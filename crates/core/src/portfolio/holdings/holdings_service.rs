@@ -1,4 +1,4 @@
-use crate::assets::{Asset, AssetClassificationService, AssetKind, AssetServiceTrait};
+use crate::assets::{canonical_asset_id, Asset, AssetClassificationService, AssetKind, AssetServiceTrait};
 use crate::errors::{CalculatorError, Error as CoreError, Result};
 use crate::fx::currency::{get_normalization_rule, normalize_currency_code};
 use crate::portfolio::holdings::holdings_model::{Holding, HoldingType, Instrument, MonetaryValue};
@@ -25,6 +25,14 @@ pub trait HoldingsServiceTrait: Send + Sync {
         asset_id: &str,
         base_currency: &str,
     ) -> Result<Option<Holding>>;
+
+    /// Converts a snapshot to holdings for display.
+    /// This is a lightweight conversion without live valuation - used for viewing historical snapshots.
+    async fn holdings_from_snapshot(
+        &self,
+        snapshot: &snapshot::AccountStateSnapshot,
+        base_currency: &str,
+    ) -> Result<Vec<Holding>>;
 }
 
 pub struct HoldingsService {
@@ -151,6 +159,21 @@ impl HoldingsServiceTrait for HoldingsService {
             .into_iter()
             .collect();
 
+        let mut cash_asset_ids_by_currency: HashMap<String, String> = HashMap::new();
+        let mut asset_ids_set: HashSet<String> = security_asset_ids.iter().cloned().collect();
+
+        for (currency, &amount) in cash_balances_map {
+            if amount == Decimal::ZERO {
+                continue;
+            }
+
+            let cash_asset_id = canonical_asset_id(&AssetKind::Cash, currency, None, currency);
+            cash_asset_ids_by_currency.insert(currency.clone(), cash_asset_id.clone());
+            asset_ids_set.insert(cash_asset_id);
+        }
+
+        let asset_ids: Vec<String> = asset_ids_set.into_iter().collect();
+
         // AssetInfo combines instrument data with kind and metadata for holding creation
         struct AssetInfo {
             instrument: Instrument,
@@ -159,12 +182,8 @@ impl HoldingsServiceTrait for HoldingsService {
             purchase_price: Option<Decimal>,
         }
 
-        let assets_info_map: HashMap<String, AssetInfo> = if !security_asset_ids.is_empty() {
-            match self
-                .asset_service
-                .get_assets_by_asset_ids(&security_asset_ids)
-                .await
-            {
+        let assets_info_map: HashMap<String, AssetInfo> = if !asset_ids.is_empty() {
+            match self.asset_service.get_assets_by_asset_ids(&asset_ids).await {
                 Ok(assets) => assets
                     .into_iter()
                     .map(|asset: Asset| {
@@ -184,7 +203,7 @@ impl HoldingsServiceTrait for HoldingsService {
                             })
                         });
 
-                        let instrument = Instrument {
+                        let mut instrument = Instrument {
                             id: asset.id.clone(),
                             symbol: asset.symbol.clone(),
                             name: asset.name,
@@ -194,6 +213,10 @@ impl HoldingsServiceTrait for HoldingsService {
                             preferred_provider: asset.preferred_provider.clone(),
                             classifications: None,
                         };
+
+                        if asset.kind == AssetKind::Cash && instrument.name.is_none() {
+                            instrument.name = Some(format!("Cash ({})", asset.symbol));
+                        }
 
                         let asset_info = AssetInfo {
                             instrument,
@@ -279,12 +302,34 @@ impl HoldingsServiceTrait for HoldingsService {
                 continue;
             }
 
+            let cash_asset_id = match cash_asset_ids_by_currency.get(currency) {
+                Some(id) => id,
+                None => {
+                    warn!(
+                        "Cash asset not available for currency {}. Skipping cash holding view.",
+                        currency
+                    );
+                    continue;
+                }
+            };
+
+            let asset_info = match assets_info_map.get(cash_asset_id) {
+                Some(info) => info,
+                None => {
+                    warn!(
+                        "Asset details not found for cash asset_id {}. Skipping cash holding view.",
+                        cash_asset_id
+                    );
+                    continue;
+                }
+            };
+
             let holding_view = Holding {
                 id: format!("CASH-{}-{}", account_id, currency),
                 account_id: account_id.to_string(),
                 holding_type: HoldingType::Cash,
-                instrument: None,
-                asset_kind: Some(AssetKind::Cash),
+                instrument: Some(asset_info.instrument.clone()),
+                asset_kind: Some(asset_info.kind.clone()),
                 quantity: amount,
                 open_date: None,
                 lots: None,
@@ -315,7 +360,7 @@ impl HoldingsServiceTrait for HoldingsService {
                 }),
                 weight: Decimal::ZERO,
                 as_of_date: today,
-                metadata: None,
+                metadata: asset_info.metadata.clone(),
             };
             holdings.push(holding_view);
         }
@@ -360,25 +405,6 @@ impl HoldingsServiceTrait for HoldingsService {
 
         for holding_view in &mut holdings {
             normalize_holding_currency(holding_view);
-        }
-
-        // Enrich holdings with taxonomy classifications (batch for efficiency)
-        let asset_ids: Vec<String> = holdings
-            .iter()
-            .filter_map(|h| h.instrument.as_ref().map(|i| i.id.clone()))
-            .collect();
-
-        if !asset_ids.is_empty() {
-            let classifications_map = self
-                .classification_service
-                .get_classifications_batch(&asset_ids);
-            for holding in &mut holdings {
-                if let Some(ref mut instrument) = holding.instrument {
-                    if let Some(classifications) = classifications_map.get(&instrument.id) {
-                        instrument.classifications = Some(classifications.clone());
-                    }
-                }
-            }
         }
 
         Ok(holdings)
@@ -551,6 +577,161 @@ impl HoldingsServiceTrait for HoldingsService {
                 Err(e)
             }
         }
+    }
+
+    async fn holdings_from_snapshot(
+        &self,
+        snapshot: &snapshot::AccountStateSnapshot,
+        base_currency: &str,
+    ) -> Result<Vec<Holding>> {
+        let mut holdings: Vec<Holding> = Vec::new();
+
+        // Get all asset IDs from positions
+        let asset_ids: Vec<String> = snapshot
+            .positions
+            .values()
+            .map(|p| p.asset_id.clone())
+            .collect();
+
+        // Fetch asset details if we have positions
+        let assets_map: HashMap<String, Asset> = if !asset_ids.is_empty() {
+            self.asset_service
+                .get_assets_by_asset_ids(&asset_ids)
+                .await?
+                .into_iter()
+                .map(|a| (a.id.clone(), a))
+                .collect()
+        } else {
+            HashMap::new()
+        };
+
+        // Convert positions to holdings
+        for position in snapshot.positions.values() {
+            if position.quantity == Decimal::ZERO {
+                continue;
+            }
+
+            let Some(asset) = assets_map.get(&position.asset_id) else {
+                warn!(
+                    "Asset {} not found for position in snapshot",
+                    position.asset_id
+                );
+                continue;
+            };
+
+            let (holding_type, id_prefix) = if asset.kind.is_alternative() {
+                (HoldingType::AlternativeAsset, "ALT")
+            } else {
+                (HoldingType::Security, "SEC")
+            };
+
+            // Extract purchase_price from metadata for alternative assets
+            let purchase_price: Option<Decimal> = asset.metadata.as_ref().and_then(|m| {
+                m.get("purchase_price").and_then(|v| {
+                    if let Some(s) = v.as_str() {
+                        s.parse::<Decimal>().ok()
+                    } else if let Some(n) = v.as_f64() {
+                        Decimal::try_from(n).ok()
+                    } else {
+                        None
+                    }
+                })
+            });
+
+            let instrument = Instrument {
+                id: asset.id.clone(),
+                symbol: asset.symbol.clone(),
+                name: asset.name.clone(),
+                currency: asset.currency.clone(),
+                notes: asset.notes.clone(),
+                pricing_mode: asset.pricing_mode.as_db_str().to_string(),
+                preferred_provider: asset.preferred_provider.clone(),
+                classifications: None,
+            };
+
+            let holding = Holding {
+                id: format!(
+                    "{}-{}-{}",
+                    id_prefix, snapshot.account_id, position.asset_id
+                ),
+                account_id: snapshot.account_id.clone(),
+                holding_type,
+                instrument: Some(instrument),
+                asset_kind: Some(asset.kind.clone()),
+                quantity: position.quantity,
+                open_date: Some(position.inception_date),
+                lots: None,
+                local_currency: position.currency.clone(),
+                base_currency: base_currency.to_string(),
+                fx_rate: None,
+                market_value: MonetaryValue::zero(),
+                cost_basis: Some(MonetaryValue {
+                    local: position.total_cost_basis,
+                    base: Decimal::ZERO,
+                }),
+                price: None,
+                purchase_price,
+                unrealized_gain: None,
+                unrealized_gain_pct: None,
+                realized_gain: None,
+                realized_gain_pct: None,
+                total_gain: None,
+                total_gain_pct: None,
+                day_change: None,
+                day_change_pct: None,
+                prev_close_value: None,
+                weight: Decimal::ZERO,
+                as_of_date: snapshot.snapshot_date,
+                metadata: asset.metadata.clone(),
+            };
+            holdings.push(holding);
+        }
+
+        // Convert cash balances to holdings
+        for (currency, &amount) in &snapshot.cash_balances {
+            if amount == Decimal::ZERO {
+                continue;
+            }
+
+            let holding = Holding {
+                id: format!("CASH-{}-{}", snapshot.account_id, currency),
+                account_id: snapshot.account_id.clone(),
+                holding_type: HoldingType::Cash,
+                instrument: None,
+                asset_kind: Some(AssetKind::Cash),
+                quantity: amount,
+                open_date: None,
+                lots: None,
+                local_currency: currency.clone(),
+                base_currency: base_currency.to_string(),
+                fx_rate: None,
+                market_value: MonetaryValue {
+                    local: amount,
+                    base: Decimal::ZERO,
+                },
+                cost_basis: Some(MonetaryValue {
+                    local: amount,
+                    base: Decimal::ZERO,
+                }),
+                price: Some(Decimal::ONE),
+                purchase_price: None,
+                unrealized_gain: None,
+                unrealized_gain_pct: None,
+                realized_gain: None,
+                realized_gain_pct: None,
+                total_gain: None,
+                total_gain_pct: None,
+                day_change: None,
+                day_change_pct: None,
+                prev_close_value: None,
+                weight: Decimal::ZERO,
+                as_of_date: snapshot.snapshot_date,
+                metadata: None,
+            };
+            holdings.push(holding);
+        }
+
+        Ok(holdings)
     }
 }
 

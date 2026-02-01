@@ -11,6 +11,7 @@ export const QueryKeys = {
   HOLDINGS: "holdings",
   HOLDING: "holding",
   PORTFOLIO_ALLOCATIONS: "portfolioAllocations",
+  HOLDINGS_BY_ALLOCATION: "holdingsByAllocation",
   INCOME_SUMMARY: "incomeSummary",
   PORTFOLIO_SUMMARY: "portfolioSummary",
   QUOTE_HISTORY: "quoteHistory",

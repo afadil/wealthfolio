@@ -1,44 +1,24 @@
-import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { EmptyPlaceholder } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
-import { Card, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@wealthfolio/ui/components/ui/sheet";
-import { AmountDisplay, EmptyPlaceholder } from "@wealthfolio/ui";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 
 import { AccountSelector } from "@/components/account-selector";
 import { useHoldings } from "@/hooks/use-holdings";
 import { usePortfolioAllocations } from "@/hooks/use-portfolio-allocations";
 import { PORTFOLIO_ACCOUNT_ID, isAlternativeAssetId } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
-import type { Account, Holding, HoldingType, Instrument } from "@/lib/types";
+import type { Account, TaxonomyAllocation } from "@/lib/types";
 import { useNavigate } from "react-router-dom";
+import { AllocationDetailSheet } from "./components/allocation-detail-sheet";
 import { CashHoldingsWidget } from "./components/cash-holdings-widget";
+import { CompactAllocationStrip } from "./components/compact-allocation-strip";
 import { PortfolioComposition } from "./components/composition-chart";
 import { HoldingCurrencyChart } from "./components/currency-chart";
+import { DrillableAccountChart } from "./components/drillable-account-chart";
+import { DrillableDonutChart } from "./components/drillable-donut-chart";
 import { SectorsChart } from "./components/sectors-chart";
 import { SegmentedAllocationBar } from "./components/segmented-allocation-bar";
-import { CompactAllocationStrip } from "./components/compact-allocation-strip";
-import { DrillableDonutChart } from "./components/drillable-donut-chart";
-import { DrillableAccountChart } from "./components/drillable-account-chart";
-
-type SheetFilterType =
-  | "class"
-  | "sector"
-  | "country"
-  | "currency"
-  | "account"
-  | "composition"
-  | "risk"
-  | "securityType"
-  | "custom";
 
 export const HoldingsInsightsPage = () => {
   const navigate = useNavigate();
@@ -63,122 +43,59 @@ export const HoldingsInsightsPage = () => {
 
   const isLoading = holdingsLoading || allocationsLoading;
 
+  // State for allocation detail sheet
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [sheetTitle, setSheetTitle] = useState("");
-  const [sheetFilterType, setSheetFilterType] = useState<SheetFilterType | null>(null);
-  const [sheetFilterName, setSheetFilterName] = useState<string | null>(null);
-  const [sheetFilterId, setSheetFilterId] = useState<string | null>(null);
-  const [sheetCompositionFilter, setSheetCompositionFilter] = useState<Instrument["id"] | null>(
-    null,
+  const [selectedAllocation, setSelectedAllocation] = useState<TaxonomyAllocation | undefined>(
+    undefined,
+  );
+  const [initialCategoryId, setInitialCategoryId] = useState<string | null>(null);
+
+  // Map filter types to allocations
+  const getAllocationForType = useCallback(
+    (type: string): TaxonomyAllocation | undefined => {
+      switch (type) {
+        case "class":
+          return allocations?.assetClasses;
+        case "sector":
+          return allocations?.sectors;
+        case "country":
+          return allocations?.regions;
+        case "risk":
+          return allocations?.riskCategory;
+        case "securityType":
+          return allocations?.securityTypes;
+        default:
+          // Check custom groups
+          if (type === "custom" && allocations?.customGroups?.length) {
+            return allocations.customGroups[0];
+          }
+          return undefined;
+      }
+    },
+    [allocations],
   );
 
-  const handleChartSectionClick = (
-    type: SheetFilterType,
-    name: string,
-    title?: string,
-    categoryId?: string,
-    compositionId?: Instrument["id"],
-  ) => {
-    setSheetFilterType(type);
-    setSheetFilterName(name);
-    setSheetFilterId(categoryId ?? null);
-    setSheetTitle(title ?? `Details for ${name}`);
-    if (type === "composition" && compositionId) {
-      setSheetCompositionFilter(compositionId);
-    } else {
-      setSheetCompositionFilter(null);
+  // Handle chart section click - opens sheet with clicked category pre-selected
+  const handleChartSectionClick = useCallback(
+    (type: string, _name: string, _title?: string, categoryId?: string) => {
+      const allocation = getAllocationForType(type);
+      if (allocation) {
+        setSelectedAllocation(allocation);
+        setInitialCategoryId(categoryId ?? null);
+        setIsSheetOpen(true);
+      }
+    },
+    [getAllocationForType],
+  );
+
+  // Handle card click - opens sheet with first category selected
+  const openAllocationSheet = useCallback((allocation: TaxonomyAllocation | undefined) => {
+    if (allocation) {
+      setSelectedAllocation(allocation);
+      setInitialCategoryId(null); // Will default to first category
+      setIsSheetOpen(true);
     }
-    setIsSheetOpen(true);
-  };
-
-  const holdingsForSheet = useMemo(() => {
-    if (!sheetFilterType || !holdings) {
-      return [];
-    }
-
-    let filteredHoldings: Holding[] = [];
-
-    switch (sheetFilterType) {
-      case "class":
-        filteredHoldings = holdings.filter((h) => {
-          const isCash = h.holdingType === ("cash" as HoldingType);
-          if (isCash) {
-            return sheetFilterName === "Cash";
-          }
-          const assetClasses = h.instrument?.classifications?.assetClasses;
-          if (assetClasses && assetClasses.length > 0) {
-            return assetClasses.some((c) => c.topLevelCategory.id === sheetFilterId);
-          }
-          return sheetFilterName === "Unknown";
-        });
-        break;
-      case "sector":
-        filteredHoldings = holdings.filter((h) => {
-          const taxonomySectors = h.instrument?.classifications?.sectors;
-          if (taxonomySectors && taxonomySectors.length > 0) {
-            return taxonomySectors.some((s) => s.topLevelCategory.id === sheetFilterId);
-          }
-          return sheetFilterName === "Unknown";
-        });
-        break;
-      case "country":
-        filteredHoldings = holdings.filter((h) => {
-          const taxonomyRegions = h.instrument?.classifications?.regions;
-          if (taxonomyRegions && taxonomyRegions.length > 0) {
-            return taxonomyRegions.some((r) => r.topLevelCategory.id === sheetFilterId);
-          }
-          return sheetFilterName === "Unknown";
-        });
-        break;
-      case "currency":
-        filteredHoldings = holdings.filter((h) => h.localCurrency === sheetFilterName);
-        break;
-      case "composition":
-        if (sheetCompositionFilter) {
-          filteredHoldings = holdings.filter((h) => h.instrument?.id === sheetCompositionFilter);
-        } else if (sheetFilterName) {
-          filteredHoldings = holdings.filter(
-            (h) => h.instrument?.classifications?.assetType?.name === sheetFilterName,
-          );
-        }
-        break;
-      case "risk":
-        filteredHoldings = holdings.filter((h) => {
-          const riskCategory = h.instrument?.classifications?.riskCategory;
-          if (riskCategory) {
-            return riskCategory.id === sheetFilterId;
-          }
-          return sheetFilterName === "Unknown";
-        });
-        break;
-      case "securityType":
-        filteredHoldings = holdings.filter((h) => {
-          const assetType = h.instrument?.classifications?.assetType;
-          if (assetType) {
-            return assetType.id === sheetFilterId;
-          }
-          return sheetFilterName === "Unknown";
-        });
-        break;
-      case "custom":
-        filteredHoldings = holdings.filter((h) => {
-          const customGroups = h.instrument?.classifications?.customGroups;
-          if (customGroups && customGroups.length > 0) {
-            return customGroups.some((c) => c.topLevelCategory.id === sheetFilterId);
-          }
-          return sheetFilterName === "Unknown";
-        });
-        break;
-      default:
-        break;
-    }
-
-    return filteredHoldings.sort((a, b) => {
-      const bBase = b.marketValue?.base ?? 0;
-      const aBase = a.marketValue?.base ?? 0;
-      return Number(bBase) - Number(aBase);
-    });
-  }, [holdings, sheetFilterType, sheetFilterName, sheetFilterId, sheetCompositionFilter]);
+  }, []);
 
   const handleAccountSelect = (account: Account) => {
     setSelectedAccount(account);
@@ -203,7 +120,13 @@ export const HoldingsInsightsPage = () => {
     allocations?.riskCategory && allocations.riskCategory.categories.length > 0;
 
   const hasCustomGroups =
-    allocations?.customGroups?.some((taxonomy) => taxonomy.categories.length > 0) ?? false;
+    allocations?.customGroups?.some(
+      (taxonomy) =>
+        taxonomy.categories.length > 0 &&
+        taxonomy.categories.some(
+          (cat) => cat.value > 0 && cat.categoryName.toLowerCase() !== "unknown",
+        ),
+    ) ?? false;
 
   const renderEmptyState = () => (
     <div className="flex items-center justify-center py-16">
@@ -250,10 +173,8 @@ export const HoldingsInsightsPage = () => {
           <DrillableAccountChart isLoading={isLoading} />
 
           <DrillableDonutChart
-            title="Asset Classes"
+            title="Classes"
             allocation={allocations?.assetClasses}
-            holdings={nonCashHoldings}
-            taxonomyType="assetClasses"
             baseCurrency={baseCurrency}
             isLoading={isLoading}
             onCategoryClick={(categoryId, categoryName) =>
@@ -264,13 +185,12 @@ export const HoldingsInsightsPage = () => {
                 categoryId,
               )
             }
+            onCardClick={() => openAllocationSheet(allocations?.assetClasses)}
           />
 
           <DrillableDonutChart
             title="Regions"
             allocation={allocations?.regions}
-            holdings={nonCashHoldings}
-            taxonomyType="regions"
             baseCurrency={baseCurrency}
             isLoading={isLoading}
             onCategoryClick={(categoryId, categoryName) =>
@@ -281,6 +201,7 @@ export const HoldingsInsightsPage = () => {
                 categoryId,
               )
             }
+            onCardClick={() => openAllocationSheet(allocations?.regions)}
           />
         </div>
 
@@ -347,7 +268,10 @@ export const HoldingsInsightsPage = () => {
             <div className="col-span-1 space-y-4 lg:col-span-3">
               {allocations?.customGroups?.map(
                 (taxonomy) =>
-                  taxonomy.categories.length > 0 && (
+                  taxonomy.categories.length > 0 &&
+                  taxonomy.categories.some(
+                    (cat) => cat.value > 0 && cat.categoryName.toLowerCase() !== "unknown",
+                  ) && (
                     <SegmentedAllocationBar
                       key={taxonomy.taxonomyId}
                       title={taxonomy.taxonomyName}
@@ -398,79 +322,15 @@ export const HoldingsInsightsPage = () => {
 
       {renderAnalyticsView()}
 
-      {/* Details Sheet */}
-      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent
-          className="w-full overflow-y-auto sm:max-w-lg [&>button]:top-[max(calc(env(safe-area-inset-top,0px)+1rem),2.5rem)]"
-          style={{
-            paddingTop: "max(env(safe-area-inset-top, 0px), 1.5rem)",
-          }}
-        >
-          <SheetHeader className="mt-8">
-            <SheetTitle>{sheetTitle}</SheetTitle>
-          </SheetHeader>
-          <div className="py-8">
-            {holdingsForSheet.length > 0 ? (
-              <ul className="space-y-2">
-                {holdingsForSheet.map((holding) => {
-                  let displayName = "N/A";
-                  let symbol = "-";
-                  let assetId: string | null = null;
-                  if (holding.holdingType === ("cash" as HoldingType)) {
-                    displayName = holding.localCurrency
-                      ? `Cash (${holding.localCurrency})`
-                      : "Cash";
-                    symbol = `$CASH-${holding.localCurrency}`;
-                    assetId = symbol;
-                  } else if (holding.instrument) {
-                    displayName =
-                      holding.instrument.name ?? holding.instrument.symbol ?? "Unnamed Security";
-                    symbol = holding.instrument.symbol ?? "-";
-                    assetId = holding.instrument.id;
-                  }
-
-                  const handleSymbolClick = () => {
-                    if (!assetId) return;
-                    setIsSheetOpen(false);
-                    navigate(`/holdings/${encodeURIComponent(assetId)}`);
-                  };
-
-                  return (
-                    <Card key={holding.id} className="flex items-center justify-between text-sm">
-                      <CardHeader className="flex w-full flex-row items-center justify-between space-x-2 p-4">
-                        <div className="flex items-center space-x-2">
-                          <Badge
-                            className="hover:bg-primary/80 flex min-w-[50px] cursor-pointer items-center justify-center rounded-sm"
-                            onClick={handleSymbolClick}
-                          >
-                            {symbol}
-                          </Badge>
-                          <CardTitle className="line-clamp-1 text-sm font-normal">
-                            {displayName}
-                          </CardTitle>
-                        </div>
-                        <div className="text-right font-semibold">
-                          <AmountDisplay
-                            value={Number(holding.marketValue?.base ?? 0)}
-                            currency={holding.baseCurrency}
-                          />
-                        </div>
-                      </CardHeader>
-                    </Card>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p>No holdings found for this selection.</p>
-            )}
-          </div>
-          <SheetFooter>
-            <SheetClose asChild>
-              <Button variant="outline">Close</Button>
-            </SheetClose>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+      {/* Allocation Detail Sheet */}
+      <AllocationDetailSheet
+        isOpen={isSheetOpen}
+        onOpenChange={setIsSheetOpen}
+        allocation={selectedAllocation}
+        accountId={accountId}
+        baseCurrency={baseCurrency}
+        initialCategoryId={initialCategoryId}
+      />
     </>
   );
 };

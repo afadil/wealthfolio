@@ -31,7 +31,9 @@ export function useAlternativeAssetMutations(options: UseAlternativeAssetMutatio
     queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });
     queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS] });
     queryClient.invalidateQueries({ queryKey: [QueryKeys.NET_WORTH] });
+    queryClient.invalidateQueries({ queryKey: [QueryKeys.NET_WORTH_HISTORY] });
     queryClient.invalidateQueries({ queryKey: [QueryKeys.ALTERNATIVE_HOLDINGS] });
+    queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSET_DATA] });
   };
 
   const createMutation = useMutation({
@@ -140,8 +142,17 @@ export function useAlternativeAssetMutations(options: UseAlternativeAssetMutatio
   });
 
   const updateMetadataMutation = useMutation({
-    mutationFn: ({ assetId, metadata }: { assetId: string; metadata: Record<string, string> }) =>
-      updateAlternativeAssetMetadata(assetId, metadata),
+    mutationFn: ({
+      assetId,
+      metadata,
+      name,
+      notes,
+    }: {
+      assetId: string;
+      metadata: Record<string, string>;
+      name?: string;
+      notes?: string | null;
+    }) => updateAlternativeAssetMetadata(assetId, metadata, name, notes),
     onSuccess: () => {
       invalidateQueries();
       options.onMetadataUpdateSuccess?.();

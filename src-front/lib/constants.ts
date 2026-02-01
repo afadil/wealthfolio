@@ -112,6 +112,149 @@ export const ALTERNATIVE_ASSET_ID_PREFIXES = [
  */
 export const CASH_ASSET_ID_PREFIX = "CASH:";
 
+// =============================================================================
+// Canonical Asset ID Parsing
+// =============================================================================
+
+/**
+ * Canonical prefixes requiring 3 parts: PREFIX:symbol:qualifier
+ * - SEC: Security (symbol:MIC)
+ * - CRYPTO: Cryptocurrency (base:quote)
+ * - FX: Foreign exchange rate (base:quote)
+ * - OPT: Option (symbol:MIC)
+ */
+const THREE_PART_PREFIXES = ["SEC", "CRYPTO", "FX", "OPT"] as const;
+
+/**
+ * Canonical prefixes requiring 2 parts: PREFIX:value
+ * - CASH: Cash position (currency)
+ * - CMDTY: Commodity (symbol)
+ * - PEQ: Private equity (random)
+ * - PROP/VEH/COLL/PREC/LIAB/ALT: Alternative assets (random)
+ */
+const TWO_PART_PREFIXES = [
+  "CASH",
+  "CMDTY",
+  "PEQ",
+  "PROP",
+  "VEH",
+  "COLL",
+  "PREC",
+  "LIAB",
+  "ALT",
+] as const;
+
+type ThreePartPrefix = (typeof THREE_PART_PREFIXES)[number];
+type TwoPartPrefix = (typeof TWO_PART_PREFIXES)[number];
+export type CanonicalPrefix = ThreePartPrefix | TwoPartPrefix;
+
+/**
+ * Parsed canonical asset ID structure.
+ * Only returned for valid canonical IDs (typed prefix with correct part count).
+ */
+export interface CanonicalAssetId {
+  /** Typed prefix (SEC, CRYPTO, FX, CASH, etc.) */
+  prefix: CanonicalPrefix;
+  /** Symbol component (ticker, base currency, or random suffix) */
+  symbol: string;
+  /** Qualifier component (MIC, quote currency, or same as symbol for 2-part) */
+  qualifier: string;
+}
+
+/**
+ * Maps canonical prefix to AssetKind.
+ */
+const PREFIX_TO_ASSET_KIND: Record<CanonicalPrefix, AssetKind> = {
+  SEC: "SECURITY",
+  CRYPTO: "CRYPTO",
+  FX: "FX_RATE",
+  OPT: "OPTION",
+  CASH: "CASH",
+  CMDTY: "COMMODITY",
+  PEQ: "PRIVATE_EQUITY",
+  PROP: "PROPERTY",
+  VEH: "VEHICLE",
+  COLL: "COLLECTIBLE",
+  PREC: "PHYSICAL_PRECIOUS",
+  LIAB: "LIABILITY",
+  ALT: "OTHER",
+};
+
+/**
+ * Parses a canonical asset ID (typed prefix format only).
+ *
+ * Canonical IDs have typed prefixes with strict part-count rules:
+ * - 3-part: SEC:AAPL:XNAS, CRYPTO:BTC:USD, FX:EUR:USD, OPT:AAPL240119C:XNAS
+ * - 2-part: CASH:USD, CMDTY:GC, PROP:a1b2c3d4, PEQ:x9y8z7w6
+ *
+ * Returns null for:
+ * - Legacy 2-part IDs without typed prefix (e.g., "AAPL:XNAS")
+ * - IDs with wrong part count for the prefix (e.g., "SEC:AAPL" or "CASH:USD:EXTRA")
+ * - Empty or malformed IDs
+ *
+ * @example
+ * parseCanonicalAssetId("SEC:AAPL:XNAS") // { prefix: "SEC", symbol: "AAPL", qualifier: "XNAS" }
+ * parseCanonicalAssetId("CASH:USD") // { prefix: "CASH", symbol: "USD", qualifier: "USD" }
+ * parseCanonicalAssetId("AAPL:XNAS") // null (legacy format, no typed prefix)
+ * parseCanonicalAssetId("SEC:AAPL") // null (wrong part count for SEC)
+ */
+export function parseCanonicalAssetId(assetId: string): CanonicalAssetId | null {
+  if (!assetId || typeof assetId !== "string") {
+    return null;
+  }
+
+  const parts = assetId.split(ASSET_ID_DELIMITER);
+  if (parts.length < 2 || parts.length > 3) {
+    return null;
+  }
+
+  const maybePrefix = parts[0];
+
+  // Check 3-part prefixes (SEC, CRYPTO, FX, OPT)
+  if ((THREE_PART_PREFIXES as readonly string[]).includes(maybePrefix)) {
+    if (parts.length !== 3) {
+      return null; // Wrong part count for this prefix
+    }
+    return {
+      prefix: maybePrefix as ThreePartPrefix,
+      symbol: parts[1],
+      qualifier: parts[2],
+    };
+  }
+
+  // Check 2-part prefixes (CASH, CMDTY, PEQ, PROP, VEH, COLL, PREC, LIAB, ALT)
+  if ((TWO_PART_PREFIXES as readonly string[]).includes(maybePrefix)) {
+    if (parts.length !== 2) {
+      return null; // Wrong part count for this prefix
+    }
+    return {
+      prefix: maybePrefix as TwoPartPrefix,
+      symbol: parts[1],
+      qualifier: parts[1], // For 2-part IDs, symbol IS the qualifier
+    };
+  }
+
+  // Not a recognized canonical prefix
+  return null;
+}
+
+/**
+ * Checks if an asset ID is in canonical format (has typed prefix with correct arity).
+ */
+export function isCanonicalAssetId(assetId: string): boolean {
+  return parseCanonicalAssetId(assetId) !== null;
+}
+
+/**
+ * Gets the AssetKind for a canonical asset ID.
+ * Returns undefined for non-canonical IDs.
+ */
+export function getAssetKindFromCanonicalId(assetId: string): AssetKind | undefined {
+  const parsed = parseCanonicalAssetId(assetId);
+  if (!parsed) return undefined;
+  return PREFIX_TO_ASSET_KIND[parsed.prefix];
+}
+
 /**
  * Parsed asset ID structure
  */
@@ -159,26 +302,62 @@ export function parseAssetId(assetId: string): ParsedAssetId | null {
 
 /**
  * Formats an asset ID for display.
- * For securities: shows symbol only (AAPL:XNAS -> AAPL)
- * For cash: shows currency (CASH:USD -> USD)
- * For alternatives: shows full ID (PROP:abc12345)
+ * Handles both canonical (typed prefix) and legacy formats.
+ *
+ * Canonical examples:
+ * - SEC:AAPL:XNAS -> "AAPL"
+ * - CRYPTO:BTC:USD -> "BTC"
+ * - FX:EUR:USD -> "EUR/USD"
+ * - CASH:USD -> "USD"
+ * - PROP:abc12345 -> "abc12345"
+ *
+ * Legacy examples:
+ * - AAPL:XNAS -> "AAPL"
+ * - BTC:USD -> "BTC"
  */
 export function formatAssetIdForDisplay(assetId: string): string {
-  const parsed = parseAssetId(assetId);
-  if (!parsed) return assetId;
+  if (!assetId) return "";
 
-  switch (parsed.kind) {
-    case "security":
-    case "crypto":
-    case "fx":
-      return parsed.primary;
-    case "cash":
-      return parsed.qualifier; // Show currency code
-    case "alternative":
-      return assetId; // Show full ID for alternatives
-    default:
-      return parsed.primary;
+  // Try canonical parsing first
+  const canonical = parseCanonicalAssetId(assetId);
+  if (canonical) {
+    switch (canonical.prefix) {
+      case "CASH":
+        return canonical.symbol; // "USD"
+      case "FX":
+        return `${canonical.symbol}/${canonical.qualifier}`; // "EUR/USD"
+      case "SEC":
+      case "CRYPTO":
+      case "OPT":
+      case "CMDTY":
+        return canonical.symbol; // "AAPL", "BTC", "GC"
+      case "PEQ":
+      case "PROP":
+      case "VEH":
+      case "COLL":
+      case "PREC":
+      case "LIAB":
+      case "ALT":
+        return canonical.symbol; // Random suffix (user sees name elsewhere)
+      default:
+        return canonical.symbol;
+    }
   }
+
+  // Fall back to legacy parsing
+  const legacy = parseAssetId(assetId);
+  if (legacy) {
+    switch (legacy.kind) {
+      case "cash":
+        return legacy.qualifier; // Show currency code
+      case "alternative":
+        return assetId; // Show full ID for alternatives
+      default:
+        return legacy.primary; // Show symbol for securities/crypto/fx
+    }
+  }
+
+  return assetId;
 }
 
 /**

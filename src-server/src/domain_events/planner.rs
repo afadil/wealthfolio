@@ -42,7 +42,9 @@ pub fn plan_portfolio_job(
                     }
                 }
                 for currency in currencies {
-                    if !currency.is_empty() && !base_currency.is_empty() && currency != base_currency
+                    if !currency.is_empty()
+                        && !base_currency.is_empty()
+                        && currency != base_currency
                     {
                         let fx_asset_id = format!("FX:{}:{}", currency, base_currency);
                         asset_ids.insert(fx_asset_id);
@@ -92,6 +94,12 @@ pub fn plan_portfolio_job(
                             asset_ids.insert(fx_asset_id);
                         }
                     }
+                }
+            }
+            DomainEvent::ManualSnapshotSaved { account_id } => {
+                has_recalc_event = true;
+                if !account_id.is_empty() {
+                    account_ids.insert(account_id.clone());
                 }
             }
             // AssetsCreated and TrackingModeChanged don't trigger portfolio recalc directly

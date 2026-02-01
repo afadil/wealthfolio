@@ -1,73 +1,90 @@
 import * as React from "react";
-import { Input } from "../ui/input";
+import { NumericFormat } from "react-number-format";
 import { cn } from "../../lib/utils";
+import { Input } from "../ui/input";
 
-export interface QuantityInputProps extends Omit<React.ComponentPropsWithoutRef<typeof Input>, "type" | "inputMode"> {
+export interface QuantityInputProps {
+  /** Current numeric value */
+  value?: number | string | null;
+  /**
+   * Called when value changes with the new numeric value.
+   * Preferred API - receives number directly.
+   */
+  onValueChange?: (value: number | undefined) => void;
+  /**
+   * Legacy onChange handler for backward compatibility.
+   * Receives a synthetic event with value in e.target.value.
+   * @deprecated Use onValueChange instead
+   */
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  /** Maximum decimal places (default: 8 for share quantities) */
   maxDecimalPlaces?: number;
+  /** Allow negative values (default: false) */
   allowNegative?: boolean;
+  /** Placeholder text */
+  placeholder?: string;
+  /** Additional class names */
+  className?: string;
+  /** Input name for forms */
+  name?: string;
+  /** Disabled state */
+  disabled?: boolean;
+  /** Read-only state */
+  readOnly?: boolean;
+  /** Aria label for accessibility */
+  "aria-label"?: string;
 }
 
 const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputProps>(
-  ({ className, maxDecimalPlaces = 8, allowNegative = false, value, defaultValue, onChange, ...props }, ref) => {
-    // Modify the sanitizedValue logic to consider defaultValue
-    const sanitizedValue =
-      value !== null && value !== undefined
-        ? value
-        : defaultValue !== null && defaultValue !== undefined
-          ? defaultValue
-          : "";
-
-    const handleChange = React.useCallback(
-      (e: React.ChangeEvent<HTMLInputElement>) => {
-        // Allow negative sign only at the start if allowNegative is true
-        const regex = allowNegative ? /^-?\d*\.?\d*$/ : /^\d*\.?\d*$/;
-        const rawValue = e.target.value;
-
-        // Return if the input doesn't match our regex pattern
-        if (!regex.test(rawValue)) {
-          return;
-        }
-
-        // Ensure only one decimal point
-        const decimalIndex = rawValue.indexOf(".");
-        let processedValue = rawValue;
-        if (decimalIndex !== -1) {
-          processedValue = rawValue.slice(0, decimalIndex + 1) + rawValue.slice(decimalIndex + 1).replace(/\./g, "");
-        }
-
-        // Limit decimal places
-        if (decimalIndex !== -1) {
-          const decimalPart = processedValue.slice(decimalIndex + 1);
-          if (decimalPart.length > maxDecimalPlaces) {
-            processedValue = processedValue.slice(0, decimalIndex + maxDecimalPlaces + 1);
-          }
-        }
-
-        // Call the original onChange with the processed value
-        if (onChange) {
-          const syntheticEvent = {
-            ...e,
-            target: {
-              ...e.target,
-              value: processedValue,
-            },
-          };
-          onChange(syntheticEvent as React.ChangeEvent<HTMLInputElement>);
-        }
-      },
-      [maxDecimalPlaces, allowNegative, onChange],
-    );
+  (
+    {
+      value,
+      onValueChange,
+      onChange,
+      maxDecimalPlaces = 8,
+      allowNegative = false,
+      placeholder = "0.00",
+      className,
+      name,
+      disabled,
+      readOnly,
+      "aria-label": ariaLabel,
+    },
+    ref,
+  ) => {
+    // Normalize value to number or empty string
+    const numericValue = value === null || value === undefined || value === "" ? "" : Number(value);
 
     return (
-      <Input
-        type="text"
-        inputMode="decimal"
-        placeholder="0.00"
+      <NumericFormat
+        customInput={Input}
+        getInputRef={ref}
+        name={name}
         className={cn("text-right", className)}
-        ref={ref}
-        {...props}
-        value={sanitizedValue}
-        onChange={handleChange}
+        placeholder={placeholder}
+        disabled={disabled}
+        readOnly={readOnly}
+        aria-label={ariaLabel}
+        allowNegative={allowNegative}
+        decimalScale={maxDecimalPlaces}
+        allowedDecimalSeparators={[".", ","]}
+        valueIsNumericString={false}
+        value={numericValue}
+        onValueChange={(values) => {
+          // Prefer onValueChange if provided
+          if (onValueChange) {
+            onValueChange(values.floatValue);
+          }
+          // Fall back to legacy onChange for backward compatibility
+          // Note: e.target.value will be a number, not a string
+          else if (onChange) {
+            const syntheticEvent = {
+              target: { name, value: values.floatValue },
+            } as unknown as React.ChangeEvent<HTMLInputElement>;
+            onChange(syntheticEvent);
+          }
+        }}
+        inputMode="decimal"
       />
     );
   },

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { Badge, Card } from "@wealthfolio/ui";
+import { Badge, Card, FacetedSearchInput } from "@wealthfolio/ui";
 
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { Button } from "@wealthfolio/ui/components/ui/button";
@@ -13,7 +13,6 @@ import {
   DropdownMenuTrigger,
 } from "@wealthfolio/ui/components/ui/dropdown-menu";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Input } from "@wealthfolio/ui/components/ui/input";
 import {
   Sheet,
   SheetClose,
@@ -181,12 +180,7 @@ export function AssetsTableMobile({
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <Input
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search securities..."
-          className="bg-secondary/30 flex-1 border-none"
-        />
+        <FacetedSearchInput value={searchQuery} onChange={setSearchQuery} className="flex-1" />
         <Button
           variant="outline"
           size="icon"

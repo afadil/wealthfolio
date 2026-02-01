@@ -13,6 +13,8 @@ use wealthfolio_core::activities::{
     ParseConfig, ParsedCsvResult,
 };
 
+use super::shared::parse_date_optional;
+
 #[derive(serde::Deserialize)]
 #[serde(untagged)]
 enum SortWrapper {
@@ -69,16 +71,8 @@ async fn search_activities(
         None => None,
     };
     // Parse date filters
-    let date_from_parsed = body
-        .date_from
-        .map(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d"))
-        .transpose()
-        .map_err(|e| crate::error::ApiError::BadRequest(format!("Invalid dateFrom format: {}", e)))?;
-    let date_to_parsed = body
-        .date_to
-        .map(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d"))
-        .transpose()
-        .map_err(|e| crate::error::ApiError::BadRequest(format!("Invalid dateTo format: {}", e)))?;
+    let date_from_parsed = parse_date_optional(body.date_from, "dateFrom")?;
+    let date_to_parsed = parse_date_optional(body.date_to, "dateTo")?;
 
     let resp = state.activity_service.search_activities(
         body.page,

@@ -36,15 +36,13 @@ export function QuantityInput<TFieldValues extends FieldValues = FieldValues>({
           <FormLabel>{label}</FormLabel>
           <FormControl>
             <BaseQuantityInput
+              ref={field.ref}
+              name={field.name}
+              value={field.value}
+              onValueChange={field.onChange}
               placeholder={placeholder}
               maxDecimalPlaces={maxDecimalPlaces}
               allowNegative={allowNegative}
-              {...field}
-              onChange={(e) => {
-                const value = e.target.value;
-                field.onChange(value === "" ? undefined : parseFloat(value));
-              }}
-              value={field.value ?? ""}
               aria-label={label}
             />
           </FormControl>

@@ -134,6 +134,26 @@ impl AssetKind {
         }
     }
 
+    /// Returns a human-readable display name for the asset kind.
+    /// Used for UI display (e.g., "Property", "Vehicle", "Precious Metal").
+    pub const fn display_name(&self) -> &'static str {
+        match self {
+            AssetKind::Security => "Security",
+            AssetKind::Crypto => "Crypto",
+            AssetKind::Cash => "Cash",
+            AssetKind::FxRate => "FX Rate",
+            AssetKind::Option => "Option",
+            AssetKind::Commodity => "Commodity",
+            AssetKind::PrivateEquity => "Private Equity",
+            AssetKind::Property => "Property",
+            AssetKind::Vehicle => "Vehicle",
+            AssetKind::Collectible => "Collectible",
+            AssetKind::PhysicalPrecious => "Precious Metal",
+            AssetKind::Liability => "Liability",
+            AssetKind::Other => "Other",
+        }
+    }
+
     /// Returns the ID prefix for canonical asset ID format.
     ///
     /// All asset IDs use typed prefixes: `{PREFIX}:{symbol}:{qualifier}`

@@ -57,6 +57,7 @@ export interface AssetDetailsSheetAsset {
   kind: AlternativeAssetKind;
   currency: string;
   metadata?: Record<string, unknown>;
+  notes?: string | null;
 }
 
 /** Represents a liability that can be linked from a property */
@@ -74,7 +75,12 @@ interface AssetDetailsSheetProps {
   /** The asset to view/edit */
   asset: AssetDetailsSheetAsset | null;
   /** Callback when the user saves changes */
-  onSave: (assetId: string, metadata: Record<string, string>) => Promise<void>;
+  onSave: (
+    assetId: string,
+    metadata: Record<string, string>,
+    name?: string,
+    notes?: string | null,
+  ) => Promise<void>;
   /** Optional: For displaying linked asset name for liabilities */
   linkedAssetName?: string;
   /** Optional: For liabilities, list of assets that can be linked */
@@ -110,17 +116,19 @@ export function AssetDetailsSheet({
 }: AssetDetailsSheetProps) {
   // Use a fallback kind for the form when asset is null (form state won't be used anyway)
   const assetKind = asset?.kind ?? AlternativeAssetKind.OTHER;
+  const assetName = asset?.name ?? "";
   const assetMetadata = asset?.metadata;
+  const assetNotes = asset?.notes;
 
   const form = useForm<AssetDetailsFormValues>({
     resolver: zodResolver(assetDetailsSchema) as Resolver<AssetDetailsFormValues>,
-    defaultValues: getDefaultDetailsFormValues(assetKind, assetMetadata),
+    defaultValues: getDefaultDetailsFormValues(assetKind, assetName, assetMetadata, assetNotes),
   });
 
   // Reset form when asset changes or sheet opens
   useEffect(() => {
     if (open && asset) {
-      form.reset(getDefaultDetailsFormValues(asset.kind, asset.metadata));
+      form.reset(getDefaultDetailsFormValues(asset.kind, asset.name, asset.metadata, asset.notes));
     }
   }, [open, asset, form]);
 
@@ -144,7 +152,10 @@ export function AssetDetailsSheet({
   const handleSubmit = async (values: AssetDetailsFormValues) => {
     try {
       const metadata = formValuesToMetadata(values);
-      await onSave(asset.id, metadata);
+      // Only pass name if it changed
+      const nameChanged = values.name !== asset.name ? values.name : undefined;
+      // Pass notes separately (it goes to asset.notes, not metadata)
+      await onSave(asset.id, metadata, nameChanged, values.notes);
       toast({
         title: "Details saved successfully",
         variant: "success",
@@ -167,11 +178,11 @@ export function AssetDetailsSheet({
         <SheetHeader className="pb-4">
           <div className="flex items-center gap-3">
             <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-full">
-              <AssetKindIcon kind={asset.kind} className="text-primary h-5 w-5" />
+              <AssetKindIcon kind={asset.kind} className="text-primary" size={20} />
             </div>
             <div className="flex flex-col items-start">
               <SheetTitle className="flex items-center gap-2">
-                {asset.name}
+                Edit {kindDisplayName}
                 <Badge variant="secondary" className="text-xs font-normal">
                   {kindDisplayName}
                 </Badge>
@@ -179,7 +190,7 @@ export function AssetDetailsSheet({
               <SheetDescription className="text-left">
                 {asset.kind === AlternativeAssetKind.LIABILITY
                   ? "Edit liability details and linking"
-                  : "Add purchase information and other details"}
+                  : "Edit name, purchase information, and other details"}
               </SheetDescription>
             </div>
           </div>
@@ -187,6 +198,27 @@ export function AssetDetailsSheet({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 pb-8">
+            {/* Name Field */}
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Name</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Enter asset name..."
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <Separator />
+
             {/* Purchase Information - only for assets, not liabilities */}
             {asset.kind !== AlternativeAssetKind.LIABILITY && (
               <>
@@ -209,10 +241,10 @@ export function AssetDetailsSheet({
                           </FormLabel>
                           <FormControl>
                             <MoneyInput
-                              value={field.value ?? ""}
-                              onChange={(e) =>
-                                field.onChange(e.target.value ? parseFloat(e.target.value) : null)
-                              }
+                              ref={field.ref}
+                              name={field.name}
+                              value={field.value}
+                              onValueChange={(value) => field.onChange(value ?? null)}
                               placeholder="0.00"
                             />
                           </FormControl>
@@ -351,20 +383,28 @@ function SectionHeader({ title, description }: { title: string; description?: st
   );
 }
 
-function AssetKindIcon({ kind, className }: { kind: AlternativeAssetKind; className?: string }) {
+function AssetKindIcon({
+  kind,
+  className,
+  size = 20,
+}: {
+  kind: AlternativeAssetKind;
+  className?: string;
+  size?: number;
+}) {
   switch (kind) {
     case AlternativeAssetKind.PROPERTY:
-      return <Icons.Building className={className} />;
+      return <Icons.RealEstateDuotone size={size} className={className} />;
     case AlternativeAssetKind.VEHICLE:
-      return <Icons.Car className={className} />;
+      return <Icons.VehicleDuotone size={size} className={className} />;
     case AlternativeAssetKind.COLLECTIBLE:
-      return <Icons.Gem className={className} />;
+      return <Icons.CollectibleDuotone size={size} className={className} />;
     case AlternativeAssetKind.PHYSICAL_PRECIOUS:
-      return <Icons.Coins className={className} />;
+      return <Icons.PreciousDuotone size={size} className={className} />;
     case AlternativeAssetKind.LIABILITY:
-      return <Icons.CreditCard className={className} />;
+      return <Icons.LiabilityDuotone size={size} className={className} />;
     default:
-      return <Icons.Package className={className} />;
+      return <Icons.OtherAssetDuotone size={size} className={className} />;
   }
 }
 
@@ -528,20 +568,40 @@ function PreciousMetalFields({
 }) {
   return (
     <div className="space-y-4">
+      <FormField
+        control={form.control}
+        name="metalType"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Metal Type</FormLabel>
+            <FormControl>
+              <ResponsiveSelect
+                value={field.value ?? ""}
+                onValueChange={(val) => field.onChange(val || null)}
+                options={METAL_TYPES.map((t) => ({ value: t.value, label: t.label }))}
+                placeholder="Select metal"
+                sheetTitle="Metal Type"
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
       <div className="grid gap-4 sm:grid-cols-2">
         <FormField
           control={form.control}
-          name="metalType"
+          name="quantity"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Metal Type</FormLabel>
+              <FormLabel>Quantity</FormLabel>
               <FormControl>
-                <ResponsiveSelect
-                  value={field.value ?? ""}
-                  onValueChange={(val) => field.onChange(val || null)}
-                  options={METAL_TYPES.map((t) => ({ value: t.value, label: t.label }))}
-                  placeholder="Select metal"
-                  sheetTitle="Metal Type"
+                <QuantityInput
+                  ref={field.ref}
+                  name={field.name}
+                  value={field.value}
+                  onValueChange={(value) => field.onChange(value ?? null)}
+                  placeholder="0"
                 />
               </FormControl>
               <FormMessage />
@@ -631,10 +691,10 @@ function LiabilityFields({
               <FormLabel>Original Amount</FormLabel>
               <FormControl>
                 <MoneyInput
-                  value={field.value ?? ""}
-                  onChange={(e) =>
-                    field.onChange(e.target.value ? parseFloat(e.target.value) : null)
-                  }
+                  ref={field.ref}
+                  name={field.name}
+                  value={field.value}
+                  onValueChange={(value) => field.onChange(value ?? null)}
                   placeholder="0.00"
                 />
               </FormControl>
@@ -651,11 +711,12 @@ function LiabilityFields({
               <FormLabel>Interest Rate (%)</FormLabel>
               <FormControl>
                 <QuantityInput
-                  value={field.value ?? ""}
-                  onChange={(e) =>
-                    field.onChange(e.target.value ? parseFloat(e.target.value) : null)
-                  }
+                  ref={field.ref}
+                  name={field.name}
+                  value={field.value}
+                  onValueChange={(value) => field.onChange(value ?? null)}
                   placeholder="0.00"
+                  maxDecimalPlaces={2}
                 />
               </FormControl>
               <FormMessage />

@@ -186,7 +186,7 @@ function ValuationContent({ args, result, status }: ValuationContentProps) {
           <IntervalSelector
             onIntervalSelect={handleIntervalSelect}
             isLoading={isRunning}
-            initialSelection={period}
+            defaultValue={period}
             className="w-full max-w-xs"
           />
         </div>

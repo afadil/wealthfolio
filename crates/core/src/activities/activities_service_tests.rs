@@ -3,7 +3,10 @@ mod tests {
     use crate::accounts::{Account, AccountServiceTrait, AccountUpdate, NewAccount};
     use crate::activities::activities_model::*;
     use crate::activities::{ActivityRepositoryTrait, ActivityService, ActivityServiceTrait};
-    use crate::assets::{Asset, AssetServiceTrait, ProviderProfile, UpdateAssetProfile};
+    use crate::assets::{
+        canonical_asset_id, Asset, AssetKind, AssetServiceTrait, PricingMode, ProviderProfile,
+        UpdateAssetProfile,
+    };
     use crate::errors::Result;
     use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
     use crate::quotes::service::ProviderInfo;
@@ -134,12 +137,26 @@ mod tests {
             unimplemented!()
         }
 
-        fn load_cash_assets(&self, _base_currency: &str) -> Result<Vec<Asset>> {
-            unimplemented!()
-        }
+        async fn ensure_cash_asset(&self, currency: &str) -> Result<Asset> {
+            let currency_upper = currency.to_uppercase();
+            let asset_id =
+                canonical_asset_id(&AssetKind::Cash, &currency_upper, None, &currency_upper);
 
-        async fn create_cash_asset(&self, _currency: &str) -> Result<Asset> {
-            unimplemented!()
+            if let Ok(asset) = self.get_asset_by_id(&asset_id) {
+                return Ok(asset);
+            }
+
+            let asset = Asset {
+                id: asset_id,
+                kind: AssetKind::Cash,
+                symbol: currency_upper.clone(),
+                currency: currency_upper,
+                pricing_mode: PricingMode::None,
+                is_active: true,
+                ..Default::default()
+            };
+            self.add_asset(asset.clone());
+            Ok(asset)
         }
 
         async fn update_pricing_mode(&self, _asset_id: &str, _pricing_mode: &str) -> Result<Asset> {
@@ -330,7 +347,6 @@ mod tests {
             _symbols: &HashSet<String>,
             _start: NaiveDate,
             _end: NaiveDate,
-            _first_appearance: &HashMap<String, NaiveDate>,
         ) -> Result<Vec<Quote>> {
             unimplemented!()
         }

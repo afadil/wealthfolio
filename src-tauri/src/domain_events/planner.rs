@@ -37,7 +37,9 @@ pub fn plan_portfolio_job(
                 account_ids.extend(acc_ids.iter().cloned());
                 asset_ids.extend(a_ids.iter().cloned());
                 for currency in currencies {
-                    if !currency.is_empty() && !base_currency.is_empty() && currency != base_currency
+                    if !currency.is_empty()
+                        && !base_currency.is_empty()
+                        && currency != base_currency
                     {
                         asset_ids.insert(format!("FX:{}:{}", currency, base_currency));
                     }
@@ -73,6 +75,10 @@ pub fn plan_portfolio_job(
                         }
                     }
                 }
+            }
+            DomainEvent::ManualSnapshotSaved { account_id } => {
+                has_recalc_events = true;
+                account_ids.insert(account_id.clone());
             }
             // AssetsCreated and TrackingModeChanged don't trigger portfolio recalc directly
             DomainEvent::AssetsCreated { .. } | DomainEvent::TrackingModeChanged { .. } => {}

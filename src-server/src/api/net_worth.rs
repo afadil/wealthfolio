@@ -6,8 +6,10 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use chrono::{NaiveDate, Utc};
+use chrono::Utc;
 use wealthfolio_core::portfolio::net_worth::{NetWorthHistoryPoint, NetWorthResponse};
+
+use super::shared::{parse_date, parse_date_optional};
 
 #[derive(serde::Deserialize)]
 struct NetWorthQuery {
@@ -19,12 +21,7 @@ async fn get_net_worth(
     State(state): State<Arc<AppState>>,
     Query(q): Query<NetWorthQuery>,
 ) -> ApiResult<Json<NetWorthResponse>> {
-    let as_of_date = match q.date {
-        Some(d) => NaiveDate::parse_from_str(&d, "%Y-%m-%d")
-            .map_err(|e| anyhow::anyhow!("Invalid date: {}", e))?,
-        None => Utc::now().date_naive(),
-    };
-
+    let as_of_date = parse_date_optional(q.date, "date")?.unwrap_or_else(|| Utc::now().date_naive());
     let response = state.net_worth_service.get_net_worth(as_of_date).await?;
     Ok(Json(response))
 }
@@ -43,10 +40,8 @@ async fn get_net_worth_history(
     State(state): State<Arc<AppState>>,
     Query(q): Query<NetWorthHistoryQuery>,
 ) -> ApiResult<Json<Vec<NetWorthHistoryPoint>>> {
-    let start = NaiveDate::parse_from_str(&q.start_date, "%Y-%m-%d")
-        .map_err(|e| anyhow::anyhow!("Invalid startDate: {}", e))?;
-    let end = NaiveDate::parse_from_str(&q.end_date, "%Y-%m-%d")
-        .map_err(|e| anyhow::anyhow!("Invalid endDate: {}", e))?;
+    let start = parse_date(&q.start_date, "startDate")?;
+    let end = parse_date(&q.end_date, "endDate")?;
 
     let history = state.net_worth_service.get_net_worth_history(start, end)?;
     Ok(Json(history))

@@ -17,7 +17,8 @@ mod assets_model_tests;
 // Re-export the public interface
 pub use alternative_assets_model::{
     AlternativeHolding, CreateAlternativeAssetRequest, CreateAlternativeAssetResponse,
-    LinkLiabilityRequest, LinkLiabilityResponse, UpdateValuationRequest, UpdateValuationResponse,
+    LinkLiabilityRequest, LinkLiabilityResponse, UpdateAssetDetailsRequest,
+    UpdateAssetDetailsResponse, UpdateValuationRequest, UpdateValuationResponse,
 };
 pub use alternative_assets_service::AlternativeAssetService;
 pub use alternative_assets_traits::{

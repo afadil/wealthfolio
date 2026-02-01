@@ -66,8 +66,10 @@ function fromDateValue(value: DateValue | null): Date | undefined {
   return undefined;
 }
 
-interface DatePickerInputProps
-  extends Omit<RacDatePickerProps<DateValue>, "value" | "onChange" | "children" | "className" | "granularity"> {
+interface DatePickerInputProps extends Omit<
+  RacDatePickerProps<DateValue>,
+  "value" | "onChange" | "children" | "className" | "granularity"
+> {
   onChange: (date: Date | undefined) => void;
   value?: string | Date;
   disabled?: boolean;
@@ -115,7 +117,7 @@ export function DatePickerInput({
     >
       <Group
         className={cn(
-          "dark:bg-input/30 border-input ring-offset-background flex h-11 w-full items-center rounded-md border bg-transparent px-3 py-1 text-sm",
+          "dark:bg-input/30 border-input ring-offset-background bg-input-bg h-input-height flex w-full items-center rounded-md border px-3 py-1 text-sm",
           "focus-within:ring-ring focus-within:ring-2 focus-within:ring-offset-2 focus-within:outline-none",
           disabled && "cursor-not-allowed opacity-50",
         )}

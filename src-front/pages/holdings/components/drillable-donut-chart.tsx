@@ -1,6 +1,6 @@
 import { AllocationBreadcrumb } from "@/components/allocation-breadcrumb";
 import { useDrillDownState } from "@/hooks/use-drill-down-state";
-import type { Holding, TaxonomyAllocation } from "@/lib/types";
+import type { TaxonomyAllocation, CategoryAllocation } from "@/lib/types";
 import {
   Card,
   CardContent,
@@ -12,34 +12,35 @@ import {
 } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
 
-type TaxonomyType = "assetClasses" | "regions" | "sectors";
-
 interface DrillableDonutChartProps {
   title: string;
   allocation?: TaxonomyAllocation;
-  holdings?: Holding[];
-  taxonomyType?: TaxonomyType;
   baseCurrency?: string;
   isLoading?: boolean;
   onCategoryClick?: (categoryId: string, categoryName: string) => void;
+  onCardClick?: () => void;
 }
 
 /**
  * A semi-donut chart with drill-down capability.
  * At root level, shows top-level categories from TaxonomyAllocation.
- * When drilled, aggregates holdings by leaf-level categories.
+ * When drilled, shows children from allocation.categories[].children.
  */
 export function DrillableDonutChart({
   title,
   allocation,
-  holdings,
-  taxonomyType,
   baseCurrency = "USD",
   isLoading,
   onCategoryClick,
+  onCardClick,
 }: DrillableDonutChartProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const { path, drillDown, navigateTo, isAtRoot } = useDrillDownState();
+
+  // Find category by ID from allocation
+  const findCategory = (categoryId: string): CategoryAllocation | undefined => {
+    return allocation?.categories?.find((cat) => cat.categoryId === categoryId);
+  };
 
   // Root level data from allocation
   const rootData = useMemo(() => {
@@ -56,51 +57,26 @@ export function DrillableDonutChart({
       }));
   }, [allocation, baseCurrency]);
 
-  // Drilled-down data computed from holdings
+  // Drilled-down data from allocation.categories[].children
   const drilledData = useMemo(() => {
-    if (path.length === 0 || !holdings || !taxonomyType) return [];
+    if (path.length === 0) return [];
 
     const currentCategoryId = path[path.length - 1].id;
-    const categoryMap = new Map<string, { name: string; value: number; color: string }>();
+    const category = findCategory(currentCategoryId);
 
-    holdings.forEach((holding) => {
-      const classifications = holding.instrument?.classifications;
-      if (!classifications) return;
+    if (!category?.children?.length) return [];
 
-      const taxonomyCategories = classifications[taxonomyType];
-      if (!taxonomyCategories || !Array.isArray(taxonomyCategories)) return;
-
-      taxonomyCategories.forEach((catWithWeight) => {
-        if (catWithWeight.topLevelCategory.id === currentCategoryId) {
-          const leafCategory = catWithWeight.category;
-          const holdingValue = Number(holding.marketValue?.base ?? 0);
-          const weightedValue = holdingValue * (catWithWeight.weight / 100);
-
-          const existing = categoryMap.get(leafCategory.id);
-          if (existing) {
-            existing.value += weightedValue;
-          } else {
-            categoryMap.set(leafCategory.id, {
-              name: leafCategory.name,
-              value: weightedValue,
-              color: leafCategory.color,
-            });
-          }
-        }
-      });
-    });
-
-    return Array.from(categoryMap.entries())
-      .map(([id, data]) => ({
-        id,
-        name: data.name,
-        value: data.value,
+    return category.children
+      .filter((child) => child.value > 0)
+      .map((child) => ({
+        id: child.categoryId,
+        name: child.categoryName,
+        value: child.value,
         currency: baseCurrency,
-        color: data.color,
+        color: child.color,
       }))
-      .filter((item) => item.value > 0)
       .sort((a, b) => b.value - a.value);
-  }, [path, holdings, taxonomyType, baseCurrency]);
+  }, [path, allocation, baseCurrency]);
 
   const data = isAtRoot ? rootData : drilledData;
 
@@ -113,14 +89,19 @@ export function DrillableDonutChart({
     const clickedItem = data.find((d) => d.name === sectionData.name);
     if (!clickedItem) return;
 
-    if (isAtRoot && holdings && taxonomyType) {
-      // Drill down to show leaf categories
-      drillDown(clickedItem.id, clickedItem.name);
-      setActiveIndex(0);
-    } else {
-      // At leaf level, trigger parent handler
-      onCategoryClick?.(clickedItem.id, clickedItem.name);
+    // At root level, check if this category has children to drill into
+    if (isAtRoot) {
+      const category = findCategory(clickedItem.id);
+      if (category?.children && category.children.length > 0) {
+        // Drill down to show children
+        drillDown(clickedItem.id, clickedItem.name);
+        setActiveIndex(0);
+        return;
+      }
     }
+
+    // No children or already drilled - open the sheet
+    onCategoryClick?.(clickedItem.id, clickedItem.name);
   };
 
   const handleBreadcrumbNavigate = (index: number) => {
@@ -144,18 +125,23 @@ export function DrillableDonutChart({
   }
 
   return (
-    <Card className="overflow-hidden backdrop-blur-sm">
+    <Card
+      className="hover:bg-muted/50 cursor-pointer overflow-hidden backdrop-blur-sm transition-colors"
+      onClick={onCardClick}
+    >
       <CardHeader>
         {isAtRoot ? (
           <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
             {title}
           </CardTitle>
         ) : (
-          <AllocationBreadcrumb
-            path={path}
-            rootLabel={title}
-            onNavigate={handleBreadcrumbNavigate}
-          />
+          <div onClick={(e) => e.stopPropagation()}>
+            <AllocationBreadcrumb
+              path={path}
+              rootLabel={title}
+              onNavigate={handleBreadcrumbNavigate}
+            />
+          </div>
         )}
       </CardHeader>
       <CardContent className="pt-0">

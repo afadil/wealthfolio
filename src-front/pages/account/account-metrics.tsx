@@ -43,15 +43,7 @@ const EditableBalance: React.FC<EditableBalanceProps> = ({ account, initialBalan
   if (isEditing) {
     return (
       <div className="flex items-center gap-2">
-        <MoneyInput
-          value={balance}
-          onChange={(e) => {
-            const inputValue = parseFloat(e.target.value);
-            if (!isNaN(inputValue)) {
-              setBalance(inputValue);
-            }
-          }}
-        />
+        <MoneyInput value={balance} onValueChange={(value) => setBalance(value ?? 0)} />
         <Button size="sm" onClick={handleSave} disabled={isPending}>
           {isPending ? (
             <Icons.Spinner className="h-4 w-4 animate-spin" />

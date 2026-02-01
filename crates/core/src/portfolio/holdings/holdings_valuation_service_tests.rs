@@ -213,7 +213,6 @@ mod tests {
             _symbols: &HashSet<String>,
             _start: NaiveDate,
             _end: NaiveDate,
-            _first_appearance: &HashMap<String, NaiveDate>,
         ) -> Result<Vec<Quote>> {
             unimplemented!()
         }

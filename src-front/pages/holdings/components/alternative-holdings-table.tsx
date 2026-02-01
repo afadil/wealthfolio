@@ -35,6 +35,7 @@ interface AlternativeHoldingsTableProps {
   onUpdateValue?: (holding: AlternativeAssetHolding) => void;
   onViewHistory?: (holding: AlternativeAssetHolding) => void;
   onDelete?: (holding: AlternativeAssetHolding) => void;
+  onRowClick?: (holding: AlternativeAssetHolding) => void;
   isDeleting?: boolean;
 }
 
@@ -47,6 +48,7 @@ export function AlternativeHoldingsTable({
   onUpdateValue,
   onViewHistory,
   onDelete,
+  onRowClick,
   isDeleting = false,
 }: AlternativeHoldingsTableProps) {
   const { isBalanceHidden } = useBalancePrivacy();
@@ -72,10 +74,31 @@ export function AlternativeHoldingsTable({
               holding.kind.toUpperCase() as keyof typeof ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES
             ] ?? holding.kind;
 
+          const handleClick = () => {
+            if (onRowClick) {
+              onRowClick(holding);
+            }
+          };
+
           return (
-            <div className="flex items-center gap-3">
+            <div
+              className={`flex items-center gap-3 ${onRowClick ? "cursor-pointer" : ""}`}
+              onClick={handleClick}
+              role={onRowClick ? "button" : undefined}
+              tabIndex={onRowClick ? 0 : undefined}
+              onKeyDown={
+                onRowClick
+                  ? (e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleClick();
+                      }
+                    }
+                  : undefined
+              }
+            >
               <div className="bg-muted flex h-10 w-10 items-center justify-center rounded-full">
-                <AssetKindIcon kind={holding.kind} className="h-5 w-5" />
+                <AssetKindIcon kind={holding.kind} size={20} />
               </div>
               <div className="flex flex-col">
                 <span className="text-sm font-medium">{holding.name}</span>
@@ -224,7 +247,7 @@ export function AlternativeHoldingsTable({
         },
       },
     ],
-    [isBalanceHidden, onEdit, onUpdateValue, onViewHistory, onDelete],
+    [isBalanceHidden, onEdit, onUpdateValue, onViewHistory, onDelete, onRowClick],
   );
 
   if (isLoading) {
@@ -296,22 +319,22 @@ export function AlternativeHoldingsTable({
 }
 
 /**
- * Icon component for alternative asset kinds
+ * Icon component for alternative asset kinds (duotone style)
  */
-function AssetKindIcon({ kind, className }: { kind: string; className?: string }) {
+function AssetKindIcon({ kind, size = 20 }: { kind: string; size?: number }) {
   switch (kind.toLowerCase()) {
     case "property":
-      return <Icons.Building className={className} />;
+      return <Icons.RealEstateDuotone size={size} />;
     case "vehicle":
-      return <Icons.Car className={className} />;
+      return <Icons.VehicleDuotone size={size} />;
     case "collectible":
-      return <Icons.Gem className={className} />;
+      return <Icons.CollectibleDuotone size={size} />;
     case "precious":
-      return <Icons.Coins className={className} />;
+      return <Icons.PreciousDuotone size={size} />;
     case "liability":
-      return <Icons.CreditCard className={className} />;
+      return <Icons.LiabilityDuotone size={size} />;
     default:
-      return <Icons.Package className={className} />;
+      return <Icons.OtherAssetDuotone size={size} />;
   }
 }
 

@@ -44,6 +44,10 @@ pub enum DomainEvent {
         /// Whether this is a connected (broker-linked) account
         is_connected: bool,
     },
+
+    /// Manual snapshot was saved (manual entry, CSV import, broker import).
+    /// Triggers portfolio recalculation for the affected account.
+    ManualSnapshotSaved { account_id: String },
 }
 
 /// Represents a currency change on an account for FX sync planning.
@@ -105,6 +109,11 @@ impl DomainEvent {
             new_mode,
             is_connected,
         }
+    }
+
+    /// Creates a ManualSnapshotSaved event.
+    pub fn manual_snapshot_saved(account_id: String) -> Self {
+        Self::ManualSnapshotSaved { account_id }
     }
 }
 

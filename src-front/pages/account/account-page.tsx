@@ -615,7 +615,7 @@ const AccountPage = () => {
                           className="relative right-0 bottom-10 left-0 z-10"
                           onIntervalSelect={handleIntervalSelect}
                           isLoading={isValuationHistoryLoading}
-                          initialSelection={INITIAL_INTERVAL_CODE}
+                          defaultValue={INITIAL_INTERVAL_CODE}
                         />
                       </div>
                     </div>

@@ -564,7 +564,6 @@ impl NetWorthServiceTrait for NetWorthService {
             &all_alt_symbols,
             start_date,
             end_date,
-            &HashMap::new(),
         )?;
 
         // Organize quotes by date -> asset_id -> value (converted to base currency)

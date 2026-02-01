@@ -32,7 +32,11 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
+  --color-input-bg: var(--input-bg);
   --color-ring: var(--ring);
+
+  /* Spacing/Sizing tokens - map to host variables */
+  --spacing-input-height: var(--input-height);
 }
 
 @layer base {

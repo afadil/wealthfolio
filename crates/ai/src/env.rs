@@ -362,6 +362,14 @@ pub mod test_env {
         ) -> CoreResult<Option<Holding>> {
             Ok(None)
         }
+
+        async fn holdings_from_snapshot(
+            &self,
+            _snapshot: &wealthfolio_core::portfolio::snapshot::AccountStateSnapshot,
+            _base_currency: &str,
+        ) -> CoreResult<Vec<Holding>> {
+            Ok(Vec::new())
+        }
     }
 
     /// Mock valuation service for testing.
@@ -699,7 +707,6 @@ pub mod test_env {
             _symbols: &HashSet<String>,
             _start: NaiveDate,
             _end: NaiveDate,
-            _first_appearance: &HashMap<String, NaiveDate>,
         ) -> CoreResult<Vec<Quote>> {
             Ok(Vec::new())
         }

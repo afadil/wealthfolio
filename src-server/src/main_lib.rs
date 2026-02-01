@@ -8,6 +8,7 @@ use crate::{
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, EnvFilter};
 use wealthfolio_ai::{AiProviderService, AiProviderServiceTrait, ChatConfig, ChatService};
+use wealthfolio_core::addons::{AddonService, AddonServiceTrait};
 use wealthfolio_connect::{
     BrokerSyncService, BrokerSyncServiceTrait, PlatformRepository, DEFAULT_CLOUD_API_URL,
 };
@@ -15,8 +16,8 @@ use wealthfolio_core::{
     accounts::AccountService,
     activities::{ActivityService as CoreActivityService, ActivityServiceTrait},
     assets::{
-        AlternativeAssetRepositoryTrait, AssetClassificationService, AssetService,
-        AssetServiceTrait,
+        AlternativeAssetRepositoryTrait, AlternativeAssetService, AlternativeAssetServiceTrait,
+        AssetClassificationService, AssetService, AssetServiceTrait,
     },
     events::DomainEventSink,
     fx::{FxService, FxServiceTrait},
@@ -83,6 +84,8 @@ pub struct AppState {
     pub taxonomy_service: Arc<dyn TaxonomyServiceTrait + Send + Sync>,
     pub net_worth_service: Arc<dyn NetWorthServiceTrait + Send + Sync>,
     pub alternative_asset_repository: Arc<dyn AlternativeAssetRepositoryTrait + Send + Sync>,
+    pub alternative_asset_service: Arc<dyn AlternativeAssetServiceTrait + Send + Sync>,
+    pub addon_service: Arc<dyn AddonServiceTrait + Send + Sync>,
     pub connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync>,
     pub ai_provider_service: Arc<dyn AiProviderServiceTrait + Send + Sync>,
     pub ai_chat_service: Arc<ChatService<ServerAiEnvironment>>,
@@ -295,6 +298,14 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             writer.clone(),
         ));
 
+    // Alternative asset service (delegates to core service)
+    let alternative_asset_service: Arc<dyn AlternativeAssetServiceTrait + Send + Sync> =
+        Arc::new(AlternativeAssetService::new(
+            alternative_asset_repository.clone(),
+            asset_repository.clone(),
+            quote_service.clone(),
+        ));
+
     // Connect sync service for broker data synchronization
     let platform_repository = Arc::new(PlatformRepository::new(pool.clone(), writer.clone()));
     let connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync> = Arc::new(
@@ -375,6 +386,11 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         secret_store.clone(),
     );
 
+    let addon_service: Arc<dyn AddonServiceTrait + Send + Sync> = Arc::new(AddonService::new(
+        &config.addons_root,
+        &settings.instance_id,
+    ));
+
     let auth_manager = config
         .auth
         .as_ref()
@@ -403,6 +419,8 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         taxonomy_service,
         net_worth_service,
         alternative_asset_repository,
+        alternative_asset_service,
+        addon_service,
         connect_sync_service,
         ai_provider_service,
         ai_chat_service,

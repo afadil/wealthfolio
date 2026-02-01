@@ -6,27 +6,22 @@ import { useSettingsContext } from "@/lib/settings-provider";
 import { DateRange, TimePeriod } from "@/lib/types";
 import { calculatePerformanceMetrics } from "@/lib/utils";
 import { PortfolioUpdateTrigger } from "@/pages/dashboard/portfolio-update-trigger";
-import { GainAmount, GainPercent, IntervalSelector } from "@wealthfolio/ui";
+import { GainAmount, GainPercent, IntervalSelector, getInitialIntervalData } from "@wealthfolio/ui";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { subMonths } from "date-fns";
 import { useMemo, useState } from "react";
 import { AccountsSummary } from "./accounts-summary";
 import Balance from "./balance";
 import SavingGoals from "./goals";
 import TopHoldings from "./top-holdings";
 
-// Helper function to get the initial date range for 3M
-const getInitialDateRange = (): DateRange => ({
-  from: subMonths(new Date(), 3),
-  to: new Date(),
-});
-
-const INITIAL_INTERVAL_CODE: TimePeriod = "3M";
+const INITIAL_INTERVAL = "3M" as const;
 
 export function DashboardContent() {
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
-  const [selectedIntervalDescription, setSelectedIntervalDescription] =
-    useState<string>("Last 3 months");
+  const initialData = getInitialIntervalData(INITIAL_INTERVAL);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(initialData.range);
+  const [selectedIntervalDescription, setSelectedIntervalDescription] = useState<string>(
+    initialData.description,
+  );
   const [isAllTime, setIsAllTime] = useState<boolean>(false);
 
   const { holdings: allHoldings, isLoading: isHoldingsLoading } = useHoldings(PORTFOLIO_ACCOUNT_ID);
@@ -139,7 +134,7 @@ export function DashboardContent() {
         </PortfolioUpdateTrigger>
       </div>
 
-      <div className="h-[300px]">
+      <div className="h-[180px]">
         <HistoryChart data={chartData} isLoading={isValuationHistoryLoading} />
         {valuationHistory && chartData.length > 0 && (
           <div className="flex w-full justify-center">
@@ -147,13 +142,14 @@ export function DashboardContent() {
               className="pointer-events-auto relative z-20 w-full max-w-screen-sm sm:max-w-screen-md md:max-w-2xl lg:max-w-3xl"
               onIntervalSelect={handleIntervalSelect}
               isLoading={isValuationHistoryLoading}
-              initialSelection={INITIAL_INTERVAL_CODE}
+              storageKey="dashboard-interval"
+              defaultValue="3M"
             />
           </div>
         )}
       </div>
 
-      <div className="from-success/30 via-success/15 to-success/10 grow bg-linear-to-t px-4 pt-12 md:px-6 md:pt-12 lg:px-10 lg:pt-20">
+      <div className="from-success/30 via-success/15 to-success/10 grow bg-linear-to-t px-4 pt-4 md:px-6 md:pt-6 lg:px-10 lg:pt-8">
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:gap-20">
           <div className="lg:col-span-2">
             <AccountsSummary />

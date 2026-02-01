@@ -118,27 +118,7 @@ impl AlternativeAssetRepositoryTrait for AlternativeAssetRepository {
         asset_id: &str,
         metadata: Option<serde_json::Value>,
     ) -> Result<()> {
-        let asset_id_owned = asset_id.to_string();
-
-        self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
-                // Serialize metadata to JSON string if present
-                let metadata_str = metadata.and_then(|v| serde_json::to_string(&v).ok());
-
-                let updated = diesel::update(assets::table.filter(assets::id.eq(&asset_id_owned)))
-                    .set(assets::metadata.eq(metadata_str))
-                    .execute(conn)
-                    .map_err(StorageError::from)?;
-
-                if updated == 0 {
-                    return Err(Error::Database(DatabaseError::NotFound(format!(
-                        "Asset not found: {}",
-                        asset_id_owned
-                    ))));
-                }
-
-                Ok(())
-            })
+        self.update_asset_details(asset_id, None, None, metadata, None)
             .await
     }
 
@@ -161,6 +141,56 @@ impl AlternativeAssetRepositoryTrait for AlternativeAssetRepository {
 
         Ok(liability_ids)
     }
+
+    /// Updates an asset's details (name, symbol, metadata, and/or notes).
+    async fn update_asset_details(
+        &self,
+        asset_id: &str,
+        name: Option<&str>,
+        symbol: Option<&str>,
+        metadata: Option<serde_json::Value>,
+        notes: Option<&str>,
+    ) -> Result<()> {
+        let asset_id_owned = asset_id.to_string();
+        let name_owned = name.map(|n| n.to_string());
+        let symbol_owned = symbol.map(|s| s.to_string());
+        let metadata_str = metadata.and_then(|v| serde_json::to_string(&v).ok());
+        let notes_owned = notes.map(|n| n.to_string());
+
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                // Build dynamic update based on which fields are provided
+                let has_updates = name_owned.is_some()
+                    || symbol_owned.is_some()
+                    || metadata_str.is_some()
+                    || notes_owned.is_some();
+
+                if !has_updates {
+                    return Ok(()); // Nothing to update
+                }
+
+                // Use a single query with all provided fields
+                let updated = diesel::update(assets::table.filter(assets::id.eq(&asset_id_owned)))
+                    .set((
+                        name_owned.as_ref().map(|n| assets::name.eq(n)),
+                        symbol_owned.as_ref().map(|s| assets::symbol.eq(s)),
+                        metadata_str.as_ref().map(|m| assets::metadata.eq(Some(m))),
+                        notes_owned.as_ref().map(|n| assets::notes.eq(Some(n))),
+                    ))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+
+                if updated == 0 {
+                    return Err(Error::Database(DatabaseError::NotFound(format!(
+                        "Asset not found: {}",
+                        asset_id_owned
+                    ))));
+                }
+
+                Ok(())
+            })
+            .await
+    }
 }
 
 #[cfg(test)]
@@ -172,6 +202,6 @@ mod tests {
         assert_eq!(pattern, "%\"linked_asset_id\":\"PROP-a1b2c3d4\"%");
 
         // This pattern would match JSON like:
-        // {"linked_asset_id":"PROP-a1b2c3d4","liability_type":"mortgage"}
+        // {"linked_asset_id":"PROP-a1b2c3d4","sub_type":"mortgage"}
     }
 }

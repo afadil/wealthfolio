@@ -186,8 +186,6 @@ impl ValuationServiceTrait for ValuationService {
         let calculation_end_date = snapshots_to_process.last().unwrap().snapshot_date;
 
         let mut required_asset_ids = HashSet::new();
-        // Track the first date each asset appears (for optimized quote fetching)
-        let mut asset_first_appearance: HashMap<String, NaiveDate> = HashMap::new();
         let mut required_fx_pairs = HashSet::new();
         let base_curr = {
             let base_guard = self.base_currency.read().unwrap();
@@ -205,10 +203,6 @@ impl ValuationServiceTrait for ValuationService {
             }
             for (asset_id, position) in &snapshot.positions {
                 required_asset_ids.insert(asset_id.clone());
-                // Track first appearance for optimized quote fetching
-                asset_first_appearance
-                    .entry(asset_id.clone())
-                    .or_insert(snapshot.snapshot_date);
                 let position_currency = normalize_currency_code(&position.currency);
                 if position_currency != account_curr {
                     required_fx_pairs
@@ -228,13 +222,11 @@ impl ValuationServiceTrait for ValuationService {
 
         let account_curr = normalized_account_currency.unwrap_or_else(|| base_curr.clone());
 
-        // Fetch quotes with single call, passing first appearance dates
-        // to suppress debug messages for dates before an asset was in the portfolio
+        // Fetch quotes with single call
         let quotes_vec = self.quote_service.get_quotes_in_range_filled(
             &required_asset_ids,
             actual_calculation_start_date,
             calculation_end_date,
-            &asset_first_appearance,
         )?;
 
         for quote in &quotes_vec {

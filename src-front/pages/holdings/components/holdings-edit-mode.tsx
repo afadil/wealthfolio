@@ -5,7 +5,7 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { CurrencyInput, DatePickerInput } from "@wealthfolio/ui";
+import { CurrencyInput, DatePickerInput, QuantityInput, MoneyInput } from "@wealthfolio/ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -175,22 +175,22 @@ export const HoldingsEditMode = ({
     return false;
   }, [editableHoldings, initialHoldings, cashBalances, initialCashBalances]);
 
-  const handleQuantityChange = useCallback((assetId: string, quantity: string) => {
-    if (quantity !== "" && !/^-?\d*\.?\d*$/.test(quantity)) return;
+  const handleQuantityChange = useCallback((assetId: string, value: number | undefined) => {
+    const quantity = value === undefined ? "" : String(value);
     setEditableHoldings((prev) =>
       prev.map((h) => (h.assetId === assetId ? { ...h, quantity } : h)),
     );
   }, []);
 
-  const handleAverageCostChange = useCallback((assetId: string, averageCost: string) => {
-    if (averageCost !== "" && !/^-?\d*\.?\d*$/.test(averageCost)) return;
+  const handleAverageCostChange = useCallback((assetId: string, value: number | undefined) => {
+    const averageCost = value === undefined ? "" : String(value);
     setEditableHoldings((prev) =>
       prev.map((h) => (h.assetId === assetId ? { ...h, averageCost } : h)),
     );
   }, []);
 
-  const handleCashAmountChange = useCallback((currency: string, amount: string) => {
-    if (amount !== "" && !/^-?\d*\.?\d*$/.test(amount)) return;
+  const handleCashAmountChange = useCallback((currency: string, value: number | undefined) => {
+    const amount = value === undefined ? "" : String(value);
     setCashBalances((prev) => prev.map((c) => (c.currency === currency ? { ...c, amount } : c)));
   }, []);
 
@@ -438,30 +438,26 @@ export const HoldingsEditMode = ({
 
                         {/* Shares */}
                         <div className="col-span-2">
-                          <Input
+                          <QuantityInput
                             ref={(el) => {
                               holdingSharesInputRefs.current[holding.assetId] = el;
                             }}
-                            type="text"
-                            inputMode="decimal"
                             value={holding.quantity}
-                            onChange={(e) => handleQuantityChange(holding.assetId, e.target.value)}
+                            onValueChange={(value) => handleQuantityChange(holding.assetId, value)}
                             placeholder="0"
-                            className="h-8 text-right text-sm"
+                            className="h-8 text-sm"
                           />
                         </div>
 
                         {/* Avg Cost */}
                         <div className="col-span-2">
-                          <Input
-                            type="text"
-                            inputMode="decimal"
+                          <MoneyInput
                             value={holding.averageCost}
-                            onChange={(e) =>
-                              handleAverageCostChange(holding.assetId, e.target.value)
+                            onValueChange={(value) =>
+                              handleAverageCostChange(holding.assetId, value)
                             }
                             placeholder="0.00"
-                            className="h-8 text-right text-sm"
+                            className="h-8 text-sm"
                           />
                         </div>
 
@@ -585,16 +581,14 @@ export const HoldingsEditMode = ({
 
                       {/* Amount */}
                       <div className="col-span-5">
-                        <Input
+                        <MoneyInput
                           ref={(el) => {
                             cashAmountInputRefs.current[cash.currency] = el;
                           }}
-                          type="text"
-                          inputMode="decimal"
                           value={cash.amount}
-                          onChange={(e) => handleCashAmountChange(cash.currency, e.target.value)}
+                          onValueChange={(value) => handleCashAmountChange(cash.currency, value)}
                           placeholder="0.00"
-                          className="h-8 text-right text-sm"
+                          className="h-8 text-sm"
                         />
                       </div>
 

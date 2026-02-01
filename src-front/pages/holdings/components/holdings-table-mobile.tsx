@@ -1,14 +1,13 @@
 import { TickerAvatar } from "@/components/ticker-avatar";
-import { Button } from "@wealthfolio/ui/components/ui/button";
-import { Card } from "@wealthfolio/ui/components/ui/card";
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Input } from "@wealthfolio/ui/components/ui/input";
-import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { Account, Holding } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { AmountDisplay, GainPercent, Separator } from "@wealthfolio/ui";
+import { AmountDisplay, FacetedSearchInput, GainPercent, Separator } from "@wealthfolio/ui";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Card } from "@wealthfolio/ui/components/ui/card";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { HoldingsMobileFilterSheet } from "./holdings-mobile-filter-sheet";
@@ -132,18 +131,13 @@ export const HoldingsTableMobile = ({
       {(showSearch || showFilterButton) && (
         <div className="flex items-center gap-2">
           {showSearch && (
-            <Input
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-secondary/30 flex-1 rounded-full border-none"
-            />
+            <FacetedSearchInput value={searchQuery} onChange={setSearchQuery} className="flex-1" />
           )}
           {showFilterButton && (
             <Button
               variant="outline"
               size="icon"
-              className="relative size-9 flex-shrink-0"
+              className="relative size-9 shrink-0"
               onClick={() => setIsFilterSheetOpen(true)}
             >
               <Icons.ListFilter className="h-4 w-4" />

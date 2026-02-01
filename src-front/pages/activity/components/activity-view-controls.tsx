@@ -3,7 +3,13 @@ import { useEffect, useMemo, useState } from "react";
 
 import { ActivityType, ActivityTypeNames } from "@/lib/constants";
 import { Account } from "@/lib/types";
-import { AnimatedToggleGroup, Button, FacetedFilter, Icons, Input } from "@wealthfolio/ui";
+import {
+  AnimatedToggleGroup,
+  Button,
+  FacetedFilter,
+  FacetedSearchInput,
+  Icons,
+} from "@wealthfolio/ui";
 import type { ActivityStatusFilter } from "../hooks/use-activity-search";
 
 export type ActivityViewMode = "table" | "datagrid";
@@ -99,33 +105,14 @@ export function ActivityViewControls({
   return (
     <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex flex-1 flex-wrap items-center gap-2">
-        <div className="relative">
-          <Input
-            value={localSearch}
-            onChange={(event) => {
-              const value = event.target.value;
-              setLocalSearch(value);
-              debouncedSearch(value);
-            }}
-            placeholder="Search..."
-            className="h-8 w-[160px] pr-8 lg:w-[240px]"
-          />
-          {localSearch && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="absolute top-0 right-0 h-8 w-8 p-0 hover:bg-transparent"
-              onClick={() => {
-                setLocalSearch("");
-                debouncedSearch("");
-              }}
-            >
-              <Icons.Close className="h-4 w-4" />
-              <span className="sr-only">Clear search</span>
-            </Button>
-          )}
-        </div>
+        <FacetedSearchInput
+          value={localSearch}
+          onChange={(value) => {
+            setLocalSearch(value);
+            debouncedSearch(value);
+          }}
+          className="w-[160px] lg:w-[240px]"
+        />
 
         <FacetedFilter
           title="Account"

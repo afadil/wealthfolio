@@ -75,9 +75,15 @@ pub trait TaxonomyServiceTrait: Send + Sync {
 
     // Assignment operations
     fn get_asset_assignments(&self, asset_id: &str) -> Result<Vec<AssetTaxonomyAssignment>>;
+    fn get_category_assignments(
+        &self,
+        taxonomy_id: &str,
+        category_id: &str,
+    ) -> Result<Vec<AssetTaxonomyAssignment>>;
     async fn assign_asset_to_category(
         &self,
         assignment: NewAssetTaxonomyAssignment,
     ) -> Result<AssetTaxonomyAssignment>;
     async fn remove_asset_assignment(&self, id: &str) -> Result<usize>;
+
 }

@@ -132,7 +132,13 @@ export function UpdateValuationModal({
                   <FormItem>
                     <FormLabel>New Value</FormLabel>
                     <FormControl>
-                      <MoneyInput {...field} placeholder="0.00" />
+                      <MoneyInput
+                        ref={field.ref}
+                        name={field.name}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="0.00"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

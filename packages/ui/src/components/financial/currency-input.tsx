@@ -117,7 +117,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
             role="combobox"
             aria-expanded={open}
             className={cn(
-              "h-11 w-full justify-between truncate rounded-md font-normal",
+              "h-input-height w-full justify-between truncate rounded-md font-normal",
               !value && "text-muted-foreground",
               className,
             )}
@@ -235,13 +235,17 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className={cn("h-11 w-full justify-between rounded-md", !value && "text-muted-foreground", className)}
+            className={cn(
+              "h-input-height w-full justify-between rounded-md",
+              !value && "text-muted-foreground",
+              className,
+            )}
             {...props}
           >
             <span className="truncate">{buttonLabel}</span>
             <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
-      </PopoverTrigger>
+        </PopoverTrigger>
         <PopoverContent className="w-full p-0" onOpenAutoFocus={handleOpenAutoFocus}>
           <Command>
             <CommandInput ref={desktopCommandInputRef} placeholder="Search currency..." className="h-9" />

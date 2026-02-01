@@ -246,7 +246,7 @@ export const OnboardingAppearance = forwardRef<
                   {/* Label area */}
                   <div
                     className={cn(
-                      "px-4 py-2.5 text-center sm:py-3",
+                      "w-full px-4 py-2.5 text-center sm:py-3",
                       font === f.value ? "bg-primary/10" : "bg-muted/50",
                     )}
                   >

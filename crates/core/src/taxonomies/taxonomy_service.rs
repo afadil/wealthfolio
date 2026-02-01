@@ -253,6 +253,15 @@ impl TaxonomyServiceTrait for TaxonomyService {
         self.repository.get_asset_assignments(asset_id)
     }
 
+    fn get_category_assignments(
+        &self,
+        taxonomy_id: &str,
+        category_id: &str,
+    ) -> Result<Vec<AssetTaxonomyAssignment>> {
+        self.repository
+            .get_category_assignments(taxonomy_id, category_id)
+    }
+
     async fn assign_asset_to_category(
         &self,
         assignment: NewAssetTaxonomyAssignment,
@@ -273,4 +282,5 @@ impl TaxonomyServiceTrait for TaxonomyService {
     async fn remove_asset_assignment(&self, id: &str) -> Result<usize> {
         self.repository.delete_assignment(id).await
     }
+
 }

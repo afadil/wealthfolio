@@ -10,6 +10,8 @@ use wealthfolio_core::{
     },
 };
 
+use super::shared::parse_date_optional;
+
 #[derive(serde::Deserialize)]
 struct AccountsSimplePerfBody {
     #[serde(rename = "accountIds")]
@@ -65,20 +67,8 @@ async fn calculate_performance_history(
     State(state): State<Arc<AppState>>,
     Json(body): Json<PerfBody>,
 ) -> ApiResult<Json<PerformanceMetrics>> {
-    let start = match &body.start_date {
-        Some(s) => Some(
-            chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                .map_err(|e| anyhow::anyhow!("Invalid startDate: {}", e))?,
-        ),
-        None => None,
-    };
-    let end = match &body.end_date {
-        Some(s) => Some(
-            chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                .map_err(|e| anyhow::anyhow!("Invalid endDate: {}", e))?,
-        ),
-        None => None,
-    };
+    let start = parse_date_optional(body.start_date, "startDate")?;
+    let end = parse_date_optional(body.end_date, "endDate")?;
     let tracking_mode = parse_tracking_mode(body.tracking_mode);
     let metrics = state
         .performance_service
@@ -91,20 +81,8 @@ async fn calculate_performance_summary(
     State(state): State<Arc<AppState>>,
     Json(body): Json<PerfBody>,
 ) -> ApiResult<Json<PerformanceMetrics>> {
-    let start = match &body.start_date {
-        Some(s) => Some(
-            chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                .map_err(|e| anyhow::anyhow!("Invalid startDate: {}", e))?,
-        ),
-        None => None,
-    };
-    let end = match &body.end_date {
-        Some(s) => Some(
-            chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                .map_err(|e| anyhow::anyhow!("Invalid endDate: {}", e))?,
-        ),
-        None => None,
-    };
+    let start = parse_date_optional(body.start_date, "startDate")?;
+    let end = parse_date_optional(body.end_date, "endDate")?;
     let tracking_mode = parse_tracking_mode(body.tracking_mode);
     let metrics = state
         .performance_service

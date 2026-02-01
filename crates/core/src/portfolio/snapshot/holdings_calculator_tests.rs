@@ -92,10 +92,6 @@ mod tests {
             Ok(self.assets.values().cloned().collect())
         }
 
-        fn list_cash_assets(&self, _base_currency: &str) -> Result<Vec<Asset>> {
-            Ok(vec![]) // Not needed for these tests
-        }
-
         fn list_by_asset_ids(&self, asset_ids: &[String]) -> Result<Vec<Asset>> {
             Ok(asset_ids
                 .iter()

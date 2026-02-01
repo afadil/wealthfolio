@@ -10,7 +10,7 @@ use wealthfolio_connect::{BrokerSyncService, PlatformRepository, DEFAULT_CLOUD_A
 use wealthfolio_core::{
     accounts::AccountService,
     activities::ActivityService,
-    assets::{AssetClassificationService, AssetService},
+    assets::{AlternativeAssetService, AssetClassificationService, AssetService},
     events::DomainEvent,
     fx::{FxService, FxServiceTrait},
     goals::GoalService,
@@ -223,6 +223,12 @@ pub async fn initialize_context(
         writer.clone(),
     ));
 
+    let alternative_asset_service = Arc::new(AlternativeAssetService::new(
+        alternative_asset_repository.clone(),
+        asset_repository.clone(),
+        quote_service.clone(),
+    ));
+
     let sync_service = Arc::new(
         BrokerSyncService::new(
             account_service.clone(),
@@ -305,6 +311,7 @@ pub async fn initialize_context(
             net_worth_service,
             sync_service,
             alternative_asset_repository,
+            alternative_asset_service,
             taxonomy_service,
             connect_service,
             ai_provider_service,

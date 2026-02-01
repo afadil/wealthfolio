@@ -2,6 +2,9 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+use async_trait::async_trait;
+
+use super::addon_traits::AddonServiceTrait;
 use super::models::*;
 
 // Constants
@@ -1290,4 +1293,324 @@ pub async fn submit_addon_rating(
     })?;
 
     Ok(response_json)
+}
+
+// ============================================================================
+// AddonService Implementation
+// ============================================================================
+
+/// Service for addon management operations.
+pub struct AddonService {
+    addons_root: PathBuf,
+    instance_id: String,
+}
+
+impl AddonService {
+    pub fn new(addons_root: impl Into<PathBuf>, instance_id: impl Into<String>) -> Self {
+        Self {
+            addons_root: addons_root.into(),
+            instance_id: instance_id.into(),
+        }
+    }
+
+    fn read_manifest_if_exists(&self, addon_dir: &Path) -> Result<Option<AddonManifest>, String> {
+        let manifest_path = addon_dir.join("manifest.json");
+        if !manifest_path.exists() {
+            return Ok(None);
+        }
+        let content = fs::read_to_string(&manifest_path)
+            .map_err(|e| format!("Failed to read manifest {}: {}", manifest_path.display(), e))?;
+        let manifest = serde_json::from_str::<AddonManifest>(&content)
+            .map_err(|e| format!("Failed to parse manifest {}: {}", manifest_path.display(), e))?;
+        Ok(Some(manifest))
+    }
+
+    fn read_manifest_or_error(&self, addon_dir: &Path) -> Result<AddonManifest, String> {
+        self.read_manifest_if_exists(addon_dir)?.ok_or_else(|| {
+            format!("Addon manifest not found in {}", addon_dir.display())
+        })
+    }
+
+    fn write_addon_files(&self, addon_dir: &Path, files: &[AddonFile]) -> Result<(), String> {
+        for file in files {
+            let file_path = addon_dir.join(&file.name);
+            if let Some(parent) = file_path.parent() {
+                fs::create_dir_all(parent)
+                    .map_err(|e| format!("Failed to create directory: {}", e))?;
+            }
+            fs::write(&file_path, &file.content)
+                .map_err(|e| format!("Failed to write file {}: {}", file.name, e))?;
+        }
+        Ok(())
+    }
+
+    fn write_manifest(&self, addon_dir: &Path, manifest: &AddonManifest) -> Result<(), String> {
+        let manifest_path = addon_dir.join("manifest.json");
+        let manifest_json = serde_json::to_string_pretty(manifest)
+            .map_err(|e| format!("Failed to serialize manifest: {}", e))?;
+        fs::write(&manifest_path, manifest_json)
+            .map_err(|e| format!("Failed to write manifest: {}", e))?;
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl AddonServiceTrait for AddonService {
+    async fn install_addon_zip(
+        &self,
+        zip_data: Vec<u8>,
+        enable_after_install: bool,
+    ) -> Result<AddonManifest, String> {
+        let extracted = extract_addon_zip_internal(zip_data)?;
+        let addon_id = extracted.metadata.id.clone();
+        let addon_dir = get_addon_path(&self.addons_root, &addon_id)?;
+
+        if addon_dir.exists() {
+            fs::remove_dir_all(&addon_dir)
+                .map_err(|e| format!("Failed to remove existing addon: {}", e))?;
+        }
+        fs::create_dir_all(&addon_dir)
+            .map_err(|e| format!("Failed to create addon directory: {}", e))?;
+
+        self.write_addon_files(&addon_dir, &extracted.files)?;
+
+        let metadata = extracted.metadata.to_installed(enable_after_install)?;
+        self.write_manifest(&addon_dir, &metadata)?;
+
+        Ok(metadata)
+    }
+
+    async fn install_addon_from_staging(
+        &self,
+        addon_id: &str,
+        enable_after_install: bool,
+    ) -> Result<AddonManifest, String> {
+        let zip = load_addon_from_staging(addon_id, &self.addons_root)?;
+        let extracted = extract_addon_zip_internal(zip)?;
+        let addon_dir = get_addon_path(&self.addons_root, &extracted.metadata.id)?;
+
+        if addon_dir.exists() {
+            fs::remove_dir_all(&addon_dir)
+                .map_err(|e| format!("Failed to remove existing addon: {}", e))?;
+        }
+        fs::create_dir_all(&addon_dir)
+            .map_err(|e| format!("Failed to create addon directory: {}", e))?;
+
+        self.write_addon_files(&addon_dir, &extracted.files)?;
+
+        let metadata = extracted.metadata.to_installed(enable_after_install)?;
+        self.write_manifest(&addon_dir, &metadata)?;
+
+        // Clean staging file
+        let _ = remove_addon_from_staging(addon_id, &self.addons_root);
+
+        Ok(metadata)
+    }
+
+    async fn uninstall_addon(&self, addon_id: &str) -> Result<(), String> {
+        let addon_dir = get_addon_path(&self.addons_root, addon_id)?;
+        if !addon_dir.exists() {
+            return Err("Addon not found".to_string());
+        }
+        fs::remove_dir_all(&addon_dir)
+            .map_err(|e| format!("Failed to remove addon: {}", e))?;
+        Ok(())
+    }
+
+    fn list_installed_addons(&self) -> Result<Vec<InstalledAddon>, String> {
+        let addons_dir = ensure_addons_directory(&self.addons_root)?;
+        let mut installed = Vec::new();
+
+        if addons_dir.exists() {
+            for entry in fs::read_dir(&addons_dir)
+                .map_err(|e| format!("Failed to read addons directory: {}", e))?
+            {
+                let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
+                let dir = entry.path();
+                if !dir.is_dir() {
+                    continue;
+                }
+                let manifest = match self.read_manifest_if_exists(&dir)? {
+                    Some(m) => m,
+                    None => continue,
+                };
+                let files_count = fs::read_dir(&dir)
+                    .map_err(|e| format!("Failed to count addon files: {}", e))?
+                    .count();
+                let is_zip_addon = files_count > 2;
+                installed.push(InstalledAddon {
+                    metadata: manifest,
+                    file_path: dir.to_string_lossy().to_string(),
+                    is_zip_addon,
+                });
+            }
+        }
+        Ok(installed)
+    }
+
+    fn load_addon_for_runtime(&self, addon_id: &str) -> Result<ExtractedAddon, String> {
+        let addon_dir = get_addon_path(&self.addons_root, addon_id)?;
+        let manifest = self.read_manifest_or_error(&addon_dir)?;
+
+        if !manifest.is_enabled() {
+            return Err("Addon is disabled".to_string());
+        }
+
+        let mut files = Vec::new();
+        read_addon_files_recursive(&addon_dir, &addon_dir, &mut files)?;
+
+        let main_file = manifest.get_main()?;
+        for f in &mut files {
+            let normalized_name = f.name.replace('\\', "/");
+            let normalized_main = main_file.replace('\\', "/");
+            f.is_main = normalized_name == normalized_main
+                || normalized_name.ends_with(&normalized_main);
+        }
+
+        if !files.iter().any(|f| f.is_main) {
+            return Err("Main addon file not found".to_string());
+        }
+
+        Ok(ExtractedAddon {
+            metadata: manifest,
+            files,
+        })
+    }
+
+    fn get_enabled_addons_on_startup(&self) -> Result<Vec<ExtractedAddon>, String> {
+        let installed = self.list_installed_addons()?;
+        let mut enabled = Vec::new();
+
+        for item in installed {
+            if item.metadata.is_enabled() {
+                if let Ok(extracted) = self.load_addon_for_runtime(&item.metadata.id) {
+                    enabled.push(extracted);
+                }
+            }
+        }
+        Ok(enabled)
+    }
+
+    async fn check_addon_update(&self, addon_id: &str) -> Result<AddonUpdateCheckResult, String> {
+        let addon_dir = get_addon_path(&self.addons_root, addon_id)?;
+        let manifest = self.read_manifest_or_error(&addon_dir)?;
+        check_addon_update_from_api(addon_id, &manifest.version, Some(&self.instance_id)).await
+    }
+
+    async fn check_all_addon_updates(&self) -> Result<Vec<AddonUpdateCheckResult>, String> {
+        let addons_dir = ensure_addons_directory(&self.addons_root)?;
+        let mut results = Vec::new();
+
+        if addons_dir.exists() {
+            for entry in fs::read_dir(&addons_dir)
+                .map_err(|e| format!("Failed to read addons directory: {}", e))?
+            {
+                let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
+                let dir = entry.path();
+                if !dir.is_dir() {
+                    continue;
+                }
+                let manifest = match self.read_manifest_if_exists(&dir)? {
+                    Some(m) => m,
+                    None => continue,
+                };
+                let addon_id = manifest.id.clone();
+                match check_addon_update_from_api(
+                    &addon_id,
+                    &manifest.version,
+                    Some(&self.instance_id),
+                )
+                .await
+                {
+                    Ok(result) => results.push(result),
+                    Err(err) => {
+                        log::error!("Failed to check update for addon {}: {}", addon_id, err);
+                        results.push(AddonUpdateCheckResult {
+                            addon_id,
+                            update_info: AddonUpdateInfo {
+                                current_version: manifest.version,
+                                latest_version: "unknown".to_string(),
+                                update_available: false,
+                                download_url: None,
+                                release_notes: None,
+                                release_date: None,
+                                changelog_url: None,
+                                is_critical: None,
+                                has_breaking_changes: None,
+                                min_wealthfolio_version: None,
+                            },
+                            error: Some(err),
+                        });
+                    }
+                }
+            }
+        }
+        Ok(results)
+    }
+
+    async fn update_addon_from_store(&self, addon_id: &str) -> Result<AddonManifest, String> {
+        let addon_dir = get_addon_path(&self.addons_root, addon_id)?;
+        let was_enabled = self
+            .read_manifest_if_exists(&addon_dir)?
+            .and_then(|m| m.enabled)
+            .unwrap_or(false);
+
+        let zip_data = download_addon_from_store(addon_id, &self.instance_id).await?;
+        let extracted = extract_addon_zip_internal(zip_data)?;
+
+        if addon_dir.exists() {
+            fs::remove_dir_all(&addon_dir)
+                .map_err(|e| format!("Failed to remove addon directory: {}", e))?;
+        }
+        fs::create_dir_all(&addon_dir)
+            .map_err(|e| format!("Failed to create addon directory: {}", e))?;
+
+        self.write_addon_files(&addon_dir, &extracted.files)?;
+
+        let metadata = extracted.metadata.to_installed(was_enabled)?;
+        self.write_manifest(&addon_dir, &metadata)?;
+
+        Ok(metadata)
+    }
+
+    fn toggle_addon(&self, addon_id: &str, enabled: bool) -> Result<(), String> {
+        let addon_dir = get_addon_path(&self.addons_root, addon_id)?;
+        let mut manifest = self.read_manifest_or_error(&addon_dir)?;
+        manifest.enabled = Some(enabled);
+        self.write_manifest(&addon_dir, &manifest)?;
+        Ok(())
+    }
+
+    async fn download_addon_to_staging(&self, addon_id: &str) -> Result<ExtractedAddon, String> {
+        let zip = download_addon_from_store(addon_id, &self.instance_id).await?;
+        let _staged_path = save_addon_to_staging(addon_id, &self.addons_root, &zip)?;
+        let extracted = extract_addon_zip_internal(zip)?;
+        Ok(extracted)
+    }
+
+    fn clear_staging(&self, addon_id: Option<&str>) -> Result<(), String> {
+        if let Some(id) = addon_id {
+            remove_addon_from_staging(id, &self.addons_root)?;
+        } else {
+            clear_staging_directory(&self.addons_root)?;
+        }
+        Ok(())
+    }
+
+    async fn fetch_store_listings(&self) -> Result<Vec<serde_json::Value>, String> {
+        fetch_addon_store_listings(Some(&self.instance_id)).await
+    }
+
+    async fn submit_rating(
+        &self,
+        addon_id: &str,
+        rating: u8,
+        review: Option<String>,
+    ) -> Result<serde_json::Value, String> {
+        submit_addon_rating(addon_id, rating, review, &self.instance_id).await
+    }
+
+    fn extract_addon_zip(&self, zip_data: Vec<u8>) -> Result<ExtractedAddon, String> {
+        extract_addon_zip_internal(zip_data)
+    }
 }

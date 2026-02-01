@@ -53,20 +53,6 @@ impl AssetRepository {
         Ok(results.into_iter().map(Asset::from).collect())
     }
 
-    /// Lists currency assets for a given base currency
-    pub fn list_cash_assets_impl(&self, base_currency: &str) -> Result<Vec<Asset>> {
-        let mut conn = get_connection(&self.pool)?;
-
-        let results = assets::table
-            .select(AssetDB::as_select())
-            .filter(assets::kind.eq("CASH"))
-            .filter(assets::symbol.like(format!("{}%", base_currency)))
-            .load::<AssetDB>(&mut conn)
-            .map_err(StorageError::from)?;
-
-        Ok(results.into_iter().map(Asset::from).collect())
-    }
-
     pub fn list_by_asset_ids_impl(&self, asset_ids: &[String]) -> Result<Vec<Asset>> {
         if asset_ids.is_empty() {
             return Ok(Vec::new());
@@ -240,11 +226,6 @@ impl AssetRepositoryTrait for AssetRepository {
     /// Lists all assets in the database
     fn list(&self) -> Result<Vec<Asset>> {
         self.list_impl()
-    }
-
-    /// Lists currency assets for a given base currency
-    fn list_cash_assets(&self, base_currency: &str) -> Result<Vec<Asset>> {
-        self.list_cash_assets_impl(base_currency)
     }
 
     /// Lists assets by their asset IDs

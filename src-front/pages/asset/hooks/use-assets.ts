@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { getAssets } from "@/adapters";
+import { isAlternativeAssetId } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { Asset } from "@/lib/types";
 
@@ -22,6 +23,11 @@ export function useAssets() {
     }
 
     if (asset.symbol.startsWith("$CASH")) {
+      return false;
+    }
+
+    // Filter out alternative assets (property, vehicle, collectible, etc.)
+    if (isAlternativeAssetId(asset.id)) {
       return false;
     }
 
