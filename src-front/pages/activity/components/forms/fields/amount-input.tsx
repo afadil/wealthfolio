@@ -33,14 +33,12 @@ export function AmountInput<TFieldValues extends FieldValues = FieldValues>({
           <FormLabel>{label}</FormLabel>
           <FormControl>
             <MoneyInput
+              ref={field.ref}
+              name={field.name}
+              value={field.value}
+              onValueChange={field.onChange}
               placeholder={placeholder}
               maxDecimalPlaces={maxDecimalPlaces}
-              {...field}
-              onChange={(e) => {
-                const value = e.target.value;
-                field.onChange(value === "" ? undefined : parseFloat(value));
-              }}
-              value={field.value ?? ""}
               aria-label={label}
             />
           </FormControl>

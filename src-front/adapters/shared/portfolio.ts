@@ -1,6 +1,7 @@
 // Portfolio Commands
 import type {
   Holding,
+  HoldingSummary,
   IncomeSummary,
   AccountValuation,
   PerformanceMetrics,
@@ -128,6 +129,22 @@ export const getHolding = async (accountId: string, assetId: string): Promise<Ho
 
 export const getPortfolioAllocations = async (accountId: string): Promise<PortfolioAllocations> => {
   return invoke<PortfolioAllocations>("get_portfolio_allocations", { accountId });
+};
+
+/**
+ * Gets holdings filtered by a taxonomy category.
+ * Used for allocation drill-down views when user clicks on a category in charts.
+ */
+export const getHoldingsByAllocation = async (
+  accountId: string,
+  taxonomyId: string,
+  categoryId: string,
+): Promise<HoldingSummary[]> => {
+  return invoke<HoldingSummary[]>("get_holdings_by_allocation", {
+    accountId,
+    taxonomyId,
+    categoryId,
+  });
 };
 
 /**

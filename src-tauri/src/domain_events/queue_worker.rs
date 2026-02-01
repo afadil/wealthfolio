@@ -307,7 +307,14 @@ async fn run_portfolio_calculation(
 
     // Calculate total portfolio snapshots
     let snapshot_service = context.snapshot_service();
-    if let Err(err) = snapshot_service.calculate_total_portfolio_snapshots().await {
+    let total_result = if force_full_recalculation {
+        snapshot_service
+            .force_recalculate_total_portfolio_snapshots()
+            .await
+    } else {
+        snapshot_service.calculate_total_portfolio_snapshots().await
+    };
+    if let Err(err) = total_result {
         let err_msg = format!("Failed to calculate TOTAL portfolio snapshot: {}", err);
         error!("{}", err_msg);
         let _ = app_handle.emit(PORTFOLIO_UPDATE_ERROR, &err_msg);

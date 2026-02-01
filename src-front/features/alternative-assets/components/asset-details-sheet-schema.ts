@@ -53,6 +53,8 @@ export const VEHICLE_TYPES = [
 
 // Base schema for common fields across all asset types
 const baseSchema = z.object({
+  // Name field (required, editable)
+  name: z.string().min(1, "Name is required").max(100, "Name must be less than 100 characters"),
   // Common fields for all types
   purchasePrice: z.coerce
     .number()
@@ -96,6 +98,7 @@ export const collectibleDetailsSchema = baseSchema.extend({
 export const preciousMetalDetailsSchema = baseSchema.extend({
   kind: z.literal(AlternativeAssetKind.PHYSICAL_PRECIOUS),
   metalType: z.enum(["gold", "silver", "platinum", "palladium"]).optional().nullable(),
+  quantity: z.coerce.number().positive("Quantity must be greater than 0").optional().nullable(),
   unit: z.enum(["oz", "g", "kg"]).optional().nullable(),
   description: z
     .string()
@@ -160,13 +163,19 @@ export type OtherDetailsFormValues = z.infer<typeof otherDetailsSchema>;
 // Helper function to get default form values based on asset kind and existing metadata
 export function getDefaultDetailsFormValues(
   kind: AlternativeAssetKind,
+  name: string,
   metadata?: Record<string, unknown>,
+  notes?: string | null,
 ): AssetDetailsFormValues {
   const base = {
+    name,
     purchasePrice: metadata?.purchase_price ? parseFloat(metadata.purchase_price as string) : null,
     purchaseDate: metadata?.purchase_date ? new Date(metadata.purchase_date as string) : null,
-    notes: (metadata?.notes as string) ?? null,
+    notes: notes ?? null,
   };
+
+  // Read sub_type from metadata (unified field for all asset types)
+  const subType = (metadata?.sub_type as string) ?? null;
 
   switch (kind) {
     case AlternativeAssetKind.PROPERTY:
@@ -174,15 +183,14 @@ export function getDefaultDetailsFormValues(
         ...base,
         kind: AlternativeAssetKind.PROPERTY,
         address: (metadata?.address as string) ?? null,
-        propertyType:
-          (metadata?.property_type as PropertyDetailsFormValues["propertyType"]) ?? null,
+        propertyType: subType as PropertyDetailsFormValues["propertyType"],
       };
 
     case AlternativeAssetKind.VEHICLE:
       return {
         ...base,
         kind: AlternativeAssetKind.VEHICLE,
-        vehicleType: (metadata?.vehicle_type as VehicleDetailsFormValues["vehicleType"]) ?? null,
+        vehicleType: subType as VehicleDetailsFormValues["vehicleType"],
         description: (metadata?.description as string) ?? null,
       };
 
@@ -190,8 +198,7 @@ export function getDefaultDetailsFormValues(
       return {
         ...base,
         kind: AlternativeAssetKind.COLLECTIBLE,
-        collectibleType:
-          (metadata?.collectible_type as CollectibleDetailsFormValues["collectibleType"]) ?? null,
+        collectibleType: subType as CollectibleDetailsFormValues["collectibleType"],
         description: (metadata?.description as string) ?? null,
       };
 
@@ -202,23 +209,23 @@ export function getDefaultDetailsFormValues(
           ? parseFloat(metadata.purchase_price_per_unit as string)
           : null,
         kind: AlternativeAssetKind.PHYSICAL_PRECIOUS,
-        metalType: (metadata?.metal_type as PreciousMetalDetailsFormValues["metalType"]) ?? null,
+        metalType: subType as PreciousMetalDetailsFormValues["metalType"],
+        quantity: metadata?.quantity ? parseFloat(metadata.quantity as string) : null,
         unit: (metadata?.unit as PreciousMetalDetailsFormValues["unit"]) ?? null,
         description: (metadata?.description as string) ?? null,
       };
 
     case AlternativeAssetKind.LIABILITY:
+      // For original amount, check both new field (original_amount) and legacy field (purchase_price)
+      const origAmount = metadata?.original_amount ?? metadata?.purchase_price;
+      // For origination date, check both new field (origination_date) and legacy field (purchase_date)
+      const origDate = metadata?.origination_date ?? metadata?.purchase_date;
       return {
         ...base,
         kind: AlternativeAssetKind.LIABILITY,
-        liabilityType:
-          (metadata?.liability_type as LiabilityDetailsFormValues["liabilityType"]) ?? null,
-        originalAmount: metadata?.original_amount
-          ? parseFloat(metadata.original_amount as string)
-          : null,
-        originationDate: metadata?.origination_date
-          ? new Date(metadata.origination_date as string)
-          : null,
+        liabilityType: subType as LiabilityDetailsFormValues["liabilityType"],
+        originalAmount: origAmount ? parseFloat(origAmount as string) : null,
+        originationDate: origDate ? new Date(origDate as string) : null,
         interestRate: metadata?.interest_rate ? parseFloat(metadata.interest_rate as string) : null,
         linkedAssetId: (metadata?.linked_asset_id as string) ?? null,
       };
@@ -251,35 +258,34 @@ export function formValuesToMetadata(values: AssetDetailsFormValues): Record<str
     metadata.purchase_date = formatDateToISO(values.purchaseDate);
   }
 
-  if (values.notes) {
-    metadata.notes = values.notes;
-  }
+  // Notes are NOT stored in metadata - they go in asset.notes field
 
-  // Type-specific fields
+  // Type-specific fields (all use unified 'sub_type' for the type field)
   switch (values.kind) {
     case AlternativeAssetKind.PROPERTY:
       if (values.address) metadata.address = values.address;
-      if (values.propertyType) metadata.property_type = values.propertyType;
+      if (values.propertyType) metadata.sub_type = values.propertyType;
       break;
 
     case AlternativeAssetKind.VEHICLE:
-      if (values.vehicleType) metadata.vehicle_type = values.vehicleType;
+      if (values.vehicleType) metadata.sub_type = values.vehicleType;
       if (values.description) metadata.description = values.description;
       break;
 
     case AlternativeAssetKind.COLLECTIBLE:
-      if (values.collectibleType) metadata.collectible_type = values.collectibleType;
+      if (values.collectibleType) metadata.sub_type = values.collectibleType;
       if (values.description) metadata.description = values.description;
       break;
 
     case AlternativeAssetKind.PHYSICAL_PRECIOUS:
-      if (values.metalType) metadata.metal_type = values.metalType;
+      if (values.metalType) metadata.sub_type = values.metalType;
+      if (values.quantity != null) metadata.quantity = values.quantity.toString();
       if (values.unit) metadata.unit = values.unit;
       if (values.description) metadata.description = values.description;
       break;
 
     case AlternativeAssetKind.LIABILITY:
-      if (values.liabilityType) metadata.liability_type = values.liabilityType;
+      if (values.liabilityType) metadata.sub_type = values.liabilityType;
       if (values.originalAmount != null)
         metadata.original_amount = values.originalAmount.toString();
       if (values.originationDate)

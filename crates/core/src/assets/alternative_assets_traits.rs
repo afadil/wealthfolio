@@ -12,7 +12,8 @@ use async_trait::async_trait;
 
 use super::alternative_assets_model::{
     AlternativeHolding, CreateAlternativeAssetRequest, CreateAlternativeAssetResponse,
-    LinkLiabilityRequest, LinkLiabilityResponse, UpdateValuationRequest, UpdateValuationResponse,
+    LinkLiabilityRequest, LinkLiabilityResponse, UpdateAssetDetailsRequest,
+    UpdateAssetDetailsResponse, UpdateValuationRequest, UpdateValuationResponse,
 };
 use crate::errors::Result;
 
@@ -96,6 +97,23 @@ pub trait AlternativeAssetServiceTrait: Send + Sync {
     /// A response confirming the unlink
     async fn unlink_liability(&self, liability_id: &str) -> Result<LinkLiabilityResponse>;
 
+    /// Updates an alternative asset's details (name and/or metadata).
+    ///
+    /// This operation:
+    /// 1. Merges new metadata with existing metadata
+    /// 2. Recalculates symbol from updated metadata
+    /// 3. If purchase_price or purchase_date changed, updates/creates the purchase quote
+    ///
+    /// # Arguments
+    /// * `request` - The update request with new values
+    ///
+    /// # Returns
+    /// A response indicating what was updated
+    async fn update_asset_details(
+        &self,
+        request: UpdateAssetDetailsRequest,
+    ) -> Result<UpdateAssetDetailsResponse>;
+
     /// Gets all alternative holdings (assets with their latest valuations).
     ///
     /// This retrieves all alternative assets (Property, Vehicle, Collectible,
@@ -145,4 +163,24 @@ pub trait AlternativeAssetRepositoryTrait: Send + Sync {
     /// # Returns
     /// List of liability asset IDs
     fn find_liabilities_linked_to(&self, linked_asset_id: &str) -> Result<Vec<String>>;
+
+    /// Updates an asset's details (name and/or metadata).
+    ///
+    /// # Arguments
+    /// * `asset_id` - The ID of the asset to update
+    /// * `name` - Optional new name for the asset
+    /// * `symbol` - Optional new symbol for the asset
+    /// * `metadata` - Optional new metadata JSON
+    /// * `notes` - Optional notes for the asset
+    ///
+    /// # Returns
+    /// Ok(()) on success
+    async fn update_asset_details(
+        &self,
+        asset_id: &str,
+        name: Option<&str>,
+        symbol: Option<&str>,
+        metadata: Option<serde_json::Value>,
+        notes: Option<&str>,
+    ) -> Result<()>;
 }

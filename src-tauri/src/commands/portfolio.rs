@@ -16,11 +16,13 @@ use tauri::{AppHandle, State};
 use wealthfolio_core::{
     accounts::TrackingMode,
     allocation::PortfolioAllocations,
-    assets::security_id_from_symbol_with_mic,
-    holdings::Holding,
+    holdings::{Holding, HoldingSummary},
     income::IncomeSummary,
     performance::{PerformanceMetrics, SimplePerformanceMetrics},
-    portfolio::snapshot::{AccountStateSnapshot, Position, SnapshotSource},
+    portfolio::snapshot::{
+        CashBalanceInput, ManualHoldingInput, ManualSnapshotRequest, ManualSnapshotService,
+        SnapshotSource,
+    },
     quotes::MarketSyncMode,
     valuation::DailyAccountValuation,
 };
@@ -112,6 +114,25 @@ pub async fn get_portfolio_allocations(
     state
         .allocation_service()
         .get_portfolio_allocations(&account_id, &base_currency)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_holdings_by_allocation(
+    state: State<'_, Arc<ServiceContext>>,
+    account_id: String,
+    taxonomy_id: String,
+    category_id: String,
+) -> Result<Vec<HoldingSummary>, String> {
+    debug!(
+        "Get holdings for category {} in taxonomy {} for account {}",
+        category_id, taxonomy_id, account_id
+    );
+    let base_currency = state.get_base_currency();
+    state
+        .allocation_service()
+        .get_holdings_by_allocation(&account_id, &base_currency, &taxonomy_id, &category_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -373,76 +394,12 @@ pub async fn save_manual_holdings(
         None => Utc::now().naive_utc().date(),
     };
 
-    // Track asset IDs for market sync
-    let mut asset_ids: Vec<String> = Vec::new();
-
-    // Build positions map from holdings input
-    let mut positions: HashMap<String, Position> = HashMap::new();
+    let mut positions: Vec<ManualHoldingInput> = Vec::new();
     for holding in holdings {
         let quantity = holding
             .quantity
             .parse::<Decimal>()
             .map_err(|e| format!("Invalid quantity for {}: {}", holding.symbol, e))?;
-
-        // Skip zero-quantity positions
-        if quantity.is_zero() {
-            continue;
-        }
-
-        // Use provided asset_id for existing holdings, or generate for new holdings
-        let asset_id = match &holding.asset_id {
-            Some(id) => id.clone(),
-            None => security_id_from_symbol_with_mic(
-                &holding.symbol,
-                holding.exchange_mic.as_deref(),
-                &holding.currency,
-            ),
-        };
-
-        // Ensure the asset exists in the database (same pattern as activities)
-        let asset = state
-            .asset_service()
-            .get_or_create_minimal_asset(
-                &asset_id,
-                Some(holding.currency.clone()),
-                None, // No additional metadata
-                None, // Use default pricing mode based on asset kind
-            )
-            .await
-            .map_err(|e| format!("Failed to ensure asset {}: {}", asset_id, e))?;
-
-        // Track asset ID for market sync
-        asset_ids.push(asset.id.clone());
-
-        // Register FX pair for holding currency if different from account currency
-        // Creates FX:holding_currency:account_currency for converting foreign values
-        if holding.currency != account.currency {
-            state
-                .fx_service()
-                .register_currency_pair(&holding.currency, &account.currency)
-                .await
-                .map_err(|e| {
-                    format!(
-                        "Failed to register FX pair {}/{}: {}",
-                        holding.currency, account.currency, e
-                    )
-                })?;
-        }
-
-        // Register FX pair for asset currency if different from holding currency and account currency
-        // Creates FX:asset_currency:account_currency for converting asset values
-        if asset.currency != account.currency && asset.currency != holding.currency {
-            state
-                .fx_service()
-                .register_currency_pair(&asset.currency, &account.currency)
-                .await
-                .map_err(|e| {
-                    format!(
-                        "Failed to register FX pair {}/{}: {}",
-                        asset.currency, account.currency, e
-                    )
-                })?;
-        }
 
         // Parse average cost if provided
         let average_cost = match &holding.average_cost {
@@ -452,90 +409,40 @@ pub async fn save_manual_holdings(
             _ => Decimal::ZERO,
         };
 
-        // Calculate total cost basis from quantity and average cost
-        let total_cost_basis = quantity * average_cost;
-
-        let position = Position {
-            id: format!("POS-{}-{}", asset.id, account_id),
-            account_id: account_id.clone(),
-            asset_id: asset.id.clone(),
+        positions.push(ManualHoldingInput {
+            asset_id: holding.asset_id,
+            symbol: holding.symbol,
+            exchange_mic: holding.exchange_mic,
             quantity,
-            average_cost,
-            total_cost_basis,
             currency: holding.currency,
-            inception_date: Utc::now(),
-            lots: std::collections::VecDeque::new(),
-            created_at: Utc::now(),
-            last_updated: Utc::now(),
-            is_alternative: false,
-        };
-        positions.insert(asset.id, position);
+            average_cost,
+        });
     }
 
-    // Parse cash balances and register FX pairs for each currency
-    let mut parsed_cash_balances: HashMap<String, Decimal> = HashMap::new();
+    let mut cash_balances_input: Vec<CashBalanceInput> = Vec::new();
     for (currency, amount_str) in cash_balances {
         let amount = amount_str
             .parse::<Decimal>()
             .map_err(|e| format!("Invalid cash amount for {}: {}", currency, e))?;
-        if !amount.is_zero() {
-            // Register FX pair for cash currency if different from account currency
-            // Creates FX:cash_currency:account_currency for converting foreign cash
-            if currency != account.currency {
-                state
-                    .fx_service()
-                    .register_currency_pair(&currency, &account.currency)
-                    .await
-                    .map_err(|e| {
-                        format!(
-                            "Failed to register FX pair {}/{}: {}",
-                            currency, account.currency, e
-                        )
-                    })?;
-            }
-            parsed_cash_balances.insert(currency, amount);
-        }
+        cash_balances_input.push(CashBalanceInput { currency, amount });
     }
 
-    // Register FX pair from account currency to base currency if different
-    // Creates FX:account_currency:base_currency for converting account values to base
-    if account.currency != base_currency {
-        state
-            .fx_service()
-            .register_currency_pair(&account.currency, &base_currency)
-            .await
-            .map_err(|e| {
-                format!(
-                    "Failed to register FX pair {}/{}: {}",
-                    account.currency, base_currency, e
-                )
-            })?;
-    }
+    let manual_snapshot_service = ManualSnapshotService::new(
+        state.asset_service(),
+        state.fx_service(),
+        state.snapshot_service(),
+    );
 
-    // Calculate total cost basis from all positions
-    let total_cost_basis: Decimal = positions.values().map(|p| p.total_cost_basis).sum();
-
-    // Create the snapshot
-    let snapshot = AccountStateSnapshot {
-        id: format!("{}_{}", account_id, date.format("%Y-%m-%d")),
-        account_id: account_id.clone(),
-        snapshot_date: date,
-        currency: account.currency.clone(),
-        positions,
-        cash_balances: parsed_cash_balances,
-        cost_basis: total_cost_basis,
-        net_contribution: Decimal::ZERO,
-        net_contribution_base: Decimal::ZERO,
-        cash_total_account_currency: Decimal::ZERO,
-        cash_total_base_currency: Decimal::ZERO,
-        calculated_at: Utc::now().naive_utc(),
-        source: SnapshotSource::ManualEntry,
-    };
-
-    // Save the snapshot
-    state
-        .snapshot_service()
-        .save_manual_snapshot(&account_id, snapshot)
+    let asset_ids = manual_snapshot_service
+        .save_manual_snapshot(ManualSnapshotRequest {
+            account_id: account_id.clone(),
+            account_currency: account.currency.clone(),
+            snapshot_date: date,
+            positions,
+            cash_balances: cash_balances_input,
+            base_currency: Some(base_currency.clone()),
+            source: SnapshotSource::ManualEntry,
+        })
         .await
         .map_err(|e| format!("Failed to save manual snapshot: {}", e))?;
 
@@ -642,21 +549,6 @@ pub async fn import_holdings_csv(
     // Get base currency for FX pair registration
     let base_currency = state.get_base_currency();
 
-    // Register FX pair from account currency to base currency if different
-    // Creates FX:account_currency:base_currency for converting account values to base
-    if account.currency != base_currency {
-        state
-            .fx_service()
-            .register_currency_pair(&account.currency, &base_currency)
-            .await
-            .map_err(|e| {
-                format!(
-                    "Failed to register FX pair {}/{}: {}",
-                    account.currency, base_currency, e
-                )
-            })?;
-    }
-
     let mut snapshots_imported = 0;
     let mut snapshots_failed = 0;
     let mut errors: Vec<String> = Vec::new();
@@ -726,79 +618,20 @@ async fn import_single_snapshot(
     state: &State<'_, Arc<ServiceContext>>,
     account_id: &str,
     account_currency: &str,
-    _base_currency: &str, // Used by caller for FX pair registration
+    base_currency: &str,
     snapshot_input: &HoldingsSnapshotInput,
 ) -> Result<Vec<String>, String> {
     // Parse the date
     let date = NaiveDate::parse_from_str(&snapshot_input.date, "%Y-%m-%d")
         .map_err(|e| format!("Invalid date format: {}", e))?;
 
-    // Track asset IDs for market sync
-    let mut asset_ids: Vec<String> = Vec::new();
-
-    // Build positions map from the input
-    let mut positions: HashMap<String, Position> = HashMap::new();
+    let mut positions: Vec<ManualHoldingInput> = Vec::new();
 
     for pos_input in &snapshot_input.positions {
         let quantity = pos_input
             .quantity
             .parse::<Decimal>()
             .map_err(|e| format!("Invalid quantity for {}: {}", pos_input.symbol, e))?;
-
-        // Skip zero-quantity positions
-        if quantity.is_zero() {
-            continue;
-        }
-
-        // Generate canonical asset ID from symbol (handles Yahoo suffixes like .TO, .L, etc.)
-        // e.g., "META.TO" → "SEC:META:XTSE", "AAPL" → "SEC:AAPL:UNKNOWN"
-        // CSV imports don't have explicit exchange_mic, so we rely on suffix extraction
-        let asset_id = security_id_from_symbol_with_mic(&pos_input.symbol, None, &pos_input.currency);
-
-        // Ensure the asset exists in the database (same pattern as activities)
-        let asset = state
-            .asset_service()
-            .get_or_create_minimal_asset(
-                &asset_id,
-                Some(pos_input.currency.clone()),
-                None, // No additional metadata
-                None, // Use default pricing mode based on asset kind
-            )
-            .await
-            .map_err(|e| format!("Failed to ensure asset {}: {}", asset_id, e))?;
-
-        // Track asset ID for market sync
-        asset_ids.push(asset.id.clone());
-
-        // Register FX pair for position currency if different from account currency
-        // Creates FX:position_currency:account_currency for converting foreign values
-        if pos_input.currency != account_currency {
-            state
-                .fx_service()
-                .register_currency_pair(&pos_input.currency, account_currency)
-                .await
-                .map_err(|e| {
-                    format!(
-                        "Failed to register FX pair {}/{}: {}",
-                        pos_input.currency, account_currency, e
-                    )
-                })?;
-        }
-
-        // Register FX pair for asset currency if different
-        // Creates FX:asset_currency:account_currency for converting asset values
-        if asset.currency != account_currency && asset.currency != pos_input.currency {
-            state
-                .fx_service()
-                .register_currency_pair(&asset.currency, account_currency)
-                .await
-                .map_err(|e| {
-                    format!(
-                        "Failed to register FX pair {}/{}: {}",
-                        asset.currency, account_currency, e
-                    )
-                })?;
-        }
 
         // Parse price from CSV if provided, use for cost basis calculation
         let price = pos_input
@@ -807,80 +640,45 @@ async fn import_single_snapshot(
             .and_then(|p| p.parse::<Decimal>().ok())
             .unwrap_or(Decimal::ZERO);
 
-        // Calculate cost basis from quantity and price
-        let total_cost_basis = quantity * price;
-        let average_cost = price;
-
-        let position = Position {
-            id: format!("POS-{}-{}", asset.id, account_id),
-            account_id: account_id.to_string(),
-            asset_id: asset.id.clone(),
+        positions.push(ManualHoldingInput {
+            asset_id: None,
+            symbol: pos_input.symbol.clone(),
+            exchange_mic: None,
             quantity,
-            average_cost,
-            total_cost_basis,
             currency: pos_input.currency.clone(),
-            inception_date: Utc::now(),
-            lots: std::collections::VecDeque::new(),
-            created_at: Utc::now(),
-            last_updated: Utc::now(),
-            is_alternative: false,
-        };
-        positions.insert(asset.id, position);
+            average_cost: price,
+        });
     }
 
-    // Parse cash balances and register FX pairs
-    let mut parsed_cash_balances: HashMap<String, Decimal> = HashMap::new();
+    let mut cash_balances_input: Vec<CashBalanceInput> = Vec::new();
     for (currency, amount_str) in &snapshot_input.cash_balances {
         let amount = amount_str
             .parse::<Decimal>()
             .map_err(|e| format!("Invalid cash amount for {}: {}", currency, e))?;
-        if !amount.is_zero() {
-            // Register FX pair for cash currency if different from account currency
-            // Creates FX:cash_currency:account_currency for converting foreign cash
-            if currency != account_currency {
-                state
-                    .fx_service()
-                    .register_currency_pair(currency, account_currency)
-                    .await
-                    .map_err(|e| {
-                        format!(
-                            "Failed to register FX pair {}/{}: {}",
-                            currency, account_currency, e
-                        )
-                    })?;
-            }
-            parsed_cash_balances.insert(currency.clone(), amount);
-        }
+        cash_balances_input.push(CashBalanceInput {
+            currency: currency.clone(),
+            amount,
+        });
     }
 
-    // Calculate total cost basis from all positions
-    let total_cost_basis: Decimal = positions.values().map(|p| p.total_cost_basis).sum();
+    let manual_snapshot_service = ManualSnapshotService::new(
+        state.asset_service(),
+        state.fx_service(),
+        state.snapshot_service(),
+    );
 
-    // Create the snapshot
-    let snapshot = AccountStateSnapshot {
-        id: format!("{}_{}", account_id, date.format("%Y-%m-%d")),
-        account_id: account_id.to_string(),
-        snapshot_date: date,
-        currency: account_currency.to_string(),
-        positions,
-        cash_balances: parsed_cash_balances,
-        cost_basis: total_cost_basis,
-        net_contribution: Decimal::ZERO,
-        net_contribution_base: Decimal::ZERO,
-        cash_total_account_currency: Decimal::ZERO,
-        cash_total_base_currency: Decimal::ZERO,
-        calculated_at: Utc::now().naive_utc(),
-        source: SnapshotSource::CsvImport,
-    };
-
-    // Save the snapshot
-    state
-        .snapshot_service()
-        .save_manual_snapshot(account_id, snapshot)
+    manual_snapshot_service
+        .save_manual_snapshot(ManualSnapshotRequest {
+            account_id: account_id.to_string(),
+            account_currency: account_currency.to_string(),
+            snapshot_date: date,
+            positions,
+            cash_balances: cash_balances_input,
+            base_currency: Some(base_currency.to_string()),
+            source: SnapshotSource::CsvImport,
+        })
         .await
-        .map_err(|e| format!("Failed to save snapshot: {}", e))?;
-
-    Ok(asset_ids)
+        .map_err(|e| format!("Failed to save snapshot: {}", e))
 }
 
 // ============================================================================

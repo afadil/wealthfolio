@@ -3,9 +3,10 @@ use std::sync::Arc;
 
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::quotes::QuoteServiceTrait;
-use crate::taxonomies::TaxonomyServiceTrait;
+use crate::taxonomies::{NewAssetTaxonomyAssignment, TaxonomyServiceTrait};
 
 use super::assets_model::{Asset, AssetKind, NewAsset, PricingMode, UpdateAssetProfile};
+use super::canonical_asset_id;
 use super::assets_traits::{AssetRepositoryTrait, AssetServiceTrait};
 use super::auto_classification::{AutoClassificationService, ClassificationInput};
 use crate::errors::{DatabaseError, Error, Result};
@@ -110,6 +111,56 @@ impl AssetService {
         self.event_sink = event_sink;
         self
     }
+
+    async fn create_cash_asset(&self, currency: &str) -> Result<Asset> {
+        let new_asset = NewAsset::new_cash_asset(currency);
+        let asset = self.asset_repository.create(new_asset).await?;
+
+        // Assign cash to CASH_BANK_DEPOSITS (child of CASH) for proper hierarchy
+        // This enables drill-down: Cash -> Bank Deposits
+        if let Some(ref taxonomy_service) = self.taxonomy_service {
+            // Asset class: CASH_BANK_DEPOSITS (rolls up to CASH)
+            let asset_class_assignment = NewAssetTaxonomyAssignment {
+                id: None,
+                asset_id: asset.id.clone(),
+                taxonomy_id: "asset_classes".to_string(),
+                category_id: "CASH_BANK_DEPOSITS".to_string(),
+                weight: 10000, // 100%
+                source: "AUTO".to_string(),
+            };
+            if let Err(e) = taxonomy_service
+                .assign_asset_to_category(asset_class_assignment)
+                .await
+            {
+                warn!("Failed to assign asset class for cash {}: {}", asset.id, e);
+            }
+
+            // Instrument type: CASH
+            let instrument_type_assignment = NewAssetTaxonomyAssignment {
+                id: None,
+                asset_id: asset.id.clone(),
+                taxonomy_id: "instrument_type".to_string(),
+                category_id: "CASH".to_string(),
+                weight: 10000, // 100%
+                source: "AUTO".to_string(),
+            };
+            if let Err(e) = taxonomy_service
+                .assign_asset_to_category(instrument_type_assignment)
+                .await
+            {
+                warn!(
+                    "Failed to assign instrument type for cash {}: {}",
+                    asset.id, e
+                );
+            }
+        }
+
+        // Emit event for newly created asset
+        self.event_sink
+            .emit(DomainEvent::assets_created(vec![asset.id.clone()]));
+
+        Ok(asset)
+    }
 }
 
 // Implement the service trait
@@ -143,21 +194,79 @@ impl AssetServiceTrait for AssetService {
             .await
     }
 
-    /// Lists currency assets for a given base currency
-    fn load_cash_assets(&self, base_currency: &str) -> Result<Vec<Asset>> {
-        self.asset_repository.list_cash_assets(base_currency)
-    }
+    /// Ensures a cash asset exists (and is properly classified). Idempotent.
+    async fn ensure_cash_asset(&self, currency: &str) -> Result<Asset> {
+        let currency_upper = currency.trim().to_uppercase();
+        let asset_id = canonical_asset_id(&AssetKind::Cash, &currency_upper, None, &currency_upper);
 
-    /// Creates a new cash asset
-    async fn create_cash_asset(&self, currency: &str) -> Result<Asset> {
-        let new_asset = NewAsset::new_cash_asset(currency);
-        let asset = self.asset_repository.create(new_asset).await?;
+        match self.asset_repository.get_by_id(&asset_id) {
+            Ok(existing_asset) => {
+                if let Some(ref taxonomy_service) = self.taxonomy_service {
+                    match taxonomy_service.get_asset_assignments(&existing_asset.id) {
+                        Ok(assignments) => {
+                            let has_asset_class = assignments
+                                .iter()
+                                .any(|a| a.taxonomy_id == "asset_classes");
+                            let has_instrument_type = assignments
+                                .iter()
+                                .any(|a| a.taxonomy_id == "instrument_type");
 
-        // Emit event for newly created asset
-        self.event_sink
-            .emit(DomainEvent::assets_created(vec![asset.id.clone()]));
+                            if !has_asset_class {
+                                let asset_class_assignment = NewAssetTaxonomyAssignment {
+                                    id: None,
+                                    asset_id: existing_asset.id.clone(),
+                                    taxonomy_id: "asset_classes".to_string(),
+                                    category_id: "CASH_BANK_DEPOSITS".to_string(),
+                                    weight: 10000, // 100%
+                                    source: "AUTO".to_string(),
+                                };
+                                if let Err(e) = taxonomy_service
+                                    .assign_asset_to_category(asset_class_assignment)
+                                    .await
+                                {
+                                    warn!(
+                                        "Failed to assign asset class for cash {}: {}",
+                                        existing_asset.id, e
+                                    );
+                                }
+                            }
 
-        Ok(asset)
+                            if !has_instrument_type {
+                                let instrument_type_assignment = NewAssetTaxonomyAssignment {
+                                    id: None,
+                                    asset_id: existing_asset.id.clone(),
+                                    taxonomy_id: "instrument_type".to_string(),
+                                    category_id: "CASH".to_string(),
+                                    weight: 10000, // 100%
+                                    source: "AUTO".to_string(),
+                                };
+                                if let Err(e) = taxonomy_service
+                                    .assign_asset_to_category(instrument_type_assignment)
+                                    .await
+                                {
+                                    warn!(
+                                        "Failed to assign instrument type for cash {}: {}",
+                                        existing_asset.id, e
+                                    );
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            warn!(
+                                "Failed to load taxonomy assignments for cash {}: {}",
+                                existing_asset.id, e
+                            );
+                        }
+                    }
+                }
+
+                Ok(existing_asset)
+            }
+            Err(Error::Database(DatabaseError::NotFound(_))) => {
+                self.create_cash_asset(&currency_upper).await
+            }
+            Err(e) => Err(e),
+        }
     }
 
     /// Creates a new asset directly without network lookups.
@@ -203,6 +312,16 @@ impl AssetServiceTrait for AssetService {
             .as_ref()
             .and_then(|m| m.kind.clone())
             .unwrap_or_else(|| infer_asset_kind(asset_id));
+
+        if kind == AssetKind::Cash {
+            let cash_currency = super::parse_canonical_asset_id(asset_id)
+                .map(|parsed| parsed.symbol)
+                .or_else(|| asset_id.strip_prefix("$CASH-").map(|s| s.to_string()))
+                .filter(|c| !c.is_empty())
+                .or_else(|| context_currency.clone().filter(|c| !c.is_empty()))
+                .unwrap_or_else(|| asset_id.to_string());
+            return self.ensure_cash_asset(&cash_currency).await;
+        }
 
         // Determine pricing mode: use hint if provided, otherwise default based on kind
         let pricing_mode = if let Some(ref hint) = pricing_mode_hint {

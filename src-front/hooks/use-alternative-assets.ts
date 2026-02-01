@@ -41,6 +41,7 @@ export function useCreateAlternativeAsset(options?: UseAlternativeAssetMutations
       queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });
       queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSETS] });
       queryClient.invalidateQueries({ queryKey: [QueryKeys.NET_WORTH] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.NET_WORTH_HISTORY] });
       queryClient.invalidateQueries({ queryKey: [QueryKeys.ALTERNATIVE_HOLDINGS] });
 
       toast({
@@ -85,6 +86,7 @@ export function useUpdateValuation(options?: UseAlternativeAssetMutationsOptions
       // Invalidate holdings-related queries to reflect the new valuation
       queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });
       queryClient.invalidateQueries({ queryKey: [QueryKeys.NET_WORTH] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.NET_WORTH_HISTORY] });
       queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS_SUMMARY] });
       queryClient.invalidateQueries({ queryKey: [QueryKeys.ALTERNATIVE_HOLDINGS] });
 
@@ -122,6 +124,7 @@ export function useDeleteAlternativeAsset(options?: UseAlternativeAssetMutations
       queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });
       queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSETS] });
       queryClient.invalidateQueries({ queryKey: [QueryKeys.NET_WORTH] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.NET_WORTH_HISTORY] });
       queryClient.invalidateQueries({ queryKey: [QueryKeys.ALTERNATIVE_HOLDINGS] });
 
       toast({
@@ -161,6 +164,9 @@ export function useLinkLiability(options?: UseAlternativeAssetMutationsOptions) 
       // Invalidate queries to reflect the link change
       queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });
       queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSETS] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.ALTERNATIVE_HOLDINGS] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.NET_WORTH] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.NET_WORTH_HISTORY] });
 
       toast({
         title: "Liability linked",
@@ -194,6 +200,9 @@ export function useUnlinkLiability(options?: UseAlternativeAssetMutationsOptions
       // Invalidate queries to reflect the unlink change
       queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });
       queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSETS] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.ALTERNATIVE_HOLDINGS] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.NET_WORTH] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.NET_WORTH_HISTORY] });
 
       toast({
         title: "Liability unlinked",
@@ -277,4 +286,56 @@ export function useNetWorthHistory(options: UseNetWorthHistoryOptions) {
     queryFn: () => getNetWorthHistory(startDate, endDate),
     enabled,
   });
+}
+
+interface UseAlternativeAssetHoldingOptions {
+  /** The asset ID to fetch */
+  assetId: string;
+  /** Whether the query is enabled. Defaults to true. */
+  enabled?: boolean;
+}
+
+/**
+ * Hook for fetching a single alternative asset holding by ID.
+ * Derives from the full list of alternative holdings.
+ */
+export function useAlternativeAssetHolding(options: UseAlternativeAssetHoldingOptions) {
+  const { assetId, enabled = true } = options;
+  const { data: holdings, isLoading, isError, error } = useAlternativeHoldings({ enabled });
+
+  const holding = holdings?.find((h) => h.id === assetId) ?? null;
+
+  return {
+    data: holding,
+    isLoading,
+    isError,
+    error,
+  };
+}
+
+interface UseLinkedLiabilitiesOptions {
+  /** The asset ID to find linked liabilities for */
+  assetId: string;
+  /** Whether the query is enabled. Defaults to true. */
+  enabled?: boolean;
+}
+
+/**
+ * Hook for fetching liabilities linked to a specific asset (property/vehicle).
+ * Returns all liability holdings that have linkedAssetId matching the given assetId.
+ */
+export function useLinkedLiabilities(options: UseLinkedLiabilitiesOptions) {
+  const { assetId, enabled = true } = options;
+  const { data: holdings, isLoading, isError, error } = useAlternativeHoldings({ enabled });
+
+  const linkedLiabilities =
+    holdings?.filter((h) => h.kind.toLowerCase() === "liability" && h.linkedAssetId === assetId) ??
+    [];
+
+  return {
+    data: linkedLiabilities,
+    isLoading,
+    isError,
+    error,
+  };
 }

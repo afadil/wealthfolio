@@ -339,7 +339,10 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => form.setValue("isArchived", false)}
+                  onClick={() => {
+                    form.setValue("isArchived", false);
+                    form.handleSubmit(onSubmit)();
+                  }}
                 >
                   Restore
                 </Button>

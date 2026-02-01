@@ -13,6 +13,7 @@ import { useIsMobileViewport } from "@/hooks/use-platform";
 import { useQuoteHistory } from "@/hooks/use-quote-history";
 import { useSyncMarketDataMutation } from "@/hooks/use-sync-market-data";
 import { useAssetTaxonomyAssignments, useTaxonomy } from "@/hooks/use-taxonomies";
+import { useAlternativeAssetHolding, useAlternativeHoldings } from "@/hooks/use-alternative-assets";
 import { useAssetProfileMutations } from "./hooks/use-asset-profile-mutations";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
@@ -26,6 +27,7 @@ import AssetHistoryCard from "./asset-history-card";
 import AssetLotsTable from "./asset-lots-table";
 import { useQuoteMutations } from "./hooks/use-quote-mutations";
 import { QuoteHistoryDataGrid } from "./quote-history-data-grid";
+import { AlternativeAssetContent, useAlternativeAssetActions } from "./alternative-asset-content";
 
 // Alternative asset kinds that should use ValueHistoryDataGrid
 const ALTERNATIVE_ASSET_KINDS: AssetKind[] = [
@@ -274,6 +276,17 @@ export const AssetProfilePage = () => {
   const isAltAsset = isAlternativeAsset(assetProfile?.kind);
   const isLiability = assetProfile?.kind === "LIABILITY";
 
+  // Fetch alternative asset holding data (for alternative assets only)
+  const { data: altHolding } = useAlternativeAssetHolding({
+    assetId,
+    enabled: isAltAsset,
+  });
+
+  // Fetch all alternative holdings for linking context
+  const { data: allAltHoldings = [] } = useAlternativeHoldings({
+    enabled: isAltAsset,
+  });
+
   const profile = useMemo(() => {
     const instrument = holding?.instrument;
     const asset = assetProfile;
@@ -357,6 +370,14 @@ export const AssetProfilePage = () => {
   const toggleItems = useMemo(() => {
     const items: { value: AssetTab; label: string }[] = [];
 
+    // For alternative assets: Overview | History (no Lots tab)
+    if (isAltAsset) {
+      items.push({ value: "overview", label: "Overview" });
+      items.push({ value: "history", label: "Values" });
+      return items;
+    }
+
+    // For regular assets
     if (profile) {
       items.push({ value: "overview", label: "Overview" });
     }
@@ -365,7 +386,7 @@ export const AssetProfilePage = () => {
       items.push({ value: "lots", label: "Lots" });
     }
 
-    items.push({ value: "history", label: isAltAsset ? "Values" : "Quotes" });
+    items.push({ value: "history", label: "Quotes" });
 
     return items;
   }, [profile, holding, isAltAsset]);
@@ -539,6 +560,14 @@ export const AssetProfilePage = () => {
     navigate(-1);
   }, [navigate]);
 
+  // Alternative asset actions hook (only used when isAltAsset && altHolding)
+  const altAssetActions = useAlternativeAssetActions({
+    holding: altHolding,
+    assetProfile: assetProfile,
+    allHoldings: allAltHoldings,
+    onNavigateBack: handleBack,
+  });
+
   if (isLoading)
     return (
       <Page>
@@ -639,63 +668,104 @@ export const AssetProfilePage = () => {
             <ActionPalette
               open={actionPaletteOpen}
               onOpenChange={setActionPaletteOpen}
-              title={(() => {
-                const parts = assetId.split(":");
-                return parts.length >= 2 ? parts[1] : assetId;
-              })()}
+              title={
+                isAltAsset && altHolding
+                  ? altHolding.name
+                  : (() => {
+                      const parts = assetId.split(":");
+                      return parts.length >= 2 ? parts[1] : assetId;
+                    })()
+              }
               groups={
-                [
-                  {
-                    title: "Record Transaction",
-                    items: [
+                isAltAsset && altHolding
+                  ? ([
                       {
-                        icon: Icons.TrendingUp,
-                        label: "Buy",
-                        onClick: () =>
-                          navigate(
-                            `/activities/manage?assetId=${encodeURIComponent(assetId)}&type=BUY`,
-                          ),
+                        title: "Valuation",
+                        items: [
+                          {
+                            icon: Icons.DollarSign,
+                            label: "Update Value",
+                            onClick: () => altAssetActions.openUpdateValuation(),
+                          },
+                        ],
                       },
                       {
-                        icon: Icons.TrendingDown,
-                        label: "Sell",
-                        onClick: () =>
-                          navigate(
-                            `/activities/manage?assetId=${encodeURIComponent(assetId)}&type=SELL`,
-                          ),
+                        title: "Manage",
+                        items: [
+                          {
+                            icon: Icons.Pencil,
+                            label: "Edit Details",
+                            onClick: () => altAssetActions.openEditDetails(),
+                          },
+                          ...(altAssetActions.isLinkableAsset
+                            ? [
+                                {
+                                  icon: Icons.Link,
+                                  label: "Add Liability",
+                                  onClick: () => altAssetActions.openAddLiability(),
+                                },
+                              ]
+                            : []),
+                          {
+                            icon: Icons.Trash,
+                            label: "Delete",
+                            onClick: () => altAssetActions.openDeleteConfirm(),
+                          },
+                        ],
+                      },
+                    ] satisfies ActionPaletteGroup[])
+                  : ([
+                      {
+                        title: "Record Transaction",
+                        items: [
+                          {
+                            icon: Icons.TrendingUp,
+                            label: "Buy",
+                            onClick: () =>
+                              navigate(
+                                `/activities/manage?assetId=${encodeURIComponent(assetId)}&type=BUY`,
+                              ),
+                          },
+                          {
+                            icon: Icons.TrendingDown,
+                            label: "Sell",
+                            onClick: () =>
+                              navigate(
+                                `/activities/manage?assetId=${encodeURIComponent(assetId)}&type=SELL`,
+                              ),
+                          },
+                          {
+                            icon: Icons.Coins,
+                            label: "Dividend",
+                            onClick: () =>
+                              navigate(
+                                `/activities/manage?assetId=${encodeURIComponent(assetId)}&type=DIVIDEND`,
+                              ),
+                          },
+                          {
+                            icon: Icons.Ellipsis,
+                            label: "Other",
+                            onClick: () =>
+                              navigate(`/activities/manage?assetId=${encodeURIComponent(assetId)}`),
+                          },
+                        ],
                       },
                       {
-                        icon: Icons.Coins,
-                        label: "Dividend",
-                        onClick: () =>
-                          navigate(
-                            `/activities/manage?assetId=${encodeURIComponent(assetId)}&type=DIVIDEND`,
-                          ),
+                        title: "Manage",
+                        items: [
+                          {
+                            icon: Icons.Refresh,
+                            label: "Refresh Price",
+                            onClick: handleRefreshQuotes,
+                          },
+                          {
+                            icon: Icons.Pencil,
+                            label: "Edit",
+                            onClick: () => setEditSheetOpen(true),
+                          },
+                        ],
                       },
-                      {
-                        icon: Icons.Ellipsis,
-                        label: "Other",
-                        onClick: () =>
-                          navigate(`/activities/manage?assetId=${encodeURIComponent(assetId)}`),
-                      },
-                    ],
-                  },
-                  {
-                    title: "Manage",
-                    items: [
-                      {
-                        icon: Icons.Refresh,
-                        label: "Refresh Price",
-                        onClick: handleRefreshQuotes,
-                      },
-                      {
-                        icon: Icons.Pencil,
-                        label: "Edit",
-                        onClick: () => setEditSheetOpen(true),
-                      },
-                    ],
-                  },
-                ] satisfies ActionPaletteGroup[]
+                    ] satisfies ActionPaletteGroup[])
               }
               trigger={
                 <Button variant="outline" size="icon" className="h-9 w-9">
@@ -707,29 +777,102 @@ export const AssetProfilePage = () => {
         }
       >
         <div className="flex items-center gap-2" data-tauri-drag-region="true">
-          {(profile?.symbol ?? holding?.instrument?.symbol) && (
-            <TickerAvatar
-              symbol={profile?.symbol ?? holding?.instrument?.symbol ?? assetId}
-              className="size-9"
-            />
+          {isAltAsset && altHolding ? (
+            <div className="bg-muted flex h-9 w-9 items-center justify-center rounded-full">
+              <AlternativeAssetIcon kind={altHolding.kind} size={20} />
+            </div>
+          ) : (
+            (profile?.symbol ?? holding?.instrument?.symbol) && (
+              <TickerAvatar
+                symbol={profile?.symbol ?? holding?.instrument?.symbol ?? assetId}
+                className="size-9"
+              />
+            )
           )}
           <div className="flex min-w-0 flex-col justify-center">
             <h1 className="truncate text-base leading-tight font-semibold md:text-lg">
               {assetProfile?.name ?? holding?.instrument?.name ?? assetId ?? "-"}
             </h1>
             <p className="text-muted-foreground text-xs leading-tight md:text-sm">
-              {(() => {
-                const fullSymbol = assetProfile?.symbol ?? holding?.instrument?.symbol ?? assetId;
-                // Extract ticker from formats like "CRYPTO:GRT:USD" or "STOCK:AAPL:USD"
-                const parts = fullSymbol.split(":");
-                return parts.length >= 2 ? parts[1] : fullSymbol;
-              })()}
+              {isAltAsset && altHolding
+                ? getAlternativeAssetKindLabel(altHolding.kind)
+                : (() => {
+                    const fullSymbol =
+                      assetProfile?.symbol ?? holding?.instrument?.symbol ?? assetId;
+                    const parts = fullSymbol.split(":");
+                    return parts.length >= 2 ? parts[1] : fullSymbol;
+                  })()}
             </p>
           </div>
         </div>
       </PageHeader>
       <PageContent>
-        {isMobile ? (
+        {/* Alternative Asset Content */}
+        {isAltAsset && altHolding && assetProfile ? (
+          isMobile ? (
+            <SwipableView
+              items={[
+                {
+                  name: "Overview",
+                  content: (
+                    <AlternativeAssetContent
+                      assetId={assetId}
+                      assetProfile={assetProfile}
+                      holding={altHolding}
+                      quoteHistory={quoteHistory ?? []}
+                      activeTab="overview"
+                      isMobile={true}
+                    />
+                  ),
+                },
+                {
+                  name: "Values",
+                  content: (
+                    <AlternativeAssetContent
+                      assetId={assetId}
+                      assetProfile={assetProfile}
+                      holding={altHolding}
+                      quoteHistory={quoteHistory ?? []}
+                      activeTab="history"
+                      isMobile={true}
+                    />
+                  ),
+                },
+              ]}
+              displayToggle={true}
+              onViewChange={(_index: number, name: string) => {
+                const tabValue = name.toLowerCase() === "values" ? "history" : "overview";
+                if (tabValue === activeTab) return;
+                triggerHaptic();
+                setActiveTab(tabValue as AssetTab);
+                navigate(`${location.pathname}?tab=${tabValue}`, { replace: true });
+              }}
+            />
+          ) : (
+            <Tabs value={activeTab} className="space-y-4">
+              <TabsContent value="overview" className="space-y-4">
+                <AlternativeAssetContent
+                  assetId={assetId}
+                  assetProfile={assetProfile}
+                  holding={altHolding}
+                  quoteHistory={quoteHistory ?? []}
+                  activeTab="overview"
+                  isMobile={false}
+                />
+              </TabsContent>
+              <TabsContent value="history" className="pt-6">
+                <AlternativeAssetContent
+                  assetId={assetId}
+                  assetProfile={assetProfile}
+                  holding={altHolding}
+                  quoteHistory={quoteHistory ?? []}
+                  activeTab="history"
+                  isMobile={false}
+                />
+              </TabsContent>
+            </Tabs>
+          )
+        ) : isMobile ? (
           <SwipableView
             items={swipableTabs}
             displayToggle={true}
@@ -879,7 +1022,7 @@ export const AssetProfilePage = () => {
         )}
       </PageContent>
 
-      {/* Edit Sheet */}
+      {/* Edit Sheet (for regular assets) */}
       <AssetEditSheet
         open={editSheetOpen}
         onOpenChange={setEditSheetOpen}
@@ -887,8 +1030,42 @@ export const AssetProfilePage = () => {
         latestQuote={quote}
         defaultTab={editSheetDefaultTab}
       />
+
+      {/* Alternative Asset Modals */}
+      {isAltAsset && altHolding && altAssetActions.modals}
     </Page>
   );
 };
+
+// Helper component for alternative asset icons
+function AlternativeAssetIcon({ kind, size = 20 }: { kind: string; size?: number }) {
+  switch (kind.toLowerCase()) {
+    case "property":
+      return <Icons.RealEstateDuotone size={size} />;
+    case "vehicle":
+      return <Icons.VehicleDuotone size={size} />;
+    case "collectible":
+      return <Icons.CollectibleDuotone size={size} />;
+    case "precious":
+      return <Icons.PreciousDuotone size={size} />;
+    case "liability":
+      return <Icons.LiabilityDuotone size={size} />;
+    default:
+      return <Icons.OtherAssetDuotone size={size} />;
+  }
+}
+
+// Helper to get display label for alternative asset kinds
+function getAlternativeAssetKindLabel(kind: string): string {
+  const labels: Record<string, string> = {
+    property: "Property",
+    vehicle: "Vehicle",
+    collectible: "Collectible",
+    precious: "Precious Metal",
+    liability: "Liability",
+    other: "Other Asset",
+  };
+  return labels[kind.toLowerCase()] || kind;
+}
 
 export default AssetProfilePage;

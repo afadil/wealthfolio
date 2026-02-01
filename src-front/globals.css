@@ -222,6 +222,7 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
+  --color-input-bg: var(--input-bg);
   --color-ring: var(--ring);
 
   /* Chart colors */
@@ -342,7 +343,7 @@
   --radius: 0.625rem;
 
   /* Input heights - desktop default */
-  --input-height: 2.5rem; /* h-10 */
+  --input-height: 2.75rem; /* h-11 */
   --input-height-lg: 2.75rem; /* h-11 */
 
   /* Button heights - desktop default */
@@ -395,7 +396,8 @@
   --warning: hsl(var(--flexoki-ye));
   --warning-foreground: hsl(var(--flexoki-bg));
   --border: hsl(var(--flexoki-ui));
-  --input: hsl(var(--flexoki-ui-2));
+  --input: hsl(var(--flexoki-ui));
+  --input-bg: hsl(var(--flexoki-bg));
   --ring: hsl(var(--flexoki-ui-3));
 
   /* Charts (full hsl colors) */

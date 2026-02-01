@@ -130,7 +130,12 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 query = query.filter(activities::activity_type.eq_any(activity_types));
             }
             if let Some(ref keyword) = asset_id_keyword {
-                query = query.filter(assets::id.like(format!("%{}%", keyword)));
+                let pattern = format!("%{}%", keyword);
+                query = query.filter(
+                    assets::id
+                        .like(pattern.clone())
+                        .or(assets::name.like(pattern)),
+                );
             }
             // Map needs_review_filter to status filter (DRAFT status means needs review)
             if let Some(needs_review) = needs_review_filter {

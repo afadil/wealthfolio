@@ -74,17 +74,23 @@ export const getNetWorth = async (date?: string): Promise<NetWorthResponse> => {
 };
 
 /**
- * Update an alternative asset's metadata (details like purchase info, address, etc.)
+ * Update an alternative asset's details (name, notes, and/or metadata)
  * @param assetId The ID of the asset to update
  * @param metadata The metadata key-value pairs to save
+ * @param name Optional new name for the asset
+ * @param notes Optional notes for the asset (stored in asset.notes, not metadata)
  */
 export const updateAlternativeAssetMetadata = async (
   assetId: string,
   metadata: Record<string, string>,
+  name?: string,
+  notes?: string | null,
 ): Promise<void> => {
   return invoke<void>("update_alternative_asset_metadata", {
     assetId,
+    name,
     metadata,
+    notes,
   });
 };
 

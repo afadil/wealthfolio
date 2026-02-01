@@ -9,7 +9,7 @@ use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
 use crate::errors::Result;
-use crate::portfolio::holdings::{Holding, HoldingType, HoldingsServiceTrait};
+use crate::portfolio::holdings::{Holding, HoldingSummary, HoldingType, HoldingsServiceTrait};
 use crate::taxonomies::{Category, TaxonomyServiceTrait};
 
 use super::{CategoryAllocation, PortfolioAllocations, TaxonomyAllocation};
@@ -24,6 +24,16 @@ pub trait AllocationServiceTrait: Send + Sync {
         account_id: &str,
         base_currency: &str,
     ) -> Result<PortfolioAllocations>;
+
+    /// Returns holdings filtered by a taxonomy category.
+    /// Used for drill-down views when user clicks on an allocation category.
+    async fn get_holdings_by_allocation(
+        &self,
+        account_id: &str,
+        base_currency: &str,
+        taxonomy_id: &str,
+        category_id: &str,
+    ) -> Result<Vec<HoldingSummary>>;
 }
 
 /// Service for computing taxonomy-based portfolio allocations.
@@ -44,7 +54,8 @@ impl AllocationService {
     }
 
     /// Aggregates holdings into a taxonomy allocation.
-    /// For hierarchical taxonomies (GICS, Regions), rolls up to top-level categories.
+    /// For hierarchical taxonomies (GICS, Regions), rolls up to top-level categories
+    /// and populates children for drill-down.
     fn aggregate_by_taxonomy(
         &self,
         holdings: &[Holding],
@@ -71,12 +82,16 @@ impl AllocationService {
                 .collect()
         };
 
-        // Aggregate values by category
-        let mut category_values: HashMap<String, Decimal> = HashMap::new();
+        // Aggregate values by category (original assignments, not rolled up)
+        // Key: original category_id, Value: (value, top_level_id)
+        let mut original_values: HashMap<String, (Decimal, String)> = HashMap::new();
+        // Aggregate values by top-level category (rolled up)
+        let mut rolled_up_values: HashMap<String, Decimal> = HashMap::new();
 
         for holding in holdings {
-            // Skip cash holdings for sector/region allocation
-            if holding.holding_type == HoldingType::Cash {
+            // Skip cash holdings for sector/region allocation (not for asset_classes)
+            // Cash has asset_class classifications but not sector/region classifications
+            if holding.holding_type == HoldingType::Cash && taxonomy_id != "asset_classes" {
                 continue;
             }
 
@@ -96,16 +111,17 @@ impl AllocationService {
 
                 if taxonomy_assignments.is_empty() {
                     // No assignment for this taxonomy - count as "Unknown"
-                    *category_values
+                    *rolled_up_values
                         .entry("__UNKNOWN__".to_string())
                         .or_insert(Decimal::ZERO) += market_value;
                 } else {
                     for (_, category_id, weight) in taxonomy_assignments {
                         // Convert weight from basis points (0-10000) to decimal (0-1)
                         let weight_decimal = Decimal::from(*weight) / dec!(10000);
+                        let weighted_value = market_value * weight_decimal;
 
-                        // Roll up to top level if needed
-                        let effective_category_id = if rollup_to_top_level {
+                        // Get top-level category
+                        let top_level_id = if rollup_to_top_level {
                             top_level_map
                                 .get(category_id.as_str())
                                 .copied()
@@ -114,22 +130,64 @@ impl AllocationService {
                             category_id.as_str()
                         };
 
-                        let weighted_value = market_value * weight_decimal;
-                        *category_values
-                            .entry(effective_category_id.to_string())
+                        // Track original category values (for children)
+                        let entry = original_values
+                            .entry(category_id.clone())
+                            .or_insert((Decimal::ZERO, top_level_id.to_string()));
+                        entry.0 += weighted_value;
+
+                        // Track rolled-up values
+                        *rolled_up_values
+                            .entry(top_level_id.to_string())
                             .or_insert(Decimal::ZERO) += weighted_value;
                     }
                 }
             } else {
                 // No assignments at all - count as "Unknown"
-                *category_values
+                *rolled_up_values
                     .entry("__UNKNOWN__".to_string())
                     .or_insert(Decimal::ZERO) += market_value;
             }
         }
 
-        // Build category allocations
-        let mut allocations: Vec<CategoryAllocation> = category_values
+        // Build children map: top_level_id -> Vec<CategoryAllocation>
+        let mut children_map: HashMap<String, Vec<CategoryAllocation>> = HashMap::new();
+        if rollup_to_top_level {
+            for (cat_id, (value, top_level_id)) in &original_values {
+                // Only add as child if different from top-level (i.e., it was rolled up)
+                if cat_id != top_level_id && *value > Decimal::ZERO {
+                    let (name, color) = category_by_id
+                        .get(cat_id.as_str())
+                        .map(|c| (c.name.clone(), c.color.clone()))
+                        .unwrap_or_else(|| (cat_id.clone(), "#808080".to_string()));
+
+                    let percentage = if total_value > Decimal::ZERO {
+                        (*value / total_value * dec!(100)).round_dp(2)
+                    } else {
+                        Decimal::ZERO
+                    };
+
+                    children_map
+                        .entry(top_level_id.clone())
+                        .or_default()
+                        .push(CategoryAllocation {
+                            category_id: cat_id.clone(),
+                            category_name: name,
+                            color,
+                            value: *value,
+                            percentage,
+                            children: Vec::new(),
+                        });
+                }
+            }
+            // Sort children by value descending
+            for children in children_map.values_mut() {
+                children.sort_by(|a, b| b.value.cmp(&a.value));
+            }
+        }
+
+        // Build top-level category allocations
+        let mut allocations: Vec<CategoryAllocation> = rolled_up_values
             .into_iter()
             .filter(|(_, value)| *value > Decimal::ZERO)
             .map(|(cat_id, value)| {
@@ -148,12 +206,15 @@ impl AllocationService {
                     Decimal::ZERO
                 };
 
+                let children = children_map.remove(&cat_id).unwrap_or_default();
+
                 CategoryAllocation {
                     category_id: cat_id,
                     category_name: name,
                     color,
                     value,
                     percentage,
+                    children,
                 }
             })
             .collect();
@@ -272,6 +333,7 @@ impl AllocationServiceTrait for AllocationService {
             match taxonomy.id.as_str() {
                 "asset_classes" => {
                     // Asset classes include cash, use total_with_cash
+                    // Cash holdings now have proper instruments with classifications
                     asset_classes_alloc = self.aggregate_by_taxonomy(
                         &holdings,
                         &taxonomy.id,
@@ -280,46 +342,8 @@ impl AllocationServiceTrait for AllocationService {
                         categories,
                         &assignments_by_asset,
                         total_with_cash,
-                        false, // No rollup for asset classes
+                        true, // Roll up to top-level asset classes
                     );
-                    // Manually add cash holdings to Cash category
-                    let cash_value: Decimal = holdings
-                        .iter()
-                        .filter(|h| h.holding_type == HoldingType::Cash)
-                        .map(|h| h.market_value.base)
-                        .sum();
-                    if cash_value > Decimal::ZERO {
-                        // Find or add Cash category
-                        if let Some(cash_cat) = asset_classes_alloc
-                            .categories
-                            .iter_mut()
-                            .find(|c| c.category_id == "CASH")
-                        {
-                            cash_cat.value += cash_value;
-                            cash_cat.percentage = if total_with_cash > Decimal::ZERO {
-                                (cash_cat.value / total_with_cash * dec!(100)).round_dp(2)
-                            } else {
-                                Decimal::ZERO
-                            };
-                        } else {
-                            let percentage = if total_with_cash > Decimal::ZERO {
-                                (cash_value / total_with_cash * dec!(100)).round_dp(2)
-                            } else {
-                                Decimal::ZERO
-                            };
-                            asset_classes_alloc.categories.push(CategoryAllocation {
-                                category_id: "CASH".to_string(),
-                                category_name: "Cash".to_string(),
-                                color: "#c437c2".to_string(),
-                                value: cash_value,
-                                percentage,
-                            });
-                        }
-                        // Re-sort by value
-                        asset_classes_alloc
-                            .categories
-                            .sort_by(|a, b| b.value.cmp(&a.value));
-                    }
                 }
                 "industries_gics" => {
                     sectors_alloc = self.aggregate_by_taxonomy(
@@ -369,8 +393,8 @@ impl AllocationServiceTrait for AllocationService {
                         true, // Roll up to top-level instrument types
                     );
                 }
-                _ if taxonomy.id == "custom_groups" || !taxonomy.is_system => {
-                    // Custom taxonomies
+                _ if !taxonomy.is_system => {
+                    // User-created custom taxonomies only (skip system placeholder "custom_groups")
                     let custom_alloc = self.aggregate_by_taxonomy(
                         &holdings,
                         &taxonomy.id,
@@ -381,7 +405,7 @@ impl AllocationServiceTrait for AllocationService {
                         total_value,
                         false,
                     );
-                    // Only include if there are any assignments
+                    // Only include if there are real categories (not just Unknown)
                     if !custom_alloc.categories.is_empty() {
                         custom_allocs.push(custom_alloc);
                     }
@@ -399,5 +423,151 @@ impl AllocationServiceTrait for AllocationService {
             custom_groups: custom_allocs,
             total_value: total_with_cash,
         })
+    }
+
+    async fn get_holdings_by_allocation(
+        &self,
+        account_id: &str,
+        base_currency: &str,
+        taxonomy_id: &str,
+        category_id: &str,
+    ) -> Result<Vec<HoldingSummary>> {
+        debug!(
+            "Getting holdings for category {} in taxonomy {} for account {}",
+            category_id, taxonomy_id, account_id
+        );
+
+        // Get all holdings for the account
+        let holdings = self
+            .holdings_service
+            .get_holdings(account_id, base_currency)
+            .await?;
+
+        if holdings.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Get taxonomy with categories for hierarchy lookup
+        let taxonomy_with_cats = self.taxonomy_service.get_taxonomy(taxonomy_id)?;
+        let empty_categories: Vec<Category> = Vec::new();
+        let categories = taxonomy_with_cats
+            .as_ref()
+            .map(|t| &t.categories)
+            .unwrap_or(&empty_categories);
+
+        // Build map from category to top-level ancestor
+        let top_level_map: HashMap<&str, &str> = self.build_top_level_map(categories);
+
+        // Get all assignments for this category (including child categories)
+        // First, find all category IDs that roll up to the target category
+        let matching_category_ids: Vec<&str> = if category_id == "__UNKNOWN__" {
+            vec!["__UNKNOWN__"]
+        } else {
+            categories
+                .iter()
+                .filter(|c| {
+                    // Include this category if it equals or rolls up to the target
+                    c.id == category_id
+                        || top_level_map.get(c.id.as_str()).copied() == Some(category_id)
+                })
+                .map(|c| c.id.as_str())
+                .collect()
+        };
+
+        // Get assignments for all matching categories
+        let mut asset_to_weight: HashMap<String, i32> = HashMap::new();
+        for cat_id in &matching_category_ids {
+            if *cat_id == "__UNKNOWN__" {
+                continue;
+            }
+            if let Ok(assignments) = self
+                .taxonomy_service
+                .get_category_assignments(taxonomy_id, cat_id)
+            {
+                for assignment in assignments {
+                    *asset_to_weight
+                        .entry(assignment.asset_id.clone())
+                        .or_insert(0) += assignment.weight;
+                }
+            }
+        }
+
+        // Calculate total value of matched holdings for weight calculation
+        let mut matched_holdings: Vec<(&Holding, i32)> = Vec::new();
+
+        for holding in &holdings {
+            let asset_id = match &holding.instrument {
+                Some(instrument) => &instrument.id,
+                None => continue,
+            };
+
+            // Check if this holding matches the category
+            if category_id == "__UNKNOWN__" {
+                // For "Unknown", include holdings with no assignment for this taxonomy
+                let has_assignment = self
+                    .taxonomy_service
+                    .get_asset_assignments(asset_id)
+                    .map(|assignments| {
+                        assignments
+                            .iter()
+                            .any(|a| a.taxonomy_id == taxonomy_id)
+                    })
+                    .unwrap_or(false);
+
+                if !has_assignment {
+                    matched_holdings.push((holding, 10000)); // 100% weight
+                }
+            } else if let Some(&weight) = asset_to_weight.get(asset_id) {
+                matched_holdings.push((holding, weight));
+            }
+        }
+
+        // Calculate total matched value for weight calculation
+        let total_matched_value: Decimal = matched_holdings
+            .iter()
+            .map(|(h, weight)| {
+                let weight_decimal = Decimal::from(*weight) / dec!(10000);
+                h.market_value.base * weight_decimal
+            })
+            .sum();
+
+        // Build summaries
+        let mut summaries: Vec<HoldingSummary> = matched_holdings
+            .into_iter()
+            .map(|(holding, weight)| {
+                let weight_decimal = Decimal::from(weight) / dec!(10000);
+                let weighted_value = holding.market_value.base * weight_decimal;
+                let weight_in_category = if total_matched_value > Decimal::ZERO {
+                    (weighted_value / total_matched_value * dec!(100)).round_dp(2)
+                } else {
+                    Decimal::ZERO
+                };
+
+                HoldingSummary {
+                    // Use instrument.id (the asset ID) for navigation, not holding.id (composite ID)
+                    id: holding
+                        .instrument
+                        .as_ref()
+                        .map(|i| i.id.clone())
+                        .unwrap_or_else(|| holding.id.clone()),
+                    symbol: holding
+                        .instrument
+                        .as_ref()
+                        .map(|i| i.symbol.clone())
+                        .unwrap_or_default(),
+                    name: holding.instrument.as_ref().and_then(|i| i.name.clone()),
+                    holding_type: holding.holding_type.clone(),
+                    quantity: holding.quantity,
+                    market_value: weighted_value,
+                    currency: holding.base_currency.clone(),
+                    weight_in_category,
+                }
+            })
+            .collect();
+
+        // Sort by market value descending
+        summaries.sort_by(|a, b| b.market_value.cmp(&a.market_value));
+
+        Ok(summaries)
     }
 }

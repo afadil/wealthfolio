@@ -516,6 +516,21 @@ export interface Holding {
 }
 
 /**
+ * Lightweight holding summary for allocation drill-down views.
+ * Contains only the fields needed to display a list of holdings for a category.
+ */
+export interface HoldingSummary {
+  id: string;
+  symbol: string;
+  name?: string | null;
+  holdingType: HoldingType;
+  quantity: number;
+  marketValue: number; // Base currency value
+  currency: string;
+  weightInCategory: number; // Percentage weight within the category (0-100)
+}
+
+/**
  * Asset interface matching the new provider-agnostic backend model
  * Note: Legacy fields (assetClass, assetSubClass, isin, profile) are stored in metadata.legacy
  * for migration purposes only. Use taxonomy system for classifications.
@@ -1084,7 +1099,7 @@ export interface AlternativeAssetHolding {
   kind: string;
   /** Asset name */
   name: string;
-  /** Asset symbol (same as ID for alternative assets) */
+  /** Asset symbol (display type label, e.g., "Property", "Vehicle") */
   symbol: string;
   /** Currency */
   currency: string;
@@ -1104,6 +1119,8 @@ export interface AlternativeAssetHolding {
   metadata?: Record<string, unknown>;
   /** For liabilities: linked asset ID if any */
   linkedAssetId?: string;
+  /** Asset notes */
+  notes?: string | null;
 }
 
 /**
@@ -1340,6 +1357,7 @@ export interface CategoryAllocation {
   color: string;
   value: number; // Base currency value
   percentage: number; // 0-100
+  children?: CategoryAllocation[]; // Child allocations for drill-down
 }
 
 export interface TaxonomyAllocation {

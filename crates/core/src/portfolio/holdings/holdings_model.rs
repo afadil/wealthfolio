@@ -50,6 +50,21 @@ impl MonetaryValue {
     }
 }
 
+/// Lightweight holding summary for allocation drill-down views.
+/// Contains only the fields needed to display a list of holdings for a category.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct HoldingSummary {
+    pub id: String,
+    pub symbol: String,
+    pub name: Option<String>,
+    pub holding_type: HoldingType,
+    pub quantity: Decimal,
+    pub market_value: Decimal,
+    pub currency: String,
+    pub weight_in_category: Decimal,
+}
+
 /// Position view model for frontend display with daily and total performance
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -105,6 +120,6 @@ pub struct Holding {
     pub as_of_date: NaiveDate,
 
     /// Asset metadata (JSON) for alternative assets.
-    /// Contains purchase_price, purchase_date, property_type, liability_type, etc.
+    /// Contains purchase_price, purchase_date, sub_type, linked_asset_id, etc.
     pub metadata: Option<Value>,
 }

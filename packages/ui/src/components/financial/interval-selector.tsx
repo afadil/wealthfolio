@@ -1,7 +1,8 @@
 import { AnimatedToggleGroup } from "../ui/animated-toggle-group";
+import { usePersistentState } from "../../hooks/use-persistent-state";
 import { cn } from "../../lib/utils";
 import { startOfYear, subMonths, subWeeks, subYears } from "date-fns";
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 
 export type TimePeriod = "1D" | "1W" | "1M" | "3M" | "6M" | "YTD" | "1Y" | "5Y" | "ALL";
 export interface DateRange {
@@ -72,25 +73,48 @@ const intervals: IntervalData[] = [
 
 const DEFAULT_INTERVAL_CODE: TimePeriod = "3M";
 
+/** Get interval data for a given period code */
+const getIntervalData = (code: TimePeriod) => {
+  return intervals.find((i) => i.code === code) ?? intervals.find((i) => i.code === DEFAULT_INTERVAL_CODE)!;
+};
+
 interface IntervalSelectorProps {
   onIntervalSelect: (code: TimePeriod, description: string, range: DateRange | undefined) => void;
   className?: string;
   isLoading?: boolean;
-  initialSelection?: TimePeriod;
+  defaultValue?: TimePeriod;
+  /** LocalStorage key to persist selection. When provided, selection is persisted. */
+  storageKey?: string;
 }
 
 const IntervalSelector: React.FC<IntervalSelectorProps> = ({
   onIntervalSelect,
   className,
-  initialSelection = DEFAULT_INTERVAL_CODE,
+  defaultValue = DEFAULT_INTERVAL_CODE,
+  storageKey,
 }) => {
+  // State for selection - persisted or local
+  const [persistedValue, setPersistedValue] = usePersistentState<TimePeriod>(
+    storageKey ?? "__interval_selector__",
+    defaultValue,
+  );
+  const [localValue, setLocalValue] = useState<TimePeriod>(defaultValue);
+
+  const currentValue = storageKey ? persistedValue : localValue;
+
   const handleValueChange = useCallback(
     (value: TimePeriod) => {
-      const selectedData = intervals.find((i) => i.code === value);
-      const dataToReturn = selectedData ?? intervals.find((i) => i.code === DEFAULT_INTERVAL_CODE)!;
-      onIntervalSelect(dataToReturn.code, dataToReturn.description, dataToReturn.calculateRange());
+      // Update state
+      if (storageKey) {
+        setPersistedValue(value);
+      } else {
+        setLocalValue(value);
+      }
+      // Notify parent
+      const data = getIntervalData(value);
+      onIntervalSelect(data.code, data.description, data.calculateRange());
     },
-    [onIntervalSelect],
+    [onIntervalSelect, storageKey, setPersistedValue],
   );
 
   const items = intervals.map((interval) => ({
@@ -113,7 +137,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
       >
         <AnimatedToggleGroup
           items={items}
-          defaultValue={initialSelection}
+          value={currentValue}
           onValueChange={handleValueChange}
           size="sm"
           variant="default"
@@ -124,4 +148,14 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
   );
 };
 
-export { IntervalSelector };
+/** Helper to get initial interval data - use this to initialize parent state */
+const getInitialIntervalData = (code: TimePeriod = DEFAULT_INTERVAL_CODE) => {
+  const data = getIntervalData(code);
+  return {
+    code: data.code,
+    description: data.description,
+    range: data.calculateRange(),
+  };
+};
+
+export { IntervalSelector, getInitialIntervalData };

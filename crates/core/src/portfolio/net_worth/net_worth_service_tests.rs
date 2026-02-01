@@ -117,15 +117,6 @@ impl AssetRepositoryTrait for MockAssetRepository {
         Ok(self.assets.clone())
     }
 
-    fn list_cash_assets(&self, _base_currency: &str) -> Result<Vec<Asset>> {
-        Ok(self
-            .assets
-            .iter()
-            .filter(|a| a.kind == AssetKind::Cash)
-            .cloned()
-            .collect())
-    }
-
     fn list_by_asset_ids(&self, asset_ids: &[String]) -> Result<Vec<Asset>> {
         Ok(self
             .assets
@@ -386,7 +377,6 @@ impl QuoteServiceTrait for MockMarketDataRepository {
         symbols: &HashSet<String>,
         start: NaiveDate,
         end: NaiveDate,
-        _first_appearance: &HashMap<String, NaiveDate>,
     ) -> Result<Vec<Quote>> {
         // For testing, just return the raw quotes in range
         // The actual implementation would fill gaps

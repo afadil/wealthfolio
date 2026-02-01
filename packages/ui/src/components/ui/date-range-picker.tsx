@@ -20,7 +20,10 @@ export function DatePickerWithRange({ date, onDateChange, className }: DatePicke
           <Button
             id="date"
             variant={"outline"}
-            className={cn("h-11 w-[300px] justify-start text-left font-normal", !date && "text-muted-foreground")}
+            className={cn(
+              "h-input-height w-[300px] justify-start text-left font-normal",
+              !date && "text-muted-foreground",
+            )}
           >
             <Icons.CalendarIcon className="mr-2 h-4 w-4" />
             {date?.from ? (

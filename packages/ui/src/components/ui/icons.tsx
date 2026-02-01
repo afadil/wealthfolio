@@ -139,8 +139,14 @@ import {
 import type { ComponentType, CSSProperties } from "react";
 
 // Phosphor icons - deep imports for optimal tree shaking with Vite
+import { GarageIcon } from "@phosphor-icons/react/dist/csr/Garage";
+import { CarProfileIcon } from "@phosphor-icons/react/dist/csr/CarProfile";
 import { ClockCounterClockwiseIcon } from "@phosphor-icons/react/dist/csr/ClockCounterClockwise";
+import { CoinsIcon } from "@phosphor-icons/react/dist/csr/Coins";
+import { CreditCardIcon } from "@phosphor-icons/react/dist/csr/CreditCard";
+import { CubeIcon } from "@phosphor-icons/react/dist/csr/Cube";
 import { DevicesIcon } from "@phosphor-icons/react/dist/csr/Devices";
+import { SketchLogoIcon } from "@phosphor-icons/react/dist/csr/SketchLogo";
 import { DotsThreeOutlineIcon } from "@phosphor-icons/react/dist/csr/DotsThreeOutline";
 import { DotsThreeOutlineVerticalIcon } from "@phosphor-icons/react/dist/csr/DotsThreeOutlineVertical";
 import { EyeIcon } from "@phosphor-icons/react/dist/csr/Eye";
@@ -687,6 +693,26 @@ const IconsInternal = {
   ClockCounterClockwise: ({ size, className, style, color }: IconProps) => (
     <ClockCounterClockwiseIcon size={size} weight="duotone" className={className} style={style} color={color} />
   ),
+
+  // Alternative asset kind icons (duotone)
+  RealEstateDuotone: ({ size, className, style, color }: IconProps) => (
+    <GarageIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+  VehicleDuotone: ({ size, className, style, color }: IconProps) => (
+    <CarProfileIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+  CollectibleDuotone: ({ size, className, style, color }: IconProps) => (
+    <SketchLogoIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+  PreciousDuotone: ({ size, className, style, color }: IconProps) => (
+    <CoinsIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+  LiabilityDuotone: ({ size, className, style, color }: IconProps) => (
+    <CreditCardIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+  OtherAssetDuotone: ({ size, className, style, color }: IconProps) => (
+    <CubeIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
 };
 
 /**
@@ -862,7 +888,13 @@ export type IconName =
   | "DotsThree"
   | "House"
   | "UploadSimple"
-  | "ClockCounterClockwise";
+  | "ClockCounterClockwise"
+  | "RealEstateDuotone"
+  | "VehicleDuotone"
+  | "CollectibleDuotone"
+  | "PreciousDuotone"
+  | "LiabilityDuotone"
+  | "OtherAssetDuotone";
 
 /**
  * Icons object with unified typing - all icons have the same Icon type

@@ -46,14 +46,15 @@ fn map_quote_type_to_instrument_type(quote_type: &str) -> Option<&'static str> {
 
 /// Maps Yahoo quote_type to asset_classes taxonomy category ID
 /// Asset classes: CASH, EQUITY, FIXED_INCOME, REAL_ESTATE, COMMODITIES, ALTERNATIVES, DIGITAL_ASSETS
+/// Note: Cash is assigned to CASH_BANK_DEPOSITS (child of CASH) for drill-down support
 fn map_quote_type_to_asset_class(quote_type: &str) -> Option<&'static str> {
     match quote_type.to_uppercase().as_str() {
         // Equity class: stocks, ETFs, mutual funds, options
         "EQUITY" | "ETF" | "MUTUALFUND" | "MUTUAL FUND" | "INDEX" | "OPTION" => Some("EQUITY"),
         // Fixed Income class: bonds, money market
         "BOND" | "MONEYMARKET" => Some("FIXED_INCOME"),
-        // Cash class
-        "CURRENCY" | "FOREX" | "FX" | "CASH" => Some("CASH"),
+        // Cash class - assign to child category for drill-down (rollup will sum to CASH)
+        "CURRENCY" | "FOREX" | "FX" | "CASH" => Some("CASH_BANK_DEPOSITS"),
         // Cryptocurrency - classify as Digital Assets
         "CRYPTOCURRENCY" | "CRYPTO" => Some("DIGITAL_ASSETS"),
         // Commodities class
@@ -491,8 +492,8 @@ mod tests {
         );
         // Fixed Income class
         assert_eq!(map_quote_type_to_asset_class("BOND"), Some("FIXED_INCOME"));
-        // Cash class
-        assert_eq!(map_quote_type_to_asset_class("CURRENCY"), Some("CASH"));
+        // Cash class (assigned to child category for drill-down)
+        assert_eq!(map_quote_type_to_asset_class("CURRENCY"), Some("CASH_BANK_DEPOSITS"));
         // Commodities class
         assert_eq!(
             map_quote_type_to_asset_class("COMMODITY"),

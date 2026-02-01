@@ -173,7 +173,7 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
           onIntervalSelect={handleIntervalSelect}
           className="absolute bottom-2 left-1/2 -translate-x-1/2 transform"
           isLoading={syncMarketDataMutation.isPending}
-          initialSelection="3M"
+          defaultValue="3M"
         />
       </CardContent>
     </Card>

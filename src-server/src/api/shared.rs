@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    error::ApiResult,
+    error::{ApiError, ApiResult},
     events::{
         ServerEvent, MARKET_SYNC_COMPLETE, MARKET_SYNC_ERROR, MARKET_SYNC_START,
         PORTFOLIO_UPDATE_COMPLETE, PORTFOLIO_UPDATE_ERROR, PORTFOLIO_UPDATE_START,
@@ -9,10 +9,29 @@ use crate::{
     main_lib::AppState,
 };
 use anyhow::anyhow;
+use chrono::NaiveDate;
 use serde_json::json;
 use wealthfolio_core::{
     accounts::AccountServiceTrait, constants::PORTFOLIO_TOTAL_ACCOUNT_ID, quotes::MarketSyncMode,
 };
+
+// ============================================================================
+// Date Parsing Utilities
+// ============================================================================
+
+/// Parse a required date string in YYYY-MM-DD format.
+pub fn parse_date(date_str: &str, field_name: &str) -> Result<NaiveDate, ApiError> {
+    NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+        .map_err(|e| ApiError::BadRequest(format!("Invalid {}: {}", field_name, e)))
+}
+
+/// Parse an optional date string in YYYY-MM-DD format.
+pub fn parse_date_optional(
+    date_str: Option<String>,
+    field_name: &str,
+) -> Result<Option<NaiveDate>, ApiError> {
+    date_str.map(|s| parse_date(&s, field_name)).transpose()
+}
 
 /// Normalize file paths by stripping file:// prefix
 pub fn normalize_file_path(path: &str) -> String {

@@ -107,15 +107,11 @@ pub trait QuoteServiceTrait: Send + Sync {
     /// * `symbols` - Set of symbols to fetch quotes for
     /// * `start` - Start date of the range
     /// * `end` - End date of the range
-    /// * `first_appearance` - Optional map of symbol -> first date it appeared in portfolio.
-    ///   Debug messages for missing quotes are only logged for dates on or after the symbol's
-    ///   first appearance, reducing noise from assets added later.
     fn get_quotes_in_range_filled(
         &self,
         symbols: &HashSet<String>,
         start: NaiveDate,
         end: NaiveDate,
-        first_appearance: &HashMap<String, NaiveDate>,
     ) -> Result<Vec<Quote>>;
 
     /// Get daily quotes grouped by date, then by symbol.
@@ -536,7 +532,6 @@ where
         symbols: &HashSet<String>,
         start: NaiveDate,
         end: NaiveDate,
-        first_appearance: &HashMap<String, NaiveDate>,
     ) -> Result<Vec<Quote>> {
         if symbols.is_empty() {
             return Ok(Vec::new());
@@ -556,13 +551,7 @@ where
         }
 
         // Fill missing quotes
-        Ok(fill_missing_quotes(
-            &all_quotes,
-            symbols,
-            start,
-            end,
-            first_appearance,
-        ))
+        Ok(fill_missing_quotes(&all_quotes, symbols, start, end))
     }
 
     async fn get_daily_quotes(
@@ -1347,9 +1336,6 @@ fn mic_to_yahoo_suffix(mic: &str) -> Option<&'static str> {
 /// * `required_symbols` - Symbols to fill
 /// * `start_date` - Start of the output range
 /// * `end_date` - End of the output range
-/// * `first_appearance` - Optional map of symbol -> first date it appeared in portfolio.
-///   Debug messages for missing quotes are only logged for dates on or after the symbol's
-///   first appearance, reducing noise from assets added later.
 ///
 /// # Returns
 /// A Vec of quotes with one entry per symbol per day (filled from last known value)
@@ -1358,7 +1344,6 @@ fn fill_missing_quotes(
     required_symbols: &HashSet<String>,
     start_date: NaiveDate,
     end_date: NaiveDate,
-    first_appearance: &HashMap<String, NaiveDate>,
 ) -> Vec<Quote> {
     if required_symbols.is_empty() {
         return Vec::new();

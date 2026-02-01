@@ -11,14 +11,22 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@wealthfolio/ui/components/ui/collapsible";
-import { GainAmount, GainPercent, IntervalSelector, PrivacyAmount } from "@wealthfolio/ui";
+import {
+  GainAmount,
+  GainPercent,
+  IntervalSelector,
+  PrivacyAmount,
+  getInitialIntervalData,
+  type TimePeriod,
+} from "@wealthfolio/ui";
 import { useNetWorth, useNetWorthHistory } from "@/hooks/use-alternative-assets";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { formatDateISO } from "@/lib/utils";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import type { DateRange, TimePeriod } from "@/lib/types";
+import type { DateRange } from "@/lib/types";
 import { NetWorthChart } from "./net-worth-chart";
+import Balance from "@/pages/dashboard/balance";
 
 // Muted tan/gold for net worth theme (matches chart)
 const THEME_COLOR = "hsl(35 45% 65%)";
@@ -47,26 +55,6 @@ const CATEGORY_CSS_COLORS: Record<string, string> = {
   otherAssets: "var(--muted-foreground)",
   liabilities: "var(--destructive)",
 };
-
-// Helper to get initial date range (all time)
-const getInitialDateRange = (): DateRange => ({
-  from: new Date(2000, 0, 1),
-  to: new Date(),
-});
-
-const INITIAL_INTERVAL_CODE: TimePeriod = "ALL";
-
-/**
- * Formats a date string to a human-readable format
- */
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
 
 /**
  * Balance Sheet Component - Collapsible breakdown of assets and liabilities
@@ -294,6 +282,8 @@ function CompositionWidget({ data, isLoading }: CompositionWidgetProps) {
   );
 }
 
+const INITIAL_INTERVAL = "ALL" as const;
+
 /**
  * Net Worth Content - Embeddable content for the combined portfolio page
  */
@@ -302,9 +292,11 @@ export function NetWorthContent() {
   const { data: netWorthData, isLoading, isError, error } = useNetWorth();
 
   // Chart date range state
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
-  const [selectedIntervalDescription, setSelectedIntervalDescription] =
-    useState<string>("All Time");
+  const initialData = getInitialIntervalData(INITIAL_INTERVAL);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(initialData.range);
+  const [selectedIntervalDescription, setSelectedIntervalDescription] = useState<string>(
+    initialData.description,
+  );
 
   // Compute ISO date strings for the history query
   const historyDates = useMemo(() => {
@@ -426,16 +418,12 @@ export function NetWorthContent() {
         <div className="flex items-start gap-2">
           <div className="min-h-[4.5rem]">
             <div className="flex items-center gap-3">
-              {isLoading ? (
-                <Skeleton className="h-9 w-48" />
-              ) : (
-                <h1
-                  className="font-heading text-3xl font-bold tracking-tight"
-                  data-testid="net-worth-balance"
-                >
-                  <PrivacyAmount value={parsedData?.netWorth ?? 0} currency={currency} />
-                </h1>
-              )}
+              <Balance
+                isLoading={isLoading}
+                targetValue={parsedData?.netWorth ?? 0}
+                currency={currency}
+                displayCurrency={true}
+              />
               {hasStaleValuations && (
                 <TooltipProvider>
                   <Tooltip>
@@ -498,7 +486,7 @@ export function NetWorthContent() {
       </div>
 
       {/* Chart section */}
-      <div className="h-[300px]">
+      <div className="h-[180px]">
         {isHistoryLoading ? (
           <div className="flex h-full items-center justify-center">
             <Skeleton className="h-full w-full" />
@@ -517,7 +505,8 @@ export function NetWorthContent() {
               className="pointer-events-auto relative z-20 w-full max-w-screen-sm sm:max-w-screen-md md:max-w-2xl lg:max-w-3xl"
               onIntervalSelect={handleIntervalSelect}
               isLoading={isHistoryLoading}
-              initialSelection={INITIAL_INTERVAL_CODE}
+              storageKey="networth-interval"
+              defaultValue="ALL"
             />
           </div>
         )}
@@ -525,7 +514,7 @@ export function NetWorthContent() {
 
       {/* Content section with gradient background */}
       <div
-        className="grow bg-linear-to-t px-4 pt-12 md:px-6 md:pt-12 lg:px-10 lg:pt-20"
+        className="grow bg-linear-to-t px-4 pt-4 md:px-6 md:pt-6 lg:px-10 lg:pt-8"
         style={{
           backgroundImage: `linear-gradient(to top, ${THEME_COLOR.replace(")", " / 0.30)")}, ${THEME_COLOR.replace(")", " / 0.15)")}, ${THEME_COLOR.replace(")", " / 0.10)")})`,
         }}
@@ -586,11 +575,22 @@ export function NetWorthContent() {
                       {netWorthData?.staleAssets.length !== 1 ? "s have" : " has"} not been updated
                       in over 90 days.
                     </p>
-                    {netWorthData?.oldestValuationDate && (
-                      <p className="text-muted-foreground mt-1 text-xs">
-                        Oldest: {formatDate(netWorthData.oldestValuationDate)}
-                      </p>
-                    )}
+                    <div className="mt-3 space-y-1.5">
+                      {netWorthData?.staleAssets.map((asset) => (
+                        <Link
+                          key={asset.assetId}
+                          to={`/holdings/${encodeURIComponent(asset.assetId)}?tab=history`}
+                          className="hover:bg-warning/10 flex items-center justify-between rounded-md px-2 py-1.5 transition-colors"
+                        >
+                          <span className="truncate text-xs font-medium">
+                            {asset.name ?? asset.assetId}
+                          </span>
+                          <span className="text-muted-foreground ml-2 shrink-0 text-xs">
+                            {asset.daysStale}d ago
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>

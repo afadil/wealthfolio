@@ -42,8 +42,8 @@ pub struct CreateAlternativeAssetRequest {
     /// Optional purchase date
     pub purchase_date: Option<NaiveDate>,
     /// Optional kind-specific metadata
-    /// Example for Property: { "property_type": "residence", "address": "123 Main St" }
-    /// Example for Liability: { "liability_type": "mortgage", "linked_asset_id": "PROP-a1b2c3d4" }
+    /// Example for Property: { "sub_type": "residence", "address": "123 Main St" }
+    /// Example for Liability: { "sub_type": "mortgage", "linked_asset_id": "PROP-a1b2c3d4" }
     pub metadata: Option<Value>,
     /// For liabilities only: ID of the asset this liability finances (UI-only aggregation)
     pub linked_asset_id: Option<String>,
@@ -118,7 +118,7 @@ pub struct AlternativeHolding {
     pub kind: AssetKind,
     /// Asset name
     pub name: String,
-    /// Asset symbol (same as ID for alternative assets)
+    /// Asset symbol (display type label, e.g., "Property", "Vehicle")
     pub symbol: String,
     /// Currency
     pub currency: String,
@@ -134,8 +134,38 @@ pub struct AlternativeHolding {
     pub unrealized_gain_pct: Option<Decimal>,
     /// Date of the latest valuation
     pub valuation_date: DateTime<Utc>,
-    /// Asset metadata (property_type, liability_type, linked_asset_id, etc.)
+    /// Asset metadata (sub_type, linked_asset_id, address, etc.)
     pub metadata: Option<Value>,
     /// For liabilities: the asset this liability is linked to
     pub linked_asset_id: Option<String>,
+    /// Asset notes
+    pub notes: Option<String>,
+}
+
+/// Request for updating an alternative asset's details.
+///
+/// This merges the provided fields with existing values.
+/// If purchase_price or purchase_date changes, the purchase quote is also updated.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateAssetDetailsRequest {
+    /// The asset ID to update
+    pub asset_id: String,
+    /// Optional new name for the asset
+    pub name: Option<String>,
+    /// Optional notes for the asset (stored in asset.notes, not metadata)
+    pub notes: Option<String>,
+    /// Optional new metadata (merged with existing)
+    /// Keys with None values are removed
+    pub metadata: Option<std::collections::HashMap<String, Option<String>>>,
+}
+
+/// Response after updating asset details.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateAssetDetailsResponse {
+    /// The asset ID that was updated
+    pub asset_id: String,
+    /// Whether the purchase quote was updated
+    pub purchase_quote_updated: bool,
 }

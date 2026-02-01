@@ -31,12 +31,12 @@ const THEME_COLORS = [
   "var(--chart-7)",
 ];
 
-// Risk colors using theme variables (desaturated tiers)
+// Risk colors - muted Flexoki tones that don't attract attention
 const RISK_COLORS: Record<string, string> = {
-  low: "var(--color-green-300)",
-  medium: "var(--color-yellow-200)",
-  high: "var(--color-red-300)",
-  unknown: "var(--color-base-300)",
+  low: "var(--color-green-150)",
+  medium: "var(--color-yellow-150)",
+  high: "var(--color-orange-200)",
+  unknown: "var(--color-base-200)",
 };
 
 // Fixed order for risk categories - ALWAYS in this order

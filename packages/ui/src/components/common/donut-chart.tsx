@@ -142,8 +142,9 @@ export const DonutChart: React.FC<DonutChartProps> = ({
     dataKey: "value",
     nameKey: "name",
     onMouseEnter: handlePieEnter,
-    onClick: (_event, index) => {
+    onClick: (_data, index, event) => {
       if (onSectionClick && data[index]) {
+        event?.stopPropagation?.();
         onSectionClick(data[index], index);
       }
     },
@@ -165,7 +166,11 @@ export const DonutChart: React.FC<DonutChartProps> = ({
           )}
           <Pie {...pieProps}>
             {data.map((_, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              <Cell
+                key={`cell-${index}`}
+                fill={COLORS[index % COLORS.length]}
+                style={{ cursor: onSectionClick ? "pointer" : "default" }}
+              />
             ))}
           </Pie>
           {activeData && (

@@ -17,6 +17,9 @@ pub struct CategoryAllocation {
     pub value: Decimal,
     /// Percentage of total portfolio (0-100)
     pub percentage: Decimal,
+    /// Child category allocations (for drill-down). Only populated for rolled-up categories.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub children: Vec<CategoryAllocation>,
 }
 
 /// Allocation breakdown for a single taxonomy.

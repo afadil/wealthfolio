@@ -12,8 +12,8 @@ pub trait AssetServiceTrait: Send + Sync {
         asset_id: &str,
         payload: UpdateAssetProfile,
     ) -> Result<Asset>;
-    fn load_cash_assets(&self, base_currency: &str) -> Result<Vec<Asset>>;
-    async fn create_cash_asset(&self, currency: &str) -> Result<Asset>;
+    /// Ensures a cash asset exists (and is properly classified). Idempotent.
+    async fn ensure_cash_asset(&self, currency: &str) -> Result<Asset>;
     /// Creates a new asset directly without network lookups.
     /// Used for alternative assets and other manually created assets.
     async fn create_asset(&self, new_asset: NewAsset) -> Result<Asset>;
@@ -53,7 +53,6 @@ pub trait AssetRepositoryTrait: Send + Sync {
     async fn update_pricing_mode(&self, asset_id: &str, pricing_mode: &str) -> Result<Asset>;
     fn get_by_id(&self, asset_id: &str) -> Result<Asset>;
     fn list(&self) -> Result<Vec<Asset>>;
-    fn list_cash_assets(&self, base_currency: &str) -> Result<Vec<Asset>>;
     fn list_by_asset_ids(&self, asset_ids: &[String]) -> Result<Vec<Asset>>;
     async fn delete(&self, asset_id: &str) -> Result<()>;
 

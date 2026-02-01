@@ -1259,6 +1259,41 @@ WHERE json_extract(a.metadata, '$.legacy.asset_sub_class') IS NOT NULL
   );
 
 -- ============================================================================
+-- AUTO-MIGRATE: ensure CASH assets have default taxonomy assignments
+-- Adds CASH_BANK_DEPOSITS for asset_classes and CASH for instrument_type
+-- ============================================================================
+
+INSERT INTO asset_taxonomy_assignments (id, asset_id, taxonomy_id, category_id, weight, source)
+SELECT
+    lower(hex(randomblob(16))),
+    a.id,
+    'asset_classes',
+    'CASH_BANK_DEPOSITS',
+    10000,
+    'migrated'
+FROM assets a
+WHERE a.kind = 'CASH'
+  AND NOT EXISTS (
+    SELECT 1 FROM asset_taxonomy_assignments ata
+    WHERE ata.asset_id = a.id AND ata.taxonomy_id = 'asset_classes'
+  );
+
+INSERT INTO asset_taxonomy_assignments (id, asset_id, taxonomy_id, category_id, weight, source)
+SELECT
+    lower(hex(randomblob(16))),
+    a.id,
+    'instrument_type',
+    'CASH',
+    10000,
+    'migrated'
+FROM assets a
+WHERE a.kind = 'CASH'
+  AND NOT EXISTS (
+    SELECT 1 FROM asset_taxonomy_assignments ata
+    WHERE ata.asset_id = a.id AND ata.taxonomy_id = 'instrument_type'
+  );
+
+-- ============================================================================
 -- NOTE: Legacy metadata cleanup is handled by the Rust migrate_legacy_classifications
 -- function after manual migration completes via the UI banner.
 -- The $.legacy structure is preserved here so the migration banner can detect

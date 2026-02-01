@@ -39,11 +39,14 @@ import {
 import { updateAlternativeAssetMetadata } from "@/adapters";
 import { ClassificationSheet } from "@/components/classification/classification-sheet";
 import { useUpdatePortfolioMutation } from "@/hooks/use-calculate-portfolio";
+import { useQueryClient } from "@tanstack/react-query";
+import { QueryKeys } from "@/lib/query-keys";
 
 export const HoldingsPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const currentTab = searchParams.get("tab") ?? "investments";
+  const queryClient = useQueryClient();
 
   const [selectedAccount, setSelectedAccount] = useState<Account | null>({
     id: PORTFOLIO_ACCOUNT_ID,
@@ -138,15 +141,18 @@ export const HoldingsPage = () => {
 
   // Handler to save asset details
   const handleSaveAssetDetails = useCallback(
-    async (assetId: string, metadata: Record<string, string>) => {
+    async (assetId: string, metadata: Record<string, string>, name?: string) => {
       setIsSavingDetails(true);
       try {
-        await updateAlternativeAssetMetadata(assetId, metadata);
+        await updateAlternativeAssetMetadata(assetId, metadata, name);
+        // Invalidate queries to refresh the list
+        queryClient.invalidateQueries({ queryKey: [QueryKeys.ALTERNATIVE_HOLDINGS] });
+        queryClient.invalidateQueries({ queryKey: [QueryKeys.NET_WORTH] });
       } finally {
         setIsSavingDetails(false);
       }
     },
-    [],
+    [queryClient],
   );
 
   // Handler to delete an asset
@@ -161,6 +167,14 @@ export const HoldingsPage = () => {
   const handleViewHistory = useCallback(
     (holding: AlternativeAssetHolding) => {
       navigate(`/holdings/${encodeURIComponent(holding.id)}?tab=history`);
+    },
+    [navigate],
+  );
+
+  // Handler to navigate to asset detail page
+  const handleRowClick = useCallback(
+    (holding: AlternativeAssetHolding) => {
+      navigate(`/holdings/${encodeURIComponent(holding.id)}`);
     },
     [navigate],
   );
@@ -418,6 +432,7 @@ export const HoldingsPage = () => {
           onUpdateValue={setUpdateValueAsset}
           onViewHistory={handleViewHistory}
           onDelete={handleDeleteAsset}
+          onRowClick={handleRowClick}
           isDeleting={isDeleting}
         />
       )}
@@ -450,6 +465,7 @@ export const HoldingsPage = () => {
           onUpdateValue={setUpdateValueAsset}
           onViewHistory={handleViewHistory}
           onDelete={handleDeleteAsset}
+          onRowClick={handleRowClick}
           isDeleting={isDeleting}
         />
       )}

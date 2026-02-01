@@ -11,11 +11,17 @@ import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { Checkbox } from "@wealthfolio/ui/components/ui/checkbox";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { CurrencyInput, DatePickerInput, ResponsiveSelect } from "@wealthfolio/ui";
+import {
+  CurrencyInput,
+  DatePickerInput,
+  ResponsiveSelect,
+  MoneyInput,
+  QuantityInput,
+} from "@wealthfolio/ui";
 import { cn } from "@/lib/utils";
 import { useSettingsContext } from "@/lib/settings-provider";
 
-import { METAL_TYPES, LIABILITY_TYPES } from "./alternative-asset-quick-add-schema";
+import { METAL_TYPES, LIABILITY_TYPES, WEIGHT_UNITS } from "./alternative-asset-quick-add-schema";
 import { useAlternativeAssetMutations } from "../hooks/use-alternative-asset-mutations";
 import {
   AlternativeAssetKind,
@@ -35,7 +41,7 @@ const ASSET_TYPES = [
     kind: AlternativeAssetKind.PROPERTY,
     label: "Property",
     description: "Real estate & land",
-    icon: Icons.Home,
+    icon: Icons.RealEstateDuotone,
     iconColor: "text-green-400",
     selectedBg: "bg-green-400/15",
     borderColor: "border-green-400/50",
@@ -44,7 +50,7 @@ const ASSET_TYPES = [
     kind: AlternativeAssetKind.VEHICLE,
     label: "Vehicle",
     description: "Cars, boats & more",
-    icon: Icons.Car,
+    icon: Icons.VehicleDuotone,
     iconColor: "text-blue-400",
     selectedBg: "bg-blue-400/15",
     borderColor: "border-blue-400/50",
@@ -53,7 +59,7 @@ const ASSET_TYPES = [
     kind: AlternativeAssetKind.COLLECTIBLE,
     label: "Collectible",
     description: "Art, watches & rare items",
-    icon: Icons.Gem,
+    icon: Icons.CollectibleDuotone,
     iconColor: "text-purple-400",
     selectedBg: "bg-purple-400/15",
     borderColor: "border-purple-400/50",
@@ -62,7 +68,7 @@ const ASSET_TYPES = [
     kind: AlternativeAssetKind.PHYSICAL_PRECIOUS,
     label: "Precious Metal",
     description: "Gold, silver & platinum",
-    icon: Icons.Coins,
+    icon: Icons.PreciousDuotone,
     iconColor: "text-orange-400",
     selectedBg: "bg-orange-400/15",
     borderColor: "border-orange-400/50",
@@ -71,7 +77,7 @@ const ASSET_TYPES = [
     kind: AlternativeAssetKind.LIABILITY,
     label: "Liability",
     description: "Loans & debt",
-    icon: Icons.CreditCard,
+    icon: Icons.LiabilityDuotone,
     iconColor: "text-red-400",
     selectedBg: "bg-red-400/15",
     borderColor: "border-red-400/50",
@@ -80,7 +86,7 @@ const ASSET_TYPES = [
     kind: AlternativeAssetKind.OTHER,
     label: "Other Asset",
     description: "Custom assets",
-    icon: Icons.Package,
+    icon: Icons.OtherAssetDuotone,
     iconColor: "text-base-500",
     selectedBg: "bg-base-500/15",
     borderColor: "border-base-500/50",
@@ -106,6 +112,8 @@ interface FormData {
   purchasePrice?: string;
   purchaseDate?: Date;
   metalType?: string;
+  quantity?: string;
+  unit?: string;
   liabilityType?: string;
   hasMortgage?: boolean;
   linkedAssetId?: string;
@@ -218,9 +226,15 @@ export function AlternativeAssetQuickAddModal({
     }));
   }, []);
 
-  const updateFormData = useCallback((field: keyof FormData, value: string | boolean | Date) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  }, []);
+  const updateFormData = useCallback(
+    (field: keyof FormData, value: string | boolean | Date | number | undefined) => {
+      // Convert numbers to strings for numeric fields
+      const finalValue =
+        typeof value === "number" ? String(value) : value === undefined ? "" : value;
+      setFormData((prev) => ({ ...prev, [field]: finalValue }));
+    },
+    [],
+  );
 
   const canProceed = useMemo(() => {
     if (step === 1) return true;
@@ -231,13 +245,21 @@ export function AlternativeAssetQuickAddModal({
     if (!canProceed) return;
 
     const metadata: Record<string, string> = {};
+    const isLiability = formData.kind === AlternativeAssetKind.LIABILITY;
 
+    // Use unified 'sub_type' field for all asset types
     if (formData.kind === AlternativeAssetKind.PHYSICAL_PRECIOUS) {
-      if (formData.metalType) metadata.metal_type = formData.metalType;
+      if (formData.metalType) metadata.sub_type = formData.metalType;
+      if (formData.quantity) metadata.quantity = formData.quantity;
+      if (formData.unit) metadata.unit = formData.unit;
     }
 
-    if (formData.kind === AlternativeAssetKind.LIABILITY && formData.liabilityType) {
-      metadata.liability_type = formData.liabilityType;
+    if (isLiability) {
+      if (formData.liabilityType) metadata.sub_type = formData.liabilityType;
+      // For liabilities, store "Original Amount" as original_amount in metadata
+      if (formData.purchasePrice) metadata.original_amount = formData.purchasePrice;
+      // Store "Origination Date" as origination_date in metadata
+      if (formData.purchaseDate) metadata.origination_date = formatDateToISO(formData.purchaseDate);
     }
 
     const request: CreateAlternativeAssetRequest = {
@@ -246,6 +268,7 @@ export function AlternativeAssetQuickAddModal({
       currency: formData.currency,
       currentValue: formData.currentValue,
       valueDate: formatDateToISO(formData.valueDate),
+      // Pass purchasePrice/purchaseDate for all asset types (including liabilities) to create historical quotes
       purchasePrice: formData.purchasePrice || undefined,
       purchaseDate: formData.purchaseDate ? formatDateToISO(formData.purchaseDate) : undefined,
       metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
@@ -374,7 +397,7 @@ export function AlternativeAssetQuickAddModal({
                             isSelected ? type.selectedBg : "bg-muted",
                           )}
                         >
-                          <Icon className={cn("h-5 w-5", type.iconColor)} />
+                          <Icon size={20} className={type.iconColor} />
                         </div>
                         <span
                           className={cn(
@@ -403,19 +426,45 @@ export function AlternativeAssetQuickAddModal({
               >
                 {/* Type-specific fields */}
                 {formData.kind === AlternativeAssetKind.PHYSICAL_PRECIOUS && (
-                  <div className="space-y-2">
-                    <Label className="text-foreground text-sm font-medium">Metal Type</Label>
-                    <ResponsiveSelect
-                      value={formData.metalType || "gold"}
-                      onValueChange={(v) => updateFormData("metalType", v)}
-                      options={METAL_TYPES.map((metal) => ({
-                        value: metal.value,
-                        label: metal.label,
-                      }))}
-                      placeholder="Select metal"
-                      sheetTitle="Select Metal Type"
-                    />
-                  </div>
+                  <>
+                    <div className="space-y-2">
+                      <Label className="text-foreground text-sm font-medium">Metal Type</Label>
+                      <ResponsiveSelect
+                        value={formData.metalType || "gold"}
+                        onValueChange={(v) => updateFormData("metalType", v)}
+                        options={METAL_TYPES.map((metal) => ({
+                          value: metal.value,
+                          label: metal.label,
+                        }))}
+                        placeholder="Select metal"
+                        sheetTitle="Select Metal Type"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-foreground text-sm font-medium">Quantity</Label>
+                        <QuantityInput
+                          value={formData.quantity || ""}
+                          onValueChange={(v) => updateFormData("quantity", v)}
+                          placeholder="0"
+                          className="h-11"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-foreground text-sm font-medium">Unit</Label>
+                        <ResponsiveSelect
+                          value={formData.unit || "oz"}
+                          onValueChange={(v) => updateFormData("unit", v)}
+                          options={WEIGHT_UNITS.map((unit) => ({
+                            value: unit.value,
+                            label: unit.label,
+                          }))}
+                          placeholder="Select unit"
+                          sheetTitle="Select Unit"
+                        />
+                      </div>
+                    </div>
+                  </>
                 )}
 
                 {formData.kind === AlternativeAssetKind.LIABILITY && (
@@ -459,17 +508,12 @@ export function AlternativeAssetQuickAddModal({
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="text-foreground text-sm font-medium">{getValueLabel()}</Label>
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        value={formData.currentValue}
-                        onChange={(e) => updateFormData("currentValue", e.target.value)}
-                        placeholder="0.00"
-                        min="0"
-                        step="any"
-                        className="h-11"
-                      />
-                    </div>
+                    <MoneyInput
+                      value={formData.currentValue}
+                      onValueChange={(value) => updateFormData("currentValue", value)}
+                      placeholder="0.00"
+                      className="h-11"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-foreground text-sm font-medium">
@@ -484,45 +528,44 @@ export function AlternativeAssetQuickAddModal({
                   </div>
                 </div>
 
-                {/* Purchase Price and Date (optional, for gain calculation) - only for assets, not liabilities */}
-                {formData.kind !== AlternativeAssetKind.LIABILITY && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-foreground text-sm font-medium">
-                        Purchase Price
-                        <span className="text-muted-foreground ml-1 text-xs font-normal">
-                          (optional)
-                        </span>
-                      </Label>
-                      <div className="relative">
-                        <Input
-                          type="number"
-                          value={formData.purchasePrice || ""}
-                          onChange={(e) => updateFormData("purchasePrice", e.target.value)}
-                          placeholder="0.00"
-                          min="0"
-                          step="any"
-                          className="h-11"
-                        />
-                      </div>
-                      <p className="text-muted-foreground text-xs">
-                        Used to calculate unrealized gain
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-foreground text-sm font-medium">
-                        Purchase Date
-                        <span className="text-muted-foreground ml-1 text-xs font-normal">
-                          (optional)
-                        </span>
-                      </Label>
-                      <DatePickerInput
-                        value={formData.purchaseDate}
-                        onChange={(date) => date && updateFormData("purchaseDate", date)}
-                      />
-                    </div>
+                {/* Purchase/Original Amount and Date (optional, for gain/paydown calculation) */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-foreground text-sm font-medium">
+                      {formData.kind === AlternativeAssetKind.LIABILITY
+                        ? "Original Amount"
+                        : "Purchase Price"}
+                      <span className="text-muted-foreground ml-1 text-xs font-normal">
+                        (optional)
+                      </span>
+                    </Label>
+                    <MoneyInput
+                      value={formData.purchasePrice || ""}
+                      onValueChange={(value) => updateFormData("purchasePrice", value)}
+                      placeholder="0.00"
+                      className="h-11"
+                    />
+                    <p className="text-muted-foreground text-xs">
+                      {formData.kind === AlternativeAssetKind.LIABILITY
+                        ? "Used to track debt paydown"
+                        : "Used to calculate unrealized gain"}
+                    </p>
                   </div>
-                )}
+                  <div className="space-y-2">
+                    <Label className="text-foreground text-sm font-medium">
+                      {formData.kind === AlternativeAssetKind.LIABILITY
+                        ? "Origination Date"
+                        : "Purchase Date"}
+                      <span className="text-muted-foreground ml-1 text-xs font-normal">
+                        (optional)
+                      </span>
+                    </Label>
+                    <DatePickerInput
+                      value={formData.purchaseDate}
+                      onChange={(date) => date && updateFormData("purchaseDate", date)}
+                    />
+                  </div>
+                </div>
 
                 {/* Mortgage checkbox for property */}
                 {formData.kind === AlternativeAssetKind.PROPERTY && (

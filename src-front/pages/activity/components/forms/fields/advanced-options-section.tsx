@@ -18,7 +18,7 @@ import {
   SelectValue,
   Input,
 } from "@wealthfolio/ui";
-import { CurrencyInput } from "@wealthfolio/ui/components/financial";
+import { CurrencyInput, MoneyInput } from "@wealthfolio/ui/components/financial";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
@@ -186,15 +186,13 @@ export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldV
                 <FormItem>
                   <FormLabel>FX Rate</FormLabel>
                   <FormControl>
-                    <Input
-                      type="number"
-                      step="any"
+                    <MoneyInput
+                      ref={field.ref}
+                      name={field.name}
+                      value={field.value}
+                      onValueChange={field.onChange}
                       placeholder="1.0000"
-                      value={field.value ?? ""}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        field.onChange(value === "" ? undefined : parseFloat(value));
-                      }}
+                      maxDecimalPlaces={6}
                       className="w-full"
                     />
                   </FormControl>
