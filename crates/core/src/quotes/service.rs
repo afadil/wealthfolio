@@ -202,8 +202,8 @@ pub trait QuoteServiceTrait: Send + Sync {
     /// * `BackfillHistory { days }` - Rebuilds full history from activity start (or N days fallback).
     async fn sync(&self, mode: SyncMode, asset_ids: Option<Vec<String>>) -> Result<SyncResult>;
 
-    /// Force resync for specific symbols (or all if None) using BackfillHistory mode.
-    async fn resync(&self, symbols: Option<Vec<String>>) -> Result<SyncResult>;
+    /// Force resync for specific asset IDs (or all if None) using BackfillHistory mode.
+    async fn resync(&self, asset_ids: Option<Vec<String>>) -> Result<SyncResult>;
 
     /// Refresh sync state from holdings/activities.
     async fn refresh_sync_state(&self) -> Result<()>;
@@ -234,6 +234,12 @@ pub trait QuoteServiceTrait: Send + Sync {
 
     /// Get sync states that have errors (error_count > 0).
     fn get_sync_states_with_errors(&self) -> Result<Vec<QuoteSyncState>>;
+
+    /// Update position status (active/inactive) based on current holdings.
+    async fn update_position_status_from_holdings(
+        &self,
+        current_holdings: &std::collections::HashMap<String, rust_decimal::Decimal>,
+    ) -> Result<()>;
 
     // =========================================================================
     // Provider Settings
@@ -774,9 +780,9 @@ where
         sync_service.sync(mode, asset_ids).await
     }
 
-    async fn resync(&self, symbols: Option<Vec<String>>) -> Result<SyncResult> {
+    async fn resync(&self, asset_ids: Option<Vec<String>>) -> Result<SyncResult> {
         let sync_service = self.get_sync_service().await?;
-        sync_service.resync(symbols).await
+        sync_service.resync(asset_ids).await
     }
 
     async fn refresh_sync_state(&self) -> Result<()> {
@@ -890,10 +896,6 @@ where
         }
 
         Ok(())
-    }
-
-    fn get_sync_states_with_errors(&self) -> Result<Vec<QuoteSyncState>> {
-        self.sync_state_store.get_with_errors()
     }
 
     fn get_sync_states_with_errors(&self) -> Result<Vec<QuoteSyncState>> {

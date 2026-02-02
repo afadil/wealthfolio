@@ -84,6 +84,7 @@ export const OnboardingAppearance = forwardRef<
               {/* Light Theme */}
               <button
                 type="button"
+                data-testid="theme-light-button"
                 onClick={() => handleThemeChange("light")}
                 className={cn(
                   "group relative overflow-hidden rounded-xl border-2 transition-all duration-200",
@@ -94,8 +95,8 @@ export const OnboardingAppearance = forwardRef<
               >
                 <div className="overflow-hidden rounded-t-lg">
                   <img
-                    src="/theme-light.webp"
-                    srcSet="/theme-light.webp 1x, /theme-light@2x.webp 2x"
+                    src="/themes/theme-light.webp"
+                    srcSet="/themes/theme-light.webp 1x, /themes/theme-light@2x.webp 2x"
                     alt="Light theme preview"
                     className="h-auto w-full object-cover"
                   />
@@ -134,8 +135,8 @@ export const OnboardingAppearance = forwardRef<
               >
                 <div className="overflow-hidden rounded-t-lg">
                   <img
-                    src="/theme-dark.webp"
-                    srcSet="/theme-dark.webp 1x, /theme-dark@2x.webp 2x"
+                    src="/themes/theme-dark.webp"
+                    srcSet="/themes/theme-dark.webp 1x, /themes/theme-dark@2x.webp 2x"
                     alt="Dark theme preview"
                     className="h-auto w-full object-cover"
                   />
@@ -174,8 +175,8 @@ export const OnboardingAppearance = forwardRef<
               >
                 <div className="overflow-hidden rounded-t-lg">
                   <img
-                    src="/theme-system.webp"
-                    srcSet="/theme-system.webp 1x, /theme-system@2x.webp 2x"
+                    src="/themes/theme-system.webp"
+                    srcSet="/themes/theme-system.webp 1x, /themes/theme-system@2x.webp 2x"
                     alt="System theme preview"
                     className="h-auto w-full object-cover"
                   />

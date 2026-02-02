@@ -44,6 +44,7 @@ export function QuantityInput<TFieldValues extends FieldValues = FieldValues>({
               maxDecimalPlaces={maxDecimalPlaces}
               allowNegative={allowNegative}
               aria-label={label}
+              data-testid={`${label.toLowerCase().replace(/\s+/g, "-")}-input`}
             />
           </FormControl>
           <FormMessage />

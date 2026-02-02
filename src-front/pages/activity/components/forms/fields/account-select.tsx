@@ -42,7 +42,7 @@ export function AccountSelect<TFieldValues extends FieldValues = FieldValues>({
           <FormLabel>{label}</FormLabel>
           <FormControl>
             <Select onValueChange={field.onChange} defaultValue={field.value}>
-              <SelectTrigger aria-label={label}>
+              <SelectTrigger aria-label={label} data-testid="account-select">
                 <SelectValue placeholder={placeholder} />
               </SelectTrigger>
               <SelectContent className="max-h-[500px] overflow-y-auto">

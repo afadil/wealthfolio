@@ -33,6 +33,12 @@ export interface MoneyInputProps {
   readOnly?: boolean;
   /** Aria label for accessibility */
   "aria-label"?: string;
+  /** Test ID for e2e testing */
+  "data-testid"?: string;
+  /** Auto focus on mount */
+  autoFocus?: boolean;
+  /** Key down handler */
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }
 
 const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
@@ -49,6 +55,9 @@ const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
       disabled,
       readOnly,
       "aria-label": ariaLabel,
+      "data-testid": testId,
+      autoFocus,
+      onKeyDown,
     },
     ref,
   ) => {
@@ -65,6 +74,9 @@ const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
         disabled={disabled}
         readOnly={readOnly}
         aria-label={ariaLabel}
+        data-testid={testId}
+        autoFocus={autoFocus}
+        onKeyDown={onKeyDown}
         allowNegative={false}
         decimalScale={maxDecimalPlaces}
         thousandSeparator={thousandSeparator}

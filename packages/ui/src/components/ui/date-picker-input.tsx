@@ -77,6 +77,7 @@ interface DatePickerInputProps extends Omit<
   enableTime?: boolean;
   timeGranularity?: "hour" | "minute" | "second";
   onInteractionEnd?: () => void;
+  "data-testid"?: string;
 }
 
 export function DatePickerInput({
@@ -87,6 +88,7 @@ export function DatePickerInput({
   enableTime,
   timeGranularity,
   onInteractionEnd,
+  "data-testid": testId,
   ...props
 }: DatePickerInputProps) {
   const actualGranularity = React.useMemo(() => {
@@ -121,6 +123,7 @@ export function DatePickerInput({
           "focus-within:ring-ring focus-within:ring-2 focus-within:ring-offset-2 focus-within:outline-none",
           disabled && "cursor-not-allowed opacity-50",
         )}
+        data-testid={testId}
       >
         <DateInput
           unstyled

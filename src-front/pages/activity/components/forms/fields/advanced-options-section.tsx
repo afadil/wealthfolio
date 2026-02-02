@@ -16,7 +16,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Input,
 } from "@wealthfolio/ui";
 import { CurrencyInput, MoneyInput } from "@wealthfolio/ui/components/financial";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -118,6 +117,7 @@ export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldV
           variant="ghost"
           size="sm"
           type="button"
+          data-testid="advanced-options-button"
           className="text-muted-foreground hover:text-foreground flex w-full items-center justify-between px-0 py-1 hover:bg-transparent"
         >
           <span className="text-sm font-medium">Advanced Options</span>
@@ -144,6 +144,7 @@ export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldV
                       onChange={field.onChange}
                       placeholder="Select currency"
                       className="w-full"
+                      data-testid="advanced-currency-input"
                     />
                   </FormControl>
                   {prioritizedCurrencies.length > 1 && (
@@ -194,6 +195,7 @@ export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldV
                       placeholder="1.0000"
                       maxDecimalPlaces={6}
                       className="w-full"
+                      data-testid="fx-rate-input"
                     />
                   </FormControl>
                   <FormMessage />
@@ -215,7 +217,7 @@ export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldV
                       onValueChange={(value) => field.onChange(value === "__none__" ? null : value)}
                       value={field.value ?? "__none__"}
                     >
-                      <SelectTrigger aria-label="Subtype">
+                      <SelectTrigger aria-label="Subtype" data-testid="subtype-select">
                         <SelectValue placeholder="Select subtype" />
                       </SelectTrigger>
                       <SelectContent>

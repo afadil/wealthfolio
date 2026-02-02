@@ -141,6 +141,7 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
                 {...field}
                 onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                 aria-label={label}
+                data-testid="symbol-input"
               />
             ) : (
               <TickerSearchInput
@@ -148,6 +149,7 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
                 value={field.value}
                 defaultCurrency={defaultCurrency}
                 aria-label={label}
+                data-testid="symbol-search"
               />
             )}
           </FormControl>

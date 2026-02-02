@@ -35,6 +35,8 @@ interface SearchProps {
   className?: string;
   /** Default currency to use for custom assets (typically from account) */
   defaultCurrency?: string;
+  /** Test ID for e2e testing */
+  "data-testid"?: string;
 }
 
 interface SearchResultsProps {
@@ -188,6 +190,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       autoFocusSearch = false,
       className,
       defaultCurrency,
+      "data-testid": testId,
     },
     ref,
   ) => {
@@ -318,16 +321,19 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       [autoFocusSearch],
     );
 
-    const handleInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key !== "Tab") return;
-      closeFocusIntentRef.current = e.shiftKey ? "prev" : "next";
-      e.preventDefault();
-      if (isControlled) {
-        onOpenChange?.(false);
-      } else {
-        setUncontrolledOpen(false);
-      }
-    }, [isControlled, onOpenChange]);
+    const handleInputKeyDown = useCallback(
+      (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key !== "Tab") return;
+        closeFocusIntentRef.current = e.shiftKey ? "prev" : "next";
+        e.preventDefault();
+        if (isControlled) {
+          onOpenChange?.(false);
+        } else {
+          setUncontrolledOpen(false);
+        }
+      },
+      [isControlled, onOpenChange],
+    );
 
     const handleCloseAutoFocus = useCallback((e: Event) => {
       const intent = closeFocusIntentRef.current;
@@ -357,6 +363,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
               ref={composedTriggerRef}
               aria-expanded={open}
               aria-haspopup="listbox"
+              data-testid={testId}
             >
               {displayName}
               <Icons.Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />

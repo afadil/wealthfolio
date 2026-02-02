@@ -33,6 +33,10 @@ export interface QuantityInputProps {
   readOnly?: boolean;
   /** Aria label for accessibility */
   "aria-label"?: string;
+  /** Test ID for e2e testing */
+  "data-testid"?: string;
+  /** Key down handler */
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }
 
 const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputProps>(
@@ -49,6 +53,8 @@ const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputProps>(
       disabled,
       readOnly,
       "aria-label": ariaLabel,
+      "data-testid": testId,
+      onKeyDown,
     },
     ref,
   ) => {
@@ -65,6 +71,8 @@ const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputProps>(
         disabled={disabled}
         readOnly={readOnly}
         aria-label={ariaLabel}
+        data-testid={testId}
+        onKeyDown={onKeyDown}
         allowNegative={allowNegative}
         decimalScale={maxDecimalPlaces}
         allowedDecimalSeparators={[".", ","]}

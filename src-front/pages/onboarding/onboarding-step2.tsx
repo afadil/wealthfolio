@@ -147,6 +147,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                               <button
                                 key={curr}
                                 type="button"
+                                data-testid={`currency-${curr.toLowerCase()}-button`}
                                 onClick={() => field.onChange(curr)}
                                 className={`rounded-lg border-2 p-4 font-semibold transition-all ${
                                   field.value === curr

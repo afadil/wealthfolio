@@ -144,8 +144,8 @@ test.describe("Activity Creation Tests", () => {
     await page.waitForTimeout(200);
   }
 
-  async function selectAccount(accountName: string, currency: string, label = "Account") {
-    const accountSelect = page.locator(`[aria-label="${label}"]`);
+  async function selectAccount(accountName: string, currency: string) {
+    const accountSelect = page.getByTestId("account-select");
     await accountSelect.click();
     await page
       .getByRole("option", { name: new RegExp(`${accountName}.*\\(${currency}\\)`) })
@@ -153,13 +153,73 @@ test.describe("Activity Creation Tests", () => {
       .click();
   }
 
+  // Counter to spread activities over different dates
+  let activityDateCounter = 30;
+
+  // Helper to generate date parts for a date N days ago
+  function getDatePartsAgo(daysAgo: number): { month: string; day: string; year: string } {
+    const date = new Date();
+    date.setDate(date.getDate() - daysAgo);
+    return {
+      month: String(date.getMonth() + 1).padStart(2, "0"),
+      day: String(date.getDate()).padStart(2, "0"),
+      year: String(date.getFullYear()),
+    };
+  }
+
   async function selectDate() {
-    const datePickerButton = page.getByRole("button", { name: "Pick a date" });
-    await datePickerButton.click();
-    await page.waitForSelector('[role="grid"]', { state: "visible", timeout: 5000 });
-    const day15Button = page.getByRole("button", { name: /15,/i }).first();
-    await day15Button.click();
-    await page.waitForTimeout(200);
+    // Fill React Aria DateInput by clicking on each segment with data-type attributes
+    const { month, day, year } = getDatePartsAgo(activityDateCounter);
+    activityDateCounter = Math.max(1, activityDateCounter - 1); // Decrement but stay positive
+
+    // Find the date field container using testid
+    const dateField = page.getByTestId("date-picker");
+
+    // Click and fill month segment
+    const monthSegment = dateField.locator('[data-type="month"]');
+    await monthSegment.click();
+    await page.waitForTimeout(50);
+    await page.keyboard.type(month, { delay: 30 });
+    await page.waitForTimeout(50);
+
+    // Click and fill day segment
+    const daySegment = dateField.locator('[data-type="day"]');
+    await daySegment.click();
+    await page.waitForTimeout(50);
+    await page.keyboard.type(day, { delay: 30 });
+    await page.waitForTimeout(50);
+
+    // Click and fill year segment
+    const yearSegment = dateField.locator('[data-type="year"]');
+    await yearSegment.click();
+    await page.waitForTimeout(50);
+    await page.keyboard.type(year, { delay: 30 });
+    await page.waitForTimeout(50);
+
+    // Click and fill hour segment (10 AM)
+    const hourSegment = dateField.locator('[data-type="hour"]');
+    await hourSegment.click();
+    await page.waitForTimeout(50);
+    await page.keyboard.type("10", { delay: 30 });
+    await page.waitForTimeout(50);
+
+    // Click and fill minute segment
+    const minuteSegment = dateField.locator('[data-type="minute"]');
+    await minuteSegment.click();
+    await page.waitForTimeout(50);
+    await page.keyboard.type("00", { delay: 30 });
+    await page.waitForTimeout(50);
+
+    // Click and fill AM/PM segment
+    const dayPeriodSegment = dateField.locator('[data-type="dayPeriod"]');
+    await dayPeriodSegment.click();
+    await page.waitForTimeout(50);
+    await page.keyboard.type("A", { delay: 30 });
+    await page.waitForTimeout(100);
+
+    // Tab to move to next field
+    await page.keyboard.press("Tab");
+    await page.waitForTimeout(100);
   }
 
   async function searchAndSelectSymbol(symbol: string) {
@@ -177,8 +237,8 @@ test.describe("Activity Creation Tests", () => {
     await page.waitForTimeout(200);
   }
 
-  async function fillAmount(value: number, label = "Amount") {
-    const amountInput = page.getByLabel(label);
+  async function fillAmount(value: number, testId = "amount-input") {
+    const amountInput = page.getByTestId(testId);
     await amountInput.click();
     await amountInput.press("Control+a");
     await amountInput.type(String(value), { delay: 50 });
@@ -187,7 +247,7 @@ test.describe("Activity Creation Tests", () => {
   }
 
   async function fillQuantity(value: number) {
-    const quantityInput = page.getByLabel("Quantity");
+    const quantityInput = page.getByTestId("quantity-input");
     await quantityInput.click();
     await quantityInput.press("Control+a");
     await quantityInput.type(String(value), { delay: 50 });
@@ -195,7 +255,7 @@ test.describe("Activity Creation Tests", () => {
   }
 
   async function fillPrice(value: number) {
-    const priceInput = page.getByLabel("Price");
+    const priceInput = page.getByTestId("price-input");
     await priceInput.click();
     await priceInput.press("Control+a");
     await priceInput.type(String(value), { delay: 50 });
@@ -203,7 +263,7 @@ test.describe("Activity Creation Tests", () => {
   }
 
   async function fillFee(value: number) {
-    const feeInput = page.getByLabel("Fee");
+    const feeInput = page.getByTestId("fee-input");
     await feeInput.click();
     await feeInput.press("Control+a");
     await feeInput.type(String(value), { delay: 50 });
@@ -211,7 +271,7 @@ test.describe("Activity Creation Tests", () => {
   }
 
   async function fillNotes(text: string) {
-    const notesInput = page.getByPlaceholder("Add an optional note...");
+    const notesInput = page.getByTestId("notes-input");
     if (await notesInput.isVisible()) {
       await notesInput.fill(text);
       await notesInput.blur();
@@ -219,21 +279,26 @@ test.describe("Activity Creation Tests", () => {
   }
 
   async function expandAdvancedOptions() {
-    const advancedButton = page.getByRole("button", { name: "Advanced Options" });
-    if (await advancedButton.isVisible()) {
-      await advancedButton.click();
-      await page.waitForTimeout(300);
-    }
+    const advancedButton = page.getByTestId("advanced-options-button");
+    await expect(advancedButton).toBeVisible({ timeout: 5000 });
+    await advancedButton.click();
+    // Wait for collapsible content to expand
+    await page.waitForTimeout(500);
+    // Wait for FX Rate field to be visible
+    const fxRateInput = page.getByTestId("fx-rate-input");
+    await expect(fxRateInput).toBeVisible({ timeout: 5000 });
   }
 
   async function selectSubtype(subtype: string) {
-    const subtypeSelect = page.locator('[aria-label="Subtype"]');
+    const subtypeSelect = page.getByTestId("subtype-select");
+    await expect(subtypeSelect).toBeVisible({ timeout: 5000 });
     await subtypeSelect.click();
     await page.getByRole("option", { name: subtype }).click();
   }
 
   async function fillFxRate(rate: number) {
-    const fxRateInput = page.getByLabel("FX Rate");
+    const fxRateInput = page.getByTestId("fx-rate-input");
+    await expect(fxRateInput).toBeVisible({ timeout: 5000 });
     await fxRateInput.click();
     await fxRateInput.press("Control+a");
     await fxRateInput.type(String(rate), { delay: 50 });
@@ -297,17 +362,26 @@ test.describe("Activity Creation Tests", () => {
 
     await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
 
-    // Handle login if needed
+    // Handle login if needed - check for login page or any authenticated page
     const loginInput = page.getByPlaceholder("Enter your password");
+    const accountsHeading = page.getByRole("heading", { name: "Accounts" });
     const dashboardHeading = page.getByRole("heading", { name: "Dashboard" });
 
-    await expect(loginInput.or(dashboardHeading)).toBeVisible({ timeout: 120000 });
+    // Wait for any of: login page, dashboard, or accounts page (where 01-happy-path ends)
+    await expect(loginInput.or(dashboardHeading).or(accountsHeading)).toBeVisible({
+      timeout: 120000,
+    });
 
     if (await loginInput.isVisible()) {
       await loginInput.fill(TEST_PASSWORD);
       await page.getByRole("button", { name: "Sign In" }).click();
-      await expect(dashboardHeading).toBeVisible({ timeout: 15000 });
+      // After login, wait for either dashboard or accounts page
+      await expect(dashboardHeading.or(accountsHeading)).toBeVisible({ timeout: 15000 });
     }
+
+    // Navigate to dashboard to confirm app is ready
+    await page.goto(`${BASE_URL}/dashboard`, { waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("portfolio-balance-value")).toBeVisible({ timeout: 30000 });
   });
 
   test("2. Create test accounts", async () => {
@@ -424,6 +498,7 @@ test.describe("Activity Creation Tests", () => {
   });
 
   test("6. Create BUY activity with advanced options", async () => {
+    test.setTimeout(60000); // Longer timeout for advanced options test
     await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
 

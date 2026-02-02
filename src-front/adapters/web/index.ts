@@ -126,6 +126,7 @@ export {
   calculateAccountsSimplePerformance,
   getHolding,
   getPortfolioAllocations,
+  getHoldingsByAllocation,
   saveManualHoldings,
   importHoldingsCsv,
   getSnapshots,

@@ -45,6 +45,7 @@ export function DatePicker<TFieldValues extends FieldValues = FieldValues>({
             enableTime={enableTime}
             timeGranularity={timeGranularity}
             maxValue={maxValue}
+            data-testid="date-picker"
           />
           <FormMessage />
         </FormItem>

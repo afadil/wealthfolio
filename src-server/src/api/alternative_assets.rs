@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use wealthfolio_core::{
     assets::{
-        AlternativeAssetServiceTrait, AssetKind, CreateAlternativeAssetRequest as CoreCreateRequest,
+        AssetKind, CreateAlternativeAssetRequest as CoreCreateRequest,
         LinkLiabilityRequest as CoreLinkRequest, UpdateAssetDetailsRequest as CoreUpdateDetailsRequest,
         UpdateValuationRequest as CoreValuationRequest,
     },

@@ -40,6 +40,7 @@ export function AmountInput<TFieldValues extends FieldValues = FieldValues>({
               placeholder={placeholder}
               maxDecimalPlaces={maxDecimalPlaces}
               aria-label={label}
+              data-testid={`${label.toLowerCase().replace(/\s+/g, "-")}-input`}
             />
           </FormControl>
           <FormMessage />

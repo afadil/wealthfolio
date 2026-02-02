@@ -127,6 +127,7 @@ pub async fn process_portfolio_job(
                     json!({ "failed_syncs": result.failed }),
                 ));
                 tracing::info!("Market data sync completed in {:?}", sync_start.elapsed());
+                state.health_service.clear_cache().await;
                 if let Err(err) = state.fx_service.initialize() {
                     tracing::warn!(
                         "Failed to initialize FxService after market data sync: {}",

@@ -39,6 +39,7 @@ export function NotesInput<TFieldValues extends FieldValues = FieldValues>({
               {...field}
               value={field.value || ""}
               aria-label={label}
+              data-testid="notes-input"
             />
           </FormControl>
           <FormMessage />

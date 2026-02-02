@@ -23,9 +23,9 @@
 
 use async_trait::async_trait;
 use chrono::{Duration, NaiveDate, TimeZone, Utc};
-use log::{debug, error, warn};
-use std::collections::HashMap;
-use std::sync::Arc;
+use log::{debug, error, info, warn};
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, LazyLock, Mutex};
 use tokio::sync::RwLock;
 
 use super::client::MarketDataClient;
@@ -498,16 +498,14 @@ where
                 // For FX assets in BackfillHistory mode, use global earliest activity date
                 // FX assets have no activities, so activity_min is always NULL
                 if is_fx_asset_id(asset_id) {
-                    // Get global earliest activity date for FX coverage
                     let global_earliest = self
-                        .sync_state_store
-                        .get_earliest_activity_date_global()
+                        .activity_repo
+                        .get_first_activity_date_overall()
                         .ok()
-                        .flatten();
+                        .map(|dt| dt.date_naive());
 
                     let start = global_earliest
                         .map(|d| d - Duration::days(QUOTE_HISTORY_BUFFER_DAYS))
-                        // Unify fallback policy: missing activity bounds should never imply a multi-year fetch.
                         .unwrap_or_else(|| today - Duration::days(QUOTE_HISTORY_BUFFER_DAYS));
 
                     debug!(
@@ -516,11 +514,9 @@ where
                     );
                     (start, today)
                 } else {
-                    // Non-FX: Fetch from activity start (with buffer) or fallback to buffer days
                     let start = inputs
                         .activity_min
                         .map(|d| d - Duration::days(QUOTE_HISTORY_BUFFER_DAYS))
-                        // Unify fallback policy: missing activity bounds should never imply a multi-year fetch.
                         .unwrap_or_else(|| today - Duration::days(QUOTE_HISTORY_BUFFER_DAYS));
                     (start, today)
                 }
@@ -769,6 +765,51 @@ where
                 continue;
             }
 
+            if matches!(category, SyncCategory::NeedsBackfill) && inputs.is_active {
+                if let Some((start_date, end_date)) =
+                    calculate_sync_window(&category, &inputs, today)
+                {
+                    if start_date <= end_date {
+                        plans.push(SymbolSyncPlan {
+                            asset_id: state.asset_id.clone(),
+                            category: category.clone(),
+                            start_date,
+                            end_date,
+                            priority: state.sync_priority,
+                            data_source: state.data_source.clone(),
+                            quote_symbol: None,
+                            currency: "USD".to_string(), // Will be updated from asset
+                        });
+                    }
+                }
+
+                let recent_category = SyncCategory::Active;
+                if let Some((start_date, end_date)) =
+                    calculate_sync_window(&recent_category, &inputs, today)
+                {
+                    let start_date = if start_date >= today {
+                        today - Duration::days(MIN_SYNC_LOOKBACK_DAYS)
+                    } else {
+                        start_date
+                    };
+
+                    if start_date <= end_date {
+                        plans.push(SymbolSyncPlan {
+                            asset_id: state.asset_id.clone(),
+                            category: recent_category,
+                            start_date,
+                            end_date,
+                            priority: SyncCategory::Active.default_priority(),
+                            data_source: state.data_source.clone(),
+                            quote_symbol: None,
+                            currency: "USD".to_string(), // Will be updated from asset
+                        });
+                    }
+                }
+
+                continue;
+            }
+
             // Use the new calculate_sync_window function
             let Some((start_date, end_date)) = calculate_sync_window(&category, &inputs, today)
             else {
@@ -803,9 +844,11 @@ where
         Ok(plans)
     }
 
-    /// Build sync states from current holdings and activities.
-    async fn refresh_sync_states(&self) -> Result<()> {
-        debug!("Refreshing quote sync states...");
+    /// Ensure sync states exist for the given assets.
+    async fn ensure_sync_states_for_assets(&self, assets: &[Asset]) -> Result<()> {
+        debug!("Ensuring sync states for {} assets...", assets.len());
+
+        let mut new_states = Vec::new();
 
         for asset in assets.iter().filter(|a| self.should_sync_asset(a)) {
             let existing = self.sync_state_store.get_by_asset_id(&asset.id)?;
@@ -848,37 +891,20 @@ where
     A: AssetRepositoryTrait + 'static,
     R: ActivityRepositoryTrait + 'static,
 {
-    async fn sync(&self) -> Result<SyncResult> {
-        debug!("Starting optimized quote sync...");
-
-        // Initialize result to track skipped assets
-        let mut result = SyncResult::default();
-
-        // Get assets to sync
-        let assets = match &asset_ids {
-            Some(ids) if !ids.is_empty() => {
-                let found_assets = self.asset_repo.list_by_asset_ids(ids)?;
-
-        if plans.is_empty() {
-            debug!("No assets need syncing");
-            return Ok(SyncResult::default());
-        }
-
-        debug!("Syncing {} assets", plans.len());
-        Ok(self.execute_sync_plans(plans).await)
-    }
-
-    async fn resync(&self, asset_ids: Option<Vec<String>>) -> Result<SyncResult> {
-        debug!("Starting resync for {:?}", asset_ids);
+    async fn sync(&self, mode: SyncMode, asset_ids: Option<Vec<String>>) -> Result<SyncResult> {
+        debug!("Starting sync (mode: {}) for {:?}", mode, asset_ids);
 
         let assets = match asset_ids {
-            Some(ids) if !ids.is_empty() => self.asset_repo.list_by_symbols(&ids)?,
+            Some(ids) if !ids.is_empty() => self.asset_repo.list_by_asset_ids(&ids)?,
             _ => self.asset_repo.list()?,
         };
 
         if let Err(e) = self.ensure_sync_states_for_assets(&assets).await {
             warn!("Failed to ensure sync states: {:?}", e);
         }
+
+        // Initialize result to track skipped assets
+        let mut result = SyncResult::default();
         let mut syncable: Vec<&Asset> = Vec::new();
 
         for asset in &assets {
@@ -925,58 +951,104 @@ where
         }
 
         // Build plans using the mode-specific date range calculation
-        let plans: Vec<SymbolSyncPlan> = syncable
-            .iter()
-            .map(|asset| {
-                let state = self
-                    .sync_state_store
-                    .get_by_asset_id(&asset.id)
-                    .ok()
-                    .flatten();
+        let mut plans: Vec<SymbolSyncPlan> = Vec::new();
+        for asset in &syncable {
+            let state = self
+                .sync_state_store
+                .get_by_asset_id(&asset.id)
+                .ok()
+                .flatten();
 
-                // Build SyncPlanningInputs from computed bounds
-                let (activity_min, activity_max) = activity_bounds
-                    .get(&asset.id)
-                    .copied()
-                    .unwrap_or((None, None));
+            // Build SyncPlanningInputs from computed bounds
+            let (activity_min, activity_max) = activity_bounds
+                .get(&asset.id)
+                .copied()
+                .unwrap_or((None, None));
 
-                let (quote_min, quote_max) = quote_bounds
-                    .get(&asset.id)
-                    .map(|(min, max)| (Some(*min), Some(*max)))
-                    .unwrap_or((None, None));
+            let (quote_min, quote_max) = quote_bounds
+                .get(&asset.id)
+                .map(|(min, max)| (Some(*min), Some(*max)))
+                .unwrap_or((None, None));
 
-                let inputs = SyncPlanningInputs {
-                    is_active: state.as_ref().map(|s| s.is_active).unwrap_or(true),
-                    position_closed_date: state.as_ref().and_then(|s| s.position_closed_date),
-                    activity_min,
-                    activity_max,
-                    quote_min,
-                    quote_max,
-                };
+            let inputs = SyncPlanningInputs {
+                is_active: state.as_ref().map(|s| s.is_active).unwrap_or(true),
+                position_closed_date: state.as_ref().and_then(|s| s.position_closed_date),
+                activity_min,
+                activity_max,
+                quote_min,
+                quote_max,
+            };
 
-                let (start_date, end_date) =
-                    self.calculate_date_range_for_mode(&inputs, mode, today, &asset.id);
+            // Determine category for priority
+            let category =
+                determine_sync_category(&inputs, CLOSED_POSITION_GRACE_PERIOD_DAYS, today);
 
-                // Determine category for priority
-                let category =
-                    determine_sync_category(&inputs, CLOSED_POSITION_GRACE_PERIOD_DAYS, today);
-
-                SymbolSyncPlan {
-                    asset_id: asset.id.clone(),
-                    category: category.clone(),
-                    start_date,
-                    end_date,
-                    priority: category.default_priority(),
-                    data_source: asset
-                        .preferred_provider
-                        .clone()
-                        .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string()),
-                    quote_symbol: None,
-                    currency: asset.currency.clone(),
+            if matches!(mode, SyncMode::Incremental)
+                && matches!(category, SyncCategory::NeedsBackfill)
+                && inputs.is_active
+            {
+                let recent_category = SyncCategory::Active;
+                if let Some((start_date, end_date)) =
+                    calculate_sync_window(&recent_category, &inputs, today)
+                {
+                    if start_date <= end_date {
+                        plans.push(SymbolSyncPlan {
+                            asset_id: asset.id.clone(),
+                            category: recent_category,
+                            start_date,
+                            end_date,
+                            priority: SyncCategory::Active.default_priority(),
+                            data_source: asset
+                                .preferred_provider
+                                .clone()
+                                .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string()),
+                            quote_symbol: None,
+                            currency: asset.currency.clone(),
+                        });
+                    }
                 }
-            })
-            .filter(|plan| plan.start_date <= plan.end_date)
-            .collect();
+
+                if let Some((start_date, end_date)) =
+                    calculate_sync_window(&category, &inputs, today)
+                {
+                    if start_date <= end_date {
+                        plans.push(SymbolSyncPlan {
+                            asset_id: asset.id.clone(),
+                            category: category.clone(),
+                            start_date,
+                            end_date,
+                            priority: category.default_priority(),
+                            data_source: asset
+                                .preferred_provider
+                                .clone()
+                                .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string()),
+                            quote_symbol: None,
+                            currency: asset.currency.clone(),
+                        });
+                    }
+                }
+                continue;
+            }
+
+            let (start_date, end_date) =
+                self.calculate_date_range_for_mode(&inputs, mode, today, &asset.id);
+
+            plans.push(SymbolSyncPlan {
+                asset_id: asset.id.clone(),
+                category: category.clone(),
+                start_date,
+                end_date,
+                priority: category.default_priority(),
+                data_source: asset
+                    .preferred_provider
+                    .clone()
+                    .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string()),
+                quote_symbol: None,
+                currency: asset.currency.clone(),
+            });
+        }
+
+        plans.retain(|plan| plan.start_date <= plan.end_date);
 
         if plans.is_empty() {
             info!(

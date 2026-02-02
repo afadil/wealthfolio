@@ -60,7 +60,7 @@ pub fn gather_legacy_migration_status(
     asset_service: &dyn AssetServiceTrait,
     taxonomy_service: &dyn TaxonomyServiceTrait,
 ) -> Option<LegacyMigrationInfo> {
-    use log::info;
+    use log::{error, info};
 
     // Get all assets
     let assets = match asset_service.get_assets() {
@@ -72,7 +72,10 @@ pub fn gather_legacy_migration_status(
             assets
         }
         Err(e) => {
-            info!("gather_legacy_migration_status: failed to load assets: {}", e);
+            error!(
+                "gather_legacy_migration_status: failed to load assets: {}",
+                e
+            );
             return None;
         }
     };
@@ -84,21 +87,6 @@ pub fn gather_legacy_migration_status(
         .flatten();
 
     let regions_taxonomy = taxonomy_service.get_taxonomy("regions").ok().flatten();
-
-    info!(
-        "gather_legacy_migration_status: gics_taxonomy exists={}, regions_taxonomy exists={}",
-        gics_taxonomy.is_some(),
-        regions_taxonomy.is_some()
-    );
-
-    // Log first asset with metadata for debugging
-    if let Some(asset) = assets.iter().find(|a| a.metadata.is_some()) {
-        info!(
-            "Sample asset metadata for {}: {:?}",
-            asset.symbol,
-            asset.metadata
-        );
-    }
 
     let mut assets_needing_migration = Vec::new();
     let mut assets_already_migrated = 0;

@@ -779,7 +779,7 @@ pub mod test_env {
             Ok(SyncResult::default())
         }
 
-        async fn resync(&self, _symbols: Option<Vec<String>>) -> CoreResult<SyncResult> {
+        async fn resync(&self, _asset_ids: Option<Vec<String>>) -> CoreResult<SyncResult> {
             Ok(SyncResult::default())
         }
 

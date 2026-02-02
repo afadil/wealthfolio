@@ -8,10 +8,14 @@ use chrono::{NaiveDate, Utc};
 use rust_decimal::Decimal;
 use wealthfolio_core::{
     accounts::AccountServiceTrait,
+    constants::PORTFOLIO_TOTAL_ACCOUNT_ID,
     portfolio::{
         allocation::PortfolioAllocations,
         holdings::{Holding, HoldingSummary},
-        snapshot::{CashBalanceInput, ManualHoldingInput, ManualSnapshotRequest, ManualSnapshotService, SnapshotSource},
+        snapshot::{
+            CashBalanceInput, ManualHoldingInput, ManualSnapshotRequest, ManualSnapshotService,
+            SnapshotSource,
+        },
         valuation::DailyAccountValuation,
     },
 };
@@ -242,6 +246,30 @@ pub async fn delete_snapshot_handler(
         .await
     {
         tracing::warn!("Failed to recalculate TOTAL snapshots after delete: {}", e);
+    }
+
+    // Update position status from TOTAL snapshot for quote sync planning
+    if let Ok(Some(total_snapshot)) = state
+        .snapshot_service
+        .get_latest_holdings_snapshot(PORTFOLIO_TOTAL_ACCOUNT_ID)
+    {
+        let current_holdings: std::collections::HashMap<String, rust_decimal::Decimal> =
+            total_snapshot
+                .positions
+                .iter()
+                .map(|(asset_id, position)| (asset_id.clone(), position.quantity))
+                .collect();
+
+        if let Err(e) = state
+            .quote_service
+            .update_position_status_from_holdings(&current_holdings)
+            .await
+        {
+            tracing::warn!(
+                "Failed to update position status from holdings after delete: {}",
+                e
+            );
+        }
     }
 
     // Recalculate valuations for the TOTAL portfolio

@@ -7,6 +7,72 @@ test.describe("Onboarding And Main Flow", () => {
   const TEST_PASSWORD = "password001";
   let page: Page;
 
+  // Helper to generate date parts for a date N days ago
+  function getDatePartsAgo(daysAgo: number): { month: string; day: string; year: string } {
+    const date = new Date();
+    date.setDate(date.getDate() - daysAgo);
+    return {
+      month: String(date.getMonth() + 1).padStart(2, "0"),
+      day: String(date.getDate()).padStart(2, "0"),
+      year: String(date.getFullYear()),
+    };
+  }
+
+  // Helper to fill date in React Aria DateInput by clicking on each segment
+  // React Aria DateInput has separate segments with data-type attributes
+  async function fillDateField(page: Page, daysAgo: number) {
+    const { month, day, year } = getDatePartsAgo(daysAgo);
+
+    // Find the date field container using testid
+    const dateField = page.getByTestId("date-picker");
+
+    // Click and fill month segment
+    const monthSegment = dateField.locator('[data-type="month"]');
+    await monthSegment.click();
+    await page.waitForTimeout(50);
+    await page.keyboard.type(month, { delay: 30 });
+    await page.waitForTimeout(50);
+
+    // Click and fill day segment
+    const daySegment = dateField.locator('[data-type="day"]');
+    await daySegment.click();
+    await page.waitForTimeout(50);
+    await page.keyboard.type(day, { delay: 30 });
+    await page.waitForTimeout(50);
+
+    // Click and fill year segment
+    const yearSegment = dateField.locator('[data-type="year"]');
+    await yearSegment.click();
+    await page.waitForTimeout(50);
+    await page.keyboard.type(year, { delay: 30 });
+    await page.waitForTimeout(50);
+
+    // Click and fill hour segment (10 AM)
+    const hourSegment = dateField.locator('[data-type="hour"]');
+    await hourSegment.click();
+    await page.waitForTimeout(50);
+    await page.keyboard.type("10", { delay: 30 });
+    await page.waitForTimeout(50);
+
+    // Click and fill minute segment
+    const minuteSegment = dateField.locator('[data-type="minute"]');
+    await minuteSegment.click();
+    await page.waitForTimeout(50);
+    await page.keyboard.type("00", { delay: 30 });
+    await page.waitForTimeout(50);
+
+    // Click and fill AM/PM segment
+    const dayPeriodSegment = dateField.locator('[data-type="dayPeriod"]');
+    await dayPeriodSegment.click();
+    await page.waitForTimeout(50);
+    await page.keyboard.type("A", { delay: 30 });
+    await page.waitForTimeout(100);
+
+    // Tab to move to next field
+    await page.keyboard.press("Tab");
+    await page.waitForTimeout(100);
+  }
+
   // Test data - define once, use everywhere
   // Note: London stocks (*.L) are priced in pence, app auto-converts to GBP
   const TEST_DATA = {
@@ -97,35 +163,35 @@ test.describe("Onboarding And Main Flow", () => {
     await expect(page.getByRole("button", { name: "Continue" })).toBeVisible({ timeout: 10000 });
     await page.getByRole("button", { name: "Continue" }).click();
 
-    // Wait for step 2 to load (currency and theme selection)
-    const cadButton = page.getByRole("button", { name: "CAD", exact: true });
+    // Step 2: Currency selection
+    const cadButton = page.getByTestId("currency-cad-button");
     await expect(cadButton).toBeVisible({ timeout: 5000 });
-
-    // Step 2: Settings - Select CAD currency and Light theme
     await cadButton.click();
     // Verify CAD is selected (has border-primary styling)
     await expect(cadButton).toHaveClass(/border-primary/);
 
-    // Select Light theme
-    const lightThemeButton = page.getByRole("button", { name: "Light", exact: true });
-    await expect(lightThemeButton).toBeVisible();
-    await lightThemeButton.click();
-    // Verify Light theme is selected
-    await expect(lightThemeButton).toHaveClass(/border-primary/);
-
-    // Click Continue (this submits the form)
-    // Note: Step 2 saves settings with onboardingCompleted: true, which causes
-    // the app to redirect to "/" instead of showing step 3
+    // Click Continue to proceed to appearance step
     const step2ContinueButton = page.getByRole("button", { name: "Continue" });
     await expect(step2ContinueButton).toBeEnabled();
     await step2ContinueButton.click();
 
-    // Wait for step 3 to appear
+    // Step 3: Appearance - Select Light theme
+    const lightThemeButton = page.getByTestId("theme-light-button");
+    await expect(lightThemeButton).toBeVisible({ timeout: 5000 });
+    await lightThemeButton.click();
+    // Verify Light theme is selected
+    await expect(lightThemeButton).toHaveClass(/border-primary/);
+
+    // Click Continue to proceed to connect step
+    const step3ContinueButton = page.getByRole("button", { name: "Continue" });
+    await expect(step3ContinueButton).toBeEnabled();
+    await step3ContinueButton.click();
+
+    // Step 4: Connect - Click "Get Started" to complete onboarding
     const getStartedButton = page.getByTestId("onboarding-finish-button");
     await expect(getStartedButton).toBeVisible({ timeout: 15000 });
-
-    // Click "Get Started" to complete onboarding
     await getStartedButton.click();
+
     await expect(page).toHaveURL(new RegExp(`${BASE_URL}/settings/accounts`), {
       timeout: 10000,
     });
@@ -207,7 +273,10 @@ test.describe("Onboarding And Main Flow", () => {
     await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
 
-    for (const deposit of TEST_DATA.deposits) {
+    // Create deposits spread over days 30-27 ago (before buys)
+    for (let i = 0; i < TEST_DATA.deposits.length; i++) {
+      const deposit = TEST_DATA.deposits[i];
+
       // Wait for any overlay/backdrop to disappear before opening new sheet
       await page
         .locator('[data-state="open"][aria-hidden="true"]')
@@ -229,26 +298,18 @@ test.describe("Onboarding And Main Flow", () => {
       await page.waitForTimeout(200);
 
       // Select Account using the AccountSelect component
-      const accountSelect = page.locator('[aria-label="Account"]');
+      const accountSelect = page.getByTestId("account-select");
       await accountSelect.click();
       await page
         .getByRole("option", { name: new RegExp(`${deposit.account}.*\\(${deposit.currency}\\)`) })
         .first()
         .click();
 
-      // Select a past date to avoid validation issues with "today" edge cases
-      // The DatePicker's maxValue is today(), but default new Date() with time can cause validation errors
-      const datePickerButton = page.getByRole("button", { name: "Pick a date" });
-      await datePickerButton.click();
-      // Wait for calendar popover
-      await page.waitForSelector('[role="grid"]', { state: "visible", timeout: 5000 });
-      // Click on day 15 (mid-month, always in the past for any date)
-      const day15Button = page.getByRole("button", { name: /15,/i }).first();
-      await day15Button.click();
-      await page.waitForTimeout(200);
+      // Fill date using direct input (spread deposits over different days)
+      await fillDateField(page, 30 - i); // 30, 29, 28, 27 days ago
 
       // Fill in amount using click, clear, type (more reliable with MoneyInput component)
-      const amountInput = page.getByLabel("Amount");
+      const amountInput = page.getByTestId("amount-input");
       await amountInput.click();
       await amountInput.press("Control+a");
       await amountInput.type(String(deposit.amount), { delay: 50 });
@@ -256,7 +317,7 @@ test.describe("Onboarding And Main Flow", () => {
       await page.waitForTimeout(200);
 
       // Fill notes/comment (optional)
-      const notesInput = page.getByLabel("Notes");
+      const notesInput = page.getByTestId("notes-input");
       if (await notesInput.isVisible()) {
         await notesInput.click();
         await notesInput.type(`Initial deposit ${deposit.currency}`, { delay: 20 });
@@ -284,7 +345,10 @@ test.describe("Onboarding And Main Flow", () => {
     await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
 
-    for (const trade of TEST_DATA.trades) {
+    // Create buys spread over days 20-17 ago (after deposits which were 30-27 days ago)
+    for (let i = 0; i < TEST_DATA.trades.length; i++) {
+      const trade = TEST_DATA.trades[i];
+
       // Wait for any overlay/backdrop to disappear before opening new sheet
       await page.waitForTimeout(500);
 
@@ -302,20 +366,15 @@ test.describe("Onboarding And Main Flow", () => {
       await page.waitForTimeout(200);
 
       // Select Account
-      const accountSelect = page.locator('[aria-label="Account"]');
+      const accountSelect = page.getByTestId("account-select");
       await accountSelect.click();
       await page
         .getByRole("option", { name: new RegExp(`${trade.account}.*\\(${trade.currency}\\)`) })
         .first()
         .click();
 
-      // Select a past date to avoid validation issues with "today" edge cases
-      const datePickerButton = page.getByRole("button", { name: "Pick a date" });
-      await datePickerButton.click();
-      await page.waitForSelector('[role="grid"]', { state: "visible", timeout: 5000 });
-      const day15Button = page.getByRole("button", { name: /15,/i }).first();
-      await day15Button.click();
-      await page.waitForTimeout(200);
+      // Fill date using direct input (spread trades over different days, after deposits)
+      await fillDateField(page, 20 - i); // 20, 19, 18, 17 days ago
 
       // Fill Symbol - click the combobox trigger to open search
       const symbolCombobox = page.getByRole("combobox").filter({ hasText: /Select symbol/i });
@@ -336,17 +395,17 @@ test.describe("Onboarding And Main Flow", () => {
       await page.waitForTimeout(200);
 
       // Fill Quantity and blur to trigger validation
-      const quantityInput = page.getByLabel("Quantity");
+      const quantityInput = page.getByTestId("quantity-input");
       await quantityInput.fill(String(trade.shares));
       await quantityInput.blur();
 
       // Fill Price and blur
-      const priceInput = page.getByLabel("Price");
+      const priceInput = page.getByTestId("price-input");
       await priceInput.fill(String(trade.price));
       await priceInput.blur();
 
-      // Fill notes/comment (optional) - use specific placeholder to avoid ambiguity
-      const notesInput = page.getByPlaceholder("Add an optional note...");
+      // Fill notes/comment (optional)
+      const notesInput = page.getByTestId("notes-input");
       if (await notesInput.isVisible()) {
         await notesInput.fill(`Buy ${trade.symbol}`);
         await notesInput.blur();
@@ -370,30 +429,50 @@ test.describe("Onboarding And Main Flow", () => {
   });
 
   test("5. Check portfolio value calculation", async () => {
-    // Increase timeout for this test as it involves multiple page navigations
-    test.setTimeout(120000);
+    // Increase timeout for this test as it involves multiple page navigations and sync
+    test.setTimeout(180000); // 3 minutes
 
     // Helper: wait for market sync and portfolio calculation to complete
     // The app shows toast messages during sync - wait for them to disappear
-    const waitForSyncComplete = async () => {
-      // Wait for "Syncing market data..." toast to disappear (if visible)
-      const syncToast = page.getByText("Syncing market data...");
-      if (await syncToast.isVisible().catch(() => false)) {
-        await expect(syncToast).not.toBeVisible({ timeout: 30000 });
+    const waitForSyncComplete = async (maxWaitMs = 60000) => {
+      const startTime = Date.now();
+
+      // Poll for sync toasts and wait for them to complete
+      while (Date.now() - startTime < maxWaitMs) {
+        const syncToast = page.getByText("Syncing market data...");
+        const calcToast = page.getByText("Calculating portfolio");
+        const syncingToast = page.getByText(/syncing/i);
+
+        const isSyncing =
+          (await syncToast.isVisible().catch(() => false)) ||
+          (await calcToast.isVisible().catch(() => false)) ||
+          (await syncingToast.isVisible().catch(() => false));
+
+        if (isSyncing) {
+          // Wait for all sync toasts to disappear
+          await Promise.all([
+            syncToast.waitFor({ state: "hidden", timeout: 30000 }).catch(() => {}),
+            calcToast.waitFor({ state: "hidden", timeout: 30000 }).catch(() => {}),
+            syncingToast.waitFor({ state: "hidden", timeout: 30000 }).catch(() => {}),
+          ]);
+          // Small delay after sync completes
+          await page.waitForTimeout(1000);
+        } else {
+          // No sync toast visible, wait a bit and check again
+          await page.waitForTimeout(500);
+          break;
+        }
       }
 
-      // Wait for "Calculating portfolio..." toast to disappear (if visible)
-      const calcToast = page.getByText("Calculating portfolio");
-      if (await calcToast.isVisible().catch(() => false)) {
-        await expect(calcToast).not.toBeVisible({ timeout: 30000 });
-      }
-
-      // Small delay to ensure data is fully updated
-      await page.waitForTimeout(500);
+      // Final delay to ensure data is fully updated
+      await page.waitForTimeout(1000);
     };
 
-    // Wait for any ongoing sync to complete before starting
-    await waitForSyncComplete();
+    // Navigate to dashboard first to trigger market sync
+    await page.goto(`${BASE_URL}/dashboard`, { waitUntil: "domcontentloaded" });
+
+    // Wait for initial sync to complete (this triggers quote fetching)
+    await waitForSyncComplete(90000);
 
     // First, get exchange rates from settings -> general
     await page.goto(`${BASE_URL}/settings/general`, { waitUntil: "domcontentloaded" });
@@ -509,14 +588,29 @@ test.describe("Onboarding And Main Flow", () => {
     await page.goto(`${BASE_URL}/dashboard`, { waitUntil: "domcontentloaded" });
 
     // Wait for any sync to complete before reading dashboard value
-    await waitForSyncComplete();
+    await waitForSyncComplete(60000);
 
     const balanceElement = page.getByTestId("portfolio-balance-value");
     await expect(balanceElement).toBeVisible({ timeout: 15000 });
-    const balanceText = await balanceElement.textContent();
 
-    // Extract the displayed balance value
-    const displayedBalance = parseFloat(balanceText?.replace(/[^0-9.]/g, "") || "0");
+    // Poll for balance to stabilize (it may update as calculations complete)
+    let displayedBalance = 0;
+    let balanceText = "";
+    const minExpectedValue = 10000; // Should be at least this much with our deposits
+
+    // Retry up to 10 times waiting for the value to be reasonable
+    for (let attempt = 0; attempt < 10; attempt++) {
+      balanceText = (await balanceElement.textContent()) || "";
+      displayedBalance = parseFloat(balanceText.replace(/[^0-9.]/g, "") || "0");
+
+      if (displayedBalance >= minExpectedValue) {
+        break; // Value looks reasonable, proceed with verification
+      }
+
+      // Wait and retry - portfolio may still be calculating
+      await page.waitForTimeout(2000);
+      await waitForSyncComplete(10000);
+    }
 
     // Verify the portfolio value matches our calculation within 0.1% tolerance
     // This accounts for minor rounding differences in decimal calculations

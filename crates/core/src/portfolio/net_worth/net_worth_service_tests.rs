@@ -459,7 +459,7 @@ impl QuoteServiceTrait for MockMarketDataRepository {
         unimplemented!()
     }
 
-    async fn resync(&self, _symbols: Option<Vec<String>>) -> Result<SyncResult> {
+    async fn resync(&self, _asset_ids: Option<Vec<String>>) -> Result<SyncResult> {
         unimplemented!()
     }
 
