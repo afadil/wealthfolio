@@ -337,7 +337,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             let subtype = activity.subtype.clone();
 
             // Calculate needs_review flag using mapping module
-            let needs_review = mapping::needs_review(&activity);
+            let mut needs_review = mapping::needs_review(&activity);
             if needs_review {
                 needs_review_count += 1;
             }
@@ -380,6 +380,13 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 .and_then(|c| c.code.clone())
                 .filter(|c| !c.trim().is_empty());
 
+            let is_placeholder_symbol = |symbol: &str| {
+                let trimmed = symbol.trim();
+                trimmed.is_empty()
+                    || trimmed.eq_ignore_ascii_case("UNKNOWN")
+                    || trimmed.to_uppercase().starts_with("$UNKNOWN-")
+            };
+
             // Determine the display symbol based on asset type
             // For crypto: we want the base symbol (e.g., "SOL" not "SOL-USD")
             // For securities: use raw_symbol if available, else broker symbol
@@ -388,12 +395,12 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                     // For crypto: raw_symbol > extract base from symbol field
                     symbol_ref
                         .and_then(|s| s.raw_symbol.clone())
-                        .filter(|r| !r.trim().is_empty())
+                        .filter(|r| !is_placeholder_symbol(r))
                         .or_else(|| {
                             // Try to extract base from symbol field (e.g., "SOL-CAD" -> "SOL")
                             symbol_ref
                                 .and_then(|s| s.symbol.clone())
-                                .filter(|sym| !sym.trim().is_empty())
+                                .filter(|sym| !is_placeholder_symbol(sym))
                                 .map(|sym| sym.split('-').next().unwrap_or(&sym).to_string())
                         })
                 }
@@ -401,11 +408,11 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                     // For securities/other: raw_symbol > symbol (without exchange suffix)
                     symbol_ref
                         .and_then(|s| s.raw_symbol.clone())
-                        .filter(|r| !r.trim().is_empty())
+                        .filter(|r| !is_placeholder_symbol(r))
                         .or_else(|| {
                             symbol_ref
                                 .and_then(|s| s.symbol.clone())
-                                .filter(|sym| !sym.trim().is_empty())
+                                .filter(|sym| !is_placeholder_symbol(sym))
                                 .map(|sym| {
                                     // Remove exchange suffix like ".TO" for canonical ID
                                     // The exchange is stored separately in exchange_mic
@@ -420,59 +427,65 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 .option_symbol
                 .as_ref()
                 .and_then(|s| s.ticker.clone())
-                .filter(|t| !t.trim().is_empty());
+                .filter(|t| !is_placeholder_symbol(t));
 
             // Determine asset currency for canonical ID
             let asset_currency = symbol_currency
                 .clone()
                 .unwrap_or_else(|| currency_code.clone());
 
+            let missing_symbol =
+                display_symbol.is_none() && option_symbol.is_none() && !is_cash_like;
+            if missing_symbol && !needs_review {
+                needs_review = true;
+                needs_review_count += 1;
+            }
+
             // Generate canonical asset_id using the new format
             let asset_id = if is_cash_like && display_symbol.is_none() && option_symbol.is_none() {
                 // Cash activity without symbol - generate CASH:{currency}
-                canonical_asset_id(&AssetKind::Cash, &asset_currency, None, &asset_currency)
+                Some(canonical_asset_id(
+                    &AssetKind::Cash,
+                    &asset_currency,
+                    None,
+                    &asset_currency,
+                ))
             } else if let Some(ref opt_sym) = option_symbol {
                 // Option symbol takes priority
-                canonical_asset_id(
+                Some(canonical_asset_id(
                     &asset_kind,
                     opt_sym,
                     exchange_mic.as_deref(),
                     &asset_currency,
-                )
+                ))
             } else if let Some(ref sym) = display_symbol {
                 // Regular symbol
-                canonical_asset_id(&asset_kind, sym, exchange_mic.as_deref(), &asset_currency)
+                Some(canonical_asset_id(
+                    &asset_kind,
+                    sym,
+                    exchange_mic.as_deref(),
+                    &asset_currency,
+                ))
             } else {
-                // No symbol available - generate UNKNOWN placeholder
-                format!("SEC:UNKNOWN:{}", currency_code)
+                // No symbol available - skip asset creation, mark for review
+                None
             };
 
             // Track asset IDs and currencies for domain events
-            activity_asset_ids.insert(asset_id.clone());
+            if let Some(ref asset_id) = asset_id {
+                activity_asset_ids.insert(asset_id.clone());
+            }
             activity_currencies.insert(currency_code.clone());
 
-            if seen_assets.insert(asset_id.clone()) {
-                let asset_db = if asset_id.starts_with("CASH:") {
+            if let Some(ref asset_id) = asset_id {
+                if seen_assets.insert(asset_id.clone()) {
+                    let asset_db = if asset_id.starts_with("CASH:") {
                     // Cash asset
                     let new_asset = NewAsset::new_cash_asset(&asset_currency);
                     let mut db: AssetDB = new_asset.into();
                     db.created_at = now_rfc3339.clone();
                     db.updated_at = now_rfc3339.clone();
                     db
-                } else if asset_id.contains(":UNKNOWN:") {
-                    // Unknown placeholder - use SECURITY kind with NONE pricing
-                    AssetDB {
-                        id: asset_id.clone(),
-                        symbol: "UNKNOWN".to_string(),
-                        name: Some("Unknown Asset".to_string()),
-                        currency: currency_code.clone(),
-                        kind: "SECURITY".to_string(),
-                        pricing_mode: "NONE".to_string(),
-                        is_active: 1,
-                        created_at: now_rfc3339.clone(),
-                        updated_at: now_rfc3339.clone(),
-                        ..Default::default()
-                    }
                 } else {
                     // Build metadata with broker info (raw_symbol, exchange, option details)
                     let metadata = build_asset_metadata(&activity);
@@ -505,6 +518,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                     }
                 };
                 asset_rows.push(asset_db);
+                }
             }
 
             let activity_date = activity
@@ -568,7 +582,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 &account_id,
                 &activity_type,
                 &activity_datetime,
-                Some(&asset_id),
+                asset_id.as_deref(),
                 Some(quantity),
                 Some(unit_price),
                 amount,
@@ -581,8 +595,8 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 id: Some(activity_id),
                 account_id: account_id.clone(),
                 // Broker sync provides asset_id directly (already resolved by mapping)
-                asset: Some(AssetInput {
-                    id: Some(asset_id),
+                asset: asset_id.map(|id| AssetInput {
+                    id: Some(id),
                     symbol: None, // Broker sync uses resolved asset_id directly
                     exchange_mic: None,
                     kind: None,

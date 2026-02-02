@@ -126,7 +126,6 @@ pub trait ActivityServiceTrait: Send + Sync {
         &self,
         account_id: String,
         activities: Vec<ActivityImport>,
-        dry_run: bool,
     ) -> Result<Vec<ActivityImport>>;
     async fn import_activities(
         &self,
