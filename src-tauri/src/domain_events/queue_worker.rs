@@ -208,11 +208,8 @@ async fn run_portfolio_job(
             Ok(result) => {
                 let failed_syncs = result.failures;
 
-                // If there were sync failures, clear health cache
-                if !failed_syncs.is_empty() {
-                    let health_service = context.health_service();
-                    health_service.clear_cache().await;
-                }
+                let health_service = context.health_service();
+                health_service.clear_cache().await;
 
                 let result_payload = MarketSyncResult { failed_syncs };
                 if let Err(e) = app_handle.emit(MARKET_SYNC_COMPLETE, &result_payload) {

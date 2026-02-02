@@ -60,6 +60,7 @@ impl WebDomainEventSink {
         asset_service: Arc<dyn AssetServiceTrait + Send + Sync>,
         connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync>,
         event_bus: EventBus,
+        health_service: Arc<dyn wealthfolio_core::health::HealthServiceTrait + Send + Sync>,
         snapshot_service: Arc<
             dyn wealthfolio_core::portfolio::snapshot::SnapshotServiceTrait + Send + Sync,
         >,
@@ -83,6 +84,7 @@ impl WebDomainEventSink {
             asset_service,
             connect_sync_service,
             event_bus,
+            health_service,
             snapshot_service,
             quote_service,
             valuation_service,

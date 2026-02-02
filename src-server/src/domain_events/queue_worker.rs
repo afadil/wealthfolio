@@ -24,6 +24,7 @@ pub struct QueueWorkerDeps {
     pub asset_service: Arc<dyn AssetServiceTrait + Send + Sync>,
     pub connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync>,
     pub event_bus: EventBus,
+    pub health_service: Arc<dyn wealthfolio_core::health::HealthServiceTrait + Send + Sync>,
     // We need a way to enqueue portfolio jobs. Since AppState is not easily cloneable,
     // we pass what we need for enqueue_portfolio_job (which spawns its own async task).
     // The shared.rs enqueue_portfolio_job needs Arc<AppState>, so we'll need to pass
@@ -238,6 +239,7 @@ async fn run_portfolio_job(
                     json!({ "failed_syncs": result.failed }),
                 ));
                 tracing::info!("Market data sync completed in {:?}", sync_start.elapsed());
+                deps.health_service.clear_cache().await;
                 if let Err(err) = deps.fx_service.initialize() {
                     tracing::warn!(
                         "Failed to initialize FxService after market data sync: {}",

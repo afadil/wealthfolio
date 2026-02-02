@@ -81,15 +81,11 @@ fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: 
                                 // Convert SyncResult to legacy format for backwards compatibility
                                 let failed_syncs = result.failures;
 
-                                // If there were sync failures, clear health cache so the next
-                                // health check will detect missing market data issues
-                                if !failed_syncs.is_empty() {
-                                    let health_service = context.health_service();
-                                    let health_clone = health_service.clone();
-                                    spawn(async move {
-                                        health_clone.clear_cache().await;
-                                    });
-                                }
+                                let health_service = context.health_service();
+                                let health_clone = health_service.clone();
+                                spawn(async move {
+                                    health_clone.clear_cache().await;
+                                });
 
                                 let result_payload = MarketSyncResult { failed_syncs };
                                 if let Err(e) =
