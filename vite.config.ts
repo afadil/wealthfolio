@@ -36,30 +36,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   publicDir: "public",
   optimizeDeps: {
-    include: [
-      // Icon libraries (heavy barrel exports)
-      "lucide-react",
-      // Charting
-      "recharts",
-      // TanStack
-      "@tanstack/react-table",
-      "@tanstack/react-virtual",
-      "@tanstack/react-query",
-      // Animation
-      "motion",
-      // Forms
-      "react-hook-form",
-      "@hookform/resolvers",
-      // Utilities
-      "date-fns",
-      "zod",
-      "clsx",
-      "tailwind-merge",
-      "lodash",
-      "papaparse",
-      "qrcode.react",
-      "@supabase/supabase-js",
-    ],
+    include: ["lucide-react", "recharts", "lodash"],
   },
   define: {
     __BUILD_TARGET__: JSON.stringify(buildTarget),
@@ -76,7 +53,9 @@ export default defineConfig({
       // Platform-specific core module for shared adapters
       "#platform": path.resolve(
         __dirname,
-        buildTarget === "tauri" ? "./src-front/adapters/tauri/core" : "./src-front/adapters/web/core",
+        buildTarget === "tauri"
+          ? "./src-front/adapters/tauri/core"
+          : "./src-front/adapters/web/core",
       ),
       "@": path.resolve(__dirname, "./src-front"),
     },

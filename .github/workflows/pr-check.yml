@@ -67,11 +67,6 @@ jobs:
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            src-core
-            src-server
-            src-tauri
 
       - name: Install system dependencies
         run: |
@@ -79,45 +74,19 @@ jobs:
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev
 
       - name: Create dist folder for Tauri context
-        run:
-          mkdir -p dist && echo '<!DOCTYPE html><html><head></head><body></body></html>' >
-          dist/index.html
+        run: mkdir -p dist && echo '<!DOCTYPE html><html><head></head><body></body></html>' > dist/index.html
 
-      - name: Check formatting (src-core)
-        run: cargo fmt --manifest-path src-core/Cargo.toml --all -- --check
+      - name: Check formatting
+        run: cargo fmt --all -- --check
 
-      - name: Check formatting (src-server)
-        run: cargo fmt --manifest-path src-server/Cargo.toml --all -- --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-      - name: Check formatting (src-tauri)
-        run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
-
-      - name: Clippy (src-core)
-        run:
-          cargo clippy --manifest-path src-core/Cargo.toml --all-targets --all-features -- -D
-          warnings
-
-      - name: Clippy (src-server)
-        run:
-          cargo clippy --manifest-path src-server/Cargo.toml --all-targets --all-features -- -D
-          warnings
-
-      - name: Clippy (src-tauri)
-        run:
-          cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D
-          warnings
-
-      - name: Test (src-core)
-        run: cargo test --manifest-path src-core/Cargo.toml
-
-      - name: Test (src-server)
-        run: cargo test --manifest-path src-server/Cargo.toml
-
-      - name: Test (src-tauri)
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Test
+        run: cargo test --workspace
 
       - name: Build (src-server)
-        run: cargo build --manifest-path src-server/Cargo.toml --release
+        run: cargo build -p wealthfolio-server --release
 
   build-status:
     name: Build Status
