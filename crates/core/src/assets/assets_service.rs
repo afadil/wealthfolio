@@ -8,6 +8,7 @@ use crate::taxonomies::{NewAssetTaxonomyAssignment, TaxonomyServiceTrait};
 use super::assets_model::{Asset, AssetKind, NewAsset, PricingMode, UpdateAssetProfile};
 use super::canonical_asset_id;
 use super::assets_traits::{AssetRepositoryTrait, AssetServiceTrait};
+use super::normalize_exchange_mic;
 use super::auto_classification::{AutoClassificationService, ClassificationInput};
 use crate::errors::{DatabaseError, Error, Result};
 
@@ -110,6 +111,53 @@ impl AssetService {
     pub fn with_event_sink(mut self, event_sink: Arc<dyn DomainEventSink>) -> Self {
         self.event_sink = event_sink;
         self
+    }
+
+    async fn merge_unknown_asset_if_needed(&self, asset: &Asset) -> Result<()> {
+        if asset.kind != AssetKind::Security {
+            return Ok(());
+        }
+
+        let exchange_mic = normalize_exchange_mic(asset.exchange_mic.as_deref());
+        if exchange_mic.is_none() || exchange_mic == Some("UNKNOWN") {
+            return Ok(());
+        }
+
+        let unknown_asset_id = canonical_asset_id(
+            &AssetKind::Security,
+            &asset.symbol,
+            Some("UNKNOWN"),
+            &asset.currency,
+        );
+
+        if unknown_asset_id == asset.id {
+            return Ok(());
+        }
+
+        let unknown_asset = match self.asset_repository.get_by_id(&unknown_asset_id) {
+            Ok(asset) => asset,
+            Err(Error::Database(DatabaseError::NotFound(_))) => return Ok(()),
+            Err(err) => return Err(err),
+        };
+
+        if unknown_asset.currency != asset.currency {
+            return Ok(());
+        }
+
+        let (updated_count, account_ids, currencies) = self
+            .asset_repository
+            .merge_unknown_asset(&unknown_asset_id, &asset.id)
+            .await?;
+
+        if updated_count > 0 {
+            self.event_sink.emit(DomainEvent::activities_changed(
+                account_ids,
+                vec![asset.id.clone()],
+                currencies,
+            ));
+        }
+
+        Ok(())
     }
 
     async fn create_cash_asset(&self, currency: &str) -> Result<Asset> {
@@ -271,7 +319,13 @@ impl AssetServiceTrait for AssetService {
 
     /// Creates a new asset directly without network lookups.
     async fn create_asset(&self, new_asset: NewAsset) -> Result<Asset> {
+        let mut new_asset = new_asset;
+        new_asset.exchange_mic =
+            normalize_exchange_mic(new_asset.exchange_mic.as_deref()).map(|m| m.to_string());
+
         let asset = self.asset_repository.create(new_asset).await?;
+
+        self.merge_unknown_asset_if_needed(&asset).await?;
 
         // Emit event for newly created asset
         self.event_sink
@@ -353,6 +407,8 @@ impl AssetServiceTrait for AssetService {
         let (name, exchange_mic_from_metadata) = metadata
             .map(|m| (m.name, m.exchange_mic))
             .unwrap_or_default();
+        let exchange_mic_from_metadata =
+            normalize_exchange_mic(exchange_mic_from_metadata.as_deref()).map(|m| m.to_string());
 
         // Extract symbol from canonical asset ID format (e.g., "SEC:AAPL:XNAS" -> "AAPL")
         // Falls back to asset_id if parsing fails (for legacy IDs)
@@ -425,6 +481,8 @@ impl AssetServiceTrait for AssetService {
         );
 
         let asset = self.asset_repository.create(new_asset).await?;
+
+        self.merge_unknown_asset_if_needed(&asset).await?;
 
         // Emit event for newly created asset
         self.event_sink

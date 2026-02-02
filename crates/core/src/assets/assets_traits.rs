@@ -63,4 +63,12 @@ pub trait AssetRepositoryTrait: Send + Sync {
     /// Removes the $.legacy structure from asset metadata.
     /// Preserves $.identifiers if present.
     async fn cleanup_legacy_metadata(&self, asset_id: &str) -> Result<()>;
+
+    /// Reassigns activities from an UNKNOWN asset to a resolved asset and deactivates the UNKNOWN asset.
+    /// Returns (updated_activity_count, account_ids, currencies) for downstream events.
+    async fn merge_unknown_asset(
+        &self,
+        unknown_asset_id: &str,
+        resolved_asset_id: &str,
+    ) -> Result<(usize, Vec<String>, Vec<String>)>;
 }

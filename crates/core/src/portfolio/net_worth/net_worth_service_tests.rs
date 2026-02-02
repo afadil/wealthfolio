@@ -137,6 +137,14 @@ impl AssetRepositoryTrait for MockAssetRepository {
     async fn cleanup_legacy_metadata(&self, _asset_id: &str) -> Result<()> {
         Ok(())
     }
+
+    async fn merge_unknown_asset(
+        &self,
+        _unknown_asset_id: &str,
+        _resolved_asset_id: &str,
+    ) -> Result<(usize, Vec<String>, Vec<String>)> {
+        Ok((0, Vec::new(), Vec::new()))
+    }
 }
 
 struct MockSnapshotRepository {

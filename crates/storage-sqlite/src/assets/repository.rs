@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use chrono::Utc;
 use diesel::prelude::*;
 use diesel::r2d2::{self, Pool};
 use diesel::sqlite::SqliteConnection;
@@ -301,6 +302,52 @@ impl AssetRepositoryTrait for AssetRepository {
                     .map_err(StorageError::from)?;
 
                 Ok(())
+            })
+            .await
+    }
+
+    async fn merge_unknown_asset(
+        &self,
+        unknown_asset_id: &str,
+        resolved_asset_id: &str,
+    ) -> Result<(usize, Vec<String>, Vec<String>)> {
+        let unknown_asset_id = unknown_asset_id.to_string();
+        let resolved_asset_id = resolved_asset_id.to_string();
+
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<(usize, Vec<String>, Vec<String>)> {
+                let activity_rows: Vec<(String, String)> = activities::table
+                    .filter(activities::asset_id.eq(&unknown_asset_id))
+                    .select((activities::account_id, activities::currency))
+                    .distinct()
+                    .load::<(String, String)>(conn)
+                    .map_err(StorageError::from)?;
+
+                let mut account_ids = Vec::new();
+                let mut currencies = Vec::new();
+                for (account_id, currency) in activity_rows {
+                    if !account_ids.contains(&account_id) {
+                        account_ids.push(account_id);
+                    }
+                    if !currencies.contains(&currency) {
+                        currencies.push(currency);
+                    }
+                }
+
+                let updated_count = diesel::update(
+                    activities::table.filter(activities::asset_id.eq(&unknown_asset_id)),
+                )
+                .set(activities::asset_id.eq(&resolved_asset_id))
+                .execute(conn)
+                .map_err(StorageError::from)?;
+
+                let now = Utc::now().to_rfc3339();
+                let _ = diesel::update(assets::table.filter(assets::id.eq(&unknown_asset_id)))
+                    .set((assets::is_active.eq(0), assets::updated_at.eq(&now)))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+
+                Ok((updated_count, account_ids, currencies))
             })
             .await
     }

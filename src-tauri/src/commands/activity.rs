@@ -137,17 +137,12 @@ pub async fn save_account_import_mapping(
 pub async fn check_activities_import(
     account_id: String,
     activities: Vec<ActivityImport>,
-    dry_run: Option<bool>,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Vec<ActivityImport>, String> {
-    let dry_run = dry_run.unwrap_or(false);
-    debug!(
-        "Checking activities import for account: {} (dry_run: {})",
-        account_id, dry_run
-    );
+    debug!("Checking activities import for account: {}", account_id);
     let result = state
         .activity_service()
-        .check_activities_import(account_id, activities, dry_run)
+        .check_activities_import(account_id, activities)
         .await?;
     Ok(result)
 }

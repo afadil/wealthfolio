@@ -4,7 +4,7 @@ use std::sync::Arc;
 use chrono::{NaiveDate, Utc};
 use rust_decimal::Decimal;
 
-use crate::assets::{security_id_from_symbol_with_mic, AssetServiceTrait};
+use crate::assets::{normalize_exchange_mic, security_id_from_symbol_with_mic, AssetServiceTrait};
 use crate::errors::Result;
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::fx::FxServiceTrait;
@@ -80,7 +80,7 @@ impl ManualSnapshotService {
                 Some(id) if !id.is_empty() => id.to_string(),
                 _ => security_id_from_symbol_with_mic(
                     &holding.symbol,
-                    holding.exchange_mic.as_deref(),
+                    normalize_exchange_mic(holding.exchange_mic.as_deref()),
                     &holding.currency,
                 ),
             };

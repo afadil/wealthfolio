@@ -29,6 +29,7 @@ pub use asset_id::{
     alternative_id,
     // Canonical ID Generation
     canonical_asset_id,
+    normalize_exchange_mic,
     // Yahoo symbol parsing helpers
     parse_symbol_with_exchange_suffix,
     parse_crypto_pair_symbol,

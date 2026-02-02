@@ -12,7 +12,10 @@ use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
 use crate::activities::csv_parser::{self, ParseConfig, ParsedCsvResult};
 use crate::activities::{ActivityRepositoryTrait, ActivityServiceTrait};
-use crate::assets::{canonical_asset_id, parse_crypto_pair_symbol, AssetKind, AssetServiceTrait};
+use crate::assets::{
+    canonical_asset_id, normalize_exchange_mic, parse_crypto_pair_symbol, AssetKind,
+    AssetServiceTrait,
+};
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::fx::currency::{get_normalization_rule, normalize_amount};
 use crate::fx::FxServiceTrait;
@@ -216,6 +219,7 @@ impl ActivityService {
         activity_type: &str,
         currency: &str,
     ) -> Result<Option<String>> {
+        let exchange_mic = normalize_exchange_mic(exchange_mic);
         // 1. If asset_id is explicitly provided, use it (backward compatibility for updates)
         if let Some(id) = asset_id {
             if !id.is_empty() {
@@ -338,7 +342,8 @@ impl ActivityService {
 
         // Extract asset fields from nested `asset` object
         let symbol = activity.get_symbol().map(|s| s.to_string());
-        let exchange_mic = activity.get_exchange_mic().map(|s| s.to_string());
+        let exchange_mic =
+            normalize_exchange_mic(activity.get_exchange_mic()).map(|s| s.to_string());
         let asset_kind = activity.get_asset_kind().map(|s| s.to_string());
         let asset_name = activity.get_asset_name().map(|s| s.to_string());
         let pricing_mode = activity.get_pricing_mode().map(|s| s.to_string());
@@ -515,7 +520,8 @@ impl ActivityService {
 
         // Extract asset fields using helper methods (supports both nested `asset` and legacy flat fields)
         let symbol = activity.get_symbol().map(|s| s.to_string());
-        let exchange_mic = activity.get_exchange_mic().map(|s| s.to_string());
+        let exchange_mic =
+            normalize_exchange_mic(activity.get_exchange_mic()).map(|s| s.to_string());
         let asset_kind = activity.get_asset_kind().map(|s| s.to_string());
         let asset_name = activity.get_asset_name().map(|s| s.to_string());
         let pricing_mode = activity.get_pricing_mode().map(|s| s.to_string());
@@ -1030,15 +1036,12 @@ impl ActivityServiceTrait for ActivityService {
         Ok(persisted)
     }
 
-    /// Verifies the activities import from CSV file
-    /// When `dry_run` is true, this performs read-only validation without creating
-    /// assets or registering FX pairs. When `dry_run` is false (default legacy behavior),
-    /// it creates minimal assets and registers FX pairs as needed.
+    /// Verifies the activities import from CSV file.
+    /// This is a read-only validation pass and does not create assets or register FX pairs.
     async fn check_activities_import(
         &self,
         account_id: String,
         activities: Vec<ActivityImport>,
-        dry_run: bool,
     ) -> Result<Vec<ActivityImport>> {
         let account: Account = self.account_service.get_account(&account_id)?;
 
@@ -1068,7 +1071,11 @@ impl ActivityServiceTrait for ActivityService {
             };
 
             // Get resolved exchange MIC from cache
-            let exchange_mic = symbol_mic_cache.get(&activity.symbol).cloned().flatten();
+            let exchange_mic = symbol_mic_cache
+                .get(&activity.symbol)
+                .cloned()
+                .flatten()
+                .and_then(|mic| normalize_exchange_mic(Some(mic.as_str())).map(|m| m.to_string()));
 
             // Store resolved exchange_mic in activity for use during import
             activity.exchange_mic = exchange_mic.clone();
@@ -1108,103 +1115,36 @@ impl ActivityServiceTrait for ActivityService {
 
             let (mut is_valid, mut error_message) = (true, None);
 
-            if dry_run {
-                // Dry-run mode: read-only validation without side effects
-                // Just check if asset exists (don't create it)
-                match self.asset_service.get_asset_by_id(&canonical_id) {
-                    Ok(asset) => {
-                        activity.symbol_name = asset.name;
-                    }
-                    Err(_) => {
-                        // Asset doesn't exist yet - that's OK for dry-run
-                        // It will be created during actual import
-                        // Use the symbol as a placeholder name
-                        activity.symbol_name = Some(activity.symbol.clone());
-                    }
+            // Read-only validation without side effects
+            // Just check if asset exists (don't create it)
+            match self.asset_service.get_asset_by_id(&canonical_id) {
+                Ok(asset) => {
+                    activity.symbol_name = asset.name;
                 }
+                Err(_) => {
+                    // Asset doesn't exist yet - that's OK for validation
+                    // It will be created during actual import
+                    // Use the symbol as a placeholder name
+                    activity.symbol_name = Some(activity.symbol.clone());
+                }
+            }
 
-                // Validate currency without registering FX pair
-                if activity.currency.is_empty() {
+            // Validate currency without registering FX pair
+            if activity.currency.is_empty() {
+                is_valid = false;
+                error_message = Some("Activity currency is missing in the import data.".to_string());
+            } else if activity.currency != account.currency {
+                // Just check that currencies are valid 3-letter codes
+                // The actual FX pair will be registered during import
+                let from = &account.currency;
+                let to = &activity.currency;
+                if from.len() != 3
+                    || !from.chars().all(|c| c.is_alphabetic())
+                    || to.len() != 3
+                    || !to.chars().all(|c| c.is_alphabetic())
+                {
                     is_valid = false;
-                    error_message =
-                        Some("Activity currency is missing in the import data.".to_string());
-                } else if activity.currency != account.currency {
-                    // In dry-run mode, just check that currencies are valid 3-letter codes
-                    // The actual FX pair will be registered during import
-                    let from = &account.currency;
-                    let to = &activity.currency;
-                    if from.len() != 3
-                        || !from.chars().all(|c| c.is_alphabetic())
-                        || to.len() != 3
-                        || !to.chars().all(|c| c.is_alphabetic())
-                    {
-                        is_valid = false;
-                        error_message = Some(format!("Invalid currency code: {} or {}", from, to));
-                    }
-                }
-            } else {
-                // Legacy mode: create assets and register FX pairs
-                // Pass exchange_mic as metadata for asset creation
-                let asset_metadata =
-                    exchange_mic
-                        .as_ref()
-                        .map(|mic| crate::assets::AssetMetadata {
-                            name: None,
-                            kind: None,
-                            exchange_mic: Some(mic.clone()),
-                        });
-
-                let symbol_profile_result = self
-                    .asset_service
-                    .get_or_create_minimal_asset(
-                        &canonical_id,
-                        Some(asset_context_currency),
-                        asset_metadata,
-                        None,
-                    )
-                    .await;
-
-                match symbol_profile_result {
-                    Ok(asset) => {
-                        // symbol_profile_result now returns Asset
-                        activity.symbol_name = asset.name; // Use asset name
-
-                        // Check if activity currency (from import) is valid and handle FX
-                        if activity.currency.is_empty() {
-                            // Activity must have a currency specified in the import
-                            is_valid = false;
-                            error_message = Some(
-                                "Activity currency is missing in the import data.".to_string(),
-                            );
-                        } else if activity.currency != account.currency {
-                            match self
-                                .fx_service
-                                .register_currency_pair(
-                                    activity.currency.as_str(), // Foreign currency (from import data)
-                                    account.currency.as_str(),  // Target currency (account currency)
-                                )
-                                .await
-                            {
-                                Ok(_) => { /* FX pair registered or already exists */ }
-                                Err(e) => {
-                                    is_valid = false;
-                                    error_message = Some(format!(
-                                        "Failed to register currency pair for FX: {}",
-                                        e
-                                    ));
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        // Failed to get or create asset
-                        let error_msg = format!(
-                            "Failed to resolve asset for symbol '{}': {}",
-                            &activity.symbol, e
-                        );
-                        is_valid = false;
-                        error_message = Some(error_msg);
-                    }
+                    error_message = Some(format!("Invalid currency code: {} or {}", from, to));
                 }
             }
 
@@ -1249,7 +1189,7 @@ impl ActivityServiceTrait for ActivityService {
         }
 
         let validated_activities = self
-            .check_activities_import(account_id.clone(), activities, false)
+            .check_activities_import(account_id.clone(), activities)
             .await?;
 
         let has_errors = validated_activities.iter().any(|activity| {

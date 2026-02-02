@@ -275,6 +275,7 @@ pub fn canonical_asset_id(
     let raw_sym = symbol.trim();
     let sym = raw_sym.to_uppercase();
     let ccy = currency.trim().to_uppercase();
+    let exchange_mic = normalize_exchange_mic(exchange_mic);
 
     match kind {
         AssetKind::Cash => format!("{}:{}", CASH_PREFIX, ccy),
@@ -318,6 +319,13 @@ pub fn canonical_asset_id(
         AssetKind::Liability => format!("{}:{}", LIABILITY_PREFIX, random_suffix()),
         AssetKind::Other => format!("{}:{}", OTHER_PREFIX, random_suffix()),
     }
+}
+
+/// Normalizes exchange MIC values by trimming and dropping empty strings.
+pub fn normalize_exchange_mic(exchange_mic: Option<&str>) -> Option<&str> {
+    exchange_mic
+        .map(|mic| mic.trim())
+        .filter(|mic| !mic.is_empty())
 }
 
 /// Parses a symbol that may contain a Yahoo Finance exchange suffix and extracts
@@ -452,7 +460,7 @@ pub fn security_id_from_symbol_with_mic(
 ) -> String {
     let (base_symbol, suffix_mic) = parse_symbol_with_exchange_suffix(symbol);
     // Prefer explicit MIC, then suffix-derived MIC
-    let mic = explicit_mic.or(suffix_mic);
+    let mic = normalize_exchange_mic(explicit_mic).or(suffix_mic);
     canonical_asset_id(&AssetKind::Security, base_symbol, mic, currency)
 }
 
