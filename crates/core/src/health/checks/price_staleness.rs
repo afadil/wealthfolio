@@ -9,8 +9,10 @@ use chrono::{DateTime, Datelike, NaiveDate, Utc, Weekday};
 use std::collections::HashMap;
 
 use crate::errors::Result;
+use crate::assets::{parse_canonical_asset_id, AssetKind};
 use crate::health::model::{AffectedItem, FixAction, HealthCategory, HealthIssue, Severity};
 use crate::health::traits::{HealthCheck, HealthContext};
+use crate::utils::time_utils;
 
 /// Data about an asset holding for staleness checks.
 #[derive(Debug, Clone)]
@@ -79,7 +81,10 @@ impl PriceStalenessCheck {
                     // Only check staleness for assets with positive market value
                     // (assets with 0 quantity are not actively held)
                     if holding.market_value > 0.0 {
-                        let days_stale = trading_days_since(*quote_time, ctx.now);
+                        let mic = extract_exchange_mic(&holding.asset_id);
+                        let effective_today =
+                            time_utils::market_effective_date(ctx.now, mic.as_deref());
+                        let days_stale = trading_days_since(*quote_time, effective_today);
 
                         if days_stale >= critical_trading_days {
                             error_assets.push(holding);
@@ -270,10 +275,24 @@ fn trading_days_between(from_date: NaiveDate, to_date: NaiveDate) -> i64 {
 /// Counts trading days elapsed since a quote timestamp.
 ///
 /// Extracts dates from the timestamps and counts weekdays between them.
-fn trading_days_since(last_quote: DateTime<Utc>, now: DateTime<Utc>) -> i64 {
+fn trading_days_since(last_quote: DateTime<Utc>, today: NaiveDate) -> i64 {
     let last_date = last_quote.date_naive();
-    let today = now.date_naive();
     trading_days_between(last_date, today)
+}
+
+fn extract_exchange_mic(asset_id: &str) -> Option<String> {
+    parse_canonical_asset_id(asset_id).and_then(|parsed| {
+        match parsed.kind {
+            Some(AssetKind::Security) | Some(AssetKind::Option) => {
+                if parsed.qualifier == "UNKNOWN" {
+                    None
+                } else {
+                    Some(parsed.qualifier)
+                }
+            }
+            _ => None,
+        }
+    })
 }
 
 #[async_trait]
@@ -498,8 +517,8 @@ mod tests {
     fn test_monday_friday_quote_not_stale() {
         let check = PriceStalenessCheck::new();
 
-        // Set "now" to Monday Jan 22, 2024
-        let monday = Utc.with_ymd_and_hms(2024, 1, 22, 10, 0, 0).unwrap();
+        // Set "now" to Monday Jan 22, 2024 after US market close
+        let monday = Utc.with_ymd_and_hms(2024, 1, 22, 23, 0, 0).unwrap();
         let ctx = HealthContext::with_timestamp(HealthConfig::default(), "USD", 100_000.0, monday);
 
         let holdings = vec![AssetHoldingInfo {

@@ -198,6 +198,180 @@ pub fn mic_to_currency(mic: &str) -> Option<&'static str> {
     }
 }
 
+/// Get the IANA timezone name for a MIC code.
+///
+/// Returns the canonical timezone used for market session calculations.
+/// This is used for determining the effective trading date based on
+/// market close times.
+pub fn mic_to_timezone(mic: &str) -> Option<&'static str> {
+    match mic {
+        // North America
+        "XNYS" | "XNAS" | "XASE" | "ARCX" | "BATS" => Some("America/New_York"),
+        "XTSE" | "XTSX" | "XCNQ" => Some("America/Toronto"),
+        "XMEX" => Some("America/Mexico_City"),
+
+        // UK & Ireland
+        "XLON" => Some("Europe/London"),
+        "XDUB" => Some("Europe/Dublin"),
+
+        // Germany
+        "XETR" | "XFRA" | "XSTU" | "XHAM" | "XDUS" | "XMUN" | "XBER" | "XHAN" => {
+            Some("Europe/Berlin")
+        }
+
+        // Euronext
+        "XPAR" => Some("Europe/Paris"),
+        "XAMS" => Some("Europe/Amsterdam"),
+        "XBRU" => Some("Europe/Brussels"),
+        "XLIS" => Some("Europe/Lisbon"),
+
+        // Southern Europe
+        "XMIL" => Some("Europe/Rome"),
+        "XMAD" => Some("Europe/Madrid"),
+        "XATH" => Some("Europe/Athens"),
+
+        // Nordic
+        "XSTO" => Some("Europe/Stockholm"),
+        "XHEL" => Some("Europe/Helsinki"),
+        "XCSE" => Some("Europe/Copenhagen"),
+        "XOSL" => Some("Europe/Oslo"),
+        "XICE" => Some("Atlantic/Reykjavik"),
+
+        // Central/Eastern Europe
+        "XSWX" => Some("Europe/Zurich"),
+        "XWBO" => Some("Europe/Vienna"),
+        "XWAR" => Some("Europe/Warsaw"),
+        "XPRA" => Some("Europe/Prague"),
+        "XBUD" => Some("Europe/Budapest"),
+        "XIST" => Some("Europe/Istanbul"),
+
+        // Asia - China & Hong Kong
+        "XSHG" | "XSHE" => Some("Asia/Shanghai"),
+        "XHKG" => Some("Asia/Hong_Kong"),
+
+        // Asia - Japan & Korea
+        "XTKS" => Some("Asia/Tokyo"),
+        "XKRX" | "XKOS" => Some("Asia/Seoul"),
+
+        // Southeast Asia
+        "XSES" => Some("Asia/Singapore"),
+        "XBKK" => Some("Asia/Bangkok"),
+        "XIDX" => Some("Asia/Jakarta"),
+        "XKLS" => Some("Asia/Kuala_Lumpur"),
+
+        // India
+        "XBOM" | "XNSE" => Some("Asia/Kolkata"),
+
+        // Taiwan
+        "XTAI" => Some("Asia/Taipei"),
+
+        // Oceania
+        "XASX" => Some("Australia/Sydney"),
+        "XNZE" => Some("Pacific/Auckland"),
+
+        // South America
+        "BVMF" => Some("America/Sao_Paulo"),
+        "XBUE" => Some("America/Argentina/Buenos_Aires"),
+        "XSGO" => Some("America/Santiago"),
+
+        // Middle East
+        "XTAE" => Some("Asia/Jerusalem"),
+        "XSAU" => Some("Asia/Riyadh"),
+        "XDFM" | "XADS" => Some("Asia/Dubai"),
+        "DSMD" => Some("Asia/Qatar"),
+
+        // Africa
+        "XJSE" => Some("Africa/Johannesburg"),
+        "XCAI" => Some("Africa/Cairo"),
+
+        _ => None,
+    }
+}
+
+/// Get the market close time (hour, minute) for a MIC code.
+///
+/// Returns the local market close time for the exchange timezone.
+pub fn mic_to_market_close(mic: &str) -> Option<(u8, u8)> {
+    match mic {
+        // North America
+        "XNYS" | "XNAS" | "XASE" | "ARCX" | "BATS" => Some((16, 0)),
+        "XTSE" | "XTSX" | "XCNQ" => Some((16, 0)),
+        "XMEX" => Some((15, 0)),
+
+        // UK & Ireland
+        "XLON" => Some((16, 30)),
+        "XDUB" => Some((16, 30)),
+
+        // Germany
+        "XETR" | "XFRA" | "XSTU" | "XHAM" | "XDUS" | "XMUN" | "XBER" | "XHAN" => Some((17, 30)),
+
+        // Euronext
+        "XPAR" | "XAMS" | "XBRU" => Some((17, 30)),
+        "XLIS" => Some((16, 30)),
+
+        // Southern Europe
+        "XMIL" => Some((17, 30)),
+        "XMAD" => Some((17, 30)),
+        "XATH" => Some((17, 20)),
+
+        // Nordic
+        "XSTO" => Some((17, 30)),
+        "XHEL" => Some((18, 30)),
+        "XCSE" => Some((17, 0)),
+        "XOSL" => Some((16, 20)),
+        "XICE" => Some((15, 30)),
+
+        // Central/Eastern Europe
+        "XSWX" => Some((17, 30)),
+        "XWBO" => Some((17, 30)),
+        "XWAR" => Some((17, 0)),
+        "XPRA" => Some((16, 25)),
+        "XBUD" => Some((17, 0)),
+        "XIST" => Some((18, 0)),
+
+        // Asia - China & Hong Kong
+        "XSHG" | "XSHE" => Some((15, 0)),
+        "XHKG" => Some((16, 0)),
+
+        // Asia - Japan & Korea
+        "XTKS" => Some((15, 0)),
+        "XKRX" | "XKOS" => Some((15, 30)),
+
+        // Southeast Asia
+        "XSES" => Some((17, 0)),
+        "XBKK" => Some((16, 30)),
+        "XIDX" => Some((16, 0)),
+        "XKLS" => Some((17, 0)),
+
+        // India
+        "XBOM" | "XNSE" => Some((15, 30)),
+
+        // Taiwan
+        "XTAI" => Some((13, 30)),
+
+        // Oceania
+        "XASX" => Some((16, 0)),
+        "XNZE" => Some((16, 45)),
+
+        // South America
+        "BVMF" => Some((17, 0)),
+        "XBUE" => Some((17, 0)),
+        "XSGO" => Some((16, 0)),
+
+        // Middle East
+        "XTAE" => Some((17, 25)),
+        "XSAU" => Some((15, 0)),
+        "XDFM" | "XADS" => Some((14, 0)),
+        "DSMD" => Some((13, 0)),
+
+        // Africa
+        "XJSE" => Some((17, 0)),
+        "XCAI" => Some((14, 30)),
+
+        _ => None,
+    }
+}
+
 /// Get the list of preferred exchanges for a given currency.
 ///
 /// Returns exchanges sorted by priority for the given currency.

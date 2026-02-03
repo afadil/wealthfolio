@@ -22,7 +22,7 @@
 //! - **Activity-driven sync**: Sync ranges based on activity dates
 
 use async_trait::async_trait;
-use chrono::{Duration, NaiveDate, TimeZone, Utc};
+use chrono::{DateTime, Duration, NaiveDate, TimeZone, Utc};
 use log::{debug, error, info, warn};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, LazyLock, Mutex};
@@ -38,9 +38,11 @@ use super::sync_state::{
 use super::types::{AssetId, Day, ProviderId};
 use crate::activities::ActivityRepositoryTrait;
 use crate::assets::{
-    is_cash_asset_id, is_fx_asset_id, Asset, AssetKind, AssetRepositoryTrait, PricingMode,
+    is_cash_asset_id, is_fx_asset_id, parse_canonical_asset_id, Asset, AssetKind,
+    AssetRepositoryTrait, PricingMode,
 };
 use crate::errors::Result;
+use crate::utils::time_utils;
 
 // =============================================================================
 // Per-Asset Sync Locking (US-012)
@@ -75,6 +77,23 @@ impl Drop for SyncLockGuard {
         let mut locks = SYNC_LOCKS.lock().unwrap();
         locks.remove(&self.asset_id);
     }
+}
+
+fn effective_market_today(now: DateTime<Utc>, asset_id: &str) -> NaiveDate {
+    let mic = parse_canonical_asset_id(asset_id).and_then(|parsed| {
+        match parsed.kind {
+            Some(AssetKind::Security) | Some(AssetKind::Option) => {
+                if parsed.qualifier == "UNKNOWN" {
+                    None
+                } else {
+                    Some(parsed.qualifier)
+                }
+            }
+            _ => None,
+        }
+    });
+
+    time_utils::market_effective_date(now, mic.as_deref())
 }
 
 // Test helpers - expose lock functions for testing
@@ -330,7 +349,7 @@ where
     /// - Last synced date (for incremental sync)
     /// - Current sync category (active, new, needs backfill, etc.)
     pub fn build_sync_plan(&self, assets: &[Asset]) -> Vec<SymbolSyncPlan> {
-        let today = Utc::now().date_naive();
+        let now = Utc::now();
         let asset_ids: Vec<String> = assets.iter().map(|asset| asset.id.clone()).collect();
         let activity_bounds = self
             .activity_repo
@@ -361,7 +380,7 @@ where
             .iter()
             .filter(|a| self.should_sync_asset(a))
             .filter_map(|asset| {
-                self.build_asset_sync_plan(asset, today, &activity_bounds, &quote_bounds)
+                self.build_asset_sync_plan(asset, now, &activity_bounds, &quote_bounds)
             })
             .collect()
     }
@@ -392,14 +411,16 @@ where
         None
     }
 
+
     /// Build sync plan for a single asset.
     fn build_asset_sync_plan(
         &self,
         asset: &Asset,
-        today: NaiveDate,
+        now: DateTime<Utc>,
         activity_bounds: &HashMap<String, (Option<NaiveDate>, Option<NaiveDate>)>,
         quote_bounds: &HashMap<String, (NaiveDate, NaiveDate)>,
     ) -> Option<SymbolSyncPlan> {
+        let effective_today = effective_market_today(now, &asset.id);
         // Get existing sync state
         let state = self
             .sync_state_store
@@ -427,7 +448,11 @@ where
             quote_max,
         };
 
-        let category = determine_sync_category(&inputs, CLOSED_POSITION_GRACE_PERIOD_DAYS, today);
+        let category = determine_sync_category(
+            &inputs,
+            CLOSED_POSITION_GRACE_PERIOD_DAYS,
+            effective_today,
+        );
 
         // Skip closed positions
         if matches!(category, SyncCategory::Closed) {
@@ -435,7 +460,7 @@ where
         }
 
         // Use the new calculate_sync_window function
-        let (start_date, end_date) = calculate_sync_window(&category, &inputs, today)?;
+        let (start_date, end_date) = calculate_sync_window(&category, &inputs, effective_today)?;
 
         // Validate date range
         if start_date > end_date {
@@ -694,7 +719,7 @@ where
             .sync_state_store
             .get_assets_needing_sync(CLOSED_POSITION_GRACE_PERIOD_DAYS)?;
 
-        let today = Utc::now().date_naive();
+        let now = Utc::now();
         let asset_ids: Vec<String> = states.iter().map(|state| state.asset_id.clone()).collect();
 
         // Fetch actual assets to check pricing_mode - filter out non-market-priced assets
@@ -758,8 +783,12 @@ where
                 quote_max,
             };
 
-            let category =
-                determine_sync_category(&inputs, CLOSED_POSITION_GRACE_PERIOD_DAYS, today);
+            let effective_today = effective_market_today(now, &state.asset_id);
+            let category = determine_sync_category(
+                &inputs,
+                CLOSED_POSITION_GRACE_PERIOD_DAYS,
+                effective_today,
+            );
 
             if matches!(category, SyncCategory::Closed) {
                 continue;
@@ -767,7 +796,7 @@ where
 
             if matches!(category, SyncCategory::NeedsBackfill) && inputs.is_active {
                 if let Some((start_date, end_date)) =
-                    calculate_sync_window(&category, &inputs, today)
+                    calculate_sync_window(&category, &inputs, effective_today)
                 {
                     if start_date <= end_date {
                         plans.push(SymbolSyncPlan {
@@ -785,10 +814,10 @@ where
 
                 let recent_category = SyncCategory::Active;
                 if let Some((start_date, end_date)) =
-                    calculate_sync_window(&recent_category, &inputs, today)
+                    calculate_sync_window(&recent_category, &inputs, effective_today)
                 {
-                    let start_date = if start_date >= today {
-                        today - Duration::days(MIN_SYNC_LOOKBACK_DAYS)
+                    let start_date = if start_date >= effective_today {
+                        effective_today - Duration::days(MIN_SYNC_LOOKBACK_DAYS)
                     } else {
                         start_date
                     };
@@ -811,14 +840,15 @@ where
             }
 
             // Use the new calculate_sync_window function
-            let Some((start_date, end_date)) = calculate_sync_window(&category, &inputs, today)
+            let Some((start_date, end_date)) =
+                calculate_sync_window(&category, &inputs, effective_today)
             else {
                 continue;
             };
 
             // Ensure minimum lookback
-            let start_date = if start_date >= today {
-                today - Duration::days(MIN_SYNC_LOOKBACK_DAYS)
+            let start_date = if start_date >= effective_today {
+                effective_today - Duration::days(MIN_SYNC_LOOKBACK_DAYS)
             } else {
                 start_date
             };
