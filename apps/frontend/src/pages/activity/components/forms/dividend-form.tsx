@@ -33,6 +33,12 @@ export const dividendFormSchema = z.object({
   comment: z.string().optional().nullable(),
   // Advanced options
   currency: z.string().optional(),
+  fxRate: z.coerce
+    .number({
+      invalid_type_error: "FX Rate must be a number.",
+    })
+    .positive({ message: "FX Rate must be positive." })
+    .optional(),
   subtype: z.string().optional().nullable(),
 });
 
@@ -81,6 +87,7 @@ export function DividendForm({
       amount: undefined,
       comment: null,
       currency: initialCurrency,
+      fxRate: undefined,
       subtype: null,
       ...defaultValues,
     },
@@ -126,6 +133,7 @@ export function DividendForm({
             {/* Advanced Options */}
             <AdvancedOptionsSection
               currencyName="currency"
+              fxRateName="fxRate"
               subtypeName="subtype"
               activityType={ActivityType.DIVIDEND}
               assetCurrency={assetCurrency}

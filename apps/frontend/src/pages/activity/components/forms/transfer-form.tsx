@@ -71,6 +71,12 @@ export const transferFormSchema = z
     comment: z.string().optional().nullable(),
     // Advanced options
     currency: z.string().optional(),
+    fxRate: z.coerce
+      .number({
+        invalid_type_error: "FX Rate must be a number.",
+      })
+      .positive({ message: "FX Rate must be positive." })
+      .optional(),
     subtype: z.string().optional().nullable(),
     // Internal field for manual pricing mode
     pricingMode: z.enum([PricingMode.MARKET, PricingMode.MANUAL]).default(PricingMode.MARKET),
@@ -247,6 +253,7 @@ export function TransferForm({
       unitPrice: null,
       comment: null,
       currency: initialCurrency,
+      fxRate: undefined,
       subtype: null,
       pricingMode: PricingMode.MARKET,
       exchangeMic: undefined,
@@ -460,6 +467,7 @@ export function TransferForm({
             {/* Advanced Options */}
             <AdvancedOptionsSection
               currencyName="currency"
+              fxRateName="fxRate"
               subtypeName="subtype"
               activityType={ActivityType.TRANSFER_IN}
               assetCurrency={assetCurrency}

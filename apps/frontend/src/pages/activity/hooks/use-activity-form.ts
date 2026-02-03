@@ -93,13 +93,15 @@ export function useActivityForm({
             const fromAccount = accounts.find((a) => a.value === transferData.fromAccountId);
             const toAccount = accounts.find((a) => a.value === transferData.toAccountId);
 
-            // Extract assetId to convert to symbol (ActivityCreate uses symbol, not assetId)
-            const { assetId, ...sharedFields } = formPayload as { assetId?: string } & Record<
-              string,
-              unknown
-            >;
+            // Extract assetId and fxRate from payload
+            // - assetId: converted to symbol (ActivityCreate uses symbol, not assetId)
+            // - fxRate: only applies to IN leg (converts activity currency to destination account currency)
+            const { assetId, fxRate, ...sharedFields } = formPayload as {
+              assetId?: string;
+              fxRate?: number;
+            } & Record<string, unknown>;
 
-            // Create TRANSFER_OUT on source account
+            // Create TRANSFER_OUT on source account (no fxRate - activity currency = account currency)
             const transferOutActivity: ActivityCreate = {
               ...sharedFields,
               accountId: transferData.fromAccountId,
@@ -109,7 +111,7 @@ export function useActivityForm({
               asset: assetId ? { symbol: assetId } : undefined,
             } as ActivityCreate;
 
-            // Create TRANSFER_IN on destination account
+            // Create TRANSFER_IN on destination account (fxRate applies if currencies differ)
             const transferInActivity: ActivityCreate = {
               ...sharedFields,
               accountId: transferData.toAccountId,
@@ -117,6 +119,7 @@ export function useActivityForm({
               currency: toAccount?.currency,
               sourceGroupId,
               asset: assetId ? { symbol: assetId } : undefined,
+              fxRate,
             } as ActivityCreate;
 
             await saveActivitiesMutation.mutateAsync({

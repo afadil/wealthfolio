@@ -28,6 +28,12 @@ export const depositFormSchema = z.object({
   comment: z.string().optional().nullable(),
   // Advanced options
   currency: z.string().optional(),
+  fxRate: z.coerce
+    .number({
+      invalid_type_error: "FX Rate must be a number.",
+    })
+    .positive({ message: "FX Rate must be positive." })
+    .optional(),
 });
 
 export type DepositFormValues = z.infer<typeof depositFormSchema>;
@@ -67,6 +73,7 @@ export function DepositForm({
       amount: undefined,
       comment: null,
       currency: initialCurrency,
+      fxRate: undefined,
       ...defaultValues,
     },
   });
@@ -99,9 +106,10 @@ export function DepositForm({
             {/* Amount */}
             <AmountInput name="amount" label="Amount" />
 
-            {/* Advanced Options - Currency only (no subtypes for deposits) */}
+            {/* Advanced Options - Currency and FX Rate (no subtypes for deposits) */}
             <AdvancedOptionsSection
               currencyName="currency"
+              fxRateName="fxRate"
               accountCurrency={accountCurrency}
               baseCurrency={baseCurrency}
               showSubtype={false}

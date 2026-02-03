@@ -165,6 +165,9 @@ export const ACTIVITY_FORM_CONFIG: Record<
     getDefaults: (activity, accounts) => ({
       ...getBaseDefaults(activity, accounts),
       amount: activity?.amount,
+      // Advanced options
+      currency: activity?.currency,
+      fxRate: activity?.fxRate ?? undefined,
     }),
     toPayload: (data) => {
       const d = data as DepositFormValues;
@@ -173,6 +176,8 @@ export const ACTIVITY_FORM_CONFIG: Record<
         activityDate: d.activityDate,
         amount: d.amount,
         comment: d.comment,
+        currency: d.currency,
+        fxRate: d.fxRate,
       };
     },
   },
@@ -183,6 +188,9 @@ export const ACTIVITY_FORM_CONFIG: Record<
     getDefaults: (activity, accounts) => ({
       ...getBaseDefaults(activity, accounts),
       amount: activity?.amount,
+      // Advanced options
+      currency: activity?.currency,
+      fxRate: activity?.fxRate ?? undefined,
     }),
     toPayload: (data) => {
       const d = data as WithdrawalFormValues;
@@ -191,6 +199,8 @@ export const ACTIVITY_FORM_CONFIG: Record<
         activityDate: d.activityDate,
         amount: d.amount,
         comment: d.comment,
+        currency: d.currency,
+        fxRate: d.fxRate,
       };
     },
   },
@@ -204,6 +214,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
       amount: activity?.amount,
       // Advanced options
       currency: activity?.currency,
+      fxRate: activity?.fxRate ?? undefined,
       subtype: activity?.subtype ?? null,
       exchangeMic: activity?.exchangeMic,
     }),
@@ -217,6 +228,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
         comment: d.comment,
         subtype: d.subtype,
         currency: d.currency,
+        fxRate: d.fxRate,
         exchangeMic: d.exchangeMic,
       };
     },
@@ -248,6 +260,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
         comment: activity?.comment ?? null,
         // Advanced options
         currency: activity?.currency,
+        fxRate: activity?.fxRate ?? undefined,
         subtype: activity?.subtype ?? null,
         pricingMode:
           activity?.assetPricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET,
@@ -267,6 +280,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
         comment: d.comment,
         subtype: d.subtype,
         currency: d.currency,
+        fxRate: d.fxRate,
         pricingMode: d.pricingMode,
         exchangeMic: d.exchangeMic,
         assetMetadata: d.assetMetadata,

@@ -28,6 +28,12 @@ export const withdrawalFormSchema = z.object({
   comment: z.string().optional().nullable(),
   // Advanced options
   currency: z.string().optional(),
+  fxRate: z.coerce
+    .number({
+      invalid_type_error: "FX Rate must be a number.",
+    })
+    .positive({ message: "FX Rate must be positive." })
+    .optional(),
 });
 
 export type WithdrawalFormValues = z.infer<typeof withdrawalFormSchema>;
@@ -67,6 +73,7 @@ export function WithdrawalForm({
       amount: undefined,
       comment: null,
       currency: initialCurrency,
+      fxRate: undefined,
       ...defaultValues,
     },
   });
@@ -99,9 +106,10 @@ export function WithdrawalForm({
             {/* Amount */}
             <AmountInput name="amount" label="Amount" />
 
-            {/* Advanced Options - Currency only (no subtypes for withdrawals) */}
+            {/* Advanced Options - Currency and FX Rate (no subtypes for withdrawals) */}
             <AdvancedOptionsSection
               currencyName="currency"
+              fxRateName="fxRate"
               accountCurrency={accountCurrency}
               baseCurrency={baseCurrency}
               showSubtype={false}

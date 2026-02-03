@@ -144,8 +144,11 @@ test.describe("Activity Creation Tests", () => {
     await page.waitForTimeout(200);
   }
 
-  async function selectAccount(accountName: string, currency: string) {
-    const accountSelect = page.getByTestId("account-select");
+  async function selectAccount(accountName: string, currency: string, label?: string) {
+    // Use label to disambiguate when multiple account selects exist (e.g., Transfer form)
+    const accountSelect = label
+      ? page.getByRole("combobox", { name: label })
+      : page.getByTestId("account-select");
     await accountSelect.click();
     await page
       .getByRole("option", { name: new RegExp(`${accountName}.*\\(${currency}\\)`) })
@@ -306,7 +309,14 @@ test.describe("Activity Creation Tests", () => {
   }
 
   async function submitActivity(activityType: string) {
-    const submitButton = page.getByRole("button", { name: new RegExp(`Add ${activityType}`, "i") });
+    // Transfer form has dynamic button text (e.g., "Transfer 1,000.00" when amount is filled)
+    // We need to match the submit button specifically, not the activity type picker
+    // Other forms use "Add {type}" pattern
+    const buttonPattern =
+      activityType === "Transfer"
+        ? /^Transfer\s+[\d,]+/i // Matches "Transfer 1,000.00" (submit button with amount)
+        : new RegExp(`Add ${activityType}`, "i");
+    const submitButton = page.getByRole("button", { name: buttonPattern });
     await expect(submitButton).toBeEnabled({ timeout: 5000 });
     await submitButton.click();
 
