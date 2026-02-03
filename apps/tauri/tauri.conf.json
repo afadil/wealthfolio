@@ -1,8 +1,8 @@
 {
   "build": {
-    "beforeDevCommand": "pnpm dev:tauri",
-    "beforeBuildCommand": "pnpm build:tauri",
-    "frontendDist": "../dist",
+    "beforeDevCommand": "pnpm --filter frontend dev:tauri",
+    "beforeBuildCommand": "pnpm --filter frontend build:tauri",
+    "frontendDist": "../../dist",
     "devUrl": "http://localhost:1420"
   },
   "bundle": {
@@ -16,11 +16,11 @@
       "icons/icon.ico"
     ],
     "copyright": "2025 Teymz Inc.",
-  "category": "Finance",
-  "createUpdaterArtifacts": "v1Compatible",
-  "iOS": {
-    "developmentTeam": "DYDJ2RNL5H"
-  }
+    "category": "Finance",
+    "createUpdaterArtifacts": "v1Compatible",
+    "iOS": {
+      "developmentTeam": "DYDJ2RNL5H"
+    }
   },
   "productName": "Wealthfolio",
   "mainBinaryName": "Wealthfolio",
@@ -29,17 +29,13 @@
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY0RjI4MkRFOUYwRDM3N0QKUldSOU53MmYzb0x5WlBySmErU21wcjVHZFNtMW9zdGcyZTBBRWpVcHRDMkoyKzF1bkQ1VmdKbkYK",
-      "endpoints": [
-        "https://wealthfolio.app/releases/{{target}}/{{arch}}/{{current_version}}"
-      ],
+      "endpoints": ["https://wealthfolio.app/releases/{{target}}/{{arch}}/{{current_version}}"],
       "windows": {
         "installMode": "passive"
       }
     },
     "deep-link": {
-      "mobile": [
-        { "host": "auth.wealthfolio.app", "pathPrefix": ["/callback", "/auth/callback"] }
-      ],
+      "mobile": [{ "host": "auth.wealthfolio.app", "pathPrefix": ["/callback", "/auth/callback"] }],
       "desktop": {
         "schemes": ["wealthfolio"]
       },
@@ -64,7 +60,6 @@
     ],
     "security": {
       "csp": null
+    }
   }
-  }
-
 }

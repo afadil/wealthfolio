@@ -92,7 +92,8 @@ export function PerformanceChartMobile({ data }: PerformanceChartMobileProps) {
     return [formattedValue + " - ", (name ?? "").toString()];
   };
 
-  const tooltipLabelFormatter = (label: string) => format(parseISO(label), "MMM d, yyyy");
+  const tooltipLabelFormatter = (label: React.ReactNode) =>
+    typeof label === "string" ? format(parseISO(label), "MMM d, yyyy") : "";
 
   return (
     <div className="h-full w-full">

@@ -1,24 +1,9 @@
 {
   "extends": "./tsconfig.base.json",
-  "compilerOptions": {
-    // Main app specific settings
-    "types": ["@tauri-apps/api", "vitest/globals"],
-    "noEmit": true,
-    "composite": false, // Main app doesn't need to be composite
-
-    // Path mapping for main app
-    "paths": {
-      "@/*": ["./src-front/*"],
-      "@wealthfolio/addon-sdk": ["packages/addon-sdk/src"],
-      "@wealthfolio/ui": ["packages/ui/src"],
-      "@wealthfolio/ui/*": ["packages/ui/src/*"],
-      "#platform": ["./src-front/adapters/tauri/core"]
-    }
-  },
-  "include": ["src-front"],
   "references": [
-    { "path": "./tsconfig.node.json" },
+    { "path": "./apps/frontend" },
     { "path": "./packages/ui" },
     { "path": "./packages/addon-sdk" }
-  ]
+  ],
+  "files": []
 }

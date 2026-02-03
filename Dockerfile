@@ -17,7 +17,7 @@ COPY . .
 ENV CI=1
 RUN npm install -g pnpm@9.9.0 && pnpm install --frozen-lockfile
 # Build only the main app to avoid building workspace addons in this image
-RUN pnpm tsc && pnpm vite build && mv dist /web-dist
+RUN pnpm build && mv dist /web-dist
 
 # Stage 2: build server with cross-compilation
 FROM --platform=$BUILDPLATFORM tonistiigi/xx AS xx
@@ -41,22 +41,22 @@ RUN xx-apk add --no-cache musl-dev gcc openssl-dev openssl-libs-static sqlite-de
 RUN rustup target add $(xx-cargo --print-target-triple)
 
 # Leverage Docker layer caching for dependencies
-COPY src-core/Cargo.toml ./src-core/Cargo.toml
-COPY src-server/Cargo.toml src-server/Cargo.lock ./src-server/
-RUN mkdir -p src-core/src src-server/src && \
-    echo "fn main(){}" > src-server/src/main.rs && \
-    echo "" > src-core/src/lib.rs && \
-    xx-cargo fetch --manifest-path src-server/Cargo.toml
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+COPY apps/server ./apps/server
+RUN mkdir -p apps/server/src && \
+    echo "fn main(){}" > apps/server/src/main.rs && \
+    xx-cargo fetch --manifest-path apps/server/Cargo.toml
 
 # Now copy full sources
-COPY src-core ./src-core
-COPY src-server ./src-server
+COPY crates ./crates
+COPY apps/server ./apps/server
 ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 ENV OPENSSL_STATIC=1
 # Build using xx-cargo which handles target flags
-RUN xx-cargo build --release --manifest-path src-server/Cargo.toml && \
+RUN xx-cargo build --release --manifest-path apps/server/Cargo.toml && \
     # Move the binary to a predictable location because the target dir changes with --target
-    cp src-server/target/$(xx-cargo --print-target-triple)/release/wealthfolio-server /wealthfolio-server
+    cp target/$(xx-cargo --print-target-triple)/release/wealthfolio-server /wealthfolio-server
 
 # Final stage
 FROM alpine:3.19

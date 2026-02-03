@@ -321,7 +321,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let data_root = data_root_path.to_string_lossy().to_string();
 
     // AI provider service - catalog is embedded at compile time
-    let ai_catalog_json = include_str!("../../crates/ai/src/ai_providers.json");
+    let ai_catalog_json = include_str!("../../../crates/ai/src/ai_providers.json");
     let ai_provider_service: Arc<dyn AiProviderServiceTrait + Send + Sync> =
         Arc::new(AiProviderService::new(
             settings_repo.clone() as Arc<dyn SettingsRepositoryTrait>,

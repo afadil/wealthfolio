@@ -17,7 +17,7 @@ use tauri::State;
 use crate::context::ServiceContext;
 
 use wealthfolio_core::assets::{
-    AlternativeAssetServiceTrait, AssetKind, CreateAlternativeAssetRequest as CoreCreateRequest,
+    AssetKind, CreateAlternativeAssetRequest as CoreCreateRequest,
     LinkLiabilityRequest as CoreLinkRequest, UpdateAssetDetailsRequest as CoreUpdateDetailsRequest,
     UpdateValuationRequest as CoreValuationRequest,
 };

@@ -114,9 +114,9 @@ export function EquityCurveChart({
                     </>
                   );
                 }}
-                labelFormatter={(label) => {
-                  return format(parseISO(label), tooltipDateFormat);
-                }}
+                labelFormatter={(label) =>
+                  typeof label === 'string' ? format(parseISO(label), tooltipDateFormat) : ''
+                }
               />
             }
           />

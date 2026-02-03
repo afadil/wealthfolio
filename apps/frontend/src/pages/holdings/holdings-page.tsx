@@ -208,7 +208,8 @@ export const HoldingsPage = () => {
     (propertyId: string): LinkedLiability[] => {
       return liabilitiesHoldings
         .filter((h) => {
-          const linkedAssetId = (h.metadata as Record<string, unknown>)?.linked_asset_id;
+          const metadata = h.metadata as Record<string, unknown> | null | undefined;
+          const linkedAssetId = metadata?.linked_asset_id;
           return linkedAssetId === propertyId;
         })
         .map((h) => ({
@@ -225,7 +226,7 @@ export const HoldingsPage = () => {
     (excludePropertyId?: string): LinkedLiability[] => {
       return liabilitiesHoldings
         .filter((h) => {
-          const metadata = h.metadata as Record<string, unknown>;
+          const metadata = h.metadata as Record<string, unknown> | null | undefined;
           const liabilityType = metadata?.liability_type;
           const linkedAssetId = metadata?.linked_asset_id;
           // Only mortgages that are not linked to any asset (or linked to this property for re-linking)

@@ -6,16 +6,16 @@ coverage/
 node_modules/
 
 # Generated files
-src-tauri/gen/
+apps/tauri/gen/
 **/*.d.ts
 
 # Assets and images
-src-front/public/
+apps/frontend/public/
 
 # Rust code
-src-tauri/
-src-core/
-src-server/
+apps/tauri/
+apps/server/
+crates/
 
 # Binary files
 *.png

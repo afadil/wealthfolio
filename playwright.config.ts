@@ -12,7 +12,7 @@ import { defineConfig, devices } from "@playwright/test";
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
-  testDir: "./e2e-tests",
+  testDir: "./e2e",
   /* Run tests in files sequentially to ensure onboarding runs before activity tests */
   fullyParallel: false,
   /* Fail the build on CI if you accidentally left test.only in the source code. */

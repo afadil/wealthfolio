@@ -1,8 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-    "src-tauri",
-    "src-server",
+    "apps/tauri",
+    "apps/server",
     "crates/*",
 ]
 

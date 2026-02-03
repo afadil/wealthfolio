@@ -2,7 +2,7 @@
 @import "tw-animate-css";
 @import "tw-shimmer";
 @plugin "@tailwindcss/typography";
-@source "../packages/ui/src";
+@source "../../../packages/ui/src";
 /* Fonts - using variable fonts where available for best performance */
 /* Inter (sans) - variable font: single file for all weights */
 @import "@fontsource-variable/inter";

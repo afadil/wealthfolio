@@ -243,7 +243,7 @@ pub async fn initialize_context(
     let connect_service = Arc::new(ConnectService::new());
 
     // AI provider service - catalog is embedded at compile time
-    let ai_catalog_json = include_str!("../../../crates/ai/src/ai_providers.json");
+    let ai_catalog_json = include_str!("../../../../crates/ai/src/ai_providers.json");
     let ai_provider_service = Arc::new(AiProviderService::new(
         settings_repository.clone() as Arc<dyn SettingsRepositoryTrait>,
         secret_store.clone(),
@@ -310,7 +310,6 @@ pub async fn initialize_context(
             valuation_service,
             net_worth_service,
             sync_service,
-            alternative_asset_repository,
             alternative_asset_service,
             taxonomy_service,
             connect_service,

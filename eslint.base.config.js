@@ -74,7 +74,7 @@ export function createBaseConfig(options = {}) {
           },
         ],
         // Prefer warnings for stylistic suggestions to reduce friction
-        "@typescript-eslint/prefer-nullish-coalescing": "warn",
+        "@typescript-eslint/prefer-nullish-coalescing": "off",
         "@typescript-eslint/prefer-optional-chain": "warn",
         "@typescript-eslint/no-unnecessary-type-assertion": "warn",
         "@typescript-eslint/restrict-template-expressions": [

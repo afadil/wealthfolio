@@ -24,7 +24,7 @@ function stripExchangeSuffix(symbol: string): string {
  */
 function stripCryptoQuoteSuffix(symbol: string, currencyHint?: string): string {
   const trimmed = symbol.trim();
-  const match = trimmed.match(/^(.*)-([A-Za-z]{3,5})$/);
+  const match = /^(.*)-([A-Za-z]{3,5})$/.exec(trimmed);
   if (!match) return trimmed;
   const base = match[1]?.trim();
   const quote = match[2]?.trim().toUpperCase();

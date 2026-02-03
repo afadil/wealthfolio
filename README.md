@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/afadil/wealthfolio">
-    <img src="src-front/public/logo.svg" alt="Logo" width="80" height="80">
+    <img src="apps/frontend/public/logo.svg" alt="Logo" width="80" height="80">
   </a>
 
   <h3 align="center">Wealthfolio</h3>
@@ -20,7 +20,7 @@
 </div>
 <div align="center">
 
-[<img src="./src-front/public/button-buy-me-a-coffee.png" width="180" alt="Buy me a coffee button"/>](https://www.buymeacoffee.com/afadil)
+[<img src="./apps/frontend/public/button-buy-me-a-coffee.png" width="180" alt="Buy me a coffee button"/>](https://www.buymeacoffee.com/afadil)
 
 </div>
 
@@ -46,7 +46,7 @@ Data Storage. No Subscriptions, No Cloud.
 
 Visit the app website at [Wealthfolio App](https://wealthfolio.app/).
 
-![Screenshot](src-front/public/screenshot.webp)
+![Screenshot](apps/frontend/public/screenshot.webp)
 
 ### ✨ Key Features
 
@@ -283,7 +283,7 @@ All configuration is done via environment variables in `.env.web`.
 Run just the HTTP server without the Vite dev server (from repo root):
 
 ```bash
-cargo run --manifest-path src-server/Cargo.toml
+cargo run --manifest-path apps/server/Cargo.toml
 ```
 
 The server accepts the same `WF_*` environment variables as documented in the
@@ -291,7 +291,7 @@ The server accepts the same `WF_*` environment variables as documented in the
 or via `.env.web`:
 
 ```bash
-WF_LISTEN_ADDR=127.0.0.1:8080 WF_DB_PATH=./db/app.db cargo run --manifest-path src-server/Cargo.toml
+WF_LISTEN_ADDR=127.0.0.1:8080 WF_DB_PATH=./db/app.db cargo run --manifest-path apps/server/Cargo.toml
 ```
 
 See [Web Mode Configuration](#configuration) for a complete list of supported
@@ -586,32 +586,31 @@ Check out the [addons/](addons/) directory for sample addons including:
 
 ```
 wealthfolio/
-├── src-front/                   # React frontend application
-│   ├── adapters/                # Environment adapters (Tauri/Web)
-│   │   ├── tauri/               # Desktop/Tauri implementation
-│   │   ├── web/                 # Web/REST API implementation
-│   │   └── types.ts             # Shared adapter types
-│   ├── addons/                  # Addon system runtime
-│   ├── commands/                # Backend command wrappers
-│   ├── components/              # React components
-│   ├── features/                # Feature modules (self-contained)
-│   ├── pages/                   # Application pages and routes
-│   ├── hooks/                   # Custom React hooks
-│   ├── lib/                     # Utility libraries and helpers
-│   ├── public/                  # Static assets
-│   └── index.html               # HTML entry point
+├── apps/                        # Application packages
+│   ├── frontend/                # React frontend application
+│   │   ├── src/                 # Source code
+│   │   │   ├── adapters/        # Environment adapters (Tauri/Web)
+│   │   │   ├── addons/          # Addon system runtime
+│   │   │   ├── components/      # React components
+│   │   │   ├── features/        # Feature modules (self-contained)
+│   │   │   ├── pages/           # Application pages and routes
+│   │   │   ├── hooks/           # Custom React hooks
+│   │   │   └── lib/             # Utility libraries and helpers
+│   │   ├── public/              # Static assets
+│   │   ├── index.html           # HTML entry point
+│   │   └── vite.config.ts       # Vite build config
+│   ├── tauri/                   # Tauri desktop/mobile app (Rust IPC commands)
+│   └── server/                  # Axum HTTP server for web mode
 ├── crates/                      # Rust crates (shared backend logic)
 │   ├── core/                    # Core business logic, services, models
 │   ├── storage-sqlite/          # SQLite storage layer (Diesel ORM)
 │   ├── market-data/             # Market data providers
 │   ├── connect/                 # External service integrations
 │   └── device-sync/             # Device sync functionality
-├── src-tauri/                   # Tauri desktop app (Rust IPC commands)
-├── src-server/                  # Axum HTTP server for web mode
 ├── addons/                      # Example addons
 │   ├── goal-progress-tracker/   # Goal tracking addon
 │   ├── investment-fees-tracker/ # Fees tracking addon
-│   └── swingfolio-addon/        # Trading addon
+│   └── swingfolio/              # Trading addon
 ├── packages/                    # Shared TypeScript packages
 │   ├── addon-sdk/               # Addon SDK for developers
 │   ├── addon-dev-tools/         # CLI and dev server for addons
@@ -620,12 +619,12 @@ wealthfolio/
 │   ├── addons/                  # Addon development docs
 │   ├── activities/              # Activity types docs
 │   └── architecture/            # Architecture docs
-├── db/                          # SQLite database and migrations
+├── e2e/                         # End-to-end tests
+├── scripts/                     # Build and dev scripts
 ├── Cargo.toml                   # Rust workspace config
 ├── package.json                 # Node.js dependencies
 ├── pnpm-workspace.yaml          # pnpm workspace config
-├── tsconfig.json                # TypeScript config
-└── vite.config.ts               # Vite build config
+└── tsconfig.json                # TypeScript config
 ```
 
 ### Security & Data Storage

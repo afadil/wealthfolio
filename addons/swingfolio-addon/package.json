@@ -34,17 +34,18 @@
     "@tanstack/react-query": "^5.90.5",
     "@wealthfolio/addon-sdk": "workspace:*",
     "@wealthfolio/ui": "workspace:*",
-    "clsx": "^2.1.1",
     "date-fns": "^4.1.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.13",
     "@types/node": "^20.0.0",
-    "@types/react": "^19.1.1",
-    "@types/react-dom": "^19.1.1",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.2",
     "@wealthfolio/addon-dev-tools": "workspace:*",
+    "clsx": "^2.1.1",
     "rollup-plugin-external-globals": "^0.13.0",
+    "tailwind-merge": "^3.4.0",
     "tailwindcss": "^4.1.13",
     "typescript": "^5.9.2",
     "vite": "^7.1.5"

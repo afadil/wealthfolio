@@ -31,8 +31,7 @@ const buildTarget = process.env.BUILD_TARGET || "tauri";
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  root: "src-front",
-  envDir: "..", // Load .env from project root, not src-front
+  envDir: "../..",
   plugins: [react(), tailwindcss()],
   publicDir: "public",
   optimizeDeps: {
@@ -43,21 +42,19 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@wealthfolio/addon-sdk": path.resolve(__dirname, "packages/addon-sdk/src"),
-      "@wealthfolio/ui": path.resolve(__dirname, "packages/ui/src"),
+      "@wealthfolio/addon-sdk": path.resolve(__dirname, "../../packages/addon-sdk/src"),
+      "@wealthfolio/ui": path.resolve(__dirname, "../../packages/ui/src"),
       // Conditional adapter alias based on build target
       "@/adapters": path.resolve(
         __dirname,
-        buildTarget === "tauri" ? "./src-front/adapters/tauri" : "./src-front/adapters/web",
+        buildTarget === "tauri" ? "./src/adapters/tauri" : "./src/adapters/web",
       ),
       // Platform-specific core module for shared adapters
       "#platform": path.resolve(
         __dirname,
-        buildTarget === "tauri"
-          ? "./src-front/adapters/tauri/core"
-          : "./src-front/adapters/web/core",
+        buildTarget === "tauri" ? "./src/adapters/tauri/core" : "./src/adapters/web/core",
       ),
-      "@": path.resolve(__dirname, "./src-front"),
+      "@": path.resolve(__dirname, "./src"),
     },
     extensions: [".js", ".ts", ".jsx", ".tsx", ".json"],
   },
@@ -79,8 +76,8 @@ export default defineConfig({
       : undefined,
     proxy: serverProxy,
     watch: {
-      // 3. tell vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+      // 3. tell vite to ignore watching `apps/desktop`
+      ignored: ["**/apps/tauri/**"],
     },
   },
   // 3. to make use of `TAURI_DEBUG` and other env variables
@@ -88,7 +85,7 @@ export default defineConfig({
   envPrefix: ["VITE_", "TAURI_", "CONNECT_"],
   build: {
     // Output to project root's dist folder (for Tauri)
-    outDir: "../dist",
+    outDir: "../../dist",
     // Tauri uses Chromium on Windows and WebKit on macOS and Linux
     //target: process.env.TAURI_PLATFORM == 'windows' ? 'chrome105' : 'safari13',
     // don't minify for debug builds
@@ -99,7 +96,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "jsdom",
-    setupFiles: "./test/setup.ts",
+    setupFiles: "./src/test/setup.ts",
     include: ["**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
   },
 } as unknown as import("vitest/config").UserConfigExport);

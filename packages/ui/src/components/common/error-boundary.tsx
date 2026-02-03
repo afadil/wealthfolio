@@ -55,11 +55,11 @@ function ErrorFallback({ error }: { error?: Error }) {
         {showDetails && error && (
           <div className="bg-muted/50 mt-4 w-full overflow-hidden rounded-lg border">
             <div className="border-b px-3 py-2">
-              <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Error details</span>
+              <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Error details</span>
             </div>
             <pre className="text-foreground/80 max-h-40 overflow-auto p-3 font-mono text-xs leading-relaxed">
               {error.message}
-              {import.meta.env.DEV && error.stack && (
+              {import.meta.env?.DEV && error.stack && (
                 <>
                   {"\n\n"}
                   {error.stack}

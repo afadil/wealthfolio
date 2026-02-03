@@ -17,7 +17,7 @@ environments, with the correct implementation selected at build time.
 ## Directory Structure
 
 ```
-src-front/adapters/
+apps/frontend/src/adapters/
 ├── index.ts          # Re-exports from default adapter (for TypeScript)
 ├── types.ts          # Shared types for all adapters
 ├── tauri/
@@ -35,7 +35,7 @@ Vite's `resolve.alias` is configured to point `@/adapters` to either
 variable:
 
 ```typescript
-// vite.config.ts
+// apps/frontend/vite.config.ts
 const buildTarget = process.env.BUILD_TARGET || "tauri";
 
 export default defineConfig({
@@ -44,8 +44,8 @@ export default defineConfig({
       "@/adapters": path.resolve(
         __dirname,
         buildTarget === "tauri"
-          ? "./src-front/adapters/tauri"
-          : "./src-front/adapters/web"
+          ? "./src/adapters/tauri"
+          : "./src/adapters/web"
       ),
     },
   },
@@ -73,7 +73,7 @@ For TypeScript type-checking (which doesn't use Vite's aliases), `index.ts`
 re-exports from the Tauri adapter by default:
 
 ```typescript
-// src-front/adapters/index.ts
+// apps/frontend/src/adapters/index.ts
 export * from "./tauri";
 ```
 

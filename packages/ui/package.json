@@ -58,7 +58,8 @@
     "build:types": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@hookform/resolvers": "^5.2.2",
+    "@internationalized/date": "^3.10.0",
+    "@number-flow/react": "^0.5.10",
     "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -101,7 +102,7 @@
     "react-number-format": "^5.4.4",
     "recharts": "^3.3.0",
     "sonner": "^2.0.7",
-    "zod": "^3.25.76"
+    "tailwind-merge": "^3.3.1"
   },
   "peerDependencies": {
     "react": "^19.1.1",
@@ -112,6 +113,7 @@
     "@types/react-dom": "^19.1.9",
     "shadcn": "^3.3.1",
     "tsup": "^8.5.0",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vite": "^7.3.1"
   }
 }

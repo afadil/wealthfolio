@@ -170,7 +170,7 @@ export function ShortTextCell<TData>({
         onInput={onInput}
         suppressContentEditableWarning
         className={cn("size-full overflow-hidden outline-none", {
-          "whitespace-nowrap **:inline **:whitespace-nowrap [&_br]:hidden": isEditing,
+          "**:inline **:whitespace-nowrap whitespace-nowrap [&_br]:hidden": isEditing,
         })}
       >
         {displayValue}
@@ -683,7 +683,7 @@ export function UrlCell<TData>({
             href={urlHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-primary decoration-primary/30 hover:decoration-primary/60 data-focused:text-foreground data-invalid:text-destructive data-focused:decoration-foreground/50 data-invalid:decoration-destructive/50 data-focused:hover:decoration-foreground/70 data-invalid:hover:decoration-destructive/70 truncate underline underline-offset-2 data-invalid:cursor-not-allowed"
+            className="text-primary decoration-primary/30 hover:decoration-primary/60 data-focused:text-foreground data-invalid:text-destructive data-focused:decoration-foreground/50 data-invalid:decoration-destructive/50 data-focused:hover:decoration-foreground/70 data-invalid:hover:decoration-destructive/70 data-invalid:cursor-not-allowed truncate underline underline-offset-2"
             onClick={onLinkClick}
           >
             {displayValue}
@@ -700,7 +700,7 @@ export function UrlCell<TData>({
           onInput={onInput}
           suppressContentEditableWarning
           className={cn("size-full overflow-hidden outline-none", {
-            "whitespace-nowrap **:inline **:whitespace-nowrap [&_br]:hidden": isEditing,
+            "**:inline **:whitespace-nowrap whitespace-nowrap [&_br]:hidden": isEditing,
           })}
         >
           {displayValue}
@@ -913,7 +913,7 @@ export function SelectCell<TData>({
     }
 
     return (
-      <Badge data-slot="grid-cell-content" variant="secondary" className="px-1.5 text-xs whitespace-pre-wrap">
+      <Badge data-slot="grid-cell-content" variant="secondary" className="whitespace-pre-wrap px-1.5 text-xs">
         {displayLabel}
       </Badge>
     );
@@ -943,7 +943,7 @@ export function SelectCell<TData>({
         <Select value={selectValue} onValueChange={onValueChange} open={isEditing} onOpenChange={onOpenChange}>
           <SelectTrigger className="size-full h-auto items-start border-none p-0 shadow-none focus-visible:ring-0 dark:bg-transparent [&_svg]:hidden">
             {displayLabel ? (
-              <Badge variant="secondary" className="px-1.5 text-xs whitespace-pre-wrap">
+              <Badge variant="secondary" className="whitespace-pre-wrap px-1.5 text-xs">
                 <SelectValue />
               </Badge>
             ) : (
@@ -1184,7 +1184,7 @@ export function MultiSelectCell<TData>({
               </div>
               <CommandList className="max-h-full">
                 <CommandEmpty>No options found.</CommandEmpty>
-                <CommandGroup className="max-h-[300px] scroll-py-1 overflow-x-hidden overflow-y-auto">
+                <CommandGroup className="max-h-[300px] scroll-py-1 overflow-y-auto overflow-x-hidden">
                   {options.map((option) => {
                     const isSelected = selectedValues.includes(option.value);
 
@@ -2269,7 +2269,7 @@ export function FileCell<TData>({
                 data-invalid={error ? "" : undefined}
                 data-disabled={isPending ? "" : undefined}
                 tabIndex={isDragging || isPending ? -1 : 0}
-                className="hover:bg-accent/30 focus-visible:border-ring/50 data-dragging:border-primary/30 data-invalid:border-destructive data-dragging:bg-accent/30 data-invalid:ring-destructive/20 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed p-6 transition-colors outline-none data-disabled:pointer-events-none data-disabled:opacity-50"
+                className="hover:bg-accent/30 focus-visible:border-ring/50 data-dragging:border-primary/30 data-invalid:border-destructive data-dragging:bg-accent/30 data-invalid:ring-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed p-6 outline-none transition-colors"
                 ref={dropzoneRef}
                 onClick={onDropzoneClick}
                 onDragEnter={onDropzoneDragEnter}
@@ -2329,7 +2329,7 @@ export function FileCell<TData>({
                         <div
                           key={file.id}
                           data-pending={isFilePending ? "" : undefined}
-                          className="bg-muted/50 flex items-center gap-2 rounded-md border px-2 py-1.5 data-pending:opacity-60"
+                          className="bg-muted/50 data-pending:opacity-60 flex items-center gap-2 rounded-md border px-2 py-1.5"
                         >
                           {FileIcon && <FileIcon className="text-muted-foreground size-4 shrink-0" />}
                           <div className="flex-1 overflow-hidden">
@@ -2426,22 +2426,19 @@ export function SymbolCell<TData>({
     return symbol.replace(suffixPattern, "");
   }, []);
 
-  const normalizeCryptoPairSymbol = React.useCallback(
-    (symbol: string, currencyHint?: string) => {
-      // Provider may return a pair symbol like "BTC-USD". Canonical crypto IDs use the base symbol.
-      const trimmed = symbol.trim();
-      const match = trimmed.match(/^(.*)-([A-Za-z]{3,5})$/);
-      if (!match) return trimmed;
-      const base = match[1]?.trim();
-      const quote = match[2]?.trim().toUpperCase();
-      const hint = currencyHint?.trim().toUpperCase();
-      if (hint && quote && quote !== hint) {
-        return trimmed;
-      }
-      return base || trimmed;
-    },
-    [],
-  );
+  const normalizeCryptoPairSymbol = React.useCallback((symbol: string, currencyHint?: string) => {
+    // Provider may return a pair symbol like "BTC-USD". Canonical crypto IDs use the base symbol.
+    const trimmed = symbol.trim();
+    const match = /^(.*)-([A-Za-z]{3,5})$/.exec(trimmed);
+    if (!match) return trimmed;
+    const base = match[1]?.trim();
+    const quote = match[2]?.trim().toUpperCase();
+    const hint = currencyHint?.trim().toUpperCase();
+    if (hint && quote && quote !== hint) {
+      return trimmed;
+    }
+    return base || trimmed;
+  }, []);
 
   const initialValue = cell.getValue() as string;
   const [value, setValue] = React.useState(initialValue ?? "");
@@ -2595,11 +2592,7 @@ export function SymbolCell<TData>({
     return option.longName || option.shortName || option.symbol;
   };
   const getOptionKey = (option: SymbolSearchResult) => {
-    const parts = [
-      option.symbol,
-      option.exchangeMic ?? option.exchange,
-      option.currency,
-    ].filter(Boolean);
+    const parts = [option.symbol, option.exchangeMic ?? option.exchange, option.currency].filter(Boolean);
     return parts.join("|");
   };
 

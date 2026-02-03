@@ -8,7 +8,6 @@ use wealthfolio_core::{
     fx, goals, health, limits, portfolio, quotes, settings, taxonomies,
 };
 use wealthfolio_device_sync::DeviceEnrollService;
-use wealthfolio_storage_sqlite::assets::AlternativeAssetRepository;
 use wealthfolio_storage_sqlite::portfolio::snapshot::SnapshotRepository;
 
 use super::TauriAiEnvironment;
@@ -44,7 +43,6 @@ pub struct ServiceContext {
     pub valuation_service: Arc<dyn portfolio::valuation::ValuationServiceTrait>,
     pub net_worth_service: Arc<dyn portfolio::net_worth::NetWorthServiceTrait>,
     pub sync_service: Arc<dyn BrokerSyncServiceTrait>,
-    pub alternative_asset_repository: Arc<AlternativeAssetRepository>,
     pub alternative_asset_service: Arc<dyn AlternativeAssetServiceTrait>,
     pub taxonomy_service: Arc<dyn taxonomies::TaxonomyServiceTrait>,
     pub connect_service: Arc<ConnectService>,
@@ -129,10 +127,6 @@ impl ServiceContext {
 
     pub fn net_worth_service(&self) -> Arc<dyn portfolio::net_worth::NetWorthServiceTrait> {
         Arc::clone(&self.net_worth_service)
-    }
-
-    pub fn alternative_asset_repository(&self) -> Arc<AlternativeAssetRepository> {
-        Arc::clone(&self.alternative_asset_repository)
     }
 
     pub fn alternative_asset_service(&self) -> Arc<dyn AlternativeAssetServiceTrait> {

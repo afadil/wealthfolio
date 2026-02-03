@@ -87,7 +87,8 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
     return [formattedValue + " - ", (name ?? "").toString()];
   };
 
-  const tooltipLabelFormatter = (label: string) => format(parseISO(label), "PPP");
+  const tooltipLabelFormatter = (label: React.ReactNode) =>
+    typeof label === "string" ? format(parseISO(label), "PPP") : "";
 
   return (
     <div className="h-full w-full">

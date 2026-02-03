@@ -119,7 +119,9 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
                           </>
                         );
                       }}
-                      labelFormatter={(label) => `Symbol: ${label}`}
+                      labelFormatter={(label) =>
+                        typeof label === 'string' ? `Symbol: ${label}` : ''
+                      }
                     />
                   }
                 />
@@ -198,7 +200,9 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
                           </>
                         );
                       }}
-                      labelFormatter={(label) => `Period: ${label}`}
+                      labelFormatter={(label) =>
+                        typeof label === 'string' ? `Period: ${label}` : ''
+                      }
                     />
                   }
                 />

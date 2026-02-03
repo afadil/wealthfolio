@@ -2,7 +2,6 @@ import { useState, useMemo, useCallback, useEffect, useLayoutEffect, useRef } fr
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { CurrencyInput, DatePickerInput, QuantityInput, MoneyInput } from "@wealthfolio/ui";

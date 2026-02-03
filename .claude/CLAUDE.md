@@ -5,11 +5,12 @@ frontend, Tauri/Rust backend, SQLite storage.
 
 Key directories:
 
-- `src-front/` — React app (pages, components, commands, hooks)
+- `apps/frontend/` — React app (pages, components, commands, hooks)
+- `apps/tauri/` — Tauri desktop/mobile app (IPC commands)
+- `apps/server/` — Axum HTTP server (web mode)
 - `crates/` — Rust crates (core logic, storage, market-data, connect, device-sync)
-- `src-tauri/` — Tauri desktop app (IPC commands)
-- `src-server/` — Axum HTTP server (web mode)
 - `packages/` — Shared TS packages (addon-sdk, ui, addon-dev-tools)
+- `addons/` — Distributable addon plugins
 
 ## Quick Commands
 
