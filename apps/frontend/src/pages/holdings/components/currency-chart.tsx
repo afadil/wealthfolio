@@ -98,7 +98,7 @@ export function HoldingCurrencyChart({
         <div className="space-y-6">
           {/* Title */}
           <div className="flex items-center justify-between">
-            <h3 className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
+            <h3 className="text-muted-foreground text-sm font-medium uppercase tracking-wider">
               Currency
             </h3>
           </div>

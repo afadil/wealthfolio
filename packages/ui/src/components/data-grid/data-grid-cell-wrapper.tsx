@@ -6,9 +6,7 @@ import { cn } from "../../lib/utils";
 import type { CellValidationState, DataGridCellProps } from "./data-grid-types";
 import { getCellKey } from "./data-grid-utils";
 
-interface DataGridCellWrapperProps<TData>
-  extends DataGridCellProps<TData>,
-    React.ComponentProps<"div"> {
+interface DataGridCellWrapperProps<TData> extends DataGridCellProps<TData>, React.ComponentProps<"div"> {
   /** Cell validation state for error/warning highlighting */
   cellState?: CellValidationState;
 }
@@ -62,15 +60,7 @@ export function DataGridCellWrapper<TData>({
         }
       }
     },
-    [
-      tableMeta,
-      rowIndex,
-      columnId,
-      isEditing,
-      isFocused,
-      readOnly,
-      onClickProp,
-    ],
+    [tableMeta, rowIndex, columnId, isEditing, isFocused, readOnly, onClickProp],
   );
 
   const onContextMenu = React.useCallback(
@@ -134,15 +124,7 @@ export function DataGridCellWrapper<TData>({
         }
       }
     },
-    [
-      onKeyDownProp,
-      isFocused,
-      isEditing,
-      readOnly,
-      tableMeta,
-      rowIndex,
-      columnId,
-    ],
+    [onKeyDownProp, isFocused, isEditing, readOnly, tableMeta, rowIndex, columnId],
   );
 
   const onMouseDown = React.useCallback(
@@ -184,7 +166,7 @@ export function DataGridCellWrapper<TData>({
   // Use native title attribute for tooltip (performant with virtualization)
   const cellTitle = React.useMemo(() => {
     if (!cellState?.messages?.length) return undefined;
-    return cellState.messages.join('\n');
+    return cellState.messages.join("\n");
   }, [cellState]);
 
   return (
@@ -201,22 +183,17 @@ export function DataGridCellWrapper<TData>({
       ref={composedRef}
       style={{ ...props.style, ...cellStateStyle }}
       className={cn(
-        "size-full px-2 py-1.5 text-start text-sm outline-none has-data-[slot=checkbox]:pt-2.5",
+        "has-data-[slot=checkbox]:pt-2.5 size-full px-2 py-1.5 text-start text-sm outline-none",
         {
-          "ring-1 ring-ring ring-inset": isFocused,
-          "bg-yellow-100 dark:bg-yellow-900/30":
-            isSearchMatch && !isActiveSearchMatch,
+          "ring-ring ring-1 ring-inset": isFocused,
+          "bg-yellow-100 dark:bg-yellow-900/30": isSearchMatch && !isActiveSearchMatch,
           "bg-orange-200 dark:bg-orange-900/50": isActiveSearchMatch,
           "bg-primary/10": isSelected && !isEditing,
           "cursor-default": !isEditing,
-          "**:data-[slot=grid-cell-content]:line-clamp-1":
-            !isEditing && rowHeight === "short",
-          "**:data-[slot=grid-cell-content]:line-clamp-2":
-            !isEditing && rowHeight === "medium",
-          "**:data-[slot=grid-cell-content]:line-clamp-3":
-            !isEditing && rowHeight === "tall",
-          "**:data-[slot=grid-cell-content]:line-clamp-4":
-            !isEditing && rowHeight === "extra-tall",
+          "**:data-[slot=grid-cell-content]:line-clamp-1": !isEditing && rowHeight === "short",
+          "**:data-[slot=grid-cell-content]:line-clamp-2": !isEditing && rowHeight === "medium",
+          "**:data-[slot=grid-cell-content]:line-clamp-3": !isEditing && rowHeight === "tall",
+          "**:data-[slot=grid-cell-content]:line-clamp-4": !isEditing && rowHeight === "extra-tall",
         },
         className,
       )}

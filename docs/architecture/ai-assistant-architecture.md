@@ -2,7 +2,10 @@
 
 ## Overview
 
-The AI Assistant provides conversational access to portfolio data through natural language queries. It uses LLM orchestration with tool calling to fetch and analyze financial data, presenting results through a streaming chat interface.
+The AI Assistant provides conversational access to portfolio data through
+natural language queries. It uses LLM orchestration with tool calling to fetch
+and analyze financial data, presenting results through a streaming chat
+interface.
 
 ## Architecture Diagram
 
@@ -123,9 +126,11 @@ The AI Assistant provides conversational access to portfolio data through natura
 
 ### 1. Non-Blocking Streaming
 
-The streaming response must never be blocked by database operations. We achieve this through:
+The streaming response must never be blocked by database operations. We achieve
+this through:
 
-- **Write-behind pattern**: Persistence happens asynchronously after stream completion
+- **Write-behind pattern**: Persistence happens asynchronously after stream
+  completion
 - **Background actor**: A dedicated tokio task handles all DB writes
 - **Bounded channels**: Backpressure prevents memory exhaustion
 
@@ -133,11 +138,11 @@ The streaming response must never be blocked by database operations. We achieve 
 
 Clear separation between streaming and persistence concerns:
 
-| Layer | Types | Purpose |
-|-------|-------|---------|
+| Layer         | Types                                               | Purpose                           |
+| ------------- | --------------------------------------------------- | --------------------------------- |
 | **Streaming** | `AiStreamEvent`, `ToolResult`, `SendMessageRequest` | Wire format for real-time updates |
-| **Domain** | `AiThread`, `AiMessage`, `AiMessageContent` | Persistence and business logic |
-| **Storage** | `AiThreadDB`, `AiMessageDB` | Database models (Diesel) |
+| **Domain**    | `AiThread`, `AiMessage`, `AiMessageContent`         | Persistence and business logic    |
+| **Storage**   | `AiThreadDB`, `AiMessageDB`                         | Database models (Diesel)          |
 
 ### 3. Stateless LLM Integration
 
@@ -149,6 +154,7 @@ agent.stream_chat(prompt, history: Vec<Message>).multi_turn(6)
 ```
 
 This allows:
+
 - Clean separation between orchestration and persistence
 - Easy testing with mock history
 - No hidden state in the agent
@@ -255,12 +261,50 @@ impl ToolRegistry {
 ```typescript
 type AiStreamEvent =
   | { type: "system"; threadId: string; runId: string; messageId: string }
-  | { type: "textDelta"; threadId: string; runId: string; messageId: string; delta: string }
-  | { type: "reasoningDelta"; threadId: string; runId: string; messageId: string; delta: string }
-  | { type: "toolCall"; threadId: string; runId: string; messageId: string; toolCall: ToolCall }
-  | { type: "toolResult"; threadId: string; runId: string; messageId: string; result: ToolResultData }
-  | { type: "error"; threadId: string; runId: string; messageId?: string; code: string; message: string }
-  | { type: "done"; threadId: string; runId: string; messageId: string; message: AiMessage; usage?: UsageStats }
+  | {
+      type: "textDelta";
+      threadId: string;
+      runId: string;
+      messageId: string;
+      delta: string;
+    }
+  | {
+      type: "reasoningDelta";
+      threadId: string;
+      runId: string;
+      messageId: string;
+      delta: string;
+    }
+  | {
+      type: "toolCall";
+      threadId: string;
+      runId: string;
+      messageId: string;
+      toolCall: ToolCall;
+    }
+  | {
+      type: "toolResult";
+      threadId: string;
+      runId: string;
+      messageId: string;
+      result: ToolResultData;
+    }
+  | {
+      type: "error";
+      threadId: string;
+      runId: string;
+      messageId?: string;
+      code: string;
+      message: string;
+    }
+  | {
+      type: "done";
+      threadId: string;
+      runId: string;
+      messageId: string;
+      message: AiMessage;
+      usage?: UsageStats;
+    };
 ```
 
 ### Event Sequence
@@ -315,12 +359,12 @@ pub struct ToolResult {
 
 Tools enforce maximum output sizes to prevent context overflow:
 
-| Tool | Limit | Constant |
-|------|-------|----------|
-| get_holdings | 100 items | `MAX_HOLDINGS` |
-| search_activities | 200 rows | `MAX_ACTIVITIES_ROWS` |
-| get_valuations | 400 points | `MAX_VALUATIONS_POINTS` |
-| get_income | 50 records | `MAX_INCOME_RECORDS` |
+| Tool              | Limit      | Constant                |
+| ----------------- | ---------- | ----------------------- |
+| get_holdings      | 100 items  | `MAX_HOLDINGS`          |
+| search_activities | 200 rows   | `MAX_ACTIVITIES_ROWS`   |
+| get_valuations    | 400 points | `MAX_VALUATIONS_POINTS` |
+| get_income        | 50 records | `MAX_INCOME_RECORDS`    |
 
 ## Message Content Schema
 
@@ -354,16 +398,16 @@ Messages store structured content with versioning for forward compatibility:
 
 ### Error Categories
 
-| Code | HTTP Status | Description |
-|------|-------------|-------------|
-| `invalid_input` | 400 | Malformed request |
-| `missing_api_key` | 400 | Provider API key not configured |
-| `provider_error` | 502 | LLM provider returned error |
-| `tool_not_found` | 400 | Unknown tool requested |
-| `tool_not_allowed` | 403 | Tool not in allowlist |
-| `tool_execution_failed` | 500 | Tool threw an error |
-| `thread_not_found` | 404 | Thread ID doesn't exist |
-| `internal_error` | 500 | Unexpected server error |
+| Code                    | HTTP Status | Description                     |
+| ----------------------- | ----------- | ------------------------------- |
+| `invalid_input`         | 400         | Malformed request               |
+| `missing_api_key`       | 400         | Provider API key not configured |
+| `provider_error`        | 502         | LLM provider returned error     |
+| `tool_not_found`        | 400         | Unknown tool requested          |
+| `tool_not_allowed`      | 403         | Tool not in allowlist           |
+| `tool_execution_failed` | 500         | Tool threw an error             |
+| `thread_not_found`      | 404         | Thread ID doesn't exist         |
+| `internal_error`        | 500         | Unexpected server error         |
 
 ### Error Recovery
 
@@ -375,10 +419,10 @@ Messages store structured content with versioning for forward compatibility:
 
 ### Caching Strategy
 
-| Cache | Size | TTL | Purpose |
-|-------|------|-----|---------|
-| Thread cache | 100 entries | LRU eviction | Fast thread lookups |
-| Provider catalog | Static | Compile-time | Provider/model metadata |
+| Cache            | Size        | TTL          | Purpose                 |
+| ---------------- | ----------- | ------------ | ----------------------- |
+| Thread cache     | 100 entries | LRU eviction | Fast thread lookups     |
+| Provider catalog | Static      | Compile-time | Provider/model metadata |
 
 ### Database Optimization
 
@@ -419,7 +463,8 @@ Messages store structured content with versioning for forward compatibility:
 
 ### Planned Features
 
-1. **Conversation summarization**: Compress long histories for context efficiency
+1. **Conversation summarization**: Compress long histories for context
+   efficiency
 2. **Semantic search**: Find relevant past conversations
 3. **Write tools**: Add activities, update goals (with confirmation)
 4. **Multi-modal**: Support for chart screenshots in queries

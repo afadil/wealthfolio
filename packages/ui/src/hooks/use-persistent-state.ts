@@ -39,7 +39,8 @@ export function usePersistentState<T>(
   const setStateAndBroadcast = useCallback<Dispatch<SetStateAction<T>>>(
     (action) => {
       setState((prevState) => {
-        const newState = typeof action === "function" ? (action as (prev: T) => T)(prevState) : action;
+        const newState =
+          typeof action === "function" ? (action as (prev: T) => T)(prevState) : action;
 
         // Write to localStorage
         try {

@@ -50,8 +50,8 @@ export function AddonStoreCard({
   };
 
   return (
-    <Card className="group hover:shadow-primary/10 relative h-full overflow-hidden transition-all duration-200 hover:shadow-lg">
-      <CardHeader className="pt-8 pb-2">
+    <Card className="hover:shadow-primary/10 group relative h-full overflow-hidden transition-all duration-200 hover:shadow-lg">
+      <CardHeader className="pb-2 pt-8">
         <CardTitle className="line-clamp-1 text-sm">{listing.name}</CardTitle>
         <CardDescription className="line-clamp-2 text-xs">{listing.description}</CardDescription>
       </CardHeader>
@@ -473,7 +473,7 @@ export function AddonStoreCard({
       </div>
 
       {/* Status Indicators */}
-      <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-90">
+      <div className="absolute right-2 top-2 flex flex-col gap-1 opacity-90">
         {isInstalled && (
           <Badge
             variant="secondary"

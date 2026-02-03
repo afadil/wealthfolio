@@ -62,7 +62,7 @@ export function QuoteImportHelpPopover() {
             <div className="space-y-4">
               <div>
                 <p className="font-semibold">Required CSV Format:</p>
-                <pre className="bg-muted mt-2 overflow-x-auto rounded-md p-3 text-xs leading-relaxed select-all">
+                <pre className="bg-muted mt-2 select-all overflow-x-auto rounded-md p-3 text-xs leading-relaxed">
                   <span className="text-muted-foreground">
                     # Required columns: symbol, date, close
                   </span>

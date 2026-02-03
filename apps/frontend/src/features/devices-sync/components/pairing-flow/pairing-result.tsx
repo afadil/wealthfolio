@@ -48,7 +48,7 @@ export function PairingResult({ success, error, onRetry, onDone }: PairingResult
           <Icons.CheckCircle className="h-10 w-10 text-green-600 dark:text-green-500" />
         </div>
         <div className="mb-6 text-center">
-          <p className="text-foreground text-lg font-semibold">You're all set!</p>
+          <p className="text-foreground text-lg font-semibold">You&apos;re all set!</p>
           <p className="text-muted-foreground mt-2 text-sm">Device connected successfully</p>
         </div>
         <Button className="w-full max-w-[200px]" onClick={onDone}>

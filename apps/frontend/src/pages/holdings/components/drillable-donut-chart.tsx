@@ -131,7 +131,7 @@ export function DrillableDonutChart({
     >
       <CardHeader>
         {isAtRoot ? (
-          <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
+          <CardTitle className="text-muted-foreground text-sm font-medium uppercase tracking-wider">
             {title}
           </CardTitle>
         ) : (

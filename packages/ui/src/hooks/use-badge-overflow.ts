@@ -142,10 +142,7 @@ export function useBadgeOverflow<T>({
         currentLineWidth = widthWithGap;
         visible.push(item);
       } else {
-        if (
-          currentLineWidth + overflowBadgeWidth > containerWidth &&
-          visible.length > 0
-        ) {
+        if (currentLineWidth + overflowBadgeWidth > containerWidth && visible.length > 0) {
           visible.pop();
         }
 

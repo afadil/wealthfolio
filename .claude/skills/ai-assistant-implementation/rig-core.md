@@ -7,7 +7,8 @@
 
 ## Rules
 
-- **All provider calls are backend-only**; never accept API keys from the frontend.
+- **All provider calls are backend-only**; never accept API keys from the
+  frontend.
 - Secrets are read from OS secret store using key `ai_<provider_id>`.
 - IDs are minted by backend using uuid7 (threads/messages/toolCallId if needed).
 - Tools are read-only in v1 and have strict input validation + bounded outputs.
@@ -15,8 +16,10 @@
 ## E2E default provider (keyless)
 
 - Prefer **Ollama** for E2E/smoke because it is keyless.
-- The backend should treat missing `ai_OLLAMA` as normal (no “API key required”).
-- Apply `baseUrl` from user settings when calling Ollama (typically `http://localhost:11434`).
+- The backend should treat missing `ai_OLLAMA` as normal (no “API key
+  required”).
+- Apply `baseUrl` from user settings when calling Ollama (typically
+  `http://localhost:11434`).
 
 ## Structure (expected)
 
@@ -35,4 +38,5 @@
 ## Logging/privacy
 
 - Never log secrets.
-- Never log raw portfolio payloads; log only metadata (tool name, counts, duration, truncation).
+- Never log raw portfolio payloads; log only metadata (tool name, counts,
+  duration, truncation).

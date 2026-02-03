@@ -209,7 +209,7 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         {/* Search */}
         <div className="relative flex-1">
-          <Icons.Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+          <Icons.Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
           <Input
             placeholder="Search addons..."
             value={searchQuery}
@@ -271,7 +271,7 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
             {searchQuery && (
               <>
                 {" "}
-                for "<span className="font-medium">{searchQuery}</span>"
+                for &quot;<span className="font-medium">{searchQuery}</span>&quot;
               </>
             )}
           </p>

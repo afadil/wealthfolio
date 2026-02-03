@@ -99,7 +99,7 @@ const NetWorthWidgetError = ({ error, compact = false }: { error: Error; compact
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-destructive text-sm font-medium">Failed to load net worth</p>
-        <p className="text-muted-foreground mt-1 text-xs break-words">
+        <p className="text-muted-foreground mt-1 break-words text-xs">
           {error?.message || "An unexpected error occurred"}
         </p>
       </div>
@@ -221,7 +221,7 @@ export const NetWorthWidget = ({
         <div className="flex items-center justify-between">
           <span
             className={cn(
-              "text-muted-foreground font-medium tracking-wider uppercase",
+              "text-muted-foreground font-medium uppercase tracking-wider",
               compact ? "text-[10px]" : "text-xs",
             )}
           >

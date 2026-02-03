@@ -104,7 +104,7 @@ export function EnterCode({ onSubmit, onCancel, isLoading, error }: EnterCodePro
   const isDisabled = isLoading || isScanning;
 
   return (
-    <div className="flex flex-col gap-5 pt-4 pb-2">
+    <div className="flex flex-col gap-5 pb-2 pt-4">
       {/* Scan QR Card - mobile only */}
       {canScan && (
         <button
@@ -132,7 +132,7 @@ export function EnterCode({ onSubmit, onCancel, isLoading, error }: EnterCodePro
       {canScan && (
         <div className="flex items-center gap-4">
           <div className="bg-border h-px flex-1" />
-          <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+          <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
             Or
           </span>
           <div className="bg-border h-px flex-1" />
@@ -155,7 +155,7 @@ export function EnterCode({ onSubmit, onCancel, isLoading, error }: EnterCodePro
             type="button"
             onClick={handlePaste}
             disabled={isDisabled}
-            className="text-primary hover:text-primary/80 absolute top-1/2 right-3 -translate-y-1/2 px-2 py-1 text-sm font-medium transition-colors disabled:opacity-50"
+            className="text-primary hover:text-primary/80 absolute right-3 top-1/2 -translate-y-1/2 px-2 py-1 text-sm font-medium transition-colors disabled:opacity-50"
           >
             Paste
           </button>

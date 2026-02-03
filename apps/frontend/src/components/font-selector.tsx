@@ -44,7 +44,7 @@ export function FontSelector({ value, onChange, className }: FontSelectorProps) 
           </div>
           <div className="text-xs font-medium sm:text-sm">{font.label}</div>
           {value === font.value && (
-            <div className="bg-primary absolute top-2 right-2 h-1.5 w-1.5 rounded-full" />
+            <div className="bg-primary absolute right-2 top-2 h-1.5 w-1.5 rounded-full" />
           )}
         </button>
       ))}

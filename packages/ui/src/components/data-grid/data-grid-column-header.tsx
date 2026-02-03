@@ -1,12 +1,6 @@
 "use client";
 
-import type {
-  ColumnSort,
-  Header,
-  SortDirection,
-  SortingState,
-  Table,
-} from "@tanstack/react-table";
+import type { ColumnSort, Header, SortDirection, SortingState, Table } from "@tanstack/react-table";
 import * as React from "react";
 import { Icons } from "../ui/icons";
 
@@ -18,16 +12,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "../ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "../../lib/utils";
 import { getColumnVariant } from "./data-grid-utils";
 
-interface DataGridColumnHeaderProps<TData, TValue>
-  extends React.ComponentProps<typeof DropdownMenuTrigger> {
+interface DataGridColumnHeaderProps<TData, TValue> extends React.ComponentProps<typeof DropdownMenuTrigger> {
   header: Header<TData, TValue>;
   table: Table<TData>;
 }
@@ -46,8 +35,7 @@ export function DataGridColumnHeader<TData, TValue>({
       ? column.columnDef.header
       : column.id;
 
-  const isAnyColumnResizing =
-    table.getState().columnSizingInfo.isResizingColumn;
+  const isAnyColumnResizing = table.getState().columnSizingInfo.isResizingColumn;
 
   const cellVariant = column.columnDef.meta?.cell;
   const columnVariant = getColumnVariant(cellVariant?.variant);
@@ -59,9 +47,7 @@ export function DataGridColumnHeader<TData, TValue>({
   const onSortingChange = React.useCallback(
     (direction: SortDirection) => {
       table.setSorting((prev: SortingState) => {
-        const existingSortIndex = prev.findIndex(
-          (sort) => sort.id === column.id,
-        );
+        const existingSortIndex = prev.findIndex((sort) => sort.id === column.id);
         const newSort: ColumnSort = {
           id: column.id,
           desc: direction === "desc",
@@ -80,9 +66,7 @@ export function DataGridColumnHeader<TData, TValue>({
   );
 
   const onSortRemove = React.useCallback(() => {
-    table.setSorting((prev: SortingState) =>
-      prev.filter((sort) => sort.id !== column.id),
-    );
+    table.setSorting((prev: SortingState) => prev.filter((sort) => sort.id !== column.id));
   }, [column.id, table]);
 
   const onLeftPin = React.useCallback(() => {
@@ -115,7 +99,7 @@ export function DataGridColumnHeader<TData, TValue>({
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger
           className={cn(
-            "flex size-full items-center justify-between gap-2 p-2 text-sm hover:bg-accent/40 data-[state=open]:bg-accent/40 [&_svg]:size-4",
+            "hover:bg-accent/40 data-[state=open]:bg-accent/40 flex size-full items-center justify-between gap-2 p-2 text-sm [&_svg]:size-4",
             isAnyColumnResizing && "pointer-events-none",
             className,
           )}
@@ -126,7 +110,7 @@ export function DataGridColumnHeader<TData, TValue>({
             {columnVariant && (
               <Tooltip delayDuration={100}>
                 <TooltipTrigger asChild>
-                  <columnVariant.icon className="size-3.5 shrink-0 text-muted-foreground" />
+                  <columnVariant.icon className="text-muted-foreground size-3.5 shrink-0" />
                 </TooltipTrigger>
                 <TooltipContent side="top">
                   <p>{columnVariant.label}</p>
@@ -135,13 +119,13 @@ export function DataGridColumnHeader<TData, TValue>({
             )}
             <span className="truncate">{label}</span>
           </div>
-          <Icons.ChevronDown className="shrink-0 text-muted-foreground" />
+          <Icons.ChevronDown className="text-muted-foreground shrink-0" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" sideOffset={0} className="w-60">
           {column.getCanSort() && (
             <>
               <DropdownMenuCheckboxItem
-                className="relative ltr:pr-8 ltr:pl-2 rtl:pr-2 rtl:pl-8 [&>span:first-child]:ltr:right-2 [&>span:first-child]:ltr:left-auto [&>span:first-child]:rtl:right-auto [&>span:first-child]:rtl:left-2 [&_svg]:text-muted-foreground"
+                className="[&_svg]:text-muted-foreground relative ltr:pl-2 ltr:pr-8 rtl:pl-8 rtl:pr-2 [&>span:first-child]:ltr:left-auto [&>span:first-child]:ltr:right-2 [&>span:first-child]:rtl:left-2 [&>span:first-child]:rtl:right-auto"
                 checked={column.getIsSorted() === "asc"}
                 onClick={() => onSortingChange("asc")}
               >
@@ -149,7 +133,7 @@ export function DataGridColumnHeader<TData, TValue>({
                 Sort asc
               </DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem
-                className="relative ltr:pr-8 ltr:pl-2 rtl:pr-2 rtl:pl-8 [&>span:first-child]:ltr:right-2 [&>span:first-child]:ltr:left-auto [&>span:first-child]:rtl:right-auto [&>span:first-child]:rtl:left-2 [&_svg]:text-muted-foreground"
+                className="[&_svg]:text-muted-foreground relative ltr:pl-2 ltr:pr-8 rtl:pl-8 rtl:pr-2 [&>span:first-child]:ltr:left-auto [&>span:first-child]:ltr:right-2 [&>span:first-child]:rtl:left-2 [&>span:first-child]:rtl:right-auto"
                 checked={column.getIsSorted() === "desc"}
                 onClick={() => onSortingChange("desc")}
               >
@@ -169,35 +153,23 @@ export function DataGridColumnHeader<TData, TValue>({
               {column.getCanSort() && <DropdownMenuSeparator />}
 
               {isPinnedLeft ? (
-                <DropdownMenuItem
-                  className="[&_svg]:text-muted-foreground"
-                  onClick={onUnpin}
-                >
+                <DropdownMenuItem className="[&_svg]:text-muted-foreground" onClick={onUnpin}>
                   <Icons.PinOff />
                   Unpin from left
                 </DropdownMenuItem>
               ) : (
-                <DropdownMenuItem
-                  className="[&_svg]:text-muted-foreground"
-                  onClick={onLeftPin}
-                >
+                <DropdownMenuItem className="[&_svg]:text-muted-foreground" onClick={onLeftPin}>
                   <Icons.Pin />
                   Pin to left
                 </DropdownMenuItem>
               )}
               {isPinnedRight ? (
-                <DropdownMenuItem
-                  className="[&_svg]:text-muted-foreground"
-                  onClick={onUnpin}
-                >
+                <DropdownMenuItem className="[&_svg]:text-muted-foreground" onClick={onUnpin}>
                   <Icons.PinOff />
                   Unpin from right
                 </DropdownMenuItem>
               ) : (
-                <DropdownMenuItem
-                  className="[&_svg]:text-muted-foreground"
-                  onClick={onRightPin}
-                >
+                <DropdownMenuItem className="[&_svg]:text-muted-foreground" onClick={onRightPin}>
                   <Icons.Pin />
                   Pin to right
                 </DropdownMenuItem>
@@ -218,42 +190,29 @@ export function DataGridColumnHeader<TData, TValue>({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-      {header.column.getCanResize() && (
-        <DataGridColumnResizer header={header} table={table} label={label} />
-      )}
+      {header.column.getCanResize() && <DataGridColumnResizer header={header} table={table} label={label} />}
     </>
   );
 }
 
-const DataGridColumnResizer = React.memo(
-  DataGridColumnResizerImpl,
-  (prev, next) => {
-    const prevColumn = prev.header.column;
-    const nextColumn = next.header.column;
+const DataGridColumnResizer = React.memo(DataGridColumnResizerImpl, (prev, next) => {
+  const prevColumn = prev.header.column;
+  const nextColumn = next.header.column;
 
-    if (
-      prevColumn.getIsResizing() !== nextColumn.getIsResizing() ||
-      prevColumn.getSize() !== nextColumn.getSize()
-    ) {
-      return false;
-    }
+  if (prevColumn.getIsResizing() !== nextColumn.getIsResizing() || prevColumn.getSize() !== nextColumn.getSize()) {
+    return false;
+  }
 
-    if (prev.label !== next.label) return false;
+  if (prev.label !== next.label) return false;
 
-    return true;
-  },
-) as typeof DataGridColumnResizerImpl;
+  return true;
+}) as typeof DataGridColumnResizerImpl;
 
-interface DataGridColumnResizerProps<TData, TValue>
-  extends DataGridColumnHeaderProps<TData, TValue> {
+interface DataGridColumnResizerProps<TData, TValue> extends DataGridColumnHeaderProps<TData, TValue> {
   label: string;
 }
 
-function DataGridColumnResizerImpl<TData, TValue>({
-  header,
-  table,
-  label,
-}: DataGridColumnResizerProps<TData, TValue>) {
+function DataGridColumnResizerImpl<TData, TValue>({ header, table, label }: DataGridColumnResizerProps<TData, TValue>) {
   const defaultColumnDef = table._getDefaultColumnDef();
 
   const onDoubleClick = React.useCallback(() => {
@@ -270,10 +229,8 @@ function DataGridColumnResizerImpl<TData, TValue>({
       aria-valuemax={defaultColumnDef.maxSize}
       tabIndex={0}
       className={cn(
-        "after:-translate-x-1/2 -end-px absolute top-0 z-50 h-full w-0.5 cursor-ew-resize touch-none select-none bg-border transition-opacity after:absolute after:inset-y-0 after:start-1/2 after:h-full after:w-[18px] after:content-[''] hover:bg-primary focus:bg-primary focus:outline-none",
-        header.column.getIsResizing()
-          ? "bg-primary"
-          : "opacity-0 hover:opacity-100",
+        "bg-border hover:bg-primary focus:bg-primary absolute -end-px top-0 z-50 h-full w-0.5 cursor-ew-resize touch-none select-none transition-opacity after:absolute after:inset-y-0 after:start-1/2 after:h-full after:w-[18px] after:-translate-x-1/2 after:content-[''] focus:outline-none",
+        header.column.getIsResizing() ? "bg-primary" : "opacity-0 hover:opacity-100",
       )}
       onDoubleClick={onDoubleClick}
       onMouseDown={header.getResizeHandler()}

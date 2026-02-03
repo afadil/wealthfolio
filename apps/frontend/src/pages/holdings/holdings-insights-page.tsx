@@ -300,7 +300,7 @@ export const HoldingsInsightsPage = () => {
   return (
     <>
       {/* Account selector - fixed position in header area */}
-      <div className="pointer-events-auto fixed top-4 right-2 z-20 hidden md:block lg:right-4">
+      <div className="pointer-events-auto fixed right-2 top-4 z-20 hidden md:block lg:right-4">
         <AccountSelector
           selectedAccount={selectedAccount}
           setSelectedAccount={handleAccountSelect}

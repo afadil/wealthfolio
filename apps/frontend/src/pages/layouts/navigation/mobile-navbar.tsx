@@ -179,7 +179,7 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
                   side="top"
                   align="end"
                   sideOffset={16}
-                  className="mr-0 mb-0 flex w-42 flex-col gap-1 border-0 bg-transparent p-0 shadow-none ring-0 ring-offset-0"
+                  className="w-42 mb-0 mr-0 flex flex-col gap-1 border-0 bg-transparent p-0 shadow-none ring-0 ring-offset-0"
                 >
                   {menuItems.map((item) => {
                     const isActive = isPathActive(location.pathname, item.href);

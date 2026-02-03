@@ -13,7 +13,7 @@ function HelpPopover() {
       <PopoverContent className="w-96" align="start">
         <div className="space-y-4">
           <div className="space-y-2">
-            <h4 className="leading-none font-medium">How It Works</h4>
+            <h4 className="font-medium leading-none">How It Works</h4>
             <div className="text-muted-foreground space-y-2 text-sm">
               <p>• Select a goal from your saved goals or track a custom target</p>
               <p>• Each dot represents your chosen step amount towards your investment target</p>

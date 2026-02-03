@@ -1,27 +1,13 @@
 "use client";
 
-import type {
-  ColumnPinningState,
-  Row,
-  TableMeta,
-  VisibilityState,
-} from "@tanstack/react-table";
+import type { ColumnPinningState, Row, TableMeta, VisibilityState } from "@tanstack/react-table";
 import type { VirtualItem } from "@tanstack/react-virtual";
 import * as React from "react";
 import { useComposedRefs } from "../../lib/compose-refs";
 import { cn } from "../../lib/utils";
 import { DataGridCell } from "./data-grid-cell";
-import type {
-  CellPosition,
-  Direction,
-  RowHeightValue,
-} from "./data-grid-types";
-import {
-  flexRender,
-  getCellKey,
-  getCommonPinningStyles,
-  getRowHeightValue,
-} from "./data-grid-utils";
+import type { CellPosition, Direction, RowHeightValue } from "./data-grid-types";
+import { flexRender, getCellKey, getCommonPinningStyles, getRowHeightValue } from "./data-grid-utils";
 
 interface DataGridRowProps<TData> extends React.ComponentProps<"div"> {
   row: Row<TData>;
@@ -176,10 +162,7 @@ function DataGridRowImpl<TData>({
   // Memoize visible cells to avoid recreating cell array on every render
   // Though TanStack returns new Cell wrappers, memoizing the array helps React's reconciliation
   // biome-ignore lint/correctness/useExhaustiveDependencies: columnVisibility and columnPinning are used for calculating the visible cells
-  const visibleCells = React.useMemo(
-    () => row.getVisibleCells(),
-    [row, columnVisibility, columnPinning],
-  );
+  const visibleCells = React.useMemo(() => row.getVisibleCells(), [row, columnVisibility, columnPinning]);
 
   return (
     <div
@@ -192,10 +175,7 @@ function DataGridRowImpl<TData>({
       tabIndex={-1}
       {...props}
       ref={rowRef}
-      className={cn(
-        "absolute flex w-full border-b will-change-transform",
-        className,
-      )}
+      className={cn("absolute flex w-full border-b will-change-transform", className)}
       style={{
         height: `${getRowHeightValue(rowHeight)}px`,
         transform: `translateY(${virtualItem.start}px)`,
@@ -205,15 +185,9 @@ function DataGridRowImpl<TData>({
       {visibleCells.map((cell, colIndex) => {
         const columnId = cell.column.id;
 
-        const isCellFocused =
-          focusedCell?.rowIndex === virtualRowIndex &&
-          focusedCell?.columnId === columnId;
-        const isCellEditing =
-          editingCell?.rowIndex === virtualRowIndex &&
-          editingCell?.columnId === columnId;
-        const isCellSelected =
-          cellSelectionKeys?.has(getCellKey(virtualRowIndex, columnId)) ??
-          false;
+        const isCellFocused = focusedCell?.rowIndex === virtualRowIndex && focusedCell?.columnId === columnId;
+        const isCellEditing = editingCell?.rowIndex === virtualRowIndex && editingCell?.columnId === columnId;
+        const isCellSelected = cellSelectionKeys?.has(getCellKey(virtualRowIndex, columnId)) ?? false;
 
         const isSearchMatch = searchMatchColumns?.has(columnId) ?? false;
         const isActiveSearchMatch = activeSearchMatch?.columnId === columnId;

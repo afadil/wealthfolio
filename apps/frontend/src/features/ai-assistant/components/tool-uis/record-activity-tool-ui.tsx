@@ -522,8 +522,7 @@ function DraftForm({
     if (backendSubtypes.length > 0) return backendSubtypes;
 
     // Fallback to frontend constants
-    const subtypeValues =
-      SUBTYPES_BY_ACTIVITY_TYPE[activityType as keyof typeof SUBTYPES_BY_ACTIVITY_TYPE] ?? [];
+    const subtypeValues = SUBTYPES_BY_ACTIVITY_TYPE[activityType] ?? [];
     return subtypeValues.map((value) => ({
       value,
       label: SUBTYPE_DISPLAY_NAMES[value] ?? value,

@@ -4,34 +4,34 @@
  * Open a file dialog for CSV files.
  * Web implementation - not fully supported, returns null.
  */
-export const openCsvFileDialog = async (): Promise<null | string | string[]> => {
+export const openCsvFileDialog = (): Promise<null | string | string[]> => {
   // Web implementation would use file input - return null to indicate not supported
-  return null;
+  return Promise.resolve(null);
 };
 
 /**
  * Open a folder selection dialog.
  * Not supported in web.
  */
-export const openFolderDialog = async (): Promise<string | null> => {
+export const openFolderDialog = (): Promise<string | null> => {
   // Not supported in web
-  return null;
+  return Promise.resolve(null);
 };
 
 /**
  * Open a file dialog for database files.
  * Not supported in web.
  */
-export const openDatabaseFileDialog = async (): Promise<string | null> => {
+export const openDatabaseFileDialog = (): Promise<string | null> => {
   // Not supported in web
-  return null;
+  return Promise.resolve(null);
 };
 
 /**
  * Open a file save dialog and save content.
  * Web implementation using download.
  */
-export const openFileSaveDialog = async (
+export const openFileSaveDialog = (
   fileContent: string | Blob | Uint8Array,
   fileName: string,
 ): Promise<boolean> => {
@@ -54,9 +54,9 @@ export const openFileSaveDialog = async (
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    return true;
+    return Promise.resolve(true);
   } catch {
-    return false;
+    return Promise.resolve(false);
   }
 };
 
@@ -67,6 +67,7 @@ export const openFileSaveDialog = async (
 /**
  * Open a URL in the browser.
  */
-export const openUrlInBrowser = async (url: string): Promise<void> => {
+export const openUrlInBrowser = (url: string): Promise<void> => {
   window.open(url, "_blank");
+  return Promise.resolve();
 };

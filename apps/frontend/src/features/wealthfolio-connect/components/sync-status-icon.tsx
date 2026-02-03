@@ -29,7 +29,7 @@ function StatusIndicator({ status }: { status: AggregatedSyncStatus }) {
   if (status === "needs_review") {
     // Yellow/warning dot
     return (
-      <span className="absolute -top-0.5 -right-0.5 flex h-1.5 w-1.5">
+      <span className="absolute -right-0.5 -top-0.5 flex h-1.5 w-1.5">
         <span className="absolute inline-flex h-full w-full rounded-full bg-yellow-500/80" />
       </span>
     );
@@ -38,7 +38,7 @@ function StatusIndicator({ status }: { status: AggregatedSyncStatus }) {
   if (status === "failed") {
     // Red/error dot
     return (
-      <span className="absolute -top-0.5 -right-0.5 flex h-1.5 w-1.5">
+      <span className="absolute -right-0.5 -top-0.5 flex h-1.5 w-1.5">
         <span className="absolute inline-flex h-full w-full rounded-full bg-red-500/80" />
       </span>
     );

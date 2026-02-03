@@ -117,10 +117,10 @@ export function UpdateDialog() {
         {/* Scrollable content area */}
         <div className="flex-1 overflow-y-auto">
           {/* Header */}
-          <div className="relative px-6 pt-6 pb-4">
+          <div className="relative px-6 pb-4 pt-6">
             <button
               onClick={handleClose}
-              className="bg-secondary/50 text-muted-foreground hover:bg-secondary hover:text-foreground absolute top-4 right-4 rounded-full p-2 transition-all duration-200 hover:scale-105"
+              className="bg-secondary/50 text-muted-foreground hover:bg-secondary hover:text-foreground absolute right-4 top-4 rounded-full p-2 transition-all duration-200 hover:scale-105"
               aria-label="Close dialog"
             >
               <Icons.Close className="h-4 w-4" />
@@ -136,14 +136,14 @@ export function UpdateDialog() {
 
             {/* Title */}
             <div className="mb-3 space-y-3">
-              <h2 className="text-foreground text-2xl font-bold text-balance">
+              <h2 className="text-foreground text-balance text-2xl font-bold">
                 New Update Available
               </h2>
             </div>
 
             {/* Description */}
             {updateInfo.notes && (
-              <p className="text-muted-foreground text-sm leading-relaxed text-pretty">
+              <p className="text-muted-foreground text-pretty text-sm leading-relaxed">
                 {updateInfo.notes}
               </p>
             )}

@@ -407,7 +407,7 @@ const AccountPage = () => {
           )}
           <div className="flex min-w-0 flex-col justify-center">
             <div className="flex items-center gap-1">
-              <h1 className="truncate text-base leading-tight font-semibold md:text-lg">
+              <h1 className="truncate text-base font-semibold leading-tight md:text-lg">
                 {account?.name ?? "Account"}
               </h1>
               {/* Desktop account selector */}
@@ -474,7 +474,7 @@ const AccountPage = () => {
                       <Icons.ChevronDown className="text-muted-foreground h-5 w-5" />
                     </Button>
                   </SheetTrigger>
-                  <SheetContent side="bottom" className="mx-1 h-[80vh] rounded-t-4xl p-0">
+                  <SheetContent side="bottom" className="rounded-t-4xl mx-1 h-[80vh] p-0">
                     <SheetHeader className="border-border border-b px-6 py-4">
                       <SheetTitle>Switch Account</SheetTitle>
                       <SheetDescription>Choose an account to view</SheetDescription>
@@ -612,7 +612,7 @@ const AccountPage = () => {
                           }}
                         />
                         <IntervalSelector
-                          className="relative right-0 bottom-10 left-0 z-10"
+                          className="relative bottom-10 left-0 right-0 z-10"
                           onIntervalSelect={handleIntervalSelect}
                           isLoading={isValuationHistoryLoading}
                           defaultValue={INITIAL_INTERVAL_CODE}

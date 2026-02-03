@@ -239,7 +239,7 @@ function ActivityTypeMappingSection({ items, onMapActivityType }: ActivityTypeMa
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Icons.AlertCircle className="text-muted-foreground mb-4 h-12 w-12" />
         <p className="text-muted-foreground">
-          Map the "Activity Type" column first to see values here.
+          Map the &quot;Activity Type&quot; column first to see values here.
         </p>
       </div>
     );
@@ -323,7 +323,9 @@ function SymbolResolutionSection({ items, onResolveSymbol }: SymbolResolutionSec
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Icons.AlertCircle className="text-muted-foreground mb-4 h-12 w-12" />
-        <p className="text-muted-foreground">Map the "Symbol" column first to see values here.</p>
+        <p className="text-muted-foreground">
+          Map the &quot;Symbol&quot; column first to see values here.
+        </p>
       </div>
     );
   }

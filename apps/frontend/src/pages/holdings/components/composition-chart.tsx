@@ -340,7 +340,7 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center space-x-2">
             <Icons.LayoutDashboard className="text-muted-foreground h-4 w-4" />
-            <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
+            <CardTitle className="text-muted-foreground text-sm font-medium uppercase tracking-wider">
               Composition
             </CardTitle>
           </div>
@@ -380,7 +380,7 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <div className="flex items-center space-x-2">
-          <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
+          <CardTitle className="text-muted-foreground text-sm font-medium uppercase tracking-wider">
             Composition
           </CardTitle>
         </div>

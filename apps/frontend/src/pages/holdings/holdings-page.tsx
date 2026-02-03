@@ -134,7 +134,7 @@ export const HoldingsPage = () => {
       name: holding.name,
       kind: apiKindToAlternativeAssetKind(holding.kind),
       currency: holding.currency,
-      metadata: holding.metadata as Record<string, unknown> | undefined,
+      metadata: holding.metadata,
     };
     setEditAsset(assetForSheet);
   }, []);

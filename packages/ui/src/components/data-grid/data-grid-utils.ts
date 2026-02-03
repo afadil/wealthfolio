@@ -89,17 +89,13 @@ export function getCommonPinningStyles<TData>(params: {
   const { column, withBorder = false, dir = "ltr" } = params;
 
   const isPinned = column.getIsPinned();
-  const isLastLeftPinnedColumn =
-    isPinned === "left" && column.getIsLastColumn("left");
-  const isFirstRightPinnedColumn =
-    isPinned === "right" && column.getIsFirstColumn("right");
+  const isLastLeftPinnedColumn = isPinned === "left" && column.getIsLastColumn("left");
+  const isFirstRightPinnedColumn = isPinned === "right" && column.getIsFirstColumn("right");
 
   const isRtl = dir === "rtl";
 
-  const leftPosition =
-    isPinned === "left" ? `${column.getStart("left")}px` : undefined;
-  const rightPosition =
-    isPinned === "right" ? `${column.getAfter("right")}px` : undefined;
+  const leftPosition = isPinned === "left" ? `${column.getStart("left")}px` : undefined;
+  const rightPosition = isPinned === "right" ? `${column.getAfter("right")}px` : undefined;
 
   return {
     boxShadow: withBorder
@@ -132,7 +128,7 @@ export function getScrollDirection(
     direction === "home" ||
     direction === "end"
   ) {
-    return direction as "left" | "right" | "home" | "end";
+    return direction;
   }
   if (direction === "pageleft") return "left";
   if (direction === "pageright") return "right";
@@ -147,8 +143,7 @@ export function scrollCellIntoView<TData>(params: {
   direction?: "left" | "right" | "home" | "end";
   isRtl: boolean;
 }): void {
-  const { container, targetCell, tableRef, direction, viewportOffset, isRtl } =
-    params;
+  const { container, targetCell, tableRef, direction, viewportOffset, isRtl } = params;
 
   const containerRect = container.getBoundingClientRect();
   const cellRect = targetCell.getBoundingClientRect();
@@ -160,14 +155,8 @@ export function scrollCellIntoView<TData>(params: {
   const leftPinnedColumns = currentTable?.getLeftVisibleLeafColumns() ?? [];
   const rightPinnedColumns = currentTable?.getRightVisibleLeafColumns() ?? [];
 
-  const leftPinnedWidth = leftPinnedColumns.reduce(
-    (sum, c) => sum + c.getSize(),
-    0,
-  );
-  const rightPinnedWidth = rightPinnedColumns.reduce(
-    (sum, c) => sum + c.getSize(),
-    0,
-  );
+  const leftPinnedWidth = leftPinnedColumns.reduce((sum, c) => sum + c.getSize(), 0);
+  const rightPinnedWidth = rightPinnedColumns.reduce((sum, c) => sum + c.getSize(), 0);
 
   const viewportLeft = isActuallyRtl
     ? containerRect.left + rightPinnedWidth + viewportOffset
@@ -176,8 +165,7 @@ export function scrollCellIntoView<TData>(params: {
     ? containerRect.right - leftPinnedWidth - viewportOffset
     : containerRect.right - rightPinnedWidth - viewportOffset;
 
-  const isFullyVisible =
-    cellRect.left >= viewportLeft && cellRect.right <= viewportRight;
+  const isFullyVisible = cellRect.left >= viewportLeft && cellRect.right <= viewportRight;
 
   if (isFullyVisible) return;
 
@@ -210,8 +198,7 @@ export function scrollCellIntoView<TData>(params: {
 export function getIsInPopover(element: unknown): boolean {
   return (
     element instanceof Element &&
-    (element.closest("[data-grid-cell-editor]") ||
-      element.closest("[data-grid-popover]")) !== null
+    (element.closest("[data-grid-cell-editor]") || element.closest("[data-grid-popover]")) !== null
   );
 }
 

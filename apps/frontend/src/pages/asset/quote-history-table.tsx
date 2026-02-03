@@ -400,7 +400,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
                     <>
                       <p className="text-muted-foreground text-sm">
                         Switching to manual tracking will stop automatic data fetching from Market
-                        Data Provider. You'll need to enter and maintain price data manually.
+                        Data Provider. You&apos;ll need to enter and maintain price data manually.
                       </p>
                       <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
                         ⚠️ Automatic price updates will be disabled.

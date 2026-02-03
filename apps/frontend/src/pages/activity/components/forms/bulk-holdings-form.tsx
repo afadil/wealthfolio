@@ -368,7 +368,7 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
             <div className="col-span-6">Tickers</div>
             <div className="col-span-1 text-right">Shares</div>
             <div className="col-span-2 text-right">Average cost</div>
-            <div className="col-span-2 text-right whitespace-nowrap">Total value</div>
+            <div className="col-span-2 whitespace-nowrap text-right">Total value</div>
             <div className="col-span-1 text-right"></div>
           </div>
 

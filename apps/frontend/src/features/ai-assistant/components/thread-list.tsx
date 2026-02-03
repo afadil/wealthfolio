@@ -125,19 +125,19 @@ interface ThreadSearchInputProps {
 const ThreadSearchInput: FC<ThreadSearchInputProps> = ({ value, onChange }) => {
   return (
     <div className="relative px-1">
-      <Icons.Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+      <Icons.Search className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
       <Input
         type="text"
         placeholder="Search threads..."
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-8 pr-8 pl-8 text-sm"
+        className="h-8 pl-8 pr-8 text-sm"
       />
       {value && (
         <button
           type="button"
           onClick={() => onChange("")}
-          className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2"
+          className="text-muted-foreground hover:text-foreground absolute right-3 top-1/2 -translate-y-1/2"
           aria-label="Clear search"
         >
           <Icons.Close className="size-4" />
@@ -353,7 +353,7 @@ const ThreadListItemCustom: FC<ThreadListItemCustomProps> = ({
 }) => {
   return (
     <div
-      className={`aui-thread-list-item hover:bg-muted focus-visible:bg-muted focus-visible:ring-ring group relative rounded-lg transition-all focus-visible:ring-2 focus-visible:outline-none ${
+      className={`aui-thread-list-item hover:bg-muted focus-visible:bg-muted focus-visible:ring-ring group relative rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 ${
         isActive ? "bg-muted" : ""
       }`}
       data-active={isActive || undefined}

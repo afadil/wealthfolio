@@ -358,7 +358,7 @@ function MobileAccountSheet({ accounts, open, onOpenChange, onSelect }: MobileAc
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="mx-1 h-[70vh] rounded-t-4xl p-0">
+      <SheetContent side="bottom" className="rounded-t-4xl mx-1 h-[70vh] p-0">
         <SheetHeader className="border-border border-b">
           <SheetTitle>Select Account</SheetTitle>
           <SheetDescription>Choose the account for this transaction</SheetDescription>

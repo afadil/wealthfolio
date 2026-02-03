@@ -1,9 +1,4 @@
-import {
-  ActivityStatus,
-  ActivityTypeNames,
-  SUBTYPE_DISPLAY_NAMES,
-  type ActivityType,
-} from "@/lib/constants";
+import { ActivityStatus, ActivityTypeNames, SUBTYPE_DISPLAY_NAMES } from "@/lib/constants";
 import type { ActivityDetails } from "@/lib/types";
 import {
   Badge,
@@ -115,9 +110,8 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
           <div className="from-primary/5 to-primary/10 rounded-xl border bg-gradient-to-br p-4">
             <div className="flex items-start justify-between">
               <div>
-                <div className="text-muted-foreground mb-1 text-xs tracking-wide uppercase">
-                  {ActivityTypeNames[activity.activityType as ActivityType] ||
-                    activity.activityType}
+                <div className="text-muted-foreground mb-1 text-xs uppercase tracking-wide">
+                  {ActivityTypeNames[activity.activityType] || activity.activityType}
                 </div>
                 {activity.assetSymbol && (
                   <div className="text-xl font-bold">{activity.assetSymbol}</div>
@@ -157,8 +151,7 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
               label="Type"
               value={
                 <Badge variant="outline">
-                  {ActivityTypeNames[activity.activityType as ActivityType] ||
-                    activity.activityType}
+                  {ActivityTypeNames[activity.activityType] || activity.activityType}
                 </Badge>
               }
             />
@@ -206,7 +199,7 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
           {/* Comment */}
           {activity.comment && (
             <DetailSection title="Notes" icon={<Icons.FileText className="h-4 w-4" />}>
-              <p className="text-sm whitespace-pre-wrap">{activity.comment}</p>
+              <p className="whitespace-pre-wrap text-sm">{activity.comment}</p>
             </DetailSection>
           )}
 

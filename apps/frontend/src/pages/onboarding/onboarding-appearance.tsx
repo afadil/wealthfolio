@@ -116,7 +116,7 @@ export const OnboardingAppearance = forwardRef<
                   <span className="text-sm font-medium">Light</span>
                 </div>
                 {theme === "light" && (
-                  <div className="bg-primary absolute top-2 right-2 rounded-full p-0.5">
+                  <div className="bg-primary absolute right-2 top-2 rounded-full p-0.5">
                     <Icons.Check className="h-3 w-3 text-white" />
                   </div>
                 )}
@@ -156,7 +156,7 @@ export const OnboardingAppearance = forwardRef<
                   <span className="text-sm font-medium">Dark</span>
                 </div>
                 {theme === "dark" && (
-                  <div className="bg-primary absolute top-2 right-2 rounded-full p-0.5">
+                  <div className="bg-primary absolute right-2 top-2 rounded-full p-0.5">
                     <Icons.Check className="h-3 w-3 text-white" />
                   </div>
                 )}
@@ -196,7 +196,7 @@ export const OnboardingAppearance = forwardRef<
                   <span className="text-sm font-medium">System</span>
                 </div>
                 {theme === "system" && (
-                  <div className="bg-primary absolute top-2 right-2 rounded-full p-0.5">
+                  <div className="bg-primary absolute right-2 top-2 rounded-full p-0.5">
                     <Icons.Check className="h-3 w-3 text-white" />
                   </div>
                 )}
@@ -239,7 +239,7 @@ export const OnboardingAppearance = forwardRef<
                         Track investments with clarity.
                       </div>
                       {/* Secondary: numbers sample */}
-                      <div className="text-muted-foreground/60 text-[10px] whitespace-nowrap sm:text-xs">
+                      <div className="text-muted-foreground/60 whitespace-nowrap text-[10px] sm:text-xs">
                         12345 · $1,234
                       </div>
                     </div>
@@ -254,7 +254,7 @@ export const OnboardingAppearance = forwardRef<
                     <div className="text-muted-foreground text-xs">{f.description}</div>
                   </div>
                   {font === f.value && (
-                    <div className="bg-primary absolute top-2 right-2 rounded-full p-0.5">
+                    <div className="bg-primary absolute right-2 top-2 rounded-full p-0.5">
                       <Icons.Check className="h-3 w-3 text-white" />
                     </div>
                   )}

@@ -49,7 +49,7 @@ function NavigationPills({
             onClick={() => onViewChange(view.value)}
             className={cn(
               "relative flex cursor-pointer items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-200",
-              "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none",
+              "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2",
               isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground/80",
             )}
             aria-current={isActive ? "page" : undefined}
@@ -102,7 +102,7 @@ function MobileNavigation({
             onClick={() => onViewChange(item.value)}
             className={cn(
               "relative flex cursor-pointer items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-200",
-              "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
+              "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
               isActive ? "text-foreground" : "text-muted-foreground",
             )}
             aria-label={item.label}
@@ -215,7 +215,7 @@ export function SwipablePage({
           /* Desktop: Navigation at top center + content below */
           <div className="hidden h-full flex-col md:flex">
             {/* Header with Navigation and Actions */}
-            <div className="flex shrink-0 items-center justify-between gap-4 px-2 pt-4 pb-3 lg:px-4">
+            <div className="flex shrink-0 items-center justify-between gap-4 px-2 pb-3 pt-4 lg:px-4">
               <div className="flex items-center gap-3">
                 {title && <h1 className="text-muted-foreground text-sm font-medium">{title}</h1>}
                 <NavigationPills

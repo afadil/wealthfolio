@@ -582,7 +582,7 @@ function ActivityItem({ run, accountName }: { run: ImportRun; accountName?: stri
       }`}
     >
       <StatusDot status={dotStatus} />
-      <span className="text-muted-foreground min-w-[100px] shrink-0 text-sm whitespace-nowrap">
+      <span className="text-muted-foreground min-w-[100px] shrink-0 whitespace-nowrap text-sm">
         {timeAgo} ago
       </span>
       {accountName && (

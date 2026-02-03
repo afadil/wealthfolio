@@ -411,9 +411,7 @@ export function buildSavePayload(
       const newMeta = {
         ...existingMeta,
         flow: {
-          ...((existingMeta as Record<string, unknown>)?.flow as
-            | Record<string, unknown>
-            | undefined),
+          ...(existingMeta?.flow as Record<string, unknown> | undefined),
           is_external: transaction.isExternal,
         },
       };

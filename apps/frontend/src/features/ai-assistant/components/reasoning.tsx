@@ -81,7 +81,7 @@ const ReasoningGroupImpl: ReasoningGroupComponent = ({ children, startIndex, end
     >
       {/* Header */}
       <div
-        className="hover:bg-muted/80 flex cursor-pointer items-center justify-between px-3 py-2 transition-colors select-none"
+        className="hover:bg-muted/80 flex cursor-pointer select-none items-center justify-between px-3 py-2 transition-colors"
         onClick={toggleExpanded}
       >
         <div className="flex items-center gap-2">

@@ -88,7 +88,7 @@ export const ActivityTable = ({
             <div className="flex items-center text-sm">
               <ActivityTypeBadge
                 type={activityType as ActivityType}
-                className="text-xs font-normal whitespace-nowrap"
+                className="whitespace-nowrap text-xs font-normal"
               />
             </div>
           );

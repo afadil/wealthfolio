@@ -15,10 +15,8 @@ import { useDataGrid } from "./use-data-grid";
 const EMPTY_CELL_SELECTION_SET = new Set<string>();
 
 interface DataGridProps<TData>
-  extends Omit<
-      ReturnType<typeof useDataGrid<TData>>,
-      "dir" | "virtualTotalSize" | "virtualItems" | "measureElement"
-    >,
+  extends
+    Omit<ReturnType<typeof useDataGrid<TData>>, "dir" | "virtualTotalSize" | "virtualItems" | "measureElement">,
     Omit<React.ComponentProps<"div">, "contextMenu"> {
   dir?: Direction;
   /** Height of the grid. Can be a number (px) or CSS string like "100%" */
@@ -62,12 +60,9 @@ export function DataGrid<TData>({
   const columnVisibility = table.getState().columnVisibility;
   const columnPinning = table.getState().columnPinning;
 
-  const onDataGridContextMenu = React.useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      event.preventDefault();
-    },
-    [],
-  );
+  const onDataGridContextMenu = React.useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+  }, []);
 
   const onAddRowKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -82,18 +77,9 @@ export function DataGrid<TData>({
   );
 
   return (
-    <div
-      data-slot="grid-wrapper"
-      dir={dir}
-      {...props}
-      className={cn("relative flex w-full flex-col", className)}
-    >
+    <div data-slot="grid-wrapper" dir={dir} {...props} className={cn("relative flex w-full flex-col", className)}>
       {searchState && <DataGridSearch {...searchState} />}
-      <DataGridContextMenu
-        tableMeta={tableMeta}
-        columns={columns}
-        contextMenu={contextMenu}
-      />
+      <DataGridContextMenu tableMeta={tableMeta} columns={columns} contextMenu={contextMenu} />
       <DataGridPasteDialog tableMeta={tableMeta} pasteDialog={pasteDialog} />
       <div
         role="grid"
@@ -103,10 +89,7 @@ export function DataGrid<TData>({
         data-slot="grid"
         tabIndex={0}
         ref={dataGridRef}
-        className={cn(
-          "relative grid select-none overflow-auto rounded-md border focus:outline-none",
-          className,
-        )}
+        className={cn("relative grid select-none overflow-auto rounded-md border focus:outline-none", className)}
         style={{
           ...columnSizeVars,
           ...(height !== undefined && {
@@ -119,7 +102,7 @@ export function DataGrid<TData>({
           role="rowgroup"
           data-slot="grid-header"
           ref={headerRef}
-          className="sticky top-0 z-10 grid border-b bg-background"
+          className="bg-background sticky top-0 z-10 grid border-b"
         >
           {table.getHeaderGroups().map((headerGroup, rowIndex) => (
             <div
@@ -132,9 +115,7 @@ export function DataGrid<TData>({
             >
               {headerGroup.headers.map((header, colIndex) => {
                 const sorting = table.getState().sorting;
-                const currentSort = sorting.find(
-                  (sort) => sort.id === header.column.id,
-                );
+                const currentSort = sorting.find((sort) => sort.id === header.column.id);
                 const isSortable = header.column.getCanSort();
 
                 return (
@@ -162,13 +143,9 @@ export function DataGrid<TData>({
                       width: `calc(var(--header-${header.id}-size) * 1px)`,
                     }}
                   >
-                    {header.isPlaceholder ? null : typeof header.column
-                        .columnDef.header === "function" ? (
+                    {header.isPlaceholder ? null : typeof header.column.columnDef.header === "function" ? (
                       <div className="size-full px-3 py-1.5">
-                        {flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
+                        {flexRender(header.column.columnDef.header, header.getContext())}
                       </div>
                     ) : (
                       <DataGridColumnHeader header={header} table={table} />
@@ -192,14 +169,10 @@ export function DataGrid<TData>({
             const row = rows[virtualItem.index];
             if (!row) return null;
 
-            const cellSelectionKeys =
-              cellSelectionMap?.get(virtualItem.index) ??
-              EMPTY_CELL_SELECTION_SET;
+            const cellSelectionKeys = cellSelectionMap?.get(virtualItem.index) ?? EMPTY_CELL_SELECTION_SET;
 
-            const searchMatchColumns =
-              searchMatchesByRow?.get(virtualItem.index) ?? null;
-            const isActiveSearchRow =
-              activeSearchMatch?.rowIndex === virtualItem.index;
+            const searchMatchColumns = searchMatchesByRow?.get(virtualItem.index) ?? null;
+            const isActiveSearchRow = activeSearchMatch?.rowIndex === virtualItem.index;
 
             return (
               <DataGridRow
@@ -229,7 +202,7 @@ export function DataGrid<TData>({
             role="rowgroup"
             data-slot="grid-footer"
             ref={footerRef}
-            className="sticky bottom-0 z-10 grid border-t bg-background"
+            className="bg-background sticky bottom-0 z-10 grid border-t"
           >
             <div
               role="row"
@@ -241,7 +214,7 @@ export function DataGrid<TData>({
               <div
                 role="gridcell"
                 tabIndex={0}
-                className="relative flex h-9 grow items-center bg-muted/30 transition-colors hover:bg-muted/50 focus:bg-muted/50 focus:outline-none"
+                className="bg-muted/30 hover:bg-muted/50 focus:bg-muted/50 relative flex h-9 grow items-center transition-colors focus:outline-none"
                 style={{
                   width: table.getTotalSize(),
                   minWidth: table.getTotalSize(),
@@ -249,7 +222,7 @@ export function DataGrid<TData>({
                 onClick={onRowAdd}
                 onKeyDown={onAddRowKeyDown}
               >
-                <div className="sticky start-0 flex items-center gap-2 px-3 text-muted-foreground">
+                <div className="text-muted-foreground sticky start-0 flex items-center gap-2 px-3">
                   <Icons.Plus className="size-3.5" />
                   <span className="text-sm">Add row</span>
                 </div>

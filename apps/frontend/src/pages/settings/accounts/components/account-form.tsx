@@ -137,7 +137,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
     setShowModeConfirmation(false);
     setPendingFormData(null);
     // Revert the tracking mode in the form
-    form.setValue("trackingMode", initialTrackingMode!);
+    form.setValue("trackingMode", initialTrackingMode);
   };
 
   return (
@@ -230,7 +230,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                 {needsSetup && !currentTrackingMode && (
                   <Alert
                     variant="warning"
-                    className="px-3 py-2.5 [&>svg]:top-2.5 [&>svg]:left-3 [&>svg~*]:pl-6"
+                    className="px-3 py-2.5 [&>svg]:left-3 [&>svg]:top-2.5 [&>svg~*]:pl-6"
                   >
                     <Icons.AlertTriangle className="h-4 w-4" />
                     <AlertDescription className="text-xs">
@@ -286,7 +286,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                 {field.value === "HOLDINGS" && (
                   <Alert
                     variant="warning"
-                    className="px-3 py-2.5 [&>svg]:top-2.5 [&>svg]:left-3 [&>svg~*]:pl-6"
+                    className="px-3 py-2.5 [&>svg]:left-3 [&>svg]:top-2.5 [&>svg~*]:pl-6"
                   >
                     <Icons.AlertTriangle className="h-4 w-4" />
                     <AlertDescription className="text-xs">

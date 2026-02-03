@@ -23,7 +23,7 @@ import {
 } from "@wealthfolio/ui/components/ui/sheet";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
-import { ASSET_KIND_DISPLAY_NAMES, AssetKind, Quote } from "@/lib/types";
+import { ASSET_KIND_DISPLAY_NAMES, Quote } from "@/lib/types";
 import { cn, formatAmount, formatDate } from "@/lib/utils";
 import { ScrollArea, Separator } from "@wealthfolio/ui";
 import { ParsedAsset } from "./asset-utils";
@@ -189,7 +189,7 @@ export function AssetsTableMobile({
         >
           <Icons.ListFilter className="h-4 w-4" />
           {hasActiveFilters && (
-            <span className="bg-destructive absolute top-0.5 right-0 h-2 w-2 rounded-full" />
+            <span className="bg-destructive absolute right-0 top-0.5 h-2 w-2 rounded-full" />
           )}
         </Button>
       </div>
@@ -290,7 +290,7 @@ export function AssetsTableMobile({
 
       {/* Filter Sheet */}
       <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
-        <SheetContent side="bottom" className="mx-1 flex h-[70vh] flex-col rounded-t-4xl">
+        <SheetContent side="bottom" className="rounded-t-4xl mx-1 flex h-[70vh] flex-col">
           <SheetHeader className="text-left">
             <SheetTitle>Filter Options</SheetTitle>
           </SheetHeader>
@@ -299,7 +299,7 @@ export function AssetsTableMobile({
               {/* Data Source Filter */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+                  <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
                     Data Source
                   </h4>
                   {selectedDataSources.length > 0 && (
@@ -360,7 +360,7 @@ export function AssetsTableMobile({
               {/* Asset Kind Filter */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+                  <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
                     Asset Kind
                   </h4>
                   {selectedAssetKinds.length > 0 && (
@@ -406,7 +406,7 @@ export function AssetsTableMobile({
                             {isSelected && <Icons.Check className="text-secondary h-3 w-3" />}
                           </div>
                           <span className="font-medium">
-                            {ASSET_KIND_DISPLAY_NAMES[kind as AssetKind] ?? kind}
+                            {ASSET_KIND_DISPLAY_NAMES[kind] ?? kind}
                           </span>
                         </div>
                         <Badge variant="secondary" className="ml-auto">
@@ -423,7 +423,7 @@ export function AssetsTableMobile({
               {/* Price Status Filter */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+                  <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
                     Price Status
                   </h4>
                   {selectedPriceStatus.length > 0 && (

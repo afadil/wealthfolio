@@ -272,7 +272,7 @@ function convertToExternalMessage(msg: ChatMessage): ExternalMessage {
         const idx = toolCallIndexes.get(part.toolCallId);
         if (idx !== undefined) {
           const tcPart = parts[idx];
-          if (tcPart && tcPart.type === "toolCall") {
+          if (tcPart?.type === "toolCall") {
             tcPart.result = part.success
               ? part.meta
                 ? { data: part.data, meta: part.meta }
@@ -624,7 +624,7 @@ export function useChatRuntime(config?: ChatModelConfig) {
               // Append to existing text part or create new one
               if (textPartIndex !== null) {
                 const part = streamParts[textPartIndex];
-                if (part && part.type === "text") {
+                if (part?.type === "text") {
                   part.content += event.delta;
                 }
               } else {
@@ -639,7 +639,7 @@ export function useChatRuntime(config?: ChatModelConfig) {
               // Append to existing reasoning part or create new one
               if (reasoningPartIndex !== null) {
                 const part = streamParts[reasoningPartIndex];
-                if (part && part.type === "reasoning") {
+                if (part?.type === "reasoning") {
                   part.content += event.delta;
                 }
               } else {
@@ -670,7 +670,7 @@ export function useChatRuntime(config?: ChatModelConfig) {
               const tcIdx = toolCallIndexes.get(event.result.toolCallId);
               if (tcIdx !== undefined) {
                 const part = streamParts[tcIdx];
-                if (part && part.type === "toolCall") {
+                if (part?.type === "toolCall") {
                   part.result = event.result.success
                     ? event.result.meta
                       ? { data: event.result.data, meta: event.result.meta }

@@ -23,7 +23,7 @@ function EmptyPlaceholder({
           {icon}
         </div>
         <h2 className="mt-2 text-xl font-semibold">{title}</h2>
-        <p className="text-muted-foreground mt-2 text-center text-sm leading-6 font-normal">
+        <p className="text-muted-foreground mt-2 text-center text-sm font-normal leading-6">
           {description}
         </p>
       </div>
@@ -138,7 +138,7 @@ export function AccountBreakdown({
                           {percentage.toFixed(1)}% of total fees
                         </div>
                         {/* Tooltip arrow */}
-                        <div className="border-t-border absolute top-full left-1/2 h-0 w-0 -translate-x-1/2 transform border-t-4 border-r-4 border-l-4 border-r-transparent border-l-transparent"></div>
+                        <div className="border-t-border absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 transform border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent"></div>
                       </div>
                     </div>
                   </div>

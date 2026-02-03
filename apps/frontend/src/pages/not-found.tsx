@@ -7,13 +7,13 @@ export default function NotFoundPage() {
   return (
     <div className="animate-in fade-in zoom-in flex h-full w-full flex-col items-center justify-center gap-6 p-8 text-center duration-500">
       <div className="space-y-2">
-        <h1 className="text-muted-foreground/10 text-9xl font-black tracking-tighter select-none">
+        <h1 className="text-muted-foreground/10 select-none text-9xl font-black tracking-tighter">
           404
         </h1>
         <h2 className="text-3xl font-bold tracking-tight">Page not found</h2>
         <p className="text-muted-foreground mx-auto max-w-[450px] text-lg">
-          Sorry, we couldn't find the page you're looking for. It might have been moved, deleted, or
-          never existed.
+          Sorry, we couldn&apos;t find the page you&apos;re looking for. It might have been moved,
+          deleted, or never existed.
         </p>
       </div>
       <div className="flex gap-4">

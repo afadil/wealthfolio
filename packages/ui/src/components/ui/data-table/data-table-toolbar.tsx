@@ -132,7 +132,7 @@ function SearchInput({
 
   return (
     <div className={cn("relative", className)}>
-      <Icons.Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2" />
+      <Icons.Search className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2" />
       <input
         type="text"
         value={value}
@@ -141,7 +141,7 @@ function SearchInput({
         onBlur={handleBlur}
         placeholder={placeholder}
         className={cn(
-          "shadow-inner-xs bg-muted/90 hover:bg-muted/80 h-8 w-full rounded-md pr-8 pl-8 text-sm transition-colors outline-none",
+          "shadow-inner-xs bg-muted/90 hover:bg-muted/80 h-8 w-full rounded-md pl-8 pr-8 text-sm outline-none transition-colors",
           "placeholder:text-muted-foreground",
           "focus:ring-ring/50 focus:ring-2",
         )}
@@ -150,7 +150,7 @@ function SearchInput({
         <button
           type="button"
           onClick={handleClear}
-          className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 -translate-y-1/2"
+          className="text-muted-foreground hover:text-foreground absolute right-2 top-1/2 -translate-y-1/2"
         >
           <Icons.Close className="h-4 w-4" />
           <span className="sr-only">Clear search</span>

@@ -435,7 +435,7 @@ function ImportWizardContent() {
 
       <PageContent withPadding={false}>
         <ErrorBoundary>
-          <div className="px-2 pt-2 pb-6 sm:px-4 sm:pt-4 md:px-6 md:pt-6">
+          <div className="px-2 pb-6 pt-2 sm:px-4 sm:pt-4 md:px-6 md:pt-6">
             <Card className="w-full">
               {/* Step indicator */}
               <CardHeader className="border-b px-3 py-3 sm:px-6 sm:py-4">

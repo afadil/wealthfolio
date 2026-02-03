@@ -134,7 +134,7 @@ export function DrillableAccountChart({
         // Drill down to show individual accounts
         drillDown(clickedItem.id, clickedItem.name);
         setActiveIndex(0);
-      } else if (group && group.accountIds.length === 1) {
+      } else if (group?.accountIds.length === 1) {
         // Single account in group, trigger click handler directly
         onAccountClick?.(group.accountIds[0], clickedItem.name);
       }
@@ -168,7 +168,7 @@ export function DrillableAccountChart({
     <Card className="overflow-hidden backdrop-blur-sm">
       <CardHeader>
         {isAtRoot ? (
-          <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
+          <CardTitle className="text-muted-foreground text-sm font-medium uppercase tracking-wider">
             Accounts
           </CardTitle>
         ) : (

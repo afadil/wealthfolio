@@ -107,7 +107,7 @@ const OnboardingPage = () => {
 
       {/* Fixed Footer */}
       <footer className="flex-none pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto max-w-4xl px-4 pt-6 pb-8 sm:px-6 sm:pb-18">
+        <div className="sm:pb-18 mx-auto max-w-4xl px-4 pb-8 pt-6 sm:px-6">
           {currentStep === 4 ? (
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="order-2 sm:order-1">
@@ -129,7 +129,7 @@ const OnboardingPage = () => {
                 </Button>
                 <Button
                   data-testid="onboarding-finish-button"
-                  className="from-primary to-primary/90 order-1 bg-linear-to-r sm:order-2"
+                  className="from-primary to-primary/90 bg-linear-to-r order-1 sm:order-2"
                   onClick={() => updateSettings({ onboardingCompleted: true })}
                 >
                   Get Started

@@ -318,7 +318,7 @@ export function AlternativeAssetQuickAddModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="border-border/50 bg-card gap-0 overflow-hidden p-0 shadow-2xl sm:max-w-[560px]">
         {/* Header with progress indicator */}
-        <DialogHeader className="border-border/50 border-b px-6 pt-6 pb-4">
+        <DialogHeader className="border-border/50 border-b px-6 pb-4 pt-6">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-foreground text-xl font-semibold tracking-tight">
               {step === 1 ? "Add New Asset" : selectedAssetType?.label}
@@ -384,7 +384,7 @@ export function AlternativeAssetQuickAddModal({
                           <motion.div
                             initial={{ scale: 0 }}
                             animate={{ scale: 1 }}
-                            className="absolute top-2 right-2"
+                            className="absolute right-2 top-2"
                           >
                             <div className="bg-primary flex h-5 w-5 items-center justify-center rounded-full">
                               <Icons.Check className="text-primary-foreground h-3 w-3" />

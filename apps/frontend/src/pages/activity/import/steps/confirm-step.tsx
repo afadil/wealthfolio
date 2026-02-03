@@ -258,7 +258,7 @@ export function ConfirmStep() {
 
       {/* Summary section */}
       <div className="space-y-6">
-        <h4 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+        <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
           Import Summary
         </h4>
 
@@ -303,7 +303,7 @@ export function ConfirmStep() {
         {/* Activity type breakdown */}
         {Object.keys(summary.byType).length > 0 && (
           <div className="space-y-3">
-            <h4 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+            <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
               By Activity Type
             </h4>
             <div className="flex flex-wrap gap-2">
@@ -332,7 +332,7 @@ export function ConfirmStep() {
         {/* Skipped breakdown */}
         {Object.keys(summary.bySkipReason).length > 0 && (
           <div className="space-y-3">
-            <h4 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+            <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
               Skipped Breakdown
             </h4>
             <div className="flex flex-wrap gap-2">

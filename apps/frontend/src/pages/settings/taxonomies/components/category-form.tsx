@@ -266,8 +266,8 @@ export function CategoryForm({
                   <AlertDialogHeader>
                     <AlertDialogTitle>Delete Category</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to delete "{category?.name}"? This will remove all asset
-                      assignments to this category. This action cannot be undone.
+                      Are you sure you want to delete &quot;{category?.name}&quot;? This will remove
+                      all asset assignments to this category. This action cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>

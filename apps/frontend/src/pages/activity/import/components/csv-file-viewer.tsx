@@ -137,7 +137,7 @@ export function CSVFileViewer({ data, className, maxHeight = "400px" }: CSVFileV
         const isHeader = row.original.id === 0;
 
         return (
-          <div className={cn("font-mono text-xs whitespace-nowrap", isHeader && "font-semibold")}>
+          <div className={cn("whitespace-nowrap font-mono text-xs", isHeader && "font-semibold")}>
             {(content as React.ReactNode) || (
               <span className="text-muted-foreground italic">empty line</span>
             )}

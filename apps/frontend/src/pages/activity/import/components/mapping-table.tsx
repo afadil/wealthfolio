@@ -78,7 +78,7 @@ export function MappingTable({
                   <TableHead
                     key={field}
                     className={cn(
-                      "p-2 whitespace-nowrap transition-colors",
+                      "whitespace-nowrap p-2 transition-colors",
                       IMPORT_REQUIRED_FIELDS.includes(field as ImportRequiredField)
                         ? !isFieldMapped(field)
                           ? "bg-amber-50 dark:bg-amber-950/20"
@@ -105,7 +105,7 @@ export function MappingTable({
                     transition={{ duration: 0.2, delay: index * 0.03 }}
                     key={`row-${row.lineNumber}`}
                     className={cn(
-                      "group hover:bg-muted/50 transition-colors",
+                      "hover:bg-muted/50 group transition-colors",
                       index % 2 === 0 ? "bg-background" : "bg-muted/20",
                     )}
                   >

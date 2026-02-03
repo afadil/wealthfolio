@@ -177,7 +177,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
               <Icons.Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="bottom" className="mx-1 h-[85vh] rounded-t-4xl p-0">
+          <SheetContent side="bottom" className="rounded-t-4xl mx-1 h-[85vh] p-0">
             {showCustomAssetForm ? (
               <>
                 {/* Custom Asset Form Header */}
@@ -293,13 +293,13 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                   {/* Search Input */}
                   <div className="border-border border-b px-6 py-4">
                     <div className="relative">
-                      <Icons.Search className="text-muted-foreground absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2" />
+                      <Icons.Search className="text-muted-foreground absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2" />
                       <input
                         type="text"
                         placeholder="Search symbols..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="bg-background border-input ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring h-14 w-full rounded-md border px-4 py-3 pl-12 text-base focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                        className="bg-background border-input ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring h-14 w-full rounded-md border px-4 py-3 pl-12 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                         autoFocus
                       />
                     </div>
@@ -377,7 +377,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                       sortedSearchResults.length === 0 &&
                       searchQuery.length > 1 && (
                         <div className="text-muted-foreground py-8 text-center text-sm">
-                          <p>No matches found for "{searchQuery}"</p>
+                          <p>No matches found for &quot;{searchQuery}&quot;</p>
                           <p className="mt-2 text-xs">You can create a custom asset below.</p>
                         </div>
                       )}

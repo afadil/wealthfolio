@@ -38,7 +38,7 @@ export function MobileActionsMenu({
           <Icons.MoreVertical className="h-4 w-4" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="bottom" className="mx-1 rounded-t-4xl p-0">
+      <SheetContent side="bottom" className="rounded-t-4xl mx-1 p-0">
         <SheetHeader className="border-border border-b px-6 py-4">
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>{description}</SheetDescription>
@@ -53,7 +53,7 @@ export function MobileActionsMenu({
                   action.onClick();
                   onOpenChange(false);
                 }}
-                className="hover:bg-accent active:bg-accent/80 focus:ring-primary flex items-center gap-4 rounded-lg border p-4 text-left transition-colors focus:ring-2 focus:outline-none"
+                className="hover:bg-accent active:bg-accent/80 focus:ring-primary flex items-center gap-4 rounded-lg border p-4 text-left transition-colors focus:outline-none focus:ring-2"
               >
                 <div className="bg-primary/10 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full">
                   <IconComponent className="text-primary h-5 w-5" />

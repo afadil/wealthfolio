@@ -65,7 +65,7 @@ export function ActionPalette({
         side={side}
         sideOffset={8}
         className={cn(
-          "w-auto max-w-[320px] min-w-[260px] p-0",
+          "w-auto min-w-[260px] max-w-[320px] p-0",
           "rounded-2xl",
           "border-border/50 border dark:border-white/10",
           "bg-card backdrop-blur-xl",
@@ -74,7 +74,7 @@ export function ActionPalette({
       >
         {/* Header - only show if title provided */}
         {title && (
-          <div className="flex items-center justify-between px-5 pt-5 pb-3">
+          <div className="flex items-center justify-between px-5 pb-3 pt-5">
             <h3 className="text-foreground text-lg font-bold">{title}</h3>
             <button
               onClick={handleClose}
@@ -97,7 +97,7 @@ export function ActionPalette({
           {groups.map((group, groupIndex) => (
             <div key={groupIndex}>
               {group.title && (
-                <div className="text-muted-foreground px-2 py-1.5 text-xs font-medium tracking-wider uppercase">
+                <div className="text-muted-foreground px-2 py-1.5 text-xs font-medium uppercase tracking-wider">
                   {group.title}
                 </div>
               )}

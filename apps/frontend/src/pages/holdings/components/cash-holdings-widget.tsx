@@ -33,7 +33,7 @@ export const CashHoldingsWidget = ({
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div>
-              <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase sm:text-xs">
+              <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider sm:text-xs">
                 Cash Balance
               </p>
               <Skeleton className="mt-0.5 h-5 w-24 sm:h-5 sm:w-24" />
@@ -59,7 +59,7 @@ export const CashHoldingsWidget = ({
         {/* Left: Total */}
         <div className="flex items-center gap-2.5">
           <div className="min-w-0">
-            <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase sm:text-xs">
+            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider sm:text-xs">
               Cash Balance
             </p>
             <p className="text-foreground mt-0.5 text-base font-semibold tracking-tight sm:text-base">
@@ -78,7 +78,7 @@ export const CashHoldingsWidget = ({
             {cashHoldings.map((holding, index) => (
               <div key={holding.id} className="flex items-center gap-2.5">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase sm:text-[10px]">
+                  <span className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider sm:text-[10px]">
                     {holding.localCurrency}
                   </span>
                   <span className="text-foreground text-sm sm:text-sm">

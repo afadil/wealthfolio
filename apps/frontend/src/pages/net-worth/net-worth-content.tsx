@@ -95,7 +95,7 @@ function BalanceSheet({ data, currency }: BalanceSheetProps) {
   const hasLiabilities = data.liabilities.total > 0 || data.liabilities.breakdown.length > 0;
 
   return (
-    <div className="border-border bg-card rounded-lg border shadow-xs">
+    <div className="border-border bg-card shadow-xs rounded-lg border">
       {/* Assets Section */}
       <Collapsible open={assetsOpen} onOpenChange={setAssetsOpen}>
         <CollapsibleTrigger className="hover:bg-muted/50 flex w-full items-center justify-between px-4 py-3 transition-colors md:px-5">
@@ -217,7 +217,7 @@ function CompositionWidget({ data, isLoading }: CompositionWidgetProps) {
     return (
       <div className="w-full">
         <h2 className="text-md pb-2 font-semibold tracking-tight">Composition</h2>
-        <div className="border-border bg-card rounded-lg border p-4 shadow-xs md:p-5">
+        <div className="border-border bg-card shadow-xs rounded-lg border p-4 md:p-5">
           <Skeleton className="mb-4 h-2.5 w-full rounded-full" />
           <div className="grid grid-cols-2 gap-x-4 gap-y-2">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -237,7 +237,7 @@ function CompositionWidget({ data, isLoading }: CompositionWidgetProps) {
   return (
     <div className="w-full">
       <h2 className="text-md pb-2 font-semibold tracking-tight">Composition</h2>
-      <div className="border-border bg-card rounded-lg border p-4 shadow-xs md:p-5">
+      <div className="border-border bg-card shadow-xs rounded-lg border p-4 md:p-5">
         {/* Stacked horizontal bar */}
         <div className="mb-4 flex h-2.5 w-full overflow-hidden rounded-full">
           {items.map((item, index) => (
@@ -514,7 +514,7 @@ export function NetWorthContent() {
 
       {/* Content section with gradient background */}
       <div
-        className="grow bg-linear-to-t px-4 pt-4 md:px-6 md:pt-6 lg:px-10 lg:pt-8"
+        className="bg-linear-to-t grow px-4 pt-4 md:px-6 md:pt-6 lg:px-10 lg:pt-8"
         style={{
           backgroundImage: `linear-gradient(to top, ${THEME_COLOR.replace(")", " / 0.30)")}, ${THEME_COLOR.replace(")", " / 0.15)")}, ${THEME_COLOR.replace(")", " / 0.10)")})`,
         }}
@@ -526,7 +526,7 @@ export function NetWorthContent() {
               <h2 className="text-md pb-2 font-semibold tracking-tight">Breakdown</h2>
 
               {isLoading ? (
-                <div className="border-border bg-card rounded-lg border p-4 shadow-xs md:p-5">
+                <div className="border-border bg-card shadow-xs rounded-lg border p-4 md:p-5">
                   <div className="space-y-4">
                     {Array.from({ length: 3 }).map((_, i) => (
                       <div key={i} className="flex items-center justify-between">

@@ -755,7 +755,7 @@ export function AppLauncher() {
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent
           side="bottom"
-          className="mx-auto flex h-[85vh] w-full max-w-screen-sm flex-col overflow-hidden rounded-t-3xl border-none px-0 pt-4 pb-6"
+          className="mx-auto flex h-[85vh] w-full max-w-screen-sm flex-col overflow-hidden rounded-t-3xl border-none px-0 pb-6 pt-4"
         >
           <SheetHeader className="px-6">
             <SheetTitle>Quick launch</SheetTitle>
@@ -764,7 +764,7 @@ export function AppLauncher() {
             className={cn(
               "flex flex-1 flex-col bg-transparent",
               "[&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:px-4 [&_[cmdk-group-heading]]:font-medium",
-              "[&_[cmdk-group]]:px-2 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0",
+              "[&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2",
               "[&_[cmdk-input-wrapper]]:px-5 [&_[cmdk-input]]:h-14 [&_[cmdk-input]]:text-base",
               "[&_[cmdk-item]]:px-4 [&_[cmdk-item]]:py-4 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5",
               "[&_[data-cmdk-input-wrapper]_svg]:h-5 [&_[data-cmdk-input-wrapper]_svg]:w-5",

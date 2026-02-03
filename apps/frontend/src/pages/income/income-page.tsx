@@ -84,7 +84,7 @@ export default function IncomePage() {
   if (!periodSummary || !totalSummary) {
     return (
       <>
-        <div className="pointer-events-auto fixed top-4 right-2 z-20 lg:right-4">
+        <div className="pointer-events-auto fixed right-2 top-4 z-20 lg:right-4">
           <IncomePeriodSelector
             selectedPeriod={selectedPeriod}
             onPeriodSelect={setSelectedPeriod}
@@ -164,7 +164,7 @@ export default function IncomePage() {
   return (
     <>
       {/* Period selector - fixed position in header area */}
-      <div className="pointer-events-auto fixed top-4 right-2 z-20 hidden md:block lg:right-4">
+      <div className="pointer-events-auto fixed right-2 top-4 z-20 hidden md:block lg:right-4">
         <IncomePeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
       </div>
 
@@ -409,7 +409,7 @@ export default function IncomePage() {
                                   {percentage.toFixed(1)}% of total
                                 </div>
                                 {/* Tooltip arrow */}
-                                <div className="border-t-border absolute top-full left-1/2 h-0 w-0 -translate-x-1/2 transform border-t-4 border-r-4 border-l-4 border-r-transparent border-l-transparent"></div>
+                                <div className="border-t-border absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 transform border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent"></div>
                               </div>
                             </div>
                           </div>

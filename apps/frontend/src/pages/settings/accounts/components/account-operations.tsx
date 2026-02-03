@@ -103,8 +103,8 @@ export function AccountOperations({
             </AlertDialogTitle>
             <AlertDialogDescription>
               Archiving will remove this account from your Total Portfolio history and net worth
-              calculations. Historical charts will be recalculated without this account's data. You
-              can restore it later.
+              calculations. Historical charts will be recalculated without this account&apos;s data.
+              You can restore it later.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

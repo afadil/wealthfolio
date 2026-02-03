@@ -253,7 +253,7 @@ function ProviderSettings({
             <div className="grid gap-6 md:grid-cols-2">
               {/* Left column - Capabilities */}
               <div className="space-y-4">
-                <h4 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
                   Capabilities
                 </h4>
                 <div className="space-y-3">
@@ -319,7 +319,7 @@ function ProviderSettings({
 
               {/* Right column - Settings */}
               <div className="space-y-4">
-                <h4 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
                   Settings
                 </h4>
                 <div className="space-y-4">

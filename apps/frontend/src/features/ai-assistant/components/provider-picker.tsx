@@ -40,7 +40,7 @@ export const ProviderPicker: FC = () => {
         <SelectValue>
           {currentProvider && (
             <span className="flex items-center gap-2">
-              <ProviderIcon name={currentProvider.icon as string} size={16} />
+              <ProviderIcon name={currentProvider.icon} size={16} />
               <span>{currentProvider.name}</span>
             </span>
           )}
@@ -50,7 +50,7 @@ export const ProviderPicker: FC = () => {
         {activeProviders.map((provider) => (
           <SelectItem key={provider.id} value={provider.id}>
             <span className="flex items-center gap-2">
-              <ProviderIcon name={provider.icon as string} size={16} />
+              <ProviderIcon name={provider.icon} size={16} />
               <span>{provider.name}</span>
             </span>
           </SelectItem>

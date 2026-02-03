@@ -105,7 +105,7 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
             className="h-9 w-[60px] text-center sm:h-8"
             title={`Enter a page number between 1 and ${totalPages}`}
           />
-          <span className="text-muted-foreground text-sm whitespace-nowrap">
+          <span className="text-muted-foreground whitespace-nowrap text-sm">
             <span className="hidden sm:inline">of</span>
             <span className="sm:hidden">/</span> {totalPages}
           </span>

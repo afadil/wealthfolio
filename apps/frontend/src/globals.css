@@ -736,7 +736,6 @@ number-flow-react.muted-fraction::part(fraction) {
   }
 }
 
-
 @utility animate-accordion-down {
   animation: accordion-down 0.2s ease-out;
 }

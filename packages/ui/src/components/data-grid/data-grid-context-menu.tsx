@@ -20,11 +20,7 @@ interface DataGridContextMenuProps<TData> {
   contextMenu: ContextMenuState;
 }
 
-export function DataGridContextMenu<TData>({
-  tableMeta,
-  columns,
-  contextMenu,
-}: DataGridContextMenuProps<TData>) {
+export function DataGridContextMenu<TData>({ tableMeta, columns, contextMenu }: DataGridContextMenuProps<TData>) {
   const onContextMenuOpenChange = tableMeta?.onContextMenuOpenChange;
   const selectionState = tableMeta?.selectionState;
   const dataGridRef = tableMeta?.dataGridRef;
@@ -52,7 +48,8 @@ export function DataGridContextMenu<TData>({
 }
 
 interface ContextMenuProps<TData>
-  extends Pick<
+  extends
+    Pick<
       TableMeta<TData>,
       | "dataGridRef"
       | "onContextMenuOpenChange"
@@ -110,15 +107,14 @@ function ContextMenuImpl<TData>({
     [contextMenu.x, contextMenu.y],
   );
 
-  const onCloseAutoFocus: NonNullable<
-    React.ComponentProps<typeof DropdownMenuContent>["onCloseAutoFocus"]
-  > = React.useCallback(
-    (event) => {
-      event.preventDefault();
-      dataGridRef?.current?.focus();
-    },
-    [dataGridRef],
-  );
+  const onCloseAutoFocus: NonNullable<React.ComponentProps<typeof DropdownMenuContent>["onCloseAutoFocus"]> =
+    React.useCallback(
+      (event) => {
+        event.preventDefault();
+        dataGridRef?.current?.focus();
+      },
+      [dataGridRef],
+    );
 
   const onCopy = React.useCallback(() => {
     onCellsCopy?.();
@@ -129,11 +125,7 @@ function ContextMenuImpl<TData>({
   }, [onCellsCut]);
 
   const onClear = React.useCallback(() => {
-    if (
-      !selectionState?.selectedCells ||
-      selectionState.selectedCells.size === 0
-    )
-      return;
+    if (!selectionState?.selectedCells || selectionState.selectedCells.size === 0) return;
 
     const updates: UpdateCell[] = [];
 
@@ -162,17 +154,11 @@ function ContextMenuImpl<TData>({
 
     onDataUpdate?.(updates);
 
-    toast.success(
-      `${updates.length} cell${updates.length !== 1 ? "s" : ""} cleared`,
-    );
+    toast.success(`${updates.length} cell${updates.length !== 1 ? "s" : ""} cleared`);
   }, [onDataUpdate, selectionState, columns]);
 
   const onDelete = React.useCallback(async () => {
-    if (
-      !selectionState?.selectedCells ||
-      selectionState.selectedCells.size === 0
-    )
-      return;
+    if (!selectionState?.selectedCells || selectionState.selectedCells.size === 0) return;
 
     const rowIndices = new Set<number>();
     for (const cellKey of selectionState.selectedCells) {
@@ -189,17 +175,9 @@ function ContextMenuImpl<TData>({
   }, [onRowsDelete, selectionState]);
 
   return (
-    <DropdownMenu
-      open={contextMenu.open}
-      onOpenChange={onContextMenuOpenChange}
-    >
+    <DropdownMenu open={contextMenu.open} onOpenChange={onContextMenuOpenChange}>
       <DropdownMenuTrigger style={triggerStyle} />
-      <DropdownMenuContent
-        data-grid-popover=""
-        align="start"
-        className="w-48"
-        onCloseAutoFocus={onCloseAutoFocus}
-      >
+      <DropdownMenuContent data-grid-popover="" align="start" className="w-48" onCloseAutoFocus={onCloseAutoFocus}>
         <DropdownMenuItem onSelect={onCopy}>
           <Icons.Copy />
           Copy

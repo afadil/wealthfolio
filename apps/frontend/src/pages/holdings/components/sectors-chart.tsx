@@ -36,7 +36,7 @@ export function SectorsChart({
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
+          <CardTitle className="text-muted-foreground text-sm font-medium uppercase tracking-wider">
             Sectors
           </CardTitle>
         </div>
@@ -84,7 +84,7 @@ export function SectorsChart({
                         <div className="bg-secondary relative h-5 flex-1 overflow-hidden rounded">
                           {/* Actual Progress Fill */}
                           <div
-                            className="absolute top-0 left-0 h-full rounded"
+                            className="absolute left-0 top-0 h-full rounded"
                             style={{
                               width: `${percent * 100}%`,
                               backgroundColor: `var(--chart-${(sectors.indexOf(sector) % 9) + 1})`,
@@ -95,14 +95,14 @@ export function SectorsChart({
                             <>
                               {/* Percentage INSIDE the fill, right-aligned, white text */}
                               <div
-                                className="text-background absolute top-0 left-0 flex h-full items-center justify-end pr-1 text-xs font-medium"
+                                className="text-background absolute left-0 top-0 flex h-full items-center justify-end pr-1 text-xs font-medium"
                                 style={{ width: `${percent * 100}%` }}
                               >
                                 <span className="whitespace-nowrap">{formatPercent(percent)}</span>
                               </div>
                               {/* Name OUTSIDE the fill, right-aligned, standard text color */}
                               <div
-                                className="text-foreground absolute top-0 flex h-full items-center justify-end pr-1 pl-1 text-xs font-medium"
+                                className="text-foreground absolute top-0 flex h-full items-center justify-end pl-1 pr-1 text-xs font-medium"
                                 style={{
                                   left: `${percent * 100}%`,
                                   right: "0",
@@ -122,10 +122,10 @@ export function SectorsChart({
                                 right: "0",
                               }}
                             >
-                              <span className="pl-1 whitespace-nowrap">
+                              <span className="whitespace-nowrap pl-1">
                                 {formatPercent(percent)}
                               </span>
-                              <span className="truncate pr-1 pl-1" title={sector.categoryName}>
+                              <span className="truncate pl-1 pr-1" title={sector.categoryName}>
                                 {sector.categoryName}
                               </span>
                             </div>

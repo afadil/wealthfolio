@@ -199,7 +199,7 @@ export default function AddonSettingsPage() {
                           <Icons.Refresh className="h-4 w-4" />
                         )}
                         {hasUpdates() && (
-                          <div className="bg-destructive absolute -top-1 -right-1 h-2 w-2 rounded-full" />
+                          <div className="bg-destructive absolute -right-1 -top-1 h-2 w-2 rounded-full" />
                         )}
                       </Button>
                     </div>

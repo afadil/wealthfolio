@@ -89,7 +89,7 @@ const SearchResults = memo(
         {/* No results message */}
         {showNoResults && (
           <div className="text-muted-foreground px-2 py-3 text-center text-sm">
-            No matches found for "{query}"
+            No matches found for &quot;{query}&quot;
           </div>
         )}
 
@@ -373,7 +373,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
           <PopoverContent
             side="bottom"
             align="start"
-            className="h-auto w-(--radix-popover-trigger-width) min-w-[280px] p-0"
+            className="w-(--radix-popover-trigger-width) h-auto min-w-[280px] p-0"
             onOpenAutoFocus={handleOpenAutoFocus}
             onCloseAutoFocus={handleCloseAutoFocus}
           >

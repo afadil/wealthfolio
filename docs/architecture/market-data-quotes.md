@@ -2,7 +2,9 @@
 
 ## Overview
 
-The market data system is responsible for fetching, storing, and managing financial quotes from external providers. It follows a layered architecture with clear separation between:
+The market data system is responsible for fetching, storing, and managing
+financial quotes from external providers. It follows a layered architecture with
+clear separation between:
 
 - **Provider Layer** (`market-data` crate) - External API integrations
 - **Client Layer** (`core/quotes`) - Domain logic and orchestration
@@ -46,7 +48,8 @@ The market data system is responsible for fetching, storing, and managing financ
 
 ### `crates/market-data/` - Provider Integration Layer
 
-Low-level crate for market data provider integrations. No knowledge of the application domain (assets, portfolios).
+Low-level crate for market data provider integrations. No knowledge of the
+application domain (assets, portfolios).
 
 ```
 market-data/
@@ -131,13 +134,13 @@ The core abstraction for external data sources.
 
 Each provider declares what it supports:
 
-| Provider | Equities | Crypto | Forex | Metals | Search | Profiles | Historical |
-|----------|----------|--------|-------|--------|--------|----------|------------|
-| Yahoo | Global | Yes | Yes | Yes | Yes | Yes | Yes |
-| Alpha Vantage | Global | Yes | Yes | No | No | Yes | Yes |
-| MarketData.app | US only | No | No | No | No | No | Yes |
-| Metal Price API | No | No | No | Yes | No | No | No |
-| Finnhub | US/EU | No | No | No | Yes | Yes | Yes |
+| Provider        | Equities | Crypto | Forex | Metals | Search | Profiles | Historical |
+| --------------- | -------- | ------ | ----- | ------ | ------ | -------- | ---------- |
+| Yahoo           | Global   | Yes    | Yes   | Yes    | Yes    | Yes      | Yes        |
+| Alpha Vantage   | Global   | Yes    | Yes   | No     | No     | Yes      | Yes        |
+| MarketData.app  | US only  | No     | No    | No     | No     | No       | Yes        |
+| Metal Price API | No       | No     | No    | Yes    | No     | No       | No         |
+| Finnhub         | US/EU    | No     | No    | No     | Yes    | Yes      | Yes        |
 
 ### 2. ProviderRegistry
 
@@ -220,12 +223,12 @@ Translates canonical instrument identifiers to provider-specific formats.
 
 **InstrumentId Variants:**
 
-| Variant | Fields | Example |
-|---------|--------|---------|
+| Variant  | Fields                 | Example                         |
+| -------- | ---------------------- | ------------------------------- |
 | `Equity` | ticker, mic (optional) | `{ticker: "AAPL", mic: "XNAS"}` |
-| `Crypto` | base, quote | `{base: "BTC", quote: "USD"}` |
-| `Fx` | base, quote | `{base: "EUR", quote: "USD"}` |
-| `Metal` | code, quote | `{code: "XAU", quote: "USD"}` |
+| `Crypto` | base, quote            | `{base: "BTC", quote: "USD"}`   |
+| `Fx`     | base, quote            | `{base: "EUR", quote: "USD"}`   |
+| `Metal`  | code, quote            | `{code: "XAU", quote: "USD"}`   |
 
 ### 4. Circuit Breaker
 
@@ -254,6 +257,7 @@ Protects against failing providers.
 ```
 
 **States:**
+
 - **CLOSED**: Normal operation, requests pass through
 - **OPEN**: Provider disabled, requests fail fast
 - **HALF-OPEN**: Testing if provider recovered
@@ -359,12 +363,12 @@ Manages quote synchronization for portfolio assets.
 
 **Sync Categories:**
 
-| Category | Description | Sync Behavior |
-|----------|-------------|---------------|
-| `Active` | Has open position | Sync from first activity to today |
-| `Closed` | Position closed recently | Sync during grace period |
-| `Dormant` | Position closed long ago | No sync needed |
-| `FxRate` | Currency pair | Sync when activities exist in that currency |
+| Category  | Description              | Sync Behavior                               |
+| --------- | ------------------------ | ------------------------------------------- |
+| `Active`  | Has open position        | Sync from first activity to today           |
+| `Closed`  | Position closed recently | Sync during grace period                    |
+| `Dormant` | Position closed long ago | No sync needed                              |
+| `FxRate`  | Currency pair            | Sync when activities exist in that currency |
 
 ### 8. MarketDataClient
 
@@ -444,13 +448,13 @@ Bridge between core domain and market-data crate.
 
 The system uses newtype patterns for type safety:
 
-| Type | Underlying | Purpose |
-|------|------------|---------|
-| `AssetId` | `String` | Internal asset identifier |
-| `Day` | `NaiveDate` | UTC date bucket for quotes |
-| `ProviderId` | `String` | Provider identifier |
-| `QuoteSource` | enum | Manual or Provider(ProviderId) |
-| `Currency` | `Cow<str>` | ISO 4217 currency code |
+| Type          | Underlying  | Purpose                        |
+| ------------- | ----------- | ------------------------------ |
+| `AssetId`     | `String`    | Internal asset identifier      |
+| `Day`         | `NaiveDate` | UTC date bucket for quotes     |
+| `ProviderId`  | `String`    | Provider identifier            |
+| `QuoteSource` | enum        | Manual or Provider(ProviderId) |
+| `Currency`    | `Cow<str>`  | ISO 4217 currency code         |
 
 ---
 
@@ -830,13 +834,13 @@ Total required coverage: first_activity - 52 days (45 + 7)
 
 **Why these values:**
 
-| Constant | Value | Rationale |
-|----------|-------|-----------|
-| `QUOTE_HISTORY_BUFFER_DAYS` | 45 | Accounts for ~8-9 weekend days + holidays per month. Ensures ~20 trading days of data before first activity. |
-| `BACKFILL_SAFETY_MARGIN_DAYS` | 7 | Extra cushion for backfill detection. Prevents edge cases where quotes barely cover the needed range. |
-| `MIN_SYNC_LOOKBACK_DAYS` | 5 | When syncing active positions, look back at least 5 days to handle weekends/holidays. |
-| `QUOTE_LOOKBACK_DAYS` | 14 | Gap-filling operations look back 14 days to find last known quote. |
-| `CLOSED_POSITION_GRACE_PERIOD` | 30 | Continue syncing for 30 days after position closes (for late dividends, etc.). |
+| Constant                       | Value | Rationale                                                                                                    |
+| ------------------------------ | ----- | ------------------------------------------------------------------------------------------------------------ |
+| `QUOTE_HISTORY_BUFFER_DAYS`    | 45    | Accounts for ~8-9 weekend days + holidays per month. Ensures ~20 trading days of data before first activity. |
+| `BACKFILL_SAFETY_MARGIN_DAYS`  | 7     | Extra cushion for backfill detection. Prevents edge cases where quotes barely cover the needed range.        |
+| `MIN_SYNC_LOOKBACK_DAYS`       | 5     | When syncing active positions, look back at least 5 days to handle weekends/holidays.                        |
+| `QUOTE_LOOKBACK_DAYS`          | 14    | Gap-filling operations look back 14 days to find last known quote.                                           |
+| `CLOSED_POSITION_GRACE_PERIOD` | 30    | Continue syncing for 30 days after position closes (for late dividends, etc.).                               |
 
 ---
 
@@ -927,13 +931,13 @@ Closed within grace period?
 
 Each category calculates its fetch range differently:
 
-| Category | Start Date | End Date |
-|----------|------------|----------|
-| `New` | `first_activity - 45 days` | today |
-| `NeedsBackfill` | `first_activity - 45 days` | `earliest_quote` |
-| `Active` | `last_quote + 1 day` | today |
-| `RecentlyClosed` | `last_quote + 1 day` | today |
-| `Closed` | (no fetch) | (no fetch) |
+| Category         | Start Date                 | End Date         |
+| ---------------- | -------------------------- | ---------------- |
+| `New`            | `first_activity - 45 days` | today            |
+| `NeedsBackfill`  | `first_activity - 45 days` | `earliest_quote` |
+| `Active`         | `last_quote + 1 day`       | today            |
+| `RecentlyClosed` | `last_quote + 1 day`       | today            |
+| `Closed`         | (no fetch)                 | (no fetch)       |
 
 ### State Refresh Process
 
@@ -977,6 +981,7 @@ If earliest_quote_date is NULL:
 ```
 
 **Example:**
+
 ```
 Asset: TSLA
 first_activity_date: 2025-11-07
@@ -998,6 +1003,7 @@ System will fetch quotes from 2025-09-16 to 2026-01-05
 **Decision:** Separate `market-data` crate from `core` crate.
 
 **Rationale:**
+
 - `market-data` has no knowledge of application domain (assets, portfolios)
 - Can be reused in other projects
 - Clear API boundary enforces separation of concerns
@@ -1008,6 +1014,7 @@ System will fetch quotes from 2025-09-16 to 2026-01-05
 **Decision:** Centralized registry orchestrates all provider interactions.
 
 **Rationale:**
+
 - Single point for cross-cutting concerns (rate limiting, circuit breaking)
 - Consistent provider selection logic
 - Easy to add new providers
@@ -1018,6 +1025,7 @@ System will fetch quotes from 2025-09-16 to 2026-01-05
 **Decision:** Separate symbol resolution from provider implementation.
 
 **Rationale:**
+
 - Providers don't need to know about other providers' formats
 - Rules can be updated without changing providers
 - Supports provider-specific overrides in assets
@@ -1028,6 +1036,7 @@ System will fetch quotes from 2025-09-16 to 2026-01-05
 **Decision:** Preserve error types across crate boundaries.
 
 **Rationale:**
+
 - Higher layers can make informed retry decisions
 - Better error messages for users
 - Enables smart fallback behavior
@@ -1038,6 +1047,7 @@ System will fetch quotes from 2025-09-16 to 2026-01-05
 **Decision:** Sort quotes by timestamp after fetching.
 
 **Rationale:**
+
 - Providers don't guarantee order
 - Sync logic relies on first()/last() for date ranges
 - Small overhead for correctness guarantee
@@ -1048,6 +1058,7 @@ System will fetch quotes from 2025-09-16 to 2026-01-05
 **Decision:** Allow users to override provider priority.
 
 **Rationale:**
+
 - Different users have different provider preferences
 - Some users have paid API keys for specific providers
 - Regional differences (US vs international markets)

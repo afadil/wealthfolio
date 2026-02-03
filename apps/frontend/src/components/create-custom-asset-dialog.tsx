@@ -129,7 +129,8 @@ export function CreateCustomAssetDialog({
         <DialogHeader>
           <DialogTitle>Create Custom Asset</DialogTitle>
           <DialogDescription>
-            You'll maintain prices manually, or map to a market ticker later for automatic updates.
+            You&apos;ll maintain prices manually, or map to a market ticker later for automatic
+            updates.
           </DialogDescription>
         </DialogHeader>
 

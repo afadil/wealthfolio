@@ -78,15 +78,15 @@ crates/
 
 ## Run Targets
 
-| Task | Command |
-|------|---------|
-| Desktop dev | `pnpm tauri dev` |
-| Web dev | `pnpm run dev:web` |
-| Tests (TS) | `pnpm test` |
-| Tests (Rust) | `cargo test` |
-| Type check | `pnpm type-check` |
-| Lint | `pnpm lint` |
-| All checks | `pnpm check` |
+| Task         | Command            |
+| ------------ | ------------------ |
+| Desktop dev  | `pnpm tauri dev`   |
+| Web dev      | `pnpm run dev:web` |
+| Tests (TS)   | `pnpm test`        |
+| Tests (Rust) | `cargo test`       |
+| Type check   | `pnpm type-check`  |
+| Lint         | `pnpm lint`        |
+| All checks   | `pnpm check`       |
 
 ---
 
@@ -95,8 +95,10 @@ crates/
 ### Adding a feature with backend data
 
 1. **Frontend route/UI** → `src-front/pages/`, `src-front/routes.tsx`
-2. **Command wrapper** → `src-front/commands/<domain>.ts` (follow `RUN_ENV` pattern)
-3. **Tauri command** → `src-tauri/src/commands/*.rs`, wire in `mod.rs` + `lib.rs`
+2. **Command wrapper** → `src-front/commands/<domain>.ts` (follow `RUN_ENV`
+   pattern)
+3. **Tauri command** → `src-tauri/src/commands/*.rs`, wire in `mod.rs` +
+   `lib.rs`
 4. **Web endpoint** → `src-server/src/api/`, call `crates/core` service
 5. **Core logic** → `crates/core/` services/repos
 6. **Tests** → Vitest for TS, `#[test]` for Rust
@@ -124,18 +126,21 @@ Frontend → Adapter (tauri/web) → Command wrapper
 ## Conventions
 
 ### TypeScript
+
 - Strict mode, no unused locals/params
 - Prefer interfaces over types, avoid enums
 - Functional components, named exports
 - Directory names: lowercase-with-dashes
 
 ### Rust
+
 - Idiomatic Rust, small focused functions
 - `Result`/`Option`, propagate with `?`, `thiserror` for domain errors
 - Keep Tauri/Axum commands thin—delegate to `crates/core`
 - Migrations in `crates/storage-sqlite/migrations`
 
 ### Security
+
 - All data local (SQLite), no cloud
 - Secrets via OS keyring—never disk/localStorage
 - Never log secrets or financial data

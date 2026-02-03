@@ -120,18 +120,18 @@ export function DatePickerInput({
       <Group
         className={cn(
           "dark:bg-input/30 border-input ring-offset-background bg-input-bg h-input-height flex w-full items-center rounded-md border px-3 py-1 text-sm",
-          "focus-within:ring-ring focus-within:ring-2 focus-within:ring-offset-2 focus-within:outline-none",
+          "focus-within:ring-ring focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2",
           disabled && "cursor-not-allowed opacity-50",
         )}
         data-testid={testId}
       >
         <DateInput
           unstyled
-          className="flex-1 border-none bg-transparent ring-0 outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+          className="flex-1 border-none bg-transparent outline-none ring-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
         />
         <Button
           className={cn(
-            "text-muted-foreground/80 hover:text-foreground focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
+            "text-muted-foreground/80 hover:text-foreground focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
             "flex h-6 w-6 items-center justify-center rounded-sm transition-[color]",
             disabled && "pointer-events-none",
           )}
@@ -141,7 +141,7 @@ export function DatePickerInput({
         </Button>
       </Group>
       <Popover
-        className="bg-background text-popover-foreground data-entering:animate-in data-exiting:animate-out data-entering:fade-in-0 data-exiting:fade-out-0 data-entering:zoom-in-95 data-exiting:zoom-out-95 data-[placement=bottom]:slide-in-from-top-2 data-[placement=left]:slide-in-from-right-2 data-[placement=right]:slide-in-from-left-2 data-[placement=top]:slide-in-from-bottom-2 z-50 rounded-lg border shadow-lg outline-hidden"
+        className="bg-background text-popover-foreground data-entering:animate-in data-exiting:animate-out data-entering:fade-in-0 data-exiting:fade-out-0 data-entering:zoom-in-95 data-exiting:zoom-out-95 data-[placement=bottom]:slide-in-from-top-2 data-[placement=left]:slide-in-from-right-2 data-[placement=right]:slide-in-from-left-2 data-[placement=top]:slide-in-from-bottom-2 outline-hidden z-50 rounded-lg border shadow-lg"
         offset={4}
         onOpenChange={(isOpen: boolean) => {
           if (!isOpen && onInteractionEnd) {

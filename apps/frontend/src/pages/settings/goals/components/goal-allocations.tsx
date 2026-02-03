@@ -86,13 +86,13 @@ const GoalsAllocations: React.FC<GoalsAllocationsProps> = ({
               ))}
             </tr>
             <tr>
-              <td className="bg-muted text-muted-foreground sticky left-0 z-10 border-t border-r px-4 py-2 text-xs">
+              <td className="bg-muted text-muted-foreground sticky left-0 z-10 border-r border-t px-4 py-2 text-xs">
                 Total
               </td>
               {accounts.map((account) => (
                 <td
                   key={account.id}
-                  className={`text-muted-foreground border-t border-l px-4 py-2 text-right text-xs ${
+                  className={`text-muted-foreground border-l border-t px-4 py-2 text-right text-xs ${
                     totalAllocations[account.id] > 100 ? "text-destructive" : ""
                   }`}
                 >

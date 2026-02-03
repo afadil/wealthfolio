@@ -44,7 +44,7 @@ export function MappingHeaderCell({
 
   return (
     <div>
-      <div className="flex items-center gap-2 pt-2 pb-0">
+      <div className="flex items-center gap-2 pb-0 pt-2">
         <span className="font-bold">
           {field}
           {isRequired && !isMapped && (
@@ -200,7 +200,7 @@ function ActivityTypeDisplayCell({
       <Badge
         variant="destructive"
         title={trimmedCsvType}
-        className="shrink-0 text-xs whitespace-nowrap"
+        className="shrink-0 whitespace-nowrap text-xs"
       >
         {displayValue}
       </Badge>

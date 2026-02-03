@@ -16,15 +16,17 @@ class ServerEventBridge {
 
   constructor(private readonly url: string) {}
 
-  async listen<T>(eventName: string, handler: EventCallback<T>): Promise<UnlistenFn> {
+  listen<T>(eventName: string, handler: EventCallback<T>): Promise<UnlistenFn> {
     if (typeof window === "undefined" || typeof EventSource === "undefined") {
-      throw new Error("EventSource is not available in this environment.");
+      return Promise.reject(new Error("EventSource is not available in this environment."));
     }
     this.ensureConnection();
     this.addListener(eventName, handler as EventCallback<unknown>);
-    return async () => {
+    const unlisten: UnlistenFn = () => {
       this.removeListener(eventName, handler as EventCallback<unknown>);
+      return Promise.resolve();
     };
+    return Promise.resolve(unlisten);
   }
 
   private ensureConnection() {
@@ -128,74 +130,64 @@ const portfolioEventBridge = new ServerEventBridge(EVENTS_ENDPOINT);
 // Event Listeners
 // ============================================================================
 
-export const listenPortfolioUpdateStart = async <T>(
-  handler: EventCallback<T>,
-): Promise<UnlistenFn> => {
+export const listenPortfolioUpdateStart = <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
   return portfolioEventBridge.listen("portfolio:update-start", handler);
 };
 
-export const listenPortfolioUpdateComplete = async <T>(
+export const listenPortfolioUpdateComplete = <T>(
   handler: EventCallback<T>,
 ): Promise<UnlistenFn> => {
   return portfolioEventBridge.listen("portfolio:update-complete", handler);
 };
 
-export const listenPortfolioUpdateError = async <T>(
-  handler: EventCallback<T>,
-): Promise<UnlistenFn> => {
+export const listenPortfolioUpdateError = <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
   return portfolioEventBridge.listen("portfolio:update-error", handler);
 };
 
-export const listenMarketSyncStart = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
+export const listenMarketSyncStart = <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
   return portfolioEventBridge.listen("market:sync-start", handler);
 };
 
-export const listenMarketSyncComplete = async <T>(
-  handler: EventCallback<T>,
-): Promise<UnlistenFn> => {
+export const listenMarketSyncComplete = <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
   return portfolioEventBridge.listen("market:sync-complete", handler);
 };
 
 // Desktop-only features - no-op in web
-export const listenFileDropHover = async <T>(_handler: EventCallback<T>): Promise<UnlistenFn> => {
-  return async () => {};
+const noopUnlisten: UnlistenFn = () => Promise.resolve();
+
+export const listenFileDropHover = <T>(_handler: EventCallback<T>): Promise<UnlistenFn> => {
+  return Promise.resolve(noopUnlisten);
 };
 
-export const listenFileDrop = async <T>(_handler: EventCallback<T>): Promise<UnlistenFn> => {
-  return async () => {};
+export const listenFileDrop = <T>(_handler: EventCallback<T>): Promise<UnlistenFn> => {
+  return Promise.resolve(noopUnlisten);
 };
 
-export const listenFileDropCancelled = async <T>(
-  _handler: EventCallback<T>,
-): Promise<UnlistenFn> => {
-  return async () => {};
+export const listenFileDropCancelled = <T>(_handler: EventCallback<T>): Promise<UnlistenFn> => {
+  return Promise.resolve(noopUnlisten);
 };
 
-export const listenDatabaseRestored = async <T>(
-  _handler: EventCallback<T>,
-): Promise<UnlistenFn> => {
-  return async () => {};
+export const listenDatabaseRestored = <T>(_handler: EventCallback<T>): Promise<UnlistenFn> => {
+  return Promise.resolve(noopUnlisten);
 };
 
-export const listenNavigateToRoute = async <T>(_handler: EventCallback<T>): Promise<UnlistenFn> => {
-  return async () => {};
+export const listenNavigateToRoute = <T>(_handler: EventCallback<T>): Promise<UnlistenFn> => {
+  return Promise.resolve(noopUnlisten);
 };
 
-export const listenDeepLink = async <T>(_handler: EventCallback<T>): Promise<UnlistenFn> => {
-  return async () => {};
+export const listenDeepLink = <T>(_handler: EventCallback<T>): Promise<UnlistenFn> => {
+  return Promise.resolve(noopUnlisten);
 };
 
 // Broker sync events
-export const listenBrokerSyncStart = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
+export const listenBrokerSyncStart = <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
   return portfolioEventBridge.listen("broker:sync-start", handler);
 };
 
-export const listenBrokerSyncComplete = async <T>(
-  handler: EventCallback<T>,
-): Promise<UnlistenFn> => {
+export const listenBrokerSyncComplete = <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
   return portfolioEventBridge.listen("broker:sync-complete", handler);
 };
 
-export const listenBrokerSyncError = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
+export const listenBrokerSyncError = <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
   return portfolioEventBridge.listen("broker:sync-error", handler);
 };

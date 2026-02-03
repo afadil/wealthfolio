@@ -367,7 +367,7 @@ export function ProviderSettingsCard({
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="absolute top-0 right-0 h-full w-9 hover:bg-transparent"
+                        className="absolute right-0 top-0 h-full w-9 hover:bg-transparent"
                         onClick={handleRevealApiKey}
                         disabled={isLoadingKey}
                         aria-label={showApiKey ? "Hide API key" : "Show API key"}
@@ -514,7 +514,7 @@ export function ProviderSettingsCard({
                     <div className="bg-background rounded-md border">
                       {enabledModels.length === 0 ? (
                         <div className="text-muted-foreground flex items-center justify-center py-6 text-sm">
-                          No models selected. Click "Add" to add models.
+                          No models selected. Click &quot;Add&quot; to add models.
                         </div>
                       ) : (
                         <div className="divide-y">

@@ -53,7 +53,7 @@ export function SwipableView({
   const [scrollSnaps, setScrollSnaps] = React.useState<number[]>([]);
   const previousIndexRef = React.useRef<number>(initialIndex);
 
-  const scrollTo = React.useCallback((index: number) => emblaApi && emblaApi.scrollTo(index), [emblaApi]);
+  const scrollTo = React.useCallback((index: number) => emblaApi?.scrollTo(index), [emblaApi]);
 
   const onSelect = React.useCallback(
     (api: CarouselApi) => {
@@ -138,7 +138,7 @@ export function SwipableView({
                   onClick={() => scrollTo(index)}
                   className={cn(
                     "size-2 rounded-full transition-all duration-300",
-                    "focus-visible:ring-ring hover:scale-110 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
+                    "focus-visible:ring-ring hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
                     "bg-foreground/20 hover:bg-foreground/40",
                     dotClassName,
                   )}
@@ -166,7 +166,7 @@ export function SwipableView({
                  2. This ensures the Header stays fixed while content scrolls.
                  3. touch-pan-y allows vertical scrolling while horizontal swipes trigger the carousel.
                */}
-              <div className="h-full w-full overflow-x-hidden overflow-y-auto">
+              <div className="h-full w-full overflow-y-auto overflow-x-hidden">
                 {shouldRender(index) ? (
                   item.content
                 ) : (

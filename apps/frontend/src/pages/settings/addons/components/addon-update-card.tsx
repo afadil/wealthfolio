@@ -142,7 +142,7 @@ export function AddonUpdateCard({
                     {updateInfo.releaseNotes && (
                       <div className="space-y-2">
                         <h4 className="font-medium">Release Notes</h4>
-                        <div className="text-muted-foreground text-sm whitespace-pre-wrap">
+                        <div className="text-muted-foreground whitespace-pre-wrap text-sm">
                           {updateInfo.releaseNotes}
                         </div>
                       </div>

@@ -85,9 +85,9 @@ export const AccountSelectionStep = ({
     let isValid = true;
 
     if (Array.isArray(errors)) {
-      isValid = !errors.some((error) => error && error.row === index);
+      isValid = !errors.some((error) => error?.row === index);
       rowErrors = errors
-        .filter((error) => error && error.row === index)
+        .filter((error) => error?.row === index)
         .map((error) => error.message || "");
     } else if (errors && typeof errors === "object") {
       isValid = !errors[index] || errors[index].length === 0;

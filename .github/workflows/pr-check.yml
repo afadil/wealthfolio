@@ -74,7 +74,9 @@ jobs:
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev
 
       - name: Create dist folder for Tauri context
-        run: mkdir -p dist && echo '<!DOCTYPE html><html><head></head><body></body></html>' > dist/index.html
+        run:
+          mkdir -p dist && echo '<!DOCTYPE html><html><head></head><body></body></html>' >
+          dist/index.html
 
       - name: Check formatting
         run: cargo fmt --all -- --check

@@ -35,7 +35,7 @@ export function QuoteImportForm({
     setIsDragging(false);
 
     const droppedFile = event.dataTransfer.files?.[0];
-    if (droppedFile && droppedFile.type === "text/csv") {
+    if (droppedFile?.type === "text/csv") {
       onFileSelect(droppedFile);
     }
   };

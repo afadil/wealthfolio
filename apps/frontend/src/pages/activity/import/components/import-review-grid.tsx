@@ -691,7 +691,7 @@ export function ImportReviewGrid({
     enableSearch: false,
     enablePaste: true,
     onDataChange: handleDataChange,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     meta: {
       getCellState,
     } as any,

@@ -205,8 +205,8 @@ export function SubscriptionPlans({
             </div>
             <h3 className="text-foreground mb-2 text-base font-medium">Connection Issue</h3>
             <p className="text-muted-foreground mb-4 max-w-sm text-sm">
-              We're having trouble connecting to your account. This can happen if your session has
-              expired.{" "}
+              We&apos;re having trouble connecting to your account. This can happen if your session
+              has expired.{" "}
               <Popover>
                 <PopoverTrigger asChild>
                   <button className="text-muted-foreground hover:text-foreground underline underline-offset-2">
@@ -267,7 +267,8 @@ export function SubscriptionPlans({
             </div>
             <h3 className="text-foreground mb-2 text-base font-medium">Unable to Load Plans</h3>
             <p className="text-muted-foreground mb-4 max-w-sm text-sm">
-              We couldn't retrieve subscription plans right now. This is usually a temporary issue.{" "}
+              We couldn&apos;t retrieve subscription plans right now. This is usually a temporary
+              issue.{" "}
               <Popover>
                 <PopoverTrigger asChild>
                   <button className="text-muted-foreground hover:text-foreground underline underline-offset-2">

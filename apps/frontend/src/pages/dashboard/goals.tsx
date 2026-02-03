@@ -78,7 +78,7 @@ export function SavingGoals() {
     return (
       <div className="flex flex-wrap gap-4 pb-4">
         <h2 className="text-md font-semibold">Saving Goals</h2>
-        <Card className="border-border/50 bg-success/10 w-full shadow-xs">
+        <Card className="border-border/50 bg-success/10 shadow-xs w-full">
           <CardContent className="px-4 py-6">
             <div className="text-center">
               <p className="text-sm">No saving goals set.</p>
@@ -99,7 +99,7 @@ export function SavingGoals() {
   return (
     <div className="flex flex-wrap gap-4 pb-4">
       <h2 className="text-md font-semibold">Saving Goals</h2>
-      <Card className="w-full shadow-xs">
+      <Card className="shadow-xs w-full">
         <CardContent className="bg-transparent px-4 pt-6">
           {[...goals]
             .sort((a, b) => a.targetAmount - b.targetAmount)

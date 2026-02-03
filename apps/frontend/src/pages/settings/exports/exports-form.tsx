@@ -107,7 +107,7 @@ export const ExportForm = () => {
   return (
     <>
       <div className="mt-8 px-2">
-        <h3 className="pt-5 pb-3 font-semibold">Choose Your Preferred Format</h3>
+        <h3 className="pb-3 pt-5 font-semibold">Choose Your Preferred Format</h3>
         <RadioGroup
           onValueChange={setSelectedFormat}
           className="grid grid-cols-1 gap-4 md:grid-cols-3"
@@ -132,7 +132,7 @@ export const ExportForm = () => {
 
       {selectedFormat && (
         <div className="px-2 pt-4">
-          <h3 className="pt-5 pb-3 font-semibold">Customize Your Export</h3>
+          <h3 className="pb-3 pt-5 font-semibold">Customize Your Export</h3>
           {dataTypes[selectedFormat as keyof typeof dataTypes].map((item) => (
             <Card key={item.key} className="mb-4">
               <CardContent className="flex items-center justify-between p-4">

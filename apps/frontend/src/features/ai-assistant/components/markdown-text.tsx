@@ -113,7 +113,7 @@ const customComponents = memoizeMarkdownComponents({
   pre: ({ className, ...props }) => (
     <pre
       className={cn(
-        "aui-md-pre not-prose overflow-x-auto rounded-t-none rounded-b-lg bg-black p-4 text-sm text-white",
+        "aui-md-pre not-prose overflow-x-auto rounded-b-lg rounded-t-none bg-black p-4 text-sm text-white",
         className,
       )}
       {...props}

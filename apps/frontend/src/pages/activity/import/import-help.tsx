@@ -89,7 +89,7 @@ export function ImportHelpPopover() {
     <div className="space-y-4">
       <div>
         <p className="font-semibold">Example CSV format:</p>
-        <pre className="bg-muted mt-2 overflow-x-auto p-3 text-xs leading-relaxed select-all">
+        <pre className="bg-muted mt-2 select-all overflow-x-auto p-3 text-xs leading-relaxed">
           <span className="text-muted-foreground"># Standard format:</span>
           <br />
           date,symbol,quantity,activityType,unitPrice,currency,fee,amount,fxRate,subtype
@@ -152,7 +152,7 @@ export function ImportHelpPopover() {
             <Icons.HelpCircle className="h-6 w-6" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="bottom" className="mx-1 h-[85vh] rounded-t-4xl">
+        <SheetContent side="bottom" className="rounded-t-4xl mx-1 h-[85vh]">
           <SheetHeader>
             <SheetTitle>How to Import CSV</SheetTitle>
           </SheetHeader>

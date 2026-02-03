@@ -235,7 +235,9 @@ export function getEffectiveType(activity: Activity): string {
  * Check if activity has user override
  */
 export function hasUserOverride(activity: Activity): boolean {
-  return activity.activityTypeOverride !== undefined && activity.activityTypeOverride !== null;
+  return (
+    activity.activityTypeOverride !== undefined && activity.activityTypeOverride !== null
+  );
 }
 
 export interface ActivityDetails {
@@ -788,7 +790,12 @@ export interface TrackedItem {
 
 export type ImportRunType = 'SYNC' | 'IMPORT';
 export type ImportRunMode = 'INITIAL' | 'INCREMENTAL' | 'BACKFILL' | 'REPAIR';
-export type ImportRunStatus = 'RUNNING' | 'APPLIED' | 'NEEDS_REVIEW' | 'FAILED' | 'CANCELLED';
+export type ImportRunStatus =
+  | 'RUNNING'
+  | 'APPLIED'
+  | 'NEEDS_REVIEW'
+  | 'FAILED'
+  | 'CANCELLED';
 export type ReviewMode = 'NEVER' | 'ALWAYS' | 'IF_WARNINGS';
 
 export interface ImportRunSummary {

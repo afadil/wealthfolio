@@ -50,7 +50,7 @@ export function RecoveryDialog({ open, onOpenChange }: RecoveryDialogProps) {
               portal.
             </p>
             <p>
-              You'll need to re-enable device sync and pair with a trusted device to continue
+              You&apos;ll need to re-enable device sync and pair with a trusted device to continue
               syncing your data.
             </p>
           </AlertDialogDescription>

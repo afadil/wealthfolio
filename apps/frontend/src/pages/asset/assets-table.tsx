@@ -26,7 +26,7 @@ import {
 } from "@wealthfolio/ui/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 
-import { ASSET_KIND_DISPLAY_NAMES, AssetKind } from "@/lib/types";
+import { ASSET_KIND_DISPLAY_NAMES } from "@/lib/types";
 import { Quote } from "@/lib/types";
 import { formatAmount, formatDate } from "@/lib/utils";
 import { ParsedAsset } from "./asset-utils";
@@ -98,7 +98,7 @@ export function AssetsTable({
             >
               <TickerAvatar symbol={asset.symbol} className="h-8 w-8 shrink-0" />
               <div className="min-w-0 flex-1">
-                <div className="group-hover:text-primary leading-tight font-semibold transition-colors">
+                <div className="group-hover:text-primary font-semibold leading-tight transition-colors">
                   {displaySymbol}
                 </div>
                 <div className="text-muted-foreground line-clamp-2 text-xs leading-tight">
@@ -296,7 +296,7 @@ export function AssetsTable({
   const kindOptions = useMemo(() => {
     const kinds = new Set(assets.map((asset) => asset.kind).filter(Boolean));
     return Array.from(kinds).map((kind) => ({
-      label: ASSET_KIND_DISPLAY_NAMES[kind as AssetKind] ?? kind,
+      label: ASSET_KIND_DISPLAY_NAMES[kind] ?? kind,
       value: kind,
     }));
   }, [assets]);

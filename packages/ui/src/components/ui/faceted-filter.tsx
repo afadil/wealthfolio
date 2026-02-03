@@ -26,12 +26,7 @@ export interface FacetedFilterProps {
   onFilterChange: (values: Set<string>) => void;
 }
 
-export function FacetedFilter({
-  title,
-  options,
-  selectedValues,
-  onFilterChange,
-}: FacetedFilterProps) {
+export function FacetedFilter({ title, options, selectedValues, onFilterChange }: FacetedFilterProps) {
   return (
     <Popover>
       <PopoverTrigger asChild>

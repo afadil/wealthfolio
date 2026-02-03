@@ -214,7 +214,7 @@ export interface SearchState {
 }
 
 export interface CellValidationState {
-  type: 'error' | 'warning';
+  type: "error" | "warning";
   messages: string[];
 }
 

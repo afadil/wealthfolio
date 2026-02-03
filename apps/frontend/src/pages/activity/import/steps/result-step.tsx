@@ -152,7 +152,7 @@ export const ResultStep = ({ activities, accounts, onBack, onReset }: ResultStep
       ) : (
         <motion.div variants={cardVariants}>
           <Card className="bg-success/5 border-success/20 mx-auto w-full max-w-lg">
-            <CardContent className="flex flex-col items-center space-y-5 pt-8 pb-10 text-center">
+            <CardContent className="flex flex-col items-center space-y-5 pb-10 pt-8 text-center">
               <motion.div
                 className="bg-success/10 ring-success/20 rounded-full p-4 ring-4"
                 variants={iconContainerVariants}

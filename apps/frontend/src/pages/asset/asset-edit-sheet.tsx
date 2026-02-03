@@ -171,8 +171,8 @@ function PricingModeToggle({
               {isAutomatic ? (
                 <>
                   <p className="text-muted-foreground text-sm">
-                    Turning this off will stop automatic price updates. You'll need to enter and
-                    maintain price data yourself.
+                    Turning this off will stop automatic price updates. You&apos;ll need to enter
+                    and maintain price data yourself.
                   </p>
                   <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
                     Automatic price updates will be disabled.
@@ -568,8 +568,8 @@ export function AssetEditSheet({
                           <div>
                             <label className="text-sm font-medium">Symbol Mapping</label>
                             <p className="text-muted-foreground text-xs">
-                              Use a different ticker for specific providers if the default doesn't
-                              work.
+                              Use a different ticker for specific providers if the default
+                              doesn&apos;t work.
                             </p>
                           </div>
                           <Button
@@ -590,7 +590,7 @@ export function AssetEditSheet({
                               No symbol mappings configured
                             </p>
                             <p className="text-muted-foreground text-xs">
-                              Using "{asset.symbol}" for all providers.
+                              Using &quot;{asset.symbol}&quot; for all providers.
                             </p>
                           </div>
                         ) : (

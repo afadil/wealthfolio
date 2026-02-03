@@ -189,7 +189,7 @@ export function SwipableRoutesPage({
                   {isActive ? (
                     /* Current View Label */
                     <div
-                      className="bg-muted/80 text-foreground rounded-full px-4 py-1.5 text-sm font-medium whitespace-nowrap shadow-sm backdrop-blur-sm transition-all duration-300"
+                      className="bg-muted/80 text-foreground whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium shadow-sm backdrop-blur-sm transition-all duration-300"
                       role="status"
                       aria-live="polite"
                     >
@@ -200,7 +200,7 @@ export function SwipableRoutesPage({
                     <button
                       type="button"
                       onClick={() => handleNavigate(route.path)}
-                      className="focus-visible:ring-ring bg-foreground/20 hover:bg-foreground/40 size-2 flex-shrink-0 rounded-full transition-all duration-300 hover:scale-110 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                      className="focus-visible:ring-ring bg-foreground/20 hover:bg-foreground/40 size-2 flex-shrink-0 rounded-full transition-all duration-300 hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                       aria-label={`Go to ${route.label}`}
                     />
                   )}
@@ -216,23 +216,20 @@ export function SwipableRoutesPage({
             onViewChange={handleSwipe}
             onInit={(api) => {
               if (api) {
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 emblaApiRef.current = api;
 
                 // Initialize selected index
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-                setSelectedIndex(api.selectedScrollSnap() as number);
+
+                setSelectedIndex(api.selectedScrollSnap());
 
                 // Set up event listeners for tracking selection
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+
                 api.on("select", () => {
-                  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-                  setSelectedIndex(api.selectedScrollSnap() as number);
+                  setSelectedIndex(api.selectedScrollSnap());
                 });
 
                 // Scroll to current route on init
                 if (currentRouteIndex > 0) {
-                  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
                   api?.scrollTo(currentRouteIndex);
                 }
               }

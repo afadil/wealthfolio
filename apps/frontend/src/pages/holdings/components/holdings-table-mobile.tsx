@@ -80,7 +80,7 @@ export const HoldingsTableMobile = ({
       result = result.filter((holding) => {
         const nameMatch = holding.instrument?.name?.toLowerCase().includes(lowercasedQuery);
         const symbolMatch = holding.instrument?.symbol?.toLowerCase().includes(lowercasedQuery);
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+
         return nameMatch || symbolMatch;
       });
     }
@@ -142,7 +142,7 @@ export const HoldingsTableMobile = ({
             >
               <Icons.ListFilter className="h-4 w-4" />
               {hasActiveFilters && (
-                <span className="bg-destructive absolute top-0.5 right-0 h-2 w-2 rounded-full" />
+                <span className="bg-destructive absolute right-0 top-0.5 h-2 w-2 rounded-full" />
               )}
             </Button>
           )}

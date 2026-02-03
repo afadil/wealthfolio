@@ -122,15 +122,15 @@ export const checkForUpdates = async (): Promise<UpdateInfo | null> => {
  * Download and install an available update.
  * Not supported in web - users update via Docker/manual download.
  */
-export const installUpdate = async (): Promise<void> => {
-  throw new Error("Updates can only be installed on the desktop client");
+export const installUpdate = (): Promise<void> => {
+  return Promise.reject(new Error("Updates can only be installed on the desktop client"));
 };
 
 // ============================================================================
 // Platform Commands
 // ============================================================================
 
-export const getPlatform = async (): Promise<PlatformInfo> => {
+export const getPlatform = (): Promise<PlatformInfo> => {
   // Web environment - detect from user agent
   const userAgent = typeof window !== "undefined" ? window.navigator.userAgent.toLowerCase() : "";
   const platform =
@@ -158,9 +158,9 @@ export const getPlatform = async (): Promise<PlatformInfo> => {
 
   const is_mobile = isMobileUA || isTablet;
 
-  return {
+  return Promise.resolve({
     os,
     is_mobile,
     is_desktop: !is_mobile,
-  };
+  });
 };

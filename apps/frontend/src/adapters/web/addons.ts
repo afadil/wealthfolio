@@ -23,14 +23,16 @@ export const installAddonZip = async (
   });
 };
 
-export const installAddonFile = async (
+export const installAddonFile = (
   fileName: string,
   fileContent: string,
   enableAfterInstall?: boolean,
 ): Promise<AddonManifest> => {
   // Web doesn't support single-file addon installation
-  throw new Error(
-    `installAddonFile not supported in web: ${fileName}, ${fileContent}, ${enableAfterInstall}`,
+  return Promise.reject(
+    new Error(
+      `installAddonFile not supported in web: ${fileName}, ${fileContent}, ${enableAfterInstall}`,
+    ),
   );
 };
 

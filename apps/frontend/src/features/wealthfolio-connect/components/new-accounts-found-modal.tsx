@@ -139,7 +139,7 @@ export function NewAccountsFoundModal({
             <div className="space-y-6 p-6">
               <Alert
                 variant="warning"
-                className="px-3 py-2.5 [&>svg]:top-2.5 [&>svg]:left-3 [&>svg~*]:pl-6"
+                className="px-3 py-2.5 [&>svg]:left-3 [&>svg]:top-2.5 [&>svg~*]:pl-6"
               >
                 <Icons.AlertTriangle className="h-4 w-4" />
                 <AlertDescription className="text-sm">

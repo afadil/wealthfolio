@@ -65,7 +65,7 @@ export function SegmentedAllocationBar({
       return (
         <Card className="p-3 sm:p-3.5">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
+            <p className="text-muted-foreground text-sm font-medium uppercase tracking-wider">
               {displayTitle}
             </p>
             <span className="text-muted-foreground text-xs">No data</span>
@@ -76,7 +76,7 @@ export function SegmentedAllocationBar({
     return (
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
+          <CardTitle className="text-muted-foreground text-sm font-medium uppercase tracking-wider">
             {displayTitle}
           </CardTitle>
         </CardHeader>
@@ -104,7 +104,7 @@ export function SegmentedAllocationBar({
         <TooltipProvider>
           <div className="space-y-2">
             {/* Title */}
-            <p className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
+            <p className="text-muted-foreground text-sm font-medium uppercase tracking-wider">
               {displayTitle}
             </p>
 
@@ -164,7 +164,7 @@ export function SegmentedAllocationBar({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-muted-foreground text-sm font-medium tracking-wider uppercase">
+        <CardTitle className="text-muted-foreground text-sm font-medium uppercase tracking-wider">
           {displayTitle}
         </CardTitle>
       </CardHeader>

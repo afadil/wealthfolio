@@ -260,7 +260,7 @@ function GoalCard({
           ) : (
             <Icons.Target className="text-muted-foreground h-4 w-4 flex-shrink-0" />
           )}
-          <span className="text-sm leading-tight font-medium">{goal.title}</span>
+          <span className="text-sm font-medium leading-tight">{goal.title}</span>
         </div>
         <Badge
           variant={goal.isAchieved ? "default" : "secondary"}

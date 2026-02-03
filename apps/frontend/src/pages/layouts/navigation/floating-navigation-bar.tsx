@@ -201,7 +201,7 @@ export function FloatingNavigationBar({ navigation }: FloatingNavigationBarProps
                   side="top"
                   align="end"
                   sideOffset={16}
-                  className="mr-0 mb-0 flex w-48 flex-col gap-1 border-0 bg-transparent p-0 shadow-none ring-0 ring-offset-0"
+                  className="mb-0 mr-0 flex w-48 flex-col gap-1 border-0 bg-transparent p-0 shadow-none ring-0 ring-offset-0"
                 >
                   {overflowItems.map((item) => {
                     const isActive = isPathActive(location.pathname, item.href);
@@ -256,7 +256,7 @@ export function FloatingNavigationBar({ navigation }: FloatingNavigationBarProps
                   side="top"
                   align="end"
                   sideOffset={16}
-                  className="mr-0 mb-0 flex w-48 flex-col gap-1 border-0 bg-transparent p-0 shadow-none ring-0 ring-offset-0"
+                  className="mb-0 mr-0 flex w-48 flex-col gap-1 border-0 bg-transparent p-0 shadow-none ring-0 ring-offset-0"
                 >
                   {addonItems.map((item) => {
                     const isActive = isPathActive(location.pathname, item.href);

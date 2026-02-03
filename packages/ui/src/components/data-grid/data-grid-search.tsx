@@ -14,10 +14,7 @@ export const DataGridSearch = React.memo(DataGridSearchImpl, (prev, next) => {
 
   if (!next.searchOpen) return true;
 
-  if (
-    prev.searchQuery !== next.searchQuery ||
-    prev.matchIndex !== next.matchIndex
-  ) {
+  if (prev.searchQuery !== next.searchQuery || prev.matchIndex !== next.matchIndex) {
     return false;
   }
 
@@ -29,10 +26,7 @@ export const DataGridSearch = React.memo(DataGridSearchImpl, (prev, next) => {
 
     if (!prevMatch || !nextMatch) return false;
 
-    if (
-      prevMatch.rowIndex !== nextMatch.rowIndex ||
-      prevMatch.columnId !== nextMatch.columnId
-    ) {
+    if (prevMatch.rowIndex !== nextMatch.rowIndex || prevMatch.columnId !== nextMatch.columnId) {
       return false;
     }
   }
@@ -104,38 +98,33 @@ function DataGridSearchImpl({
     [onSearchQueryChange, debouncedSearch],
   );
 
-  const onTriggerPointerDown = React.useCallback(
-    (event: React.PointerEvent<HTMLButtonElement>) => {
-      // prevent implicit pointer capture
-      const target = event.target;
-      if (!(target instanceof HTMLElement)) return;
-      if (target.hasPointerCapture(event.pointerId)) {
-        target.releasePointerCapture(event.pointerId);
-      }
+  const onTriggerPointerDown = React.useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    // prevent implicit pointer capture
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (target.hasPointerCapture(event.pointerId)) {
+      target.releasePointerCapture(event.pointerId);
+    }
 
-      // Only prevent default if we're not clicking on the input
-      // This allows text selection in the input while still preventing focus stealing elsewhere
-      if (
-        event.button === 0 &&
-        event.ctrlKey === false &&
-        event.pointerType === "mouse" &&
-        !(event.target instanceof HTMLInputElement)
-      ) {
-        event.preventDefault();
-      }
-    },
-    [],
-  );
+    // Only prevent default if we're not clicking on the input
+    // This allows text selection in the input while still preventing focus stealing elsewhere
+    if (
+      event.button === 0 &&
+      event.ctrlKey === false &&
+      event.pointerType === "mouse" &&
+      !(event.target instanceof HTMLInputElement)
+    ) {
+      event.preventDefault();
+    }
+  }, []);
 
   const onPrevMatchPointerDown = React.useCallback(
-    (event: React.PointerEvent<HTMLButtonElement>) =>
-      onTriggerPointerDown(event),
+    (event: React.PointerEvent<HTMLButtonElement>) => onTriggerPointerDown(event),
     [onTriggerPointerDown],
   );
 
   const onNextMatchPointerDown = React.useCallback(
-    (event: React.PointerEvent<HTMLButtonElement>) =>
-      onTriggerPointerDown(event),
+    (event: React.PointerEvent<HTMLButtonElement>) => onTriggerPointerDown(event),
     [onTriggerPointerDown],
   );
 
@@ -149,7 +138,7 @@ function DataGridSearchImpl({
     <div
       role="search"
       data-slot="grid-search"
-      className="fade-in-0 slide-in-from-top-2 absolute end-4 top-4 z-50 flex animate-in flex-col gap-2 rounded-lg border bg-background p-2 shadow-lg"
+      className="fade-in-0 slide-in-from-top-2 animate-in bg-background absolute end-4 top-4 z-50 flex flex-col gap-2 rounded-lg border p-2 shadow-lg"
     >
       <div className="flex items-center gap-2">
         <Input
@@ -187,18 +176,12 @@ function DataGridSearchImpl({
           >
             <Icons.ChevronDown />
           </Button>
-          <Button
-            aria-label="Close search"
-            variant="ghost"
-            size="icon"
-            className="size-7"
-            onClick={onClose}
-          >
+          <Button aria-label="Close search" variant="ghost" size="icon" className="size-7" onClick={onClose}>
             <Icons.X />
           </Button>
         </div>
       </div>
-      <div className="flex items-center gap-1 whitespace-nowrap text-muted-foreground text-xs">
+      <div className="text-muted-foreground flex items-center gap-1 whitespace-nowrap text-xs">
         {searchMatches.length > 0 ? (
           <span>
             {matchIndex + 1} of {searchMatches.length}

@@ -186,7 +186,7 @@ const applySettingsToDocument = (newSettings: Settings) => {
       try {
         const { getCurrentWindow } = await import("@tauri-apps/api/window");
         const currentWindow = getCurrentWindow();
-        await currentWindow.setTheme(explicit as "light" | "dark");
+        await currentWindow.setTheme(explicit);
       } catch {
         logger.error("Error setting window theme.");
       }

@@ -182,7 +182,7 @@ export const ImportPreviewTable = ({
                     transition={{ duration: 0.2, delay: index * 0.03 }}
                     key={row.id}
                     className={cn(
-                      "group hover:bg-muted/50 dark:hover:bg-muted/10 transition-colors",
+                      "hover:bg-muted/50 dark:hover:bg-muted/10 group transition-colors",
                       row.getValue("isValid")
                         ? index % 2 === 0
                           ? "bg-background"

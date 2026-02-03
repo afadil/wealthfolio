@@ -90,7 +90,7 @@ export function IssueDetailSheet({
           {/* Affected Items List - grows to fill space */}
           {issue.affectedItems && issue.affectedItems.length > 0 && (
             <div className="flex min-h-0 flex-1 flex-col gap-3">
-              <h4 className="text-muted-foreground shrink-0 text-xs font-medium tracking-wide uppercase">
+              <h4 className="text-muted-foreground shrink-0 text-xs font-medium uppercase tracking-wide">
                 Affected Items ({issue.affectedItems.length})
               </h4>
               <ScrollArea className="min-h-0 flex-1 rounded-md border">
@@ -133,7 +133,7 @@ export function IssueDetailSheet({
           {(issue.affectedCount > 0 || (issue.affectedMvPct != null && issue.affectedMvPct > 0)) &&
             !issue.affectedItems && (
               <div className="space-y-3">
-                <h4 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
                   Impact
                 </h4>
                 <div className="grid grid-cols-2 gap-4">
@@ -158,7 +158,7 @@ export function IssueDetailSheet({
           {/* Additional Details */}
           {issue.details && (
             <div className="space-y-2">
-              <h4 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+              <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
                 Details
               </h4>
               <p className="text-muted-foreground text-sm">{issue.details}</p>
@@ -168,7 +168,7 @@ export function IssueDetailSheet({
 
         {/* About this issue - before actions */}
         <div className="shrink-0 space-y-2 border-t pt-6">
-          <h4 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+          <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
             About this issue
           </h4>
           <p className="text-muted-foreground text-sm">{categoryConfig.description}</p>

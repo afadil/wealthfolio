@@ -83,7 +83,7 @@ export function ConnectEmptyState() {
         {/* CTA */}
         <footer className="flex flex-col items-center gap-4">
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:justify-center">
-            <Button asChild className="from-primary to-primary/90 w-full bg-linear-to-r sm:w-auto">
+            <Button asChild className="from-primary to-primary/90 bg-linear-to-r w-full sm:w-auto">
               <a href={WEALTHFOLIO_CONNECT_PORTAL_URL} target="_blank" rel="noopener noreferrer">
                 Get Started with Connect
                 <Icons.ExternalLink className="ml-1.5 h-4 w-4" />

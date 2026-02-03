@@ -284,7 +284,7 @@ export function MultiSelectTaxonomy({
                         className="h-8 pr-6 text-sm"
                         placeholder="100"
                       />
-                      <span className="text-muted-foreground pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-sm">
+                      <span className="text-muted-foreground pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-sm">
                         %
                       </span>
                     </div>

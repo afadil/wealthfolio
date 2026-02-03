@@ -163,7 +163,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                             <button
                               type="button"
                               onClick={() => setShowCurrencySearch(true)}
-                              className="border-border hover:border-primary/50 hover:bg-accent ring-offset-background focus-visible:ring-ring inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 text-sm font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0"
+                              className="border-border hover:border-primary/50 hover:bg-accent ring-offset-background focus-visible:ring-ring inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg border-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0"
                             >
                               <Icons.Search className="size-5" />
                               Other
@@ -198,7 +198,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                 </div>
 
                 <div className="relative mb-4">
-                  <Icons.Search className="text-muted-foreground absolute top-1/2 left-3 h-5 w-5 -translate-y-1/2 transform" />
+                  <Icons.Search className="text-muted-foreground absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform" />
                   <Input
                     type="text"
                     placeholder="Search currencies..."

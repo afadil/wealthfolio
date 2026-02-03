@@ -107,7 +107,7 @@ export function ShortTextCell<TData>({
         setValue(event.key);
 
         queueMicrotask(() => {
-          if (cellRef.current && cellRef.current.contentEditable === "true") {
+          if (cellRef.current?.contentEditable === "true") {
             cellRef.current.textContent = event.key;
             const range = document.createRange();
             const selection = window.getSelection();
@@ -597,7 +597,7 @@ export function UrlCell<TData>({
         setValue(event.key);
 
         queueMicrotask(() => {
-          if (cellRef.current && cellRef.current.contentEditable === "true") {
+          if (cellRef.current?.contentEditable === "true") {
             cellRef.current.textContent = event.key;
             const range = document.createRange();
             const selection = window.getSelection();

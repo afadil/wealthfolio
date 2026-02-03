@@ -84,7 +84,7 @@ function HealthIssueRow({
 
   return (
     <div
-      className="group hover:bg-muted/50 flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors"
+      className="hover:bg-muted/50 group flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors"
       onClick={onClick}
     >
       <SeverityDot severity={issue.severity} />

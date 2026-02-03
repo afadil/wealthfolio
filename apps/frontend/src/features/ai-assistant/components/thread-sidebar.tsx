@@ -267,7 +267,7 @@ export function ThreadSidebar({
       {/* Search */}
       <div className="border-b p-2">
         <div className="relative">
-          <Icons.Search className="text-muted-foreground absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2" />
+          <Icons.Search className="text-muted-foreground absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2" />
           <Input
             type="search"
             placeholder="Search conversations..."

@@ -107,7 +107,7 @@ export const AutoComplete = ({
 
   return (
     <CommandPrimitive onKeyDown={handleKeyDown}>
-      <div className="border-input bg-input-bg dark:bg-input/30 ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring h-input-height flex w-full rounded-md border py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50">
+      <div className="border-input bg-input-bg dark:bg-input/30 ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring h-input-height flex w-full rounded-md border py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
         <CommandInput
           ref={inputRef}
           value={inputValue}
@@ -116,7 +116,7 @@ export const AutoComplete = ({
           //onFocus={() => setOpen(true)}
           placeholder={placeholder}
           disabled={disabled}
-          className="w-full border-0 border-transparent bg-transparent focus:ring-0 focus:ring-transparent focus:outline-none"
+          className="w-full border-0 border-transparent bg-transparent focus:outline-none focus:ring-0 focus:ring-transparent"
         />
       </div>
       <div className="relative mt-1">
@@ -153,7 +153,7 @@ export const AutoComplete = ({
                 </CommandGroup>
               ) : null}
               {!isLoading ? (
-                <CommandPrimitive.Empty className="rounded-sm px-2 py-3 text-center text-sm select-none">
+                <CommandPrimitive.Empty className="select-none rounded-sm px-2 py-3 text-center text-sm">
                   {emptyMessage}
                 </CommandPrimitive.Empty>
               ) : null}

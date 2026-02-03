@@ -43,9 +43,7 @@ export default defineConfig({
     alias: {
       "@/adapters": path.resolve(
         __dirname,
-        buildTarget === "tauri"
-          ? "./src/adapters/tauri"
-          : "./src/adapters/web"
+        buildTarget === "tauri" ? "./src/adapters/tauri" : "./src/adapters/web",
       ),
     },
   },
@@ -119,7 +117,7 @@ Import typed functions from `@/adapters` and use them in services:
 import {
   logger,
   getAccounts as getAccountsAdapter,
-  syncBrokerData as syncBrokerDataAdapter
+  syncBrokerData as syncBrokerDataAdapter,
 } from "@/adapters";
 
 // Service wraps adapter with error handling
@@ -205,7 +203,9 @@ import { isDesktop } from "@/adapters";
 
 if (isDesktop) {
   const { open } = await import("@tauri-apps/plugin-dialog");
-  const filePath = await open({ filters: [{ name: "CSV", extensions: ["csv"] }] });
+  const filePath = await open({
+    filters: [{ name: "CSV", extensions: ["csv"] }],
+  });
   // ...
 }
 ```

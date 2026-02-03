@@ -102,9 +102,9 @@ function PerformanceContent({
       {isLoading && (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <div className="animate-subtle-pulse absolute inset-0 border-2 border-transparent">
-            <div className="animate-progress-border bg-primary absolute top-0 left-0 h-[2px]"></div>
+            <div className="animate-progress-border bg-primary absolute left-0 top-0 h-[2px]"></div>
           </div>
-          <div className="absolute right-4 bottom-4">
+          <div className="absolute bottom-4 right-4">
             <div className="bg-background/80 rounded-md border px-3 py-1.5 shadow-sm backdrop-blur-sm">
               <p className="text-muted-foreground flex items-center text-xs font-medium">
                 <span className="bg-primary mr-2 inline-block h-2 w-2 animate-pulse rounded-full"></span>
@@ -156,7 +156,7 @@ const SelectedItemBadge = ({
       className={cn(
         "text-foreground group relative cursor-pointer rounded-md px-2.5 py-1.5 shadow-sm transition-all sm:px-3",
         "hover:bg-accent/80 hover:shadow-md",
-        "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
+        "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
         isSelected && "bg-warning/20 hover:bg-warning/30",
       )}
       onClick={onSelect}
@@ -354,7 +354,7 @@ export default function PerformancePage() {
   return (
     <>
       {/* Date range selector - fixed position in header area */}
-      <div className="pointer-events-auto fixed top-4 right-2 z-20 hidden md:block lg:right-4">
+      <div className="pointer-events-auto fixed right-2 top-4 z-20 hidden md:block lg:right-4">
         <DateRangeSelector value={dateRange} onChange={setDateRange} />
       </div>
 
@@ -512,7 +512,7 @@ export default function PerformancePage() {
                           <CarouselContent className="-ml-2 md:-ml-4">
                             <CarouselItem className="basis-[38%] pl-2 md:pl-4">
                               <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
-                                <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
+                                <span className="text-muted-foreground text-[9px] font-medium uppercase tracking-wide">
                                   Total Return
                                 </span>
                                 <span
@@ -534,7 +534,7 @@ export default function PerformancePage() {
 
                             <CarouselItem className="basis-[38%] pl-2 md:pl-4">
                               <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
-                                <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
+                                <span className="text-muted-foreground text-[9px] font-medium uppercase tracking-wide">
                                   Annualized
                                 </span>
                                 <span
@@ -556,7 +556,7 @@ export default function PerformancePage() {
 
                             <CarouselItem className="basis-[38%] pl-2 md:pl-4">
                               <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
-                                <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
+                                <span className="text-muted-foreground text-[9px] font-medium uppercase tracking-wide">
                                   Volatility
                                 </span>
                                 <span className="text-foreground text-base font-bold">
@@ -574,7 +574,7 @@ export default function PerformancePage() {
 
                             <CarouselItem className="basis-[38%] pl-2 md:pl-4">
                               <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
-                                <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
+                                <span className="text-muted-foreground text-[9px] font-medium uppercase tracking-wide">
                                   Max Drawdown
                                 </span>
                                 <span className="text-destructive text-base font-bold">

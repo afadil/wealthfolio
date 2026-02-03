@@ -1,6 +1,10 @@
 ---
 name: ai-assistant-implementation
-description: Implement Wealthfolio AI Assistant using repo-idiomatic structure with @assistant-ui/react (frontend) and rig-core (Rust backend). Enforces backend-only secrets, unified streaming events, deterministic tool UI, and treats AI-POC-COPY as reference-only.
+description:
+  Implement Wealthfolio AI Assistant using repo-idiomatic structure with
+  @assistant-ui/react (frontend) and rig-core (Rust backend). Enforces
+  backend-only secrets, unified streaming events, deterministic tool UI, and
+  treats AI-POC-COPY as reference-only.
 ---
 
 # Wealthfolio AI Assistant Implementation (SOTA + Repo-Idiomatic)
@@ -9,11 +13,19 @@ Use this skill whenever implementing or refactoring the AI Assistant.
 
 ## Non-negotiables
 
-- **Repo conventions first**: follow existing patterns in `src-front/commands/*`, adapters, and backend command wiring; do not invent a parallel architecture.
-- **`AI-POC-COPY/` is reference-only**: never import it into production paths; do not copy folder structure; only port small snippets after aligning with repo patterns and adding tests.
-- **Backend-only secrets**: the frontend never needs provider keys for chat/model listing/tools; backend reads `ai_<provider_id>` from OS secret store and attaches it to provider SDK requests.
-- **Unified stream contract**: desktop (Tauri Channel) and web (NDJSON) must emit the same `AiStreamEvent` schema with `messageId` + terminal `done`.
-- **Deterministic tool UI in v1**: tool results are structured DTOs rendered with fixed React components; no model-emitted UI JSON.
+- **Repo conventions first**: follow existing patterns in
+  `src-front/commands/*`, adapters, and backend command wiring; do not invent a
+  parallel architecture.
+- **`AI-POC-COPY/` is reference-only**: never import it into production paths;
+  do not copy folder structure; only port small snippets after aligning with
+  repo patterns and adding tests.
+- **Backend-only secrets**: the frontend never needs provider keys for
+  chat/model listing/tools; backend reads `ai_<provider_id>` from OS secret
+  store and attaches it to provider SDK requests.
+- **Unified stream contract**: desktop (Tauri Channel) and web (NDJSON) must
+  emit the same `AiStreamEvent` schema with `messageId` + terminal `done`.
+- **Deterministic tool UI in v1**: tool results are structured DTOs rendered
+  with fixed React components; no model-emitted UI JSON.
 
 ## Required references
 
@@ -29,10 +41,11 @@ Use this skill whenever implementing or refactoring the AI Assistant.
 
 ## E2E Smoke Testing (Recommended Default)
 
-Use **Ollama** for end-to-end testing because it requires **no API key** and can run fully local.
+Use **Ollama** for end-to-end testing because it requires **no API key** and can
+run fully local.
 
 - Provider: `OLLAMA`
 - Secret: none (no `ai_OLLAMA` key)
 - Base URL (typical): `http://localhost:11434`
-- Model: use an installed Ollama model (e.g., `mistral` / `mistral-3` if present)
-
+- Model: use an installed Ollama model (e.g., `mistral` / `mistral-3` if
+  present)

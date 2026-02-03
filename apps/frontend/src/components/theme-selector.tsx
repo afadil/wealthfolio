@@ -50,7 +50,7 @@ export function ThemeSelector({ value, onChange, className }: ThemeSelectorProps
           <FormControl>
             <RadioGroupItem value="dark" className="sr-only" />
           </FormControl>
-          <div className="dark border-muted bg-popover hover:bg-accent hover:text-accent-foreground items-center rounded-md border-2 p-2">
+          <div className="border-muted bg-popover hover:bg-accent hover:text-accent-foreground dark items-center rounded-md border-2 p-2">
             <div className="space-y-1 rounded-sm bg-[hsl(var(--flexoki-bg))] p-1 sm:space-y-2 sm:p-2">
               <div className="space-y-1 rounded-md bg-[hsl(var(--flexoki-bg-2))] p-1 sm:p-2">
                 <div className="h-1 w-[40px] rounded-lg bg-[hsl(var(--flexoki-ui-2))] sm:h-2 sm:w-[80px]" />

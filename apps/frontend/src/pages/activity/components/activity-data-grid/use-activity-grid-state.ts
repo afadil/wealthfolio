@@ -141,7 +141,7 @@ export const useActivityGridState = ({
           continue;
         }
         // This is a non-dirty item - use server version
-        merged.push(server as LocalTransaction);
+        merged.push(server);
       }
 
       return merged;
