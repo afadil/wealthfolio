@@ -649,7 +649,7 @@ export function useStrictModeValidation(
   - Deviation (target - current)
   - Value (current market value)
   - Target Value
-  - Locked (🔒 icon)
+  - Locked (🔒 icon flat design)
   - Actions ([View Details] button)
 - ✅ Calculate cascaded percentages:
   ```typescript
@@ -1317,24 +1317,37 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 
 ---
 
-### Sprint 3: Holdings Allocation Table ⏳ NOT STARTED
+### Sprint 3: Holdings Allocation Table ✅ COMPLETE
 
-**Status:** Pending Sprint 2 completion
+**Status:** Completed
 
 **Tasks:**
 
-- [ ] Create HoldingsAllocationTable component
-- [ ] Reuse DataTable component
-- [ ] Define columns (symbol, name, targets, deviation, etc.)
-- [ ] Calculate cascaded percentages
-- [ ] Color-coded deviation column
-- [ ] Filtering by asset class, type, locked
-- [ ] Sorting on all columns
-- [ ] Search by symbol/name
-- [ ] Empty state with CTA
-- [ ] Add "Holdings Table" tab
-- [ ] Update tab navigation
-- [ ] Test filtering, sorting, navigation
+- [x] Create HoldingsAllocationTable component
+- [x] Reuse DataTable component
+- [x] Define columns (symbol, name, targets, deviation, etc.)
+- [x] Calculate cascaded percentages
+- [x] Color-coded deviation column
+- [x] Filtering by asset class, type, locked
+- [x] Sorting on all columns
+- [x] Search by symbol/name
+- [x] Empty state with CTA
+- [x] Add "Holdings Table" tab
+- [x] Update tab navigation
+- [x] Test filtering, sorting, navigation
+
+**Implementation Notes:**
+
+- Created `holdings-allocation-table.tsx` component
+- Added new tab type `'holdings-table'` to `TabType`
+- Tab order: Targets → Composition → Allocation Overview → Holdings Table →
+  Rebalancing Suggestions
+- Table columns: Symbol, Name, Asset Class, Type, Value, Target % (Class),
+  Target % (Total), Current %, Deviation, Locked, Actions
+- Deviation color coding: Red (under-allocated), Green (over-allocated), Gray
+  (on target ±0.5%)
+- Filters: Asset Class, Type, Lock Status
+- Search: By symbol or name
 
 **Estimated Duration:** 2 days
 

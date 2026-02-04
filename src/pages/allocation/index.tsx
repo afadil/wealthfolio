@@ -21,6 +21,7 @@ import { AllocationPieChartView } from "./components/allocation-pie-chart-view";
 import { AssetClassFormDialog } from "./components/asset-class-form-dialog";
 import { AssetClassTargetCard } from "./components/asset-class-target-card";
 import { HoldingTargetRow } from "./components/holding-target-row";
+import { HoldingsAllocationTable } from "./components/holdings-allocation-table";
 import { RebalancingAdvisor } from "./components/rebalancing-advisor";
 import { SaveAsPortfolioModal } from "./components/save-as-portfolio-modal";
 import { SubPieChart } from "./components/sub-pie-chart";
@@ -41,7 +42,7 @@ import {
 } from "./hooks/use-current-allocation";
 import { calculateAutoDistribution } from "./lib/auto-distribution";
 
-type TabType = "targets" | "composition" | "pie-chart" | "rebalancing";
+type TabType = "targets" | "composition" | "pie-chart" | "holdings-table" | "rebalancing";
 
 const createPortfolioAccount = (): Account => ({
   id: PORTFOLIO_ACCOUNT_ID,
@@ -822,6 +823,7 @@ export default function AllocationPage() {
           { id: "targets", label: "Targets" },
           { id: "composition", label: "Composition" },
           { id: "pie-chart", label: "Allocation Overview" },
+          { id: "holdings-table", label: "Holdings Table" },
           { id: "rebalancing", label: "Rebalancing Suggestions" },
         ].map((tab) => (
           <button
@@ -1263,6 +1265,15 @@ export default function AllocationPage() {
             }}
             showHiddenTargets={showHiddenTargets}
             onToggleHiddenTargets={() => setShowHiddenTargets(!showHiddenTargets)}
+          />
+        )}
+
+        {viewTab === "holdings-table" && (
+          <HoldingsAllocationTable
+            currentAllocation={currentAllocation}
+            assetClassTargets={targets}
+            holdingTargets={allHoldingTargets}
+            onNavigateToOverview={() => setViewTab("pie-chart")}
           />
         )}
 
