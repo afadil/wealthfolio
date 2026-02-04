@@ -77,6 +77,7 @@ export function DonutChartFull({
 
   return (
     <div className="w-full h-full flex items-center justify-center p-6">
+      <div style={{ height: "100%", width: "100%" }}></div>
       <DonutChartExpandable
         data={pieData}
         activeIndex={activeIndex}

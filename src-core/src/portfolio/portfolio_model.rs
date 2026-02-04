@@ -21,9 +21,36 @@ use crate::{errors::ValidationError, schema::portfolios, Error, Result};
 pub struct Portfolio {
     pub id: String,
     pub name: String,
-    pub account_ids: String, // JSON array
+    #[serde(
+        serialize_with = "serialize_account_ids",
+        deserialize_with = "deserialize_account_ids"
+    )]
+    pub account_ids: String, // JSON array stored as string in DB
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
+}
+
+/// Custom serializer to convert JSON string to array for frontend
+fn serialize_account_ids<S>(
+    account_ids: &String,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let ids: Vec<String> = serde_json::from_str(account_ids)
+        .map_err(|e| serde::ser::Error::custom(format!("Invalid account_ids JSON: {}", e)))?;
+    ids.serialize(serializer)
+}
+
+/// Custom deserializer to convert array from frontend to JSON string for DB
+fn deserialize_account_ids<'de, D>(deserializer: D) -> std::result::Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let ids: Vec<String> = Vec::deserialize(deserializer)?;
+    serde_json::to_string(&ids)
+        .map_err(|e| serde::de::Error::custom(format!("Failed to serialize account_ids: {}", e)))
 }
 
 /// Input model for creating a new portfolio

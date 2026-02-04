@@ -13,17 +13,17 @@ export function useAssetClassMutations() {
   const queryClient = useQueryClient();
 
   const saveTargetMutation = useMutation({
-    mutationFn: async (payload: SaveTargetPayload) => {
+    mutationFn: async (payload: SaveTargetPayload & { toastMessage?: string }) => {
       console.log("Sending save payload:", payload);
       const result = await saveAssetClassTarget(payload as any);
       console.log("Save result:", result);
-      return result;
+      return { result, toastMessage: payload.toastMessage };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       console.log("Save succeeded, invalidating queries");
       toast({
         title: "Success",
-        description: "Allocation target saved successfully",
+        description: data.toastMessage || "Allocation target saved successfully",
       });
       queryClient.invalidateQueries({
         queryKey: [QueryKeys.ASSET_CLASS_TARGETS],

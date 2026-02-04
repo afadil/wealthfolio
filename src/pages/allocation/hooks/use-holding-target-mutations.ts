@@ -88,15 +88,16 @@ export function useHoldingTargetMutations() {
   });
 
   const toggleLockMutation = useMutation({
-    mutationFn: async ({ id }: { id: string; assetClassId: string }) => {
-      return toggleHoldingTargetLock(id);
+    mutationFn: async ({ id, holdingName }: { id: string; assetClassId: string; holdingName?: string }) => {
+      return { result: await toggleHoldingTargetLock(id), holdingName };
     },
-    onSuccess: (result, variables) => {
+    onSuccess: (data, variables) => {
+      const name = data.holdingName || 'Holding';
       toast({
         title: 'Success',
-        description: result.isLocked
-          ? 'Holding target locked'
-          : 'Holding target unlocked',
+        description: data.result.isLocked
+          ? `${name} is now locked`
+          : `${name} is now unlocked`,
       });
       // Invalidate queries for this asset class
       queryClient.invalidateQueries({

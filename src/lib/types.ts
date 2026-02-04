@@ -30,6 +30,26 @@ export interface Account {
   componentAccountIds?: string; // JSON array of account IDs
 }
 
+export interface Portfolio {
+  id: string;
+  name: string;
+  accountIds: string[]; // Array of account IDs
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface NewPortfolio {
+  id?: string;
+  name: string;
+  accountIds: string[]; // Must contain at least 2 accounts
+}
+
+export interface UpdatePortfolio {
+  id: string;
+  name?: string;
+  accountIds?: string[];
+}
+
 export interface Activity {
   id: string;
   type: ActivityType;

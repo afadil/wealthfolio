@@ -51,11 +51,15 @@ export function calculateAutoDistribution(
     const currentPercent =
       assetClassValue > 0 ? ((holding.marketValue?.base || 0) / assetClassValue) * 100 : 0;
 
+    const isLocked = existingTarget?.isLocked ?? false;
+
     // Determine if this is user-set:
-    // - Has pending edit, OR
-    // - Has existing saved target (either locked or unlocked)
-    // This ensures that when editing one holding, other saved holdings aren't overwritten
-    const isUserSet = pendingValue !== undefined || existingTarget !== undefined;
+    // - If NO pending edits exist at all → all saved targets are "user-set" (not previews)
+    // - If pending edits DO exist → only pending OR locked are "user-set"
+    const hasPendingEdits = pendingEdits.size > 0;
+    const isUserSet = hasPendingEdits
+      ? (pendingValue !== undefined || isLocked)  // Active editing session
+      : (existingTarget !== undefined);             // No editing - all saved are user-set
 
     holdingMap.set(assetId, {
       assetId,
@@ -64,7 +68,7 @@ export function calculateAutoDistribution(
       currentValue: holding.marketValue?.base || 0,
       currentPercent,
       targetPercent: pendingValue ?? existingTarget?.targetPercentOfClass,
-      isLocked: existingTarget?.isLocked ?? false,
+      isLocked,
       isUserSet,
     });
   });

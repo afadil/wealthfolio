@@ -415,7 +415,7 @@ export function RebalancingAdvisor({
                 const cleaned = sanitized.replace(/^0+(?=\d)/, '');
                 // Limit to 2 decimal places
                 const limited = cleaned.includes('.')
-                  ? cleaned.split('.')[0] + '.' + cleaned.split('.')[1].substring(0, 2)
+                  ? cleaned.split('.')[0] + '.' + (cleaned.split('.')[1]?.substring(0, 2) || '')
                   : cleaned;
                 setAvailableCash(parseFloat(limited) || 0);
               }}

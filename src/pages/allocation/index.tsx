@@ -1,9 +1,10 @@
 import { findOrCreateCombinedPortfolio } from "@/commands/account";
 import { getHoldings } from "@/commands/portfolio";
 import { getRebalancingStrategies, saveRebalancingStrategy } from "@/commands/rebalancing";
-import { AccountSelector } from "@/components/account-selector";
+import { AccountPortfolioSelector } from "@/components/account-portfolio-selector";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/use-toast";
+import { useAccounts } from "@/hooks/use-accounts";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { formatCurrencyDisplay } from "@/lib/currency-format";
 import { QueryKeys } from "@/lib/query-keys";
@@ -12,7 +13,7 @@ import type { Account, AccountType, Holding } from "@/lib/types";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { Button, Sheet, SheetContent, SheetHeader, SheetTitle } from "@wealthfolio/ui";
 import { ChevronDown } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AllocationPieChartView } from "./components/allocation-pie-chart-view";
 import { AssetClassFormDialog } from "./components/asset-class-form-dialog";
@@ -123,6 +124,10 @@ function HoldingsTargetList({
       newMap.set(assetId, percent);
     }
     onSharedPendingChange(newMap);
+
+    // Trigger re-calculation of auto-distribution with new pending edits
+    // This ensures that when a user sets one target, others adjust automatically
+    // The parent component will re-render with updated distribution
   };
 
   const pendingValue = (assetId: string) => sharedPendingEdits.get(assetId);
@@ -151,14 +156,22 @@ function HoldingsTargetList({
               currentValue: holdingData.currentValue,
             }}
             target={target}
-            previewPercent={holdingData.isUserSet ? undefined : holdingData.targetPercent}
+            previewPercent={
+              // Show preview for auto-distributed holdings (not user-set in current session)
+              // This includes holdings with saved targets that aren't locked and have no pending edit
+              holdingData.isUserSet ? undefined : holdingData.targetPercent
+            }
             pendingPercent={pending}
             assetClassId={assetClassId}
             isLocked={holdingData.isLocked ?? false}
             onPendingChange={(percent) => handlePendingChange(holdingData.assetId, percent)}
             onToggleLock={() => {
               if (target) {
-                toggleLockMutation.mutate({ id: target.id, assetClassId });
+                toggleLockMutation.mutate({
+                  id: target.id,
+                  assetClassId,
+                  holdingName: holdingData.displayName
+                });
               }
             }}
             onDelete={() => {
@@ -181,21 +194,30 @@ function HoldingsTargetList({
 }
 
 export default function AllocationPage() {
-  const [selectedAccounts, setSelectedAccounts] = useState<Account[]>([
-    createPortfolioAccount()
-  ]);
+  const { accounts } = useAccounts(false, false);
+  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([PORTFOLIO_ACCOUNT_ID]);
+  // const [activePortfolioId, setActivePortfolioId] = useState<string | null>(null); // TODO: Will be used for portfolio-specific allocation strategies
   const [formOpen, setFormOpen] = useState(false);
   const [editingTarget, setEditingTarget] = useState<string | null>(null);
   const [viewTab, setViewTab] = useState<TabType>('pie-chart');
   const [showAssetDetails, setShowAssetDetails] = useState(false);
   const [selectedAssetClass, setSelectedAssetClass] = useState<string | null>(null);
   const [assetClassPendingEdits, setAssetClassPendingEdits] = useState<Map<string, number>>(new Map());
+  const [assetClassLockStates, setAssetClassLockStates] = useState<Map<string, boolean>>(new Map());
   const [isSavingAllTargets, setIsSavingAllTargets] = useState(false);
   const [showHiddenTargets, setShowHiddenTargets] = useState(false);
   const [combinedPortfolio, setCombinedPortfolio] = useState<Account | null>(null);
   const [isLoadingCombinedPortfolio, setIsLoadingCombinedPortfolio] = useState(false);
   const queryClient = useQueryClient();
   const { settings } = useSettingsContext(); // ← NEW: Get base currency
+
+  // Derive selectedAccounts from selectedAccountIds
+  const selectedAccounts = useMemo(() => {
+    if (selectedAccountIds.includes(PORTFOLIO_ACCOUNT_ID)) {
+      return [createPortfolioAccount()];
+    }
+    return accounts?.filter(acc => selectedAccountIds.includes(acc.id)) ?? [];
+  }, [selectedAccountIds, accounts]);
 
   // Use the first selected account for strategy-based features
   // In multi-select mode, we create/use a combined portfolio account for strategies
@@ -213,35 +235,40 @@ export default function AllocationPage() {
     ? combinedPortfolio.id
     : primaryAccount?.id ?? PORTFOLIO_ACCOUNT_ID;
 
+  // Track last processed account IDs to prevent redundant calls
+  const lastProcessedAccountIds = useRef<string>("");
+
   // Create or find combined portfolio when multiple accounts are selected
   useEffect(() => {
     const handleMultiAccountSelection = async () => {
+      // Use stable selectedAccountIds instead of selectedAccounts object
+      const accountIdsKey = selectedAccountIds.slice().sort().join(',');
+
+      // Skip if we've already processed this exact combination
+      if (lastProcessedAccountIds.current === accountIdsKey) {
+        return;
+      }
+
       if (!isMultiAccountView) {
         setCombinedPortfolio(null);
+        lastProcessedAccountIds.current = accountIdsKey;
         return;
       }
 
       // Filter out the "All Portfolio" virtual account
-      const realAccounts = selectedAccounts.filter(acc => acc.id !== PORTFOLIO_ACCOUNT_ID);
+      const realAccountIds = selectedAccountIds.filter(id => id !== PORTFOLIO_ACCOUNT_ID);
 
-      if (realAccounts.length < 2) {
+      if (realAccountIds.length < 2) {
         setCombinedPortfolio(null);
+        lastProcessedAccountIds.current = accountIdsKey;
         return;
       }
 
       try {
         setIsLoadingCombinedPortfolio(true);
-        const accountIds = realAccounts.map(acc => acc.id);
-        const combined = await findOrCreateCombinedPortfolio(accountIds);
+        const combined = await findOrCreateCombinedPortfolio(realAccountIds);
         setCombinedPortfolio(combined);
-
-        // Invalidate queries to reload with new combined portfolio
-        queryClient.invalidateQueries({
-          queryKey: [QueryKeys.ASSET_CLASS_TARGETS],
-        });
-        queryClient.invalidateQueries({
-          queryKey: [QueryKeys.REBALANCING_STRATEGIES],
-        });
+        lastProcessedAccountIds.current = accountIdsKey;
       } catch (err) {
         console.error("Failed to create combined portfolio:", err);
         toast({
@@ -255,31 +282,43 @@ export default function AllocationPage() {
     };
 
     handleMultiAccountSelection();
-  }, [selectedAccounts, isMultiAccountView, queryClient]);
+  }, [selectedAccountIds, isMultiAccountView]);
+
+  // Track accounts for which we've already created strategies
+  const createdStrategies = useRef<Set<string>>(new Set());
 
   // Auto-create strategy for account if it doesn't exist
   useEffect(() => {
     const ensureStrategy = async () => {
-      if (!primaryAccount || primaryAccount.id === PORTFOLIO_ACCOUNT_ID) {
+      if (!selectedAccountId || selectedAccountId === PORTFOLIO_ACCOUNT_ID) {
         return; // Skip for portfolio view
+      }
+
+      // Skip if we've already created/checked this account
+      if (createdStrategies.current.has(selectedAccountId)) {
+        return;
       }
 
       try {
         const strategies = await getRebalancingStrategies();
         const exists = strategies.some((s) => s.accountId === selectedAccountId);
 
-        if (!exists) {
+        if (!exists && primaryAccount) {
           console.log("Creating strategy for account:", selectedAccountId, primaryAccount.name);
           await saveRebalancingStrategy({
             name: `${primaryAccount.name} Allocation Strategy`,
             accountId: selectedAccountId,
             isActive: true,
           } as any);
-
-          // Invalidate strategy queries to force refetch
+          // Mark as created to prevent recreation
+          createdStrategies.current.add(selectedAccountId);
+          // Invalidate to refetch the new strategy
           queryClient.invalidateQueries({
-            queryKey: [QueryKeys.REBALANCING_STRATEGIES],
+            queryKey: [QueryKeys.REBALANCING_STRATEGIES, selectedAccountId],
           });
+        } else {
+          // Mark as checked even if it already exists
+          createdStrategies.current.add(selectedAccountId);
         }
       } catch (err) {
         console.error("Failed to ensure strategy:", err);
@@ -289,13 +328,8 @@ export default function AllocationPage() {
     ensureStrategy();
   }, [selectedAccountId, primaryAccount, queryClient]);
 
-  // Invalidate targets when account changes to ensure fresh data
-  useEffect(() => {
-    queryClient.invalidateQueries({
-      queryKey: [QueryKeys.ASSET_CLASS_TARGETS, selectedAccountId],
-    });
-  }, [selectedAccountId, queryClient]);
-
+  // React Query automatically refetches when selectedAccountId changes via queryKey
+  // No need for manual invalidation here
   const { data: targets = [] } =
     useAssetClassTargets(selectedAccountId);
 
@@ -529,6 +563,22 @@ export default function AllocationPage() {
           )
         : { holdings: [] };
 
+      // Validate total percentage
+      const totalPercent = distribution.holdings.reduce(
+        (sum, h) => sum + (h.targetPercent || 0),
+        0
+      );
+
+      if (Math.abs(totalPercent - 100) > 0.01) {
+        toast({
+          title: 'Invalid Allocation',
+          description: `Total must equal 100%. Current total: ${totalPercent.toFixed(1)}%`,
+          variant: 'destructive',
+        });
+        setIsSavingAllTargets(false);
+        return;
+      }
+
       // Save all holdings with targets
       const savePromises = distribution.holdings
         .filter((h) => h.targetPercent !== undefined && h.targetPercent > 0)
@@ -583,26 +633,20 @@ export default function AllocationPage() {
 
   return (
     <div className="space-y-6 p-8">
-      {/* Account Selector - Fixed position in top right corner */}
+      {/* Account/Portfolio Selector - Fixed position in top right corner */}
       <div className="pointer-events-auto fixed top-4 right-2 z-20 hidden md:block lg:right-4">
-        <AccountSelector
-          multiSelect={true}
-          selectedAccounts={selectedAccounts}
-          setSelectedAccounts={setSelectedAccounts}
-          includePortfolio={true}
-          variant="dropdown"
+        <AccountPortfolioSelector
+          selectedAccountIds={selectedAccountIds}
+          onAccountsChange={setSelectedAccountIds}
           className="h-9"
         />
       </div>
 
-      {/* Account Selector - Mobile */}
+      {/* Account/Portfolio Selector - Mobile */}
       <div className="mb-4 flex justify-end md:hidden">
-        <AccountSelector
-          multiSelect={true}
-          selectedAccounts={selectedAccounts}
-          setSelectedAccounts={setSelectedAccounts}
-          includePortfolio={true}
-          variant="dropdown"
+        <AccountPortfolioSelector
+          selectedAccountIds={selectedAccountIds}
+          onAccountsChange={setSelectedAccountIds}
           className="h-9"
         />
       </div>
@@ -704,8 +748,30 @@ export default function AllocationPage() {
                     key={comp.assetClass}
                     composition={comp}
                     targetPercent={target?.targetPercent || 0}
+                    allTargets={targets}
+                    allLockStates={assetClassLockStates}
+                    isLocked={target?.isLocked || false}
                     onEdit={() => handleOpenForm(comp.assetClass)}
                     onDelete={() => handleDelete(comp.assetClass)}
+                    onToggleLock={async () => {
+                      if (!strategy?.id || isMultiAccountView) return;
+                      const existingTarget = targets.find(t => t.assetClass === comp.assetClass);
+                      if (existingTarget) {
+                        const newLockState = !existingTarget.isLocked;
+                        // Update local lock state map immediately
+                        const newMap = new Map(assetClassLockStates);
+                        newMap.set(comp.assetClass, newLockState);
+                        setAssetClassLockStates(newMap);
+
+                        await saveTargetMutation.mutateAsync({
+                          id: existingTarget.id,
+                          strategyId: strategy.id,
+                          assetClass: comp.assetClass,
+                          targetPercent: existingTarget.targetPercent,
+                          isLocked: newLockState,
+                        });
+                      }
+                    }}
                     onTargetChange={async (newPercent) => {
                       if (!strategy?.id || isMultiAccountView) return;
                       const existingTarget = targets.find(t => t.assetClass === comp.assetClass);
@@ -717,6 +783,22 @@ export default function AllocationPage() {
                           targetPercent: newPercent,
                           isLocked: existingTarget.isLocked || false,
                         });
+                      }
+                    }}
+                    onProportionalChange={async (updatedTargets) => {
+                      if (!strategy?.id || isMultiAccountView) return;
+                      // Save all updated targets
+                      for (const updatedTarget of updatedTargets) {
+                        const existingTarget = targets.find(t => t.assetClass === updatedTarget.assetClass);
+                        if (existingTarget) {
+                          await saveTargetMutation.mutateAsync({
+                            id: existingTarget.id,
+                            strategyId: strategy.id,
+                            assetClass: updatedTarget.assetClass,
+                            targetPercent: updatedTarget.targetPercent,
+                            isLocked: updatedTarget.isLocked || false,
+                          });
+                        }
                       }
                     }}
                     isLoading={isMutating}
@@ -938,13 +1020,25 @@ export default function AllocationPage() {
             onUpdateTarget={async (assetClass: string, newPercent: number, isLocked?: boolean) => {
               const target = targets.find((t) => t.assetClass === assetClass);
               if (target && strategy?.id) {
+                // Determine if this is a lock toggle (isLocked explicitly passed AND different from current)
+                const isLockChange = isLocked !== undefined && isLocked !== target.isLocked;
+                const isPercentChange = newPercent !== target.targetPercent;
+
+                let customMessage: string | undefined;
+                if (isLockChange && !isPercentChange) {
+                  // Pure lock toggle (no slider movement)
+                  customMessage = `${assetClass} is now ${isLocked ? 'locked' : 'unlocked'}`;
+                }
+                // For slider/text changes, use default message (undefined)
+
                 await saveTargetMutation.mutateAsync({
                   id: target.id,
                   strategyId: strategy.id,
                   assetClass,
                   targetPercent: newPercent,
                   isLocked: isLocked !== undefined ? isLocked : target.isLocked,
-                });
+                  toastMessage: customMessage,
+                } as any);
                 queryClient.invalidateQueries({
                   queryKey: [QueryKeys.ASSET_CLASS_TARGETS, selectedAccountId],
                 });

@@ -3,6 +3,10 @@ export const QueryKeys = {
   ACCOUNTS: "accounts",
   ACCOUNTS_SUMMARY: "accounts_summary",
 
+  // Portfolio management keys
+  PORTFOLIOS: "portfolios",
+  PORTFOLIO: "portfolio",
+
   // Activity related keys
   ACTIVITY_DATA: "activity-data",
   ACTIVITIES: "activities",

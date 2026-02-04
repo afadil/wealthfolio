@@ -17,6 +17,7 @@ import PortfolioInsightsPage from "@/pages/insights/portfolio-insights";
 import PerformancePage from "@/pages/performance/performance-page";
 import SettingsAccountsPage from "@/pages/settings/accounts/accounts-page";
 import SettingsAppearancePage from "@/pages/settings/appearance/appearance-page";
+import SettingsPortfoliosPage from "@/pages/settings/portfolios/portfolios-page";
 import AccountPage from "./pages/account/account-page";
 import AssetProfilePage from "./pages/asset/asset-profile-page";
 import OnboardingPage from "./pages/onboarding/onboarding-page";
@@ -103,6 +104,7 @@ export function AppRoutes() {
             <Route index element={<GeneralSettingsPage />} />
             <Route path="general" element={<GeneralSettingsPage />} />
             <Route path="accounts" element={<SettingsAccountsPage />} />
+            <Route path="portfolios" element={<SettingsPortfoliosPage />} />
             <Route path="goals" element={<SettingsGoalsPage />} />
             <Route path="appearance" element={<SettingsAppearancePage />} />
             <Route path="about" element={<AboutSettingsPage />} />

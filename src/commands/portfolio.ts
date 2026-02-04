@@ -1,10 +1,13 @@
-import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb, logger } from "@/adapters";
+import { getRunEnv, invokeTauri, invokeWeb, logger, RUN_ENV } from "@/adapters";
 import {
-  Holding,
-  IncomeSummary,
-  AccountValuation,
-  PerformanceMetrics,
-  SimplePerformanceMetrics,
+    AccountValuation,
+    Holding,
+    IncomeSummary,
+    NewPortfolio,
+    PerformanceMetrics,
+    Portfolio,
+    SimplePerformanceMetrics,
+    UpdatePortfolio,
 } from "@/lib/types";
 
 export const updatePortfolio = async (): Promise<void> => {
@@ -246,5 +249,135 @@ export const getHolding = async (accountId: string, assetId: string): Promise<Ho
     // Re-throw or return null depending on desired error handling
     throw error;
     // return null;
+  }
+};
+
+// ============================================================================
+// Portfolio Management Commands
+// ============================================================================
+
+/**
+ * Creates a new portfolio grouping multiple accounts
+ */
+export const createPortfolio = async (newPortfolio: NewPortfolio): Promise<Portfolio> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri<Portfolio>("create_portfolio", { newPortfolio });
+      case RUN_ENV.WEB:
+        return invokeWeb<Portfolio>("/portfolios", {
+          method: "POST",
+          body: JSON.stringify(newPortfolio),
+        });
+      default:
+        throw new Error(`Unsupported environment`);
+    }
+  } catch (error) {
+    logger.error("Error creating portfolio.");
+    throw error;
+  }
+};
+
+/**
+ * Updates an existing portfolio
+ */
+export const updatePortfolioManagement = async (
+  updatePortfolio: UpdatePortfolio,
+): Promise<Portfolio> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri<Portfolio>("update_portfolio_cmd", { updatePortfolio });
+      case RUN_ENV.WEB:
+        return invokeWeb<Portfolio>(`/portfolios/${updatePortfolio.id}`, {
+          method: "PUT",
+          body: JSON.stringify(updatePortfolio),
+        });
+      default:
+        throw new Error(`Unsupported environment`);
+    }
+  } catch (error) {
+    logger.error("Error updating portfolio.");
+    throw error;
+  }
+};
+
+/**
+ * Gets a specific portfolio by ID
+ */
+export const getPortfolioById = async (portfolioId: string): Promise<Portfolio> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri<Portfolio>("get_portfolio", { portfolioId });
+      case RUN_ENV.WEB:
+        return invokeWeb<Portfolio>(`/portfolios/${portfolioId}`);
+      default:
+        throw new Error(`Unsupported environment`);
+    }
+  } catch (error) {
+    logger.error("Error fetching portfolio.");
+    throw error;
+  }
+};
+
+/**
+ * Lists all portfolios
+ */
+export const listPortfolios = async (): Promise<Portfolio[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri<Portfolio[]>("list_portfolios");
+      case RUN_ENV.WEB:
+        return invokeWeb<Portfolio[]>("/portfolios");
+      default:
+        throw new Error(`Unsupported environment`);
+    }
+  } catch (error) {
+    logger.error("Error fetching portfolios.");
+    throw error;
+  }
+};
+
+/**
+ * Deletes a portfolio by ID
+ */
+export const deletePortfolio = async (portfolioId: string): Promise<void> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        await invokeTauri("delete_portfolio", { portfolioId });
+        break;
+      case RUN_ENV.WEB:
+        await invokeWeb(`/portfolios/${portfolioId}`, { method: "DELETE" });
+        break;
+      default:
+        throw new Error(`Unsupported environment`);
+    }
+  } catch (error) {
+    logger.error("Error deleting portfolio.");
+    throw error;
+  }
+};
+
+/**
+ * Gets all portfolios that contain a specific account
+ */
+export const getPortfoliosContainingAccount = async (
+  accountId: string,
+): Promise<Portfolio[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri<Portfolio[]>("get_portfolios_containing_account", { accountId });
+      case RUN_ENV.WEB:
+        return invokeWeb<Portfolio[]>(`/portfolios/by-account/${accountId}`);
+      default:
+        throw new Error(`Unsupported environment`);
+    }
+  } catch (error) {
+    logger.error("Error fetching portfolios containing account.");
+    throw error;
   }
 };

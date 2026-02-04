@@ -276,11 +276,12 @@ export function AllocationPieChartView({
                               if (onUpdateTarget && clamped !== target.targetPercent) {
                                 setIsSaving(true);
                                 try {
-                                  // Calculate proportional adjustment
+                                  // Calculate proportional adjustment with locked assets
                                   const proportionalTargets = calculateProportionalTargets(
                                     targets,
                                     target.assetClass,
-                                    clamped
+                                    clamped,
+                                    lockedAssets  // Pass locked assets to respect locks
                                   );
                                   // Update all targets at once
                                   for (const t of proportionalTargets) {
@@ -307,19 +308,25 @@ export function AllocationPieChartView({
                               }
                             }}
                             autoFocus
-                            className="w-12 px-1 py-0.5 border border-primary rounded bg-background text-foreground font-semibold text-xs"
+                            disabled={lockedAssets.has(target.assetClass)}
+                            className="w-12 px-1 py-0.5 border border-primary rounded bg-background text-foreground font-semibold text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                             placeholder="0"
                           />
                         ) : (
                           <p
                             onClick={() => {
+                              if (lockedAssets.has(target.assetClass)) return;
                               setEditingAsset(target.assetClass);
                               setEditValues((prev) => ({
                                 ...prev,
                                 [target.assetClass]: target.targetPercent.toFixed(0),
                               }));
                             }}
-                            className="font-semibold cursor-pointer hover:text-primary transition-colors"
+                            className={`font-semibold transition-colors ${
+                              lockedAssets.has(target.assetClass)
+                                ? 'cursor-not-allowed opacity-50'
+                                : 'cursor-pointer hover:text-primary'
+                            }`}
                           >
                             {target.targetPercent.toFixed(0)}%
                           </p>
@@ -360,11 +367,12 @@ export function AllocationPieChartView({
 
                             setIsSaving(true);
                             try {
-                              // Calculate proportional adjustment
+                              // Calculate proportional adjustment with locked assets
                               const proportionalTargets = calculateProportionalTargets(
                                 targets,
                                 target.assetClass,
-                                val
+                                val,
+                                lockedAssets  // Pass locked assets to respect locks
                               );
 
                               // Update all targets at once

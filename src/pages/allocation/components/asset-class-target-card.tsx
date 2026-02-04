@@ -1,6 +1,6 @@
 import type { AssetClassTarget } from "@/lib/types";
 import { Button, Card, TargetPercentSlider } from "@wealthfolio/ui";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useProportionalAllocation } from "../hooks";
 import type { AssetClassComposition } from "../hooks/use-current-allocation";
 
@@ -8,34 +8,45 @@ interface AssetClassTargetCardProps {
   composition: AssetClassComposition;
   targetPercent: number;
   allTargets?: AssetClassTarget[];
+  allLockStates?: Map<string, boolean>; // Current lock states (may not be saved yet)
   onEdit: () => void;
   onDelete: () => void;
   onTargetChange: (newPercent: number) => Promise<void>;
   onProportionalChange?: (targets: AssetClassTarget[]) => Promise<void>;
+  onToggleLock?: () => void; // Add lock toggle handler
   isLoading?: boolean;
   accountId?: string;
   isReadOnly?: boolean;
+  isLocked?: boolean; // Add lock state from parent
 }
 
 export function AssetClassTargetCard({
   composition,
   targetPercent,
   allTargets = [],
+  allLockStates = new Map(),
   onEdit,
   onDelete,
   onTargetChange,
   onProportionalChange,
+  onToggleLock,
   isLoading = false,
   accountId: _accountId = '',
   isReadOnly = false,
+  isLocked = false, // Get initial lock state from parent
 }: AssetClassTargetCardProps) {
   const { assetClass, actualPercent } = composition;
   const [localTarget, setLocalTarget] = useState(targetPercent);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditingTarget, setIsEditingTarget] = useState(false);
   const [editValue, setEditValue] = useState(localTarget.toFixed(1));
-  const [isLocked, setIsLocked] = useState(false);
+  const [isLockedState, setIsLockedState] = useState(isLocked);
   const { calculateProportionalTargets } = useProportionalAllocation();
+
+  // Sync local lock state with parent prop (when lock is toggled elsewhere)
+  useEffect(() => {
+    setIsLockedState(isLocked);
+  }, [isLocked]);
 
   const handleSliderChange = async (newValue: number) => {
     setLocalTarget(newValue);
@@ -43,10 +54,33 @@ export function AssetClassTargetCard({
 
     // If proportional adjustment enabled and we have all targets
     if (onProportionalChange && allTargets.length > 0) {
+      // Build set of locked asset classes using CURRENT UI lock states
+      const lockedAssets = new Set<string>();
+
+      // Add current asset class if it's locked (use local UI state)
+      if (isLockedState) {
+        lockedAssets.add(assetClass);
+      }
+
+      // Add other locked asset classes from their saved state OR from allLockStates map
+      // Priority: allLockStates map (if provided) > saved state (from query)
+      allTargets.forEach((t) => {
+        if (t.assetClass !== assetClass) {
+          const currentLockState = allLockStates.has(t.assetClass)
+            ? allLockStates.get(t.assetClass)
+            : t.isLocked;
+          if (currentLockState) {
+            lockedAssets.add(t.assetClass);
+          }
+        }
+      });
+
+      // Calculate proportional targets
       const proportionalTargets = calculateProportionalTargets(
         allTargets,
         assetClass,
-        newValue
+        newValue,
+        lockedAssets // Pass locked assets to prevent them from being adjusted
       );
 
       setIsSaving(true);
@@ -150,13 +184,18 @@ export function AssetClassTargetCard({
                 }
               }}
               autoFocus
-              className="w-16 px-2 py-1 border border-primary rounded bg-background text-foreground font-semibold"
+              disabled={isLockedState}
+              className="w-16 px-2 py-1 border border-primary rounded bg-background text-foreground font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               placeholder="0"
             />
           ) : (
             <p
-              onClick={() => setIsEditingTarget(true)}
-              className="font-semibold cursor-pointer hover:text-primary transition-colors"
+              onClick={() => !isLockedState && setIsEditingTarget(true)}
+              className={`font-semibold transition-colors ${
+                isLockedState
+                  ? 'cursor-not-allowed opacity-50'
+                  : 'cursor-pointer hover:text-primary'
+              }`}
             >
               {localTarget.toFixed(1)}%
             </p>
@@ -183,10 +222,16 @@ export function AssetClassTargetCard({
             onChange={(val) => setLocalTarget(val)}
             onChangeEnd={(val) => handleSliderChange(val)}
             label="Target"
-            disabled={isLoading || isSaving}
+            disabled={isLoading || isSaving || isLockedState}
             showValue={false}
-            isLocked={isLocked}
-            onToggleLock={() => setIsLocked(!isLocked)}
+            isLocked={isLockedState}
+            onToggleLock={() => {
+              // Don't update local state here - let parent update the prop
+              // This ensures assetClassLockStates Map is updated FIRST
+              if (onToggleLock) {
+                onToggleLock();
+              }
+            }}
             overlay={true}
             barColor="bg-chart-2"
           />

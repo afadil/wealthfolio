@@ -144,7 +144,7 @@ export function HoldingTargetRow({
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
               onBlur={handleSave}
-              disabled={disabled}
+              disabled={disabled || isLocked}
               className="h-6 w-16 text-right text-xs"
               autoFocus
             />
@@ -153,14 +153,17 @@ export function HoldingTargetRow({
         ) : (
           <button
             onClick={() => {
+              if (isLocked) return; // Don't allow editing locked holdings
               setIsEditing(true);
               // For preview values, start with the preview value so user can accept/modify it
               setInputValue(displayPercent.toFixed(1));
             }}
-            disabled={disabled}
+            disabled={disabled || isLocked}
             className={`transition-colors font-medium ${
               isPreview
                 ? 'text-muted-foreground italic hover:text-foreground cursor-pointer'
+                : isLocked
+                ? 'text-foreground cursor-not-allowed opacity-50'
                 : 'text-foreground hover:text-primary'
             }`}
           >
