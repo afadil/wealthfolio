@@ -10,8 +10,8 @@ use wealthfolio_core::{
     accounts::AccountServiceTrait,
     constants::PORTFOLIO_TOTAL_ACCOUNT_ID,
     portfolio::{
-        allocation::PortfolioAllocations,
-        holdings::{Holding, HoldingSummary},
+        allocation::{AllocationHoldings, PortfolioAllocations},
+        holdings::Holding,
         snapshot::{
             CashBalanceInput, ManualHoldingInput, ManualSnapshotRequest, ManualSnapshotService,
             SnapshotSource,
@@ -125,13 +125,13 @@ pub async fn get_portfolio_allocations(
 pub async fn get_holdings_by_allocation(
     State(state): State<Arc<AppState>>,
     Query(q): Query<AllocationHoldingsQuery>,
-) -> ApiResult<Json<Vec<HoldingSummary>>> {
+) -> ApiResult<Json<AllocationHoldings>> {
     let base = state.base_currency.read().unwrap().clone();
-    let holdings = state
+    let result = state
         .allocation_service
         .get_holdings_by_allocation(&q.account_id, &base, &q.taxonomy_id, &q.category_id)
         .await?;
-    Ok(Json(holdings))
+    Ok(Json(result))
 }
 
 /// Gets snapshots for an account (all sources: CALCULATED, MANUAL_ENTRY, etc.)

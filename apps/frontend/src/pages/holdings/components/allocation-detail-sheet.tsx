@@ -22,7 +22,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { getHoldingsByAllocation } from "@/adapters";
 import { TickerAvatar } from "@/components/ticker-avatar";
-import type { TaxonomyAllocation, HoldingSummary } from "@/lib/types";
+import type { TaxonomyAllocation, HoldingSummary, AllocationHoldings } from "@/lib/types";
 import { QueryKeys } from "@/lib/query-keys";
 import { CompactAllocationStrip } from "./compact-allocation-strip";
 
@@ -65,7 +65,7 @@ export function AllocationDetailSheet({
   );
 
   // Fetch holdings for the selected category
-  const { data: holdings, isLoading: holdingsLoading } = useQuery({
+  const { data: allocationHoldings, isLoading: holdingsLoading } = useQuery({
     queryKey: [
       QueryKeys.HOLDINGS_BY_ALLOCATION,
       accountId,
@@ -77,6 +77,9 @@ export function AllocationDetailSheet({
     enabled: !!selectedCategoryId && !!allocation?.taxonomyId,
     staleTime: 30000, // Cache for 30 seconds
   });
+
+  // Extract holdings array from the response
+  const holdings = allocationHoldings?.holdings;
 
   const handleSegmentClick = useCallback((categoryId: string, categoryName: string) => {
     setSelectedCategoryId(categoryId);

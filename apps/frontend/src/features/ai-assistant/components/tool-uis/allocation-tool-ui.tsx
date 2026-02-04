@@ -22,10 +22,12 @@ import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 
 interface GetAssetAllocationArgs {
   accountId?: string;
-  groupBy?: string; // e.g., "asset_class", "sector", "region"
+  groupBy?: string;
+  taxonomyId?: string;
+  categoryId?: string;
 }
 
-interface CategoryAllocation {
+interface AllocationDto {
   categoryId: string;
   categoryName: string;
   color: string;
@@ -33,18 +35,22 @@ interface CategoryAllocation {
   percentage: number;
 }
 
-interface TaxonomyAllocation {
-  taxonomyId: string;
-  taxonomyName: string;
-  color: string;
-  categories: CategoryAllocation[];
+interface HoldingDto {
+  symbol: string;
+  name?: string;
+  value: number;
+  weight: number;
 }
 
 interface GetAssetAllocationOutput {
-  allocation: TaxonomyAllocation;
+  allocations: AllocationDto[];
   totalValue: number;
   currency: string;
-  accountScope: string;
+  groupBy: string;
+  taxonomyId?: string;
+  taxonomyName?: string;
+  holdings?: HoldingDto[];
+  categoryName?: string;
 }
 
 // ============================================================================
@@ -79,53 +85,58 @@ function normalizeResult(result: unknown): GetAssetAllocationOutput | null {
     return normalizeResult(candidate.data);
   }
 
-  // Extract allocation object
-  const allocationRaw = (candidate.allocation as Record<string, unknown> | undefined) ?? candidate;
-
-  // Parse categories array
-  const categoriesRaw = Array.isArray(allocationRaw.categories) ? allocationRaw.categories : [];
-
-  const categories: CategoryAllocation[] = categoriesRaw
+  // Parse allocations array (new format)
+  const allocationsRaw = Array.isArray(candidate.allocations) ? candidate.allocations : [];
+  const allocations: AllocationDto[] = allocationsRaw
     .map((entry) => entry as Record<string, unknown>)
     .map((entry, index) => ({
       categoryId:
         (entry.categoryId as string | undefined) ??
         (entry.category_id as string | undefined) ??
+        (entry.category as string | undefined) ??
         `category-${index}`,
       categoryName:
         (entry.categoryName as string | undefined) ??
         (entry.category_name as string | undefined) ??
+        (entry.category as string | undefined) ??
         "Unknown",
       color: (entry.color as string | undefined) ?? `var(--chart-${(index % 5) + 1})`,
       value: Number(entry.value ?? 0),
       percentage: Number(entry.percentage ?? 0),
     }));
 
-  const allocation: TaxonomyAllocation = {
-    taxonomyId:
-      (allocationRaw.taxonomyId as string | undefined) ??
-      (allocationRaw.taxonomy_id as string | undefined) ??
-      "unknown",
-    taxonomyName:
-      (allocationRaw.taxonomyName as string | undefined) ??
-      (allocationRaw.taxonomy_name as string | undefined) ??
-      "Allocation",
-    color: (allocationRaw.color as string | undefined) ?? "#6b7280",
-    categories,
-  };
+  // Parse holdings array (drill-down mode)
+  const holdingsRaw = Array.isArray(candidate.holdings) ? candidate.holdings : undefined;
+  const holdings: HoldingDto[] | undefined = holdingsRaw?.map((entry) => {
+    const h = entry as Record<string, unknown>;
+    return {
+      symbol: (h.symbol as string) ?? "",
+      name: h.name as string | undefined,
+      value: Number(h.value ?? h.market_value ?? 0),
+      weight: Number(h.weight ?? h.weight_in_category ?? 0),
+    };
+  });
 
   return {
-    allocation,
+    allocations,
     totalValue: Number(
       (candidate.totalValue as number | string | undefined) ??
         (candidate.total_value as number | string | undefined) ??
-        categories.reduce((sum, c) => sum + c.value, 0),
+        allocations.reduce((sum, c) => sum + c.value, 0),
     ),
     currency: (candidate.currency as string | undefined) ?? "USD",
-    accountScope:
-      (candidate.accountScope as string | undefined) ??
-      (candidate.account_scope as string | undefined) ??
-      "TOTAL",
+    groupBy:
+      (candidate.groupBy as string | undefined) ?? (candidate.group_by as string | undefined) ?? "",
+    taxonomyId:
+      (candidate.taxonomyId as string | undefined) ??
+      (candidate.taxonomy_id as string | undefined),
+    taxonomyName:
+      (candidate.taxonomyName as string | undefined) ??
+      (candidate.taxonomy_name as string | undefined),
+    holdings,
+    categoryName:
+      (candidate.categoryName as string | undefined) ??
+      (candidate.category_name as string | undefined),
   };
 }
 
@@ -149,18 +160,24 @@ type AllocationContentProps = ToolCallMessagePartProps<
 >;
 
 function AllocationContent({ args, result, status }: AllocationContentProps) {
-  // Cast args to typed interface since makeAssistantToolUI provides ReadonlyJSONObject
   const typedArgs = args as GetAssetAllocationArgs | undefined;
   const { isBalanceHidden } = useBalancePrivacy();
   const parsed = normalizeResult(result);
 
+  // Detect drill-down mode
+  const isDrillDown = parsed?.holdings && parsed.holdings.length > 0;
+
   // Sort categories by value descending
   const sortedCategories = useMemo(() => {
-    if (!parsed?.allocation?.categories) return [];
-    return [...parsed.allocation.categories]
-      .filter((c) => c.value > 0)
-      .sort((a, b) => b.value - a.value);
-  }, [parsed?.allocation?.categories]);
+    if (!parsed?.allocations) return [];
+    return [...parsed.allocations].filter((c) => c.value > 0).sort((a, b) => b.value - a.value);
+  }, [parsed?.allocations]);
+
+  // Sort holdings by value descending
+  const sortedHoldings = useMemo(() => {
+    if (!parsed?.holdings) return [];
+    return [...parsed.holdings].sort((a, b) => b.value - a.value);
+  }, [parsed?.holdings]);
 
   const currency = parsed?.currency ?? "USD";
   const totalValue = parsed?.totalValue ?? 0;
@@ -176,12 +193,13 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
     [currency],
   );
 
-  const accountLabel = parsed?.accountScope ?? typedArgs?.accountId ?? "TOTAL";
-  const taxonomyName = parsed?.allocation?.taxonomyName ?? "Allocation";
+  const taxonomyName = parsed?.taxonomyName ?? "Allocation";
+  const categoryName = parsed?.categoryName;
   const isLoading = status?.type === "running";
   const isComplete = status?.type === "complete" || status?.type === "incomplete";
   const hasError = status?.type === "incomplete" && status.reason === "error";
   const categoryCount = sortedCategories.length;
+  const holdingsCount = sortedHoldings.length;
 
   // Format value with privacy
   const formatValue = (value: number) => {
@@ -191,7 +209,7 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
     return formatter.format(value);
   };
 
-  // Calculate total for percentages (in case backend doesn't provide)
+  // Calculate total for percentages
   const computedTotal = useMemo(() => {
     return sortedCategories.reduce((sum, c) => sum + c.value, 0);
   }, [sortedCategories]);
@@ -213,9 +231,7 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
           </div>
         </CardHeader>
         <CardContent className="pb-4">
-          {/* Skeleton bar */}
           <Skeleton className="mb-4 h-6 w-full rounded-md" />
-          {/* Skeleton legend items */}
           <div className="space-y-2">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="flex items-center justify-between gap-2">
@@ -246,12 +262,66 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
     );
   }
 
-  // Empty state - don't render anything, let LLM explain
-  if (isComplete && categoryCount === 0) {
+  // Empty state
+  if (isComplete && categoryCount === 0 && holdingsCount === 0) {
     return null;
   }
 
-  // Complete state with data
+  // Drill-down mode: show holdings table
+  if (isDrillDown) {
+    return (
+      <Card className="bg-muted/40 border-primary/10 w-full overflow-hidden">
+        <CardHeader className="pb-2">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <CardTitle className="text-sm font-medium">
+                {categoryName ?? "Holdings"}
+              </CardTitle>
+              <p className="text-muted-foreground mt-1 text-xs">
+                {holdingsCount} holding{holdingsCount !== 1 ? "s" : ""}
+              </p>
+            </div>
+            <Badge variant="outline" className="text-xs">
+              Drill-down
+            </Badge>
+          </div>
+          <div className="mt-2">
+            <span className="text-xl font-bold">{formatValue(totalValue)}</span>
+          </div>
+        </CardHeader>
+        <CardContent className="pb-4">
+          <div className="max-h-[250px] overflow-y-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-muted-foreground border-b text-left">
+                  <th className="pb-2 font-medium">Symbol</th>
+                  <th className="pb-2 font-medium">Name</th>
+                  <th className="pb-2 text-right font-medium">Value</th>
+                  <th className="pb-2 text-right font-medium">Weight</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedHoldings.map((holding, index) => (
+                  <tr key={`${holding.symbol}-${index}`} className="border-b border-border/50">
+                    <td className="py-2 font-medium">{holding.symbol}</td>
+                    <td className="text-muted-foreground truncate py-2">
+                      {holding.name ?? "-"}
+                    </td>
+                    <td className="py-2 text-right tabular-nums">{formatValue(holding.value)}</td>
+                    <td className="text-muted-foreground py-2 text-right tabular-nums">
+                      {formatPercent(holding.weight / 100)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Allocation mode: show stacked bar + legend
   return (
     <Card className="bg-muted/40 border-primary/10 w-full overflow-hidden">
       <CardHeader className="pb-2">
@@ -262,9 +332,9 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
               {categoryCount} categor{categoryCount !== 1 ? "ies" : "y"}
             </p>
           </div>
-          {accountLabel !== "TOTAL" && (
+          {typedArgs?.accountId && typedArgs.accountId !== "TOTAL" && (
             <Badge variant="outline" className="text-xs uppercase">
-              {accountLabel}
+              {typedArgs.accountId}
             </Badge>
           )}
         </div>

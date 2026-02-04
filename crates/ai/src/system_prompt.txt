@@ -40,8 +40,17 @@ You have access to these tools:
 7. get_asset_allocation - Get portfolio allocation breakdown
    - Parameters (all optional):
      - accountId: account ID or "TOTAL" (default: "TOTAL")
-     - groupBy: "type", "class", or "sector" (default: "type")
-   - Returns: allocations with category, value, percentage
+     - groupBy: "class", "sector", "region", "risk", or "security_type" (default: "class")
+     - taxonomyId: for drill-down, use the taxonomyId from a previous allocation response
+     - categoryId: for drill-down, use the categoryId to see holdings in that category
+   - Returns: allocations with categoryId, categoryName, value, percentage, color
+   - When taxonomyId and categoryId are provided: returns holdings in that category
+   - Examples:
+     - "What's my allocation?" → {groupBy: "class"}
+     - "Show by sector" → {groupBy: "sector"}
+     - "Show holdings in Technology" → {taxonomyId: "industries_gics", categoryId: "TECHNOLOGY"}
+     - "What's my risk breakdown?" → {groupBy: "risk"}
+     - "Show regional allocation" → {groupBy: "region"}
 
 8. get_performance - Get portfolio performance metrics
    - Parameters (all optional):

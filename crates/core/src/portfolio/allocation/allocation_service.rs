@@ -12,7 +12,7 @@ use crate::errors::Result;
 use crate::portfolio::holdings::{Holding, HoldingSummary, HoldingType, HoldingsServiceTrait};
 use crate::taxonomies::{Category, TaxonomyServiceTrait};
 
-use super::{CategoryAllocation, PortfolioAllocations, TaxonomyAllocation};
+use super::{AllocationHoldings, CategoryAllocation, PortfolioAllocations, TaxonomyAllocation};
 
 /// Trait for allocation service.
 #[async_trait]
@@ -25,7 +25,7 @@ pub trait AllocationServiceTrait: Send + Sync {
         base_currency: &str,
     ) -> Result<PortfolioAllocations>;
 
-    /// Returns holdings filtered by a taxonomy category.
+    /// Returns holdings filtered by a taxonomy category with full category metadata.
     /// Used for drill-down views when user clicks on an allocation category.
     async fn get_holdings_by_allocation(
         &self,
@@ -33,7 +33,7 @@ pub trait AllocationServiceTrait: Send + Sync {
         base_currency: &str,
         taxonomy_id: &str,
         category_id: &str,
-    ) -> Result<Vec<HoldingSummary>>;
+    ) -> Result<AllocationHoldings>;
 }
 
 /// Service for computing taxonomy-based portfolio allocations.
@@ -431,11 +431,32 @@ impl AllocationServiceTrait for AllocationService {
         base_currency: &str,
         taxonomy_id: &str,
         category_id: &str,
-    ) -> Result<Vec<HoldingSummary>> {
+    ) -> Result<AllocationHoldings> {
         debug!(
             "Getting holdings for category {} in taxonomy {} for account {}",
             category_id, taxonomy_id, account_id
         );
+
+        // Get taxonomy with categories for hierarchy lookup and metadata
+        let taxonomy_with_cats = self.taxonomy_service.get_taxonomy(taxonomy_id)?;
+        let empty_categories: Vec<Category> = Vec::new();
+
+        // Extract taxonomy metadata
+        let (taxonomy_name, taxonomy_color, categories) = match &taxonomy_with_cats {
+            Some(twc) => (twc.taxonomy.name.clone(), twc.taxonomy.color.clone(), &twc.categories),
+            None => ("Unknown".to_string(), "#808080".to_string(), &empty_categories),
+        };
+
+        // Look up category metadata
+        let (category_name, category_color) = if category_id == "__UNKNOWN__" {
+            ("Unknown".to_string(), "#878580".to_string())
+        } else {
+            categories
+                .iter()
+                .find(|c| c.id == category_id)
+                .map(|c| (c.name.clone(), c.color.clone()))
+                .unwrap_or_else(|| (category_id.to_string(), taxonomy_color.clone()))
+        };
 
         // Get all holdings for the account
         let holdings = self
@@ -444,16 +465,17 @@ impl AllocationServiceTrait for AllocationService {
             .await?;
 
         if holdings.is_empty() {
-            return Ok(Vec::new());
+            return Ok(AllocationHoldings {
+                taxonomy_id: taxonomy_id.to_string(),
+                taxonomy_name,
+                category_id: category_id.to_string(),
+                category_name,
+                color: category_color,
+                holdings: Vec::new(),
+                total_value: Decimal::ZERO,
+                currency: base_currency.to_string(),
+            });
         }
-
-        // Get taxonomy with categories for hierarchy lookup
-        let taxonomy_with_cats = self.taxonomy_service.get_taxonomy(taxonomy_id)?;
-        let empty_categories: Vec<Category> = Vec::new();
-        let categories = taxonomy_with_cats
-            .as_ref()
-            .map(|t| &t.categories)
-            .unwrap_or(&empty_categories);
 
         // Build map from category to top-level ancestor
         let top_level_map: HashMap<&str, &str> = self.build_top_level_map(categories);
@@ -568,6 +590,15 @@ impl AllocationServiceTrait for AllocationService {
         // Sort by market value descending
         summaries.sort_by(|a, b| b.market_value.cmp(&a.market_value));
 
-        Ok(summaries)
+        Ok(AllocationHoldings {
+            taxonomy_id: taxonomy_id.to_string(),
+            taxonomy_name,
+            category_id: category_id.to_string(),
+            category_name,
+            color: category_color,
+            holdings: summaries,
+            total_value: total_matched_value,
+            currency: base_currency.to_string(),
+        })
     }
 }

@@ -529,6 +529,21 @@ export interface HoldingSummary {
 }
 
 /**
+ * Holdings within an allocation category.
+ * Returned by getHoldingsByAllocation for drill-down views.
+ */
+export interface AllocationHoldings {
+  taxonomyId: string;
+  taxonomyName: string;
+  categoryId: string;
+  categoryName: string;
+  color: string;
+  holdings: HoldingSummary[];
+  totalValue: number;
+  currency: string;
+}
+
+/**
  * Asset interface matching the new provider-agnostic backend model
  * Note: Legacy fields (assetClass, assetSubClass, isin, profile) are stored in metadata.legacy
  * for migration purposes only. Use taxonomy system for classifications.

@@ -265,6 +265,7 @@ pub async fn initialize_context(
         secret_store.clone(),
         ai_chat_repository,
         quote_service.clone(),
+        allocation_service.clone(),
     ));
     let ai_chat_service = Arc::new(ChatService::new(ai_environment, ChatConfig::default()));
 

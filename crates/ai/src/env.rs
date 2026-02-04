@@ -10,7 +10,10 @@ use wealthfolio_core::{
     accounts::AccountServiceTrait,
     activities::ActivityServiceTrait,
     goals::GoalServiceTrait,
-    portfolio::{holdings::HoldingsServiceTrait, valuation::ValuationServiceTrait},
+    portfolio::{
+        allocation::AllocationServiceTrait, holdings::HoldingsServiceTrait,
+        valuation::ValuationServiceTrait,
+    },
     quotes::QuoteServiceTrait,
     secrets::SecretStore,
     settings::SettingsServiceTrait,
@@ -57,6 +60,9 @@ pub trait AiEnvironment: Send + Sync {
 
     /// Get the quote service for symbol search.
     fn quote_service(&self) -> Arc<dyn QuoteServiceTrait>;
+
+    /// Get the allocation service for portfolio allocations.
+    fn allocation_service(&self) -> Arc<dyn AllocationServiceTrait>;
 }
 
 #[cfg(test)]
@@ -75,7 +81,8 @@ pub mod test_env {
         assets::{Asset, ProviderProfile},
         errors::DatabaseError,
         goals::{Goal, GoalServiceTrait, GoalsAllocation, NewGoal},
-        holdings::{Holding, HoldingsServiceTrait},
+        holdings::{Holding, HoldingSummary, HoldingsServiceTrait},
+        portfolio::allocation::{AllocationHoldings, AllocationServiceTrait, PortfolioAllocations},
         quotes::{
             LatestQuotePair, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait, QuoteSyncState,
             SymbolSearchResult, SymbolSyncPlan, SyncMode, SyncResult,
@@ -864,6 +871,40 @@ pub mod test_env {
         }
     }
 
+    /// Mock allocation service for testing.
+    #[derive(Default)]
+    pub struct MockAllocationService;
+
+    #[async_trait]
+    impl AllocationServiceTrait for MockAllocationService {
+        async fn get_portfolio_allocations(
+            &self,
+            _account_id: &str,
+            _base_currency: &str,
+        ) -> CoreResult<PortfolioAllocations> {
+            Ok(PortfolioAllocations::default())
+        }
+
+        async fn get_holdings_by_allocation(
+            &self,
+            _account_id: &str,
+            base_currency: &str,
+            taxonomy_id: &str,
+            category_id: &str,
+        ) -> CoreResult<AllocationHoldings> {
+            Ok(AllocationHoldings {
+                taxonomy_id: taxonomy_id.to_string(),
+                taxonomy_name: "Mock Taxonomy".to_string(),
+                category_id: category_id.to_string(),
+                category_name: "Mock Category".to_string(),
+                color: "#808080".to_string(),
+                holdings: Vec::new(),
+                total_value: rust_decimal::Decimal::ZERO,
+                currency: base_currency.to_string(),
+            })
+        }
+    }
+
     /// Mock environment for testing.
     pub struct MockEnvironment {
         pub base_currency: String,
@@ -876,6 +917,7 @@ pub mod test_env {
         pub secret_store: Arc<dyn SecretStore>,
         pub chat_repository: Arc<dyn ChatRepositoryTrait>,
         pub quote_service: Arc<dyn QuoteServiceTrait>,
+        pub allocation_service: Arc<dyn AllocationServiceTrait>,
     }
 
     impl Default for MockEnvironment {
@@ -897,6 +939,7 @@ pub mod test_env {
                 secret_store: Arc::new(MockSecretStore::default()),
                 chat_repository: Arc::new(MockChatRepository::default()),
                 quote_service: Arc::new(MockQuoteService::default()),
+                allocation_service: Arc::new(MockAllocationService::default()),
             }
         }
 
@@ -946,6 +989,10 @@ pub mod test_env {
 
         fn quote_service(&self) -> Arc<dyn QuoteServiceTrait> {
             self.quote_service.clone()
+        }
+
+        fn allocation_service(&self) -> Arc<dyn AllocationServiceTrait> {
+            self.allocation_service.clone()
         }
     }
 }
