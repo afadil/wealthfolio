@@ -9,8 +9,8 @@ import {
 import { AmountDisplay, GainPercent, QuantityDisplay } from "@wealthfolio/ui";
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
-import { Holding, HOLDING_GROUP_ORDER, AccountType } from "@/lib/types";
-import { AssetKind } from "@/lib/constants";
+import { Holding, HOLDING_GROUP_ORDER } from "@/lib/types";
+import { AccountType, AssetKind } from "@/lib/constants";
 import { cn, safeDivide } from "@/lib/utils";
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -74,7 +74,7 @@ export function HoldingsGroupedTable({
     holdings.forEach((holding) => {
       const accountType = accountTypeMap.get(holding.accountId);
       const groupName = getGroupName(accountType);
-      const isLiability = accountType === AccountType.LIABILITY;
+      const isLiability = holding.assetKind === AssetKind.LIABILITY;
 
       const holdingWithMeta: HoldingWithMeta = {
         ...holding,
@@ -298,20 +298,8 @@ function getGroupName(accountType: string | undefined): string {
       return "Investments";
     case AccountType.CASH:
       return "Cash";
-    case AccountType.PROPERTY:
-      return "Properties";
-    case AccountType.VEHICLE:
-      return "Vehicles";
-    case AccountType.COLLECTIBLE:
-      return "Collectibles";
-    case AccountType.PRECIOUS:
-      return "Precious Metals";
-    case AccountType.LIABILITY:
-      return "Liabilities";
-    case AccountType.OTHER:
-      return "Other Assets";
     default:
-      return "Investments"; // Default to Investments for unknown types
+      return "Investments";
   }
 }
 

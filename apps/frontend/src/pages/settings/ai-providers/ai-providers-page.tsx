@@ -64,7 +64,7 @@ export default function AiProvidersPage() {
         />
         <Separator />
         <div className="overflow-hidden rounded-lg border">
-          {[1, 2, 3].map((i) => (
+          {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className="flex items-center gap-4 border-b px-4 py-3 last:border-b-0">
               <Skeleton className="h-9 w-9 rounded-lg" />
               <div className="flex-1 space-y-2">

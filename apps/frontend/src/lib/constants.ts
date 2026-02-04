@@ -16,13 +16,6 @@ export const AccountType = {
   SECURITIES: "SECURITIES",
   CASH: "CASH",
   CRYPTOCURRENCY: "CRYPTOCURRENCY",
-  // New account types for alternative assets
-  PROPERTY: "PROPERTY",
-  VEHICLE: "VEHICLE",
-  COLLECTIBLE: "COLLECTIBLE",
-  PRECIOUS: "PRECIOUS",
-  LIABILITY: "LIABILITY",
-  OTHER: "OTHER",
 } as const;
 
 export type AccountType = (typeof AccountType)[keyof typeof AccountType];
@@ -31,17 +24,10 @@ export const accountTypeSchema = z.enum([
   AccountType.SECURITIES,
   AccountType.CASH,
   AccountType.CRYPTOCURRENCY,
-  AccountType.PROPERTY,
-  AccountType.VEHICLE,
-  AccountType.COLLECTIBLE,
-  AccountType.PRECIOUS,
-  AccountType.LIABILITY,
-  AccountType.OTHER,
 ]);
 
 /**
  * Returns the default group name for a given account type.
- * Maps account types to their default group names for UI organization.
  */
 export function defaultGroupForAccountType(accountType: AccountType): string {
   switch (accountType) {
@@ -51,41 +37,9 @@ export function defaultGroupForAccountType(accountType: AccountType): string {
       return "Cash";
     case AccountType.CRYPTOCURRENCY:
       return "Crypto";
-    case AccountType.PROPERTY:
-      return "Properties";
-    case AccountType.VEHICLE:
-      return "Vehicles";
-    case AccountType.COLLECTIBLE:
-      return "Collectibles";
-    case AccountType.PRECIOUS:
-      return "Precious Metals";
-    case AccountType.LIABILITY:
-      return "Liabilities";
-    case AccountType.OTHER:
-      return "Other Assets";
     default:
-      return "Other";
+      return "Investments";
   }
-}
-
-/**
- * Returns true if the account type is for alternative assets (non-investment).
- */
-export function isAlternativeAssetType(accountType: AccountType): boolean {
-  return (
-    accountType === AccountType.PROPERTY ||
-    accountType === AccountType.VEHICLE ||
-    accountType === AccountType.COLLECTIBLE ||
-    accountType === AccountType.PRECIOUS ||
-    accountType === AccountType.OTHER
-  );
-}
-
-/**
- * Returns true if the account type is a liability.
- */
-export function isLiabilityType(accountType: AccountType): boolean {
-  return accountType === AccountType.LIABILITY;
 }
 
 /**
@@ -780,12 +734,6 @@ export const HOLDING_GROUP_DISPLAY_NAMES: Record<string, string> = {
   [AccountType.SECURITIES]: "Investments",
   [AccountType.CRYPTOCURRENCY]: "Investments",
   [AccountType.CASH]: "Cash",
-  [AccountType.PROPERTY]: "Properties",
-  [AccountType.VEHICLE]: "Vehicles",
-  [AccountType.COLLECTIBLE]: "Collectibles",
-  [AccountType.PRECIOUS]: "Precious Metals",
-  [AccountType.LIABILITY]: "Liabilities",
-  [AccountType.OTHER]: "Other Assets",
 };
 
 /**

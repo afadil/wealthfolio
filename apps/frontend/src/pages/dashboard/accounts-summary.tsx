@@ -1,29 +1,17 @@
 "use client";
 
+import { useAccounts } from "@/hooks/use-accounts";
+import { useLatestValuations } from "@/hooks/use-latest-valuations";
+import { useSettingsContext } from "@/lib/settings-provider";
+import type { AccountValuation } from "@/lib/types";
+import { calculatePerformanceMetrics } from "@/lib/utils";
+import { GainAmount, GainPercent, PrivacyAmount } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { useAccounts } from "@/hooks/use-accounts";
-import { useLatestValuations } from "@/hooks/use-latest-valuations";
-import { useSettingsContext } from "@/lib/settings-provider";
-import type { Account, AccountValuation } from "@/lib/types";
-import { calculatePerformanceMetrics } from "@/lib/utils";
-import { isAlternativeAssetType, isLiabilityType } from "@/lib/constants";
-import { GainAmount, GainPercent, PrivacyAmount } from "@wealthfolio/ui";
 import React, { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-
-/**
- * Filter accounts to only include investment/savings accounts.
- * Excludes: Property, Vehicle, Collectible, Precious Metals, Liability, Other
- */
-function filterInvestmentAccounts(accounts: Account[]): Account[] {
-  return accounts.filter((acc) => {
-    const accountType = acc.accountType;
-    return !isAlternativeAssetType(accountType) && !isLiabilityType(accountType);
-  });
-}
 
 interface AccountSummaryDisplayData {
   accountName: string;
@@ -50,7 +38,7 @@ const AccountSummarySkeleton = () => (
       <Skeleton className="h-4 w-32 rounded md:h-4" />
     </div>
     <div className="flex shrink-0 items-center gap-2 md:gap-3">
-      <div className="flex min-h-[3rem] flex-col items-end justify-center gap-1 md:gap-1.5">
+      <div className="flex min-h-12 flex-col items-end justify-center gap-1 md:gap-1.5">
         <Skeleton className="h-5 w-24 rounded md:h-6" />
         <Skeleton className="h-4 w-32 rounded md:h-4" />
       </div>
@@ -228,11 +216,7 @@ export const AccountsSummary = React.memo(() => {
     error: errorAccounts,
   } = useAccounts();
 
-  // Filter to only investment/savings accounts (exclude alternative assets and liabilities)
-  const accounts = useMemo(
-    () => (allAccounts ? filterInvestmentAccounts(allAccounts) : []),
-    [allAccounts],
-  );
+  const accounts = allAccounts ?? [];
 
   const accountIds = useMemo(() => accounts?.map((acc) => acc.id) ?? [], [accounts]);
 

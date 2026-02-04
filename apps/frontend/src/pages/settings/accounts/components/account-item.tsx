@@ -23,36 +23,6 @@ const accountTypeConfig: Record<AccountType, { icon: Icon; bgClass: string; icon
     bgClass: "bg-orange-500/10",
     iconClass: "text-orange-500",
   },
-  PROPERTY: {
-    icon: Icons.Home,
-    bgClass: "bg-purple-500/10",
-    iconClass: "text-purple-500",
-  },
-  VEHICLE: {
-    icon: Icons.Activity2,
-    bgClass: "bg-slate-500/10",
-    iconClass: "text-slate-500",
-  },
-  COLLECTIBLE: {
-    icon: Icons.Star,
-    bgClass: "bg-amber-500/10",
-    iconClass: "text-amber-500",
-  },
-  PRECIOUS: {
-    icon: Icons.HandCoins,
-    bgClass: "bg-yellow-500/10",
-    iconClass: "text-yellow-500",
-  },
-  LIABILITY: {
-    icon: Icons.CreditCard,
-    bgClass: "bg-red-500/10",
-    iconClass: "text-red-500",
-  },
-  OTHER: {
-    icon: Icons.Package,
-    bgClass: "bg-muted",
-    iconClass: "text-muted-foreground",
-  },
 };
 
 export interface AccountItemProps {
