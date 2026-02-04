@@ -666,6 +666,42 @@ export const calculatePortfolioPercent = (
 6. Test with 10+ holdings in one asset class (verify scrolling, performance)
 7. Test rebalancing with insufficient cash (verify partial suggestions)
 
+### 7.4 Rebalancing Advisor – Edge Cases to Test
+
+Use these to sanity-check the rebalancing tool (manual or automated).
+
+**Available cash & input**
+- [✅] **Zero cash:** Button "Calculate Suggestions" disabled; entering 0 and pressing Enter shows inline error message "Please enter an amount greater than 0" below input field (no alert popup). Error clears when user starts typing.
+- [✅] **Decimal input:** `0.50`, `12.99`, `100.00`, `.5` (leading dot), `12.` (trailing dot) all accepted and used correctly; max 2 decimals (e.g. `1.999` → `1.99`).
+- [✅] **Empty input:** Field can be cleared; calculated suggestions still show previous run until recalculated; button disabled when effective amount ≤ 0.
+- [✅] **Very large amount:** e.g. 1,000,000; no overflow; "Remaining" or "Additional cash needed" behaves correctly.
+
+**Portfolio & targets**
+- [✅] **No allocation targets:** Empty state message: "No allocation targets set" / "Go to Allocation Overview..."; no calculator UI.
+- [✅] **Zero portfolio value:** No division-by-zero or "Infinity%"; current % shown as 0 (or safe fallback); suggestions still calculable when cash > 0.
+- [✅] **Asset class with no holdings in composition:** Target exists but composition has no holdings for that class; no crash; asset class suggestion can still show (shortfall), holding-level section empty for that class.
+- [✅] **No holding targets (asset-class only):** Only asset-class suggestions; no "Holding-Level Suggestions" section (or section empty).
+- [] **Holding target points to sold/missing holding:** Holding target exists but holding not in composition (e.g. sold); that holding skipped in suggestions; no crash.
+
+**Cash vs shortfall**
+- [✅] **Cash exactly fills shortfall:** All suggestions funded; "Remaining" = 0; no "Additional cash needed".
+- [✅] **Cash less than total shortfall:** Proportional scaling; "Additional cash needed to reach targets" shows correct amount; per-holding amounts scaled down.
+- [✅] **Cash greater than total shortfall:** Suggestions sum to total shortfall; "Remaining" shows leftover cash; no "Additional cash needed".
+- [✅] **No shortfall (already at or above targets):** Asset-class suggested buy = 0; holding suggestions 0; "Remaining" = full available cash; optional: "Additional cash needed" = 0 or hidden.
+
+**Whole-share optimization**
+- [✅] **Holding with price 0 or missing:** Shows "No price"; 0 shares suggested; no crash; other holdings in same class still get suggestions.
+- [✅] **Cash too small to buy one share of any holding:** Whole-share step suggests 0 shares where applicable; residual (can't buy whole shares) shown per asset class.
+- [✅] **Single holding per asset class:** Suggestions and optimization still correct; no cross-class leakage.
+
+**UI & export**
+- [✅] **Copy text / Export CSV:** Include both asset-class and holding-level rows when holding targets exist; numbers and currency consistent with UI. Holdings show: Name (Symbol), Shares to Buy × Price per Share, Amount. CSV columns: Type, Asset Class, Name, Symbol, Shares to Buy, Price per Share, Target %, Current %, Suggested Buy, Shortfall %.
+- [✅ ] **Overview vs Detailed:** With holding targets, toggling view shows asset-class only (Overview) vs per-holding breakdown (Detailed); no duplicate or missing data.
+- [✅ ] **Collapsible by asset class:** Expand/collapse works; totals per class match sum of holdings.
+
+**Multi-account**
+- [✅] **Multiple accounts selected:** Single banner (portfolio name or account list + Save as Portfolio); no "Viewing rebalancing suggestions for combined accounts" banner; rebalancing uses combined composition and targets.
+
 ### 7.4 Portfolio Feature Test Scenarios (Phase 3)
 
 #### Scenario 1: Create Portfolio in Settings
@@ -965,6 +1001,8 @@ Portfolio feature fully implemented! All core functionality and UX polish comple
 - ✅ Lock: all targets included in rebalancing (lock only affects target-editing panel; user chooses what to buy)
 - ✅ Available cash input: decimals supported (max 2 decimal places); string state so user can type e.g. "100.50"
 - ✅ Removed rebalancing-specific combined-accounts banner; single banner shows portfolio/account names + Save as Portfolio when multiple accounts selected
+- ✅ **Zero cash validation UX**: Inline error message (red text below input) replaces alert popup; error clears on typing (Feb 1, 2026)
+- ✅ **Export enhancements**: CSV and copy text now include holding name before symbol, shares to buy, and price per share for complete rebalancing data (Feb 1, 2026)
 
 **Optional (deferred):**
 - ⏳ Unit tests for cascading percentage calculations
@@ -1064,7 +1102,8 @@ Portfolio feature fully implemented! All core functionality and UX polish comple
 - Reuse AlertDialog for locked deletion warnings
 - Icons: Lock, LockOpen, Trash2 (same as Phase 2)
 
-**Last Updated:** January 30, 2026
+**Last Updated:** February 1, 2026
 **Status:** Sprint 1 Complete ✅, Sprint 2 Complete ✅, Sprint 3 Complete ✅
-**Current Focus:** Phase 3 complete; optional: add unit tests for cascading %, rebalancing integration tests
+**Current Focus:** Phase 3 100% COMPLETE - All core features, UX polish, and edge case handling implemented
+**Recent Enhancements (Feb 1):** Zero cash inline validation, export format improvements (holding names + shares + prices)
 **Next Step:** Phase 4 (if planned) or optional tests; no blocking work for Phase 3
