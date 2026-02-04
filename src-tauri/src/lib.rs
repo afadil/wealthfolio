@@ -212,6 +212,17 @@ pub fn run() {
             commands::portfolio::recalculate_portfolio,
             commands::portfolio::calculate_performance_summary,
             commands::portfolio::calculate_performance_history,
+            // Rebalancing commands
+            commands::rebalancing::get_rebalancing_strategies,
+            commands::rebalancing::get_rebalancing_strategy,
+            commands::rebalancing::save_rebalancing_strategy,
+            commands::rebalancing::delete_rebalancing_strategy,
+            commands::rebalancing::get_asset_class_targets,
+            commands::rebalancing::save_asset_class_target,
+            commands::rebalancing::delete_asset_class_target,
+            commands::rebalancing::get_holding_targets,
+            commands::rebalancing::save_holding_target,
+            commands::rebalancing::delete_holding_target,
             // Contribution limit commands
             commands::limits::get_contribution_limits,
             commands::limits::create_contribution_limit,

@@ -222,6 +222,15 @@ diesel::table! {
 }
 
 diesel::table! {
+    goals_allocation (id) {
+        id -> Text,
+        percent_allocation -> Integer,
+        goal_id -> Text,
+        account_id -> Text,
+    }
+}
+
+diesel::table! {
     holding_targets (id) {
         id -> Text,
         asset_class_id -> Text,
@@ -308,6 +317,8 @@ diesel::joinable!(budget_allocations -> categories (category_id));
 diesel::joinable!(events -> event_types (event_type_id));
 diesel::joinable!(goal_contributions -> accounts (account_id));
 diesel::joinable!(goal_contributions -> goals (goal_id));
+diesel::joinable!(goals_allocation -> accounts (account_id));
+diesel::joinable!(goals_allocation -> goals (goal_id));
 diesel::joinable!(holding_targets -> asset_class_targets (asset_class_id));
 diesel::joinable!(holding_targets -> assets (asset_id));
 diesel::joinable!(quotes -> assets (symbol));
@@ -330,6 +341,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     events,
     goal_contributions,
     goals,
+    goals_allocation,
     holding_targets,
     holdings_snapshots,
     market_data_providers,

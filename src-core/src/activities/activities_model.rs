@@ -98,6 +98,11 @@ pub struct ActivityDB {
     pub comment: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    pub name: Option<String>,
+    pub category_id: Option<String>,
+    pub sub_category_id: Option<String>,
+    pub event_id: Option<String>,
+    pub recurrence: Option<String>,
 }
 
 /// Input model for creating a new activity
@@ -679,6 +684,11 @@ impl From<NewActivity> for ActivityDB {
             comment: domain.comment,
             created_at: now.to_rfc3339(),
             updated_at: now.to_rfc3339(),
+            name: None,
+            category_id: None,
+            sub_category_id: None,
+            event_id: None,
+            recurrence: None,
         }
     }
 }
@@ -751,6 +761,11 @@ impl From<ActivityUpdate> for ActivityDB {
             comment: domain.comment,
             created_at: now.to_rfc3339(), // This should ideally preserve original created_at. Need to fetch before update.
             updated_at: now.to_rfc3339(),
+            name: None,
+            category_id: None,
+            sub_category_id: None,
+            event_id: None,
+            recurrence: None,
         }
     }
 }
