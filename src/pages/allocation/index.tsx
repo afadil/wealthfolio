@@ -1188,7 +1188,7 @@ export default function AllocationPage() {
                                 {/* Progress Bar - INSIDE summary, always visible */}
                                 <div className="bg-muted h-3 overflow-hidden rounded">
                                   <div
-                                    className="bg-chart-2 h-full"
+                                    className="bg-muted-foreground/60 h-full"
                                     style={{
                                       width: `${Math.min(subClass.subClassPercent, 100)}%`,
                                     }}
