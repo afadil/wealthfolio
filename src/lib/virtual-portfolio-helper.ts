@@ -1,5 +1,5 @@
-import type { Account, RebalancingStrategy } from './types';
-import { getRebalancingStrategies, saveRebalancingStrategy } from '@/commands/rebalancing';
+import type { Account, RebalancingStrategy } from "./types";
+import { getRebalancingStrategies, saveRebalancingStrategy } from "@/commands/rebalancing";
 
 /**
  * Generate a deterministic ID for a virtual portfolio based on account IDs
@@ -7,7 +7,7 @@ import { getRebalancingStrategies, saveRebalancingStrategy } from '@/commands/re
  */
 export function generateVirtualPortfolioId(accountIds: string[]): string {
   const sortedIds = [...accountIds].sort();
-  return `virtual_${sortedIds.join('_')}`;
+  return `virtual_${sortedIds.join("_")}`;
 }
 
 /**
@@ -16,37 +16,42 @@ export function generateVirtualPortfolioId(accountIds: string[]): string {
 export function generateVirtualPortfolioName(accounts: Account[]): string {
   const names = accounts.map((acc) => acc.name).slice(0, 3); // Show first 3 names
   if (accounts.length > 3) {
-    return `Virtual Portfolio: ${names.join(', ')} +${accounts.length - 3} more`;
+    return `Virtual Portfolio: ${names.join(", ")} +${accounts.length - 3} more`;
   }
-  return `Virtual Portfolio: ${names.join(' + ')}`;
+  return `Virtual Portfolio: ${names.join(" + ")}`;
 }
 
 /**
  * Get or create a virtual portfolio strategy for multiple accounts
  * Returns the strategy ID that should be used for saving targets
+ *
+ * NOTE: We search by name instead of ID because:
+ * - Name is deterministic based on account names
+ * - If user renames accounts, they'll get a new virtual strategy (correct behavior)
+ * - Avoids "Record not found" errors when trying to UPDATE non-existent ID
  */
 export async function getOrCreateVirtualStrategy(
   accountIds: string[],
-  accounts: Account[]
+  accounts: Account[],
 ): Promise<RebalancingStrategy> {
-  // Generate deterministic ID based on sorted account IDs
-  const virtualId = generateVirtualPortfolioId(accountIds);
+  // Generate deterministic name
+  const name = generateVirtualPortfolioName(accounts);
 
-  // Check if strategy already exists
+  // Check if strategy already exists (search by name)
   const strategies = await getRebalancingStrategies();
-  const existing = strategies.find((s) => s.id === virtualId);
+  const existing = strategies.find((s) => s.name === name);
 
   if (existing) {
-    console.log('Found existing virtual strategy:', existing);
+    console.log("Found existing virtual strategy:", existing);
     return existing;
   }
 
   // Create new virtual strategy
-  const name = generateVirtualPortfolioName(accounts);
-  console.log('Creating new virtual strategy:', virtualId, name);
+  console.log("Creating new virtual strategy:", name);
 
+  // Don't pass ID - let backend generate UUID
+  // Passing ID would trigger UPDATE logic instead of CREATE
   const newStrategy = await saveRebalancingStrategy({
-    id: virtualId, // Use deterministic ID
     name,
     accountId: null, // Virtual portfolios don't link to a specific account
     isActive: true,
@@ -59,5 +64,5 @@ export async function getOrCreateVirtualStrategy(
  * Check if a strategy is a virtual portfolio
  */
 export function isVirtualPortfolio(strategy: RebalancingStrategy): boolean {
-  return strategy.name.startsWith('Virtual Portfolio:');
+  return strategy.name.startsWith("Virtual Portfolio:");
 }
