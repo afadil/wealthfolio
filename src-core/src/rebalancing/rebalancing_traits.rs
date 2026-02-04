@@ -46,6 +46,12 @@ pub trait RebalancingRepository: Send + Sync {
         &self,
         account_id: &str,
     ) -> Result<Option<RebalancingStrategy>>;
+
+    /// Get count of unused virtual strategies
+    async fn get_unused_virtual_strategies_count(&self) -> Result<usize>;
+
+    /// Delete unused virtual strategies and return count of deleted strategies
+    async fn delete_unused_virtual_strategies(&self) -> Result<usize>;
 }
 
 #[async_trait]
@@ -78,4 +84,10 @@ pub trait RebalancingService: Send + Sync {
         &self,
         account_id: &str,
     ) -> Result<Vec<AssetClassTarget>>;
+
+    /// Get statistics about unused virtual strategies
+    async fn get_unused_virtual_strategies_count(&self) -> Result<usize>;
+
+    /// Clean up unused virtual strategies (no targets, created >30 days ago)
+    async fn cleanup_unused_virtual_strategies(&self) -> Result<usize>;
 }

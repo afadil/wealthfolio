@@ -166,3 +166,27 @@ pub async fn toggle_holding_target_lock(
         .await
         .map_err(|e| e.to_string())
 }
+
+// Virtual portfolio cleanup
+
+#[tauri::command]
+pub async fn get_unused_virtual_strategies_count(
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<usize, String> {
+    state
+        .rebalancing_service
+        .get_unused_virtual_strategies_count()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn cleanup_unused_virtual_strategies(
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<usize, String> {
+    state
+        .rebalancing_service
+        .cleanup_unused_virtual_strategies()
+        .await
+        .map_err(|e| e.to_string())
+}

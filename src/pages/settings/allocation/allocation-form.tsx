@@ -10,9 +10,16 @@ import {
   FormItem,
   FormLabel,
 } from "@/components/ui/form";
+import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useAllocationSettings } from "@/hooks/useAllocationSettings";
 import { toast } from "@/components/ui/use-toast";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import {
+  getUnusedVirtualStrategiesCount,
+  cleanupUnusedVirtualStrategies,
+} from "@/commands/rebalancing";
 
 const allocationFormSchema = z.object({
   holdingTargetMode: z.enum(["preview", "strict"], {
@@ -28,6 +35,39 @@ type AllocationFormValues = z.infer<typeof allocationFormSchema>;
 export function AllocationForm() {
   const { settings, isLoading, updateHoldingTargetMode, updateDefaultView } =
     useAllocationSettings();
+  const [isCleaningUp, setIsCleaningUp] = useState(false);
+
+  // Query for unused virtual strategies count
+  const { data: unusedCount = 0, refetch: refetchCount } = useQuery({
+    queryKey: ["unused-virtual-strategies-count"],
+    queryFn: getUnusedVirtualStrategiesCount,
+  });
+
+  // Mutation for cleanup
+  const cleanupMutation = useMutation({
+    mutationFn: cleanupUnusedVirtualStrategies,
+    onSuccess: (deletedCount) => {
+      toast({
+        title: "Cleanup complete",
+        description: `Removed ${deletedCount} unused virtual ${deletedCount === 1 ? "portfolio" : "portfolios"}.`,
+      });
+      refetchCount();
+    },
+    onError: (error) => {
+      console.error("Cleanup failed:", error);
+      toast({
+        title: "Error",
+        description: "Failed to clean up unused virtual portfolios.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  async function handleCleanup() {
+    setIsCleaningUp(true);
+    await cleanupMutation.mutateAsync();
+    setIsCleaningUp(false);
+  }
 
   const defaultValues: AllocationFormValues = {
     holdingTargetMode: settings.holdingTargetMode,
@@ -191,6 +231,32 @@ export function AllocationForm() {
             </FormItem>
           )}
         />
+
+        {/* Cleanup Section */}
+        <div className="space-y-3 rounded-lg border p-4">
+          <div className="space-y-1">
+            <h3 className="text-base font-medium">Virtual Portfolio Cleanup</h3>
+            <p className="text-muted-foreground text-sm">
+              When you select multiple accounts without saving as a portfolio, the app creates
+              temporary virtual portfolios to store your allocation targets. Clean up unused ones to
+              keep your data tidy.
+            </p>
+          </div>
+          <div className="bg-muted/50 flex items-center justify-between rounded-lg p-3">
+            <div className="text-sm">
+              <span className="font-medium">{unusedCount}</span> unused virtual{" "}
+              {unusedCount === 1 ? "portfolio" : "portfolios"}
+            </div>
+            <Button
+              onClick={handleCleanup}
+              disabled={isCleaningUp || unusedCount === 0}
+              size="sm"
+              variant="outline"
+            >
+              {isCleaningUp ? "Cleaning..." : "Clean Up"}
+            </Button>
+          </div>
+        </div>
       </div>
     </Form>
   );

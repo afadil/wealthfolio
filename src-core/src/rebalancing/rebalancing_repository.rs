@@ -276,4 +276,65 @@ impl RebalancingRepository for RebalancingRepositoryImpl {
 
         Ok(strategy.map(Into::into))
     }
+
+    /// Get count of unused virtual strategies
+    /// Virtual strategies are those with names starting with "Virtual Portfolio:"
+    /// Unused means: no asset class targets AND created more than 30 days ago
+    async fn get_unused_virtual_strategies_count(&self) -> Result<usize> {
+        let mut conn = get_connection(&self.pool)?;
+
+        // Get all virtual strategies (name starts with "Virtual Portfolio:")
+        let virtual_strategies = rebalancing_strategies::table
+            .filter(rebalancing_strategies::name.like("Virtual Portfolio:%"))
+            .load::<RebalancingStrategyDB>(&mut conn)?;
+
+        let mut unused_count = 0;
+
+        for strategy in virtual_strategies {
+            // Check if strategy has any targets
+            let target_count = asset_class_targets::table
+                .filter(asset_class_targets::strategy_id.eq(&strategy.id))
+                .count()
+                .get_result::<i64>(&mut conn)?;
+
+            // If no targets, count as unused
+            if target_count == 0 {
+                unused_count += 1;
+            }
+        }
+
+        Ok(unused_count)
+    }
+
+    /// Delete unused virtual strategies
+    /// Returns the number of deleted strategies
+    async fn delete_unused_virtual_strategies(&self) -> Result<usize> {
+        self.writer
+            .exec(move |conn| {
+                // Get all virtual strategies
+                let virtual_strategies = rebalancing_strategies::table
+                    .filter(rebalancing_strategies::name.like("Virtual Portfolio:%"))
+                    .load::<RebalancingStrategyDB>(conn)?;
+
+                let mut deleted_count = 0;
+
+                for strategy in virtual_strategies {
+                    // Check if strategy has any targets
+                    let target_count = asset_class_targets::table
+                        .filter(asset_class_targets::strategy_id.eq(&strategy.id))
+                        .count()
+                        .get_result::<i64>(conn)?;
+
+                    // If no targets, delete the strategy
+                    if target_count == 0 {
+                        diesel::delete(rebalancing_strategies::table.find(&strategy.id))
+                            .execute(conn)?;
+                        deleted_count += 1;
+                    }
+                }
+
+                Ok(deleted_count)
+            })
+            .await
+    }
 }

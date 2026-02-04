@@ -10,12 +10,12 @@
 
 import { getRunEnv, invokeTauri, logger, RUN_ENV } from "@/adapters";
 import type {
-    AssetClassTarget,
-    HoldingTarget,
-    NewAssetClassTarget,
-    NewHoldingTarget,
-    NewRebalancingStrategy,
-    RebalancingStrategy,
+  AssetClassTarget,
+  HoldingTarget,
+  NewAssetClassTarget,
+  NewHoldingTarget,
+  NewRebalancingStrategy,
+  RebalancingStrategy,
 } from "@/lib/types";
 
 // ============================================================================
@@ -62,7 +62,7 @@ export const getRebalancingStrategy = async (id: string): Promise<RebalancingStr
 };
 
 export const saveRebalancingStrategy = async (
-  strategy: NewRebalancingStrategy | RebalancingStrategy
+  strategy: NewRebalancingStrategy | RebalancingStrategy,
 ): Promise<RebalancingStrategy> => {
   try {
     switch (getRunEnv()) {
@@ -70,9 +70,10 @@ export const saveRebalancingStrategy = async (
         return invokeTauri("save_rebalancing_strategy", { strategy });
       case RUN_ENV.WEB:
         const method = "id" in strategy ? "PUT" : "POST";
-        const endpoint = "id" in strategy
-          ? `/api/v1/rebalancing/strategy/${strategy.id}`
-          : "/api/v1/rebalancing/strategy";
+        const endpoint =
+          "id" in strategy
+            ? `/api/v1/rebalancing/strategy/${strategy.id}`
+            : "/api/v1/rebalancing/strategy";
         const response = await fetch(endpoint, {
           method,
           headers: { "Content-Type": "application/json" },
@@ -133,7 +134,7 @@ export const getAssetClassTargets = async (strategyId: string): Promise<AssetCla
 };
 
 export const saveAssetClassTarget = async (
-  target: NewAssetClassTarget | AssetClassTarget
+  target: NewAssetClassTarget | AssetClassTarget,
 ): Promise<AssetClassTarget> => {
   try {
     switch (getRunEnv()) {
@@ -141,9 +142,8 @@ export const saveAssetClassTarget = async (
         return invokeTauri("save_asset_class_target", { target });
       case RUN_ENV.WEB:
         const method = "id" in target ? "PUT" : "POST";
-        const endpoint = "id" in target
-          ? `/api/v1/rebalancing/target/${target.id}`
-          : "/api/v1/rebalancing/target";
+        const endpoint =
+          "id" in target ? `/api/v1/rebalancing/target/${target.id}` : "/api/v1/rebalancing/target";
         const response = await fetch(endpoint, {
           method,
           headers: { "Content-Type": "application/json" },
@@ -204,7 +204,7 @@ export const getHoldingTargets = async (assetClassId: string): Promise<HoldingTa
 };
 
 export const saveHoldingTarget = async (
-  target: NewHoldingTarget | HoldingTarget
+  target: NewHoldingTarget | HoldingTarget,
 ): Promise<HoldingTarget> => {
   try {
     switch (getRunEnv()) {
@@ -264,6 +264,48 @@ export const toggleHoldingTargetLock = async (id: string): Promise<HoldingTarget
     }
   } catch (error) {
     logger.error(`Error toggling lock for holding target ${id}.`);
+    throw error;
+  }
+};
+
+// ============================================================================
+// Virtual Portfolio Cleanup
+// ============================================================================
+
+export const getUnusedVirtualStrategiesCount = async (): Promise<number> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri("get_unused_virtual_strategies_count");
+      case RUN_ENV.WEB:
+        const response = await fetch("/api/v1/rebalancing/virtual-strategies/unused-count");
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      default:
+        throw new Error("Unsupported environment");
+    }
+  } catch (error) {
+    logger.error("Error getting unused virtual strategies count.");
+    throw error;
+  }
+};
+
+export const cleanupUnusedVirtualStrategies = async (): Promise<number> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri("cleanup_unused_virtual_strategies");
+      case RUN_ENV.WEB:
+        const response = await fetch("/api/v1/rebalancing/virtual-strategies/cleanup", {
+          method: "DELETE",
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      default:
+        throw new Error("Unsupported environment");
+    }
+  } catch (error) {
+    logger.error("Error cleaning up unused virtual strategies.");
     throw error;
   }
 };
