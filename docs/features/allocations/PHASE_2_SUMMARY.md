@@ -1,7 +1,7 @@
 # Phase 2 Summary - Rebalancing Suggestions Calculator
 
-**Status**: ✅ COMPLETE  
-**Date**: January 27, 2026  
+**Status**: ✅ COMPLETE
+**Date**: January 27, 2026
 **Scope**: Asset-class level rebalancing suggestions (not per-holding)
 
 ---
@@ -161,7 +161,7 @@ Core Features:
   - Calculates shortfalls for each asset class to reach targets
   - Proportionally scales suggestions if cash is insufficient
   - Accounts for new portfolio total after deposit
-  
+
 UI/UX Improvements:
 - Empty state message when no targets set
 - Auto-reset suggestions and form when user switches accounts
