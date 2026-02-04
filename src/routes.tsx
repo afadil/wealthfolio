@@ -84,10 +84,7 @@ export function AppRoutes() {
           <Route path="insights" element={<PortfolioInsightsPage />} />
           <Route path="allocation" element={<AllocationPage />} />
           <Route path="allocations" element={<AllocationPage />} />
-          <Route
-            path="allocations/:accountId?"
-            element={<AllocationPage />}
-          />
+          <Route path="allocations/:accountId?"element={<AllocationPage />}/>
           {/* Dynamic addon routes */}
           {dynamicRoutes.map(({ path, component: Component }) => (
             <Route

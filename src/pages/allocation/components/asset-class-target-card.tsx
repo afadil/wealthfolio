@@ -1,66 +1,51 @@
 import { DriftGauge } from '@/components/drift-gauge';
-import { cn } from '@/lib/utils';
-import { Card } from '@wealthfolio/ui';
-import { ChevronDown } from 'lucide-react';
-import { useState } from 'react';
-import type { AssetClassComposition } from '../hooks/use-allocation-calculations';
+import { Button } from '@wealthfolio/ui';
+import { Edit2, Trash2 } from 'lucide-react';
+import type { AssetClassComposition } from '../hooks/use-current-allocation';
 
 interface AssetClassTargetCardProps {
-  composition: AssetClassComposition;
-  onEdit?: () => void;
-  onDelete?: () => void;
+  composition: AssetClassComposition; // From calculateAssetClassComposition()
+  onEdit?: (assetClass: string) => void; // Called when user clicks Edit
+  onDelete?: (assetClass: string) => void; // Called when user clicks Delete
+  isLoading?: boolean; // Disables buttons during mutation
 }
 
 export function AssetClassTargetCard({
   composition,
   onEdit,
   onDelete,
+  isLoading = false,
 }: AssetClassTargetCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-
   return (
-    <Card className="p-4 space-y-4">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center gap-2 text-lg font-semibold hover:text-primary transition-colors"
-        >
-          <ChevronDown
-            className={cn('w-5 h-5 transition-transform', isExpanded && 'rotate-180')}
-          />
+    <div className="rounded-lg border border-border bg-card p-4 shadow-sm transition-all hover:shadow-md">
+      {/* Header: Asset Class Name + Actions */}
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-foreground">
           {composition.assetClass}
-        </button>
-
-        {/* Actions */}
+        </h3>
         <div className="flex gap-2">
-          {onEdit && (
-            <button
-              onClick={onEdit}
-              className="px-3 py-1 text-xs hover:bg-secondary rounded transition-colors"
-              title="Edit allocation"
-            >
-              ✎
-            </button>
-          )}
-          {onDelete && (
-            <button
-              onClick={onDelete}
-              className="px-3 py-1 text-xs hover:bg-secondary rounded transition-colors"
-              title="Delete allocation"
-            >
-              ✕
-            </button>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onEdit?.(composition.assetClass)}
+            disabled={isLoading}
+            title="Edit allocation target"
+          >
+            <Edit2 className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onDelete?.(composition.assetClass)}
+            disabled={isLoading}
+            title="Delete allocation target"
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
         </div>
       </div>
 
-      {/* Value display */}
-      <p className="text-sm text-muted-foreground">
-        ${composition.actualValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-      </p>
-
-      {/* Tier 1: Drift Gauge */}
+      {/* Drift Gauge */}
       <DriftGauge
         target={composition.targetPercent}
         actual={composition.actualPercent}
@@ -68,15 +53,47 @@ export function AssetClassTargetCard({
         status={composition.status}
       />
 
-      {/* Tier 2: Expandable details (Phase 2) */}
-      {isExpanded && (
-        <div className="pt-4 border-t space-y-3">
-          <p className="text-sm font-medium text-muted-foreground">HOLDINGS BREAKDOWN</p>
-          <p className="text-xs text-muted-foreground italic">
-            Holdings breakdown coming in Phase 2
+      {/* Summary Row: Target vs Actual vs Value */}
+      <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
+        <div>
+          <p className="text-muted-foreground">Target</p>
+          <p className="text-base font-semibold text-foreground">
+            {composition.targetPercent.toFixed(1)}%
           </p>
         </div>
-      )}
-    </Card>
+        <div>
+          <p className="text-muted-foreground">Actual</p>
+          <p className="text-base font-semibold text-foreground">
+            {composition.actualPercent.toFixed(1)}%
+          </p>
+        </div>
+        <div>
+          <p className="text-muted-foreground">Value</p>
+          <p className="text-base font-semibold text-foreground">
+            ${(composition.actualValue / 1000).toFixed(1)}k
+          </p>
+        </div>
+      </div>
+
+      {/* Status Badge */}
+      <div className="mt-4 flex items-center gap-2">
+        <div
+          className={`h-2 w-2 rounded-full ${
+            composition.status === 'on-target'
+              ? 'bg-green-500'
+              : composition.status === 'underweight'
+              ? 'bg-yellow-500'
+              : 'bg-red-500'
+          }`}
+        />
+        <span className="text-xs font-medium text-muted-foreground">
+          {composition.status === 'on-target'
+            ? 'On Target'
+            : composition.status === 'underweight'
+            ? 'Underweight'
+            : 'Overweight'}
+        </span>
+      </div>
+    </div>
   );
 }

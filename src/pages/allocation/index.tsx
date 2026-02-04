@@ -1,173 +1,247 @@
+import { getRebalancingStrategies, saveRebalancingStrategy } from "@/commands/rebalancing";
 import { AccountSelector } from "@/components/account-selector";
-import { useAccounts } from "@/hooks/use-accounts";
-import { useSettings } from "@/hooks/use-settings";
-import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
-import type { Account } from "@/lib/types";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Button,
-  Separator,
-  Skeleton,
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-} from "@wealthfolio/ui";
-import { useMemo, useState } from "react";
+} from "@/components/ui/tabs";
+import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { QueryKeys } from "@/lib/query-keys";
+import type { Account, AccountType } from "@/lib/types";
+import { useQueryClient } from "@tanstack/react-query";
+import { Button } from "@wealthfolio/ui";
+import { useEffect, useMemo, useState } from "react";
+import { AssetClassForm } from "./components/asset-class-form";
 import { AssetClassTargetCard } from "./components/asset-class-target-card";
-import { calculateAssetClassComposition } from "./hooks/use-allocation-calculations";
-import { useAssetClassTargets, useHoldingsForAllocation } from "./hooks/use-asset-class-queries";
+import {
+  useAssetClassMutations,
+  useAssetClassTargets,
+  useHoldingsForAllocation,
+  useRebalancingStrategy,
+} from "./hooks";
+import { calculateAssetClassComposition } from "./hooks/use-current-allocation";
+
+const createPortfolioAccount = (): Account => ({
+  id: PORTFOLIO_ACCOUNT_ID,
+  name: "All Portfolio",
+  accountType: "portfolio" as AccountType,
+  balance: 0,
+  currency: "USD",
+  isDefault: true,
+  isActive: true,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+});
 
 export default function AllocationPage() {
-  const { accounts } = useAccounts(true);
-  const { data: settings } = useSettings();
-
-  // Create "All Portfolio" account as default
-  const createPortfolioAccount = (): Account => ({
-    id: PORTFOLIO_ACCOUNT_ID,
-    name: "All Portfolio",
-    accountType: "PORTFOLIO" as unknown as Account["accountType"],
-    balance: 0,
-    currency: settings?.baseCurrency ?? "USD",
-    isDefault: false,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  } as Account);
-
-  // Initialize with "All Portfolio" selected by default
-  const [selectedAccount, setSelectedAccount] = useState<Account | null>(createPortfolioAccount());
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(
+    createPortfolioAccount()
+  );
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingTarget, setEditingTarget] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const selectedAccountId = selectedAccount?.id ?? PORTFOLIO_ACCOUNT_ID;
 
-  // Get targets for selected account (now uses accountId correctly)
-  const { data: targets = [], isLoading: targetsLoading } = useAssetClassTargets(
-    selectedAccountId
-  );
+  // Auto-create strategy for account if it doesn't exist
+  useEffect(() => {
+    const ensureStrategy = async () => {
+      if (!selectedAccount || selectedAccount.id === PORTFOLIO_ACCOUNT_ID) {
+        return; // Skip for portfolio view
+      }
 
-  // Fetch holdings for selected account
-  const { data: holdings = [], isLoading: holdingsLoading } = useHoldingsForAllocation(
-    selectedAccountId
-  );
+      try {
+        const strategies = await getRebalancingStrategies();
+        const exists = strategies.some((s) => s.accountId === selectedAccountId);
 
-  // Calculate composition
+        if (!exists) {
+          console.log("Creating strategy for account:", selectedAccountId, selectedAccount.name);
+          await saveRebalancingStrategy({
+            name: `${selectedAccount.name} Allocation Strategy`,
+            accountId: selectedAccountId,
+            isActive: true,
+          } as any);
+
+          // Invalidate strategy queries to force refetch
+          queryClient.invalidateQueries({
+            queryKey: [QueryKeys.REBALANCING_STRATEGIES],
+          });
+        }
+      } catch (err) {
+        console.error("Failed to ensure strategy:", err);
+      }
+    };
+
+    ensureStrategy();
+  }, [selectedAccountId, selectedAccount, queryClient]);
+
+  const { data: targets = [], isLoading: targetsLoading } =
+    useAssetClassTargets(selectedAccountId);
+  const { data: holdings = [], isLoading: holdingsLoading } =
+    useHoldingsForAllocation(selectedAccountId);
+  const { saveTargetMutation, deleteTargetMutation } =
+    useAssetClassMutations();
+  const { data: strategy } = useRebalancingStrategy(selectedAccountId);
+
   const composition = useMemo(() => {
     if (!targets || !holdings) return [];
-    const totalValue = holdings.reduce((sum, h) => sum + (h.currentValue || 0), 0);
+    const totalValue = holdings.reduce(
+      (sum, h) => sum + (h.marketValue?.base || 0),
+      0
+    );
     return calculateAssetClassComposition(targets, holdings, totalValue);
   }, [targets, holdings]);
 
   const isLoading = targetsLoading || holdingsLoading;
+  const isMutating = saveTargetMutation.isPending || deleteTargetMutation.isPending;
 
-  if (isLoading && !selectedAccount) {
-    return (
-      <div className="space-y-6 p-8">
-        <Skeleton className="h-12" />
-        <Skeleton className="h-32" />
-      </div>
-    );
-  }
+  const handleOpenForm = (assetClass?: string) => {
+    if (assetClass) {
+      setEditingTarget(assetClass);
+    } else {
+      setEditingTarget(null);
+    }
+    setFormOpen(true);
+  };
 
-  if (!accounts || accounts.length === 0) {
-    return (
-      <div className="space-y-6 p-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Portfolio Allocations</h1>
-          <p className="text-muted-foreground mt-2">
-            Set target allocations and rebalance your portfolio efficiently.
-          </p>
-        </div>
-        <Separator />
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
-          <p className="font-semibold mb-2">No accounts found</p>
-          <p className="text-sm">
-            Please create an account in the Portfolio section first.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const handleCloseForm = () => {
+    setFormOpen(false);
+    setEditingTarget(null);
+  };
+
+  const handleFormSubmit = async (formData: any) => {
+    if (!strategy?.id) {
+      console.error("No strategy ID available");
+      return;
+    }
+    await saveTargetMutation.mutateAsync({
+      strategyId: strategy.id,
+      assetClass: formData.assetClass,
+      targetPercent: formData.targetPercent,
+    });
+  };
+
+  const handleDelete = async (assetClass: string) => {
+    if (confirm(`Delete ${assetClass} allocation target?`)) {
+      const targetToDelete = targets.find((t) => t.assetClass === assetClass);
+      if (targetToDelete) {
+        await deleteTargetMutation.mutateAsync(targetToDelete.id);
+      }
+    }
+  };
+
+  const editingTargetData = editingTarget
+    ? targets.find((t) => t.assetClass === editingTarget)
+    : null;
 
   return (
     <div className="space-y-6 p-8">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Portfolio Allocations</h1>
-        <p className="text-muted-foreground mt-2">
-          Set target allocations and rebalance your portfolio efficiently.
+      <div className="space-y-2">
+        <h1 className="text-3xl font-bold tracking-tight">Allocations</h1>
+        <p className="text-muted-foreground">
+          Manage your strategic asset allocation targets and track actual
+          holdings.
         </p>
       </div>
 
-      <Separator />
-
-      {/* Account Selector (with "All Portfolio" as default) */}
+      {/* Account Selector - Standalone */}
       <AccountSelector
         selectedAccount={selectedAccount}
         setSelectedAccount={setSelectedAccount}
-        variant="dropdown"
         includePortfolio={true}
-        filterActive={true}
+        variant="button"
+        buttonText={selectedAccount?.name || "Select Account"}
       />
 
-      {/* Loading state */}
-      {isLoading && (
-        <div className="space-y-4">
-          <Skeleton className="h-20" />
-          <Skeleton className="h-32" />
-        </div>
-      )}
+      {/* Tabs */}
+      <Tabs defaultValue="targets" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="targets">Targets</TabsTrigger>
+          <TabsTrigger value="composition">Composition</TabsTrigger>
+          <TabsTrigger value="rebalancing">Rebalancing</TabsTrigger>
+        </TabsList>
 
-      {!isLoading && selectedAccount && (
-        <>
-          {/* Tabs */}
-          <Tabs defaultValue="targets" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="targets">Targets</TabsTrigger>
-              <TabsTrigger value="composition">Composition</TabsTrigger>
-              <TabsTrigger value="rebalancing">Rebalancing</TabsTrigger>
-            </TabsList>
+        {/* Targets Tab */}
+        <TabsContent value="targets" className="space-y-4">
+          {isLoading && (
+            <div className="space-y-4">
+              <Skeleton className="h-32" />
+              <Skeleton className="h-32" />
+            </div>
+          )}
 
-            <TabsContent value="targets" className="space-y-4">
-              {composition.length === 0 ? (
-                <div className="text-center py-12 rounded-lg border border-dashed">
-                  <p className="text-muted-foreground mb-4">No allocation targets set</p>
-                  <Button disabled>Create Allocation (Phase 2)</Button>
-                </div>
-              ) : (
-                <div className="grid gap-4">
-                  {composition.map((comp) => (
-                    <AssetClassTargetCard key={comp.assetClass} composition={comp} />
-                  ))}
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="composition" className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                View how your current holdings break down by asset class.
+          {!isLoading && composition.length === 0 && (
+            <div className="text-center py-12 rounded-lg border border-dashed">
+              <p className="text-muted-foreground mb-4">
+                No allocation targets set
               </p>
-              {composition.length === 0 ? (
-                <div className="text-center py-12 rounded-lg border border-dashed">
-                  <p className="text-muted-foreground">No holdings data available</p>
-                </div>
-              ) : (
-                <div className="grid gap-4">
-                  {composition.map((comp) => (
-                    <AssetClassTargetCard key={comp.assetClass} composition={comp} />
-                  ))}
-                </div>
-              )}
-            </TabsContent>
+              <Button
+                onClick={() => handleOpenForm()}
+                disabled={isMutating}
+              >
+                Create Allocation Target
+              </Button>
+            </div>
+          )}
 
-            <TabsContent value="rebalancing" className="space-y-4">
-              <div className="text-center py-12 rounded-lg border border-dashed">
-                <p className="text-muted-foreground">
-                  Rebalancing suggestions coming in Phase 2
-                </p>
+          {!isLoading && composition.length > 0 && (
+            <div className="space-y-4">
+              <Button
+                onClick={() => handleOpenForm()}
+                disabled={isMutating}
+              >
+                Create Allocation Target
+              </Button>
+              <div className="grid gap-4">
+                {composition.map((comp) => (
+                  <AssetClassTargetCard
+                    key={comp.assetClass}
+                    composition={comp}
+                    onEdit={() => handleOpenForm(comp.assetClass)}
+                    onDelete={() => handleDelete(comp.assetClass)}
+                    isLoading={isMutating}
+                  />
+                ))}
               </div>
-            </TabsContent>
-          </Tabs>
-        </>
-      )}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Composition Tab */}
+        <TabsContent value="composition" className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            View how your current holdings break down by asset class.
+          </p>
+          <div className="text-center py-12 rounded-lg border border-dashed">
+            <p className="text-muted-foreground">
+              Holdings breakdown coming in Phase 2
+            </p>
+          </div>
+        </TabsContent>
+
+        {/* Rebalancing Tab */}
+        <TabsContent value="rebalancing" className="space-y-4">
+          <div className="text-center py-12 rounded-lg border border-dashed">
+            <p className="text-muted-foreground">
+              Rebalancing suggestions coming in Phase 2
+            </p>
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Asset Class Form Modal */}
+      <AssetClassForm
+        open={formOpen}
+        onOpenChange={handleCloseForm}
+        onSubmit={handleFormSubmit}
+        existingTargets={targets}
+        editingTarget={editingTargetData || null}
+        isLoading={isMutating}
+        strategyId={strategy?.id}
+      />
     </div>
   );
 }

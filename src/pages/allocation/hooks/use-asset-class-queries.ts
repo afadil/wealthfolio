@@ -19,10 +19,23 @@ export function useRebalancingStrategy(accountId: string | null) {
   return useQuery({
     queryKey: [QueryKeys.REBALANCING_STRATEGIES, accountId],
     queryFn: async () => {
-      if (!accountId) return null;
+      if (!accountId) {
+        console.log("useRebalancingStrategy: no accountId");
+        return null;
+      }
       const strategies = await getRebalancingStrategies();
-      // Find strategy for this account (accountId matches)
-      return strategies.find((s) => s.accountId === accountId) || null;
+      console.log("useRebalancingStrategy - all strategies:", strategies);
+      console.log("useRebalancingStrategy - looking for accountId:", accountId);
+
+      // For "TOTAL" (all portfolio), use strategy with accountId === null
+      // For specific accounts, match accountId directly
+      const strategy =
+        accountId === "TOTAL"
+          ? strategies.find((s) => s.accountId === null) || null
+          : strategies.find((s) => s.accountId === accountId) || null;
+
+      console.log("useRebalancingStrategy - found strategy:", strategy);
+      return strategy;
     },
     enabled: !!accountId,
   });
