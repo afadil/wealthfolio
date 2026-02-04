@@ -18,6 +18,11 @@ export const QueryKeys = {
   GOALS: "goals",
   GOALS_ALLOCATIONS: "goals_allocations",
 
+  // Rebalancing (Allocations) related keys
+  REBALANCING_STRATEGIES: "rebalancing_strategies",
+  ASSET_CLASS_TARGETS: "asset_class_targets",
+  HOLDING_TARGETS: "holding_targets",
+
   // Settings related keys
   SETTINGS: "settings",
   EXCHANGE_RATES: "exchangeRates",

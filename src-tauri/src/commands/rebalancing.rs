@@ -55,6 +55,32 @@ pub async fn delete_rebalancing_strategy(
 
 // Asset class targets
 
+/// Get asset class targets for a specific account's active strategy
+#[tauri::command]
+pub async fn get_asset_class_targets_for_account(
+    account_id: String,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<AssetClassTarget>, String> {
+    state
+        .rebalancing_service
+        .get_asset_class_targets_for_account(&account_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Get the active rebalancing strategy for a specific account
+#[tauri::command]
+pub async fn get_active_strategy_for_account(
+    account_id: String,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Option<RebalancingStrategy>, String> {
+    state
+        .rebalancing_service
+        .get_active_strategy_for_account(&account_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn get_asset_class_targets(
     strategy_id: String,

@@ -217,6 +217,8 @@ pub fn run() {
             commands::rebalancing::get_rebalancing_strategy,
             commands::rebalancing::save_rebalancing_strategy,
             commands::rebalancing::delete_rebalancing_strategy,
+            commands::rebalancing::get_asset_class_targets_for_account,
+            commands::rebalancing::get_active_strategy_for_account,
             commands::rebalancing::get_asset_class_targets,
             commands::rebalancing::save_asset_class_target,
             commands::rebalancing::delete_asset_class_target,

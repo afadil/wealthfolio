@@ -8,6 +8,7 @@ import SettingsLayout from "@/pages/settings/settings-layout";
 import ActivityManagerPage from "@/pages/activity/activity-manager-page";
 import ActivityPage from "@/pages/activity/activity-page";
 import ActivityImportPage from "@/pages/activity/import/activity-import-page";
+import AllocationPage from "@/pages/allocation";
 import AssetsPage from "@/pages/asset/assets-page";
 import DashboardPage from "@/pages/dashboard/dashboard-page";
 import HoldingsPage from "@/pages/holdings/holdings-page";
@@ -81,6 +82,12 @@ export function AppRoutes() {
           <Route path="income" element={<IncomePage />} />
           <Route path="performance" element={<PerformancePage />} />
           <Route path="insights" element={<PortfolioInsightsPage />} />
+          <Route path="allocation" element={<AllocationPage />} />
+          <Route path="allocations" element={<AllocationPage />} />
+          <Route
+            path="allocations/:accountId?"
+            element={<AllocationPage />}
+          />
           {/* Dynamic addon routes */}
           {dynamicRoutes.map(({ path, component: Component }) => (
             <Route

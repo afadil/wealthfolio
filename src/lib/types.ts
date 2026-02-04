@@ -561,3 +561,39 @@ export interface UpdateInfo {
   changelogUrl?: string;
   screenshots?: string[];
 }
+
+// ============================================================================
+// Rebalancing Types
+// ============================================================================
+
+export interface RebalancingStrategy {
+  id: string;
+  name: string;
+  accountId: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssetClassTarget {
+  id: string;
+  strategyId: string;
+  assetClass: string;
+  targetPercent: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HoldingTarget {
+  id: string;
+  assetClassId: string;
+  assetId: string;
+  targetPercentOfClass: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// New types for creating entities (without id and timestamps)
+export type NewRebalancingStrategy = Omit<RebalancingStrategy, "id" | "createdAt" | "updatedAt">;
+export type NewAssetClassTarget = Omit<AssetClassTarget, "id" | "createdAt" | "updatedAt">;
+export type NewHoldingTarget = Omit<HoldingTarget, "id" | "createdAt" | "updatedAt">;

@@ -4,8 +4,8 @@ use std::sync::Arc;
 use crate::Result;
 
 use super::rebalancing_model::{
-    AssetClassTarget, HoldingTarget, NewAssetClassTarget, NewHoldingTarget,
-    NewRebalancingStrategy, RebalancingStrategy,
+    AssetClassTarget, HoldingTarget, NewAssetClassTarget, NewHoldingTarget, NewRebalancingStrategy,
+    RebalancingStrategy,
 };
 use super::rebalancing_traits::{RebalancingRepository, RebalancingService};
 
@@ -45,7 +45,10 @@ impl RebalancingService for RebalancingServiceImpl {
         self.repository.get_asset_class_targets(strategy_id).await
     }
 
-    async fn save_asset_class_target(&self, target: NewAssetClassTarget) -> Result<AssetClassTarget> {
+    async fn save_asset_class_target(
+        &self,
+        target: NewAssetClassTarget,
+    ) -> Result<AssetClassTarget> {
         if target.id.is_some() {
             self.repository.update_asset_class_target(target).await
         } else {
@@ -71,5 +74,28 @@ impl RebalancingService for RebalancingServiceImpl {
 
     async fn delete_holding_target(&self, id: &str) -> Result<()> {
         self.repository.delete_holding_target(id).await
+    }
+
+    async fn get_active_strategy_for_account(
+        &self,
+        account_id: &str,
+    ) -> Result<Option<RebalancingStrategy>> {
+        self.repository
+            .get_active_strategy_for_account(account_id)
+            .await
+    }
+
+    async fn get_asset_class_targets_for_account(
+        &self,
+        account_id: &str,
+    ) -> Result<Vec<AssetClassTarget>> {
+        // Get active strategy for account
+        if let Some(strategy) = self.get_active_strategy_for_account(account_id).await? {
+            // Return targets for that strategy
+            self.get_asset_class_targets(&strategy.id).await
+        } else {
+            // No active strategy; return empty
+            Ok(vec![])
+        }
     }
 }

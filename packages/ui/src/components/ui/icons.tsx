@@ -32,6 +32,7 @@ import {
   CreditCard,
   DollarSign,
   Download,
+  Edit,
   Eraser,
   ExternalLink,
   Eye,
@@ -91,6 +92,7 @@ import {
   StretchHorizontal,
   Sun,
   Tag,
+  Target,
   Trash,
   TrendingDown,
   TrendingUp,
@@ -104,7 +106,7 @@ import {
   Wifi,
   X,
   XCircle,
-  type LucideIcon,
+  type LucideIcon
 } from "lucide-react";
 
 export type Icon = LucideIcon;
@@ -215,6 +217,8 @@ export const Icons = {
   Undo: Undo2,
   Fullscreen: Fullscreen,
   RectangleEllipsis: RectangleEllipsis,
+  Target: Target,
+  Edit: Edit,
 
   Dashboard: ({ size, ...props }: LucideProps) => (
     <svg

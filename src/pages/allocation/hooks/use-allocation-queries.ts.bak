@@ -1,0 +1,93 @@
+import { logger } from "@/adapters";
+import { getHoldings } from "@/commands/portfolio";
+import {
+  deleteRebalancingStrategy,
+  getActiveStrategyForAccount,
+  getAssetClassTargetsForAccount,
+  getRebalancingStrategies,
+  saveRebalancingStrategy,
+} from "@/commands/rebalancing";
+import { QueryKeys } from "@/lib/query-keys";
+import type { AssetClassTarget, NewRebalancingStrategy, RebalancingStrategy } from "@/lib/types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+
+// ============================================================================
+// Queries
+// ============================================================================
+
+export const useRebalancingStrategies = () => {
+  return useQuery<RebalancingStrategy[], Error>({
+    queryKey: [QueryKeys.REBALANCING_STRATEGIES],
+    queryFn: getRebalancingStrategies,
+  });
+};
+
+export function useAssetClassTargets(accountId: string | null) {
+  return useQuery<AssetClassTarget[], Error>({
+    queryKey: [QueryKeys.ASSET_CLASS_TARGETS, accountId],
+    queryFn: () => getAssetClassTargetsForAccount(accountId!),
+    enabled: !!accountId,
+  });
+}
+
+export function useActiveStrategy(accountId: string | null) {
+  return useQuery<RebalancingStrategy | null, Error>({
+    queryKey: [QueryKeys.ACTIVE_STRATEGY, accountId],
+    queryFn: () => getActiveStrategyForAccount(accountId!),
+    enabled: !!accountId,
+  });
+}
+
+export function useHoldingsForAllocation(accountId: string | null) {
+  return useQuery<any[], Error>({
+    queryKey: ["holdings", accountId],
+    queryFn: () => getHoldings(accountId!),
+    enabled: !!accountId,
+  });
+}
+
+// ============================================================================
+// Mutations
+// ============================================================================
+
+export const useRebalancingMutations = () => {
+  const queryClient = useQueryClient();
+
+  const handleSuccess = (message: string, invalidateKeys: string[]) => {
+    invalidateKeys.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
+    toast.success(message);
+  };
+
+  const handleError = (action: string, error: unknown) => {
+    logger.error(`Error ${action}:`, error);
+    toast.error("Uh oh! Something went wrong.", {
+      description: `There was a problem ${action}.`,
+    });
+  };
+
+  const saveStrategyMutation = useMutation({
+    mutationFn: (strategy: NewRebalancingStrategy | RebalancingStrategy) =>
+      saveRebalancingStrategy(strategy),
+    onSuccess: (_, variables) => {
+      const isNew = !("id" in variables);
+      handleSuccess(
+        isNew ? "Allocation strategy created successfully." : "Allocation strategy updated successfully.",
+        [QueryKeys.REBALANCING_STRATEGIES]
+      );
+    },
+    onError: (error) => handleError("saving allocation strategy", error),
+  });
+
+  const deleteStrategyMutation = useMutation({
+    mutationFn: deleteRebalancingStrategy,
+    onSuccess: () =>
+      handleSuccess("Allocation strategy deleted successfully.", [QueryKeys.REBALANCING_STRATEGIES]),
+    onError: (error) => handleError("deleting allocation strategy", error),
+  });
+
+  return {
+    saveStrategyMutation,
+    deleteStrategyMutation,
+  };
+};

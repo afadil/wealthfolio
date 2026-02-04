@@ -1,7 +1,7 @@
 # Portfolio Allocation Rebalancing - Documentation Index
 
-**Last Updated:** January 19, 2026  
-**Status:** Planning Phase Complete ✅  
+**Last Updated:** January 19, 2026
+**Status:** Planning Phase Complete ✅
 **Next Phase:** Pre-Implementation Setup (Phase 0)
 
 ---
@@ -15,6 +15,7 @@ This folder contains comprehensive documentation for implementing the portfolio 
 **👉 START HERE:**
 1. [`executive-summary.md`](./executive-summary.md) - Read this first! (15 min)
 2. [`quick-start-checklist.md`](./quick-start-checklist.md) - Your action items (5 min)
+3. ['AGENTS.md](/Users/admin/Desktop/wealthfolio/AGENTS.md) - VERY IMPORTANT!
 
 **📖 CORE DOCUMENTATION:**
 - [`implementation-review.md`](./implementation-review.md) - Complete implementation plan (45 min)
@@ -71,8 +72,8 @@ This folder contains comprehensive documentation for implementing the portfolio 
 ## 📁 File Descriptions
 
 ### `executive-summary.md`
-**Purpose:** High-level review of the project  
-**Audience:** You (the developer)  
+**Purpose:** High-level review of the project
+**Audience:** You (the developer)
 **Key Info:**
 - What's good about your plan
 - What needs fixing
@@ -84,8 +85,8 @@ This folder contains comprehensive documentation for implementing the portfolio 
 ---
 
 ### `quick-start-checklist.md`
-**Purpose:** One-page action list  
-**Audience:** You (for daily reference)  
+**Purpose:** One-page action list
+**Audience:** You (for daily reference)
 **Key Info:**
 - Daily tasks
 - Time tracking
@@ -97,8 +98,8 @@ This folder contains comprehensive documentation for implementing the portfolio 
 ---
 
 ### `implementation-review.md`
-**Purpose:** Complete implementation guide  
-**Audience:** You (for implementation)  
+**Purpose:** Complete implementation guide
+**Audience:** You (for implementation)
 **Key Info:**
 - Corrected database schema
 - Phase-by-phase plan
@@ -111,8 +112,8 @@ This folder contains comprehensive documentation for implementing the portfolio 
 ---
 
 ### `database-schema-fixes.md`
-**Purpose:** Schema comparison and fixes  
-**Audience:** You (for database work)  
+**Purpose:** Schema comparison and fixes
+**Audience:** You (for database work)
 **Key Info:**
 - Side-by-side wrong vs. right
 - Why each fix matters
@@ -124,8 +125,8 @@ This folder contains comprehensive documentation for implementing the portfolio 
 ---
 
 ### `phase-0-setup-guide.md`
-**Purpose:** Pre-implementation preparation  
-**Audience:** You (for this week)  
+**Purpose:** Pre-implementation preparation
+**Audience:** You (for this week)
 **Key Info:**
 - Backup procedures
 - Codebase study guide
@@ -137,41 +138,41 @@ This folder contains comprehensive documentation for implementing the portfolio 
 ---
 
 ### `conversation_summary.md`
-**Purpose:** Original feature planning  
-**Audience:** Historical reference  
+**Purpose:** Original feature planning
+**Audience:** Historical reference
 **Key Info:**
 - Feature selection rationale
 - Algorithm explanations
 - UI design vision
 - Design decisions
 
-**Status:** ✅ Good, keep as reference  
+**Status:** ✅ Good, keep as reference
 **Action:** None, for context only
 
 ---
 
 ### `allocations_project_spec.md`
-**Purpose:** Technical specification  
-**Audience:** Historical reference  
+**Purpose:** Technical specification
+**Audience:** Historical reference
 **Key Info:**
 - Database schema (OUTDATED)
 - Implementation phases
 - Algorithms
 
-**Status:** ⚠️ Needs revision  
+**Status:** ⚠️ Needs revision
 **Action:** Don't use database schema from this document
 
 ---
 
 ### `selected-features-difficulty.md`
-**Purpose:** Complexity assessment  
-**Audience:** Planning reference  
+**Purpose:** Complexity assessment
+**Audience:** Planning reference
 **Key Info:**
 - Time estimates
 - Difficulty ratings
 - Feature-by-feature analysis
 
-**Status:** ✅ Good, accurate estimates  
+**Status:** ✅ Good, accurate estimates
 **Action:** Use for planning
 
 ---
@@ -179,8 +180,8 @@ This folder contains comprehensive documentation for implementing the portfolio 
 ## 🗺️ Implementation Roadmap
 
 ### Current Phase: Phase 0 (This Week)
-**Goal:** Prepare without coding  
-**Duration:** 1 week  
+**Goal:** Prepare without coding
+**Duration:** 1 week
 **Documents:**
 - Phase 0 Setup Guide
 - Quick Start Checklist
@@ -194,8 +195,8 @@ This folder contains comprehensive documentation for implementing the portfolio 
 ---
 
 ### Next Phase: Phase 1 (Next Week, if ready)
-**Goal:** Database and backend  
-**Duration:** 3-4 days  
+**Goal:** Database and backend
+**Duration:** 3-4 days
 **Documents:**
 - Implementation Review (Phase 1 section)
 - Database Schema Fixes
@@ -209,7 +210,7 @@ This folder contains comprehensive documentation for implementing the portfolio 
 ---
 
 ### Future Phases: Phase 2-4 (Weeks 3-4)
-**Goal:** UI and advanced features  
+**Goal:** UI and advanced features
 **Documents:**
 - Implementation Review (Phase 2-4 sections)
 - Conversation Summary (for UI reference)
@@ -345,20 +346,20 @@ Use this space for personal notes:
 Date: _______
 
 Notes:
-- 
-- 
-- 
+-
+-
+-
 
 Questions:
-- 
-- 
-- 
+-
+-
+-
 ```
 
 ---
 
-**Created:** January 19, 2026  
-**Status:** 🟢 Complete and ready for use  
+**Created:** January 19, 2026
+**Status:** 🟢 Complete and ready for use
 **Next Update:** After Phase 0 completion
 
 ---
