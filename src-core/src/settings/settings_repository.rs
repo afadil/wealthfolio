@@ -62,6 +62,16 @@ impl SettingsRepositoryTrait for SettingsRepository {
                 "sync_enabled" => {
                     settings.sync_enabled = value.parse().unwrap_or(true);
                 }
+                // Phase 4: Allocation preferences
+                "allocation_holding_target_mode" => {
+                    settings.allocation_holding_target_mode = Some(value);
+                }
+                "allocation_default_view" => {
+                    settings.allocation_default_view = Some(value);
+                }
+                "allocation_settings_banner_dismissed" => {
+                    settings.allocation_settings_banner_dismissed = Some(value);
+                }
                 _ => {} // Ignore unknown settings
             }
         }
@@ -132,6 +142,38 @@ impl SettingsRepositoryTrait for SettingsRepository {
                         .values(&AppSetting {
                             setting_key: "sync_enabled".to_string(),
                             setting_value: sync_enabled.to_string(),
+                        })
+                        .execute(conn)?;
+                }
+
+                // Phase 4: Allocation preferences
+                if let Some(ref allocation_holding_target_mode) =
+                    settings.allocation_holding_target_mode
+                {
+                    diesel::replace_into(app_settings)
+                        .values(&AppSetting {
+                            setting_key: "allocation_holding_target_mode".to_string(),
+                            setting_value: allocation_holding_target_mode.clone(),
+                        })
+                        .execute(conn)?;
+                }
+
+                if let Some(ref allocation_default_view) = settings.allocation_default_view {
+                    diesel::replace_into(app_settings)
+                        .values(&AppSetting {
+                            setting_key: "allocation_default_view".to_string(),
+                            setting_value: allocation_default_view.clone(),
+                        })
+                        .execute(conn)?;
+                }
+
+                if let Some(ref allocation_settings_banner_dismissed) =
+                    settings.allocation_settings_banner_dismissed
+                {
+                    diesel::replace_into(app_settings)
+                        .values(&AppSetting {
+                            setting_key: "allocation_settings_banner_dismissed".to_string(),
+                            setting_value: allocation_settings_banner_dismissed.clone(),
                         })
                         .execute(conn)?;
                 }

@@ -16,6 +16,7 @@ import IncomePage from "@/pages/income/income-page";
 import PortfolioInsightsPage from "@/pages/insights/portfolio-insights";
 import PerformancePage from "@/pages/performance/performance-page";
 import SettingsAccountsPage from "@/pages/settings/accounts/accounts-page";
+import SettingsAllocationPage from "@/pages/settings/allocation/allocation-page";
 import SettingsAppearancePage from "@/pages/settings/appearance/appearance-page";
 import SettingsPortfoliosPage from "@/pages/settings/portfolios/portfolios-page";
 import AccountPage from "./pages/account/account-page";
@@ -85,7 +86,7 @@ export function AppRoutes() {
           <Route path="insights" element={<PortfolioInsightsPage />} />
           <Route path="allocation" element={<AllocationPage />} />
           <Route path="allocations" element={<AllocationPage />} />
-          <Route path="allocations/:accountId?"element={<AllocationPage />}/>
+          <Route path="allocations/:accountId?" element={<AllocationPage />} />
           {/* Dynamic addon routes */}
           {dynamicRoutes.map(({ path, component: Component }) => (
             <Route
@@ -107,6 +108,7 @@ export function AppRoutes() {
             <Route path="portfolios" element={<SettingsPortfoliosPage />} />
             <Route path="goals" element={<SettingsGoalsPage />} />
             <Route path="appearance" element={<SettingsAppearancePage />} />
+            <Route path="allocation" element={<SettingsAllocationPage />} />
             <Route path="about" element={<AboutSettingsPage />} />
             <Route path="exports" element={<ExportSettingsPage />} />
             <Route path="contribution-limits" element={<ContributionLimitPage />} />

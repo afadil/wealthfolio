@@ -42,6 +42,12 @@ const sidebarNavItems = [
     icon: <Icons.Goal className="h-5 w-5" />,
   },
   {
+    title: "Allocation",
+    href: "allocation",
+    subtitle: "Allocation and rebalancing preferences",
+    icon: <Icons.PieChart className="h-5 w-5" />,
+  },
+  {
     title: "Securities",
     href: "securities",
     subtitle: "Manage security definitions",
