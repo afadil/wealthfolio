@@ -313,7 +313,9 @@ export default function AllocationPage() {
     };
 
     ensureStrategy();
-  }, [selectedAccountIds, isMultiAccountView, selectedAccounts, primaryAccount, queryClient]);
+  }, [selectedAccountIds, isMultiAccountView, primaryAccount, queryClient]);
+  // Note: selectedAccounts intentionally omitted - it's derived from selectedAccountIds
+  // Including it causes infinite loop because it's a new array reference each render
 
   // Auto-match portfolio detection and toast notification
   useEffect(() => {
