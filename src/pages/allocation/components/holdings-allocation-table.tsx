@@ -357,7 +357,7 @@ function EditableTargetCell({
             : needsRedHighlight
               ? "cursor-pointer border border-red-400 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-600 dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-950"
               : isPendingValue
-                ? "cursor-pointer bg-amber-50 text-amber-700 italic dark:bg-amber-950/50 dark:text-amber-300"
+                ? "cursor-pointer bg-orange-50 text-orange-700 italic dark:bg-orange-950/50 dark:text-orange-300"
                 : row.isAutoDistributed
                   ? "text-muted-foreground hover:text-foreground cursor-pointer italic"
                   : "hover:text-primary cursor-pointer"
@@ -520,7 +520,7 @@ function getColumns(
           <div
             className={`text-right ${
               isPending
-                ? "text-amber-700 italic dark:text-amber-300"
+                ? "text-orange-700 italic dark:text-orange-300"
                 : isAutoDistributed
                   ? "text-muted-foreground italic"
                   : ""
@@ -570,7 +570,7 @@ function getColumns(
             colorClass = "text-red-600 dark:text-red-400";
           } else {
             // Over-allocated (current > target)
-            colorClass = "text-green-600 dark:text-green-400";
+            colorClass = "text-success";
           }
         }
 
@@ -598,7 +598,7 @@ function getColumns(
             ) : status === "auto" ? (
               <span className="text-muted-foreground text-xs italic">Auto</span>
             ) : status === "pending" ? (
-              <span className="text-xs text-amber-600 italic dark:text-amber-400">Pending</span>
+              <span className="text-xs text-orange-600 italic dark:text-orange-400">Pending</span>
             ) : status === "needs-value" ? (
               <span className="text-xs text-red-600 dark:text-red-400">Required</span>
             ) : status === "set" ? (
@@ -1103,7 +1103,7 @@ export function HoldingsAllocationTable({
     <div className="space-y-4">
       {/* Pending edits banner for strict mode */}
       {isStrictMode && hasPendingEdits && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950/30">
+        <div className="bg-muted/50 rounded-lg border-l-4 border-l-red-600 p-3 dark:border-l-red-400">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-2">
               <div className="mt-0.5 text-red-600 dark:text-red-400">
@@ -1116,11 +1116,11 @@ export function HoldingsAllocationTable({
                 </svg>
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                <p className="text-foreground text-sm font-medium">
                   Set targets for all holdings to reach 100%
                 </p>
                 {validationWarnings.length > 0 && (
-                  <ul className="mt-1 text-sm text-red-700 dark:text-red-300">
+                  <ul className="text-muted-foreground mt-1 text-sm">
                     {validationWarnings.map((warning) => (
                       <li key={warning.assetClassId}>
                         <span className="font-medium">{warning.assetClass}</span>:{" "}

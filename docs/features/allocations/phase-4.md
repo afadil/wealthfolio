@@ -1666,36 +1666,118 @@ If Phase 4 needs to be rolled back:
 
 ---
 
-## 15. Pre-Release Checklist
+## 15. Pre-Release UI Theme Audit ✅ COMPLETE
 
-### 15.1 Dark Mode UI Review
+Full audit of the allocation page against the Flexoki color palette. The app
+disables these Tailwind colors: amber, lime, emerald, teal, sky, indigo, violet,
+fuchsia, pink, rose, slate, zinc, neutral, stone. Available Flexoki colors: red,
+orange, yellow, green, cyan, blue, purple, magenta. Gray is NOT disabled and
+remains available. Semantic tokens (bg-background, text-foreground, bg-muted,
+text-muted-foreground, bg-card, bg-secondary, bg-destructive, etc.) should be
+preferred over raw colors where appropriate.
 
-Before release, conduct a full dark mode review to ensure all allocation
-components match the rest of the UI:
+### 15.1 Light Theme Audit ✅ COMPLETE
 
-- [ ] Sub-pie chart colors (grey gradient in light mode, orange gradient in dark
-      mode)
-- [ ] Allocation target bars (Target/Actual bar colors and text contrast)
-- [ ] Side panel backgrounds and borders
-- [ ] Holdings table row styling
-- [ ] Progress bars and status indicators
-- [ ] Validation error message colors
-- [ ] Tab navigation styling
-- [ ] Empty state styling
-- [ ] Banner/notification colors
+- [x] `holdings-allocation-table.tsx` — Replaced 3 disabled `amber-*` colors
+      with `orange-*` equivalents (lines 360, 523, 601)
+- [x] `index.tsx` — Removed Targets and Composition tabs + dead code cleanup
+      (`getSubClassColor`, `getAssetClassColor`, `renderHoldingName`,
+      `formatCurrency`, `totalAllocated`, `assetClassLockStates`,
+      `holdingsLoading`, `getHoldingDisplayName` import)
+- [x] Replaced `bg-green-600 dark:bg-green-500` with `bg-success/60` on all
+      Actual allocation bars (allocation-pie-chart-view, index.tsx,
+      asset-class-target-card) — matches dashboard chart green
+- [x] Replaced all `text-green-600`/`text-green-700` with `text-success`
+      across 9 files (15 instances) — consistent Flexoki green
+- [x] `drift-gauge.tsx` — Added dark variants to all bar colors:
+      `bg-green-500 dark:bg-green-600`, `bg-yellow-500 dark:bg-yellow-600`,
+      `bg-red-500 dark:bg-red-600`
+- [x] `allocation-overview.tsx` — Added missing dark variants for yellow and
+      red text colors
+- [x] Delete button → `bg-destructive text-destructive-foreground` (semantic)
+- [x] Lock/eye buttons → `text-foreground` when active (was `text-gray-700`)
+- [x] Sub-class progress bars → `bg-chart-2` (matches Target bar grey)
+- [x] Deleted unused `allocation-overview.tsx` (dead code)
 
-**Testing approach:**
+### 15.2 Dark Theme Audit ✅ COMPLETE
 
-1. Toggle dark mode in system settings or app settings
-2. Navigate through all allocation views (Targets, Composition, Pie Chart,
-   Holdings Table, Rebalancing)
-3. Open side panel and verify all elements are readable
-4. Check hover/active states on interactive elements
-5. Verify color contrast meets accessibility standards
+- [x] `holdings-allocation-table.tsx` — All amber-to-orange replacements
+      include proper `dark:` variants
+- [x] `donut-chart-full.tsx` — Added dark variants to status color strings:
+      `text-red-600 dark:text-red-400`, `text-blue-600 dark:text-blue-400`,
+      `text-success` (semantic, no dark needed)
+- [x] `holding-target-row.tsx` — Replaced `dark:bg-gray-200` with
+      `dark:bg-muted-foreground` for softer vertical indicator bar
+- [x] `allocation-pie-chart-view.tsx` — "Unused Targets" section restyled
+      with left-border accent pattern: `bg-muted/50 border-l-4
+      border-l-orange-500 dark:border-l-orange-400` + semantic text colors
+- [x] `holdings-allocation-table.tsx` — Red validation banner restyled with
+      left-border accent: `bg-muted/50 border-l-4 border-l-red-600
+      dark:border-l-red-400` + semantic text colors
+- [x] `index.tsx` — Blue info banners (portfolio match/save) restyled with
+      left-border accent: `bg-muted/50 border-l-4 border-l-blue-600
+      dark:border-l-blue-400` + semantic text colors
+- [x] Lock icon in `TargetPercentSlider` (packages/ui) — Replaced
+      `text-gray-700` with `text-foreground` (white in dark mode)
+- [x] `TargetPercentSlider` — Replaced `text-green-600 dark:text-green-400`
+      and `text-red-600 dark:text-red-400` with `text-success` and
+      `text-destructive` (semantic tokens)
+- [x] `index.tsx` — Sub-class progress bars changed to `bg-chart-2`
+      (theme-aware: grey in light, orange in dark)
+- [x] `index.tsx` — Added safe-area-inset padding to SheetContent for mobile
+      notch/dynamic island support
+
+### 15.3 Banner/Alert Pattern
+
+All banners now follow a consistent pattern across both themes:
+
+| Type    | Left Border           | Icon Color          | Background   | Text       |
+|---------|-----------------------|---------------------|--------------|------------|
+| Info    | `border-l-blue-600`   | `text-blue-600`     | `bg-muted/50`| semantic   |
+| Error   | `border-l-red-600`    | `text-red-600`      | `bg-muted/50`| semantic   |
+| Warning | `border-l-orange-500` | `text-orange-600`   | `bg-muted/50`| semantic   |
+| Unsaved | `border-primary/20`   | —                   | `bg-primary/5`| semantic  |
+
+### 15.4 Pre-Existing TypeScript Errors (Not Theme-Related)
+
+These exist in the codebase before our changes and should be tracked separately:
+
+- [ ] `holdings-allocation-table.tsx (line 1163)` — `onFilterChange` prop does
+      not exist on `DataTableProps`. Need to either add the prop to the
+      DataTable component or remove it from usage.
+- [ ] `sub-pie-chart.tsx (line 3)` — `DonutChartCompact` is not exported from
+      `@wealthfolio/ui`. Need to either export it from the UI package or use a
+      different chart component.
+
+### 15.5 Testing Approach
+
+**Light Theme Testing:**
+1. Set system/app to light mode
+2. Navigate to Allocation Overview (pie chart tab) — verify chart colors,
+   target cards, and drift indicators use proper Flexoki warm tones
+3. Open side panel — verify Target bar (grey/`bg-chart-2`), Actual bar
+   (green/`bg-success/60`), sub-class bars (grey/`bg-chart-2`)
+4. Switch to Holdings Table tab — verify row highlighting (pending = orange,
+   error = red), status badges, and deviation colors
+5. Switch to Rebalancing Suggestions tab — verify buy/sell/hold colors
+6. Check banner styling (blue left stripe for info, red for errors, orange
+   for warnings)
+7. Verify all text has sufficient contrast on light backgrounds
+
+**Dark Theme Testing:**
+1. Set system/app to dark mode
+2. Repeat all navigation steps from light theme testing
+3. Verify Actual bars show softer Flexoki green (`bg-success/60`)
+4. Verify lock icons are white when locked, light grey when unlocked
+5. Verify banners are visible with `bg-muted/50` background + colored left
+   stripe
+6. Verify sub-class bars use `bg-chart-2` (orange gradient in dark)
+7. Check hover/active states on interactive elements remain visible
 
 ---
 
-**Last Updated:** February 2, 2026  
-**Status:** Planning Complete - Ready for Sprint 1  
-**Current Focus:** Awaiting approval to begin implementation  
-**Next Step:** Sprint 1 - Settings Infrastructure (1-2 days)
+**Last Updated:** February 4, 2026
+**Status:** All 4 Sprints + UI Theme Audit Complete
+**Tabs Removed:** Targets, Composition (no longer needed)
+**Dead Code Removed:** `allocation-overview.tsx`, `getSubClassColor`,
+`getAssetClassColor`, `renderHoldingName`, `formatCurrency`, and related imports

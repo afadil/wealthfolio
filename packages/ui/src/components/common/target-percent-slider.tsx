@@ -135,7 +135,7 @@ export const TargetPercentSlider: React.FC<TargetPercentSliderProps> = ({
             onClick={onToggleLock}
             className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded transition-all disabled:opacity-30 ${
               isLocked
-                ? "bg-secondary text-gray-700"
+                ? "bg-secondary text-foreground"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted opacity-70 hover:opacity-100"
             }`}
             title={isLocked ? "Unlock target" : "Lock target"}
@@ -159,7 +159,7 @@ export const TargetPercentSlider: React.FC<TargetPercentSliderProps> = ({
               type="button"
               onClick={onToggleLock}
               className={`flex h-4 w-4 items-center justify-center rounded px-1 transition-colors ${
-                isLocked ? "bg-secondary text-gray-700" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                isLocked ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"
               }`}
               title={isLocked ? "Unlock target" : "Lock target"}
             >
@@ -192,9 +192,9 @@ export const TargetPercentSlider: React.FC<TargetPercentSliderProps> = ({
         {remainingAllocation !== undefined && (
           <span className="flex-1 text-center">
             {remainingAllocation > 0 ? (
-              <span className="text-green-600 dark:text-green-400">{remainingAllocation.toFixed(1)}% remaining</span>
+              <span className="text-success">{remainingAllocation.toFixed(1)}% remaining</span>
             ) : remainingAllocation < 0 ? (
-              <span className="text-red-600 dark:text-red-400">{Math.abs(remainingAllocation).toFixed(1)}% over</span>
+              <span className="text-destructive">{Math.abs(remainingAllocation).toFixed(1)}% over</span>
             ) : (
               <span>Fully allocated</span>
             )}

@@ -208,7 +208,7 @@ export function AssetClassFormDialog({
               <div className="text-muted-foreground">
                 <span>Remaining to allocate: </span>
                 <span
-                  className={`font-semibold tabular-nums ${actualRemaining <= 0 ? "text-green-600 dark:text-green-400" : "text-orange-600 dark:text-orange-400"}`}
+                  className={`font-semibold tabular-nums ${actualRemaining <= 0 ? "text-success" : "text-orange-600 dark:text-orange-400"}`}
                 >
                   {actualRemaining.toFixed(2)}%
                 </span>
@@ -218,7 +218,7 @@ export function AssetClassFormDialog({
                   isOverAllocated
                     ? "text-orange-600 dark:text-orange-400"
                     : totalIfSaved === 100
-                      ? "text-green-600 dark:text-green-400"
+                      ? "text-success"
                       : "text-foreground"
                 }
               >

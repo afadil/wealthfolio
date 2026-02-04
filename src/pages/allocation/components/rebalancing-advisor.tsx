@@ -525,7 +525,7 @@ export function RebalancingAdvisor({
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Suggested Buy:</span>
                       <div className="text-right">
-                        <div className="font-semibold text-green-600 dark:text-green-400">
+                        <div className="text-success font-semibold">
                           {formatCurrency(suggestion.suggestedBuy)}
                         </div>
                         {suggestion.suggestedBuy > 0 &&
@@ -729,7 +729,7 @@ export function RebalancingAdvisor({
                                               No price
                                             </span>
                                           )}
-                                          <span className="text-right font-semibold text-green-600 dark:text-green-400">
+                                          <span className="text-success text-right font-semibold">
                                             {formatCurrency(actualCost)}
                                           </span>
                                         </div>

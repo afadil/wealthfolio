@@ -18,16 +18,16 @@ export function DriftGauge({ assetClass, targetPercent, actualPercent }: DriftGa
 
   if (absoluteDrift <= 2) {
     status = "on-target";
-    statusColor = "text-green-600 dark:text-green-400";
-    barColor = "bg-green-500";
+    statusColor = "text-success";
+    barColor = "bg-green-500 dark:bg-green-600";
   } else if (absoluteDrift <= 5) {
     status = "warning";
     statusColor = "text-yellow-600 dark:text-yellow-400";
-    barColor = "bg-yellow-500";
+    barColor = "bg-yellow-500 dark:bg-yellow-600";
   } else {
     status = "rebalance";
     statusColor = "text-red-600 dark:text-red-400";
-    barColor = "bg-red-500";
+    barColor = "bg-red-500 dark:bg-red-600";
   }
 
   // Clamp for visual representation (0–100%)

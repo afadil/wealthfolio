@@ -106,7 +106,7 @@ export function HoldingTargetRow({
               disabled={disabled}
               className={`h-6 w-6 rounded p-0 transition-all ${
                 isLocked
-                  ? "bg-secondary text-gray-700"
+                  ? "bg-secondary text-foreground"
                   : "hover:bg-muted opacity-70 hover:opacity-100"
               }`}
               title={isLocked ? "Unlock target" : "Lock target"}
@@ -192,7 +192,7 @@ export function HoldingTargetRow({
         <div
           className={`absolute top-0 h-full w-0.5 transition-colors ${
             holding.currentPercent <= displayPercent
-              ? "bg-background dark:bg-gray-200" // Light color when inside target bar
+              ? "bg-background dark:bg-muted-foreground" // Light color when inside target bar
               : "bg-chart-2" // Dark grey when outside target bar
           }`}
           style={{

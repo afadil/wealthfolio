@@ -20,7 +20,7 @@ export function getDriftStatus(actualPercent: number, targetPercent: number) {
       label: "On Target",
       icon: "✓",
       barColor: "bg-green-500 dark:bg-green-500",
-      statusColor: "text-green-700 dark:text-green-300",
+      statusColor: "text-success",
       statusBgColor: "bg-green-100 dark:bg-green-900/40",
     };
   }
@@ -30,7 +30,7 @@ export function getDriftStatus(actualPercent: number, targetPercent: number) {
       label: "On Target",
       icon: "✓",
       barColor: "bg-green-400 dark:bg-green-400",
-      statusColor: "text-green-700 dark:text-green-300",
+      statusColor: "text-success",
       statusBgColor: "bg-green-100/80 dark:bg-green-900/30",
     };
   }
@@ -40,7 +40,7 @@ export function getDriftStatus(actualPercent: number, targetPercent: number) {
       label: "Minor Drift",
       icon: "◐",
       barColor: "bg-green-300 dark:bg-green-300",
-      statusColor: "text-green-700 dark:text-green-400",
+      statusColor: "text-success",
       statusBgColor: "bg-green-100/60 dark:bg-green-900/20",
     };
   }

@@ -154,9 +154,7 @@ export function AllocationPieChartView({
               <p className="text-muted-foreground mb-1 text-xs">Remaining</p>
               <p
                 className={`text-3xl font-bold ${
-                  remaining < 0
-                    ? "text-red-600 dark:text-red-400"
-                    : "text-green-600 dark:text-green-400"
+                  remaining < 0 ? "text-red-600 dark:text-red-400" : "text-success"
                 }`}
               >
                 {remaining.toFixed(2)}%
@@ -177,7 +175,7 @@ export function AllocationPieChartView({
                     onClick={onToggleHiddenTargets}
                     className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded transition-all ${
                       showHiddenTargets
-                        ? "bg-secondary text-gray-700"
+                        ? "bg-secondary text-foreground"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted opacity-70 hover:opacity-100"
                     }`}
                     title={showHiddenTargets ? "Hide unused targets" : "Show unused targets"}
@@ -207,7 +205,7 @@ export function AllocationPieChartView({
                 const drift = (actual?.actualPercent || 0) - target.targetPercent;
                 const driftColor =
                   Math.abs(drift) < 2
-                    ? "text-green-600 dark:text-green-400"
+                    ? "text-success"
                     : drift > 0
                       ? "text-blue-600 dark:text-blue-400"
                       : "text-orange-600 dark:text-orange-400";
@@ -233,7 +231,7 @@ export function AllocationPieChartView({
                                   }
                                 }}
                                 disabled={isDeleting}
-                                className="rounded bg-red-600 px-2 py-1 font-medium text-white hover:bg-red-700"
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded px-2 py-1 font-medium"
                               >
                                 Delete
                               </button>
@@ -446,7 +444,7 @@ export function AllocationPieChartView({
                       <div className="flex items-center gap-2">
                         <div className="bg-secondary relative flex h-6 flex-1 items-center justify-between overflow-hidden rounded">
                           <div
-                            className="absolute top-0 left-0 h-full rounded bg-green-600 transition-all dark:bg-green-500"
+                            className="bg-success/60 absolute top-0 left-0 h-full rounded transition-all"
                             style={{ width: `${Math.min(actual?.actualPercent || 0, 100)}%` }}
                           />
                           {/* Label on left (inside colored portion) */}
@@ -483,7 +481,7 @@ export function AllocationPieChartView({
                   }
 
                   return (
-                    <div className="mt-4 border-t border-orange-200 pt-4 dark:border-orange-900">
+                    <div className="mt-4 border-t pt-4">
                       <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-orange-600 dark:text-orange-400">
                         <Icons.AlertTriangle className="h-3 w-3" />
                         Unused Targets
@@ -492,10 +490,10 @@ export function AllocationPieChartView({
                         {orphanedTargets.map((target) => (
                           <div
                             key={target.assetClass}
-                            className="rounded-lg bg-orange-50 p-2 dark:bg-orange-950/30"
+                            className="bg-muted/50 rounded-lg border-l-4 border-l-orange-500 p-2 dark:border-l-orange-400"
                           >
                             <div className="mb-1 flex items-center justify-between">
-                              <span className="text-xs font-medium text-orange-900 dark:text-orange-100">
+                              <span className="text-foreground text-xs font-medium">
                                 {target.assetClass}
                               </span>
                               {onDeleteTarget && (
@@ -505,13 +503,13 @@ export function AllocationPieChartView({
                                   }}
                                   variant="ghost"
                                   size="sm"
-                                  className="h-6 px-2 text-xs text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300"
+                                  className="text-muted-foreground hover:text-foreground h-6 px-2 text-xs"
                                 >
                                   Delete
                                 </Button>
                               )}
                             </div>
-                            <div className="text-xs text-orange-700 dark:text-orange-300">
+                            <div className="text-muted-foreground text-xs">
                               Target: {target.targetPercent.toFixed(1)}% • No holdings in this
                               account
                             </div>

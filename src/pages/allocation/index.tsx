@@ -1,7 +1,6 @@
 import { getHoldings } from "@/commands/portfolio";
 import { getRebalancingStrategies, saveRebalancingStrategy } from "@/commands/rebalancing";
 import { AccountPortfolioSelector } from "@/components/account-portfolio-selector";
-import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/use-toast";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useAllocationSettings } from "@/hooks/useAllocationSettings";
@@ -19,7 +18,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AllocationPieChartView } from "./components/allocation-pie-chart-view";
 import { AssetClassFormDialog } from "./components/asset-class-form-dialog";
-import { AssetClassTargetCard } from "./components/asset-class-target-card";
+
 import { HoldingTargetRow } from "./components/holding-target-row";
 import { HoldingsAllocationTable } from "./components/holdings-allocation-table";
 import { RebalancingAdvisor } from "./components/rebalancing-advisor";
@@ -36,13 +35,12 @@ import {
 import { useStrictModeValidation } from "./hooks/use-strict-mode-validation";
 import {
   getAvailableAssetClasses,
-  getHoldingDisplayName,
   useCurrentAllocation,
   useHoldingsByAssetClass,
 } from "./hooks/use-current-allocation";
 import { calculateAutoDistribution } from "./lib/auto-distribution";
 
-type TabType = "targets" | "composition" | "pie-chart" | "holdings-table" | "rebalancing";
+type TabType = "pie-chart" | "holdings-table" | "rebalancing";
 
 const createPortfolioAccount = (): Account => ({
   id: PORTFOLIO_ACCOUNT_ID,
@@ -56,27 +54,6 @@ const createPortfolioAccount = (): Account => ({
   updatedAt: new Date(),
   isCombinedPortfolio: false,
 });
-
-// KEEP existing getAssetClassColor function (for base colors)
-/**
- * Get green color based on asset class percentage
- * Higher % = darker green, Lower % = lighter green
- */
-function getAssetClassColor(percent: number): string {
-  if (percent >= 80) return "bg-green-700 dark:bg-green-600"; // Dark green (80%+)
-  if (percent >= 50) return "bg-green-500 dark:bg-green-600"; // Dark green (50-79%)
-  if (percent >= 30) return "bg-green-400 dark:bg-green-500"; // Medium green (30-49%)
-  if (percent >= 20) return "bg-green-300 dark:bg-green-400"; // Light green (20-29%)
-  return "bg-green-300 dark:bg-green-200"; // Very light green (<20%)
-}
-
-// KEEP existing getSubClassColor (orange tones)
-const getSubClassColor = (percent: number): string => {
-  if (percent >= 50) return "bg-orange-500";
-  if (percent >= 30) return "bg-orange-400";
-  if (percent >= 15) return "bg-amber-400";
-  return "bg-yellow-400";
-};
 
 // Helper component for rendering holdings with targets
 function HoldingsTargetList({
@@ -229,7 +206,7 @@ export default function AllocationPage() {
   const [assetClassPendingEdits, setAssetClassPendingEdits] = useState<Map<string, number>>(
     new Map(),
   );
-  const [assetClassLockStates, setAssetClassLockStates] = useState<Map<string, boolean>>(new Map());
+
   const [isSavingAllTargets, setIsSavingAllTargets] = useState(false);
   const [showHiddenTargets, setShowHiddenTargets] = useState(false);
   // Removed combinedPortfolio - now using virtual strategies instead
@@ -412,9 +389,8 @@ export default function AllocationPage() {
   // Aggregate holdings from all selected accounts
   const allHoldings = holdingsQueries.flatMap((query) => query.data || []);
   const holdings = allHoldings;
-  const holdingsLoading = holdingsQueries.some((query) => query.isLoading);
 
-  // NEW: Get available asset classes from holdings
+  // Get available asset classes from holdings
   const availableAssetClasses = getAvailableAssetClasses(holdings);
 
   const { saveTargetMutation, deleteTargetMutation } = useAssetClassMutations();
@@ -441,12 +417,6 @@ export default function AllocationPage() {
     selectedAssetClass,
     totalHoldingsInSelectedClass,
   );
-
-  // Calculate total allocated from composition only (excludes orphaned targets without holdings)
-  const totalAllocated = composition.reduce((sum, comp) => {
-    const target = targets.find((t) => t.assetClass === comp.assetClass);
-    return sum + (target?.targetPercent || 0);
-  }, 0);
 
   const isMutating = saveTargetMutation.isPending || deleteTargetMutation.isPending;
 
@@ -574,27 +544,6 @@ export default function AllocationPage() {
         queryKey: [QueryKeys.ASSET_CLASS_TARGETS, selectedAccountId],
       });
     }
-  };
-
-  // Composition tab holdings display
-  const renderHoldingName = (holding: Holding): string => {
-    // For cash holdings in specific account, use account name
-    // Check if holding has no instrument (indicates cash holding)
-    if (!holding.instrument && primaryAccount?.id !== PORTFOLIO_ACCOUNT_ID) {
-      return getHoldingDisplayName(holding, primaryAccount?.name);
-    }
-    // For portfolio view or non-cash, use standard logic
-    // In portfolio view, find account by holding.accountId from available data
-    const holdingAccount = holdings.find((h) => h.accountId === holding.accountId)?.accountId;
-    return getHoldingDisplayName(holding, holdingAccount ? primaryAccount?.name : undefined);
-  };
-
-  // Format currency helper (use throughout)
-  const formatCurrency = (value: number): string => {
-    return value.toLocaleString("en-US", {
-      style: "currency",
-      currency: baseCurrency,
-    });
   };
 
   // Calculate total percentage for validation (used in UI)
@@ -830,8 +779,6 @@ export default function AllocationPage() {
       {/* Tabs - Navigation Pills style */}
       <nav className="bg-muted/60 inline-flex items-center rounded-lg p-1">
         {[
-          { id: "targets", label: "Targets" },
-          { id: "composition", label: "Composition" },
           { id: "pie-chart", label: "Allocation Overview" },
           { id: "holdings-table", label: "Holdings Table" },
           { id: "rebalancing", label: "Rebalancing Suggestions" },
@@ -861,7 +808,7 @@ export default function AllocationPage() {
           !selectedAccountIds.includes(PORTFOLIO_ACCOUNT_ID) &&
           (exactMatchingPortfolio ? (
             // Show portfolio composition when exact match found
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/30">
+            <div className="bg-muted/50 rounded-lg border-l-4 border-l-blue-600 p-4 dark:border-l-blue-400">
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 text-blue-600 dark:text-blue-400">
                   <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
@@ -873,10 +820,10 @@ export default function AllocationPage() {
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                  <p className="text-foreground text-sm font-medium">
                     {exactMatchingPortfolio.name}
                   </p>
-                  <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+                  <p className="text-muted-foreground mt-1 text-sm">
                     Includes:{" "}
                     {selectedAccountIds
                       .map((id) => accounts?.find((a) => a.id === id)?.name)
@@ -888,7 +835,7 @@ export default function AllocationPage() {
             </div>
           ) : (
             // Show save as portfolio option when no exact match
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/30">
+            <div className="bg-muted/50 rounded-lg border-l-4 border-l-blue-600 p-4 dark:border-l-blue-400">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex flex-1 items-start gap-3">
                   <div className="mt-0.5 text-blue-600 dark:text-blue-400">
@@ -902,10 +849,10 @@ export default function AllocationPage() {
                     </svg>
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    <p className="text-foreground text-sm font-medium">
                       Viewing {selectedAccountIds.length} accounts
                     </p>
-                    <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+                    <p className="text-muted-foreground mt-1 text-sm">
                       Save this selection as a portfolio for quick access later.
                     </p>
                   </div>
@@ -932,305 +879,6 @@ export default function AllocationPage() {
               <div className="border-muted-foreground h-5 w-5 animate-spin rounded-full border-2 border-t-transparent" />
               <p className="text-muted-foreground text-sm">Setting up combined portfolio view...</p>
             </div>
-          </div>
-        )}
-
-        {viewTab === "targets" && (
-          <div className="space-y-4">
-            {/* Header with Action Button */}
-            <div className="flex items-center justify-between">
-              <Button
-                onClick={() => handleOpenForm()}
-                disabled={isMutating || availableAssetClasses.length === 0}
-                size="sm"
-              >
-                + Add Target
-              </Button>
-              <div className="flex items-center gap-4 text-xs">
-                <div>
-                  <span className="text-muted-foreground">Allocated:</span>{" "}
-                  <span className="font-semibold">{totalAllocated.toFixed(1)}%</span>
-                </div>
-                <div
-                  className={
-                    totalAllocated > 100
-                      ? "text-red-600 dark:text-red-400"
-                      : "text-green-600 dark:text-green-400"
-                  }
-                >
-                  <span className="text-muted-foreground">Remaining:</span>{" "}
-                  <span className="font-semibold">{(100 - totalAllocated).toFixed(1)}%</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Target Cards Grid - FULL WIDTH WITH SLIDERS */}
-            <div className="grid grid-cols-1 gap-4">
-              {composition.map((comp) => {
-                const target = targets.find((t) => t.assetClass === comp.assetClass);
-                return (
-                  <AssetClassTargetCard
-                    key={comp.assetClass}
-                    composition={comp}
-                    targetPercent={target?.targetPercent || 0}
-                    allTargets={targets}
-                    allLockStates={assetClassLockStates}
-                    isLocked={target?.isLocked || false}
-                    onEdit={() => handleOpenForm(comp.assetClass)}
-                    onDelete={() => handleDelete(comp.assetClass)}
-                    onToggleLock={async () => {
-                      if (!strategy?.id) return;
-                      const existingTarget = targets.find((t) => t.assetClass === comp.assetClass);
-                      if (existingTarget) {
-                        const newLockState = !existingTarget.isLocked;
-                        // Update local lock state map immediately
-                        const newMap = new Map(assetClassLockStates);
-                        newMap.set(comp.assetClass, newLockState);
-                        setAssetClassLockStates(newMap);
-
-                        await saveTargetMutation.mutateAsync({
-                          id: existingTarget.id,
-                          strategyId: strategy.id,
-                          assetClass: comp.assetClass,
-                          targetPercent: existingTarget.targetPercent,
-                          isLocked: newLockState,
-                        });
-                      }
-                    }}
-                    onTargetChange={async (newPercent) => {
-                      if (!strategy?.id) return;
-                      const existingTarget = targets.find((t) => t.assetClass === comp.assetClass);
-                      if (existingTarget) {
-                        await saveTargetMutation.mutateAsync({
-                          id: existingTarget.id,
-                          strategyId: strategy.id,
-                          assetClass: comp.assetClass,
-                          targetPercent: newPercent,
-                          isLocked: existingTarget.isLocked || false,
-                        });
-                      }
-                    }}
-                    onProportionalChange={async (updatedTargets) => {
-                      if (!strategy?.id) return;
-                      // Save all updated targets
-                      for (const updatedTarget of updatedTargets) {
-                        const existingTarget = targets.find(
-                          (t) => t.assetClass === updatedTarget.assetClass,
-                        );
-                        if (existingTarget) {
-                          await saveTargetMutation.mutateAsync({
-                            id: existingTarget.id,
-                            strategyId: strategy.id,
-                            assetClass: updatedTarget.assetClass,
-                            targetPercent: updatedTarget.targetPercent,
-                            isLocked: updatedTarget.isLocked || false,
-                          });
-                        }
-                      }
-                    }}
-                    isLoading={isMutating}
-                    accountId={selectedAccountId}
-                    isReadOnly={false}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {viewTab === "composition" && (
-          <div className="space-y-4">
-            {holdingsLoading && (
-              <div className="space-y-4">
-                <Skeleton className="h-32" />
-                <Skeleton className="h-32" />
-                <Skeleton className="h-32" />
-              </div>
-            )}
-
-            {!holdingsLoading && currentAllocation.assetClasses.length === 0 && (
-              <div className="rounded-lg border border-dashed py-12 text-center">
-                <p className="text-muted-foreground">No holdings in this account yet</p>
-              </div>
-            )}
-
-            {!holdingsLoading && currentAllocation.assetClasses.length > 0 && (
-              <div className="space-y-6">
-                {/* Summary stats - USE formatCurrency */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-card rounded-lg border p-4">
-                    <p className="text-muted-foreground text-xs">Total Value</p>
-                    <p className="text-xl font-bold">
-                      {formatCurrency(currentAllocation.totalValue)}
-                    </p>
-                  </div>
-                  <div className="bg-card rounded-lg border p-4">
-                    <p className="text-muted-foreground text-xs">Asset Classes</p>
-                    <p className="text-xl font-bold">{currentAllocation.assetClasses.length}</p>
-                  </div>
-                  <div className="bg-card rounded-lg border p-4">
-                    <p className="text-muted-foreground text-xs">Holdings</p>
-                    <p className="text-xl font-bold">{holdings.length}</p>
-                  </div>
-                </div>
-
-                {/* Asset class breakdown (Tier 1) */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold">By Asset Class</h3>
-                  {currentAllocation.assetClasses.map((assetClass) => (
-                    <details
-                      key={assetClass.assetClass}
-                      className="bg-card group space-y-3 rounded-lg border p-4"
-                    >
-                      {/* Tier 1: Asset Class Header - TWO LINES: (chevron + name) then (color bar) */}
-                      <summary className="cursor-pointer list-none space-y-2">
-                        {/* LINE 1: Chevron + Name + Percentage */}
-                        <div className="flex items-center gap-3">
-                          {/* Chevron icon (LEFT) */}
-                          <div className="flex w-5 flex-shrink-0 items-center justify-center">
-                            <svg
-                              className="text-muted-foreground h-4 w-4 transition-transform group-open:rotate-90"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M9 5l7 7-7 7"
-                              />
-                            </svg>
-                          </div>
-
-                          {/* Asset Class Name */}
-                          <span className="text-foreground flex-shrink-0 text-sm font-semibold">
-                            {assetClass.assetClass}
-                          </span>
-
-                          {/* Spacer */}
-                          <div className="flex-1" />
-
-                          {/* Percentage (RIGHT) */}
-                          <span className="text-foreground w-12 flex-shrink-0 text-right text-sm font-semibold">
-                            {assetClass.actualPercent.toFixed(1)}%
-                          </span>
-                        </div>
-
-                        {/* LINE 2: Color Bar - DIMMED WHEN OPEN */}
-                        <div className="bg-muted h-3 overflow-hidden rounded">
-                          <div
-                            className={`h-full rounded transition-all ${getAssetClassColor(assetClass.actualPercent)} group-open:opacity-50 group-open:brightness-110`}
-                            style={{ width: `${Math.min(assetClass.actualPercent, 100)}%` }}
-                          />
-                        </div>
-                      </summary>
-
-                      {/* Expanded Content (Hidden when collapsed) */}
-                      <div className="hidden space-y-3 pl-8 group-open:block">
-                        {/* Asset Class Value */}
-                        <p className="text-muted-foreground text-xs">
-                          {formatCurrency(assetClass.currentValue)}
-                        </p>
-
-                        {/* Tier 2: Asset Sub-Classes Breakdown */}
-                        {assetClass.subClasses.length > 0 && (
-                          <div className="border-border/50 space-y-2 border-t pt-3">
-                            <p className="text-muted-foreground text-xs font-semibold uppercase">
-                              By Sub-Class
-                            </p>
-                            {assetClass.subClasses.map((subClass) => (
-                              <details
-                                key={subClass.subClass}
-                                className="bg-muted/30 group space-y-2 rounded-md p-2"
-                              >
-                                {/* Sub-Class Header - TWO LINES: (chevron + name) then (color bar) */}
-                                <summary className="cursor-pointer list-none space-y-2">
-                                  {/* LINE 1: Chevron + Name + Percentage */}
-                                  <div className="flex items-center gap-2">
-                                    {/* Chevron icon (LEFT) */}
-                                    <div className="flex w-4 flex-shrink-0 items-center justify-center">
-                                      <svg
-                                        className="text-muted-foreground h-3 w-3 transition-transform group-open:rotate-90"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M9 5l7 7-7 7"
-                                        />
-                                      </svg>
-                                    </div>
-
-                                    {/* Sub-Class Name */}
-                                    <span className="text-foreground flex-shrink-0 text-xs font-semibold">
-                                      {subClass.subClass}
-                                    </span>
-
-                                    {/* Spacer */}
-                                    <div className="flex-1" />
-
-                                    {/* Percentage (RIGHT) */}
-                                    <span className="text-foreground w-10 flex-shrink-0 text-right text-xs font-semibold">
-                                      {subClass.subClassPercent.toFixed(1)}%
-                                    </span>
-                                  </div>
-
-                                  {/* LINE 2: Color Bar */}
-                                  <div className="bg-muted h-3 overflow-hidden rounded">
-                                    <div
-                                      className={`h-full rounded transition-all ${getSubClassColor(subClass.subClassPercent)}`}
-                                      style={{
-                                        width: `${Math.min(subClass.subClassPercent, 100)}%`,
-                                      }}
-                                    />
-                                  </div>
-                                </summary>
-
-                                {/* Sub-Class Details */}
-                                <div className="hidden space-y-2 pl-4 group-open:block">
-                                  {/* Info row: "X% of Asset Class" + Value */}
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-muted-foreground text-xs">
-                                      {subClass.subClassPercent.toFixed(1)}% of{" "}
-                                      {assetClass.assetClass}
-                                    </span>
-                                    <span className="text-foreground text-xs font-semibold">
-                                      {formatCurrency(subClass.subClassValue)}
-                                    </span>
-                                  </div>
-
-                                  {/* Holdings in Sub-Class (Tier 3) */}
-                                  <div className="border-border/30 space-y-1 border-l pl-2 text-xs">
-                                    {subClass.holdings
-                                      .sort(
-                                        (a, b) =>
-                                          (b.marketValue?.base || 0) - (a.marketValue?.base || 0),
-                                      )
-                                      .map((h) => (
-                                        <div
-                                          key={h.id}
-                                          className="text-muted-foreground flex justify-between"
-                                        >
-                                          <span>{renderHoldingName(h)}</span>
-                                          <span>{formatCurrency(h.marketValue?.base || 0)}</span>
-                                        </div>
-                                      ))}
-                                  </div>
-                                </div>
-                              </details>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </details>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -1332,7 +980,12 @@ export default function AllocationPage() {
             }
           }}
         >
-          <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
+          <SheetContent
+            className="w-full overflow-y-auto sm:max-w-2xl [&>button]:top-[max(calc(env(safe-area-inset-top,0px)+1rem),2.5rem)]"
+            style={{
+              paddingTop: "max(env(safe-area-inset-top, 0px), 1.5rem)",
+            }}
+          >
             <SheetHeader>
               <SheetTitle>{selectedAssetClass} Allocation</SheetTitle>
             </SheetHeader>
@@ -1391,7 +1044,7 @@ export default function AllocationPage() {
                         {/* Actual Bar - with label inside */}
                         <div className="bg-secondary relative h-6 flex-1 overflow-hidden rounded">
                           <div
-                            className="absolute top-0 left-0 h-full rounded bg-green-600 transition-all dark:bg-green-500"
+                            className="bg-success/60 absolute top-0 left-0 h-full rounded transition-all"
                             style={{
                               width: `${Math.min(
                                 currentAllocation.assetClasses.find(
@@ -1535,7 +1188,7 @@ export default function AllocationPage() {
                                 {/* Progress Bar - INSIDE summary, always visible */}
                                 <div className="bg-muted h-3 overflow-hidden rounded">
                                   <div
-                                    className="h-full bg-orange-500"
+                                    className="bg-chart-2 h-full"
                                     style={{
                                       width: `${Math.min(subClass.subClassPercent, 100)}%`,
                                     }}

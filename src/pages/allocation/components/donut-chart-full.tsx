@@ -39,11 +39,11 @@ export function DonutChartFull({
         let status: { label: string; color: string } | undefined;
         if (target && targetPercent > 0) {
           if (diff > 2) {
-            status = { label: "Overweight", color: "text-red-600" };
+            status = { label: "Overweight", color: "text-red-600 dark:text-red-400" };
           } else if (diff < -2) {
-            status = { label: "Underweight", color: "text-blue-600" };
+            status = { label: "Underweight", color: "text-blue-600 dark:text-blue-400" };
           } else {
-            status = { label: "In Line", color: "text-green-600" };
+            status = { label: "In Line", color: "text-success" };
           }
         }
 

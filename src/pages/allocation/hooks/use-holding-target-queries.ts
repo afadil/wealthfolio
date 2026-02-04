@@ -1,7 +1,7 @@
-import { getHoldingTargets } from "@/commands/rebalancing";
-import { QueryKeys } from "@/lib/query-keys";
-import type { HoldingTarget } from "@/lib/types";
-import { useQuery } from "@tanstack/react-query";
+import { getHoldingTargets } from '@/commands/rebalancing';
+import { QueryKeys } from '@/lib/query-keys';
+import type { HoldingTarget } from '@/lib/types';
+import { useQuery } from '@tanstack/react-query';
 
 // ============================================================================
 // Holding Target Queries
@@ -32,7 +32,7 @@ export function useHoldingTargets(assetClassId: string | null) {
  */
 export function useCascadingPercentages(
   holdingTargets: HoldingTarget[],
-  assetClassPercent: number,
+  assetClassPercent: number
 ) {
   return holdingTargets.map((target) => ({
     ...target,

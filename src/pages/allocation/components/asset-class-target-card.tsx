@@ -139,7 +139,7 @@ export function AssetClassTargetCard({
   const drift = actualPercent - localTarget;
   const driftColor =
     Math.abs(drift) < 2
-      ? "text-green-600 dark:text-green-400"
+      ? "text-success"
       : drift > 0
         ? "text-orange-600 dark:text-orange-400"
         : "text-blue-600 dark:text-blue-400";
@@ -247,7 +247,7 @@ export function AssetClassTargetCard({
         <div className="flex items-center gap-2">
           <div className="bg-secondary relative flex h-6 flex-1 items-center justify-between overflow-hidden rounded">
             <div
-              className="absolute top-0 left-0 h-full rounded bg-green-600 transition-all dark:bg-green-500"
+              className="bg-success/60 absolute top-0 left-0 h-full rounded transition-all"
               style={{ width: `${Math.min(actualPercent, 100)}%` }}
             />
             {/* Label on left (inside colored portion) */}
