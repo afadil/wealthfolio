@@ -8,6 +8,7 @@ export function useSyncStates() {
     queryKey: [QueryKeys.BROKER_SYNC_STATES],
     queryFn: getBrokerSyncStates,
     staleTime: 30 * 1000, // 30 seconds
-    refetchInterval: 60 * 1000, // Refetch every minute
+    // No polling - state is refreshed via event-driven invalidation
+    // when broker:sync-complete fires (see use-global-event-listener.ts)
   });
 }
