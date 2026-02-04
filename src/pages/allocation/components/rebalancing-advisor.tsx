@@ -1,4 +1,5 @@
 import { getHoldingTargets } from "@/commands/rebalancing";
+import { toast } from "@/components/ui/use-toast";
 import { QueryKeys } from "@/lib/query-keys";
 import { AssetClassTarget, HoldingTarget } from "@/lib/types";
 import { useQueries } from "@tanstack/react-query";
@@ -314,7 +315,10 @@ export function RebalancingAdvisor({
   const handleCopyText = () => {
     const text = generateSuggestionText();
     navigator.clipboard.writeText(text);
-    alert("Copied to clipboard!");
+    toast({
+      title: "Copied to clipboard",
+      description: "Rebalancing suggestions copied as text.",
+    });
   };
 
   const handleExportCSV = () => {
@@ -326,6 +330,10 @@ export function RebalancingAdvisor({
     a.download = "rebalancing-suggestions.csv";
     a.click();
     URL.revokeObjectURL(url);
+    toast({
+      title: "CSV exported",
+      description: "Rebalancing suggestions saved as CSV file.",
+    });
   };
 
   const generateSuggestionText = (): string => {
