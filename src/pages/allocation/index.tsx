@@ -281,17 +281,30 @@ export default function AllocationPage() {
 
   return (
     <div className="space-y-6 p-8">
-      {/* Account Selector - Standalone */}
-      <AccountSelector
-        selectedAccount={selectedAccount}
-        setSelectedAccount={setSelectedAccount}
-        includePortfolio={true}
-        variant="button"
-        buttonText={selectedAccount?.name || "Select Account"}
-      />
+      {/* Account Selector - Fixed position in top right corner */}
+      <div className="pointer-events-auto fixed top-4 right-2 z-20 hidden md:block lg:right-4">
+        <AccountSelector
+          selectedAccount={selectedAccount}
+          setSelectedAccount={setSelectedAccount}
+          includePortfolio={true}
+          variant="dropdown"
+          className="h-9"
+        />
+      </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-border">
+      {/* Account Selector - Mobile */}
+      <div className="mb-4 flex justify-end md:hidden">
+        <AccountSelector
+          selectedAccount={selectedAccount}
+          setSelectedAccount={setSelectedAccount}
+          includePortfolio={true}
+          variant="dropdown"
+          className="h-9"
+        />
+      </div>
+
+      {/* Tabs - Navigation Pills style */}
+      <nav className="bg-muted/60 inline-flex items-center rounded-lg p-1">
         {[
           { id: 'targets', label: 'Targets' },
           { id: 'composition', label: 'Composition' },
@@ -301,16 +314,20 @@ export default function AllocationPage() {
           <button
             key={tab.id}
             onClick={() => setViewTab(tab.id as TabType)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`relative flex items-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-200 focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none ${
               viewTab === tab.id
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
+                ? 'text-foreground'
+                : 'text-muted-foreground hover:text-foreground/80'
             }`}
+            aria-current={viewTab === tab.id ? "page" : undefined}
           >
-            {tab.label}
+            {viewTab === tab.id && (
+              <div className="bg-background absolute inset-0 rounded-md shadow-sm" />
+            )}
+            <span className="relative z-10">{tab.label}</span>
           </button>
         ))}
-      </div>
+      </nav>
 
       {/* Tab Content */}
       <div className="mt-6">
