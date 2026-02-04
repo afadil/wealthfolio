@@ -12,7 +12,7 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 use crate::error::{ApiError, ApiResult};
 use crate::events::{
@@ -481,7 +481,8 @@ async fn sync_broker_data(State(state): State<Arc<AppState>>) -> StatusCode {
 
 /// Core broker sync logic - syncs connections, accounts, and activities from cloud to local DB.
 /// Uses the centralized SyncOrchestrator for full pagination support.
-pub(crate) async fn perform_broker_sync(state: &AppState) -> Result<SyncResult, String> {
+/// Also used by the background scheduler for periodic syncs.
+pub async fn perform_broker_sync(state: &AppState) -> Result<SyncResult, String> {
     // Create API client
     let client = create_connect_client(state)
         .await
@@ -496,34 +497,8 @@ pub(crate) async fn perform_broker_sync(state: &AppState) -> Result<SyncResult, 
     );
 
     // Run the sync via the centralized orchestrator
-    let result = orchestrator.sync_all(&client).await?;
-
-    // Enrich newly created assets (triggers auto-classification)
-    if let Some(ref activities) = result.activities_synced {
-        if !activities.new_asset_ids.is_empty() {
-            info!(
-                "[Connect] Enriching {} new assets...",
-                activities.new_asset_ids.len()
-            );
-            match state
-                .asset_service
-                .enrich_assets(activities.new_asset_ids.clone())
-                .await
-            {
-                Ok((enriched, skipped, failed)) => {
-                    info!(
-                        "[Connect] Asset enrichment complete: {} enriched, {} skipped, {} failed",
-                        enriched, skipped, failed
-                    );
-                }
-                Err(e) => {
-                    warn!("[Connect] Asset enrichment failed: {}", e);
-                }
-            }
-        }
-    }
-
-    Ok(result)
+    // Note: Asset enrichment is handled automatically via domain events (AssetsCreated)
+    orchestrator.sync_all(&client).await
 }
 
 async fn get_subscription_plans(

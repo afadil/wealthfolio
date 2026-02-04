@@ -513,12 +513,14 @@ impl ActivityRepositoryTrait for ActivityRepository {
     }
 
     /// Retrieves activities by account IDs
+    /// Note: Filters by is_archived (not is_active) so hidden accounts still have their
+    /// activities included in calculations. Only archived accounts are excluded.
     fn get_activities_by_account_ids(&self, account_ids: &[String]) -> Result<Vec<Activity>> {
         let mut conn = get_connection(&self.pool)?;
 
         let activities_db = activities::table
             .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
-            .filter(accounts::is_active.eq(true))
+            .filter(accounts::is_archived.eq(false))
             .filter(activities::account_id.eq_any(account_ids))
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())

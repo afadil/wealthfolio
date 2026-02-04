@@ -23,7 +23,7 @@ mod ai_chat;
 mod ai_providers;
 mod alternative_assets;
 mod assets;
-mod connect;
+pub mod connect;
 mod device_sync;
 mod exchange_rates;
 mod goals;

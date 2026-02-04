@@ -172,13 +172,11 @@ async fn process_event_batch(events: &[DomainEvent], deps: Arc<QueueWorkerDeps>)
 
         // Spawn broker sync as a background task
         let connect_sync_service = deps.connect_sync_service.clone();
-        let asset_service = deps.asset_service.clone();
         let event_bus = deps.event_bus.clone();
         let secret_store = deps.secret_store.clone();
 
         tokio::spawn(async move {
-            match perform_broker_sync(connect_sync_service, asset_service, event_bus, secret_store)
-                .await
+            match perform_broker_sync(connect_sync_service, event_bus, secret_store).await
             {
                 Ok(result) => {
                     tracing::info!(
@@ -519,9 +517,9 @@ async fn mint_access_token(
 
 /// Core broker sync logic - syncs connections, accounts, and activities from cloud to local DB.
 /// Uses the centralized SyncOrchestrator for full pagination support.
+/// Asset enrichment is handled automatically via domain events (AssetsCreated).
 async fn perform_broker_sync(
     connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync>,
-    asset_service: Arc<dyn AssetServiceTrait + Send + Sync>,
     event_bus: EventBus,
     secret_store: Arc<dyn SecretStore>,
 ) -> Result<wealthfolio_connect::SyncResult, String> {
@@ -538,33 +536,6 @@ async fn perform_broker_sync(
         SyncOrchestrator::new(connect_sync_service.clone(), reporter, SyncConfig::default());
 
     // Run the sync via the centralized orchestrator
-    let result = orchestrator.sync_all(&client).await?;
-
-    // Enrich newly created assets (triggers auto-classification)
-    if let Some(ref activities) = result.activities_synced {
-        if !activities.new_asset_ids.is_empty() {
-            tracing::info!(
-                "Enriching {} new assets after broker sync...",
-                activities.new_asset_ids.len()
-            );
-            match asset_service
-                .enrich_assets(activities.new_asset_ids.clone())
-                .await
-            {
-                Ok((enriched, skipped, failed)) => {
-                    tracing::info!(
-                        "Asset enrichment complete: {} enriched, {} skipped, {} failed",
-                        enriched,
-                        skipped,
-                        failed
-                    );
-                }
-                Err(e) => {
-                    tracing::warn!("Asset enrichment failed: {}", e);
-                }
-            }
-        }
-    }
-
-    Ok(result)
+    // Note: Asset enrichment is handled automatically via domain events (AssetsCreated)
+    orchestrator.sync_all(&client).await
 }

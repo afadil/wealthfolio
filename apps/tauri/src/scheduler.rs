@@ -50,7 +50,8 @@ pub async fn run_startup_sync(handle: &AppHandle, context: &Arc<ServiceContext>)
 
             // Note: broker:sync-complete event is emitted by the orchestrator via TauriProgressReporter
 
-            // Trigger portfolio update if sync was successful and activities were synced
+            // Trigger portfolio update if sync was successful
+            // Note: Asset enrichment is handled automatically via domain events (AssetsCreated)
             if result.success {
                 if let Some(ref activities) = result.activities_synced {
                     if activities.activities_upserted > 0 {
@@ -58,7 +59,6 @@ pub async fn run_startup_sync(handle: &AppHandle, context: &Arc<ServiceContext>)
                             "Triggering portfolio update after startup sync ({} activities synced)",
                             activities.activities_upserted
                         );
-                        // Startup broker sync uses incremental sync for all assets
                         crate::events::emit_portfolio_trigger_recalculate(
                             handle,
                             crate::events::PortfolioRequestPayload::builder()
@@ -66,40 +66,9 @@ pub async fn run_startup_sync(handle: &AppHandle, context: &Arc<ServiceContext>)
                                 .build(),
                         );
                     }
-
-                    // Trigger asset enrichment for new assets from activities
-                    if !activities.new_asset_ids.is_empty() {
-                        info!(
-                            "Triggering asset enrichment for {} new assets from activities",
-                            activities.new_asset_ids.len()
-                        );
-                        let asset_service = context.asset_service();
-                        let asset_ids = activities.new_asset_ids.clone();
-                        tokio::spawn(async move {
-                            if let Err(e) = asset_service.enrich_assets(asset_ids).await {
-                                warn!("Asset enrichment failed: {}", e);
-                            }
-                        });
-                    }
                 }
 
-                // Also trigger enrichment for new assets from holdings sync
                 if let Some(ref holdings) = result.holdings_synced {
-                    if !holdings.new_asset_ids.is_empty() {
-                        info!(
-                            "Triggering asset enrichment for {} new assets from holdings",
-                            holdings.new_asset_ids.len()
-                        );
-                        let asset_service = context.asset_service();
-                        let asset_ids = holdings.new_asset_ids.clone();
-                        tokio::spawn(async move {
-                            if let Err(e) = asset_service.enrich_assets(asset_ids).await {
-                                warn!("Asset enrichment failed: {}", e);
-                            }
-                        });
-                    }
-
-                    // Also trigger portfolio update if holdings were synced
                     if holdings.positions_upserted > 0 {
                         info!(
                             "Triggering portfolio update after holdings sync ({} positions synced)",
