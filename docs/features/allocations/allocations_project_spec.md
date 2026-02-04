@@ -1,15 +1,17 @@
 # Portfolio Allocations- Complete Project Specification
 
-**Date Created**: January 19, 2026
-**Branch**: `allocations`
-**Status**: Planning Phase InComplete
+**Date Created**: January 19, 2026 **Branch**: `allocations` **Status**:
+Planning Phase InComplete
 
 ---
 
 ## Project Overview
 
-Adding a comprehensive portfolio rebalancing tool to Wealthfolio that enables users to:
-1. Set target asset allocations (Level 1: Asset Classes, Level 2: Individual Holdings)
+Adding a comprehensive portfolio rebalancing tool to Wealthfolio that enables
+users to:
+
+1. Set target asset allocations (Level 1: Asset Classes, Level 2: Individual
+   Holdings)
 2. Visualize current vs target allocation
 3. Calculate rebalancing trades needed
 4. Use smart deposit planning for tax-efficient rebalancing
@@ -20,6 +22,7 @@ Adding a comprehensive portfolio rebalancing tool to Wealthfolio that enables us
 ## Design Philosophy
 
 Following Wealthfolio's \"Calm Finance\" ethos:
+
 - **Local-first**: All calculations happen on device
 - **Privacy-focused**: No external API calls for rebalancing
 - **Beautiful & Boring**: Clean, professional interface using Flexoki colors
@@ -30,9 +33,11 @@ Following Wealthfolio's \"Calm Finance\" ethos:
 ## Implementation Phases
 
 ### Phase 1: Foundation (Days 1-2) ⭐ START HERE
+
 **Goal**: Get core rebalancing functionality working
 
 **Features**:
+
 - [ ] Database schema for storing allocation targets
 - [ ] Rust backend commands (save/load targets)
 - [ ] TypeScript hooks to interact with backend
@@ -44,6 +49,7 @@ Following Wealthfolio's \"Calm Finance\" ethos:
 - [ ] **Deposit Planner** (tax-efficient rebalancing)
 
 **Deliverables**:
+
 - New page: `/allocation` route
 - Working UI with Flexoki colors
 - Functional deposit calculator
@@ -52,9 +58,11 @@ Following Wealthfolio's \"Calm Finance\" ethos:
 ---
 
 ### Phase 2: Advanced Features (Days 3-4)
+
 **Goal**: Add professional-grade capabilities
 
 **Features**:
+
 - [ ] 5/25 threshold rule implementation
 - [ ] Drift detection with visual indicators
 - [ ] Status badges (rebalance needed vs on-target)
@@ -106,8 +114,8 @@ CREATE TABLE holding_targets (
 function calculateDepositAllocation(
   currentHoldings: Holding[],
   targets: AllocationTarget[],
-  depositAmount: number
-): DepositAllocation[]
+  depositAmount: number,
+): DepositAllocation[];
 ```
 
 ### 2. 5/25 Threshold Rule
@@ -115,17 +123,15 @@ function calculateDepositAllocation(
 ```typescript
 function shouldRebalance(
   currentPercent: number,
-  targetPercent: number
-): boolean
+  targetPercent: number,
+): boolean;
 ```
 
 ---
 
 ## Development Workflow
 
-**Day 1**: Database + Backend
-**Day 2**: Frontend UI
-**Day 3**: Testing + Polish
+**Day 1**: Database + Backend **Day 2**: Frontend UI **Day 3**: Testing + Polish
 
 ---
 

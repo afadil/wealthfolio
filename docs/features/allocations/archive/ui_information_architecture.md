@@ -6,9 +6,15 @@
 
 ## Executive Summary
 
-The Allocations page is a **strategic allocation management tool** scoped to viewing and setting asset class targets. It does **not** execute trades or link to brokers. A separate "Rebalancing Suggestions" tab (Phase 2) will recommend what to buy/sell based on user-defined cash input.
+The Allocations page is a **strategic allocation management tool** scoped to
+viewing and setting asset class targets. It does **not** execute trades or link
+to brokers. A separate "Rebalancing Suggestions" tab (Phase 2) will recommend
+what to buy/sell based on user-defined cash input.
 
-**Key Principle**: Users manage allocation **strategies per account** (or globally for "All Portfolio"). The UI surfaces both targets (what they want) and composition (what they have), enabling drift monitoring and rebalancing decisions.
+**Key Principle**: Users manage allocation **strategies per account** (or
+globally for "All Portfolio"). The UI surfaces both targets (what they want) and
+composition (what they have), enabling drift monitoring and rebalancing
+decisions.
 
 ---
 
@@ -17,10 +23,14 @@ The Allocations page is a **strategic allocation management tool** scoped to vie
 ### Decision 1: Account Scope → **Per-Account Targets (Option B)**
 
 **What This Means:**
-- Each account (Brokerage, 401k, Savings, etc.) has its own `asset_class_targets`.
-- Special case: "All Portfolio" view aggregates holdings across all accounts but uses **global targets** (a single unified strategy).
+
+- Each account (Brokerage, 401k, Savings, etc.) has its own
+  `asset_class_targets`.
+- Special case: "All Portfolio" view aggregates holdings across all accounts but
+  uses **global targets** (a single unified strategy).
 
 **Schema Impact:**
+
 ```sql
 -- asset_class_targets now includes account_id
 CREATE TABLE asset_class_targets (
@@ -39,6 +49,7 @@ CREATE TABLE asset_class_targets (
 ```
 
 **UI Flow:**
+
 ```
 Account Switcher: [Brokerage Account] ▼
   └─ Shows targets for Brokerage Account ONLY
@@ -50,18 +61,24 @@ Switch to "All Portfolio"
 ```
 
 **Future Upgrade (Phase 2):**
+
 - Will support per-holding targets (e.g., "VTI = 50% of Equities")
-- Code structure must assume `asset_class_targets` is account-scoped from day one
+- Code structure must assume `asset_class_targets` is account-scoped from day
+  one
 
 ---
 
 ### Decision 2: Level 2 Granularity → **Use `asset_sub_class` (Option A)**
 
 **What This Means:**
-- Level 1: Asset classes (Equities, Fixed Income, Cash) — user controls via targets
-- Level 2: Breakdown by `asset_sub_class` (ETF, Individual Stocks, Bond Fund, etc.) — informational, derived from current holdings
+
+- Level 1: Asset classes (Equities, Fixed Income, Cash) — user controls via
+  targets
+- Level 2: Breakdown by `asset_sub_class` (ETF, Individual Stocks, Bond Fund,
+  etc.) — informational, derived from current holdings
 
 **No Schema Changes Required:**
+
 ```
 Equities (60% target) [Level 1]
 ├─ ETF (40% of Equities)          [Level 2 — asset_sub_class = "ETF"]
@@ -75,7 +92,9 @@ Equities (60% target) [Level 1]
 ```
 
 **Cash Special Case:**
-- Cash often has NULL or a single `asset_sub_class` (e.g., "Money Market", "Savings")
+
+- Cash often has NULL or a single `asset_sub_class` (e.g., "Money Market",
+  "Savings")
 - UI treats NULL as "(Unclassified)" or "Cash Holdings"
 - Example:
   ```
@@ -86,32 +105,42 @@ Equities (60% target) [Level 1]
   ```
 
 **Future Upgrade (Phase 2):**
-- Introduce `holding_targets` table: per-holding weights (e.g., "VTI = 50% of Equities")
-- Current code **must be structured** to support this later without major refactor
-- Keep Level 2 logic in a hook (`useHoldingsByAssetClass`) so it's easy to swap the source
+
+- Introduce `holding_targets` table: per-holding weights (e.g., "VTI = 50% of
+  Equities")
+- Current code **must be structured** to support this later without major
+  refactor
+- Keep Level 2 logic in a hook (`useHoldingsByAssetClass`) so it's easy to swap
+  the source
 
 ---
 
 ### Decision 3: Page Scope → **Strategic Targets + Monitoring Only (Option A)**
 
 **What This Page Does:**
+
 - ✅ View asset class targets (Level 1)
 - ✅ Edit asset class targets (set %, ensure 100% total)
 - ✅ View current allocation composition (Level 2 breakdown)
 - ✅ Monitor drift (Target vs. Actual, visual gauges)
 
 **What This Page Does NOT Do:**
+
 - ❌ Execute trades / link to brokers
 - ❌ Generate trade lists
 - ❌ Suggest specific buys/sells
 
 **Rebalancing Suggestions (Phase 2):**
+
 - New tab or separate page: "Rebalancing Advisor"
 - User enters: "I have $10k cash to invest"
-- System suggests: "Buy $6k VTI, $3k BND, $1k Cash reserves to align with targets"
-- Output: Informational (not executable within Wealthfolio; user copies to broker)
+- System suggests: "Buy $6k VTI, $3k BND, $1k Cash reserves to align with
+  targets"
+- Output: Informational (not executable within Wealthfolio; user copies to
+  broker)
 
 **Interaction Model:**
+
 ```
 ┌─ Allocations Page ─────────────────┐
 │                                    │
@@ -139,6 +168,7 @@ Equities (60% target) [Level 1]
 ## Three-Tier Information Model
 
 ### Tier 0: Account Context
+
 **User-selected scope for all operations.**
 
 - Single account: "Brokerage Account"
@@ -147,9 +177,11 @@ Equities (60% target) [Level 1]
 - Effect: Filters all data (targets, holdings, calculations)
 
 ### Tier 1: Strategic Allocation (Asset Classes)
+
 **What the user wants. User-controlled.**
 
-- Definition: Target distribution across broad categories (Equities, Fixed Income, Cash)
+- Definition: Target distribution across broad categories (Equities, Fixed
+  Income, Cash)
 - Stored in: `asset_class_targets` table (account-scoped)
 - Granularity: 3–5 classes per account
 - User Action: Click "Edit Allocation" → set %s → validate 100% → save
@@ -159,6 +191,7 @@ Equities (60% target) [Level 1]
   - `DriftGauge`: Visual bar showing current vs. target for each class
 
 **Example:**
+
 ```
 EQUITIES: 60.0% target, 64.5% actual → Overweight by 4.5%
 FIXED INCOME: 30.0% target, 28.0% actual → Underweight by 2.0%
@@ -166,9 +199,11 @@ CASH: 10.0% target, 7.5% actual → Underweight by 2.5%
 ```
 
 ### Tier 2: Holdings Breakdown (Asset Sub-Classes)
+
 **How current holdings distribute. Informational, derived from data.**
 
-- Definition: Breakdown of each asset class by sub-category (e.g., ETFs vs. Stocks within Equities)
+- Definition: Breakdown of each asset class by sub-category (e.g., ETFs vs.
+  Stocks within Equities)
 - Stored in: Instruments (asset_sub_class column) + Holdings (current values)
 - Granularity: Varies; can be 1 (all cash) to 5+ (diverse equity portfolio)
 - User Action: View only (informational; no editing at this tier in MVP)
@@ -178,6 +213,7 @@ CASH: 10.0% target, 7.5% actual → Underweight by 2.5%
   - Expandable on Level 1 card: click to reveal Level 2
 
 **Example (Within Equities, 64.5% of portfolio):**
+
 ```
 ETF: 40% of Equities (63% of the 64.5%)
   ├─ VTI: $100k
@@ -220,24 +256,31 @@ DERIVED: Tier 2 Breakdown = GROUP holdings BY instrument.asset_sub_class WITHIN 
 ### Page-Level: `AllocationPage`
 
 **Responsibilities:**
+
 - Account switcher (top)
 - Tab navigation (Targets, Composition, Rebalancing Suggestions)
 - Query orchestration (fetch targets, holdings, calculate actuals)
 
 **Props/State:**
+
 ```typescript
 interface AllocationPageProps {
   // Implicit from URL param or default to first account
 }
 
 // Internal state:
-const [selectedAccountId, setSelectedAccountId] = useState<string>(accounts[0]?.id || '');
-const [viewTab, setViewTab] = useState<'targets' | 'composition' | 'rebalancing'>('targets');
+const [selectedAccountId, setSelectedAccountId] = useState<string>(
+  accounts[0]?.id || "",
+);
+const [viewTab, setViewTab] = useState<
+  "targets" | "composition" | "rebalancing"
+>("targets");
 ```
 
 ### Tab 1: `AssetClassTargets` Component
 
 **Responsibilities:**
+
 - Display Tier 1 (targets) in card/table format
 - Show Target % (user-set) vs. Actual % (calculated)
 - Drift visualization (bar gauge)
@@ -245,6 +288,7 @@ const [viewTab, setViewTab] = useState<'targets' | 'composition' | 'rebalancing'
 - Modal for adding new target or editing existing
 
 **Props:**
+
 ```typescript
 interface AssetClassTargetsProps {
   accountId: string;
@@ -259,6 +303,7 @@ interface AssetClassTargetsProps {
 ### Tab 2: `HoldingsCompositionByClass` Component
 
 **Responsibilities:**
+
 - Iterate over each asset class
 - For each class, show Tier 2 breakdown (sub-classes + holdings)
 - Render as expandable cards (collapsed by default)
@@ -268,6 +313,7 @@ interface AssetClassTargetsProps {
   - Current value / % of total portfolio
 
 **Props:**
+
 ```typescript
 interface HoldingsCompositionByClassProps {
   accountId: string;
@@ -279,12 +325,14 @@ interface HoldingsCompositionByClassProps {
 ### Tab 3: `RebalancingAdvisor` Component (Phase 2)
 
 **Responsibilities:**
+
 - Input field: "Cash available to invest"
 - Calculate shortfalls in each asset class
 - Suggest allocation of new cash to rebalance
 - Output: Informational text ("Buy $6k VTI, $3k BND")
 
 **Props:**
+
 ```typescript
 interface RebalancingAdvisorProps {
   accountId: string;
@@ -297,7 +345,9 @@ interface RebalancingAdvisorProps {
 ### Sub-Component: `DriftGauge`
 
 **Responsibilities:**
-- Visualize Target vs. Actual with threshold bands (±5% absolute or ±25% relative)
+
+- Visualize Target vs. Actual with threshold bands (±5% absolute or ±25%
+  relative)
 - Show if on-target, underweight, or overweight
 - Status badge (✓ On Target | ⚠ Underweight | ⚠ Overweight)
 
@@ -366,7 +416,8 @@ interface RebalancingAdvisorProps {
 ### Icons & Visual Cues
 
 - **Expandable**: Chevron icon (❯ closed, ❱ open) before class name
-- **Status**: ✓ (on-target, green) | ⚠ (warning, yellow/orange) | ✕ (rebalance, red)
+- **Status**: ✓ (on-target, green) | ⚠ (warning, yellow/orange) | ✕ (rebalance,
+  red)
 - **Lock Toggle** (Phase 2): 🔒 (locked) | 🔓 (unlocked) per target
 - **Edit / Delete**: Pencil 🖊️ and Trash 🗑️ icons
 
@@ -450,9 +501,9 @@ UI: Same layout, but note in subtitle: "Viewing All Accounts"
 
 **How to store global targets:**
 
-Option 1: Add row with `account_id = NULL`
-Option 2: Add boolean flag `is_global = true` to `asset_class_targets`
-Option 3: Separate table `global_asset_class_targets`
+Option 1: Add row with `account_id = NULL` Option 2: Add boolean flag
+`is_global = true` to `asset_class_targets` Option 3: Separate table
+`global_asset_class_targets`
 
 → **Recommend Option 1** (NULL account_id): simpler, fewer tables.
 
@@ -469,8 +520,9 @@ Cash (10% target)
 ```
 
 **Code pattern:**
+
 ```typescript
-const subClass = holding.instrument?.assetSubClass ?? '(Unclassified)';
+const subClass = holding.instrument?.assetSubClass ?? "(Unclassified)";
 ```
 
 ### ETF-Heavy Portfolios
@@ -485,7 +537,8 @@ Equities (60% target)
    └─ QQQ: $40k
 ```
 
-**Don't collapse this.** Show all holdings. The Tier 2 breakdown is useful even if sub-class is uniform.
+**Don't collapse this.** Show all holdings. The Tier 2 breakdown is useful even
+if sub-class is uniform.
 
 ### Empty Targets / New User
 
@@ -501,7 +554,9 @@ Clicking button opens modal to add first target(s).
 
 ### Target Exceeds 100%
 
-**Validation Rule**: When user tries to save targets that sum > 100%, show error:
+**Validation Rule**: When user tries to save targets that sum > 100%, show
+error:
+
 ```
 "Total allocation is 115%. Please adjust so sum ≤ 100%."
 ```
@@ -526,6 +581,7 @@ CREATE TABLE holding_targets (
 ```
 
 **UI Changes:**
+
 - Tier 2 cards become editable (sliders + numeric inputs)
 - User can drag to rebalance within a class
 - Lock toggle per holding
@@ -553,15 +609,15 @@ Status: "Rebalancing recommended" if thresholds exceeded
 
 ## Summary Table
 
-| Aspect | Details |
-|--------|---------|
-| **Account Scope** | Per-account targets (+ global for "All Portfolio") |
-| **Tier 1 (User Controls)** | Asset Class targets (3–5 classes, % per class) |
-| **Tier 2 (Informational)** | Sub-class breakdown (derived from holdings) |
-| **Page Scope** | View + Set targets, Monitor drift (no trade execution) |
-| **Cash Handling** | NULL asset_sub_class → Display as "(Unclassified)" |
-| **Multi-Account** | Account switcher; filtering per account |
-| **Future (Phase 2)** | Per-holding targets, trade suggestions, rebalancing logic |
+| Aspect                     | Details                                                   |
+| -------------------------- | --------------------------------------------------------- |
+| **Account Scope**          | Per-account targets (+ global for "All Portfolio")        |
+| **Tier 1 (User Controls)** | Asset Class targets (3–5 classes, % per class)            |
+| **Tier 2 (Informational)** | Sub-class breakdown (derived from holdings)               |
+| **Page Scope**             | View + Set targets, Monitor drift (no trade execution)    |
+| **Cash Handling**          | NULL asset_sub_class → Display as "(Unclassified)"        |
+| **Multi-Account**          | Account switcher; filtering per account                   |
+| **Future (Phase 2)**       | Per-holding targets, trade suggestions, rebalancing logic |
 
 ---
 
@@ -595,6 +651,7 @@ Status: "Rebalancing recommended" if thresholds exceeded
 ### Why Account-Scoped Targets?
 
 Real users have different risk profiles per account:
+
 - **Brokerage**: 80% stocks, 20% bonds (aggressive, long-term)
 - **401k**: 40% stocks, 60% bonds (conservative, pre-retirement)
 - **Savings**: 100% cash (emergency fund)
@@ -603,36 +660,40 @@ Starting per-account avoids a redesign later.
 
 ### Why Option A (asset_sub_class)?
 
-Avoids a new table (`holding_targets`) in MVP. Gives users insight into "how many ETFs vs. stocks" within each class. Sufficient for Phase 1.
+Avoids a new table (`holding_targets`) in MVP. Gives users insight into "how
+many ETFs vs. stocks" within each class. Sufficient for Phase 1.
 
 ### Why Defer Trade Execution?
 
-Out of scope (you said "not my point with this page"). Keeps allocations focused: targets + monitoring. Rebalancing suggestions (Phase 2) can be a simple calculator (no broker API calls).
+Out of scope (you said "not my point with this page"). Keeps allocations
+focused: targets + monitoring. Rebalancing suggestions (Phase 2) can be a simple
+calculator (no broker API calls).
 
 ### Code Structure for Phase 2
 
-Keep `useHoldingsByAssetClass` as a custom hook. When you add `holding_targets`, replace the implementation without breaking the component API.
+Keep `useHoldingsByAssetClass` as a custom hook. When you add `holding_targets`,
+replace the implementation without breaking the component API.
 
 ---
 
 ## Nomenclature (Frontend vs. Backend)
 
 **Frontend (User-Facing):** "Allocations" page
+
 - More intuitive for users; matches portfolio management terminology
 
 **Backend (Code):** "Rebalancing" domain
+
 - All Rust models, tables, and services use `rebalancing_*` prefix
 - Avoids conflict with existing "Goals" feature
 - Includes: `rebalancing_strategies`, `asset_class_targets`, `holding_targets`
 
-**Mapping:**
-| Frontend (UI) | Backend (Code) |
-|---------------|----------------|
-| Allocations page | `rebalancing_model.rs` |
-| Strategy (user's plan) | `RebalancingStrategy` |
-| Asset Class Targets | `AssetClassTarget` |
-| Per-Holding Targets | `HoldingTarget` (Phase 2) |
+**Mapping:** | Frontend (UI) | Backend (Code) |
+|---------------|----------------| | Allocations page | `rebalancing_model.rs` |
+| Strategy (user's plan) | `RebalancingStrategy` | | Asset Class Targets |
+`AssetClassTarget` | | Per-Holding Targets | `HoldingTarget` (Phase 2) |
 
-This convention ensures clarity: when developers work on backend Rust code, they reference "rebalancing"; when discussing UI, use "allocations."
+This convention ensures clarity: when developers work on backend Rust code, they
+reference "rebalancing"; when discussing UI, use "allocations."
 
 ---

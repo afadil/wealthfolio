@@ -94,19 +94,19 @@ export const TargetPercentSlider: React.FC<TargetPercentSliderProps> = ({
   if (overlay) {
     return (
       <>
-        <div className="relative flex-1 group">
+        <div className="group relative flex-1">
           {/* Visual Bar Layer */}
-          <div className="bg-secondary relative h-6 overflow-hidden rounded flex items-center justify-between">
+          <div className="bg-secondary relative flex h-6 items-center justify-between overflow-hidden rounded">
             <div
               className={`${barColor} absolute top-0 left-0 h-full rounded transition-all`}
               style={{ width: `${Math.min(value, 100)}%` }}
             />
             {/* Label on left (inside colored portion) */}
-            <div className="text-background absolute top-0 left-0 flex h-full items-center px-2 text-xs font-medium z-10">
+            <div className="text-background absolute top-0 left-0 z-10 flex h-full items-center px-2 text-xs font-medium">
               <span className="whitespace-nowrap">{label}</span>
             </div>
             {/* Percentage on right (inside bar, at end of colored portion) */}
-            <div className="text-foreground absolute top-0 right-0 flex h-full items-center px-2 text-xs font-medium z-10">
+            <div className="text-foreground absolute top-0 right-0 z-10 flex h-full items-center px-2 text-xs font-medium">
               <span className="whitespace-nowrap">{value.toFixed(1)}%</span>
             </div>
           </div>
@@ -124,7 +124,7 @@ export const TargetPercentSlider: React.FC<TargetPercentSliderProps> = ({
             onTouchStart={handleMouseDown}
             onTouchEnd={handleMouseUp}
             disabled={disabled}
-            className="absolute top-0 left-0 w-full h-6 opacity-0 cursor-pointer disabled:cursor-not-allowed z-10 rounded"
+            className="absolute top-0 left-0 z-10 h-6 w-full cursor-pointer rounded opacity-0 disabled:cursor-not-allowed"
           />
         </div>
 
@@ -133,18 +133,14 @@ export const TargetPercentSlider: React.FC<TargetPercentSliderProps> = ({
           <button
             type="button"
             onClick={onToggleLock}
-            className={`h-6 w-6 flex items-center justify-center flex-shrink-0 rounded transition-all disabled:opacity-30 ${
+            className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded transition-all disabled:opacity-30 ${
               isLocked
                 ? "bg-secondary text-gray-700"
-                : "opacity-70 text-muted-foreground hover:text-foreground hover:opacity-100 hover:bg-muted"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted opacity-70 hover:opacity-100"
             }`}
             title={isLocked ? "Unlock target" : "Lock target"}
           >
-            {isLocked ? (
-              <Icons.Lock className="h-4 w-4" />
-            ) : (
-              <Icons.LockOpen className="h-4 w-4" />
-            )}
+            {isLocked ? <Icons.Lock className="h-4 w-4" /> : <Icons.LockOpen className="h-4 w-4" />}
           </button>
         )}
       </>
@@ -157,29 +153,21 @@ export const TargetPercentSlider: React.FC<TargetPercentSliderProps> = ({
       {/* Header: Label + Lock + Value */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-muted-foreground">{label}</span>
+          <span className="text-muted-foreground text-xs font-medium">{label}</span>
           {onToggleLock && (
             <button
               type="button"
               onClick={onToggleLock}
-              className={`h-4 w-4 flex items-center justify-center rounded px-1 transition-colors ${
+              className={`flex h-4 w-4 items-center justify-center rounded px-1 transition-colors ${
                 isLocked ? "bg-secondary text-gray-700" : "text-muted-foreground hover:text-foreground hover:bg-muted"
               }`}
               title={isLocked ? "Unlock target" : "Lock target"}
             >
-              {isLocked ? (
-                <Icons.Lock className="h-3 w-3" />
-              ) : (
-                <Icons.LockOpen className="h-3 w-3" />
-              )}
+              {isLocked ? <Icons.Lock className="h-3 w-3" /> : <Icons.LockOpen className="h-3 w-3" />}
             </button>
           )}
         </div>
-        {showValue && (
-          <span className="text-sm font-semibold">
-            {value.toFixed(1)}%
-          </span>
-        )}
+        {showValue && <span className="text-sm font-semibold">{value.toFixed(1)}%</span>}
       </div>
 
       {/* Slider Track */}
@@ -195,22 +183,18 @@ export const TargetPercentSlider: React.FC<TargetPercentSliderProps> = ({
         onTouchStart={handleMouseDown}
         onTouchEnd={handleMouseUp}
         disabled={disabled || isLocked}
-        className="w-full h-3 bg-muted rounded appearance-none cursor-pointer slider-thumb opacity-75 hover:opacity-100 transition-opacity disabled:cursor-not-allowed"
+        className="bg-muted slider-thumb h-3 w-full cursor-pointer appearance-none rounded opacity-75 transition-opacity hover:opacity-100 disabled:cursor-not-allowed"
       />
 
       {/* Footer: Min/Max + Hint */}
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
+      <div className="text-muted-foreground flex items-center justify-between text-xs">
         <span>0%</span>
         {remainingAllocation !== undefined && (
-          <span className="text-center flex-1">
+          <span className="flex-1 text-center">
             {remainingAllocation > 0 ? (
-              <span className="text-green-600 dark:text-green-400">
-                {remainingAllocation.toFixed(1)}% remaining
-              </span>
+              <span className="text-green-600 dark:text-green-400">{remainingAllocation.toFixed(1)}% remaining</span>
             ) : remainingAllocation < 0 ? (
-              <span className="text-red-600 dark:text-red-400">
-                {Math.abs(remainingAllocation).toFixed(1)}% over
-              </span>
+              <span className="text-red-600 dark:text-red-400">{Math.abs(remainingAllocation).toFixed(1)}% over</span>
             ) : (
               <span>Fully allocated</span>
             )}
@@ -220,9 +204,7 @@ export const TargetPercentSlider: React.FC<TargetPercentSliderProps> = ({
       </div>
 
       {/* Dragging Indicator */}
-      {isDragging && (
-        <p className="text-xs text-muted-foreground italic">Adjusting...</p>
-      )}
+      {isDragging && <p className="text-muted-foreground text-xs italic">Adjusting...</p>}
     </div>
   );
 };

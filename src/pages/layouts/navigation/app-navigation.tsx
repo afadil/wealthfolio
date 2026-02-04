@@ -33,7 +33,7 @@ const staticNavigation: NavigationProps = {
       label: "View Holdings",
     },
     {
-      icon: <Icons.Target className="size-6" />,
+      icon: <Icons.PieChart className="size-6" />,
       title: "Allocations",
       href: "/allocation",
       keywords: ["rebalancing", "targets", "asset allocation", "portfolio balance"],

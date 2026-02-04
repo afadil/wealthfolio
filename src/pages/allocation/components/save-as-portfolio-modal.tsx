@@ -1,28 +1,23 @@
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import * as z from 'zod';
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 
-import { Button } from '@/components/ui/button';
+import { Button } from "@/components/ui/button";
+import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import {
-    Form,
-    FormControl,
-    FormDescription,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
-import { useAccounts } from '@/hooks/use-accounts';
-import { usePortfolioMutations, usePortfolios } from '@/hooks/use-portfolios';
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { useAccounts } from "@/hooks/use-accounts";
+import { usePortfolioMutations, usePortfolios } from "@/hooks/use-portfolios";
 
 interface SaveAsPortfolioModalProps {
   open: boolean;
@@ -35,12 +30,11 @@ const createPortfolioNameSchema = (existingNames: string[]) =>
   z.object({
     name: z
       .string()
-      .min(2, { message: 'Name must be at least 2 characters.' })
-      .max(100, { message: 'Name must not be longer than 100 characters.' })
-      .refine(
-        (name) => !existingNames.includes(name.toLowerCase()),
-        { message: 'This portfolio name is already taken.' }
-      ),
+      .min(2, { message: "Name must be at least 2 characters." })
+      .max(100, { message: "Name must not be longer than 100 characters." })
+      .refine((name) => !existingNames.includes(name.toLowerCase()), {
+        message: "This portfolio name is already taken.",
+      }),
   });
 
 type PortfolioNameForm = z.infer<ReturnType<typeof createPortfolioNameSchema>>;
@@ -61,9 +55,9 @@ export function SaveAsPortfolioModal({
 
   // Generate default name from account names
   const defaultName = selectedAccountIds
-    .map(id => accounts?.find(a => a.id === id)?.name)
+    .map((id) => accounts?.find((a) => a.id === id)?.name)
     .filter(Boolean)
-    .join(' + ');
+    .join(" + ");
 
   // Create schema with existing portfolio names for duplicate checking
   const existingPortfolioNames = portfolios.map((p: { name: string }) => p.name.toLowerCase());
@@ -72,15 +66,15 @@ export function SaveAsPortfolioModal({
   const form = useForm<PortfolioNameForm>({
     resolver: zodResolver(portfolioNameSchema),
     defaultValues: {
-      name: defaultName || '',
+      name: defaultName || "",
     },
-    mode: 'onChange',
+    mode: "onChange",
   });
 
   // Update the name field whenever the default name changes (e.g., when accounts are loaded)
   useEffect(() => {
-    if (open && defaultName && form.getValues('name') !== defaultName) {
-      form.setValue('name', defaultName);
+    if (open && defaultName && form.getValues("name") !== defaultName) {
+      form.setValue("name", defaultName);
     }
   }, [open, defaultName, form]);
 
@@ -95,7 +89,7 @@ export function SaveAsPortfolioModal({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:w-[500px] flex flex-col">
+      <SheetContent side="right" className="flex w-full flex-col sm:w-[500px]">
         <DialogHeader>
           <DialogTitle>Save as Portfolio</DialogTitle>
           <DialogDescription>
@@ -104,7 +98,7 @@ export function SaveAsPortfolioModal({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 flex-1">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 space-y-6">
             <FormField
               control={form.control}
               name="name"
@@ -118,9 +112,7 @@ export function SaveAsPortfolioModal({
                       disabled={createPortfolioMutation.isPending}
                     />
                   </FormControl>
-                  <FormDescription>
-                    A unique name to identify this portfolio.
-                  </FormDescription>
+                  <FormDescription>A unique name to identify this portfolio.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -128,16 +120,16 @@ export function SaveAsPortfolioModal({
 
             <div className="space-y-3">
               <label className="text-sm font-medium">Selected Accounts</label>
-              <div className="space-y-2 max-h-[200px] overflow-y-auto p-3 border rounded-md bg-muted/30">
-                {selectedAccountIds.map(accountId => {
-                  const account = accounts?.find(a => a.id === accountId);
+              <div className="bg-muted/30 max-h-[200px] space-y-2 overflow-y-auto rounded-md border p-3">
+                {selectedAccountIds.map((accountId) => {
+                  const account = accounts?.find((a) => a.id === accountId);
                   return (
                     <div key={accountId} className="flex items-center justify-between text-sm">
                       <div>
                         <p className="font-medium">{account?.name}</p>
-                        <p className="text-xs text-muted-foreground">{account?.currency}</p>
+                        <p className="text-muted-foreground text-xs">{account?.currency}</p>
                       </div>
-                      <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                      <span className="bg-primary/10 text-primary rounded px-2 py-1 text-xs">
                         Selected
                       </span>
                     </div>
@@ -146,7 +138,7 @@ export function SaveAsPortfolioModal({
               </div>
             </div>
 
-            <DialogFooter className="gap-2 mt-auto">
+            <DialogFooter className="mt-auto gap-2">
               <Button
                 type="button"
                 variant="outline"
@@ -159,7 +151,7 @@ export function SaveAsPortfolioModal({
                 type="submit"
                 disabled={createPortfolioMutation.isPending || !form.formState.isValid}
               >
-                {createPortfolioMutation.isPending ? 'Saving...' : 'Save Portfolio'}
+                {createPortfolioMutation.isPending ? "Saving..." : "Save Portfolio"}
               </Button>
             </DialogFooter>
           </form>

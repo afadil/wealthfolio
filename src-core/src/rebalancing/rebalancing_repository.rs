@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use crate::{
     db::{get_connection, WriteHandle},
+    errors::ValidationError,
     schema::{asset_class_targets, holding_targets, rebalancing_strategies},
     Result,
 };
@@ -308,6 +309,32 @@ impl RebalancingRepository for RebalancingRepositoryImpl {
 
     /// Delete unused virtual strategies
     /// Returns the number of deleted strategies
+    async fn get_unused_virtual_strategies(&self) -> Result<Vec<RebalancingStrategy>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        // Get all virtual strategies (name starts with "Virtual Portfolio:")
+        let virtual_strategies = rebalancing_strategies::table
+            .filter(rebalancing_strategies::name.like("Virtual Portfolio:%"))
+            .load::<RebalancingStrategyDB>(&mut conn)?;
+
+        let mut unused_strategies = Vec::new();
+
+        for strategy in virtual_strategies {
+            // Check if strategy has any targets
+            let target_count = asset_class_targets::table
+                .filter(asset_class_targets::strategy_id.eq(&strategy.id))
+                .count()
+                .get_result::<i64>(&mut conn)?;
+
+            // If no targets, it's unused
+            if target_count == 0 {
+                unused_strategies.push(strategy.into());
+            }
+        }
+
+        Ok(unused_strategies)
+    }
+
     async fn delete_unused_virtual_strategies(&self) -> Result<usize> {
         self.writer
             .exec(move |conn| {
@@ -334,6 +361,45 @@ impl RebalancingRepository for RebalancingRepositoryImpl {
                 }
 
                 Ok(deleted_count)
+            })
+            .await
+    }
+
+    async fn delete_unused_virtual_strategy(&self, id: &str) -> Result<()> {
+        let id = id.to_string();
+        self.writer
+            .exec(move |conn| {
+                // First verify it's a virtual strategy with no targets
+                let strategy = rebalancing_strategies::table
+                    .find(&id)
+                    .first::<RebalancingStrategyDB>(conn)
+                    .optional()?;
+
+                if let Some(strategy) = strategy {
+                    // Verify it's a virtual portfolio
+                    if !strategy.name.starts_with("Virtual Portfolio:") {
+                        return Err(crate::Error::Validation(ValidationError::InvalidInput(
+                            "Strategy is not a virtual portfolio".to_string(),
+                        )));
+                    }
+
+                    // Check if strategy has any targets
+                    let target_count = asset_class_targets::table
+                        .filter(asset_class_targets::strategy_id.eq(&strategy.id))
+                        .count()
+                        .get_result::<i64>(conn)?;
+
+                    if target_count > 0 {
+                        return Err(crate::Error::Validation(ValidationError::InvalidInput(
+                            "Cannot delete virtual portfolio with targets".to_string(),
+                        )));
+                    }
+
+                    // Delete the strategy
+                    diesel::delete(rebalancing_strategies::table.find(&id)).execute(conn)?;
+                }
+
+                Ok(())
             })
             .await
     }

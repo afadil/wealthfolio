@@ -1,11 +1,11 @@
 import { Button } from "@/components/ui/button";
 import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Account } from "@/lib/types";
@@ -326,20 +326,18 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
                   ) : (
                     <span className="text-muted-foreground">Select accounts</span>
                   )
+                ) : // Single-select mode (existing)
+                selectedAccount ? (
+                  <>
+                    {(() => {
+                      const IconComponent =
+                        accountTypeIcons[selectedAccount.accountType] ?? Icons.CreditCard;
+                      return <IconComponent className="h-4 w-4 shrink-0 opacity-70" />;
+                    })()}
+                    <span>{selectedAccount.name}</span>
+                  </>
                 ) : (
-                  // Single-select mode (existing)
-                  selectedAccount ? (
-                    <>
-                      {(() => {
-                        const IconComponent =
-                          accountTypeIcons[selectedAccount.accountType] ?? Icons.CreditCard;
-                        return <IconComponent className="h-4 w-4 shrink-0 opacity-70" />;
-                      })()}
-                      <span>{selectedAccount.name}</span>
-                    </>
-                  ) : (
-                    <span className="text-muted-foreground">Select an account</span>
-                  )
+                  <span className="text-muted-foreground">Select an account</span>
                 )}
               </div>
               <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -434,7 +432,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
 
                         // Check if account is selected (works for both single and multi mode)
                         const isSelected = multiSelect
-                          ? selectedAccounts?.some((a) => a.id === account.id) ?? false
+                          ? (selectedAccounts?.some((a) => a.id === account.id) ?? false)
                           : selectedAccount?.id === account.id;
 
                         return (
@@ -444,13 +442,19 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
                             onSelect={() => {
                               if (multiSelect && setSelectedAccounts) {
                                 // Multi-select mode: toggle account in array
-                                const isCurrentlySelected = selectedAccounts?.some((a) => a.id === account.id);
+                                const isCurrentlySelected = selectedAccounts?.some(
+                                  (a) => a.id === account.id,
+                                );
                                 const isAllPortfolio = account.id === PORTFOLIO_ACCOUNT_ID;
-                                const hasAllPortfolio = selectedAccounts?.some((a) => a.id === PORTFOLIO_ACCOUNT_ID);
+                                const hasAllPortfolio = selectedAccounts?.some(
+                                  (a) => a.id === PORTFOLIO_ACCOUNT_ID,
+                                );
 
                                 if (isCurrentlySelected) {
                                   // Remove account
-                                  setSelectedAccounts(selectedAccounts.filter((a) => a.id !== account.id));
+                                  setSelectedAccounts(
+                                    selectedAccounts.filter((a) => a.id !== account.id),
+                                  );
                                 } else {
                                   // Add account with exclusivity rules
                                   if (isAllPortfolio) {

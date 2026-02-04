@@ -1,13 +1,13 @@
 import { getRunEnv, invokeTauri, invokeWeb, logger, RUN_ENV } from "@/adapters";
 import {
-    AccountValuation,
-    Holding,
-    IncomeSummary,
-    NewPortfolio,
-    PerformanceMetrics,
-    Portfolio,
-    SimplePerformanceMetrics,
-    UpdatePortfolio,
+  AccountValuation,
+  Holding,
+  IncomeSummary,
+  NewPortfolio,
+  PerformanceMetrics,
+  Portfolio,
+  SimplePerformanceMetrics,
+  UpdatePortfolio,
 } from "@/lib/types";
 
 export const updatePortfolio = async (): Promise<void> => {
@@ -364,9 +364,7 @@ export const deletePortfolio = async (portfolioId: string): Promise<void> => {
 /**
  * Gets all portfolios that contain a specific account
  */
-export const getPortfoliosContainingAccount = async (
-  accountId: string,
-): Promise<Portfolio[]> => {
+export const getPortfoliosContainingAccount = async (accountId: string): Promise<Portfolio[]> => {
   try {
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:

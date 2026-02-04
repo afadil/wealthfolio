@@ -1,25 +1,25 @@
-import { useState } from 'react';
+import { useState } from "react";
 
 import {
-    AlertDialog,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Icons } from '@/components/ui/icons';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Icons } from "@/components/ui/icons";
 
-import type { Portfolio } from '@/lib/types';
+import type { Portfolio } from "@/lib/types";
 
 export interface PortfolioOperationsProps {
   portfolio: Portfolio;
@@ -57,9 +57,7 @@ export function PortfolioOperations({ portfolio, onEdit, onDelete }: PortfolioOp
       <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              Are you sure you want to delete this portfolio?
-            </AlertDialogTitle>
+            <AlertDialogTitle>Are you sure you want to delete this portfolio?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. The accounts in this portfolio will not be deleted.
             </AlertDialogDescription>

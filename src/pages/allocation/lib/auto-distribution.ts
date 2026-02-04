@@ -1,4 +1,4 @@
-import type { Holding, HoldingTarget } from '@/lib/types';
+import type { Holding, HoldingTarget } from "@/lib/types";
 
 export interface HoldingWithTarget {
   assetId: string;
@@ -37,7 +37,7 @@ export function calculateAutoDistribution(
   holdings: Holding[],
   holdingTargets: HoldingTarget[],
   pendingEdits: Map<string, number>,
-  assetClassValue: number
+  assetClassValue: number,
 ): AutoDistributionResult {
   // Build map of holdings with their current state
   const holdingMap = new Map<string, HoldingWithTarget>();
@@ -58,13 +58,13 @@ export function calculateAutoDistribution(
     // - If pending edits DO exist → only pending OR locked are "user-set"
     const hasPendingEdits = pendingEdits.size > 0;
     const isUserSet = hasPendingEdits
-      ? (pendingValue !== undefined || isLocked)  // Active editing session
-      : (existingTarget !== undefined);             // No editing - all saved are user-set
+      ? pendingValue !== undefined || isLocked // Active editing session
+      : existingTarget !== undefined; // No editing - all saved are user-set
 
     holdingMap.set(assetId, {
       assetId,
-      symbol: holding.instrument?.symbol || '',
-      displayName: holding.instrument?.name || holding.instrument?.symbol || 'Unknown',
+      symbol: holding.instrument?.symbol || "",
+      displayName: holding.instrument?.name || holding.instrument?.symbol || "Unknown",
       currentValue: holding.marketValue?.base || 0,
       currentPercent,
       targetPercent: pendingValue ?? existingTarget?.targetPercentOfClass,
@@ -93,10 +93,7 @@ export function calculateAutoDistribution(
   // If remainder > 0 and we have holdings to distribute to
   if (remainder > 0.001 && autoDistributeHoldings.length > 0) {
     // Calculate total value of holdings eligible for auto-distribution
-    const totalAutoValue = autoDistributeHoldings.reduce(
-      (sum, h) => sum + h.currentValue,
-      0
-    );
+    const totalAutoValue = autoDistributeHoldings.reduce((sum, h) => sum + h.currentValue, 0);
 
     if (totalAutoValue > 0) {
       // Distribute proportionally by market value
@@ -128,7 +125,7 @@ export function calculateAutoDistribution(
   }
 
   const allHoldings = [...userSetHoldings, ...autoDistributeHoldings].sort(
-    (a, b) => b.currentValue - a.currentValue
+    (a, b) => b.currentValue - a.currentValue,
   );
 
   const totalAllocated = allHoldings.reduce((sum, h) => sum + (h.targetPercent || 0), 0);

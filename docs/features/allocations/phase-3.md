@@ -2,7 +2,9 @@
 
 ## Overview
 
-**Goal:** Enable users to set target allocations for individual holdings within each asset class, providing granular control while maintaining the simplicity of the Phase 2 asset class system.
+**Goal:** Enable users to set target allocations for individual holdings within
+each asset class, providing granular control while maintaining the simplicity of
+the Phase 2 asset class system.
 
 **Timeline:** 4-6 days across 3 sprints
 
@@ -15,6 +17,7 @@
 ### 1.1 Data Model: Cascading Targets
 
 **Hierarchy:**
+
 ```
 Portfolio (100%)
   ├─ Asset Class Target (e.g., Equity 60%)
@@ -26,12 +29,14 @@ Portfolio (100%)
 ```
 
 **Calculation Logic:**
+
 - Holding targets are percentages **of their asset class**, not the portfolio
 - Example: VTI 50% of Equity × 60% Equity = 30% of total portfolio
 - Constraint: All holding targets within an asset class must sum to 100%
 - Auto-fill: Unallocated holdings receive remainder proportionally
 
 **Database Schema** (already exists in migrations):
+
 ```sql
 CREATE TABLE holding_targets (
   id UUID PRIMARY KEY,
@@ -49,38 +54,49 @@ CREATE TABLE holding_targets (
 ### 1.2 Rebalancing Model: Cash-First Allocation
 
 **Philosophy:**
+
 - Generate **only BUY recommendations** for underweight positions
 - Never suggest selling (avoid tax implications, user control)
 - Allocate new cash to reach targets
 
 **Rebalancing Logic:**
+
 1. User has $X cash to invest
-2. Calculate absolute target dollars: `portfolio_value * asset_class_target * holding_target`
+2. Calculate absolute target dollars:
+   `portfolio_value * asset_class_target * holding_target`
 3. Calculate gap: `target_dollars - current_dollars`
 4. Suggest buys for all positive gaps, prioritizing largest gaps
 5. Show "Would need $Y more to reach targets" if cash insufficient
 
 ### 1.3 Portfolio & Multi-Account Architecture
 
-**Overview:**
-Portfolios are lightweight groupings of accounts that enable unified allocation management without data duplication.
+**Overview:** Portfolios are lightweight groupings of accounts that enable
+unified allocation management without data duplication.
 
 **Key Features:**
+
 - Create named portfolios combining 2+ accounts
 - View allocation strategies at the portfolio level
 - Quick multi-select accounts for ad-hoc exploration
 - Save multi-select combinations as portfolios for future use
 
 **Key Benefits:**
-- **Independent Strategies**: Each portfolio/account gets its own separate allocation strategy
-- **No Data Duplication**: Portfolios reference accounts, all data stays in accounts table
-- **Flexible UX**: Support both quick exploration (multi-select) and persistent portfolios
-- **Multi-Feature Support**: Portfolios can be used across Allocation, Insights, Performance pages
-- **Clear Separation**: Portfolios ≠ Accounts (no confusion about trading accounts)
+
+- **Independent Strategies**: Each portfolio/account gets its own separate
+  allocation strategy
+- **No Data Duplication**: Portfolios reference accounts, all data stays in
+  accounts table
+- **Flexible UX**: Support both quick exploration (multi-select) and persistent
+  portfolios
+- **Multi-Feature Support**: Portfolios can be used across Allocation, Insights,
+  Performance pages
+- **Clear Separation**: Portfolios ≠ Accounts (no confusion about trading
+  accounts)
 
 **Account Selector UI (Actual Implementation):**
 
-Uses shadcn **Command/CommandItem pattern** (NOT checkboxes) to match Insights page style:
+Uses shadcn **Command/CommandItem pattern** (NOT checkboxes) to match Insights
+page style:
 
 ```
 ┌──────────────────────────────────────┐
@@ -101,6 +117,7 @@ Uses shadcn **Command/CommandItem pattern** (NOT checkboxes) to match Insights p
 ```
 
 **Implementation Details:**
+
 - Component: `src/components/account-portfolio-selector.tsx`
 - Pattern: Popover → Command → CommandItem (NOT checkboxes)
 - Selection: Array of account IDs, click to toggle
@@ -108,24 +125,29 @@ Uses shadcn **Command/CommandItem pattern** (NOT checkboxes) to match Insights p
 - Matches: Insights page account selector pattern
 
 **Why Command Pattern (Not Checkboxes):**
+
 - ✅ Consistency with Insights page design
 - ✅ Cleaner visual hierarchy
 - ✅ Better mobile UX
 
 **Auto-Matching Behavior:**
-- When user multi-selects accounts that exactly match a saved portfolio → auto-activates that portfolio
+
+- When user multi-selects accounts that exactly match a saved portfolio →
+  auto-activates that portfolio
 - Order-independent matching (A+B+C = C+B+A)
 - Toast notification: "✓ Matched Portfolio X"
 
 **User Workflows:**
 
 **Create Portfolio (Settings):**
+
 1. Navigate to Settings → Portfolios
 2. Click [+ New Portfolio]
 3. Enter name, select 2+ accounts
 4. Click [Create Portfolio]
 
 **Save Multi-Select as Portfolio:**
+
 1. Multi-select accounts (e.g., A + C)
 2. Banner shows: "💡 Viewing 2 accounts — [Save as Portfolio]"
 3. Click [Save as Portfolio]
@@ -133,6 +155,7 @@ Uses shadcn **Command/CommandItem pattern** (NOT checkboxes) to match Insights p
 5. Portfolio created and auto-activated
 
 **Edge Cases Handled:**
+
 - **Account Deletion**: Portfolio shows warning "⚠️ Incomplete"
 - **Account Renaming**: Portfolio name auto-updates
 - **Duplicate Names**: Validation prevents duplicate portfolio names
@@ -143,7 +166,9 @@ Uses shadcn **Command/CommandItem pattern** (NOT checkboxes) to match Insights p
 
 **Status**: 🔄 Required before Sprint 2 completion
 
-This section outlines the implementation steps for the Portfolio feature. **Complete these tasks before continuing Sprint 2** as the multi-account strategy is foundational to the allocation system.
+This section outlines the implementation steps for the Portfolio feature.
+**Complete these tasks before continuing Sprint 2** as the multi-account
+strategy is foundational to the allocation system.
 
 #### Database Schema
 
@@ -162,6 +187,7 @@ CREATE INDEX idx_portfolios_name ON portfolios(name);
 #### Implementation Tasks
 
 **Backend (Rust):**
+
 1. Create `portfolios` table migration
 2. Add models: `Portfolio`, `NewPortfolio`, `PortfolioDB`
 3. Add repository methods:
@@ -175,8 +201,10 @@ CREATE INDEX idx_portfolios_name ON portfolios(name);
 5. Add validation: minimum 2 accounts, unique names
 
 **Frontend:**
+
 1. Create Settings → Portfolios page
-2. Create portfolio CRUD hooks (`use-portfolio-queries`, `use-portfolio-mutations`)
+2. Create portfolio CRUD hooks (`use-portfolio-queries`,
+   `use-portfolio-mutations`)
 3. Update account selector component:
    - Add portfolios section
    - Add multi-select checkboxes
@@ -190,6 +218,7 @@ CREATE INDEX idx_portfolios_name ON portfolios(name);
 #### Test Scenarios (Must Pass)
 
 **Scenario 1: Create Portfolio in Settings**
+
 - Navigate to Settings → Portfolios
 - Click [+ New Portfolio]
 - Enter name: "Family Portfolio"
@@ -200,6 +229,7 @@ CREATE INDEX idx_portfolios_name ON portfolios(name);
 - ✅ Portfolio appears in list
 
 **Scenario 2: Multi-Select Auto-Matching**
+
 - Deselect all accounts
 - Check Account A
 - Check Account B
@@ -208,6 +238,7 @@ CREATE INDEX idx_portfolios_name ON portfolios(name);
 - ✅ Loads existing targets
 
 **Scenario 3: Save Multi-Select as Portfolio**
+
 - Multi-select: Check A + C (not a saved portfolio)
 - ✅ Banner shows: "💡 Viewing 2 accounts — [Save as Portfolio]"
 - Click [Save as Portfolio]
@@ -217,6 +248,7 @@ CREATE INDEX idx_portfolios_name ON portfolios(name);
 - ✅ Portfolio created and auto-activated
 
 **Scenario 4: Account Deletion Handling**
+
 - Create Portfolio Y (A+B+D)
 - Delete Account D from Settings → Accounts
 - View Portfolio Y
@@ -224,19 +256,23 @@ CREATE INDEX idx_portfolios_name ON portfolios(name);
 - ✅ Options: [Update Portfolio] [Delete Portfolio]
 
 **Scenario 5: Duplicate Name Validation**
+
 - Try creating "Family Portfolio" (exists)
 - ✅ Validation error: "Name already exists"
 - ✅ Create button disabled until valid name
 
 **Scenario 6: Minimum Accounts Validation**
+
 - Try creating with 1 account
 - ✅ Error: "Minimum 2 accounts required"
 - Select 2 accounts
 - ✅ Button enabled, can create
 
-**Priority**: Complete Portfolio feature implementation before Sprint 2 Live Preview work.
+**Priority**: Complete Portfolio feature implementation before Sprint 2 Live
+Preview work.
 
-For detailed UX patterns and additional test scenarios, see [archive/portfolio_architecture.md](archive/portfolio_architecture.md).
+For detailed UX patterns and additional test scenarios, see
+[archive/portfolio_architecture.md](archive/portfolio_architecture.md).
 
 ---
 
@@ -245,11 +281,13 @@ For detailed UX patterns and additional test scenarios, see [archive/portfolio_a
 ### 2.1 Layout: Enhanced Side Panel (No New Views)
 
 **Main View (60% - LEFT SIDE):**
+
 - Allocation Overview pie chart (unchanged)
 - Asset class sliders with lock/delete controls (unchanged)
 - Click pie slice → opens enhanced side panel
 
 **Side Panel (40% - RIGHT SIDE):**
+
 - Enhanced Sheet component (existing component, new content)
 - Compact design with text inputs (no sliders)
 - Scrollable holdings list
@@ -258,6 +296,7 @@ For detailed UX patterns and additional test scenarios, see [archive/portfolio_a
 ### 2.2 Side Panel Structure
 
 **Header Section (Asset Class - Unchanged for Now):**
+
 ```
 ┌─────────────────────────────────────┐
 │ Equity Allocation                   │
@@ -267,6 +306,7 @@ For detailed UX patterns and additional test scenarios, see [archive/portfolio_a
 ```
 
 **Holdings Section (Main Content):**
+
 ```
 │ Holdings Breakdown:                 │
 │                                     │
@@ -287,22 +327,26 @@ For detailed UX patterns and additional test scenarios, see [archive/portfolio_a
 ```
 
 **Key Features:**
+
 - ✅ Clickable holding names → navigate to `/holdings/{symbol}` detail page
 - ✅ Text input for targets (consistent with current asset class panel pattern)
 - ✅ Visual bars show current vs target (no interaction, just feedback)
 - ✅ Lock button per holding (prevents auto-adjustments)
-- ✅ Delete button per holding (removes target, holding gets auto-filled remainder)
+- ✅ Delete button per holding (removes target, holding gets auto-filled
+  remainder)
 - ✅ Compact vertical layout (more holdings visible without scrolling)
 
 ### 2.3 Design Rationale
 
 **Why text input instead of sliders in panel:**
+
 - Side panel is only 40% width (sliders would be cramped)
 - Consistent with current asset class section (already uses text input)
 - Faster for precise values (typing "33.33" vs dragging)
 - More vertical space = see more holdings at once
 
 **Why keep asset class section as-is for now:**
+
 - Provides context while working on holdings ("60% Equities" reference)
 - Allows editing asset class target without closing panel
 - User wants to evaluate space usage after implementation
@@ -310,6 +354,7 @@ For detailed UX patterns and additional test scenarios, see [archive/portfolio_a
 - Keeps all related info in one place during Phase 3 development
 
 **Why keep visual bars for holdings:**
+
 - Provides instant visual feedback (target vs actual)
 - Doesn't take much space (1 line per holding)
 - Helps users spot misalignments quickly
@@ -321,6 +366,7 @@ For detailed UX patterns and additional test scenarios, see [archive/portfolio_a
 ### 3.1 New Components
 
 **`AssetClassSidePanel.tsx`**
+
 - Purpose: Wrapper for side panel content when asset class is selected
 - Props: `assetClass`, `assetClassTarget`, `holdings`, `onClose`, `onNavigate`
 - Features:
@@ -330,8 +376,10 @@ For detailed UX patterns and additional test scenarios, see [archive/portfolio_a
   - Optional sub-pie chart (future enhancement)
 
 **`HoldingTargetRow.tsx`**
+
 - Purpose: Individual holding row with target input
-- Props: `holding`, `currentPercent`, `targetPercent`, `isLocked`, `onChange`, `onLock`, `onDelete`, `onNavigate`
+- Props: `holding`, `currentPercent`, `targetPercent`, `isLocked`, `onChange`,
+  `onLock`, `onDelete`, `onNavigate`
 - Features:
   - Clickable holding name (navigate to detail page)
   - Text input for target percentage
@@ -340,6 +388,7 @@ For detailed UX patterns and additional test scenarios, see [archive/portfolio_a
   - Validation (sum to 100% with siblings)
 
 **`HoldingsBreakdownPie.tsx` (Optional - Phase 3.5)**
+
 - Purpose: Mini pie chart showing holdings within asset class
 - Props: `holdings`, `assetClassTarget`
 - Features:
@@ -349,7 +398,8 @@ For detailed UX patterns and additional test scenarios, see [archive/portfolio_a
 
 ### 3.2 Existing Components (Reused)
 
-- `TargetPercentSlider` - NOT used in panel (only in main view for asset classes)
+- `TargetPercentSlider` - NOT used in panel (only in main view for asset
+  classes)
 - `Sheet` - Container for side panel (already exists)
 - `Collapsible` - For expandable sections if needed
 - `AlertDialog` - For locked target deletion warnings
@@ -358,6 +408,7 @@ For detailed UX patterns and additional test scenarios, see [archive/portfolio_a
 ### 3.3 New Hooks
 
 **`use-holding-target-queries.ts`**
+
 ```typescript
 // Get all holding targets for an account
 export const useHoldingTargets = (accountId: string) => {...}
@@ -370,6 +421,7 @@ export const useCascadingPercentages = (accountId: string) => {...}
 ```
 
 **`use-holding-target-mutations.ts`**
+
 ```typescript
 // Set holding target (validates sum to 100%)
 export const useSetHoldingTarget = () => {...}
@@ -391,6 +443,7 @@ export const useToggleHoldingTargetLock = () => {...}
 ### Sprint 1: Backend Foundation (1-2 days)
 
 **Tasks:**
+
 1. ✅ Verify `holding_targets` table exists (DONE - confirmed in migrations)
 2. Create Rust models:
    - `HoldingTarget` struct in `src-core/src/models/holding_target.rs`
@@ -403,7 +456,8 @@ export const useToggleHoldingTargetLock = () => {...}
    - Business logic: auto-fill, proportional scaling, lock handling
 5. Add Tauri commands:
    - `src-tauri/src/commands/allocation.rs`
-   - `get_holding_targets`, `set_holding_targets`, `delete_holding_target`, `toggle_holding_target_lock`
+   - `get_holding_targets`, `set_holding_targets`, `delete_holding_target`,
+     `toggle_holding_target_lock`
 6. Add Axum endpoints (web mode):
    - `src-server/src/api.rs`
    - Mirror Tauri commands for web compatibility
@@ -412,6 +466,7 @@ export const useToggleHoldingTargetLock = () => {...}
    - Switch on `RUN_ENV` (desktop/web)
 
 **Validation:**
+
 - Run `cargo test` in `src-core`
 - Test Tauri commands in desktop mode
 - Test Axum endpoints in web mode
@@ -420,6 +475,7 @@ export const useToggleHoldingTargetLock = () => {...}
 ### Sprint 2: Enhanced Side Panel UI with Live Preview (2-3 days)
 
 **Tasks:**
+
 1. ✅ Create React Query hooks:
    - `use-holding-target-queries.ts` - Fetch holding targets
    - `use-holding-target-mutations.ts` - Save/delete/lock mutations
@@ -450,6 +506,7 @@ export const useToggleHoldingTargetLock = () => {...}
    - Improve spacing and visual hierarchy
 
 **Validation:**
+
 - ✅ Click pie slice → side panel opens with holdings grouped by sub-class
 - ✅ Enter target percentage → input works, no strict validation
 - ✅ See live preview of auto-calculated % (italic, grey)
@@ -463,6 +520,7 @@ export const useToggleHoldingTargetLock = () => {...}
 ### Sprint 3: Rebalancing Enhancement (1-2 days) ✅ COMPLETE
 
 **Tasks:**
+
 1. ✅ Update `rebalancing-advisor.tsx`:
    - Fetch holding targets via `getHoldingTargets` (useQueries per asset class)
    - Calculate cascading percentages (holding% × asset_class% = portfolio%)
@@ -470,23 +528,31 @@ export const useToggleHoldingTargetLock = () => {...}
    - Group suggestions by asset class (Collapsible sections)
 2. ✅ Add new UI sections:
    - "Holding-Level Suggestions" (detailed view) with Overview/Detailed toggle
-   - Show holding-level gaps and recommended buys (symbol, shares × price, dollar amount)
+   - Show holding-level gaps and recommended buys (symbol, shares × price,
+     dollar amount)
    - Expandable/collapsible by asset class
 3. ✅ Update calculation logic:
-   - Include all holding targets in rebalancing (lock only affects target-editing panel; user chooses what to buy)
-   - Prioritize largest gaps when cash is limited (proportional scale + whole-share optimization per class)
+   - Include all holding targets in rebalancing (lock only affects
+     target-editing panel; user chooses what to buy)
+   - Prioritize largest gaps when cash is limited (proportional scale +
+     whole-share optimization per class)
    - Show "Additional cash needed to reach targets" when insufficient cash
 4. ⏳ Add tests (optional):
    - Unit tests for cascading percentage calculations
    - Integration tests for rebalancing suggestions
 
 **Validation:**
+
 - ✅ Set holding targets → rebalancing shows per-holding suggestions
-- ✅ Lock only affects target panel; rebalancing uses all targets; user chooses what to buy
-- ✅ Insufficient cash → shows partial suggestions + "Additional cash needed to reach targets"
+- ✅ Lock only affects target panel; rebalancing uses all targets; user chooses
+  what to buy
+- ✅ Insufficient cash → shows partial suggestions + "Additional cash needed to
+  reach targets"
 - ✅ No holding targets → falls back to asset class only suggestions
 - ✅ Available cash input accepts decimals (max 2 decimal places)
-- ✅ Single multi-account banner (portfolio/account names + Save as Portfolio); rebalancing-specific "Viewing rebalancing suggestions for combined accounts" banner removed
+- ✅ Single multi-account banner (portfolio/account names + Save as Portfolio);
+  rebalancing-specific "Viewing rebalancing suggestions for combined accounts"
+  banner removed
 
 ---
 
@@ -495,28 +561,35 @@ export const useToggleHoldingTargetLock = () => {...}
 ### 5.1 Validation Rules (Hybrid #1: Live Preview + Auto-distribute)
 
 **Phase 3 Strategy:**
+
 - **NO strict 100% validation** - allows incremental target setting
 - Live preview shows what will be saved before user commits
 - Auto-distributes remaining % to unset holdings
 - User sees preview → clicks "Save All Targets" → all saved at once
-- *(Strict mode deferred to Phase 4 as optional setting)*
+- _(Strict mode deferred to Phase 4 as optional setting)_
 
 **Holding Targets (per asset class):**
+
 - Each target: 0.00% to 100.00% (2 decimal places)
 - Locked targets cannot be auto-adjusted
-- Deleting a target redistributes its percentage proportionally to unlocked holdings
+- Deleting a target redistributes its percentage proportionally to unlocked
+  holdings
 - **User-set targets** displayed in bold
 - **Auto-calculated previews** displayed in italic/grey with "→" indicator
 
 **Auto-Fill Logic (Live Preview):**
+
 - When user sets target for some holdings but not all:
   - Calculate total allocated: `SUM(set_targets)`
   - Calculate remainder: `100% - total_allocated`
   - Show preview of auto-distributed % in UI (italic, grey)
-  - Distribute remainder proportionally among unset holdings based on current market values
-  - User clicks "Save All Targets" to commit all values (user-set + auto-calculated)
+  - Distribute remainder proportionally among unset holdings based on current
+    market values
+  - User clicks "Save All Targets" to commit all values (user-set +
+    auto-calculated)
 
 **Example (Live Preview UX):**
+
 ```
 Equity Asset Class (4 holdings):
 
@@ -551,6 +624,7 @@ When user clicks "Save All Targets":
 ### 5.2 Cascading Percentage Calculation
 
 **Formula:**
+
 ```
 Portfolio % = Asset Class % × Holding % of Asset Class
 
@@ -561,11 +635,12 @@ Example:
 ```
 
 **Implementation:**
+
 ```typescript
 // In use-cascading-percentages.ts
 export const calculatePortfolioPercent = (
   assetClassPercent: number,
-  holdingPercentOfClass: number
+  holdingPercentOfClass: number,
 ): number => {
   return (assetClassPercent * holdingPercentOfClass) / 100;
 };
@@ -574,14 +649,18 @@ export const calculatePortfolioPercent = (
 ### 5.3 Lock Behavior
 
 **Asset Class Lock:**
+
 - Prevents auto-scaling when other asset classes change
 - Does NOT prevent editing via text input or deletion
 - Visual indicator: `bg-secondary text-gray-700` (Phase 2 pattern)
 
 **Holding Target Lock:**
-- Prevents auto-scaling when other holdings in same asset class change (in the target-editing panel only)
+
+- Prevents auto-scaling when other holdings in same asset class change (in the
+  target-editing panel only)
 - Does NOT prevent manual editing via text input or deletion
-- Does NOT exclude a holding from rebalancing suggestions; rebalancing uses all targets. The user chooses what to buy after seeing suggestions.
+- Does NOT exclude a holding from rebalancing suggestions; rebalancing uses all
+  targets. The user chooses what to buy after seeing suggestions.
 - Independent of asset class lock
 - Visual indicator: Same as asset class lock
 
@@ -592,6 +671,7 @@ export const calculatePortfolioPercent = (
 ### 6.1 Set Holding Targets
 
 **Steps:**
+
 1. User sets asset class targets in main view (e.g., Equity 60%)
 2. User clicks "Equity" pie slice → side panel opens
 3. Panel shows all Equity holdings with current allocations
@@ -606,12 +686,14 @@ export const calculatePortfolioPercent = (
 ### 6.2 Lock and Delete
 
 **Lock:**
+
 1. User clicks lock icon on VTI holding
 2. VTI target is locked (cannot be auto-adjusted)
 3. User changes VOO from 30% to 40%
 4. System auto-adjusts only VXUS (unlocked): 20% → 10%
 
 **Delete:**
+
 1. User clicks delete icon on VOO holding
 2. System removes VOO target
 3. VOO's 30% is redistributed proportionally:
@@ -621,6 +703,7 @@ export const calculatePortfolioPercent = (
 ### 6.3 Navigate to Holding Detail
 
 **Steps:**
+
 1. Side panel shows "VTI - Total Stock Market"
 2. User clicks holding name (clickable button)
 3. Navigates to `/holdings/VTI` detail page
@@ -634,23 +717,28 @@ export const calculatePortfolioPercent = (
 ### 7.1 Unit Tests (Vitest)
 
 **Frontend:**
+
 - `use-cascading-percentages.test.ts` - Percentage calculations
 - `use-holding-target-mutations.test.ts` - Mutation logic
 - `HoldingTargetRow.test.tsx` - Component rendering and interactions
 - `AssetClassSidePanel.test.tsx` - Panel content and navigation
 
 **Backend (Rust):**
-- `holding_target_service.rs` - Auto-fill logic, validation, proportional scaling
+
+- `holding_target_service.rs` - Auto-fill logic, validation, proportional
+  scaling
 - `holding_target_repository.rs` - CRUD operations, database constraints
 
 ### 7.2 Integration Tests
 
 **Frontend:**
+
 - End-to-end flow: Set asset class → Set holdings → Rebalancing updates
 - Lock/delete behavior with auto-scaling
 - Navigation between allocation and holding detail pages
 
 **Backend:**
+
 - Tauri command wrappers (desktop mode)
 - Axum endpoints (web mode)
 - Database migrations and constraints
@@ -658,6 +746,7 @@ export const calculatePortfolioPercent = (
 ### 7.3 Manual Testing
 
 **Scenarios:**
+
 1. Set targets for all holdings in asset class (sum to 100%)
 2. Set targets for some holdings (auto-fill remainder)
 3. Lock one holding, adjust another (verify locked stays fixed)
@@ -671,41 +760,81 @@ export const calculatePortfolioPercent = (
 Use these to sanity-check the rebalancing tool (manual or automated).
 
 **Available cash & input**
-- [✅] **Zero cash:** Button "Calculate Suggestions" disabled; entering 0 and pressing Enter shows inline error message "Please enter an amount greater than 0" below input field (no alert popup). Error clears when user starts typing.
-- [✅] **Decimal input:** `0.50`, `12.99`, `100.00`, `.5` (leading dot), `12.` (trailing dot) all accepted and used correctly; max 2 decimals (e.g. `1.999` → `1.99`).
-- [✅] **Empty input:** Field can be cleared; calculated suggestions still show previous run until recalculated; button disabled when effective amount ≤ 0.
-- [✅] **Very large amount:** e.g. 1,000,000; no overflow; "Remaining" or "Additional cash needed" behaves correctly.
+
+- [✅] **Zero cash:** Button "Calculate Suggestions" disabled; entering 0 and
+  pressing Enter shows inline error message "Please enter an amount greater than
+  0" below input field (no alert popup). Error clears when user starts typing.
+- [✅] **Decimal input:** `0.50`, `12.99`, `100.00`, `.5` (leading dot), `12.`
+  (trailing dot) all accepted and used correctly; max 2 decimals (e.g. `1.999` →
+  `1.99`).
+- [✅] **Empty input:** Field can be cleared; calculated suggestions still show
+  previous run until recalculated; button disabled when effective amount ≤ 0.
+- [✅] **Very large amount:** e.g. 1,000,000; no overflow; "Remaining" or
+  "Additional cash needed" behaves correctly.
 
 **Portfolio & targets**
-- [✅] **No allocation targets:** Empty state message: "No allocation targets set" / "Go to Allocation Overview..."; no calculator UI.
-- [✅] **Zero portfolio value:** No division-by-zero or "Infinity%"; current % shown as 0 (or safe fallback); suggestions still calculable when cash > 0.
-- [✅] **Asset class with no holdings in composition:** Target exists but composition has no holdings for that class; no crash; asset class suggestion can still show (shortfall), holding-level section empty for that class.
-- [✅] **No holding targets (asset-class only):** Only asset-class suggestions; no "Holding-Level Suggestions" section (or section empty).
-- [] **Holding target points to sold/missing holding:** Holding target exists but holding not in composition (e.g. sold); that holding skipped in suggestions; no crash.
+
+- [✅] **No allocation targets:** Empty state message: "No allocation targets
+  set" / "Go to Allocation Overview..."; no calculator UI.
+- [✅] **Zero portfolio value:** No division-by-zero or "Infinity%"; current %
+  shown as 0 (or safe fallback); suggestions still calculable when cash > 0.
+- [✅] **Asset class with no holdings in composition:** Target exists but
+  composition has no holdings for that class; no crash; asset class suggestion
+  can still show (shortfall), holding-level section empty for that class.
+- [✅] **No holding targets (asset-class only):** Only asset-class suggestions;
+  no "Holding-Level Suggestions" section (or section empty).
+- [] **Holding target points to sold/missing holding:** Holding target exists
+  but holding not in composition (e.g. sold); that holding skipped in
+  suggestions; no crash.
 
 **Cash vs shortfall**
-- [✅] **Cash exactly fills shortfall:** All suggestions funded; "Remaining" = 0; no "Additional cash needed".
-- [✅] **Cash less than total shortfall:** Proportional scaling; "Additional cash needed to reach targets" shows correct amount; per-holding amounts scaled down.
-- [✅] **Cash greater than total shortfall:** Suggestions sum to total shortfall; "Remaining" shows leftover cash; no "Additional cash needed".
-- [✅] **No shortfall (already at or above targets):** Asset-class suggested buy = 0; holding suggestions 0; "Remaining" = full available cash; optional: "Additional cash needed" = 0 or hidden.
+
+- [✅] **Cash exactly fills shortfall:** All suggestions funded; "Remaining" =
+  0; no "Additional cash needed".
+- [✅] **Cash less than total shortfall:** Proportional scaling; "Additional
+  cash needed to reach targets" shows correct amount; per-holding amounts scaled
+  down.
+- [✅] **Cash greater than total shortfall:** Suggestions sum to total
+  shortfall; "Remaining" shows leftover cash; no "Additional cash needed".
+- [✅] **No shortfall (already at or above targets):** Asset-class suggested buy
+  = 0; holding suggestions 0; "Remaining" = full available cash; optional:
+  "Additional cash needed" = 0 or hidden.
 
 **Whole-share optimization**
-- [✅] **Holding with price 0 or missing:** Shows "No price"; 0 shares suggested; no crash; other holdings in same class still get suggestions.
-- [✅] **Cash too small to buy one share of any holding:** Whole-share step suggests 0 shares where applicable; residual (can't buy whole shares) shown per asset class.
-- [✅] **Single holding per asset class:** Suggestions and optimization still correct; no cross-class leakage.
+
+- [✅] **Holding with price 0 or missing:** Shows "No price"; 0 shares
+  suggested; no crash; other holdings in same class still get suggestions.
+- [✅] **Cash too small to buy one share of any holding:** Whole-share step
+  suggests 0 shares where applicable; residual (can't buy whole shares) shown
+  per asset class.
+- [✅] **Single holding per asset class:** Suggestions and optimization still
+  correct; no cross-class leakage.
 
 **UI & export**
-- [✅] **Copy text / Export CSV:** Include both asset-class and holding-level rows when holding targets exist; numbers and currency consistent with UI. Holdings show: Name (Symbol), Shares to Buy × Price per Share, Amount. CSV columns: Type, Asset Class, Name, Symbol, Shares to Buy, Price per Share, Target %, Current %, Suggested Buy, Shortfall %.
-- [✅ ] **Overview vs Detailed:** With holding targets, toggling view shows asset-class only (Overview) vs per-holding breakdown (Detailed); no duplicate or missing data.
-- [✅ ] **Collapsible by asset class:** Expand/collapse works; totals per class match sum of holdings.
+
+- [✅] **Copy text / Export CSV:** Include both asset-class and holding-level
+  rows when holding targets exist; numbers and currency consistent with UI.
+  Holdings show: Name (Symbol), Shares to Buy × Price per Share, Amount. CSV
+  columns: Type, Asset Class, Name, Symbol, Shares to Buy, Price per Share,
+  Target %, Current %, Suggested Buy, Shortfall %.
+- [✅ ] **Overview vs Detailed:** With holding targets, toggling view shows
+  asset-class only (Overview) vs per-holding breakdown (Detailed); no duplicate
+  or missing data.
+- [✅ ] **Collapsible by asset class:** Expand/collapse works; totals per class
+  match sum of holdings.
 
 **Multi-account**
-- [✅] **Multiple accounts selected:** Single banner (portfolio name or account list + Save as Portfolio); no "Viewing rebalancing suggestions for combined accounts" banner; rebalancing uses combined composition and targets.
+
+- [✅] **Multiple accounts selected:** Single banner (portfolio name or account
+  list + Save as Portfolio); no "Viewing rebalancing suggestions for combined
+  accounts" banner; rebalancing uses combined composition and targets.
 
 ### 7.4 Portfolio Feature Test Scenarios (Phase 3)
 
 #### Scenario 1: Create Portfolio in Settings
+
 **Path:** Settings → Portfolios
+
 - Navigate to Settings page
 - Click "Add portfolio" button
 - Enter name: "Family Portfolio"
@@ -718,14 +847,18 @@ Use these to sanity-check the rebalancing tool (manual or automated).
   - ✅ Portfolio appears in list
 
 #### Scenario 2: Multi-Select Auto-Matching
+
 **Path:** Allocation page (main selection flow)
-1. Create portfolio "Family Portfolio" with Account A + Account B (from Scenario 1)
+
+1. Create portfolio "Family Portfolio" with Account A + Account B (from
+   Scenario 1)
 2. Go to Allocation page
 3. Current selection: "All Accounts"
 4. Click account selector
 5. Deselect "All Accounts"
 6. Select Account A
 7. Select Account B
+
 - **Expected Results:**
   - ✅ Toast appears: "✓ Matched Portfolio "Family Portfolio""
   - ✅ Selector displays: "● Family Portfolio" (briefcase icon)
@@ -733,11 +866,14 @@ Use these to sanity-check the rebalancing tool (manual or automated).
   - ✅ Toast only shows once (no spam)
 
 #### Scenario 3: Save Multi-Select as Portfolio
+
 **Path:** Allocation page (new portfolio creation flow)
+
 1. Go to Allocation page
 2. Click account selector
 3. Select 2 accounts that DON'T match any existing portfolio
 4. (e.g., Account A + Account C, if "Family Portfolio" is A+B)
+
 - **Expected Results:**
   - ✅ Banner appears: "💡 Viewing 2 accounts — [Save as Portfolio]"
   - ✅ Click [Save as Portfolio] button
@@ -749,27 +885,35 @@ Use these to sanity-check the rebalancing tool (manual or automated).
   - ✅ Portfolio appears in Settings → Portfolios
 
 #### Scenario 4: Modified Selection Banner (Subset/Superset)
+
 **Path:** Allocation page (modified portfolio selection)
+
 1. Create "Family Portfolio" with Account A + Account B (Scenario 1)
 2. Go to Allocation page
 3. Click account selector
 4. Select only Account A (subset of Family Portfolio)
+
 - **Expected Results:**
   - ✅ **Subset Banner** appears: "⚠️ Modified selection for "Family Portfolio""
   - ✅ Message: "You've selected a subset of this portfolio's accounts"
   - ✅ Banner shows instead of "Save as Portfolio" banner
 
 5. Now select Account A + Account B + Account C (superset)
+
 - **Expected Results:**
-  - ✅ **Superset Banner** appears: "⚠️ Modified selection for "Family Portfolio""
+  - ✅ **Superset Banner** appears: "⚠️ Modified selection for "Family
+    Portfolio""
   - ✅ Message: "You've selected a superset of this portfolio's accounts"
 
 #### Scenario 5: Duplicate Name Validation
+
 **Path:** Settings → Portfolios (form validation)
+
 1. Create "Family Portfolio" with A + B (Scenario 1)
 2. Go to Settings → Portfolios
 3. Click "Add portfolio"
 4. Try entering name: "Family Portfolio" (duplicate)
+
 - **Expected Results:**
   - ✅ Name field shows error: "Name already exists"
   - ✅ Create button is disabled
@@ -777,9 +921,12 @@ Use these to sanity-check the rebalancing tool (manual or automated).
   - ✅ Button re-enables with valid name
 
 #### Scenario 6: Selector Display Consistency
+
 **Path:** Allocation page (verification of selector state)
+
 1. Complete Scenarios 2-4
 2. Close and reopen the page (refresh browser or restart app)
+
 - **Expected Results:**
   - ✅ Selector remembers last portfolio selection
   - ✅ Allocation data loads for that portfolio
@@ -822,6 +969,7 @@ Use these to sanity-check the rebalancing tool (manual or automated).
    - For advanced users who want explicit control
 
 **Storage:**
+
 ```typescript
 // localStorage or user preferences
 {
@@ -832,15 +980,15 @@ Use these to sanity-check the rebalancing tool (manual or automated).
 ```
 
 **Mutation Logic Update:**
+
 ```typescript
 const mode = useAllocationPreferences().holdingTargetMode;
 
-if (mode === 'preview') {
+if (mode === "preview") {
   // Phase 3 behavior: Show preview, allow save
   showAutoDistributedPreview();
   allowSave();
-
-} else if (mode === 'strict') {
+} else if (mode === "strict") {
   // Phase 4 behavior: Enforce 100%
   const total = calculateTotal();
   if (total !== 100) {
@@ -853,6 +1001,7 @@ if (mode === 'preview') {
 ### 8.2 Other Deferred Features
 
 **Not included in Phase 3 or 4:**
+
 - ❌ Holdings Allocation table view (optional alternative to side panel)
 - ❌ Sub-pie chart visualization in side panel (nice-to-have)
 - ❌ Drag-and-drop reordering of holdings
@@ -869,30 +1018,45 @@ if (mode === 'preview') {
 
 **Status**: READY FOR TESTING - All implementation complete
 
-Portfolio feature fully implemented! All core functionality and UX polish complete.
+Portfolio feature fully implemented! All core functionality and UX polish
+complete.
 
 **Completed Tasks:**
-- ✅ Database migration (portfolios table) - `2026-01-29-044552-0000_create_portfolios_table`
-- ✅ Database fields added (is_combined_portfolio, component_account_ids to accounts table)
+
+- ✅ Database migration (portfolios table) -
+  `2026-01-29-044552-0000_create_portfolios_table`
+- ✅ Database fields added (is_combined_portfolio, component_account_ids to
+  accounts table)
 - ✅ Rust backend models (Portfolio, NewPortfolio in types)
-- ✅ Rust backend repository (`find_or_create_combined_portfolio` in accounts service)
-- ✅ Tauri commands + Axum endpoints (createPortfolio, listPortfolios, deletePortfolio, etc.)
-- ✅ Settings → Portfolios page (`src/pages/settings/portfolios/portfolios-page.tsx`)
+- ✅ Rust backend repository (`find_or_create_combined_portfolio` in accounts
+  service)
+- ✅ Tauri commands + Axum endpoints (createPortfolio, listPortfolios,
+  deletePortfolio, etc.)
+- ✅ Settings → Portfolios page
+  (`src/pages/settings/portfolios/portfolios-page.tsx`)
 - ✅ Portfolio CRUD components (form, item, operations, edit modal)
 - ✅ Portfolio hooks (`src/hooks/use-portfolios.ts` with mutations)
 - ✅ Command wrappers (`src/commands/portfolio.ts` - desktop/web support)
 - ✅ Account selector enhanced (supports portfolio view)
 - ✅ Validation logic (minimum 2 accounts, unique names)
-- ✅ **Auto-match toast notification** - Detects when selected accounts match a saved portfolio with toast: "✓ Matched Portfolio {name}"
-- ✅ **"Save as Portfolio" banner** - Shows blue banner for multi-select without match, opens modal with auto-filled name
-- ✅ **"Modified selection" banner** - Shows amber warning for subset/superset selections
-- ✅ **SaveAsPortfolioModal component** - Sheet-based modal with form validation, auto-fill, and CRUD integration
+- ✅ **Auto-match toast notification** - Detects when selected accounts match a
+  saved portfolio with toast: "✓ Matched Portfolio {name}"
+- ✅ **"Save as Portfolio" banner** - Shows blue banner for multi-select without
+  match, opens modal with auto-filled name
+- ✅ **"Modified selection" banner** - Shows amber warning for subset/superset
+  selections
+- ✅ **SaveAsPortfolioModal component** - Sheet-based modal with form
+  validation, auto-fill, and CRUD integration
 
 **Implementation Files:**
-- Modified: `src/pages/allocation/index.tsx` (added auto-match effect, banners, modal integration)
-- Created: `src/pages/allocation/components/save-as-portfolio-modal.tsx` (new modal component)
+
+- Modified: `src/pages/allocation/index.tsx` (added auto-match effect, banners,
+  modal integration)
+- Created: `src/pages/allocation/components/save-as-portfolio-modal.tsx` (new
+  modal component)
 
 **Key Implementation Details:**
+
 1. **Auto-Match Toast** (lines 337-368):
    - Uses `usePortfolios` hook to fetch all portfolios
    - Detects order-independent matching (A+B = B+A)
@@ -908,37 +1072,53 @@ Portfolio feature fully implemented! All core functionality and UX polish comple
 3. **Modal Component** (171 lines) - FULLY FEATURED:
    - Auto-fills name from selected account names
    - Form validation with react-hook-form + Zod
-   - **Real-time duplicate name validation**: Shows error message "This portfolio name is already taken." when user types duplicate
-   - **Save button UX feedback**: Button becomes semi-transparent/disabled when form has validation errors
+   - **Real-time duplicate name validation**: Shows error message "This
+     portfolio name is already taken." when user types duplicate
+   - **Save button UX feedback**: Button becomes semi-transparent/disabled when
+     form has validation errors
    - Shows selected accounts with currencies in scrollable list
    - Auto-closes after save, resets form
    - Fully functional portfolio creation
 
 4. **Portfolio Composition Display** (lines 789-795):
-   - Shows portfolio name and selected accounts when viewing a multi-account portfolio
-   - Simple, clear display: portfolio name on first line, "Includes: [accounts]" on second
+   - Shows portfolio name and selected accounts when viewing a multi-account
+     portfolio
+   - Simple, clear display: portfolio name on first line, "Includes: [accounts]"
+     on second
 
 **Changes Made After User Feedback:**
-- Removed "Modified Selection" banner (subset/superset detection) - was confusing and didn't add value
-- Updated combined accounts banner to show portfolio composition instead of "saved separately" message
-- Fixed SaveAsPortfolioModal to properly handle form submission and save new portfolios
+
+- Removed "Modified Selection" banner (subset/superset detection) - was
+  confusing and didn't add value
+- Updated combined accounts banner to show portfolio composition instead of
+  "saved separately" message
+- Fixed SaveAsPortfolioModal to properly handle form submission and save new
+  portfolios
 - Added duplicate name validation with real-time error message feedback
 - Added disabled button state when form validation fails for better UX
 
 **Test Scenarios Status:**
-- ✅ **Scenario 1**: Create Portfolio in Settings - IMPLEMENTED & WORKING (Settings page, form validation, duplicate checking)
-- ✅ **Scenario 2**: Multi-Select Auto-Matching - IMPLEMENTED & WORKING (toast fires on match, order-independent)
-- ✅ **Scenario 3**: Save Multi-Select as Portfolio - IMPLEMENTED & WORKING (banner + modal, validation, auto-save works)
-- ✅ **Scenario 5**: Duplicate Name Validation - IMPLEMENTED & WORKING (real-time error message + disabled button)
-- ✅ **Scenario 6**: Selector Display Consistency - IMPLEMENTED & WORKING (React Query caching, state persists)
+
+- ✅ **Scenario 1**: Create Portfolio in Settings - IMPLEMENTED & WORKING
+  (Settings page, form validation, duplicate checking)
+- ✅ **Scenario 2**: Multi-Select Auto-Matching - IMPLEMENTED & WORKING (toast
+  fires on match, order-independent)
+- ✅ **Scenario 3**: Save Multi-Select as Portfolio - IMPLEMENTED & WORKING
+  (banner + modal, validation, auto-save works)
+- ✅ **Scenario 5**: Duplicate Name Validation - IMPLEMENTED & WORKING
+  (real-time error message + disabled button)
+- ✅ **Scenario 6**: Selector Display Consistency - IMPLEMENTED & WORKING (React
+  Query caching, state persists)
 
 ---
 
 ### Sprint 1: Backend Foundation ✅ COMPLETE
+
 - ✅ Database schema (holding_targets table) - Migration `2026-01-20-000001`
 - ✅ is_locked added to holding_targets - Migration `2026-01-28-101335-0000`
 - ✅ is_locked added to asset_class_targets - Migration `2026-01-28-120000-0000`
-- ✅ Rust backend commands (get_holding_targets, save_holding_target, toggle_holding_target_lock)
+- ✅ Rust backend commands (get_holding_targets, save_holding_target,
+  toggle_holding_target_lock)
 - ✅ TypeScript types (HoldingTarget, AssetClassTarget)
 - ✅ Migrations applied
 - ✅ Core data layer working (rebalancing repository/service)
@@ -946,43 +1126,62 @@ Portfolio feature fully implemented! All core functionality and UX polish comple
 ### Sprint 2: Enhanced Side Panel UI ✅ 100% COMPLETE + Portfolio Feature ✅ 100% COMPLETE
 
 **Portfolio Feature - FULLY IMPLEMENTED & READY FOR PRODUCTION:**
-- ✅ Database migration (portfolios table) - `2026-01-29-044552-0000_create_portfolios_table`
+
+- ✅ Database migration (portfolios table) -
+  `2026-01-29-044552-0000_create_portfolios_table`
 - ✅ Rust backend models (Portfolio, NewPortfolio)
-- ✅ Rust backend repository (`find_or_create_combined_portfolio` in accounts service)
-- ✅ Tauri commands + Axum endpoints (createPortfolio, listPortfolios, deletePortfolio, etc.)
+- ✅ Rust backend repository (`find_or_create_combined_portfolio` in accounts
+  service)
+- ✅ Tauri commands + Axum endpoints (createPortfolio, listPortfolios,
+  deletePortfolio, etc.)
 - ✅ Settings → Portfolios page (full CRUD UI with form validation)
 - ✅ Account selector enhanced (multi-select, portfolio grouping)
-- ✅ **Auto-match toast notification** - Detects when selected accounts match a saved portfolio
-- ✅ **"Save as Portfolio" banner** - Shows when 2+ accounts selected without match
+- ✅ **Auto-match toast notification** - Detects when selected accounts match a
+  saved portfolio
+- ✅ **"Save as Portfolio" banner** - Shows when 2+ accounts selected without
+  match
 - ✅ **SaveAsPortfolioModal component** - Full form with validation
-- ✅ **Real-time duplicate name validation** - Error message appears immediately when name already exists
-- ✅ **Save button visual feedback** - Button becomes semi-transparent when form invalid
-- ✅ **Portfolio composition display** - Shows portfolio name + accounts when exact match detected
+- ✅ **Real-time duplicate name validation** - Error message appears immediately
+  when name already exists
+- ✅ **Save button visual feedback** - Button becomes semi-transparent when form
+  invalid
+- ✅ **Portfolio composition display** - Shows portfolio name + accounts when
+  exact match detected
 - ✅ All validation logic (minimum 2 accounts, unique names)
 - ✅ Build verification (all changes passing compilation)
 
 **Implementation Files Modified:**
-- `src/pages/allocation/index.tsx` - Added auto-match effect, banners, modal integration
-- `src/pages/allocation/components/save-as-portfolio-modal.tsx` - NEW component with full validation
+
+- `src/pages/allocation/index.tsx` - Added auto-match effect, banners, modal
+  integration
+- `src/pages/allocation/components/save-as-portfolio-modal.tsx` - NEW component
+  with full validation
 
 **Side Panel UI - ✅ 100% COMPLETE:**
-- ✅ React Query hooks (use-holding-target-queries, use-holding-target-mutations)
-- ✅ HoldingTargetRow component with text input (`src/pages/allocation/components/holding-target-row.tsx`)
-- ✅ Side panel integration with sub-asset class grouping (allocation-pie-chart-view.tsx)
+
+- ✅ React Query hooks (use-holding-target-queries,
+  use-holding-target-mutations)
+- ✅ HoldingTargetRow component with text input
+  (`src/pages/allocation/components/holding-target-row.tsx`)
+- ✅ Side panel integration with sub-asset class grouping
+  (allocation-pie-chart-view.tsx)
 - ✅ Lock/delete functionality for holdings
 - ✅ Visual progress bars (h-3 compact size)
 - ✅ Custom toast notifications for lock/unlock actions (with holding names)
 - ✅ Lock state synchronization fixes (localStorage + database persistence)
 - ✅ Proportional calculation respects locks (proportional auto-adjustment)
 - ✅ Navigation to holding detail pages (clickable holding names)
-- ✅ Lock toggle shows custom toast: "VTI is now locked" (not generic "updated" message)
+- ✅ Lock toggle shows custom toast: "VTI is now locked" (not generic "updated"
+  message)
 - ✅ Live Preview functionality (bold vs italic styling, "→" indicator)
 - ✅ Auto-distribution calculation display (`lib/auto-distribution.ts`)
 - ✅ "Save All Targets" button (batch save with validation)
 - ✅ Total % validation: Button disabled when total ≠ 100%
-- ✅ Error message display: Red text below button showing exact total (e.g., "Total must equal 100%. Current total: 125.0%")
+- ✅ Error message display: Red text below button showing exact total (e.g.,
+  "Total must equal 100%. Current total: 125.0%")
 
 **Sprint 2 Completion Summary (January 30, 2026):**
+
 - All planned features implemented and working
 - Edge case validation added (prevents saving when total > 100%)
 - Real-time validation feedback with disabled button state
@@ -990,21 +1189,34 @@ Portfolio feature fully implemented! All core functionality and UX polish comple
 - Visual distinction between user-set and auto-calculated values
 
 **Known Issues (Deferred):**
-- ⚠️ Toast notification appears behind side panel Sheet overlay (minor UX issue - toast visible when sheet closes)
+
+- ⚠️ Toast notification appears behind side panel Sheet overlay (minor UX
+  issue - toast visible when sheet closes)
 
 ### Sprint 3: Rebalancing Integration ✅ COMPLETE
 
 **Completed:**
-- ✅ Per-holding buy suggestions (rebalancing-advisor: fetch holding targets, cascading %, per-holding BUY, group by asset class)
-- ✅ Cash allocation logic (scale when insufficient; "Additional cash needed to reach targets"; whole-share optimization per class)
-- ✅ Rebalancing advisor UI (Holding-Level Suggestions, Overview/Detailed view, expandable/collapsible by asset class)
-- ✅ Lock: all targets included in rebalancing (lock only affects target-editing panel; user chooses what to buy)
-- ✅ Available cash input: decimals supported (max 2 decimal places); string state so user can type e.g. "100.50"
-- ✅ Removed rebalancing-specific combined-accounts banner; single banner shows portfolio/account names + Save as Portfolio when multiple accounts selected
-- ✅ **Zero cash validation UX**: Inline error message (red text below input) replaces alert popup; error clears on typing (Feb 1, 2026)
-- ✅ **Export enhancements**: CSV and copy text now include holding name before symbol, shares to buy, and price per share for complete rebalancing data (Feb 1, 2026)
+
+- ✅ Per-holding buy suggestions (rebalancing-advisor: fetch holding targets,
+  cascading %, per-holding BUY, group by asset class)
+- ✅ Cash allocation logic (scale when insufficient; "Additional cash needed to
+  reach targets"; whole-share optimization per class)
+- ✅ Rebalancing advisor UI (Holding-Level Suggestions, Overview/Detailed view,
+  expandable/collapsible by asset class)
+- ✅ Lock: all targets included in rebalancing (lock only affects target-editing
+  panel; user chooses what to buy)
+- ✅ Available cash input: decimals supported (max 2 decimal places); string
+  state so user can type e.g. "100.50"
+- ✅ Removed rebalancing-specific combined-accounts banner; single banner shows
+  portfolio/account names + Save as Portfolio when multiple accounts selected
+- ✅ **Zero cash validation UX**: Inline error message (red text below input)
+  replaces alert popup; error clears on typing (Feb 1, 2026)
+- ✅ **Export enhancements**: CSV and copy text now include holding name before
+  symbol, shares to buy, and price per share for complete rebalancing data (Feb
+  1, 2026)
 
 **Optional (deferred):**
+
 - ⏳ Unit tests for cascading percentage calculations
 - ⏳ Integration tests for rebalancing suggestions
 
@@ -1013,12 +1225,15 @@ Portfolio feature fully implemented! All core functionality and UX polish comple
 ## 10. Known Issues & Technical Debt
 
 ### Minor UX Issues
-1. **Toast Behind Side Panel**: Lock/unlock toast notification appears behind Sheet overlay
+
+1. **Toast Behind Side Panel**: Lock/unlock toast notification appears behind
+   Sheet overlay
    - **Impact**: Low - toast becomes visible when sheet closes
    - **Root Cause**: Shadcn Sheet and Toast z-index layering
    - **Status**: Deferred - not blocking Sprint 2 completion
 
 ### Future Enhancements
+
 - Consider adding undo/redo for target changes
 - Explore keyboard shortcuts for power users (Tab to navigate, Enter to save)
 - Add visual indicator when targets are being auto-distributed vs user-set
@@ -1028,7 +1243,9 @@ Portfolio feature fully implemented! All core functionality and UX polish comple
 ## 11. Success Criteria
 
 **Phase 3 is complete when:**
-- ✅ User can set target percentages for individual holdings within asset classes
+
+- ✅ User can set target percentages for individual holdings within asset
+  classes
 - ✅ Targets validate to sum to 100% per asset class
 - ✅ Lock/delete work at holding level (independent of asset class locks)
 - ✅ Side panel shows holdings with text input (no sliders)
@@ -1042,9 +1259,12 @@ Portfolio feature fully implemented! All core functionality and UX polish comple
 
 ## 10. Questions to Resolve Before Starting
 
-- [x] Should we keep asset class section in panel? **DECISION: Yes, keep current implementation (bars + text input) - evaluate space later**
-- [x] Sliders or text input for holdings? **DECISION: Text input only (consistent, compact)**
-- [x] Preserve clickable holdings navigation? **DECISION: Yes, critical requirement**
+- [x] Should we keep asset class section in panel? **DECISION: Yes, keep current
+      implementation (bars + text input) - evaluate space later**
+- [x] Sliders or text input for holdings? **DECISION: Text input only
+      (consistent, compact)**
+- [x] Preserve clickable holdings navigation? **DECISION: Yes, critical
+      requirement**
 - [ ] Show sub-pie chart in panel or defer? **PENDING**
 - [ ] Mobile responsiveness strategy? **PENDING**
 - [ ] Should auto-fill be opt-in or automatic? **PENDING**
@@ -1056,17 +1276,21 @@ Portfolio feature fully implemented! All core functionality and UX polish comple
 **DO NOT FORGET:**
 
 ✅ **Navigation Preservation:**
+
 - Holding names MUST be clickable → navigate to `/holdings/{symbol}`
 - Use `onNavigate` callback pattern shown in component designs
-- Test navigation flow: click holding → detail page → back button → panel still open
+- Test navigation flow: click holding → detail page → back button → panel still
+  open
 
 ✅ **Text Input Pattern (No Sliders in Panel):**
+
 - Holdings use text input only (like current asset class section)
 - Visual bars are read-only feedback (show current vs target)
 - Consistent with current panel UX
 - Saves vertical space for more holdings
 
 ✅ **Validation Rules (Phase 3 - Hybrid #1):**
+
 - NO strict 100% validation in Phase 3 (deferred to Phase 4 settings)
 - Live preview shows auto-distributed % for unset holdings
 - User-set targets in bold, auto-calculated in italic/grey
@@ -1075,35 +1299,41 @@ Portfolio feature fully implemented! All core functionality and UX polish comple
 - Show total % indicator: "Total: 100% ✓" or "Total: 75% (25% auto)"
 
 ✅ **Lock Behavior:**
+
 - Lock icon pattern: `bg-secondary text-gray-700` (Phase 2 standard)
 - Locked holdings protected from auto-scaling
 - Can still manually edit locked holdings via text input
 - Delete locked holding → show AlertDialog (same as Phase 2)
 
 ✅ **Cascading Percentages:**
+
 - Formula: `Portfolio % = Asset Class % × Holding % of Asset Class`
 - Example: VTI 50% of Equity × 60% Equity = 30% of portfolio
 - Display both percentages in UI for clarity
 
 ✅ **Backend Validation:**
+
 - ✅ Phase 3: 100% sum constraint DISABLED (commented out)
 - Repository has foreign key constraints (asset_class_id, asset_id)
 - Use existing `holding_targets` table (confirmed in migrations)
 - TODO: Re-enable strict validation in Phase 4 as optional mode
 
 ✅ **Rebalancing Integration:**
+
 - Must update rebalancing-advisor.tsx in Sprint 3
 - Generate per-holding BUY suggestions (cash-first, never SELL)
 - Group suggestions by asset class for clarity
 
 ✅ **Component Reuse:**
+
 - Reuse existing Sheet component (don't create new side panel)
 - Reuse Collapsible for expandable sections
 - Reuse AlertDialog for locked deletion warnings
 - Icons: Lock, LockOpen, Trash2 (same as Phase 2)
 
-**Last Updated:** February 1, 2026
-**Status:** Sprint 1 Complete ✅, Sprint 2 Complete ✅, Sprint 3 Complete ✅
-**Current Focus:** Phase 3 100% COMPLETE - All core features, UX polish, and edge case handling implemented
-**Recent Enhancements (Feb 1):** Zero cash inline validation, export format improvements (holding names + shares + prices)
-**Next Step:** Phase 4 (if planned) or optional tests; no blocking work for Phase 3
+**Last Updated:** February 1, 2026 **Status:** Sprint 1 Complete ✅, Sprint 2
+Complete ✅, Sprint 3 Complete ✅ **Current Focus:** Phase 3 100% COMPLETE - All
+core features, UX polish, and edge case handling implemented **Recent
+Enhancements (Feb 1):** Zero cash inline validation, export format improvements
+(holding names + shares + prices) **Next Step:** Phase 4 (if planned) or
+optional tests; no blocking work for Phase 3

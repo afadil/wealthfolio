@@ -134,7 +134,15 @@ impl RebalancingService for RebalancingServiceImpl {
         self.repository.get_unused_virtual_strategies_count().await
     }
 
+    async fn get_unused_virtual_strategies(&self) -> Result<Vec<RebalancingStrategy>> {
+        self.repository.get_unused_virtual_strategies().await
+    }
+
     async fn cleanup_unused_virtual_strategies(&self) -> Result<usize> {
         self.repository.delete_unused_virtual_strategies().await
+    }
+
+    async fn delete_unused_virtual_strategy(&self, id: &str) -> Result<()> {
+        self.repository.delete_unused_virtual_strategy(id).await
     }
 }

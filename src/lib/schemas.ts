@@ -1,11 +1,11 @@
 import * as z from "zod";
 import {
-    isCashActivity,
-    isCashTransfer,
-    isFeeActivity,
-    isIncomeActivity,
-    isSplitActivity,
-    isTradeActivity,
+  isCashActivity,
+  isCashTransfer,
+  isFeeActivity,
+  isIncomeActivity,
+  isSplitActivity,
+  isTradeActivity,
 } from "./activity-utils";
 import { accountTypeSchema, ActivityType, activityTypeSchema } from "./constants";
 import { tryParseDate } from "./utils";

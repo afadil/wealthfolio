@@ -16,7 +16,7 @@ export interface AssetClassComposition {
 export function calculateAssetClassComposition(
   targets: AssetClassTarget[],
   holdings: any[],
-  totalValue: number
+  totalValue: number,
 ): AssetClassComposition[] {
   if (totalValue === 0) return [];
 

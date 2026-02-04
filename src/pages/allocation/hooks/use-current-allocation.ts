@@ -48,10 +48,7 @@ function getAssetClassForHolding(holding: Holding): string {
  * 3. For CASH holdings: account name (passed separately)
  * 4. Fallback: "Unnamed Holding"
  */
-export function getHoldingDisplayName(
-  holding: Holding,
-  accountName?: string
-): string {
+export function getHoldingDisplayName(holding: Holding, accountName?: string): string {
   if (holding.instrument?.name) {
     return holding.instrument.name;
   }
@@ -94,15 +91,12 @@ export function getAvailableAssetClasses(holdings: Holding[]): string[] {
  * Groups holdings by asset class and asset sub-class (Tier 2)
  * Returns composition with full hierarchy for Composition tab
  */
-export function useCurrentAllocation(
-  holdings: Holding[]
-): { currentAllocation: CurrentAllocation } {
+export function useCurrentAllocation(holdings: Holding[]): {
+  currentAllocation: CurrentAllocation;
+} {
   const currentAllocation = useMemo(() => {
     // Calculate total portfolio value
-    const totalValue = holdings.reduce(
-      (sum, h) => sum + (h.marketValue?.base || 0),
-      0
-    );
+    const totalValue = holdings.reduce((sum, h) => sum + (h.marketValue?.base || 0), 0);
 
     // Group holdings by asset class, then by asset sub-class (Tier 2)
     const groupedByAssetClass = holdings.reduce(
@@ -119,45 +113,39 @@ export function useCurrentAllocation(
         acc[assetClass][assetSubClass].push(holding);
         return acc;
       },
-      {} as Record<string, Record<string, Holding[]>>
+      {} as Record<string, Record<string, Holding[]>>,
     );
 
     // Transform grouped data into CompositionData structure with Tier 2
     const assetClasses = Object.entries(groupedByAssetClass)
       .map(([assetClass, subClassMap]) => {
         const classHoldings = Object.values(subClassMap).flat();
-        const classValue = classHoldings.reduce(
-          (sum, h) => sum + (h.marketValue?.base || 0),
-          0
-        );
+        const classValue = classHoldings.reduce((sum, h) => sum + (h.marketValue?.base || 0), 0);
         const classPercent = totalValue > 0 ? (classValue / totalValue) * 100 : 0;
 
         // Build sub-class (Tier 2) data
-        const subClasses = Object.entries(subClassMap).map(
-          ([subClass, subClassHoldings]) => {
-            const subClassValue = subClassHoldings.reduce(
-              (sum, h) => sum + (h.marketValue?.base || 0),
-              0
-            );
-            const subClassPercent =
-              classValue > 0 ? (subClassValue / classValue) * 100 : 0;
+        const subClasses = Object.entries(subClassMap).map(([subClass, subClassHoldings]) => {
+          const subClassValue = subClassHoldings.reduce(
+            (sum, h) => sum + (h.marketValue?.base || 0),
+            0,
+          );
+          const subClassPercent = classValue > 0 ? (subClassValue / classValue) * 100 : 0;
 
-            return {
-              subClass,
-              holdings: subClassHoldings,
-              subClassValue,
-              subClassPercent,
-            };
-          }
-        );
+          return {
+            subClass,
+            holdings: subClassHoldings,
+            subClassValue,
+            subClassPercent,
+          };
+        });
 
         return {
           assetClass,
           actualPercent: classPercent,
           currentValue: classValue,
           holdings: classHoldings,
-          subClasses: subClasses.sort((a, b) =>
-            b.subClassPercent - a.subClassPercent // ← CHANGED: Sort by % descending
+          subClasses: subClasses.sort(
+            (a, b) => b.subClassPercent - a.subClassPercent, // ← CHANGED: Sort by % descending
           ),
         };
       })
@@ -176,13 +164,10 @@ export function useCurrentAllocation(
  */
 export function useHoldingsByAssetClass(
   targets: AssetClassTarget[],
-  holdings: Holding[]
+  holdings: Holding[],
 ): AssetClassComposition[] {
   return useMemo(() => {
-    const totalValue = holdings.reduce(
-      (sum, h) => sum + (h.marketValue?.base || 0),
-      0
-    );
+    const totalValue = holdings.reduce((sum, h) => sum + (h.marketValue?.base || 0), 0);
 
     // Group holdings by asset class
     const holdingsByClass = new Map<string, Holding[]>();
@@ -197,10 +182,7 @@ export function useHoldingsByAssetClass(
     // Build composition for each target
     return targets.map((target) => {
       const classHoldings = holdingsByClass.get(target.assetClass) || [];
-      const classValue = classHoldings.reduce(
-        (sum, h) => sum + (h.marketValue?.base || 0),
-        0
-      );
+      const classValue = classHoldings.reduce((sum, h) => sum + (h.marketValue?.base || 0), 0);
       const classPercent = totalValue > 0 ? (classValue / totalValue) * 100 : 0;
 
       // Build sub-classes for this asset class
@@ -213,32 +195,24 @@ export function useHoldingsByAssetClass(
         subClassMap.get(subClass)!.push(h);
       });
 
-      const subClasses = Array.from(subClassMap.entries()).map(
-        ([subClass, subHoldings]) => {
-          const subValue = subHoldings.reduce(
-            (sum, h) => sum + (h.marketValue?.base || 0),
-            0
-          );
-          const subPercent =
-            classValue > 0 ? (subValue / classValue) * 100 : 0;
+      const subClasses = Array.from(subClassMap.entries()).map(([subClass, subHoldings]) => {
+        const subValue = subHoldings.reduce((sum, h) => sum + (h.marketValue?.base || 0), 0);
+        const subPercent = classValue > 0 ? (subValue / classValue) * 100 : 0;
 
-          return {
-            subClass,
-            holdings: subHoldings,
-            subClassValue: subValue,
-            subClassPercent: subPercent,
-          };
-        }
-      );
+        return {
+          subClass,
+          holdings: subHoldings,
+          subClassValue: subValue,
+          subClassPercent: subPercent,
+        };
+      });
 
       return {
         assetClass: target.assetClass,
         actualPercent: classPercent,
         currentValue: classValue,
         holdings: classHoldings,
-        subClasses: subClasses.sort((a, b) =>
-          b.subClassValue - a.subClassValue
-        ),
+        subClasses: subClasses.sort((a, b) => b.subClassValue - a.subClassValue),
       };
     });
   }, [targets, holdings]);

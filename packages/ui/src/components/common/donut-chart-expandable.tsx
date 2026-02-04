@@ -40,7 +40,7 @@ const ChartCenterLabel: React.FC<ChartCenterLabelProps> = ({ activeData, totalVa
       </p>
       <p className="text-muted-foreground text-xs">({formatPercent(percent)})</p>
       {status && (
-        <div className={`flex items-center justify-center gap-2 text-sm font-semibold mt-2 ${status.color}`}>
+        <div className={`mt-2 flex items-center justify-center gap-2 text-sm font-semibold ${status.color}`}>
           {status.label === "Overweight" && <ArrowUp size={16} />}
           {status.label === "Underweight" && <ArrowDown size={16} />}
           {status.label === "In Line" && <Minus size={16} />}
@@ -147,7 +147,12 @@ export const DonutChartExpandable: React.FC<DonutChartExpandableProps> = ({
       </ChartContainer>
 
       {/* Center label */}
-      <ChartCenterLabel activeData={activeData} totalValue={totalValue} isBalanceHidden={isBalanceHidden} status={displayStatus} />
+      <ChartCenterLabel
+        activeData={activeData}
+        totalValue={totalValue}
+        isBalanceHidden={isBalanceHidden}
+        status={displayStatus}
+      />
     </div>
   );
 };

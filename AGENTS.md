@@ -188,7 +188,9 @@ Docs entry points:
 
 For detailed feature-specific architecture, patterns, and workflows:
 
-- **Allocations**: `docs/features/allocations/allocation-agents.md` — Portfolio & allocation feature architecture, database schema, sprint workflow, and commit conventions
+- **Allocations**: `docs/features/allocations/allocation-agents.md` — Portfolio
+  & allocation feature architecture, database schema, sprint workflow, and
+  commit conventions
 
 ## Frontend Rules (Cursor)
 

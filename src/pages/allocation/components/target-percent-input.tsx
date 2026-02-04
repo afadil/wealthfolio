@@ -6,21 +6,17 @@ interface TargetPercentInputProps {
   disabled?: boolean;
 }
 
-export function TargetPercentInput({
-  value,
-  onSave,
-  disabled = false,
-}: TargetPercentInputProps) {
+export function TargetPercentInput({ value, onSave, disabled = false }: TargetPercentInputProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value.toFixed(1));
   const [isSaving, setIsSaving] = useState(false);
 
   const handleChange = (input: string) => {
     // Sanitize: only numbers and decimal point
-    const sanitized = input.replace(/[^0-9.]/g, '');
+    const sanitized = input.replace(/[^0-9.]/g, "");
     // Remove leading zeros
-    const cleaned = sanitized.replace(/^0+(?=\d)/, '');
-    setEditValue(cleaned || '0');
+    const cleaned = sanitized.replace(/^0+(?=\d)/, "");
+    setEditValue(cleaned || "0");
   };
 
   const handleBlur = async () => {
@@ -42,8 +38,8 @@ export function TargetPercentInput({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleBlur();
-    if (e.key === 'Escape') {
+    if (e.key === "Enter") handleBlur();
+    if (e.key === "Escape") {
       setEditValue(value.toFixed(1));
       setIsEditing(false);
     }
@@ -59,7 +55,7 @@ export function TargetPercentInput({
         onKeyDown={handleKeyDown}
         autoFocus
         disabled={disabled || isSaving}
-        className="w-20 px-2 py-1 border border-primary rounded bg-background text-foreground font-semibold text-right"
+        className="border-primary bg-background text-foreground w-20 rounded border px-2 py-1 text-right font-semibold"
         placeholder="0"
       />
     );
@@ -68,8 +64,8 @@ export function TargetPercentInput({
   return (
     <span
       onClick={() => !disabled && setIsEditing(true)}
-      className={`font-semibold cursor-pointer ${
-        disabled ? 'opacity-50 cursor-not-allowed' : 'hover:text-primary transition-colors'
+      className={`cursor-pointer font-semibold ${
+        disabled ? "cursor-not-allowed opacity-50" : "hover:text-primary transition-colors"
       }`}
     >
       {value.toFixed(1)}%

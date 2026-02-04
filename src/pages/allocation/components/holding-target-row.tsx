@@ -1,7 +1,7 @@
-import { Icons } from '@/components/ui/icons';
-import type { HoldingTarget } from '@/lib/types';
-import { Button, Input } from '@wealthfolio/ui';
-import { useState } from 'react';
+import { Icons } from "@/components/ui/icons";
+import type { HoldingTarget } from "@/lib/types";
+import { Button, Input } from "@wealthfolio/ui";
+import { useState } from "react";
 
 interface HoldingTargetRowProps {
   holding: {
@@ -37,16 +37,14 @@ export function HoldingTargetRow({
   disabled = false,
 }: HoldingTargetRowProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [inputValue, setInputValue] = useState(
-    target?.targetPercentOfClass.toString() || ''
-  );
+  const [inputValue, setInputValue] = useState(target?.targetPercentOfClass.toString() || "");
 
   const handleSave = () => {
     const numValue = parseFloat(inputValue);
 
     if (isNaN(numValue) || numValue < 0 || numValue > 100) {
       // Invalid input - revert
-      setInputValue(target?.targetPercentOfClass.toString() || '');
+      setInputValue(target?.targetPercentOfClass.toString() || "");
       setIsEditing(false);
       onPendingChange(null);
       return;
@@ -58,10 +56,10 @@ export function HoldingTargetRow({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       handleSave();
-    } else if (e.key === 'Escape') {
-      setInputValue(target?.targetPercentOfClass.toString() || '');
+    } else if (e.key === "Escape") {
+      setInputValue(target?.targetPercentOfClass.toString() || "");
       setIsEditing(false);
       onPendingChange(null);
     }
@@ -83,12 +81,16 @@ export function HoldingTargetRow({
         {/* Clickable holding name with value */}
         <button
           onClick={onNavigate}
-          className="text-sm font-medium hover:text-primary transition-colors cursor-pointer flex items-center gap-2 flex-1 text-left"
+          className="hover:text-primary flex flex-1 cursor-pointer items-center gap-2 text-left text-sm font-medium transition-colors"
           disabled={disabled}
         >
           <span className="flex-1">{holding.displayName}</span>
-          <span className="text-xs text-muted-foreground font-normal">
-            ${holding.currentValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <span className="text-muted-foreground text-xs font-normal">
+            $
+            {holding.currentValue.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </span>
           {onNavigate && <span className="text-muted-foreground">→</span>}
         </button>
@@ -102,14 +104,18 @@ export function HoldingTargetRow({
               size="sm"
               onClick={onToggleLock}
               disabled={disabled}
-              className={`h-6 w-6 p-0 rounded transition-all ${
+              className={`h-6 w-6 rounded p-0 transition-all ${
                 isLocked
-                  ? 'bg-secondary text-gray-700'
-                  : 'opacity-70 hover:opacity-100 hover:bg-muted'
+                  ? "bg-secondary text-gray-700"
+                  : "hover:bg-muted opacity-70 hover:opacity-100"
               }`}
-              title={isLocked ? 'Unlock target' : 'Lock target'}
+              title={isLocked ? "Unlock target" : "Lock target"}
             >
-              {isLocked ? <Icons.Lock className="h-3 w-3" /> : <Icons.LockOpen className="h-3 w-3" />}
+              {isLocked ? (
+                <Icons.Lock className="h-3 w-3" />
+              ) : (
+                <Icons.LockOpen className="h-3 w-3" />
+              )}
             </Button>
           )}
 
@@ -120,10 +126,10 @@ export function HoldingTargetRow({
               size="sm"
               onClick={onDelete}
               disabled={disabled}
-              className="h-6 w-6 p-0 opacity-70 hover:opacity-100 hover:bg-muted"
+              className="hover:bg-muted h-6 w-6 p-0 opacity-70 hover:opacity-100"
               title="Remove target"
             >
-              <Icons.Trash className="h-3 w-3 text-muted-foreground" />
+              <Icons.Trash className="text-muted-foreground h-3 w-3" />
             </Button>
           )}
         </div>
@@ -131,9 +137,7 @@ export function HoldingTargetRow({
 
       {/* Current and Target with Input */}
       <div className="flex items-center justify-between text-sm">
-        <span className="text-muted-foreground">
-          Current {holding.currentPercent.toFixed(1)}%
-        </span>
+        <span className="text-muted-foreground">Current {holding.currentPercent.toFixed(1)}%</span>
 
         {/* Target input or display */}
         {isEditing ? (
@@ -159,15 +163,15 @@ export function HoldingTargetRow({
               setInputValue(displayPercent.toFixed(1));
             }}
             disabled={disabled || isLocked}
-            className={`transition-colors font-medium ${
+            className={`font-medium transition-colors ${
               isPreview
-                ? 'text-muted-foreground italic hover:text-foreground cursor-pointer'
+                ? "text-muted-foreground hover:text-foreground cursor-pointer italic"
                 : isLocked
-                ? 'text-foreground cursor-not-allowed opacity-50'
-                : 'text-foreground hover:text-primary'
+                  ? "text-foreground cursor-not-allowed opacity-50"
+                  : "text-foreground hover:text-primary"
             }`}
           >
-            {isPreview && '→ '}Target {displayPercent.toFixed(1)}%
+            {isPreview && "→ "}Target {displayPercent.toFixed(1)}%
           </button>
         )}
       </div>
@@ -177,7 +181,7 @@ export function HoldingTargetRow({
         {/* Target bar */}
         <div
           className={`absolute top-0 left-0 h-full transition-all ${
-            isPreview ? 'bg-chart-2/50' : 'bg-chart-2'
+            isPreview ? "bg-chart-2/50" : "bg-chart-2"
           }`}
           style={{
             width: `${Math.min(displayPercent, 100)}%`,
@@ -188,8 +192,8 @@ export function HoldingTargetRow({
         <div
           className={`absolute top-0 h-full w-0.5 transition-colors ${
             holding.currentPercent <= displayPercent
-              ? 'bg-background dark:bg-gray-200' // Light color when inside target bar
-              : 'bg-chart-2' // Dark grey when outside target bar
+              ? "bg-background dark:bg-gray-200" // Light color when inside target bar
+              : "bg-chart-2" // Dark grey when outside target bar
           }`}
           style={{
             left: `${Math.min(holding.currentPercent, 100)}%`,

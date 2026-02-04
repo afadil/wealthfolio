@@ -1,7 +1,7 @@
-import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { useIsMobileViewport } from '@/hooks/use-platform';
-import type { Portfolio } from '@/lib/types';
-import { PortfolioForm } from './portfolio-form';
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useIsMobileViewport } from "@/hooks/use-platform";
+import type { Portfolio } from "@/lib/types";
+import { PortfolioForm } from "./portfolio-form";
 
 export interface PortfolioEditModalProps {
   portfolio?: Portfolio;
@@ -12,7 +12,7 @@ export interface PortfolioEditModalProps {
 export function PortfolioEditModal({ portfolio, open, onClose }: PortfolioEditModalProps) {
   const defaultValues = {
     id: portfolio?.id ?? undefined,
-    name: portfolio?.name ?? '',
+    name: portfolio?.name ?? "",
     accountIds: portfolio?.accountIds ?? [],
   };
 

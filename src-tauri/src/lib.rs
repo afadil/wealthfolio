@@ -235,7 +235,9 @@ pub fn run() {
             commands::rebalancing::delete_holding_target,
             commands::rebalancing::toggle_holding_target_lock,
             commands::rebalancing::get_unused_virtual_strategies_count,
+            commands::rebalancing::get_unused_virtual_strategies,
             commands::rebalancing::cleanup_unused_virtual_strategies,
+            commands::rebalancing::delete_unused_virtual_strategy,
             // Contribution limit commands
             commands::limits::get_contribution_limits,
             commands::limits::create_contribution_limit,

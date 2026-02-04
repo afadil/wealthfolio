@@ -1,6 +1,6 @@
-import type { Portfolio } from '@/lib/types';
-import { Badge, Skeleton } from '@wealthfolio/ui';
-import { PortfolioOperations } from './portfolio-operations';
+import type { Portfolio } from "@/lib/types";
+import { Badge, Skeleton } from "@wealthfolio/ui";
+import { PortfolioOperations } from "./portfolio-operations";
 
 export interface PortfolioItemProps {
   portfolio: Portfolio;
@@ -17,7 +17,7 @@ export function PortfolioItem({ portfolio, onEdit, onDelete }: PortfolioItemProp
         <div className="flex items-center gap-2">
           <span className="font-semibold">{portfolio.name}</span>
           <Badge variant="secondary" className="text-xs">
-            {accountCount} {accountCount === 1 ? 'account' : 'accounts'}
+            {accountCount} {accountCount === 1 ? "account" : "accounts"}
           </Badge>
         </div>
         <div>

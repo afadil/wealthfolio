@@ -1,12 +1,11 @@
-/**
- * Portfolio Rebalancing Commands
- *
- * Technical name: "rebalancing" (to distinguish from goals_allocation feature)
- * User-facing name: "Allocations" (displayed in menus and UI)
- *
- * Backend tables: rebalancing_strategies, asset_class_targets, holding_targets
- * Frontend types: RebalancingStrategy, AssetClassTarget, HoldingTarget
- */
+// Portfolio Rebalancing Commands
+
+// Technical name: "rebalancing" (to distinguish from goals_allocation feature)
+// User-facing name: "Allocations" (displayed in menus and UI)
+//
+// Backend tables: rebalancing_strategies, asset_class_targets, holding_targets
+// Frontend types: RebalancingStrategy, AssetClassTarget, HoldingTarget
+// ============================================================================
 
 import { getRunEnv, invokeTauri, logger, RUN_ENV } from "@/adapters";
 import type {
@@ -290,6 +289,24 @@ export const getUnusedVirtualStrategiesCount = async (): Promise<number> => {
   }
 };
 
+export const getUnusedVirtualStrategies = async (): Promise<RebalancingStrategy[]> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri("get_unused_virtual_strategies");
+      case RUN_ENV.WEB:
+        const response = await fetch("/api/v1/rebalancing/virtual-strategies/unused");
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      default:
+        throw new Error("Unsupported environment");
+    }
+  } catch (error) {
+    logger.error("Error getting unused virtual strategies.");
+    throw error;
+  }
+};
+
 export const cleanupUnusedVirtualStrategies = async (): Promise<number> => {
   try {
     switch (getRunEnv()) {
@@ -306,6 +323,27 @@ export const cleanupUnusedVirtualStrategies = async (): Promise<number> => {
     }
   } catch (error) {
     logger.error("Error cleaning up unused virtual strategies.");
+    throw error;
+  }
+};
+
+export const deleteUnusedVirtualStrategy = async (id: string): Promise<void> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        await invokeTauri("delete_unused_virtual_strategy", { id });
+        return;
+      case RUN_ENV.WEB:
+        const response = await fetch(`/api/v1/rebalancing/virtual-strategies/${id}`, {
+          method: "DELETE",
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return;
+      default:
+        throw new Error("Unsupported environment");
+    }
+  } catch (error) {
+    logger.error(`Error deleting unused virtual strategy ${id}.`);
     throw error;
   }
 };

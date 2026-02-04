@@ -1,9 +1,10 @@
 # Historical Planning Documentation (Consolidated)
 
-**Archive Date**: January 2025
-**Purpose**: Preserve early planning, design decisions, and implementation history
+**Archive Date**: January 2025 **Purpose**: Preserve early planning, design
+decisions, and implementation history
 
-This document consolidates multiple historical planning artifacts from the initial allocation feature development.
+This document consolidates multiple historical planning artifacts from the
+initial allocation feature development.
 
 ---
 
@@ -20,13 +21,15 @@ This document consolidates multiple historical planning artifacts from the initi
 
 ## 1. Initial Project Specification
 
-**Original Date**: January 19, 2026
-**Status**: Superseded by PHASE_3_PLAN.md
+**Original Date**: January 19, 2026 **Status**: Superseded by PHASE_3_PLAN.md
 
 ### Project Overview
 
-Adding a comprehensive portfolio rebalancing tool to Wealthfolio that enables users to:
-1. Set target asset allocations (Level 1: Asset Classes, Level 2: Individual Holdings)
+Adding a comprehensive portfolio rebalancing tool to Wealthfolio that enables
+users to:
+
+1. Set target asset allocations (Level 1: Asset Classes, Level 2: Individual
+   Holdings)
 2. Visualize current vs target allocation
 3. Calculate rebalancing trades needed
 4. Use smart deposit planning for tax-efficient rebalancing
@@ -35,6 +38,7 @@ Adding a comprehensive portfolio rebalancing tool to Wealthfolio that enables us
 ### Design Philosophy
 
 Following Wealthfolio's "Calm Finance" ethos:
+
 - **Local-first**: All calculations happen on device
 - **Privacy-focused**: No external API calls for rebalancing
 - **Beautiful & Boring**: Clean, professional interface using Flexoki colors
@@ -43,6 +47,7 @@ Following Wealthfolio's "Calm Finance" ethos:
 ### Original Implementation Phases
 
 **Phase 1: Foundation (Days 1-2)**
+
 - Database schema for storing allocation targets
 - Rust backend commands (save/load targets)
 - TypeScript hooks to interact with backend
@@ -54,6 +59,7 @@ Following Wealthfolio's "Calm Finance" ethos:
 - Deposit Planner (tax-efficient rebalancing)
 
 **Phase 2: Advanced Features (Days 3-4)**
+
 - 5/25 threshold rule implementation
 - Drift detection with visual indicators
 - Status badges (rebalance needed vs on-target)
@@ -68,9 +74,14 @@ Following Wealthfolio's "Calm Finance" ethos:
 
 ### User Requirements (Original Quote)
 
-> "I would like a page where we can see properly the allocation of the assets. Plus, I would like to offer the possibility to the user to rebalance his portfolio (something important for strategy). So to have the possibility to adjust the percentage and see the whole balance. We could do this for the 'All portfolio' or also per 'Account' separately."
+> "I would like a page where we can see properly the allocation of the assets.
+> Plus, I would like to offer the possibility to the user to rebalance his
+> portfolio (something important for strategy). So to have the possibility to
+> adjust the percentage and see the whole balance. We could do this for the 'All
+> portfolio' or also per 'Account' separately."
 
 **Additional Requirements:**
+
 - Two-level hierarchy: Asset Class (the ones existing) + Individual Holdings
 - Better visualization than current treemap
 - Ability to set target allocations
@@ -79,6 +90,7 @@ Following Wealthfolio's "Calm Finance" ethos:
 ### Selected Features from Research
 
 Reviewed two detailed proposals and selected:
+
 - ✅ Flexoki Design Integration (already in app)
 - ✅ 5/25 Threshold Rule (professional drift detection)
 - ✅ Soft Rebalancing Priority (tax-efficient via new contributions)
@@ -92,18 +104,21 @@ Reviewed two detailed proposals and selected:
 ### Key Design Decisions
 
 **UI Design:**
+
 - **Horizontal stacked bars** instead of pie charts
 - Expandable asset class cards
 - Flexoki color scheme (already in app)
 - Clean, "calm finance" aesthetic
 
 **Technical Architecture:**
+
 - SQLite database for persistence
 - Rust backend commands
 - React + TypeScript frontend
 - Local-first (no external APIs)
 
 **User Experience:**
+
 - Progressive disclosure (expand for details)
 - Two-level hierarchy (asset class → holdings)
 - Real-time validation
@@ -126,6 +141,7 @@ CREATE TABLE holding_targets (
 ```
 
 **Problems Identified:**
+
 1. Uses `symbol` (string) instead of linking to actual asset
 2. No cascade deletion
 3. No uniqueness constraint
@@ -149,6 +165,7 @@ CREATE TABLE holding_targets (
 ```
 
 **Benefits:**
+
 1. ✅ Links to actual asset (referential integrity)
 2. ✅ Auto-cleans up if asset deleted (CASCADE)
 3. ✅ Prevents duplicate entries (UNIQUE constraint)
@@ -206,6 +223,7 @@ CREATE TABLE holding_targets (
 **Goal:** Prepare safe environment before touching code
 
 **Step 1: Backup (15 minutes)**
+
 ```bash
 # Backup database
 cp ~/Library/Application\ Support/com.teymz.wealthfolio/wealthfolio.db \
@@ -216,12 +234,14 @@ git tag -a "before-rebalancing-impl" -m "State before implementing rebalancing f
 ```
 
 **Step 2: Study Patterns (90 minutes)**
+
 - Study database migration patterns
 - Study Rust command patterns
 - Study React Query hook patterns
 - Study Diesel ORM usage
 
 **Step 3: Environment Setup (30 minutes)**
+
 - Verify Rust/Diesel working
 - Test TypeScript compilation
 - Verify database access
@@ -231,20 +251,26 @@ git tag -a "before-rebalancing-impl" -m "State before implementing rebalancing f
 ## 5. Feature Difficulty Assessment
 
 ### 1. Flexoki Design Integration ⭐ EASY
+
 **Time**: 0 hours - Already done!
 
 ### 2. Database Schema ⭐⭐ MODERATE
+
 **Time**: 2-3 hours
+
 - Create new tables in SQLite
 - Rust backend commands
 - TypeScript hooks
 
 ### 3. Dual Metrics (Relative % & Absolute %) ⭐ EASY
+
 **Time**: 1 hour
+
 - Pure JavaScript math
 - No complex algorithms
 
 **Example:**
+
 ```javascript
 const absolutePercent = 30; // % of total portfolio
 const assetClassPercent = 60; // Stocks are 60% of portfolio
@@ -254,28 +280,38 @@ const relativePercent = (absolutePercent / assetClassPercent) * 100; // 50%
 ```
 
 ### 4. Deposit Planner ⭐⭐ MODERATE
+
 **Time**: 3-4 hours
+
 - Straightforward algorithm
 - Handle edge cases
 
 ### 5. Visual Bars ⭐ EASY
+
 **Time**: 1-2 hours
+
 - Use Tailwind width utilities
 - Color-coded sections
 
 ### 6. Combined Input/Slider ⭐⭐⭐ COMPLEX
+
 **Time**: 4-5 hours
+
 - Two-way data binding
 - Validation in both directions
 
 ### 7. Lock Mechanism ⭐⭐ MODERATE
+
 **Time**: 2-3 hours
+
 - Database persistence
 - UI disabled state
 - Proportional recalculation
 
 ### 8. Proportional Allocation ⭐⭐⭐ COMPLEX
+
 **Time**: 5-6 hours
+
 - Lock interaction
 - Real-time recalculation
 - Validation
@@ -290,9 +326,11 @@ const relativePercent = (absolutePercent / assetClassPercent) * 100; // 50%
 
 **Decision 1: Account Scope → Per-Account Targets**
 
-Each account has its own `asset_class_targets`. Special case: "All Portfolio" view aggregates holdings across all accounts but uses global targets.
+Each account has its own `asset_class_targets`. Special case: "All Portfolio"
+view aggregates holdings across all accounts but uses global targets.
 
 **Schema Impact:**
+
 ```sql
 CREATE TABLE asset_class_targets (
   id UUID PRIMARY KEY,
@@ -304,6 +342,7 @@ CREATE TABLE asset_class_targets (
 ```
 
 **UI Flow:**
+
 ```
 Account Switcher: [Brokerage Account] ▼
   └─ Shows targets for Brokerage Account ONLY
@@ -316,10 +355,13 @@ Switch to "All Portfolio"
 
 **Decision 2: Level 2 Granularity → Use `asset_sub_class`**
 
-- Level 1: Asset classes (Equities, Fixed Income, Cash) — user controls via targets
-- Level 2: Breakdown by `asset_sub_class` (ETF, Individual Stocks, etc.) — informational
+- Level 1: Asset classes (Equities, Fixed Income, Cash) — user controls via
+  targets
+- Level 2: Breakdown by `asset_sub_class` (ETF, Individual Stocks, etc.) —
+  informational
 
 Example:
+
 ```
 Equities (60% target) [Level 1]
 ├─ ETF (40% of Equities)          [asset_sub_class = "ETF"]
@@ -333,12 +375,14 @@ Equities (60% target) [Level 1]
 **Decision 3: Page Scope → Strategic Targets + Monitoring Only**
 
 **What This Page Does:**
+
 - ✅ View asset class targets (Level 1)
 - ✅ Edit asset class targets (set %, ensure 100% total)
 - ✅ View current allocation composition (Level 2 breakdown)
 - ✅ See drift indicators (over/under weight)
 
 **What It Doesn't Do:**
+
 - ❌ Execute trades
 - ❌ Connect to broker APIs
 - ❌ Auto-rebalance
@@ -348,12 +392,14 @@ Equities (60% target) [Level 1]
 ## Implementation Milestones Achieved
 
 ### Sprint 1: Backend Foundation ✅ COMPLETE
+
 - Database migration created and run
 - Rust backend commands (10 commands)
 - Service layer with business logic
 - All CRUD operations working
 
 ### Sprint 2: Enhanced UI ✅ 85% COMPLETE
+
 - React Query hooks
 - HoldingTargetRow component
 - Lock functionality with database persistence
@@ -361,6 +407,7 @@ Equities (60% target) [Level 1]
 - Side panel integration
 
 ### Sprint 3: Rebalancing ⏳ NOT STARTED
+
 - Per-holding buy suggestions
 - Cash allocation logic
 - Integration tests
@@ -369,17 +416,22 @@ Equities (60% target) [Level 1]
 
 ## Key Learnings
 
-1. **Database Schema is Critical**: Schema errors caused significant rework (symbol vs asset_id)
+1. **Database Schema is Critical**: Schema errors caused significant rework
+   (symbol vs asset_id)
 2. **Follow Existing Patterns**: Studying other modules saved time
-3. **Lock State Needs Persistence**: Originally in React state, moved to database
-4. **Test Main Branch First**: When debugging, verify main works before blaming your code
-5. **ActivityDB Bug**: Pre-existing bug (missing 5 fields) blocked progress until fixed
+3. **Lock State Needs Persistence**: Originally in React state, moved to
+   database
+4. **Test Main Branch First**: When debugging, verify main works before blaming
+   your code
+5. **ActivityDB Bug**: Pre-existing bug (missing 5 fields) blocked progress
+   until fixed
 
 ---
 
 ## Historical Context
 
 This consolidated document replaces:
+
 - `allocations_project_spec.md` (original spec)
 - `conversation_summary.md` (design decisions)
 - `database-schema-fixes.md` (schema evolution)

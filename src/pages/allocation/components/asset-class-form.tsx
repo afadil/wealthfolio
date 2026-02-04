@@ -18,9 +18,7 @@ export function AssetClassForm({
   isLoading = false,
 }: AssetClassFormProps) {
   const [assetClass, setAssetClass] = useState(initialData?.assetClass || "");
-  const [targetPercent, setTargetPercent] = useState(
-    initialData?.targetPercent?.toString() || ""
-  );
+  const [targetPercent, setTargetPercent] = useState(initialData?.targetPercent?.toString() || "");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +39,7 @@ export function AssetClassForm({
             value={assetClass}
             onChange={(e) => setAssetClass(e.target.value)}
             disabled={!!initialData || isLoading}
-            className="w-full rounded-md border border-border bg-background px-4 py-3 text-sm font-medium hover:border-border/80 focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="border-border bg-background hover:border-border/80 focus:ring-primary/20 w-full rounded-md border px-4 py-3 text-sm font-medium focus:ring-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             required
           >
             <option value="" disabled>
@@ -54,7 +52,7 @@ export function AssetClassForm({
             ))}
           </select>
         ) : (
-          <div className="rounded-md border border-dashed border-muted-foreground/30 bg-muted/20 p-4 text-center text-sm text-muted-foreground">
+          <div className="border-muted-foreground/30 bg-muted/20 text-muted-foreground rounded-md border border-dashed p-4 text-center text-sm">
             No holdings found. Add holdings first to create allocation targets.
           </div>
         )}
@@ -72,18 +70,18 @@ export function AssetClassForm({
             value={targetPercent}
             onChange={(e) => setTargetPercent(e.target.value)}
             disabled={isLoading}
-            className="w-full rounded-md border border-border bg-background px-4 py-3 text-sm font-medium placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="border-border bg-background placeholder:text-muted-foreground focus:ring-primary/20 w-full rounded-md border px-4 py-3 text-sm font-medium focus:ring-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             placeholder="0"
             required
           />
-          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
+          <span className="text-muted-foreground pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-sm">
             %
           </span>
         </div>
       </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-3 justify-end pt-4 border-t border-border">
+      <div className="border-border flex justify-end gap-3 border-t pt-4">
         <Button
           type="button"
           variant="outline"

@@ -69,14 +69,14 @@ export function DonutChartFull({
 
   if (!pieData || pieData.length === 0) {
     return (
-      <div className="w-full h-full flex items-center justify-center p-6">
+      <div className="flex h-full w-full items-center justify-center p-6">
         <p className="text-muted-foreground">No allocation data available</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full h-full flex items-center justify-center p-6">
+    <div className="flex h-full w-full items-center justify-center p-6">
       <div style={{ height: "100%", width: "100%" }}></div>
       <DonutChartExpandable
         data={pieData}

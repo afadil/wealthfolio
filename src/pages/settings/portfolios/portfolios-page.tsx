@@ -1,10 +1,10 @@
-import { usePortfolioMutations, usePortfolios } from '@/hooks/use-portfolios';
-import type { Portfolio } from '@/lib/types';
-import { Button, EmptyPlaceholder, Icons, Separator, Skeleton } from '@wealthfolio/ui';
-import { useState } from 'react';
-import { SettingsHeader } from '../settings-header';
-import { PortfolioEditModal } from './components/portfolio-edit-modal';
-import { PortfolioItem } from './components/portfolio-item';
+import { usePortfolioMutations, usePortfolios } from "@/hooks/use-portfolios";
+import type { Portfolio } from "@/lib/types";
+import { Button, EmptyPlaceholder, Icons, Separator, Skeleton } from "@wealthfolio/ui";
+import { useState } from "react";
+import { SettingsHeader } from "../settings-header";
+import { PortfolioEditModal } from "./components/portfolio-edit-modal";
+import { PortfolioItem } from "./components/portfolio-item";
 
 const SettingsPortfoliosPage = () => {
   const { data: portfolios, isLoading } = usePortfolios();

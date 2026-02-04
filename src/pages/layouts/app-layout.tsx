@@ -14,8 +14,7 @@ import { FloatingNavigationBar } from "./navigation/floating-navigation-bar";
 import { MobileNavBar } from "./navigation/mobile-navbar";
 import { NavigationModeProvider, useNavigationMode } from "./navigation/navigation-mode-context";
 
-
-  const AppLayoutContent = () => {
+const AppLayoutContent = () => {
   const { data: settings, isLoading: isSettingsLoading } = useSettings();
   const location = useLocation();
   const navigation = useNavigation();
@@ -32,9 +31,7 @@ import { NavigationModeProvider, useNavigationMode } from "./navigation/navigati
 
   // Only check onboarding when settings are loaded
   const shouldRedirectToOnboarding =
-    !isSettingsLoading &&
-    !settings?.onboardingCompleted &&
-    location.pathname !== "/onboarding";
+    !isSettingsLoading && !settings?.onboardingCompleted && location.pathname !== "/onboarding";
 
   if (shouldRedirectToOnboarding) {
     return <Navigate to="/onboarding" />;

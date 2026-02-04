@@ -1,8 +1,7 @@
 # Phase 2 Summary - Asset Allocation & Target Management
 
-**Status**: ✅ COMPLETE
-**Date**: January 27, 2026
-**Scope**: Asset-class level allocation management with lock protection and auto-scaling
+**Status**: ✅ COMPLETE **Date**: January 27, 2026 **Scope**: Asset-class level
+allocation management with lock protection and auto-scaling
 
 ---
 
@@ -11,12 +10,14 @@
 ### Core Features
 
 #### 1. Target Allocation Management
+
 - Create, edit, and delete asset class targets
 - Bidirectional slider synchronization
 - Auto-scaling when total allocation exceeds 100%
 - Duplicate prevention (can't create target for same asset class twice)
 
 #### 2. Lock/Unlock System
+
 - Toggle lock state per asset class target
 - Locked targets cannot be deleted or modified via slider
 - Visual indicator: dark grey background on lock icon when active
@@ -24,20 +25,25 @@
 - Clear tooltip on delete attempt for locked targets
 
 #### 3. Proportional Auto-Scaling
+
 **Delete scenario:**
+
 - User deletes an asset class target
 - Remaining targets automatically scale proportionally to 100%
 - Example: Delete "Equity" (60%), keep "Bonds" (30%) + "Cash" (10%)
   - Result: "Bonds" scales to 75%, "Cash" to 25%
 
 **Form submission scenario:**
+
 - User adds new target when total is already at 100%
 - Dialog allows submission (no over-allocation error blocking)
 - Backend auto-scales existing allocations proportionally
 - New target added at desired percentage
 
 #### 4. Rebalancing Suggestions Calculator
+
 **User Flow:**
+
 1. User navigates to "Rebalancing Suggestions" tab
 2. Enters available cash amount (decimal support, 2 places max)
 3. Clicks "Calculate Suggestions"
@@ -48,12 +54,14 @@
    - Total allocated vs remaining cash
 
 **Output Options:**
+
 - Copy to Clipboard (text format)
 - Export CSV (spreadsheet format)
 
 ### Calculation Logic
 
 **Rebalancing Algorithm:**
+
 1. Calculate new portfolio total: `current + availableCash`
 2. For each asset class:
    - Current value: `actualPercent × currentPortfolio`
@@ -64,6 +72,7 @@
 4. Display preview: `(currentValue + suggestedBuy) / newPortfolio × 100`
 
 **Example (€20k portfolio, €10k cash):**
+
 ```
 Equity (60% target, 50.2% current):
   Current value: €10,025
@@ -76,6 +85,7 @@ Equity (60% target, 50.2% current):
 ### UI/UX Features
 
 ✅ **Allocation Overview Tab**
+
 - Pie chart visualization of current allocation
 - Target vs Actual comparison cards
 - Lock/unlock button per asset class (dark grey background when locked)
@@ -84,6 +94,7 @@ Equity (60% target, 50.2% current):
 - Drift indicator (total deviation from targets)
 
 ✅ **Input Validation**
+
 - No leading zeros (fixed: "01000" → "1000")
 - Decimal support (2 places max)
 - Shows currency symbol based on account
@@ -91,17 +102,20 @@ Equity (60% target, 50.2% current):
 - Duplicate asset class prevention in form dialog
 
 ✅ **Empty States**
+
 - No targets set: Shows helpful message directing to "Add Target" button
 - After calculation: Shows full breakdown with summary
 - Rebalancing suggestions: Shows message when no targets configured
 
 ✅ **State Management**
+
 - Auto-resets when user switches accounts (using React key)
 - Suggestions cleared when account changes
 - Form input cleared automatically
 - Lock state persists in localStorage per account + asset class
 
 ✅ **Accessibility**
+
 - Proper labels on form inputs
 - Clear visual hierarchy
 - Keyboard navigable
@@ -111,13 +125,19 @@ Equity (60% target, 50.2% current):
 ### Components & Files
 
 **Modified/Created:**
-- `src/pages/allocation/components/allocation-overview.tsx` — Target comparison cards with lock/delete
-- `src/pages/allocation/components/allocation-pie-chart-view.tsx` — Pie chart with lock integration
-- `src/pages/allocation/components/asset-class-form-dialog.tsx` — Form validation & duplicate prevention
+
+- `src/pages/allocation/components/allocation-overview.tsx` — Target comparison
+  cards with lock/delete
+- `src/pages/allocation/components/allocation-pie-chart-view.tsx` — Pie chart
+  with lock integration
+- `src/pages/allocation/components/asset-class-form-dialog.tsx` — Form
+  validation & duplicate prevention
 - `src/pages/allocation/index.tsx` — Delete handler with proportional scaling
-- `src/pages/allocation/components/rebalancing-advisor.tsx` — Rebalancing suggestions calculator
+- `src/pages/allocation/components/rebalancing-advisor.tsx` — Rebalancing
+  suggestions calculator
 
 **Key changes:**
+
 - Lock state stored in `lockedAssets` Set in pie-chart-view component
 - Delete handler checks lock status before allowing deletion
 - Proportional scaling applied when deleting targets
@@ -140,6 +160,7 @@ Equity (60% target, 50.2% current):
 ## Testing Results
 
 **Tested scenarios:**
+
 - ✅ Bidirectional slider synchronization
 - ✅ Auto-scaling when total exceeds 100%
 - ✅ Duplicate asset class prevention
@@ -156,11 +177,14 @@ Equity (60% target, 50.2% current):
 - ✅ CSV export (functional)
 - ✅ Copy to clipboard (functional)
 - ✅ Account switching (form resets, locks persist per account)
-- ✅ All tabs working (Targets, Composition, Allocation Overview, Rebalancing Suggestions)
+- ✅ All tabs working (Targets, Composition, Allocation Overview, Rebalancing
+  Suggestions)
 
 **Known acceptable behaviors:**
+
 - Percentages can decrease when allocating new cash (by design)
-  - Reason: New money goes to underweight classes, making overweight classes smaller relative to new total
+  - Reason: New money goes to underweight classes, making overweight classes
+    smaller relative to new total
 - Proportional scaling may leave small amounts unallocated
 - No trade execution (informational only — user copies to broker)
 
@@ -171,6 +195,7 @@ Equity (60% target, 50.2% current):
 **Scenario:** €20,467 portfolio, €10k to invest, Equity at 50.2%, target 60%
 
 **Calculation:**
+
 ```
 Current Equity value: 50.2% × €20,467 = €10,274
 New total: €20,467 + €10,000 = €30,467
@@ -190,6 +215,7 @@ All calculations verified and accurate.
 ## Phase 3 Roadmap
 
 **Phase 3 will include:**
+
 1. Per-Holding Targets (new data model)
 2. Specific holding suggestions within each asset class
 3. Proportional allocation across holdings
@@ -208,6 +234,7 @@ See commit message below.
 
 ## Sign-Off
 
-Phase 2 implementation is **feature-complete and tested**. All requirements met. Ready to move to Phase 3.
+Phase 2 implementation is **feature-complete and tested**. All requirements met.
+Ready to move to Phase 3.
 
 **Next:** Per-Holding Targets & Advanced Rebalancing Logic (Phase 3)

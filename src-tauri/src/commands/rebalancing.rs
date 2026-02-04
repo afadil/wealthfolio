@@ -181,12 +181,35 @@ pub async fn get_unused_virtual_strategies_count(
 }
 
 #[tauri::command]
+pub async fn get_unused_virtual_strategies(
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<RebalancingStrategy>, String> {
+    state
+        .rebalancing_service
+        .get_unused_virtual_strategies()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn cleanup_unused_virtual_strategies(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<usize, String> {
     state
         .rebalancing_service
         .cleanup_unused_virtual_strategies()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_unused_virtual_strategy(
+    id: String,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<(), String> {
+    state
+        .rebalancing_service
+        .delete_unused_virtual_strategy(&id)
         .await
         .map_err(|e| e.to_string())
 }

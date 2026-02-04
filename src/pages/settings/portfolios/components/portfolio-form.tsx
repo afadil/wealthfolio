@@ -1,31 +1,31 @@
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import * as z from 'zod';
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
-    Form,
-    FormControl,
-    FormDescription,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-} from '@/components/ui/form';
-import { Icons } from '@/components/ui/icons';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { useAccounts } from '@/hooks/use-accounts';
-import { usePortfolioMutations } from '@/hooks/use-portfolios';
-import { newPortfolioSchema } from '@/lib/schemas';
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Icons } from "@/components/ui/icons";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAccounts } from "@/hooks/use-accounts";
+import { usePortfolioMutations } from "@/hooks/use-portfolios";
+import { newPortfolioSchema } from "@/lib/schemas";
 
 type NewPortfolio = z.infer<typeof newPortfolioSchema>;
 
@@ -34,10 +34,7 @@ interface PortfolioFormProps {
   onSuccess?: () => void;
 }
 
-export function PortfolioForm({
-  defaultValues,
-  onSuccess = () => undefined,
-}: PortfolioFormProps) {
+export function PortfolioForm({ defaultValues, onSuccess = () => undefined }: PortfolioFormProps) {
   const { createPortfolioMutation, updatePortfolioMutation } = usePortfolioMutations({
     onSuccess,
   });
@@ -62,13 +59,11 @@ export function PortfolioForm({
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <DialogHeader>
-          <DialogTitle>
-            {defaultValues?.id ? 'Update Portfolio' : 'Add Portfolio'}
-          </DialogTitle>
+          <DialogTitle>{defaultValues?.id ? "Update Portfolio" : "Add Portfolio"}</DialogTitle>
           <DialogDescription>
             {defaultValues?.id
-              ? 'Update portfolio information'
-              : 'Group multiple accounts into a portfolio with independent allocation strategies.'}
+              ? "Update portfolio information"
+              : "Group multiple accounts into a portfolio with independent allocation strategies."}
           </DialogDescription>
         </DialogHeader>
 
@@ -83,9 +78,7 @@ export function PortfolioForm({
                 <FormControl>
                   <Input placeholder="My Portfolio" {...field} />
                 </FormControl>
-                <FormDescription>
-                  A unique name to identify this portfolio.
-                </FormDescription>
+                <FormDescription>A unique name to identify this portfolio.</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -100,9 +93,9 @@ export function PortfolioForm({
                 <FormDescription>
                   Select at least 2 accounts to group into this portfolio.
                 </FormDescription>
-                <ScrollArea className="border rounded-md h-[200px] p-4">
+                <ScrollArea className="h-[200px] rounded-md border p-4">
                   {isLoadingAccounts ? (
-                    <div className="text-sm text-muted-foreground">Loading accounts...</div>
+                    <div className="text-muted-foreground text-sm">Loading accounts...</div>
                   ) : accounts && accounts.length > 0 ? (
                     <div className="space-y-3">
                       {accounts.map((account) => (
@@ -115,15 +108,13 @@ export function PortfolioForm({
                               if (checked) {
                                 field.onChange([...currentValue, account.id]);
                               } else {
-                                field.onChange(
-                                  currentValue.filter((id) => id !== account.id),
-                                );
+                                field.onChange(currentValue.filter((id) => id !== account.id));
                               }
                             }}
                           />
                           <label
                             htmlFor={account.id}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                            className="cursor-pointer text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                           >
                             {account.name} ({account.currency})
                           </label>
@@ -131,7 +122,7 @@ export function PortfolioForm({
                       ))}
                     </div>
                   ) : (
-                    <div className="text-sm text-muted-foreground">
+                    <div className="text-muted-foreground text-sm">
                       No accounts available. Please create accounts first.
                     </div>
                   )}
@@ -151,7 +142,7 @@ export function PortfolioForm({
             ) : (
               <Icons.Plus className="h-4 w-4" />
             )}
-            <span>{defaultValues?.id ? 'Update Portfolio' : 'Add Portfolio'}</span>
+            <span>{defaultValues?.id ? "Update Portfolio" : "Add Portfolio"}</span>
           </Button>
         </DialogFooter>
       </form>

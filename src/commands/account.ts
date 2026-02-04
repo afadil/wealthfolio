@@ -79,7 +79,7 @@ export const deleteAccount = async (accountId: string): Promise<void> => {
 // findOrCreateCombinedPortfolio
 export const findOrCreateCombinedPortfolio = async (accountIds: string[]): Promise<Account> => {
   try {
-    logger.debug(`Finding or creating combined portfolio for accounts: ${accountIds.join(', ')}`);
+    logger.debug(`Finding or creating combined portfolio for accounts: ${accountIds.join(", ")}`);
 
     switch (getRunEnv()) {
       case RUN_ENV.DESKTOP:

@@ -38,7 +38,7 @@ export function useProportionalAllocation() {
     targets: AssetClassTarget[],
     changedAssetClass: string,
     newPercent: number,
-    lockedAssets?: Set<string>
+    lockedAssets?: Set<string>,
   ): AssetClassTarget[] => {
     // Clamp to [0, 100]
     const clampedNewPercent = Math.max(0, Math.min(100, newPercent));
@@ -49,10 +49,11 @@ export function useProportionalAllocation() {
 
     // Get unlockable and locked targets
     const unlockableTargets = targets.filter(
-      (t) => t.assetClass !== changedAssetClass && (!lockedAssets || !lockedAssets.has(t.assetClass))
+      (t) =>
+        t.assetClass !== changedAssetClass && (!lockedAssets || !lockedAssets.has(t.assetClass)),
     );
     const lockedTargets = targets.filter(
-      (t) => t.assetClass !== changedAssetClass && lockedAssets && lockedAssets.has(t.assetClass)
+      (t) => t.assetClass !== changedAssetClass && lockedAssets && lockedAssets.has(t.assetClass),
     );
 
     const unlockableTotal = unlockableTargets.reduce((sum, t) => sum + t.targetPercent, 0);
@@ -135,6 +136,4 @@ export function useProportionalAllocation() {
   };
 }
 
-export type UseProportionalAllocationReturn = ReturnType<
-  typeof useProportionalAllocation
->;
+export type UseProportionalAllocationReturn = ReturnType<typeof useProportionalAllocation>;

@@ -2,13 +2,16 @@
 
 ## Overview
 
-**Goal:** Enhance allocation management with visual sub-pie charts, user-configurable preferences, and a dedicated holdings table view for detailed allocation analysis.
+**Goal:** Enhance allocation management with visual sub-pie charts,
+user-configurable preferences, and a dedicated holdings table view for detailed
+allocation analysis.
 
 **Timeline:** 5-7 days across 3 sprints
 
 **Date Created:** February 1, 2026
 
 **Priority Features:**
+
 1. Sub-pie chart visualization in side panel
 2. Allocation preferences (Settings page)
 3. Strict mode validation (asset class + holdings)
@@ -21,6 +24,7 @@
 ### 1.1 Settings Storage: Database Key-Value Pattern
 
 **Why Database (not localStorage):**
+
 - Consistent with existing pattern (theme, currency, font)
 - Cross-device sync support
 - Included in database backups
@@ -28,6 +32,7 @@
 - Won't be lost on browser cache clear
 
 **New Settings Keys:**
+
 ```typescript
 {
   "allocation_holding_target_mode": "preview" | "strict",
@@ -37,11 +42,13 @@
 ```
 
 **Default Values:**
+
 - `allocation_holding_target_mode`: `"preview"` (maintains Phase 3 behavior)
 - `allocation_rebalancing_default_view`: `"detailed"` (current default)
 - `allocation_settings_banner_dismissed`: `"false"`
 
 **Implementation Pattern:**
+
 - Backend: Add keys to `SettingsService` (Rust)
 - Frontend: Add fields to `Settings` TypeScript type
 - Context: Use existing `SettingsProvider` for global state
@@ -49,39 +56,52 @@
 
 ### 1.2 Strict Mode: Dual-Level Validation
 
-**Philosophy:** Strict mode applies to BOTH asset class AND holding targets for consistency.
+**Philosophy:** Strict mode applies to BOTH asset class AND holding targets for
+consistency.
 
 **Rationale:**
+
 - **Consistency**: "Strict = everything must sum to 100%" is clear mental model
-- **User intent**: Advanced users choosing strict mode want full control at all levels
-- **No surprises**: Mixed behavior (strict holdings, relaxed asset classes) would be confusing
+- **User intent**: Advanced users choosing strict mode want full control at all
+  levels
+- **No surprises**: Mixed behavior (strict holdings, relaxed asset classes)
+  would be confusing
 
 **Validation Rules:**
 
 **Asset Class Level (Strict Mode):**
+
 ```typescript
 const total = assetClassTargets.reduce((sum, t) => sum + t.targetPercent, 0);
 if (total !== 100) {
-  showError(`Asset classes must sum to 100%. Current total: ${total.toFixed(1)}%`);
+  showError(
+    `Asset classes must sum to 100%. Current total: ${total.toFixed(1)}%`,
+  );
   blockSave();
 }
 ```
 
 **Holding Level (Strict Mode):**
+
 ```typescript
 // Per asset class
-assetClassTargets.forEach(assetClass => {
-  const holdings = holdingTargets.filter(h => h.assetClassId === assetClass.id);
+assetClassTargets.forEach((assetClass) => {
+  const holdings = holdingTargets.filter(
+    (h) => h.assetClassId === assetClass.id,
+  );
   const total = holdings.reduce((sum, h) => sum + h.targetPercentOfClass, 0);
-  
+
   if (holdings.length > 0 && total !== 100) {
-    showError(`${assetClass.name} holdings must sum to 100%. Current: ${total.toFixed(1)}%`);
+    showError(
+      `${assetClass.name} holdings must sum to 100%. Current: ${total.toFixed(1)}%`,
+    );
     blockSave();
   }
 });
 ```
 
 **Preview Mode Behavior (unchanged from Phase 3):**
+
 - No strict validation
 - Auto-distribution for unset holdings
 - Live preview with bold (user-set) vs italic (auto-calculated)
@@ -90,6 +110,7 @@ assetClassTargets.forEach(assetClass => {
 ### 1.3 Tab Structure: Holdings Table as Separate View
 
 **Current Tabs (Phase 3):**
+
 ```
 1. Targets
 2. Composition
@@ -98,6 +119,7 @@ assetClassTargets.forEach(assetClass => {
 ```
 
 **New Tabs (Phase 4):**
+
 ```
 1. Targets
 2. Composition
@@ -107,12 +129,14 @@ assetClassTargets.forEach(assetClass => {
 ```
 
 **Why Separate Tab (not toggle):**
+
 - Clear separation: Table view = detailed editing, Pie chart = visual overview
 - Consistent with existing tab pattern
 - Users can switch without losing context
 - Easier to implement and maintain
 
-**Note:** Targets and Composition tabs may be removed in future (pre-production cleanup).
+**Note:** Targets and Composition tabs may be removed in future (pre-production
+cleanup).
 
 ---
 
@@ -121,6 +145,7 @@ assetClassTargets.forEach(assetClass => {
 ### 2.1 Sub-Pie Chart Location
 
 **Placement in Side Panel:**
+
 ```
 ┌─────────────────────────────────────┐
 │ Asset Class: Equity (60%)           │
@@ -145,6 +170,7 @@ assetClassTargets.forEach(assetClass => {
 ```
 
 **Design Requirements:**
+
 - Compact size: 200-250px diameter (fits side panel width)
 - Color scheme: Green tones (consistent with asset class colors)
 - Interactive: Hover shows holding details
@@ -156,6 +182,7 @@ assetClassTargets.forEach(assetClass => {
 **Location:** Settings → Allocation (new section)
 
 **Layout:**
+
 ```
 ┌────────────────────────────────────────────────────────┐
 │ Settings > Allocation                                  │
@@ -185,6 +212,7 @@ assetClassTargets.forEach(assetClass => {
 ```
 
 **UI Components:**
+
 - Radio buttons for mutually exclusive options
 - Descriptive help text under each option
 - Save button (updates `app_settings` table)
@@ -196,6 +224,7 @@ assetClassTargets.forEach(assetClass => {
 **Tab Label:** "Holdings Table"
 
 **Table Columns:**
+
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │ Symbol │ Name              │ Asset Class │ Type      │ Target % │ Target % │ Current % │
@@ -220,16 +249,21 @@ Additional Columns (scroll right):
 ```
 
 **Features:**
-- **Reuse existing component**: Adapt `HoldingsTable` from `src/pages/holdings/components/holdings-table.tsx`
+
+- **Reuse existing component**: Adapt `HoldingsTable` from
+  `src/pages/holdings/components/holdings-table.tsx`
 - **Filtering**: By asset class, type, locked status
 - **Sorting**: All columns sortable
 - **Search**: Filter by symbol or name
-- **Color coding**: Deviation column shows red (under-allocated) / green (over-allocated)
+- **Color coding**: Deviation column shows red (under-allocated) / green
+  (over-allocated)
 - **Lock indicator**: 🔒 icon for locked holdings
 - **Click to edit**: "View Details" navigates to holding detail page
-- **Read-only mode**: This view is for analysis; editing happens in side panel (Allocation Overview tab)
+- **Read-only mode**: This view is for analysis; editing happens in side panel
+  (Allocation Overview tab)
 
 **Empty State:**
+
 ```
 ┌─────────────────────────────────────────────────┐
 │                                                 │
@@ -248,6 +282,7 @@ Additional Columns (scroll right):
 **When:** First visit to Allocation page after Phase 4 upgrade
 
 **Design:**
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ 💡 New: Allocation Settings                           [×]   │
@@ -258,6 +293,7 @@ Additional Columns (scroll right):
 ```
 
 **Behavior:**
+
 - Blue info banner (not warning/error)
 - Appears at top of Allocation page
 - Dismissible with × button
@@ -274,6 +310,7 @@ Additional Columns (scroll right):
 ### 3.1 New Components
 
 **Sub-Pie Chart Component:**
+
 ```typescript
 // src/pages/allocation/components/sub-pie-chart.tsx
 
@@ -284,7 +321,12 @@ interface SubPieChartProps {
   totalValue: number;
 }
 
-export function SubPieChart({ holdingTargets, holdings, assetClassName, totalValue }: SubPieChartProps) {
+export function SubPieChart({
+  holdingTargets,
+  holdings,
+  assetClassName,
+  totalValue,
+}: SubPieChartProps) {
   // Use recharts PieChart or custom d3 implementation
   // Color scheme: Green tones (lighter to darker based on %)
   // Interactive tooltips on hover
@@ -293,6 +335,7 @@ export function SubPieChart({ holdingTargets, holdings, assetClassName, totalVal
 ```
 
 **Holdings Allocation Table:**
+
 ```typescript
 // src/pages/allocation/components/holdings-allocation-table.tsx
 
@@ -304,12 +347,12 @@ interface HoldingsAllocationTableProps {
   baseCurrency: string;
 }
 
-export function HoldingsAllocationTable({ 
-  holdings, 
-  holdingTargets, 
+export function HoldingsAllocationTable({
+  holdings,
+  holdingTargets,
   assetClassTargets,
   totalPortfolioValue,
-  baseCurrency 
+  baseCurrency,
 }: HoldingsAllocationTableProps) {
   // Reuse DataTable component from Holdings page
   // Add allocation-specific columns
@@ -319,19 +362,20 @@ export function HoldingsAllocationTable({
 ```
 
 **Allocation Settings Section:**
+
 ```typescript
 // src/pages/settings/allocation/allocation-settings-page.tsx
 
 export function AllocationSettingsPage() {
   const { settings, updateSettings } = useSettingsContext();
-  
+
   const [holdingTargetMode, setHoldingTargetMode] = useState(
-    settings?.allocationHoldingTargetMode || 'preview'
+    settings?.allocationHoldingTargetMode || "preview",
   );
   const [defaultRebalancingView, setDefaultRebalancingView] = useState(
-    settings?.allocationRebalancingDefaultView || 'detailed'
+    settings?.allocationRebalancingDefaultView || "detailed",
   );
-  
+
   const handleSave = async () => {
     await updateSettings({
       allocationHoldingTargetMode: holdingTargetMode,
@@ -339,7 +383,7 @@ export function AllocationSettingsPage() {
     });
     toast.success("Allocation settings updated");
   };
-  
+
   // Radio buttons for each setting
   // Help text explaining each mode
   // Save button
@@ -347,23 +391,24 @@ export function AllocationSettingsPage() {
 ```
 
 **One-Time Banner Component:**
+
 ```typescript
 // src/pages/allocation/components/allocation-settings-banner.tsx
 
 export function AllocationSettingsBanner() {
   const { settings, updateSettings } = useSettingsContext();
   const navigate = useNavigate();
-  
-  if (settings?.allocationSettingsBannerDismissed === 'true') {
+
+  if (settings?.allocationSettingsBannerDismissed === "true") {
     return null;
   }
-  
+
   const handleDismiss = async () => {
     await updateSettings({
-      allocationSettingsBannerDismissed: 'true',
+      allocationSettingsBannerDismissed: "true",
     });
   };
-  
+
   // Blue banner with icon, message, buttons
   // Navigate to settings on click
   // Persist dismissal to database
@@ -373,6 +418,7 @@ export function AllocationSettingsBanner() {
 ### 3.2 Modified Components
 
 **Allocation Overview (index.tsx):**
+
 - Add sub-pie chart to side panel (after target section, before holdings list)
 - Read `allocationHoldingTargetMode` from settings
 - Apply strict validation when mode = "strict"
@@ -380,11 +426,13 @@ export function AllocationSettingsBanner() {
 - Show inline error messages
 
 **Rebalancing Advisor:**
+
 - Read `allocationRebalancingDefaultView` from settings
 - Set initial view mode from settings (instead of hardcoded "detailed")
 - User can still toggle during session
 
 **Side Panel (Sheet):**
+
 - Add sub-pie chart component after `TargetPercentInput`
 - Conditionally render based on holdings count
 - Empty state when no holding targets exist
@@ -392,54 +440,66 @@ export function AllocationSettingsBanner() {
 ### 3.3 New Hooks
 
 **useAllocationSettings:**
+
 ```typescript
 // src/pages/allocation/hooks/use-allocation-settings.ts
 
 export function useAllocationSettings() {
   const { settings } = useSettingsContext();
-  
+
   return {
-    holdingTargetMode: settings?.allocationHoldingTargetMode || 'preview',
-    rebalancingDefaultView: settings?.allocationRebalancingDefaultView || 'detailed',
-    isStrictMode: settings?.allocationHoldingTargetMode === 'strict',
-    isPreviewMode: settings?.allocationHoldingTargetMode === 'preview',
+    holdingTargetMode: settings?.allocationHoldingTargetMode || "preview",
+    rebalancingDefaultView:
+      settings?.allocationRebalancingDefaultView || "detailed",
+    isStrictMode: settings?.allocationHoldingTargetMode === "strict",
+    isPreviewMode: settings?.allocationHoldingTargetMode === "preview",
   };
 }
 ```
 
 **useStrictModeValidation:**
+
 ```typescript
 // src/pages/allocation/hooks/use-strict-mode-validation.ts
 
 export function useStrictModeValidation(
   assetClassTargets: AssetClassTarget[],
-  holdingTargets: HoldingTarget[]
+  holdingTargets: HoldingTarget[],
 ) {
   const { isStrictMode } = useAllocationSettings();
-  
+
   if (!isStrictMode) {
     return { isValid: true, errors: [] };
   }
-  
+
   const errors: string[] = [];
-  
+
   // Validate asset class level
-  const assetClassTotal = assetClassTargets.reduce((sum, t) => sum + t.targetPercent, 0);
+  const assetClassTotal = assetClassTargets.reduce(
+    (sum, t) => sum + t.targetPercent,
+    0,
+  );
   if (assetClassTotal !== 100) {
-    errors.push(`Asset classes must sum to 100%. Current: ${assetClassTotal.toFixed(1)}%`);
+    errors.push(
+      `Asset classes must sum to 100%. Current: ${assetClassTotal.toFixed(1)}%`,
+    );
   }
-  
+
   // Validate holding level (per asset class)
-  assetClassTargets.forEach(assetClass => {
-    const holdings = holdingTargets.filter(h => h.assetClassId === assetClass.id);
+  assetClassTargets.forEach((assetClass) => {
+    const holdings = holdingTargets.filter(
+      (h) => h.assetClassId === assetClass.id,
+    );
     if (holdings.length === 0) return;
-    
+
     const total = holdings.reduce((sum, h) => sum + h.targetPercentOfClass, 0);
     if (total !== 100) {
-      errors.push(`${assetClass.assetClass} holdings must sum to 100%. Current: ${total.toFixed(1)}%`);
+      errors.push(
+        `${assetClass.assetClass} holdings must sum to 100%. Current: ${total.toFixed(1)}%`,
+      );
     }
   });
-  
+
   return {
     isValid: errors.length === 0,
     errors,
@@ -454,6 +514,7 @@ export function useStrictModeValidation(
 ### Sprint 1: Settings Infrastructure (1-2 days)
 
 **Backend (Rust):**
+
 - ✅ Add new setting keys to `SettingsService`
 - ✅ Update `Settings` model with new fields:
   - `allocation_holding_target_mode`
@@ -463,13 +524,14 @@ export function useStrictModeValidation(
 - ✅ Test settings CRUD operations
 
 **Frontend (TypeScript):**
+
 - ✅ Update `Settings` type in `src/lib/types.ts`:
   ```typescript
   export interface Settings {
     // ... existing fields
-    allocationHoldingTargetMode?: 'preview' | 'strict';
-    allocationRebalancingDefaultView?: 'overview' | 'detailed';
-    allocationSettingsBannerDismissed?: 'true' | 'false';
+    allocationHoldingTargetMode?: "preview" | "strict";
+    allocationRebalancingDefaultView?: "overview" | "detailed";
+    allocationSettingsBannerDismissed?: "true" | "false";
   }
   ```
 - ✅ Create `use-allocation-settings.ts` hook
@@ -479,6 +541,7 @@ export function useStrictModeValidation(
 - ✅ Test settings persistence and retrieval
 
 **Deliverables:**
+
 - Database can store/retrieve allocation settings
 - Settings page shows Allocation section
 - Users can toggle between Preview/Strict mode
@@ -490,6 +553,7 @@ export function useStrictModeValidation(
 ### Sprint 2: Sub-Pie Chart & Strict Mode (2-3 days)
 
 **Sub-Pie Chart Component:**
+
 - ✅ Install/configure charting library (recharts recommended)
 - ✅ Create `SubPieChart` component:
   - Calculate holding percentages
@@ -502,6 +566,7 @@ export function useStrictModeValidation(
 - ✅ Responsive sizing for side panel width
 
 **Strict Mode Validation:**
+
 - ✅ Create `useStrictModeValidation` hook
 - ✅ Asset class level validation:
   - Check sum = 100%
@@ -513,24 +578,28 @@ export function useStrictModeValidation(
   - Block save button
 - ✅ Error message display:
   ```tsx
-  {!validation.isValid && (
-    <div className="text-destructive text-sm space-y-1">
-      {validation.errors.map((error, i) => (
-        <div key={i}>• {error}</div>
-      ))}
-    </div>
-  )}
+  {
+    !validation.isValid && (
+      <div className="text-destructive space-y-1 text-sm">
+        {validation.errors.map((error, i) => (
+          <div key={i}>• {error}</div>
+        ))}
+      </div>
+    );
+  }
   ```
 - ✅ Visual feedback: Disable button with opacity when validation fails
 - ✅ Preview mode: No changes (existing Phase 3 behavior)
 
 **Testing:**
+
 - Verify sub-pie chart renders correctly
 - Test strict mode validation at both levels
 - Test preview mode still works (no regressions)
 - Test switching between modes in Settings
 
 **Deliverables:**
+
 - Sub-pie chart visible in side panel
 - Strict mode enforces 100% at both levels
 - Clear error messages guide users
@@ -541,6 +610,7 @@ export function useStrictModeValidation(
 ### Sprint 3: Holdings Allocation Table (2 days)
 
 **Table Component:**
+
 - ✅ Create `holdings-allocation-table.tsx`
 - ✅ Reuse `DataTable` component from Holdings page
 - ✅ Define columns:
@@ -558,9 +628,8 @@ export function useStrictModeValidation(
   - Actions ([View Details] button)
 - ✅ Calculate cascaded percentages:
   ```typescript
-  const targetPortfolioPercent = 
-    (holdingTarget.targetPercentOfClass / 100) * 
-    (assetClassTarget.targetPercent);
+  const targetPortfolioPercent =
+    (holdingTarget.targetPercentOfClass / 100) * assetClassTarget.targetPercent;
   ```
 - ✅ Color-coded deviation:
   - Red (negative): Under-allocated
@@ -572,6 +641,7 @@ export function useStrictModeValidation(
 - ✅ Empty state with CTA to Allocation Overview
 
 **Tab Integration:**
+
 - ✅ Add "Holdings Table" tab to allocation page
 - ✅ Update `TabType` type: `'holdings-table'`
 - ✅ Add tab button in navigation
@@ -584,6 +654,7 @@ export function useStrictModeValidation(
   5. Rebalancing Suggestions
 
 **Data Flow:**
+
 - Fetch holdings from current allocation hook
 - Fetch holding targets from query
 - Fetch asset class targets from query
@@ -591,6 +662,7 @@ export function useStrictModeValidation(
 - Read-only display (no inline editing)
 
 **Testing:**
+
 - Verify table displays correct data
 - Test filtering and sorting
 - Test deviation calculations
@@ -598,6 +670,7 @@ export function useStrictModeValidation(
 - Verify empty state shows correctly
 
 **Deliverables:**
+
 - Holdings Table tab functional
 - All columns display correct data
 - Filtering, sorting, search work
@@ -622,6 +695,7 @@ export function useStrictModeValidation(
 ### 5.1 Settings Schema Updates
 
 **Backend (Rust):**
+
 ```rust
 // src-core/src/settings/settings_model.rs
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -629,10 +703,10 @@ pub struct Settings {
     // ... existing fields
     #[serde(rename = "allocationHoldingTargetMode")]
     pub allocation_holding_target_mode: Option<String>, // "preview" | "strict"
-    
+
     #[serde(rename = "allocationRebalancingDefaultView")]
     pub allocation_rebalancing_default_view: Option<String>, // "overview" | "detailed"
-    
+
     #[serde(rename = "allocationSettingsBannerDismissed")]
     pub allocation_settings_banner_dismissed: Option<String>, // "true" | "false"
 }
@@ -651,6 +725,7 @@ impl SettingsRepository {
 ```
 
 **Frontend (TypeScript):**
+
 ```typescript
 // src/lib/types.ts
 export interface Settings {
@@ -658,9 +733,9 @@ export interface Settings {
   font: string;
   baseCurrency: string;
   // ... other existing fields
-  allocationHoldingTargetMode?: 'preview' | 'strict';
-  allocationRebalancingDefaultView?: 'overview' | 'detailed';
-  allocationSettingsBannerDismissed?: 'true' | 'false';
+  allocationHoldingTargetMode?: "preview" | "strict";
+  allocationRebalancingDefaultView?: "overview" | "detailed";
+  allocationSettingsBannerDismissed?: "true" | "false";
 }
 ```
 
@@ -669,37 +744,49 @@ export interface Settings {
 **Recommended Library:** recharts (already used in project)
 
 **Component Structure:**
-```tsx
-import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from 'recharts';
 
-export function SubPieChart({ holdingTargets, holdings, assetClassName }: SubPieChartProps) {
+```tsx
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+
+export function SubPieChart({
+  holdingTargets,
+  holdings,
+  assetClassName,
+}: SubPieChartProps) {
   // Prepare data
-  const data = holdingTargets.map(target => {
-    const holding = holdings.find(h => h.id === target.holdingId);
+  const data = holdingTargets.map((target) => {
+    const holding = holdings.find((h) => h.id === target.holdingId);
     return {
-      name: holding?.instrument?.symbol || 'Unknown',
+      name: holding?.instrument?.symbol || "Unknown",
       value: target.targetPercentOfClass,
       displayName: holding?.instrument?.name || holding?.instrument?.symbol,
     };
   });
-  
+
   // Green color palette (lighter to darker)
   const COLORS = [
-    '#86efac', // green-300
-    '#4ade80', // green-400
-    '#22c55e', // green-500
-    '#16a34a', // green-600
-    '#15803d', // green-700
+    "#86efac", // green-300
+    "#4ade80", // green-400
+    "#22c55e", // green-500
+    "#16a34a", // green-600
+    "#15803d", // green-700
   ];
-  
+
   if (data.length === 0) {
     return (
-      <div className="text-muted-foreground text-center text-sm py-4">
+      <div className="text-muted-foreground py-4 text-center text-sm">
         Set holding targets to see breakdown
       </div>
     );
   }
-  
+
   return (
     <ResponsiveContainer width="100%" height={250}>
       <PieChart>
@@ -716,14 +803,19 @@ export function SubPieChart({ holdingTargets, holdings, assetClassName }: SubPie
             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
           ))}
         </Pie>
-        <Tooltip 
+        <Tooltip
           formatter={(value: number) => `${value.toFixed(1)}%`}
-          contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+          contentStyle={{
+            background: "hsl(var(--card))",
+            border: "1px solid hsl(var(--border))",
+          }}
         />
-        <Legend 
-          verticalAlign="bottom" 
+        <Legend
+          verticalAlign="bottom"
           height={36}
-          formatter={(value, entry) => `${entry.payload.name} (${entry.payload.value.toFixed(1)}%)`}
+          formatter={(value, entry) =>
+            `${entry.payload.name} (${entry.payload.value.toFixed(1)}%)`
+          }
         />
       </PieChart>
     </ResponsiveContainer>
@@ -734,52 +826,53 @@ export function SubPieChart({ holdingTargets, holdings, assetClassName }: SubPie
 ### 5.3 Strict Mode Validation Logic
 
 **Validation Hook:**
+
 ```typescript
 export function useStrictModeValidation(
   assetClassTargets: AssetClassTarget[],
-  holdingTargets: HoldingTarget[]
+  holdingTargets: HoldingTarget[],
 ) {
   const { isStrictMode } = useAllocationSettings();
-  
+
   return useMemo(() => {
     if (!isStrictMode) {
       return { isValid: true, errors: [], canSave: true };
     }
-    
+
     const errors: string[] = [];
-    
+
     // Validate asset class level
     const assetClassTotal = assetClassTargets.reduce(
-      (sum, t) => sum + t.targetPercent, 
-      0
+      (sum, t) => sum + t.targetPercent,
+      0,
     );
-    
+
     if (Math.abs(assetClassTotal - 100) > 0.01) {
       errors.push(
-        `Asset classes must sum to 100%. Current total: ${assetClassTotal.toFixed(1)}%`
+        `Asset classes must sum to 100%. Current total: ${assetClassTotal.toFixed(1)}%`,
       );
     }
-    
+
     // Validate holding level per asset class
-    assetClassTargets.forEach(assetClass => {
+    assetClassTargets.forEach((assetClass) => {
       const classHoldings = holdingTargets.filter(
-        h => h.assetClassId === assetClass.id
+        (h) => h.assetClassId === assetClass.id,
       );
-      
+
       if (classHoldings.length === 0) return; // No holdings = OK
-      
+
       const total = classHoldings.reduce(
-        (sum, h) => sum + h.targetPercentOfClass, 
-        0
+        (sum, h) => sum + h.targetPercentOfClass,
+        0,
       );
-      
+
       if (Math.abs(total - 100) > 0.01) {
         errors.push(
-          `${assetClass.assetClass} holdings must sum to 100%. Current: ${total.toFixed(1)}%`
+          `${assetClass.assetClass} holdings must sum to 100%. Current: ${total.toFixed(1)}%`,
         );
       }
     });
-    
+
     return {
       isValid: errors.length === 0,
       errors,
@@ -790,6 +883,7 @@ export function useStrictModeValidation(
 ```
 
 **Usage in Component:**
+
 ```tsx
 const validation = useStrictModeValidation(assetClassTargets, holdingTargets);
 
@@ -797,13 +891,13 @@ return (
   <div>
     {/* Validation errors */}
     {!validation.isValid && (
-      <div className="bg-destructive/10 border-destructive text-destructive border rounded-md p-3 text-sm space-y-1">
+      <div className="bg-destructive/10 border-destructive text-destructive space-y-1 rounded-md border p-3 text-sm">
         {validation.errors.map((error, i) => (
           <div key={i}>• {error}</div>
         ))}
       </div>
     )}
-    
+
     {/* Save button */}
     <Button
       onClick={handleSave}
@@ -819,6 +913,7 @@ return (
 ### 5.4 Holdings Allocation Table Columns
 
 **Column Definitions:**
+
 ```typescript
 const columns: ColumnDef<HoldingWithAllocation>[] = [
   {
@@ -880,12 +975,12 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
     header: 'Deviation',
     cell: ({ row }) => {
       const deviation = row.original.deviation || 0;
-      const color = Math.abs(deviation) < 0.5 
+      const color = Math.abs(deviation) < 0.5
         ? 'text-muted-foreground'
-        : deviation < 0 
+        : deviation < 0
           ? 'text-red-600 dark:text-red-400'
           : 'text-green-600 dark:text-green-400';
-      
+
       return (
         <span className={color}>
           {deviation > 0 ? '+' : ''}{deviation.toFixed(1)}%
@@ -923,6 +1018,7 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 ### 6.1 Configure Allocation Preferences
 
 **User Journey:**
+
 1. User navigates to Settings → Allocation
 2. Sees two preference sections:
    - Holding Target Behavior (Preview/Strict)
@@ -935,6 +1031,7 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 ### 6.2 Use Strict Mode
 
 **User Journey:**
+
 1. User enables Strict Mode in Settings
 2. Navigates to Allocation Overview
 3. Opens side panel for an asset class
@@ -949,6 +1046,7 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 ### 6.3 View Sub-Pie Chart
 
 **User Journey:**
+
 1. User opens side panel for an asset class (e.g., Equity)
 2. Views allocation target section (slider/input)
 3. Sees sub-pie chart below showing holding breakdown:
@@ -962,6 +1060,7 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 ### 6.4 Analyze Holdings in Table View
 
 **User Journey:**
+
 1. User navigates to "Holdings Table" tab
 2. Sees all holdings with allocation data in table format
 3. Sorts by "Deviation" column to find biggest gaps
@@ -974,6 +1073,7 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 ### 6.5 First-Time User (Banner)
 
 **User Journey:**
+
 1. User upgrades to Phase 4
 2. Visits Allocation page for first time
 3. Sees blue banner at top: "New: Allocation Settings"
@@ -991,16 +1091,19 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 ### 7.1 Unit Tests (Vitest)
 
 **Settings Hook:**
+
 - `useAllocationSettings` returns correct values from context
 - Defaults to "preview" and "detailed" when settings undefined
 - `isStrictMode` and `isPreviewMode` flags work correctly
 
 **Validation Hook:**
+
 - `useStrictModeValidation` returns `isValid: true` in preview mode
 - Returns correct errors when totals ≠ 100% in strict mode
 - Handles edge cases (empty holdings, missing targets)
 
 **Sub-Pie Chart:**
+
 - Renders empty state when no targets
 - Calculates percentages correctly
 - Handles missing holding data gracefully
@@ -1008,18 +1111,21 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 ### 7.2 Integration Tests
 
 **Settings Persistence:**
+
 - Save allocation preferences in Settings page
 - Navigate to Allocation page
 - Verify strict mode is active (validation shown)
 - Verify rebalancing default view applied
 
 **Tab Navigation:**
+
 - Switch between all 5 tabs
 - Verify Holdings Table loads data
 - Verify Allocation Overview shows pie chart
 - Verify state persists when switching tabs
 
 **Strict Mode Workflow:**
+
 - Enable strict mode
 - Create targets that sum to 95%
 - Verify save is blocked
@@ -1029,6 +1135,7 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 ### 7.3 Manual Testing Scenarios
 
 **Settings Page:**
+
 - [ ] Allocation section visible in Settings nav
 - [ ] Radio buttons toggle correctly
 - [ ] Save button updates database
@@ -1036,6 +1143,7 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 - [ ] Preferences persist after page reload
 
 **Sub-Pie Chart:**
+
 - [ ] Chart renders in side panel
 - [ ] Positioned below target, above holdings
 - [ ] Shows correct percentages
@@ -1045,6 +1153,7 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 - [ ] Responsive to side panel width
 
 **Strict Mode:**
+
 - [ ] Asset class targets validate to 100%
 - [ ] Holding targets validate per asset class
 - [ ] Error messages are specific and helpful
@@ -1053,6 +1162,7 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 - [ ] Switching modes in Settings takes effect immediately
 
 **Holdings Table:**
+
 - [ ] Tab appears in navigation
 - [ ] Table displays all holdings with targets
 - [ ] Columns show correct data
@@ -1066,6 +1176,7 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 - [ ] Empty state when no targets
 
 **Banner (Optional):**
+
 - [ ] Shows on first visit after upgrade
 - [ ] Dismissible with × button
 - [ ] "Go to Settings" navigates correctly
@@ -1081,6 +1192,7 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 **Decision:** Holdings Table tab is for analysis only, not editing.
 
 **Rationale:**
+
 - Editing happens in side panel (Allocation Overview tab)
 - Avoids duplication of edit UI
 - Table optimized for sorting, filtering, comparison
@@ -1106,7 +1218,8 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 
 **Rationale:** Visual consistency, stays within green palette for holdings.
 
-**Enhancement (future):** Different color palettes per asset class (e.g., equity = greens, bonds = blues).
+**Enhancement (future):** Different color palettes per asset class (e.g., equity
+= greens, bonds = blues).
 
 ### 8.4 Settings Stored in Database (Not localStorage)
 
@@ -1127,6 +1240,7 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 **Status:** Planning phase
 
 **Tasks:**
+
 - [ ] Backend: Add settings keys to SettingsService
 - [ ] Backend: Update Settings model with new fields
 - [ ] Frontend: Update Settings TypeScript type
@@ -1145,6 +1259,7 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 **Status:** Pending Sprint 1 completion
 
 **Tasks:**
+
 - [ ] Install/configure recharts
 - [ ] Create SubPieChart component
 - [ ] Green color palette
@@ -1167,6 +1282,7 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 **Status:** Pending Sprint 2 completion
 
 **Tasks:**
+
 - [ ] Create HoldingsAllocationTable component
 - [ ] Reuse DataTable component
 - [ ] Define columns (symbol, name, targets, deviation, etc.)
@@ -1189,6 +1305,7 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 **Status:** Nice-to-have, implement if time permits
 
 **Tasks:**
+
 - [ ] Create AllocationSettingsBanner component
 - [ ] Check dismissed setting
 - [ ] Render at top of allocation page
@@ -1206,7 +1323,8 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 
 - ✅ Users can configure allocation preferences in Settings → Allocation
 - ✅ Strict mode enforces 100% validation at asset class AND holding levels
-- ✅ Preview mode maintains Phase 3 behavior (auto-distribution, no strict validation)
+- ✅ Preview mode maintains Phase 3 behavior (auto-distribution, no strict
+  validation)
 - ✅ Sub-pie chart displays holding breakdown in side panel
 - ✅ Sub-pie chart appears below target section, above holdings list
 - ✅ Holdings Table tab shows all holdings with allocation data
@@ -1219,6 +1337,7 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 - ✅ No regressions in Phase 3 functionality
 
 **Optional (nice-to-have):**
+
 - ⏳ One-time banner notifies users of new settings
 
 ---
@@ -1228,36 +1347,43 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 **Not included in Phase 4:**
 
 ### 11.1 Historical Tracking
+
 - Track target changes over time
 - Timeline view of allocation adjustments
 - Audit log: "User changed VTI target from 40% to 50% on 2026-02-15"
 
 ### 11.2 Drift Alerts
+
 - Notify when holdings deviate >5% from targets
 - Email/push notifications (requires notification system)
 - Dashboard widget: "3 holdings need rebalancing"
 
 ### 11.3 Drag-and-Drop Reordering
+
 - Visual reordering of holdings in side panel
 - Affects display order only (not allocation logic)
 - Persist order preference per user
 
 ### 11.4 Bulk Import/Export
+
 - CSV import: Upload holding targets in bulk
 - CSV export: Download all targets for backup
 - Template generator for import
 
 ### 11.5 Multi-Currency Target Display
+
 - Show targets in multiple currencies simultaneously
 - Currency conversion in Holdings Table
 - Toggle between base currency and local currency
 
 ### 11.6 Advanced Color Schemes
+
 - Different color palettes per asset class in sub-pie charts
 - User-customizable colors (Settings → Appearance → Allocation Colors)
 - Accessibility: High-contrast mode, color-blind friendly palettes
 
 ### 11.7 Mobile Optimization
+
 - Touch-friendly sub-pie charts
 - Responsive Holdings Table (horizontal scroll or stacked layout)
 - Mobile-specific gestures for tab switching
@@ -1273,6 +1399,7 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 Allocation preferences use existing `app_settings` key-value table.
 
 **Migration Steps:**
+
 1. No schema changes needed
 2. On first load, `SettingsService` returns defaults for new keys
 3. Users start with Preview Mode by default
@@ -1281,11 +1408,13 @@ Allocation preferences use existing `app_settings` key-value table.
 ### 12.2 Existing Users
 
 **Defaults for Phase 4 Users:**
+
 - `allocation_holding_target_mode`: `"preview"` (maintains current behavior)
 - `allocation_rebalancing_default_view`: `"detailed"` (current default)
 - `allocation_settings_banner_dismissed`: `"false"` (show banner once)
 
 **No breaking changes:**
+
 - All Phase 3 features continue to work identically
 - Strict mode is opt-in
 - Holdings Table is additive (new tab)
@@ -1294,6 +1423,7 @@ Allocation preferences use existing `app_settings` key-value table.
 ### 12.3 Rollback Plan
 
 If Phase 4 needs to be rolled back:
+
 1. Remove "Holdings Table" tab from navigation
 2. Remove sub-pie chart from side panel
 3. Remove Allocation section from Settings
@@ -1306,22 +1436,29 @@ If Phase 4 needs to be rolled back:
 
 **Before starting implementation:**
 
-1. **Sub-pie chart library:** Confirm recharts is preferred, or use d3.js directly?
+1. **Sub-pie chart library:** Confirm recharts is preferred, or use d3.js
+   directly?
    - Recommendation: recharts (simpler, already in project)
 
-2. **Strict mode UX:** Should we show a warning when switching to strict mode if current targets don't sum to 100%?
-   - Recommendation: Yes, show info dialog explaining targets will need adjustment
+2. **Strict mode UX:** Should we show a warning when switching to strict mode if
+   current targets don't sum to 100%?
+   - Recommendation: Yes, show info dialog explaining targets will need
+     adjustment
 
 3. **Holdings Table default sort:** What should be the initial sort order?
-   - Recommendation: Sort by "Asset Class" (ascending), then "Deviation" (descending) to highlight issues
+   - Recommendation: Sort by "Asset Class" (ascending), then "Deviation"
+     (descending) to highlight issues
 
-4. **Banner priority:** Should we implement the one-time banner, or defer to Phase 5?
+4. **Banner priority:** Should we implement the one-time banner, or defer to
+   Phase 5?
    - Recommendation: Defer if time-constrained; not critical for Phase 4
 
 5. **Settings section name:** "Allocation" or "Allocation Preferences"?
-   - Recommendation: "Allocation" (shorter, consistent with other sections like "Appearance")
+   - Recommendation: "Allocation" (shorter, consistent with other sections like
+     "Appearance")
 
-6. **Tab removal timing:** When will "Targets" and "Composition" tabs be removed?
+6. **Tab removal timing:** When will "Targets" and "Composition" tabs be
+   removed?
    - Note: Plan for removal before production, but Phase 4 includes all 5 tabs
 
 ---
@@ -1331,48 +1468,56 @@ If Phase 4 needs to be rolled back:
 **DO NOT FORGET:**
 
 ✅ **Strict Mode Applies to Both Levels:**
+
 - Validate asset class targets sum to 100%
 - Validate holding targets (per asset class) sum to 100%
 - Show specific error messages for each level
 - Block save when any validation fails
 
 ✅ **Sub-Pie Chart Placement:**
+
 - Must appear AFTER allocation target section
 - Must appear BEFORE holdings list
 - Compact size (200-250px) to fit side panel
 - Empty state when no holding targets exist
 
 ✅ **Settings Integration:**
+
 - Use existing `SettingsProvider` context (don't create new one)
 - Update Settings TypeScript type with new fields
 - Add default values in Rust repository
 - Test settings persistence across page reloads
 
 ✅ **Holdings Table Tab Order:**
+
 - Insert between "Allocation Overview" and "Rebalancing Suggestions"
 - Update `TabType` type definition
 - Maintain tab state when switching
 - Empty state directs users to Allocation Overview
 
 ✅ **Backward Compatibility:**
+
 - All Phase 3 features must continue working
 - Preview mode is the default (no behavior change for existing users)
 - Strict mode is opt-in
 - No breaking changes to existing hooks or components
 
 ✅ **Component Reuse:**
+
 - Reuse `DataTable` from Holdings page for table view
 - Reuse existing color palette constants
 - Reuse `TickerAvatar` component
 - Don't duplicate validation logic (use shared hook)
 
 ✅ **Error Messaging:**
+
 - Be specific: "Equity holdings must sum to 100%. Current: 95.0%"
 - Not generic: "Invalid allocation"
 - Show all errors simultaneously (don't hide after first error)
 - Clear errors when user fixes the issue
 
 ✅ **Testing Priority:**
+
 - Settings persistence is critical (affects all features)
 - Strict mode validation must be bulletproof
 - Holdings Table calculations must be accurate (cascaded percentages)

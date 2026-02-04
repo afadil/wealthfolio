@@ -23,18 +23,21 @@ export function AllocationOverview({
   onEditTargets,
   onDeleteTarget,
   onToggleLock, // ← ADDED
-  accountId = '',
+  accountId = "",
 }: AllocationOverviewProps) {
   // Merge current and target data
   const comparisonData = useMemo(() => {
-    const data = new Map<string, {
-      assetClass: string;
-      current: { value: number; percent: number };
-      target: { value: number; percent: number };
-      difference: { value: number; percent: number };
-      status: "over" | "under" | "on-target";
-      isLocked: boolean; // ← ADDED: Track lock state from database
-    }>();
+    const data = new Map<
+      string,
+      {
+        assetClass: string;
+        current: { value: number; percent: number };
+        target: { value: number; percent: number };
+        difference: { value: number; percent: number };
+        status: "over" | "under" | "on-target";
+        isLocked: boolean; // ← ADDED: Track lock state from database
+      }
+    >();
 
     // Add current allocations
     currentAllocation.forEach((allocation) => {
@@ -66,8 +69,11 @@ export function AllocationOverview({
           percent: existing.current.percent - target.targetPercent,
         };
         existing.status =
-          Math.abs(existing.difference.percent) < 0.5 ? "on-target" :
-          existing.difference.value > 0 ? "over" : "under";
+          Math.abs(existing.difference.percent) < 0.5
+            ? "on-target"
+            : existing.difference.value > 0
+              ? "over"
+              : "under";
         existing.isLocked = target.isLocked || false; // ← ADDED: Get lock state from database
       } else {
         // Target exists but no current holdings
@@ -82,16 +88,16 @@ export function AllocationOverview({
       }
     });
 
-    return Array.from(data.values()).sort((a, b) =>
-      b.current.value - a.current.value
-    );
+    return Array.from(data.values()).sort((a, b) => b.current.value - a.current.value);
   }, [currentAllocation, targets, totalValue]);
 
   // Calculate overall drift
   const totalDrift = useMemo(() => {
-    return comparisonData.reduce((sum, item) => {
-      return sum + Math.abs(item.difference.percent);
-    }, 0) / 2; // Divide by 2 because over and under cancel out
+    return (
+      comparisonData.reduce((sum, item) => {
+        return sum + Math.abs(item.difference.percent);
+      }, 0) / 2
+    ); // Divide by 2 because over and under cancel out
   }, [comparisonData]);
 
   const hasTargets = targets.length > 0;
@@ -99,12 +105,13 @@ export function AllocationOverview({
   if (!hasTargets) {
     return (
       <div className="space-y-6">
-        <div className="rounded-lg border bg-card p-6">
+        <div className="bg-card rounded-lg border p-6">
           <div className="text-center">
-            <Icons.Target className="text-muted-foreground mx-auto h-12 w-12 mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Target Allocation Set</h3>
+            <Icons.Target className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
+            <h3 className="mb-2 text-lg font-semibold">No Target Allocation Set</h3>
             <p className="text-muted-foreground mb-4">
-              Set your target allocation to see how your portfolio compares and get rebalancing guidance.
+              Set your target allocation to see how your portfolio compares and get rebalancing
+              guidance.
             </p>
             <Button onClick={onEditTargets}>
               <Icons.Plus className="mr-2 h-4 w-4" />
@@ -131,21 +138,24 @@ export function AllocationOverview({
   return (
     <div className="space-y-6">
       {/* Summary Card */}
-      <div className="rounded-lg border bg-card p-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-card rounded-lg border p-6">
+        <div className="mb-4 flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-medium text-muted-foreground">Portfolio Value</h3>
+            <h3 className="text-muted-foreground text-sm font-medium">Portfolio Value</h3>
             <p className="text-2xl font-bold">{formatAmount(totalValue, baseCurrency)}</p>
           </div>
           <div className="text-right">
-            <h3 className="text-sm font-medium text-muted-foreground">Drift from Target</h3>
-            <p className={`text-2xl font-bold ${
-              totalDrift < 1 ? "text-green-600" :
-              totalDrift < 5 ? "text-yellow-600" :
-              "text-red-600"
-            }`}>
-              {totalDrift.toFixed(1)}%
-              {totalDrift < 1 && " ✓"}
+            <h3 className="text-muted-foreground text-sm font-medium">Drift from Target</h3>
+            <p
+              className={`text-2xl font-bold ${
+                totalDrift < 1
+                  ? "text-green-600"
+                  : totalDrift < 5
+                    ? "text-yellow-600"
+                    : "text-red-600"
+              }`}
+            >
+              {totalDrift.toFixed(1)}%{totalDrift < 1 && " ✓"}
               {totalDrift >= 5 && " ⚠️"}
             </p>
           </div>
@@ -215,27 +225,27 @@ function ComparisonCard({ data, baseCurrency, onDelete, onToggleLock }: Comparis
   };
 
   const statusColor = {
-    "over": "text-blue-600 dark:text-blue-400",
-    "under": "text-orange-600 dark:text-orange-400",
+    over: "text-blue-600 dark:text-blue-400",
+    under: "text-orange-600 dark:text-orange-400",
     "on-target": "text-green-600 dark:text-green-400",
   }[data.status];
 
   const statusIcon = {
-    "over": "↑",
-    "under": "↓",
+    over: "↑",
+    under: "↓",
     "on-target": "✓",
   }[data.status];
 
   const statusText = {
-    "over": "Overweight",
-    "under": "Underweight",
+    over: "Overweight",
+    under: "Underweight",
     "on-target": "On Target",
   }[data.status];
 
   return (
-    <div className="rounded-lg border bg-card p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h4 className="font-semibold text-lg">{data.assetClass}</h4>
+    <div className="bg-card rounded-lg border p-4">
+      <div className="mb-4 flex items-center justify-between">
+        <h4 className="text-lg font-semibold">{data.assetClass}</h4>
         <div className="flex items-center gap-2">
           <span className={`text-sm font-medium ${statusColor}`}>
             {statusIcon} {statusText}
@@ -248,11 +258,9 @@ function ComparisonCard({ data, baseCurrency, onDelete, onToggleLock }: Comparis
                 onClick={handleDelete}
                 disabled={isLocked}
                 className={`h-7 w-7 p-0 ${
-                  isLocked
-                    ? 'text-muted-foreground/50 cursor-not-allowed hover:bg-transparent'
-                    : ''
+                  isLocked ? "text-muted-foreground/50 cursor-not-allowed hover:bg-transparent" : ""
                 }`}
-                title={isLocked ? 'Cannot delete locked target' : 'Delete target'}
+                title={isLocked ? "Cannot delete locked target" : "Delete target"}
               >
                 ✕
               </Button>
@@ -262,12 +270,12 @@ function ComparisonCard({ data, baseCurrency, onDelete, onToggleLock }: Comparis
                 onClick={handleToggleLock}
                 className={`h-7 w-7 p-0 ${
                   isLocked
-                    ? 'text-white bg-red-600 dark:bg-red-700 hover:bg-red-700 dark:hover:bg-red-800'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? "bg-red-600 text-white hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
-                title={isLocked ? 'Unlock target' : 'Lock target'}
+                title={isLocked ? "Unlock target" : "Lock target"}
               >
-                {isLocked ? '🔒' : '🔓'}
+                {isLocked ? "🔒" : "🔓"}
               </Button>
             </>
           )}
@@ -275,7 +283,7 @@ function ComparisonCard({ data, baseCurrency, onDelete, onToggleLock }: Comparis
       </div>
 
       {/* Top Row: Current vs Target vs Drift */}
-      <div className="flex items-center justify-between text-sm mb-4">
+      <div className="mb-4 flex items-center justify-between text-sm">
         <div>
           <p className="text-muted-foreground text-xs">Current</p>
           <p className="font-semibold">{data.current.percent.toFixed(1)}%</p>
@@ -287,7 +295,8 @@ function ComparisonCard({ data, baseCurrency, onDelete, onToggleLock }: Comparis
         <div className="text-right">
           <p className="text-muted-foreground text-xs">Drift</p>
           <p className={`font-semibold ${statusColor}`}>
-            {data.difference.percent > 0 ? "+" : ""}{data.difference.percent.toFixed(1)}%
+            {data.difference.percent > 0 ? "+" : ""}
+            {data.difference.percent.toFixed(1)}%
           </p>
         </div>
       </div>
@@ -320,9 +329,13 @@ function ComparisonCard({ data, baseCurrency, onDelete, onToggleLock }: Comparis
 
       {/* Difference Alert */}
       {data.status !== "on-target" && (
-        <div className={`text-sm p-2 rounded ${
-          data.status === "over" ? "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400" : "bg-orange-50 dark:bg-orange-950 text-orange-700 dark:text-orange-400"
-        }`}>
+        <div
+          className={`rounded p-2 text-sm ${
+            data.status === "over"
+              ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400"
+              : "bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-400"
+          }`}
+        >
           {data.status === "over" ? "Over-allocated" : "Need to add"}:{" "}
           <span className="font-semibold">
             {formatAmount(Math.abs(data.difference.value), baseCurrency)}
@@ -344,13 +357,13 @@ interface CurrentOnlyCardProps {
 
 function CurrentOnlyCard({ allocation, baseCurrency }: CurrentOnlyCardProps) {
   return (
-    <div className="rounded-lg border bg-card p-4">
-      <div className="flex items-center justify-between mb-2">
+    <div className="bg-card rounded-lg border p-4">
+      <div className="mb-2 flex items-center justify-between">
         <h4 className="font-semibold">{allocation.assetClass}</h4>
         <span className="text-lg font-semibold">{allocation.actualPercent.toFixed(1)}%</span>
       </div>
 
-      <div className="bg-muted h-3 w-full overflow-hidden rounded-full mb-2">
+      <div className="bg-muted mb-2 h-3 w-full overflow-hidden rounded-full">
         <div
           className="bg-primary h-full transition-all"
           style={{ width: `${Math.min(allocation.actualPercent, 100)}%` }}

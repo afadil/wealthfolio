@@ -31,7 +31,7 @@ export function AssetClassTargetCard({
   onProportionalChange,
   onToggleLock,
   isLoading = false,
-  accountId: _accountId = '',
+  accountId: _accountId = "",
   isReadOnly = false,
   isLocked = false, // Get initial lock state from parent
 }: AssetClassTargetCardProps) {
@@ -80,7 +80,7 @@ export function AssetClassTargetCard({
         allTargets,
         assetClass,
         newValue,
-        lockedAssets // Pass locked assets to prevent them from being adjusted
+        lockedAssets, // Pass locked assets to prevent them from being adjusted
       );
 
       setIsSaving(true);
@@ -111,10 +111,10 @@ export function AssetClassTargetCard({
   const handleTargetInputChange = (value: string) => {
     if (isReadOnly) return;
     // Allow only numbers and one decimal point
-    const sanitized = value.replace(/[^0-9.]/g, '');
+    const sanitized = value.replace(/[^0-9.]/g, "");
     // Prevent leading zeros (e.g., "020" → "20")
-    const cleaned = sanitized.replace(/^0+(?=\d)/, '');
-    setEditValue(cleaned || '0');
+    const cleaned = sanitized.replace(/^0+(?=\d)/, "");
+    setEditValue(cleaned || "0");
   };
 
   const handleTargetInputBlur = async () => {
@@ -137,13 +137,18 @@ export function AssetClassTargetCard({
   };
 
   const drift = actualPercent - localTarget;
-  const driftColor = Math.abs(drift) < 2 ? "text-green-600 dark:text-green-400" : drift > 0 ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400";
+  const driftColor =
+    Math.abs(drift) < 2
+      ? "text-green-600 dark:text-green-400"
+      : drift > 0
+        ? "text-orange-600 dark:text-orange-400"
+        : "text-blue-600 dark:text-blue-400";
 
   return (
-    <Card className="p-6 space-y-4 hover:shadow-md transition-shadow">
+    <Card className="space-y-4 p-6 transition-shadow hover:shadow-md">
       {/* Header: Name + Actions */}
       <div className="flex items-center justify-between gap-2">
-        <h3 className="font-semibold text-base">{assetClass}</h3>
+        <h3 className="text-base font-semibold">{assetClass}</h3>
         <div className="flex gap-1">
           <Button
             variant="ghost"
@@ -177,15 +182,15 @@ export function AssetClassTargetCard({
               onChange={(e) => handleTargetInputChange(e.target.value)}
               onBlur={handleTargetInputBlur}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') handleTargetInputBlur();
-                if (e.key === 'Escape') {
+                if (e.key === "Enter") handleTargetInputBlur();
+                if (e.key === "Escape") {
                   setIsEditingTarget(false);
                   setEditValue(localTarget.toFixed(1));
                 }
               }}
               autoFocus
               disabled={isLockedState}
-              className="w-16 px-2 py-1 border border-primary rounded bg-background text-foreground font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              className="border-primary bg-background text-foreground w-16 rounded border px-2 py-1 font-semibold disabled:cursor-not-allowed disabled:opacity-50"
               placeholder="0"
             />
           ) : (
@@ -193,8 +198,8 @@ export function AssetClassTargetCard({
               onClick={() => !isLockedState && setIsEditingTarget(true)}
               className={`font-semibold transition-colors ${
                 isLockedState
-                  ? 'cursor-not-allowed opacity-50'
-                  : 'cursor-pointer hover:text-primary'
+                  ? "cursor-not-allowed opacity-50"
+                  : "hover:text-primary cursor-pointer"
               }`}
             >
               {localTarget.toFixed(1)}%
@@ -208,7 +213,8 @@ export function AssetClassTargetCard({
         <div className="text-right">
           <p className="text-muted-foreground text-xs">Drift</p>
           <p className={`font-semibold ${driftColor}`}>
-            {drift > 0 ? '+' : ''}{drift.toFixed(1)}%
+            {drift > 0 ? "+" : ""}
+            {drift.toFixed(1)}%
           </p>
         </div>
       </div>
@@ -239,17 +245,17 @@ export function AssetClassTargetCard({
 
         {/* Actual Bar */}
         <div className="flex items-center gap-2">
-          <div className="bg-secondary relative h-6 flex-1 overflow-hidden rounded flex items-center justify-between">
+          <div className="bg-secondary relative flex h-6 flex-1 items-center justify-between overflow-hidden rounded">
             <div
-              className="bg-green-600 dark:bg-green-500 absolute top-0 left-0 h-full rounded transition-all"
+              className="absolute top-0 left-0 h-full rounded bg-green-600 transition-all dark:bg-green-500"
               style={{ width: `${Math.min(actualPercent, 100)}%` }}
             />
             {/* Label on left (inside colored portion) */}
-            <div className="text-background absolute top-0 left-0 flex h-full items-center px-2 text-xs font-medium z-10">
+            <div className="text-background absolute top-0 left-0 z-10 flex h-full items-center px-2 text-xs font-medium">
               <span className="whitespace-nowrap">Actual</span>
             </div>
             {/* Percentage on right (inside bar, at end of colored portion) */}
-            <div className="text-foreground absolute top-0 right-0 flex h-full items-center px-2 text-xs font-medium z-10">
+            <div className="text-foreground absolute top-0 right-0 z-10 flex h-full items-center px-2 text-xs font-medium">
               <span className="whitespace-nowrap">{actualPercent.toFixed(1)}%</span>
             </div>
           </div>

@@ -85,12 +85,18 @@ export function PerformanceChartMobile({ data }: PerformanceChartMobileProps) {
     return config;
   }, {} as ChartConfig);
 
-  const tooltipFormatter = (value: ValueType | undefined, name: NameType | undefined): [string, string] => {
-    return [String(value ?? 0), String(name ?? '')];
+  const tooltipFormatter = (
+    value: ValueType | undefined,
+    name: NameType | undefined,
+  ): [string, string] => {
+    return [String(value ?? 0), String(name ?? "")];
   };
 
-  const tooltipLabelFormatter = (label: ReactNode, _payload: readonly Payload<ValueType, NameType>[]): ReactNode => {
-    return String(label ?? '');
+  const tooltipLabelFormatter = (
+    label: ReactNode,
+    _payload: readonly Payload<ValueType, NameType>[],
+  ): ReactNode => {
+    return String(label ?? "");
   };
 
   return (
