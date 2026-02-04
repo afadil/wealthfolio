@@ -240,9 +240,11 @@ export default function AllocationPage() {
 
   // Determine which account ID to use for strategies
   // - If single account: use that account's ID
-  // - If multi-account: use virtual strategy ID
+  // - If multi-account: use virtual strategy ID (wait for it to be created)
   // - If "All Portfolio": use PORTFOLIO_ACCOUNT_ID
-  const selectedAccountId = virtualStrategy?.id ?? primaryAccount?.id ?? PORTFOLIO_ACCOUNT_ID;
+  const selectedAccountId = isMultiAccountView
+    ? (virtualStrategy?.id ?? null) // Multi-account: only use virtual strategy, don't fall back
+    : (primaryAccount?.id ?? PORTFOLIO_ACCOUNT_ID); // Single account: use account ID
 
   // Removed old combined portfolio logic - now handled by virtual strategies in ensureStrategy effect
 
