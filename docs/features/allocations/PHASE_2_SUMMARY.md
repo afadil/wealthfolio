@@ -1,15 +1,42 @@
-# Phase 2 Summary - Rebalancing Suggestions Calculator
+# Phase 2 Summary - Asset Allocation & Target Management
 
 **Status**: ✅ COMPLETE
 **Date**: January 27, 2026
-**Scope**: Asset-class level rebalancing suggestions (not per-holding)
+**Scope**: Asset-class level allocation management with lock protection and auto-scaling
 
 ---
 
 ## What's Included in Phase 2
 
-### Core Feature: Rebalancing Suggestions Tab
+### Core Features
 
+#### 1. Target Allocation Management
+- Create, edit, and delete asset class targets
+- Bidirectional slider synchronization
+- Auto-scaling when total allocation exceeds 100%
+- Duplicate prevention (can't create target for same asset class twice)
+
+#### 2. Lock/Unlock System
+- Toggle lock state per asset class target
+- Locked targets cannot be deleted or modified via slider
+- Visual indicator: dark grey background on lock icon when active
+- Lock state persists in localStorage per account
+- Clear tooltip on delete attempt for locked targets
+
+#### 3. Proportional Auto-Scaling
+**Delete scenario:**
+- User deletes an asset class target
+- Remaining targets automatically scale proportionally to 100%
+- Example: Delete "Equity" (60%), keep "Bonds" (30%) + "Cash" (10%)
+  - Result: "Bonds" scales to 75%, "Cash" to 25%
+
+**Form submission scenario:**
+- User adds new target when total is already at 100%
+- Dialog allows submission (no over-allocation error blocking)
+- Backend auto-scales existing allocations proportionally
+- New target added at desired percentage
+
+#### 4. Rebalancing Suggestions Calculator
 **User Flow:**
 1. User navigates to "Rebalancing Suggestions" tab
 2. Enters available cash amount (decimal support, 2 places max)
@@ -26,7 +53,7 @@
 
 ### Calculation Logic
 
-**Algorithm:**
+**Rebalancing Algorithm:**
 1. Calculate new portfolio total: `current + availableCash`
 2. For each asset class:
    - Current value: `actualPercent × currentPortfolio`
@@ -48,38 +75,54 @@ Equity (60% target, 50.2% current):
 
 ### UI/UX Features
 
+✅ **Allocation Overview Tab**
+- Pie chart visualization of current allocation
+- Target vs Actual comparison cards
+- Lock/unlock button per asset class (dark grey background when locked)
+- Delete button with tooltip (only for locked targets)
+- Auto-scaling visualization
+- Drift indicator (total deviation from targets)
+
 ✅ **Input Validation**
 - No leading zeros (fixed: "01000" → "1000")
 - Decimal support (2 places max)
 - Shows currency symbol based on account
 - Clear placeholder text
+- Duplicate asset class prevention in form dialog
 
 ✅ **Empty States**
-- No targets set: Shows helpful message directing to "Allocation Overview" tab
+- No targets set: Shows helpful message directing to "Add Target" button
 - After calculation: Shows full breakdown with summary
+- Rebalancing suggestions: Shows message when no targets configured
 
 ✅ **State Management**
 - Auto-resets when user switches accounts (using React key)
 - Suggestions cleared when account changes
 - Form input cleared automatically
+- Lock state persists in localStorage per account + asset class
 
 ✅ **Accessibility**
 - Proper labels on form inputs
 - Clear visual hierarchy
 - Keyboard navigable
 - Error messages are helpful
+- AlertDialog for locked target deletion attempts
 
 ### Components & Files
 
-**Modified:**
-- `src/pages/allocation/components/rebalancing-advisor.tsx` — Main calculator
-- `src/pages/allocation/index.tsx` — Tab integration + key prop
+**Modified/Created:**
+- `src/pages/allocation/components/allocation-overview.tsx` — Target comparison cards with lock/delete
+- `src/pages/allocation/components/allocation-pie-chart-view.tsx` — Pie chart with lock integration
+- `src/pages/allocation/components/asset-class-form-dialog.tsx` — Form validation & duplicate prevention
+- `src/pages/allocation/index.tsx` — Delete handler with proportional scaling
+- `src/pages/allocation/components/rebalancing-advisor.tsx` — Rebalancing suggestions calculator
 
 **Key changes:**
-- Fixed numeric input handling (text input with regex validation)
-- Corrected "Will adjust %" calculation formula
-- Added empty state message when no targets
-- Component remounts on account change
+- Lock state stored in `lockedAssets` Set in pie-chart-view component
+- Delete handler checks lock status before allowing deletion
+- Proportional scaling applied when deleting targets
+- AlertDialog replaces native confirm for better UX
+- Slider disabled when target is locked
 
 ---
 
@@ -97,14 +140,22 @@ Equity (60% target, 50.2% current):
 ## Testing Results
 
 **Tested scenarios:**
-- ✅ Large cash amounts (€100,000)
+- ✅ Bidirectional slider synchronization
+- ✅ Auto-scaling when total exceeds 100%
+- ✅ Duplicate asset class prevention
+- ✅ Lock/unlock toggle functionality
+- ✅ Slider disabled when locked
+- ✅ Delete prevention for locked targets
+- ✅ Proportional scaling on target deletion
+- ✅ AlertDialog displays on delete attempt (locked)
+- ✅ Lock icon visual changes (dark grey background)
+- ✅ Large cash amounts (€100,000) in rebalancing
 - ✅ Small cash amounts (€100, €500, €1,000)
 - ✅ Input handling (decimals, leading zeros, clear field)
 - ✅ Calculation accuracy (proportional scaling)
 - ✅ CSV export (functional)
 - ✅ Copy to clipboard (functional)
-- ✅ Account switching (form resets)
-- ✅ No targets set (empty state message)
+- ✅ Account switching (form resets, locks persist per account)
 - ✅ All tabs working (Targets, Composition, Allocation Overview, Rebalancing Suggestions)
 
 **Known acceptable behaviors:**
@@ -151,43 +202,7 @@ All calculations verified and accurate.
 
 ## Commit Information
 
-**Commit Message:**
-```
-feat(allocation): Implement Phase 2 - Rebalancing Suggestions calculator
-
-Core Features:
-- Interactive cash input field (decimal support, leading zero fix)
-- Proportional allocation calculator
-  - Calculates shortfalls for each asset class to reach targets
-  - Proportionally scales suggestions if cash is insufficient
-  - Accounts for new portfolio total after deposit
-
-UI/UX Improvements:
-- Empty state message when no targets set
-- Auto-reset suggestions and form when user switches accounts
-- 'Will adjust X to Y%' text shows correct post-allocation percentages
-- Copy to clipboard functionality for suggestions
-- CSV export for trade planning
-- Real-time calculation with visual breakdown by asset class
-
-Calculations & Math:
-- Accounts for portfolio growth across all asset classes
-- Percentage changes reflect proportional impact on total
-- Handles edge cases (small allocations, insufficient funds)
-- Currency-aware formatting with base currency support
-
-Bug Fixes:
-- Fixed numeric input handling (no more leading zeros like '01000')
-- Proper decimal precision (2 places max)
-- Corrected percentage calculations for scaled allocations
-- Component properly resets on account changes using React key
-
-Technical Implementation:
-- Rebalancing Suggestions tab integrated into main allocation page
-- Form state management with React hooks
-- Responsive card-based layout matching allocation design
-- Export buttons (Copy Text, Download CSV) functional
-```
+See commit message below.
 
 ---
 

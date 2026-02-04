@@ -13,6 +13,7 @@ interface AssetClassTargetCardProps {
   onTargetChange: (newPercent: number) => Promise<void>;
   onProportionalChange?: (targets: AssetClassTarget[]) => Promise<void>;
   isLoading?: boolean;
+  accountId?: string;
 }
 
 export function AssetClassTargetCard({
@@ -24,6 +25,7 @@ export function AssetClassTargetCard({
   onTargetChange,
   onProportionalChange,
   isLoading = false,
+  accountId = '',
 }: AssetClassTargetCardProps) {
   const { assetClass, actualPercent } = composition;
   const [localTarget, setLocalTarget] = useState(targetPercent);

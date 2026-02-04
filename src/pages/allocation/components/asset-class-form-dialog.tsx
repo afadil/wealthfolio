@@ -62,7 +62,13 @@ export function AssetClassFormDialog({
   const totalIfSavedInt = currentTotalInt - editingAmountInt + targetPercentInt;
   const totalIfSaved = totalIfSavedInt / 100;
 
+  // Check for duplicate asset class (only when creating new targets)
+  const isDuplicateAssetClass: boolean = !editingTarget && selectedClass ?
+    existingTargets.some(t => t.assetClass === selectedClass) :
+    false;
+
   // Allow exactly 100% (no tolerance needed with integer math)
+  // Over-allocation is allowed - will be auto-scaled on submit
   const isOverAllocated = totalIfSavedInt > 10000;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -206,15 +212,15 @@ export function AssetClassFormDialog({
                   {actualRemaining.toFixed(2)}%
                 </span>
               </div>
-              <div className={isOverAllocated ? 'text-red-600 dark:text-red-400' : totalIfSaved === 100 ? 'text-green-600 dark:text-green-400' : 'text-foreground'}>
+              <div className={isOverAllocated ? 'text-orange-600 dark:text-orange-400' : totalIfSaved === 100 ? 'text-green-600 dark:text-green-400' : 'text-foreground'}>
                 <span className="text-muted-foreground">Would be: </span>
                 <span className="font-semibold tabular-nums">{totalIfSaved.toFixed(1)}%</span>
               </div>
             </div>
 
             {isOverAllocated && (
-              <p className="text-xs text-red-600 dark:text-red-400 font-medium pt-2">
-                Over-allocated by {(totalIfSaved - 100).toFixed(1)}%. Please reduce.
+              <p className="text-xs text-orange-600 dark:text-orange-400 font-medium pt-2">
+                Over-allocated by {(totalIfSaved - 100).toFixed(1)}%. Other allocations will auto-scale proportionally.
               </p>
             )}
           </div>
@@ -230,13 +236,20 @@ export function AssetClassFormDialog({
             >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={isLoading || availableAssetClasses.length === 0 || isOverAllocated || !selectedClass}
-              className="min-w-24"
-            >
-              {isLoading ? "Saving..." : editingTarget ? "Update Target" : "Create Target"}
-            </Button>
+            <div className="flex flex-col gap-2 items-end flex-grow">
+              {isDuplicateAssetClass && (
+                <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                  This asset class already has a target allocation.
+                </p>
+              )}
+              <Button
+                type="submit"
+                disabled={isLoading || availableAssetClasses.length === 0 || !selectedClass || isDuplicateAssetClass}
+                className="min-w-24"
+              >
+                {isLoading ? "Saving..." : editingTarget ? "Update Target" : "Create Target"}
+              </Button>
+            </div>
           </div>
         </form>
       </DialogContent>

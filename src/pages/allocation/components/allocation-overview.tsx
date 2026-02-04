@@ -10,6 +10,8 @@ interface AllocationOverviewProps {
   totalValue: number;
   baseCurrency: string;
   onEditTargets: () => void;
+  onDeleteTarget?: (assetClass: string) => Promise<void>;
+  accountId?: string;
 }
 
 export function AllocationOverview({
@@ -18,6 +20,8 @@ export function AllocationOverview({
   totalValue,
   baseCurrency,
   onEditTargets,
+  onDeleteTarget,
+  accountId = '',
 }: AllocationOverviewProps) {
   // Merge current and target data
   const comparisonData = useMemo(() => {
@@ -155,6 +159,8 @@ export function AllocationOverview({
             key={item.assetClass}
             data={item}
             baseCurrency={baseCurrency}
+            onDelete={onDeleteTarget}
+            accountId={accountId}
           />
         ))}
       </div>
@@ -175,9 +181,38 @@ interface ComparisonCardProps {
     status: "over" | "under" | "on-target";
   };
   baseCurrency: string;
+  onDelete?: (assetClass: string) => Promise<void>;
+  accountId?: string;
 }
 
-function ComparisonCard({ data, baseCurrency }: ComparisonCardProps) {
+function ComparisonCard({ data, baseCurrency, onDelete, accountId = '' }: ComparisonCardProps) {
+  const { useState } = require('react');
+  const [isLocked, setIsLocked] = useState(() => {
+    const lockKey = `allocation-lock-${accountId}-${data.assetClass}`;
+    return localStorage.getItem(lockKey) === 'true';
+  });
+
+  const handleToggleLock = () => {
+    const newLockedState = !isLocked;
+    const lockKey = `allocation-lock-${accountId}-${data.assetClass}`;
+    setIsLocked(newLockedState);
+    if (newLockedState) {
+      localStorage.setItem(lockKey, 'true');
+    } else {
+      localStorage.removeItem(lockKey);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (isLocked) {
+      alert(`Cannot delete locked target: ${data.assetClass}. Unlock it first to delete.`);
+      return;
+    }
+    if (onDelete && confirm(`Delete ${data.assetClass} allocation target?`)) {
+      await onDelete(data.assetClass);
+    }
+  };
+
   const statusColor = {
     "over": "text-blue-600 dark:text-blue-400",
     "under": "text-orange-600 dark:text-orange-400",
@@ -200,9 +235,42 @@ function ComparisonCard({ data, baseCurrency }: ComparisonCardProps) {
     <div className="rounded-lg border bg-card p-4">
       <div className="flex items-center justify-between mb-4">
         <h4 className="font-semibold text-lg">{data.assetClass}</h4>
-        <span className={`text-sm font-medium ${statusColor}`}>
-          {statusIcon} {statusText}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={`text-sm font-medium ${statusColor}`}>
+            {statusIcon} {statusText}
+          </span>
+          {onDelete && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDelete}
+                disabled={isLocked}
+                className={`h-7 w-7 p-0 ${
+                  isLocked
+                    ? 'text-muted-foreground/50 cursor-not-allowed hover:bg-transparent'
+                    : ''
+                }`}
+                title={isLocked ? 'Cannot delete locked target' : 'Delete target'}
+              >
+                ✕
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleToggleLock}
+                className={`h-7 w-7 p-0 ${
+                  isLocked
+                    ? 'text-white bg-red-600 dark:bg-red-700 hover:bg-red-700 dark:hover:bg-red-800'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                title={isLocked ? 'Unlock target' : 'Lock target'}
+              >
+                {isLocked ? '🔒' : '🔓'}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Top Row: Current vs Target vs Drift */}

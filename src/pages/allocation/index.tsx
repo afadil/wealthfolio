@@ -157,6 +157,50 @@ export default function AllocationPage() {
       ? targets.find((t) => t.assetClass === editingTarget)
       : null;
 
+    // Calculate current total (excluding the target being edited if editing)
+    const currentTotalInt = Math.round(targets.reduce((sum, t) => sum + t.targetPercent, 0) * 100);
+    const editingAmountInt = Math.round((existingTarget?.targetPercent || 0) * 100);
+    const newAmountInt = Math.round(validPercent * 100);
+    const totalIfSavedInt = currentTotalInt - editingAmountInt + newAmountInt;
+
+    // Check if we're over 100% and need to auto-scale
+    if (totalIfSavedInt > 10000) {
+      // User is creating a new target or increasing existing one beyond 100%
+      // Auto-scale existing targets proportionally
+      const availableSpaceInt = 10000 - newAmountInt;
+      const otherTargetsInt = currentTotalInt - editingAmountInt;
+
+      if (otherTargetsInt > 0) {
+        const scaleFactor = availableSpaceInt / otherTargetsInt;
+
+        // Update all OTHER targets (not including the one being saved) with scaled percentages
+        const targetsToUpdate = targets
+          .filter((t) => {
+            if (editingTarget) {
+              // If editing, exclude the edited target
+              return t.assetClass !== editingTarget;
+            }
+            // If creating new, update all existing targets
+            return true;
+          })
+          .map((t) => ({
+            ...t,
+            targetPercent: Math.max(0, t.targetPercent * scaleFactor),
+          }));
+
+        // Save all scaled targets
+        for (const target of targetsToUpdate) {
+          await saveTargetMutation.mutateAsync({
+            id: target.id,
+            strategyId: strategy.id,
+            assetClass: target.assetClass,
+            targetPercent: target.targetPercent,
+          });
+        }
+      }
+    }
+
+    // Save the new/edited target
     const payload = {
       ...(existingTarget?.id && { id: existingTarget.id }),
       strategyId: strategy.id,
@@ -179,11 +223,38 @@ export default function AllocationPage() {
   };
 
   const handleDelete = async (assetClass: string) => {
-    if (confirm(`Delete ${assetClass} allocation target?`)) {
-      const targetToDelete = targets.find((t) => t.assetClass === assetClass);
-      if (targetToDelete) {
-        await deleteTargetMutation.mutateAsync(targetToDelete.id);
+    const targetToDelete = targets.find((t) => t.assetClass === assetClass);
+
+    if (targetToDelete) {
+      // First, delete the target
+      await deleteTargetMutation.mutateAsync(targetToDelete.id);
+
+      // Calculate remaining targets after deletion
+      const remainingTargets = targets.filter((t) => t.assetClass !== assetClass);
+      const remainingTotalInt = Math.round(
+        remainingTargets.reduce((sum, t) => sum + t.targetPercent, 0) * 100
+      );
+
+      // If remaining targets exist and don't total 100%, scale them proportionally
+      if (remainingTargets.length > 0 && remainingTotalInt > 0 && remainingTotalInt !== 10000) {
+        const scaleFactor = 10000 / remainingTotalInt; // Scale to exactly 100%
+
+        // Update all remaining targets with scaled percentages
+        for (const target of remainingTargets) {
+          const scaledPercent = target.targetPercent * scaleFactor;
+          await saveTargetMutation.mutateAsync({
+            id: target.id,
+            strategyId: strategy?.id!,
+            assetClass: target.assetClass,
+            targetPercent: scaledPercent,
+          });
+        }
       }
+
+      // Force refresh of targets after all updates complete
+      queryClient.invalidateQueries({
+        queryKey: [QueryKeys.ASSET_CLASS_TARGETS, selectedAccountId],
+      });
     }
   };
 
@@ -294,6 +365,7 @@ export default function AllocationPage() {
                       }
                     }}
                     isLoading={isMutating}
+                    accountId={selectedAccountId}
                   />
                 );
               })}
@@ -523,14 +595,9 @@ export default function AllocationPage() {
             }}
             onAddTarget={() => handleOpenForm()}
             onDeleteTarget={async (assetClass: string) => {
-              const target = targets.find((t) => t.assetClass === assetClass);
-              if (target) {
-                await deleteTargetMutation.mutateAsync(target.id);
-                queryClient.invalidateQueries({
-                  queryKey: [QueryKeys.ASSET_CLASS_TARGETS, selectedAccountId],
-                });
-              }
+              await handleDelete(assetClass);
             }}
+            accountId={selectedAccountId}
           />
         )}
 

@@ -1,6 +1,7 @@
+import { Icons } from "@/components/ui/icons";
 import { useSettingsContext } from "@/lib/settings-provider";
 import type { AssetClassTarget } from "@/lib/types";
-import { Button, Card, CardContent, CardHeader, CardTitle, Icons, TargetPercentSlider } from "@wealthfolio/ui";
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogTitle, Button, Card, CardContent, CardHeader, CardTitle, TargetPercentSlider } from "@wealthfolio/ui";
 import { useState } from "react";
 import { useProportionalAllocation } from "../hooks";
 import type { CurrentAllocation } from "../hooks/use-current-allocation";
@@ -13,6 +14,7 @@ interface AllocationPieChartViewProps {
   onUpdateTarget?: (assetClass: string, newPercent: number) => Promise<void>;
   onAddTarget?: () => void;
   onDeleteTarget?: (assetClass: string) => Promise<void>;
+  accountId?: string;
 }
 
 export function AllocationPieChartView({
@@ -22,6 +24,7 @@ export function AllocationPieChartView({
   onUpdateTarget,
   onAddTarget,
   onDeleteTarget,
+  accountId = '',
 }: AllocationPieChartViewProps) {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency || "USD";
@@ -32,6 +35,9 @@ export function AllocationPieChartView({
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [deletingAsset, setDeletingAsset] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [lockedDeleteDialogOpen, setLockedDeleteDialogOpen] = useState(false);
+  const [lockedDeleteAsset, setLockedDeleteAsset] = useState<string | null>(null);
+  const [lockRefresh, setLockRefresh] = useState(0); // Force re-render when lock changes
   const { calculateProportionalTargets } = useProportionalAllocation();
 
   // Use integer arithmetic to avoid floating point precision issues
@@ -147,7 +153,7 @@ export function AllocationPieChartView({
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-sm">{target.assetClass}</span>
                       {onDeleteTarget && (
-                        <div>
+                        <div className="flex gap-1 items-center">
                           {deletingAsset === target.assetClass ? (
                             <div className="flex gap-2 text-xs">
                               <button
@@ -176,16 +182,22 @@ export function AllocationPieChartView({
                               </button>
                             </div>
                           ) : (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDeletingAsset(target.assetClass)}
-                              disabled={isSaving || isDeleting}
-                              className="h-6 w-6 p-0"
-                              title="Delete target"
-                            >
-                              <Icons.Trash className="h-4 w-4" />
-                            </Button>
+                            <>
+                              <button
+                                onClick={() => {
+                                  if (lockedAssets.has(target.assetClass)) {
+                                    setLockedDeleteAsset(target.assetClass);
+                                    setLockedDeleteDialogOpen(true);
+                                    return;
+                                  }
+                                  setDeletingAsset(target.assetClass);
+                                }}
+                                className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                                title="Delete target"
+                              >
+                                <Icons.Trash className="w-4 h-4" />
+                              </button>
+                            </>
                           )}
                         </div>
                       )}
@@ -320,7 +332,7 @@ export function AllocationPieChartView({
                             }
                           }}
                           label="Target"
-                          disabled={isSaving}
+                          disabled={isSaving || lockedAssets.has(target.assetClass)}
                           showValue={false}
                           isLocked={lockedAssets.has(target.assetClass)}
                           onToggleLock={() => {
@@ -363,6 +375,21 @@ export function AllocationPieChartView({
           </CardContent>
         </Card>
       </div>
+
+      {/* Locked Delete Dialog */}
+      <AlertDialog open={lockedDeleteDialogOpen} onOpenChange={setLockedDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogTitle>Cannot Delete Locked Target</AlertDialogTitle>
+          <AlertDialogDescription>
+            The <strong>{lockedDeleteAsset}</strong> allocation target is locked. Please unlock it first before deleting.
+          </AlertDialogDescription>
+          <div className="flex justify-end gap-2">
+            <AlertDialogAction onClick={() => setLockedDeleteDialogOpen(false)}>
+              Got it
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

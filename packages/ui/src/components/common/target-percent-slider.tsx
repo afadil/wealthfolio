@@ -133,8 +133,11 @@ export const TargetPercentSlider: React.FC<TargetPercentSliderProps> = ({
           <button
             type="button"
             onClick={onToggleLock}
-            disabled={disabled}
-            className="h-6 w-6 flex items-center justify-center opacity-70 hover:opacity-100 transition-opacity disabled:opacity-30 flex-shrink-0 text-muted-foreground hover:text-foreground"
+            className={`h-6 w-6 flex items-center justify-center flex-shrink-0 rounded transition-all disabled:opacity-30 ${
+              isLocked
+                ? "bg-secondary text-gray-700"
+                : "opacity-70 text-muted-foreground hover:text-foreground hover:opacity-100 hover:bg-muted"
+            }`}
             title={isLocked ? "Unlock target" : "Lock target"}
           >
             {isLocked ? (
@@ -159,8 +162,9 @@ export const TargetPercentSlider: React.FC<TargetPercentSliderProps> = ({
             <button
               type="button"
               onClick={onToggleLock}
-              disabled={disabled}
-              className="h-4 w-4 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              className={`h-4 w-4 flex items-center justify-center rounded px-1 transition-colors ${
+                isLocked ? "bg-secondary text-gray-700" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
               title={isLocked ? "Unlock target" : "Lock target"}
             >
               {isLocked ? (
