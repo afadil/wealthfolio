@@ -74,7 +74,7 @@ export function RebalancingAdvisor({
     if (totalSuggestedAllocation > availableCash + 0.01) {
       const scaleFactor = availableCash / totalSuggestedAllocation;
       newSuggestions.forEach((s) => {
-        s.suggestedBuy = s.suggestedBuy * scaleFactor;
+        s.suggestedBuy = s.shortfallAmount * scaleFactor;
         s.shortfallPercent = (s.suggestedBuy / newPortfolioTotal) * 100;
       });
     }
@@ -138,8 +138,18 @@ export function RebalancingAdvisor({
         </p>
       </div>
 
-      {/* Input Section */}
-      <div className="rounded-lg border border-border bg-card p-4 space-y-4">
+      {/* Empty State: No targets */}
+      {targets.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-muted-foreground/30 bg-muted/20 p-8 text-center space-y-3">
+          <p className="text-sm font-medium text-foreground">No allocation targets set</p>
+          <p className="text-sm text-muted-foreground">
+            Go to the "Allocation Overview" tab to create allocation targets first, then you can use the rebalancing calculator.
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Input Section */}
+          <div className="rounded-lg border border-border bg-card p-4 space-y-4">
         <div>
           <label className="text-sm font-semibold text-foreground">Available Cash to Invest</label>
           <div className="flex items-center gap-2 mt-2">
@@ -147,11 +157,20 @@ export function RebalancingAdvisor({
               {baseCurrency === "USD" ? "$" : baseCurrency}
             </span>
             <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={availableCash}
-              onChange={(e) => setAvailableCash(parseFloat(e.target.value) || 0)}
+              type="text"
+              inputMode="decimal"
+              value={availableCash === 0 ? '' : availableCash}
+              onChange={(e) => {
+                // Remove any non-numeric characters except decimal point
+                const sanitized = e.target.value.replace(/[^0-9.]/g, '');
+                // Remove leading zeros (but keep "0" if it's just "0" or "0.X")
+                const cleaned = sanitized.replace(/^0+(?=\d)/, '');
+                // Limit to 2 decimal places
+                const limited = cleaned.includes('.')
+                  ? cleaned.split('.')[0] + '.' + cleaned.split('.')[1].substring(0, 2)
+                  : cleaned;
+                setAvailableCash(parseFloat(limited) || 0);
+              }}
               disabled={isLoading}
               placeholder="0.00"
               className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
@@ -209,7 +228,14 @@ export function RebalancingAdvisor({
                 {suggestion.suggestedBuy > 0 && (
                   <div className="text-xs text-muted-foreground pt-1 border-t border-border/30">
                     {(() => {
-                      const newPercent = ((suggestion.currentPercent * totalPortfolioValue + suggestion.suggestedBuy) / (totalPortfolioValue + availableCash)) * 100;
+                      // Current value in absolute terms
+                      const currentValue = (suggestion.currentPercent / 100) * totalPortfolioValue;
+                      // New value after suggested buy
+                      const newValue = currentValue + suggestion.suggestedBuy;
+                      // New total portfolio
+                      const newTotal = totalPortfolioValue + availableCash;
+                      // New percentage
+                      const newPercent = (newValue / newTotal) * 100;
                       return `Will adjust ${suggestion.assetClass} to ${newPercent.toFixed(1)}%`;
                     })()}
                   </div>
@@ -261,12 +287,14 @@ export function RebalancingAdvisor({
       )}
 
       {/* Empty State */}
-      {suggestions.length === 0 && availableCash > 0 && (
+      {suggestions.length === 0 && availableCash > 0 && targets.length > 0 && (
         <div className="rounded-lg border border-dashed border-muted-foreground/30 bg-muted/20 p-6 text-center">
           <p className="text-sm text-muted-foreground">
             Enter your available cash above and click "Calculate Suggestions"
           </p>
         </div>
+      )}
+        </>
       )}
     </div>
   );

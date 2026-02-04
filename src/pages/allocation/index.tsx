@@ -536,6 +536,7 @@ export default function AllocationPage() {
 
         {viewTab === 'rebalancing' && (
           <RebalancingAdvisor
+            key={selectedAccountId}
             targets={targets}
             composition={composition}
             totalPortfolioValue={currentAllocation.totalValue}
