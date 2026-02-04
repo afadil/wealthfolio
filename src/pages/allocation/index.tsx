@@ -22,6 +22,7 @@ import { AssetClassTargetCard } from "./components/asset-class-target-card";
 import { HoldingTargetRow } from "./components/holding-target-row";
 import { RebalancingAdvisor } from "./components/rebalancing-advisor";
 import { SaveAsPortfolioModal } from "./components/save-as-portfolio-modal";
+import { SubPieChart } from "./components/sub-pie-chart";
 import { TargetPercentInput } from "./components/target-percent-input";
 import {
   useAssetClassMutations,
@@ -30,6 +31,7 @@ import {
   useHoldingTargets,
   useRebalancingStrategy,
 } from "./hooks";
+import { useStrictModeValidation } from "./hooks/use-strict-mode-validation";
 import {
   getAvailableAssetClasses,
   getHoldingDisplayName,
@@ -363,6 +365,22 @@ export default function AllocationPage() {
   // React Query automatically refetches when selectedAccountId changes via queryKey
   // No need for manual invalidation here
   const { data: targets = [] } = useAssetClassTargets(selectedAccountId);
+
+  // Fetch all holding targets for validation (aggregate from all asset classes)
+  const allHoldingTargetsQueries = useQueries({
+    queries: targets.map((target) => ({
+      queryKey: [QueryKeys.HOLDING_TARGETS, target.id],
+      queryFn: async () => {
+        const { getHoldingTargets } = await import("@/commands/rebalancing");
+        return getHoldingTargets(target.id);
+      },
+      enabled: !!target.id,
+    })),
+  });
+  const allHoldingTargets = allHoldingTargetsQueries.flatMap((query) => query.data || []);
+
+  // Strict mode validation
+  const strictValidation = useStrictModeValidation(targets, allHoldingTargets);
 
   // Fetch holdings for all selected accounts and aggregate
   const accountIds = selectedAccounts.map((acc) => acc.id);
@@ -1368,9 +1386,17 @@ export default function AllocationPage() {
                         <div className="flex flex-col items-end gap-1">
                           <Button
                             onClick={handleSaveAllTargets}
-                            disabled={isSavingAllTargets || !totalPercentageValidation.isValid}
+                            disabled={
+                              isSavingAllTargets ||
+                              !totalPercentageValidation.isValid ||
+                              !strictValidation.canSave
+                            }
                             size="sm"
-                            className={!totalPercentageValidation.isValid ? "opacity-50" : ""}
+                            className={
+                              !totalPercentageValidation.isValid || !strictValidation.canSave
+                                ? "opacity-50"
+                                : ""
+                            }
                           >
                             {isSavingAllTargets ? "Saving..." : "Save All Targets"}
                           </Button>
@@ -1380,10 +1406,37 @@ export default function AllocationPage() {
                                 {totalPercentageValidation.error}
                               </p>
                             )}
+                          {!strictValidation.isValid && strictValidation.errors.length > 0 && (
+                            <div className="text-xs font-medium text-red-600 dark:text-red-400">
+                              {strictValidation.errors.map((error, i) => (
+                                <p key={i}>• {error}</p>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
                   )}
+
+                  {/* Sub-Pie Chart: Visual breakdown of holdings within this asset class */}
+                  <div className="bg-muted/30 rounded-lg border p-4">
+                    <div className="mb-2">
+                      <p className="text-sm font-semibold">Holdings Breakdown</p>
+                    </div>
+                    <SubPieChart
+                      holdingTargets={allHoldingTargets.filter((ht) =>
+                        currentAllocation.assetClasses
+                          .find((ac) => ac.assetClass === selectedAssetClass)
+                          ?.subClasses.some((sc) => sc.holdings.some((h) => h.id === ht.assetId)),
+                      )}
+                      holdings={
+                        currentAllocation.assetClasses
+                          .find((ac) => ac.assetClass === selectedAssetClass)
+                          ?.subClasses.flatMap((sc) => sc.holdings) || []
+                      }
+                      assetClassName={selectedAssetClass}
+                    />
+                  </div>
 
                   {/* Section 2: Sub-Class Breakdown with Holding Targets */}
                   <div className="space-y-3">

@@ -568,11 +568,13 @@ export function useStrictModeValidation(
 
 ---
 
-### Sprint 2: Sub-Pie Chart & Strict Mode (2-3 days)
+### Sprint 2: Sub-Pie Chart & Strict Mode ✅ COMPLETE (1 day)
+
+**Completed:** February 1, 2026
 
 **Sub-Pie Chart Component:**
 
-- ✅ Install/configure charting library (recharts recommended)
+- ✅ Install/configure charting library (recharts already installed)
 - ✅ Create `SubPieChart` component:
   - Calculate holding percentages
   - Render compact pie chart (200-250px)
@@ -1279,26 +1281,29 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 
 ---
 
-### Sprint 2: Sub-Pie Chart & Strict Mode ⏳ NOT STARTED
+### Sprint 2: Sub-Pie Chart & Strict Mode ✅ COMPLETE
 
-**Status:** Pending Sprint 1 completion
+**Status:** Completed February 1, 2026
 
-**Tasks:**
+**Completed Tasks:**
 
-- [ ] Install/configure recharts
-- [ ] Create SubPieChart component
-- [ ] Green color palette
-- [ ] Interactive tooltips and legend
-- [ ] Empty state
-- [ ] Integrate into side panel
-- [ ] Create useStrictModeValidation hook
-- [ ] Asset class level validation
-- [ ] Holding level validation
-- [ ] Error message display
-- [ ] Disable save button when invalid
-- [ ] Test strict mode vs preview mode
+- [x] Install/configure recharts (already installed)
+- [x] Create SubPieChart component
+- [x] Green color palette (7 shades)
+- [x] Interactive tooltips and legend
+- [x] Empty state ("Set holding targets to see breakdown")
+- [x] Integrate into side panel (between target and holdings sections)
+- [x] Create useStrictModeValidation hook
+- [x] Asset class level validation (sum to 100%)
+- [x] Holding level validation (per asset class sum to 100%)
+- [x] Error message display (specific errors with bullet points)
+- [x] Disable save button when invalid (opacity + disabled state)
+- [x] Test strict mode vs preview mode
 
-**Estimated Duration:** 2-3 days
+**Actual Duration:** 1 day
+
+**Commits:**
+- `b4214f04` - feat(allocation): add sub-pie chart and strict mode validation
 
 ---
 

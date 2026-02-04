@@ -31,7 +31,7 @@ const COLORS = [
  */
 function getColorByPercent(percent: number): string {
   // Map percentage (0-100) to color index (0-14)
-  // >=70% -> index 0 (darkest), <2% -> index 14 (lightest)
+  // >=70% -> index 0 (darkest), <5% -> index 14 (lightest)
   // 15 colors with more granularity for smaller percentages
   if (percent >= 70) return COLORS[0];
   if (percent >= 60) return COLORS[1];
@@ -66,16 +66,16 @@ const ChartCenterLabel: React.FC<ChartCenterLabelProps> = ({ activeData, totalVa
 
   return (
     <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
-      <p className="text-muted-foreground text-xs font-medium">{activeData.name}</p>
-      <p className="text-foreground text-xs font-bold">
+      <p className="text-muted-foreground text-[10px] font-medium">{activeData.name}</p>
+      <p className="text-foreground text-[10px] font-bold">
         <AmountDisplay value={activeData.value} currency={activeData.currency} isHidden={isBalanceHidden} />
       </p>
-      <p className="text-muted-foreground text-xs">({formatPercent(percent)})</p>
+      <p className="text-muted-foreground text-[9px]">({formatPercent(percent)})</p>
       {status && (
-        <div className={`mt-2 flex items-center justify-center gap-2 text-sm font-semibold ${status.color}`}>
-          {status.label === "Overweight" && <ArrowUp size={16} />}
-          {status.label === "Underweight" && <ArrowDown size={16} />}
-          {status.label === "In Line" && <Minus size={16} />}
+        <div className={`mt-1 flex items-center justify-center gap-1 text-[10px] font-semibold ${status.color}`}>
+          {status.label === "Overweight" && <ArrowUp size={10} />}
+          {status.label === "Underweight" && <ArrowDown size={10} />}
+          {status.label === "In Line" && <Minus size={10} />}
           {status.label}
         </div>
       )}
@@ -83,7 +83,7 @@ const ChartCenterLabel: React.FC<ChartCenterLabelProps> = ({ activeData, totalVa
   );
 };
 
-interface DonutChartExpandableProps {
+interface DonutChartCompactProps {
   data: {
     name: string;
     value: number;
@@ -99,7 +99,7 @@ interface DonutChartExpandableProps {
   minSliceAngle?: number;
 }
 
-export const DonutChartExpandable: React.FC<DonutChartExpandableProps> = ({
+export const DonutChartCompact: React.FC<DonutChartCompactProps> = ({
   data,
   activeIndex,
   onSectionClick,
@@ -135,23 +135,23 @@ export const DonutChartExpandable: React.FC<DonutChartExpandableProps> = ({
   };
 
   return (
-    <div className="relative w-full p-0">
-      <ChartContainer config={{}} className="h-200 w-full">
+    <div className="relative h-full w-full p-0">
+      <ChartContainer config={{}} className="h-full w-full">
         <PieChart onMouseLeave={handleMouseLeave} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-          {/* Main pie chart */}
+          {/* Main pie chart - scaled down dimensions */}
           <Pie
             data={data}
             cx="50%"
             cy="50%"
-            innerRadius={140}
-            outerRadius={250}
-            paddingAngle={6}
-            cornerRadius={6}
+            innerRadius={50}
+            outerRadius={85}
+            paddingAngle={4}
+            cornerRadius={4}
             dataKey="value"
             nameKey="name"
             startAngle={startAngle}
             endAngle={endAngle}
-            minAngle={minSliceAngle} // NEW: Minimum angle ensures visibility
+            minAngle={minSliceAngle}
             onMouseEnter={handlePieEnter}
             onClick={(_event, index) => {
               onSectionClick(data[index], index);
@@ -163,20 +163,20 @@ export const DonutChartExpandable: React.FC<DonutChartExpandableProps> = ({
             ))}
           </Pie>
 
-          {/* Active selection ring - MOVED OUTSIDE */}
+          {/* Active selection ring - scaled down dimensions */}
           {activeData && (
             <Pie
               data={data}
               dataKey="value"
               cx="50%"
               cy="50%"
-              innerRadius={255}
-              outerRadius={260}
-              paddingAngle={6}
-              cornerRadius={6}
+              innerRadius={88}
+              outerRadius={91}
+              paddingAngle={4}
+              cornerRadius={4}
               startAngle={startAngle}
               endAngle={endAngle}
-              minAngle={minSliceAngle} // NEW: Match main pie
+              minAngle={minSliceAngle}
               isAnimationActive={false}
             >
               {data.map((_, index) => (
