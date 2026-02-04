@@ -386,16 +386,23 @@
   --input: hsl(var(--flexoki-ui-2));
   --ring: hsl(var(--flexoki-ui-3));
 
-  /* Charts (full hsl colors) */
+  /* Charts (full hsl colors) - 15 color grey gradient for pie charts */
+  /* Darkest (chart-1) used for >=70%, more granularity for smaller values */
   --chart-1: hsl(40 3% 20%);
-  --chart-2: hsl(45 2% 33%);
-  --chart-3: hsl(50 3% 42%);
-  --chart-4: hsl(43 3% 52%);
-  --chart-5: hsl(47 4% 61%);
-  --chart-6: hsl(49 7% 70%);
-  --chart-7: hsl(55 10% 79%);
-  --chart-8: hsl(50 14% 83%);
-  --chart-9: hsl(51 21% 88%);
+  --chart-2: hsl(42 3% 25%);
+  --chart-3: hsl(44 3% 30%);
+  --chart-4: hsl(45 3% 35%);
+  --chart-5: hsl(44 3% 40%);
+  --chart-6: hsl(46 3% 45%);
+  --chart-7: hsl(47 4% 50%);
+  --chart-8: hsl(48 4% 55%);
+  --chart-9: hsl(47 4% 60%);
+  --chart-10: hsl(48 5% 65%);
+  --chart-11: hsl(49 6% 70%);
+  --chart-12: hsl(50 7% 75%);
+  --chart-13: hsl(51 9% 79%);
+  --chart-14: hsl(50 12% 83%);
+  --chart-15: hsl(51 15% 88%);
 
   /* Sidebar (full hsl colors) */
   --sidebar: hsl(var(--flexoki-bg));
@@ -450,16 +457,23 @@
   --flexoki-gr: 72 46% 41%;
   --flexoki-ye: 45 82% 45%;
 
-  /* Dark chart palette (full hsl colors) */
-  --chart-1: hsl(25 92% 72%);
-  --chart-2: hsl(24 81% 61%);
-  --chart-3: hsl(23 70% 51%);
-  --chart-4: hsl(23 73% 46%);
-  --chart-5: hsl(22 80% 41%);
-  --chart-6: hsl(22 82% 34%);
-  --chart-7: hsl(22 79% 25%);
-  --chart-8: hsl(22 75% 20%);
-  --chart-9: hsl(22 70% 15%);
+  /* Dark chart palette (full hsl colors) - 15 color orange gradient for pie charts */
+  /* Darkest (chart-1) used for >=70%, more granularity for smaller values */
+  --chart-1: hsl(25 92% 70%);
+  --chart-2: hsl(25 88% 66%);
+  --chart-3: hsl(24 84% 62%);
+  --chart-4: hsl(24 80% 58%);
+  --chart-5: hsl(24 76% 54%);
+  --chart-6: hsl(23 73% 50%);
+  --chart-7: hsl(23 70% 46%);
+  --chart-8: hsl(23 68% 42%);
+  --chart-9: hsl(22 66% 38%);
+  --chart-10: hsl(22 64% 34%);
+  --chart-11: hsl(22 62% 30%);
+  --chart-12: hsl(22 60% 26%);
+  --chart-13: hsl(22 58% 22%);
+  --chart-14: hsl(22 55% 18%);
+  --chart-15: hsl(22 50% 14%);
 
   /* Sonner toast overrides for dark mode - solid backgrounds for better readability */
   --toast-bg: hsl(var(--flexoki-bg-2));
