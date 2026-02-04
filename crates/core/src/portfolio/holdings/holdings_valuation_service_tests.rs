@@ -117,6 +117,10 @@ mod tests {
             unimplemented!()
         }
 
+        async fn ensure_fx_pairs(&self, _pairs: Vec<(String, String)>) -> Result<()> {
+            Ok(())
+        }
+
         fn get_latest_exchange_rate(
             &self,
             from_currency: &str,

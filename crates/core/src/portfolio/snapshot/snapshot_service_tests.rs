@@ -141,6 +141,10 @@ mod tests {
         ) -> AppResult<()> {
             Ok(())
         }
+
+        async fn ensure_fx_pairs(&self, _pairs: Vec<(String, String)>) -> AppResult<()> {
+            Ok(())
+        }
     }
 
     #[derive(Clone, Debug)]
@@ -250,6 +254,14 @@ mod tests {
         }
 
         async fn cleanup_legacy_metadata(&self, _asset_id: &str) -> AppResult<()> {
+            Ok(())
+        }
+
+        async fn deactivate(&self, _asset_id: &str) -> AppResult<()> {
+            Ok(())
+        }
+
+        async fn copy_user_metadata(&self, _source_id: &str, _target_id: &str) -> AppResult<()> {
             Ok(())
         }
     }
@@ -436,6 +448,17 @@ mod tests {
         ) -> AppResult<crate::activities::BulkUpsertResult> {
             unimplemented!()
         }
+
+        async fn reassign_asset(&self, _old_asset_id: &str, _new_asset_id: &str) -> AppResult<u32> {
+            Ok(0)
+        }
+
+        async fn get_activity_accounts_and_currencies_by_asset_id(
+            &self,
+            _asset_id: &str,
+        ) -> AppResult<(Vec<String>, Vec<String>)> {
+            Ok((Vec::new(), Vec::new()))
+        }
     }
 
     #[derive(Clone, Debug)]
@@ -572,6 +595,17 @@ mod tests {
             _activities: Vec<crate::activities::ActivityUpsert>,
         ) -> AppResult<crate::activities::BulkUpsertResult> {
             unimplemented!()
+        }
+
+        async fn reassign_asset(&self, _old_asset_id: &str, _new_asset_id: &str) -> AppResult<u32> {
+            Ok(0)
+        }
+
+        async fn get_activity_accounts_and_currencies_by_asset_id(
+            &self,
+            _asset_id: &str,
+        ) -> AppResult<(Vec<String>, Vec<String>)> {
+            Ok((Vec::new(), Vec::new()))
         }
     }
 

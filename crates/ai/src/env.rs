@@ -311,7 +311,6 @@ pub mod test_env {
             &self,
             _account_id: String,
             _activities: Vec<ActivityImport>,
-            _dry_run: bool,
         ) -> CoreResult<Vec<ActivityImport>> {
             unimplemented!("MockActivityService::check_activities_import")
         }

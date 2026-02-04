@@ -1,11 +1,14 @@
 use log::{debug, error, info, warn};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::quotes::QuoteServiceTrait;
 use crate::taxonomies::{NewAssetTaxonomyAssignment, TaxonomyServiceTrait};
 
-use super::assets_model::{Asset, AssetKind, NewAsset, PricingMode, UpdateAssetProfile};
+use super::assets_model::{
+    Asset, AssetKind, AssetSpec, EnsureAssetsResult, NewAsset, PricingMode, UpdateAssetProfile,
+};
 use super::canonical_asset_id;
 use super::assets_traits::{AssetRepositoryTrait, AssetServiceTrait};
 use super::auto_classification::{AutoClassificationService, ClassificationInput};
@@ -161,6 +164,74 @@ impl AssetService {
 
         Ok(asset)
     }
+
+    /// Creates a minimal asset from an AssetSpec without the "get" part.
+    /// Used by ensure_assets() for batch asset creation.
+    async fn create_minimal_asset_from_spec(&self, spec: &AssetSpec) -> Result<Asset> {
+        // Handle cash assets specially
+        if spec.kind == AssetKind::Cash {
+            return self.create_cash_asset(&spec.currency).await;
+        }
+
+        // Determine pricing mode: use spec override or default based on kind
+        let pricing_mode = spec.pricing_mode.clone().unwrap_or_else(|| match &spec.kind {
+            AssetKind::Cash => PricingMode::None,
+            AssetKind::Crypto | AssetKind::Security => PricingMode::Market,
+            _ => PricingMode::Manual,
+        });
+
+        // Set preferred provider based on pricing mode
+        let preferred_provider = match pricing_mode {
+            PricingMode::Market => Some("YAHOO".to_string()),
+            PricingMode::Manual => Some("MANUAL".to_string()),
+            PricingMode::None | PricingMode::Derived => None,
+        };
+
+        let new_asset = NewAsset {
+            id: Some(spec.id.clone()),
+            kind: spec.kind.clone(),
+            name: spec.name.clone(),
+            symbol: spec.symbol.clone(),
+            exchange_mic: spec.exchange_mic.clone(),
+            currency: spec.currency.clone(),
+            pricing_mode,
+            preferred_provider,
+            is_active: true,
+            ..Default::default()
+        };
+
+        debug!(
+            "Creating minimal asset from spec: id={}, kind={:?}, pricing_mode={:?}",
+            spec.id, new_asset.kind, new_asset.pricing_mode
+        );
+
+        // Create without emitting event (ensure_assets emits batch event)
+        self.asset_repository.create(new_asset).await
+    }
+}
+
+/// Helper: find UNKNOWN variant of a resolved asset ID.
+/// e.g., "SEC:AAPL:XNAS" → Some("SEC:AAPL:UNKNOWN")
+/// Returns None if the asset is not a security or already has UNKNOWN qualifier.
+fn find_unknown_variant(asset_id: &str) -> Option<String> {
+    let parsed = super::parse_canonical_asset_id(asset_id)?;
+
+    // Only securities can have UNKNOWN variants
+    if parsed.kind != Some(AssetKind::Security) {
+        return None;
+    }
+
+    // Skip if already UNKNOWN or empty qualifier
+    if parsed.qualifier.is_empty() || parsed.qualifier == "UNKNOWN" {
+        return None;
+    }
+
+    Some(canonical_asset_id(
+        &AssetKind::Security,
+        &parsed.symbol,
+        Some("UNKNOWN"),
+        &parsed.qualifier,
+    ))
 }
 
 // Implement the service trait
@@ -703,5 +774,169 @@ impl AssetServiceTrait for AssetService {
         self.asset_repository
             .cleanup_legacy_metadata(asset_id)
             .await
+    }
+
+    async fn merge_unknown_asset(
+        &self,
+        resolved_asset_id: &str,
+        unknown_asset_id: &str,
+        activity_repository: &dyn crate::activities::ActivityRepositoryTrait,
+    ) -> Result<u32> {
+        info!(
+            "Merging UNKNOWN asset {} into resolved asset {}",
+            unknown_asset_id, resolved_asset_id
+        );
+
+        let (account_ids, currencies) = match activity_repository
+            .get_activity_accounts_and_currencies_by_asset_id(unknown_asset_id)
+            .await
+        {
+            Ok(data) => data,
+            Err(e) => {
+                warn!(
+                    "Failed to load account_ids/currencies for UNKNOWN asset {}: {}",
+                    unknown_asset_id, e
+                );
+                (Vec::new(), Vec::new())
+            }
+        };
+
+        // 1. Copy user metadata (notes) from UNKNOWN to resolved
+        if let Err(e) = self
+            .asset_repository
+            .copy_user_metadata(unknown_asset_id, resolved_asset_id)
+            .await
+        {
+            warn!(
+                "Failed to copy user metadata from {} to {}: {}",
+                unknown_asset_id, resolved_asset_id, e
+            );
+        }
+
+        // 2. Reassign all activities from UNKNOWN to resolved
+        let activities_migrated = activity_repository
+            .reassign_asset(unknown_asset_id, resolved_asset_id)
+            .await?;
+
+        // 3. Deactivate the UNKNOWN asset
+        if let Err(e) = self.asset_repository.deactivate(unknown_asset_id).await {
+            warn!(
+                "Failed to deactivate UNKNOWN asset {}: {}",
+                unknown_asset_id, e
+            );
+        }
+
+        // 4. Emit assets_merged domain event
+        self.event_sink.emit(DomainEvent::assets_merged(
+            unknown_asset_id.to_string(),
+            resolved_asset_id.to_string(),
+            activities_migrated,
+        ));
+
+        // 5. Emit activities_changed to trigger recalculation for affected accounts
+        if activities_migrated > 0 {
+            let asset_ids = vec![
+                unknown_asset_id.to_string(),
+                resolved_asset_id.to_string(),
+            ];
+            self.event_sink.emit(DomainEvent::activities_changed(
+                account_ids,
+                asset_ids,
+                currencies,
+            ));
+        }
+
+        info!(
+            "Merged UNKNOWN asset {} into {}: {} activities migrated",
+            unknown_asset_id, resolved_asset_id, activities_migrated
+        );
+
+        Ok(activities_migrated)
+    }
+
+    async fn ensure_assets(
+        &self,
+        specs: Vec<AssetSpec>,
+        activity_repository: &dyn crate::activities::ActivityRepositoryTrait,
+    ) -> Result<EnsureAssetsResult> {
+        if specs.is_empty() {
+            return Ok(EnsureAssetsResult::default());
+        }
+
+        // Deduplicate specs by ID
+        let unique_specs: Vec<AssetSpec> = specs
+            .into_iter()
+            .fold(HashMap::new(), |mut map, spec| {
+                map.entry(spec.id.clone()).or_insert(spec);
+                map
+            })
+            .into_values()
+            .collect();
+
+        // 1. Batch read existing assets
+        let ids: Vec<String> = unique_specs.iter().map(|s| s.id.clone()).collect();
+        let existing = self.asset_repository.list_by_asset_ids(&ids)?;
+        let existing_map: HashMap<String, Asset> = existing
+            .into_iter()
+            .map(|a| (a.id.clone(), a))
+            .collect();
+
+        // 2. Find missing and check for UNKNOWN merges
+        let mut to_create: Vec<&AssetSpec> = Vec::new();
+        let mut merge_candidates: Vec<(String, String)> = Vec::new();
+
+        for spec in &unique_specs {
+            if existing_map.contains_key(&spec.id) {
+                continue;
+            }
+
+            // Check if this is a resolved ID and UNKNOWN version exists
+            if let Some(unknown_id) = find_unknown_variant(&spec.id) {
+                if self.asset_repository.get_by_id(&unknown_id).is_ok() {
+                    merge_candidates.push((spec.id.clone(), unknown_id));
+                }
+            }
+
+            to_create.push(spec);
+        }
+
+        // 3. Create missing assets
+        let mut created_ids: Vec<String> = Vec::new();
+        for spec in to_create {
+            let asset = self.create_minimal_asset_from_spec(spec).await?;
+            created_ids.push(asset.id.clone());
+        }
+
+        // 4. Execute merges
+        for (resolved_id, unknown_id) in &merge_candidates {
+            if let Err(e) = self
+                .merge_unknown_asset(resolved_id, unknown_id, activity_repository)
+                .await
+            {
+                warn!(
+                    "Failed to merge UNKNOWN asset {} into {}: {}",
+                    unknown_id, resolved_id, e
+                );
+            }
+        }
+
+        // 5. Emit single batch event for created assets (merges emit their own events)
+        if !created_ids.is_empty() {
+            self.event_sink
+                .emit(DomainEvent::assets_created(created_ids.clone()));
+        }
+
+        // 6. Re-fetch all requested assets
+        let all_assets = self.asset_repository.list_by_asset_ids(&ids)?;
+        let assets_map: HashMap<String, Asset> = all_assets
+            .into_iter()
+            .map(|a| (a.id.clone(), a))
+            .collect();
+
+        Ok(EnsureAssetsResult {
+            assets: assets_map,
+            created_ids,
+            merge_candidates,
+        })
     }
 }

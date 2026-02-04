@@ -3,17 +3,20 @@ use super::fx_errors::FxError;
 use super::fx_model::{ExchangeRate, NewExchangeRate};
 use super::fx_traits::{FxRepositoryTrait, FxServiceTrait};
 use crate::errors::Result;
+use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::fx::currency::{denormalization_multiplier, normalize_currency_code};
 use crate::quotes::DataSource;
 use async_trait::async_trait;
 use chrono::{NaiveDate, Utc};
 use rust_decimal::Decimal;
+use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
 
 #[derive(Clone)]
 pub struct FxService {
     repository: Arc<dyn FxRepositoryTrait>,
     converter: Arc<RwLock<Option<CurrencyConverter>>>,
+    event_sink: Arc<dyn DomainEventSink>,
 }
 
 impl FxService {
@@ -23,7 +26,14 @@ impl FxService {
         Self {
             repository,
             converter: Arc::new(RwLock::new(None)),
+            event_sink: Arc::new(NoOpDomainEventSink),
         }
+    }
+
+    /// Sets the domain event sink for this service.
+    pub fn with_event_sink(mut self, event_sink: Arc<dyn DomainEventSink>) -> Self {
+        self.event_sink = event_sink;
+        self
     }
 
     /// Initialize the currency converter with all exchange rates, filling missing days
@@ -367,6 +377,11 @@ impl FxServiceTrait for FxService {
             self.repository
                 .create_fx_asset(normalized_from, normalized_to, DataSource::Yahoo.as_str())
                 .await?;
+
+            // Emit asset created event for the FX asset
+            let fx_asset_id = ExchangeRate::make_fx_symbol(normalized_from, normalized_to);
+            self.event_sink
+                .emit(DomainEvent::assets_created(vec![fx_asset_id]));
         }
 
         Ok(())
@@ -396,8 +411,26 @@ impl FxServiceTrait for FxService {
             self.repository
                 .create_fx_asset(normalized_from, normalized_to, DataSource::Manual.as_str())
                 .await?;
+
+            // Emit asset created event for the FX asset
+            let fx_asset_id = ExchangeRate::make_fx_symbol(normalized_from, normalized_to);
+            self.event_sink
+                .emit(DomainEvent::assets_created(vec![fx_asset_id]));
         }
 
+        Ok(())
+    }
+
+    async fn ensure_fx_pairs(&self, pairs: Vec<(String, String)>) -> Result<()> {
+        // Deduplicate pairs
+        let unique_pairs: HashSet<(String, String)> = pairs.into_iter().collect();
+
+        for (from, to) in unique_pairs {
+            if from != to {
+                // register_currency_pair is already idempotent
+                self.register_currency_pair(&from, &to).await?;
+            }
+        }
         Ok(())
     }
 }

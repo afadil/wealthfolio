@@ -79,7 +79,15 @@ pub async fn initialize_context(
     let valuation_repository = Arc::new(ValuationRepository::new(pool.clone(), writer.clone()));
     let platform_repository = Arc::new(PlatformRepository::new(pool.clone(), writer.clone()));
 
-    let fx_service = Arc::new(FxService::new(fx_repository.clone()));
+    // Domain event sink - TauriDomainEventSink sends events to a channel
+    // The worker will be started by the caller after the context is managed
+    // Must be created before services that emit events
+    let (domain_event_sink, event_receiver) = TauriDomainEventSink::new();
+    let domain_event_sink: Arc<dyn wealthfolio_core::events::DomainEventSink> =
+        Arc::new(domain_event_sink);
+
+    let fx_service =
+        Arc::new(FxService::new(fx_repository.clone()).with_event_sink(domain_event_sink.clone()));
     fx_service.initialize()?;
 
     let settings_service = Arc::new(SettingsService::new(
@@ -113,13 +121,6 @@ pub async fn initialize_context(
     // Create taxonomy service before asset service (needed for auto-classification)
     let taxonomy_repository = Arc::new(TaxonomyRepository::new(pool.clone(), writer.clone()));
     let taxonomy_service = Arc::new(TaxonomyService::new(taxonomy_repository));
-
-    // Domain event sink - TauriDomainEventSink sends events to a channel
-    // The worker will be started by the caller after the context is managed
-    // Must be created before services that emit events
-    let (domain_event_sink, event_receiver) = TauriDomainEventSink::new();
-    let domain_event_sink: Arc<dyn wealthfolio_core::events::DomainEventSink> =
-        Arc::new(domain_event_sink);
 
     let asset_service = Arc::new(
         AssetService::with_taxonomy_service(
@@ -227,11 +228,13 @@ pub async fn initialize_context(
         alternative_asset_repository.clone(),
         asset_repository.clone(),
         quote_service.clone(),
-    ));
+    )
+    .with_event_sink(domain_event_sink.clone()));
 
     let sync_service = Arc::new(
         BrokerSyncService::new(
             account_service.clone(),
+            asset_service.clone(),
             platform_repository.clone(),
             pool.clone(),
             writer.clone(),

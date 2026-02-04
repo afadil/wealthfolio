@@ -355,6 +355,17 @@ mod tests {
         async fn bulk_upsert(&self, _: Vec<ActivityUpsert>) -> Result<BulkUpsertResult> {
             unimplemented!()
         }
+
+        async fn reassign_asset(&self, _old_asset_id: &str, _new_asset_id: &str) -> Result<u32> {
+            Ok(0)
+        }
+
+        async fn get_activity_accounts_and_currencies_by_asset_id(
+            &self,
+            _asset_id: &str,
+        ) -> Result<(Vec<String>, Vec<String>)> {
+            Ok((Vec::new(), Vec::new()))
+        }
     }
 
     struct MockFxService;
@@ -456,6 +467,10 @@ mod tests {
             _to_currency: &str,
         ) -> Result<()> {
             unimplemented!()
+        }
+
+        async fn ensure_fx_pairs(&self, _pairs: Vec<(String, String)>) -> Result<()> {
+            Ok(())
         }
     }
 

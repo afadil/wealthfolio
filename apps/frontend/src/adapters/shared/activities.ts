@@ -157,25 +157,23 @@ export const importActivities = async ({
 };
 
 /**
- * Check activities before import (validation/preview).
+ * Check activities before import (read-only validation/preview).
+ * This performs read-only validation without creating assets or FX pairs.
+ * Asset creation happens during the actual import when user confirms.
  * @param accountId - The account ID to import activities into
  * @param activities - The activities to validate
- * @param dryRun - If true, performs read-only validation without creating assets or FX pairs
  */
 export const checkActivitiesImport = async ({
   accountId,
   activities,
-  dryRun,
 }: {
   accountId: string;
   activities: ActivityImport[];
-  dryRun?: boolean;
 }): Promise<ActivityImport[]> => {
   try {
     return await invoke<ActivityImport[]>("check_activities_import", {
       accountId,
       activities,
-      dryRun,
     });
   } catch (err) {
     logger.error("Error checking activities import.");

@@ -133,18 +133,15 @@ struct ImportCheckBody {
     #[serde(rename = "accountId")]
     account_id: String,
     activities: Vec<ActivityImport>,
-    #[serde(rename = "dryRun")]
-    dry_run: Option<bool>,
 }
 
 async fn check_activities_import(
     State(state): State<Arc<AppState>>,
     Json(body): Json<ImportCheckBody>,
 ) -> ApiResult<Json<Vec<ActivityImport>>> {
-    let dry_run = body.dry_run.unwrap_or(false);
     let res = state
         .activity_service
-        .check_activities_import(body.account_id, body.activities, dry_run)
+        .check_activities_import(body.account_id, body.activities)
         .await?;
     Ok(Json(res))
 }

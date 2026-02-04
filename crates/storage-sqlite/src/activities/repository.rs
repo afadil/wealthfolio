@@ -4,7 +4,7 @@ use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sqlite::SqliteConnection;
 use rust_decimal::Decimal;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -1119,6 +1119,51 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 );
 
                 Ok(result)
+            })
+            .await
+    }
+
+    async fn reassign_asset(&self, old_asset_id: &str, new_asset_id: &str) -> Result<u32> {
+        let old_id = old_asset_id.to_string();
+        let new_id = new_asset_id.to_string();
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<u32> {
+                let count = diesel::update(activities::table.filter(activities::asset_id.eq(&old_id)))
+                    .set(activities::asset_id.eq(&new_id))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                Ok(count as u32)
+            })
+            .await
+    }
+
+    async fn get_activity_accounts_and_currencies_by_asset_id(
+        &self,
+        asset_id: &str,
+    ) -> Result<(Vec<String>, Vec<String>)> {
+        let asset_id_owned = asset_id.to_string();
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<(Vec<String>, Vec<String>)> {
+                let rows: Vec<(String, String)> = activities::table
+                    .filter(activities::asset_id.eq(&asset_id_owned))
+                    .select((activities::account_id, activities::currency))
+                    .distinct()
+                    .load(conn)
+                    .map_err(StorageError::from)?;
+
+                let mut account_ids: HashSet<String> = HashSet::new();
+                let mut currencies: HashSet<String> = HashSet::new();
+
+                for (account_id, currency) in rows {
+                    if !account_id.is_empty() {
+                        account_ids.insert(account_id);
+                    }
+                    if !currency.is_empty() {
+                        currencies.insert(currency);
+                    }
+                }
+
+                Ok((account_ids.into_iter().collect(), currencies.into_iter().collect()))
             })
             .await
     }

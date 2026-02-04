@@ -1,4 +1,4 @@
-use super::assets_model::{Asset, AssetMetadata, NewAsset, UpdateAssetProfile};
+use super::assets_model::{Asset, AssetMetadata, AssetSpec, EnsureAssetsResult, NewAsset, UpdateAssetProfile};
 use crate::errors::Result;
 
 /// Trait defining the contract for Asset service operations.
@@ -43,6 +43,30 @@ pub trait AssetServiceTrait: Send + Sync {
     /// Removes the $.legacy structure from asset metadata after migration.
     /// Preserves $.identifiers if present.
     async fn cleanup_legacy_metadata(&self, asset_id: &str) -> Result<()>;
+
+    /// Merges an UNKNOWN asset into a resolved asset.
+    /// - Copies user metadata (notes) from UNKNOWN to resolved
+    /// - Reassigns all activities from UNKNOWN to resolved
+    /// - Deactivates the UNKNOWN asset
+    /// - Emits assets_merged domain event
+    /// Returns the number of activities migrated.
+    async fn merge_unknown_asset(
+        &self,
+        resolved_asset_id: &str,
+        unknown_asset_id: &str,
+        activity_repository: &dyn crate::activities::ActivityRepositoryTrait,
+    ) -> Result<u32>;
+
+    /// Ensures multiple assets exist, creating any that are missing.
+    /// Returns existing + created assets, plus any UNKNOWN→resolved merge candidates.
+    ///
+    /// This is the batch version of `get_or_create_minimal_asset()`.
+    /// Use this for bulk operations like CSV import or broker sync.
+    async fn ensure_assets(
+        &self,
+        specs: Vec<AssetSpec>,
+        activity_repository: &dyn crate::activities::ActivityRepositoryTrait,
+    ) -> Result<EnsureAssetsResult>;
 }
 
 /// Trait defining the contract for Asset repository operations.
@@ -63,4 +87,12 @@ pub trait AssetRepositoryTrait: Send + Sync {
     /// Removes the $.legacy structure from asset metadata.
     /// Preserves $.identifiers if present.
     async fn cleanup_legacy_metadata(&self, asset_id: &str) -> Result<()>;
+
+    /// Deactivates an asset (sets is_active=0).
+    /// Used when merging UNKNOWN assets into resolved ones.
+    async fn deactivate(&self, asset_id: &str) -> Result<()>;
+
+    /// Copies user-editable fields from source asset to target asset.
+    /// Used during UNKNOWN asset merge to preserve user customizations.
+    async fn copy_user_metadata(&self, source_id: &str, target_id: &str) -> Result<()>;
 }

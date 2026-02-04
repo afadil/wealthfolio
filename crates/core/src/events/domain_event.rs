@@ -36,6 +36,16 @@ pub enum DomainEvent {
     /// New assets were created (not updates).
     AssetsCreated { asset_ids: Vec<String> },
 
+    /// UNKNOWN asset was merged into a resolved asset.
+    AssetsMerged {
+        /// The UNKNOWN asset ID being merged (source)
+        source_id: String,
+        /// The resolved asset ID (target)
+        target_id: String,
+        /// Number of activities migrated
+        activities_migrated: u32,
+    },
+
     /// Account tracking mode was changed.
     TrackingModeChanged {
         account_id: String,
@@ -94,6 +104,15 @@ impl DomainEvent {
     /// Creates an AssetsCreated event.
     pub fn assets_created(asset_ids: Vec<String>) -> Self {
         Self::AssetsCreated { asset_ids }
+    }
+
+    /// Creates an AssetsMerged event.
+    pub fn assets_merged(source_id: String, target_id: String, activities_migrated: u32) -> Self {
+        Self::AssetsMerged {
+            source_id,
+            target_id,
+            activities_migrated,
+        }
     }
 
     /// Creates a TrackingModeChanged event.

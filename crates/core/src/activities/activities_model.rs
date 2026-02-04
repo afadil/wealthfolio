@@ -196,18 +196,33 @@ pub struct NewActivity {
     pub activity_type: String,
     pub subtype: Option<String>, // Semantic variation (DRIP, STAKING_REWARD, etc.)
     pub activity_date: String,
-    #[serde(default, deserialize_with = "decimal_input_format::deserialize_option_decimal")]
+    #[serde(
+        default,
+        deserialize_with = "decimal_input_format::deserialize_option_decimal"
+    )]
     pub quantity: Option<Decimal>,
-    #[serde(default, deserialize_with = "decimal_input_format::deserialize_option_decimal")]
+    #[serde(
+        default,
+        deserialize_with = "decimal_input_format::deserialize_option_decimal"
+    )]
     pub unit_price: Option<Decimal>,
     pub currency: String,
-    #[serde(default, deserialize_with = "decimal_input_format::deserialize_option_decimal")]
+    #[serde(
+        default,
+        deserialize_with = "decimal_input_format::deserialize_option_decimal"
+    )]
     pub fee: Option<Decimal>,
-    #[serde(default, deserialize_with = "decimal_input_format::deserialize_option_decimal")]
+    #[serde(
+        default,
+        deserialize_with = "decimal_input_format::deserialize_option_decimal"
+    )]
     pub amount: Option<Decimal>,
     pub status: Option<ActivityStatus>,
     pub notes: Option<String>,
-    #[serde(default, deserialize_with = "decimal_input_format::deserialize_option_decimal")]
+    #[serde(
+        default,
+        deserialize_with = "decimal_input_format::deserialize_option_decimal"
+    )]
     pub fx_rate: Option<Decimal>,
     // Sync-related fields
     pub metadata: Option<String>,         // JSON blob for sync metadata
@@ -284,18 +299,33 @@ pub struct ActivityUpdate {
     pub activity_type: String,
     pub subtype: Option<String>, // Semantic variation (DRIP, STAKING_REWARD, etc.)
     pub activity_date: String,
-    #[serde(default, deserialize_with = "decimal_input_format::deserialize_patch_decimal")]
+    #[serde(
+        default,
+        deserialize_with = "decimal_input_format::deserialize_patch_decimal"
+    )]
     pub quantity: Option<Option<Decimal>>,
-    #[serde(default, deserialize_with = "decimal_input_format::deserialize_patch_decimal")]
+    #[serde(
+        default,
+        deserialize_with = "decimal_input_format::deserialize_patch_decimal"
+    )]
     pub unit_price: Option<Option<Decimal>>,
     pub currency: String,
-    #[serde(default, deserialize_with = "decimal_input_format::deserialize_patch_decimal")]
+    #[serde(
+        default,
+        deserialize_with = "decimal_input_format::deserialize_patch_decimal"
+    )]
     pub fee: Option<Option<Decimal>>,
-    #[serde(default, deserialize_with = "decimal_input_format::deserialize_patch_decimal")]
+    #[serde(
+        default,
+        deserialize_with = "decimal_input_format::deserialize_patch_decimal"
+    )]
     pub amount: Option<Option<Decimal>>,
     pub status: Option<ActivityStatus>,
     pub notes: Option<String>,
-    #[serde(default, deserialize_with = "decimal_input_format::deserialize_patch_decimal")]
+    #[serde(
+        default,
+        deserialize_with = "decimal_input_format::deserialize_patch_decimal"
+    )]
     pub fx_rate: Option<Option<Decimal>>,
     pub metadata: Option<String>, // JSON blob for metadata (e.g., flow.is_external)
 }
@@ -495,14 +525,26 @@ pub struct ActivityImport {
     pub date: String,
     pub symbol: String,
     pub activity_type: String,
-    #[serde(default, deserialize_with = "decimal_input_format::deserialize_option_decimal")]
+    #[serde(
+        default,
+        deserialize_with = "decimal_input_format::deserialize_option_decimal"
+    )]
     pub quantity: Option<Decimal>,
-    #[serde(default, deserialize_with = "decimal_input_format::deserialize_option_decimal")]
+    #[serde(
+        default,
+        deserialize_with = "decimal_input_format::deserialize_option_decimal"
+    )]
     pub unit_price: Option<Decimal>,
     pub currency: String,
-    #[serde(default, deserialize_with = "decimal_input_format::deserialize_option_decimal")]
+    #[serde(
+        default,
+        deserialize_with = "decimal_input_format::deserialize_option_decimal"
+    )]
     pub fee: Option<Decimal>,
-    #[serde(default, deserialize_with = "decimal_input_format::deserialize_option_decimal")]
+    #[serde(
+        default,
+        deserialize_with = "decimal_input_format::deserialize_option_decimal"
+    )]
     pub amount: Option<Decimal>,
     pub comment: Option<String>,
     pub account_id: Option<String>,
@@ -514,7 +556,10 @@ pub struct ActivityImport {
     pub is_draft: bool,
     pub is_valid: bool,
     pub line_number: Option<i32>,
-    #[serde(default, deserialize_with = "decimal_input_format::deserialize_option_decimal")]
+    #[serde(
+        default,
+        deserialize_with = "decimal_input_format::deserialize_option_decimal"
+    )]
     pub fx_rate: Option<Decimal>,
     pub subtype: Option<String>,
 }
@@ -957,4 +1002,65 @@ pub struct BulkUpsertResult {
     pub updated: usize,
     /// Number of activities skipped (e.g., user-modified)
     pub skipped: usize,
+}
+
+/// Activity ready for persistence
+#[derive(Debug, Clone)]
+pub struct PreparedActivity {
+    pub activity: NewActivity,
+    pub resolved_asset_id: Option<String>,
+    pub fx_pair: Option<(String, String)>, // (from_currency, to_currency)
+}
+
+/// Result of prepare_activities
+#[derive(Debug, Default)]
+pub struct PrepareActivitiesResult {
+    pub prepared: Vec<PreparedActivity>,
+    pub errors: Vec<(usize, String)>, // (index, error_message)
+    pub assets_created: u32,
+}
+
+impl From<ActivityImport> for NewActivity {
+    fn from(import: ActivityImport) -> Self {
+        let asset = if import.symbol.is_empty() {
+            None
+        } else {
+            Some(AssetInput {
+                id: None,
+                symbol: Some(import.symbol),
+                exchange_mic: import.exchange_mic,
+                kind: None,
+                name: import.symbol_name,
+                pricing_mode: None,
+            })
+        };
+
+        let status = if import.is_draft {
+            Some(ActivityStatus::Draft)
+        } else {
+            Some(ActivityStatus::Posted)
+        };
+
+        NewActivity {
+            id: import.id,
+            account_id: import.account_id.unwrap_or_default(),
+            asset,
+            activity_type: import.activity_type,
+            subtype: import.subtype,
+            activity_date: import.date,
+            quantity: import.quantity,
+            unit_price: import.unit_price,
+            currency: import.currency,
+            fee: import.fee,
+            amount: import.amount,
+            status,
+            notes: import.comment,
+            fx_rate: import.fx_rate,
+            metadata: None,
+            needs_review: None,
+            source_system: Some("CSV".to_string()),
+            source_record_id: None,
+            source_group_id: None,
+        }
+    }
 }

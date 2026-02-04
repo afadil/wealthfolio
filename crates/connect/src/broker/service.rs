@@ -20,7 +20,7 @@ use rust_decimal::Decimal;
 use std::collections::HashSet;
 use wealthfolio_core::accounts::{Account, AccountServiceTrait, NewAccount, TrackingMode};
 use wealthfolio_core::activities::{self, compute_idempotency_key, AssetInput, NewActivity};
-use wealthfolio_core::assets::{canonical_asset_id, AssetKind, NewAsset};
+use wealthfolio_core::assets::{canonical_asset_id, AssetKind, AssetServiceTrait, NewAsset};
 use wealthfolio_core::errors::Result;
 use wealthfolio_core::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use wealthfolio_core::fx::currency::{get_normalization_rule, normalize_amount};
@@ -45,6 +45,7 @@ const DEFAULT_BROKERAGE_PROVIDER: &str = "snaptrade";
 /// Service for syncing broker data to the local database
 pub struct BrokerSyncService {
     account_service: Arc<dyn AccountServiceTrait>,
+    asset_service: Arc<dyn AssetServiceTrait>,
     platform_repository: Arc<PlatformRepository>,
     brokers_sync_state_repository: Arc<BrokerSyncStateRepository>,
     import_run_repository: Arc<ImportRunRepository>,
@@ -57,12 +58,14 @@ pub struct BrokerSyncService {
 impl BrokerSyncService {
     pub fn new(
         account_service: Arc<dyn AccountServiceTrait>,
+        asset_service: Arc<dyn AssetServiceTrait>,
         platform_repository: Arc<PlatformRepository>,
         pool: Arc<DbPool>,
         writer: WriteHandle,
     ) -> Self {
         Self {
             account_service,
+            asset_service,
             platform_repository,
             brokers_sync_state_repository: Arc::new(BrokerSyncStateRepository::new(
                 pool.clone(),

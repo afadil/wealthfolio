@@ -106,6 +106,14 @@ mod tests {
         async fn cleanup_legacy_metadata(&self, _asset_id: &str) -> Result<()> {
             Ok(())
         }
+
+        async fn deactivate(&self, _asset_id: &str) -> Result<()> {
+            Ok(())
+        }
+
+        async fn copy_user_metadata(&self, _source_id: &str, _target_id: &str) -> Result<()> {
+            Ok(())
+        }
     }
 
     // --- Mock FxService ---
@@ -264,6 +272,10 @@ mod tests {
             Err(crate::errors::Error::Unexpected(
                 "MockFxService::register_currency_pair_manual not implemented".to_string(),
             ))
+        }
+
+        async fn ensure_fx_pairs(&self, _pairs: Vec<(String, String)>) -> Result<()> {
+            Ok(())
         }
     }
 

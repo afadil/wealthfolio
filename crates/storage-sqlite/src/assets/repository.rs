@@ -299,4 +299,44 @@ impl AssetRepositoryTrait for AssetRepository {
             })
             .await
     }
+
+    async fn deactivate(&self, asset_id: &str) -> Result<()> {
+        let asset_id_owned = asset_id.to_string();
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                diesel::update(assets::table.filter(assets::id.eq(&asset_id_owned)))
+                    .set(assets::is_active.eq(0))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                Ok(())
+            })
+            .await
+    }
+
+    async fn copy_user_metadata(&self, source_id: &str, target_id: &str) -> Result<()> {
+        let source_id_owned = source_id.to_string();
+        let target_id_owned = target_id.to_string();
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                // Get source asset
+                let source: AssetDB = assets::table
+                    .filter(assets::id.eq(&source_id_owned))
+                    .first(conn)
+                    .map_err(StorageError::from)?;
+
+                // Only copy notes (user-editable field) if source has content
+                // Don't overwrite target's notes if source is empty
+                if let Some(ref notes) = source.notes {
+                    if !notes.trim().is_empty() {
+                        diesel::update(assets::table.filter(assets::id.eq(&target_id_owned)))
+                            .set(assets::notes.eq(notes))
+                            .execute(conn)
+                            .map_err(StorageError::from)?;
+                    }
+                }
+
+                Ok(())
+            })
+            .await
+    }
 }

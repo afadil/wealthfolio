@@ -137,6 +137,14 @@ impl AssetRepositoryTrait for MockAssetRepository {
     async fn cleanup_legacy_metadata(&self, _asset_id: &str) -> Result<()> {
         Ok(())
     }
+
+    async fn deactivate(&self, _asset_id: &str) -> Result<()> {
+        Ok(())
+    }
+
+    async fn copy_user_metadata(&self, _source_id: &str, _target_id: &str) -> Result<()> {
+        Ok(())
+    }
 }
 
 struct MockSnapshotRepository {
@@ -654,6 +662,10 @@ impl FxServiceTrait for MockFxService {
         _from_currency: &str,
         _to_currency: &str,
     ) -> Result<()> {
+        Ok(())
+    }
+
+    async fn ensure_fx_pairs(&self, _pairs: Vec<(String, String)>) -> Result<()> {
         Ok(())
     }
 }
