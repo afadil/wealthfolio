@@ -4,6 +4,7 @@ import { AccountPortfolioSelector } from "@/components/account-portfolio-selecto
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/use-toast";
 import { useAccounts } from "@/hooks/use-accounts";
+import { useAllocationSettings } from "@/hooks/useAllocationSettings";
 import { usePortfolios } from "@/hooks/use-portfolios";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { formatCurrencyDisplay } from "@/lib/currency-format";
@@ -84,6 +85,7 @@ function HoldingsTargetList({
   assetClassValue,
   sharedPendingEdits,
   onSharedPendingChange,
+  isStrictMode,
 }: {
   assetClassId: string;
   allHoldings: Holding[]; // All holdings in asset class for auto-distribution
@@ -91,16 +93,18 @@ function HoldingsTargetList({
   assetClassValue: number;
   sharedPendingEdits: Map<string, number>;
   onSharedPendingChange: (edits: Map<string, number>) => void;
+  isStrictMode: boolean;
 }) {
   const navigate = useNavigate();
   const { data: holdingTargets = [] } = useHoldingTargets(assetClassId);
   const { deleteTargetMutation, toggleLockMutation } = useHoldingTargetMutations();
 
-  // Only run auto-distribution if user has set at least one target
+  // Only run auto-distribution if user has set at least one target AND we're in preview mode
   const hasAnyTargets = holdingTargets.length > 0 || sharedPendingEdits.size > 0;
+  const shouldAutoDistribute = hasAnyTargets && !isStrictMode;
 
   // Calculate distribution across ALL holdings in asset class
-  const distribution = hasAnyTargets
+  const distribution = shouldAutoDistribute
     ? calculateAutoDistribution(allHoldings, holdingTargets, sharedPendingEdits, assetClassValue)
     : {
         holdings: allHoldings
@@ -202,6 +206,8 @@ function HoldingsTargetList({
 export default function AllocationPage() {
   const { accounts } = useAccounts(false, false);
   const { data: portfolios = [] } = usePortfolios();
+  const { settings: allocationSettings } = useAllocationSettings();
+  const isStrictMode = allocationSettings.holdingTargetMode === "strict";
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([PORTFOLIO_ACCOUNT_ID]);
   // const [activePortfolioId, setActivePortfolioId] = useState<string | null>(null); // TODO: Will be used for portfolio-specific allocation strategies
   const [formOpen, setFormOpen] = useState(false);
@@ -379,9 +385,6 @@ export default function AllocationPage() {
   });
   const allHoldingTargets = allHoldingTargetsQueries.flatMap((query) => query.data || []);
 
-  // Strict mode validation
-  const strictValidation = useStrictModeValidation(targets, allHoldingTargets);
-
   // Fetch holdings for all selected accounts and aggregate
   const accountIds = selectedAccounts.map((acc) => acc.id);
   const holdingsQueries = useQueries({
@@ -412,6 +415,21 @@ export default function AllocationPage() {
 
   // Calculate composition (target vs actual)
   const composition = useHoldingsByAssetClass(targets, holdings);
+
+  // Strict mode validation - needs to be after currentAllocation to get total holdings
+  const totalHoldingsInSelectedClass = selectedAssetClass
+    ? currentAllocation.assetClasses
+        .find((ac) => ac.assetClass === selectedAssetClass)
+        ?.subClasses.flatMap((sc) => sc.holdings || []).length || 0
+    : 0;
+
+  const strictValidation = useStrictModeValidation(
+    targets,
+    allHoldingTargets,
+    assetClassPendingEdits,
+    selectedAssetClass,
+    totalHoldingsInSelectedClass,
+  );
 
   // Calculate total allocated from composition only (excludes orphaned targets without holdings)
   const totalAllocated = composition.reduce((sum, comp) => {
@@ -652,14 +670,43 @@ export default function AllocationPage() {
 
       // Calculate final distribution
       const hasAnyTargets = holdingTargets.length > 0 || assetClassPendingEdits.size > 0;
-      const distribution = hasAnyTargets
-        ? calculateAutoDistribution(
-            allHoldings,
-            holdingTargets,
-            assetClassPendingEdits,
-            assetClassValue,
-          )
-        : { holdings: [] };
+
+      let distribution;
+      if (isStrictMode) {
+        // In strict mode: no auto-distribution, use exact values from pending edits + saved targets
+        distribution = {
+          holdings: allHoldings
+            .map((holding) => {
+              const assetId = holding.instrument?.id || "";
+              const pendingPercent = assetClassPendingEdits.get(assetId);
+              const savedTarget = holdingTargets.find((ht) => ht.assetId === assetId);
+
+              // Use pending edit if exists, otherwise use saved target, otherwise 0
+              const targetPercent =
+                pendingPercent !== undefined
+                  ? pendingPercent
+                  : savedTarget?.targetPercentOfClass || 0;
+
+              return {
+                assetId,
+                targetPercent,
+                isLocked: savedTarget?.isLocked || false,
+                isUserSet: true, // In strict mode, all values are user-set (no auto-distribution)
+              };
+            })
+            .filter((h) => h.targetPercent > 0), // Only include holdings with targets
+        };
+      } else {
+        // In preview mode: use auto-distribution
+        distribution = hasAnyTargets
+          ? calculateAutoDistribution(
+              allHoldings,
+              holdingTargets,
+              assetClassPendingEdits,
+              assetClassValue,
+            )
+          : { holdings: [] };
+      }
 
       // Validate total percentage
       const totalPercent = distribution.holdings.reduce(
@@ -1292,21 +1339,38 @@ export default function AllocationPage() {
 
                     {targets.find((t) => t.assetClass === selectedAssetClass) && (
                       <div className="space-y-3">
-                        {/* Actual % */}
-                        <div className="mb-2 flex justify-between text-sm">
-                          <span className="text-muted-foreground">Actual:</span>
-                          <span className="font-semibold">
-                            {currentAllocation.assetClasses
-                              .find((ac) => ac.assetClass === selectedAssetClass)
-                              ?.actualPercent.toFixed(1)}
-                            %
-                          </span>
+                        {/* Target Bar - with label inside */}
+                        <div className="bg-secondary relative h-6 flex-1 overflow-hidden rounded">
+                          <div
+                            className="bg-chart-2 absolute top-0 left-0 h-full rounded transition-all"
+                            style={{
+                              width: `${Math.min(
+                                targets.find((t) => t.assetClass === selectedAssetClass)
+                                  ?.targetPercent || 0,
+                                100,
+                              )}%`,
+                            }}
+                          />
+                          {/* Label on left (inside colored portion) */}
+                          <div className="text-background absolute top-0 left-0 z-10 flex h-full items-center px-2 text-xs font-medium">
+                            <span className="whitespace-nowrap">Target</span>
+                          </div>
+                          {/* Percentage on right */}
+                          <div className="text-foreground absolute top-0 right-0 z-10 flex h-full items-center px-2 text-xs font-medium">
+                            <span className="whitespace-nowrap">
+                              {(
+                                targets.find((t) => t.assetClass === selectedAssetClass)
+                                  ?.targetPercent || 0
+                              ).toFixed(1)}
+                              %
+                            </span>
+                          </div>
                         </div>
 
-                        {/* Actual Progress Bar (Green) */}
-                        <div className="bg-muted h-3 overflow-hidden rounded">
+                        {/* Actual Bar - with label inside */}
+                        <div className="bg-secondary relative h-6 flex-1 overflow-hidden rounded">
                           <div
-                            className="h-full bg-green-500"
+                            className="absolute top-0 left-0 h-full rounded bg-green-600 transition-all dark:bg-green-500"
                             style={{
                               width: `${Math.min(
                                 currentAllocation.assetClasses.find(
@@ -1316,11 +1380,23 @@ export default function AllocationPage() {
                               )}%`,
                             }}
                           />
+                          {/* Label on left (inside colored portion) */}
+                          <div className="text-background absolute top-0 left-0 z-10 flex h-full items-center px-2 text-xs font-medium">
+                            <span className="whitespace-nowrap">Actual</span>
+                          </div>
+                          {/* Percentage on right */}
+                          <div className="text-foreground absolute top-0 right-0 z-10 flex h-full items-center px-2 text-xs font-medium">
+                            <span className="whitespace-nowrap">
+                              {currentAllocation.assetClasses
+                                .find((ac) => ac.assetClass === selectedAssetClass)
+                                ?.actualPercent.toFixed(1)}
+                              %
+                            </span>
+                          </div>
                         </div>
 
-                        {/* Target % - EDITABLE INLINE */}
-                        <div className="mt-4 flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Target:</span>
+                        {/* Hidden editable target input - click edit button to change */}
+                        <div className="hidden">
                           <TargetPercentInput
                             value={
                               targets.find((t) => t.assetClass === selectedAssetClass)
@@ -1343,32 +1419,23 @@ export default function AllocationPage() {
                             disabled={isMutating}
                           />
                         </div>
-
-                        {/* Target Progress Bar - Sector Allocation Style */}
-                        <div className="bg-secondary relative h-3 flex-1 overflow-hidden rounded">
-                          <div
-                            className="bg-chart-2 absolute top-0 left-0 h-full rounded transition-all"
-                            style={{
-                              width: `${Math.min(
-                                targets.find((t) => t.assetClass === selectedAssetClass)
-                                  ?.targetPercent || 0,
-                                100,
-                              )}%`,
-                            }}
-                          />
-                          <div className="text-background absolute top-0 left-0 flex h-full items-center px-2 text-xs font-medium">
-                            <span className="whitespace-nowrap">
-                              Target{" "}
-                              {(
-                                targets.find((t) => t.assetClass === selectedAssetClass)
-                                  ?.targetPercent || 0
-                              ).toFixed(0)}
-                              %
-                            </span>
-                          </div>
-                        </div>
                       </div>
                     )}
+                  </div>
+
+                  {/* Sub-Pie Chart: Visual breakdown of holdings within this asset class */}
+                  <div className="bg-muted/30 rounded-lg border p-4">
+                    <div className="mb-2">
+                      <p className="text-sm font-semibold">Holdings Breakdown</p>
+                    </div>
+                    <SubPieChart
+                      holdings={
+                        currentAllocation.assetClasses
+                          .find((ac) => ac.assetClass === selectedAssetClass)
+                          ?.subClasses.flatMap((sc) => sc.holdings) || []
+                      }
+                      baseCurrency={settings?.baseCurrency || "USD"}
+                    />
                   </div>
 
                   {/* Save All Targets Section - Shows when there are pending edits or auto-distribution */}
@@ -1417,26 +1484,6 @@ export default function AllocationPage() {
                       </div>
                     </div>
                   )}
-
-                  {/* Sub-Pie Chart: Visual breakdown of holdings within this asset class */}
-                  <div className="bg-muted/30 rounded-lg border p-4">
-                    <div className="mb-2">
-                      <p className="text-sm font-semibold">Holdings Breakdown</p>
-                    </div>
-                    <SubPieChart
-                      holdingTargets={allHoldingTargets.filter((ht) =>
-                        currentAllocation.assetClasses
-                          .find((ac) => ac.assetClass === selectedAssetClass)
-                          ?.subClasses.some((sc) => sc.holdings.some((h) => h.id === ht.assetId)),
-                      )}
-                      holdings={
-                        currentAllocation.assetClasses
-                          .find((ac) => ac.assetClass === selectedAssetClass)
-                          ?.subClasses.flatMap((sc) => sc.holdings) || []
-                      }
-                      assetClassName={selectedAssetClass}
-                    />
-                  </div>
 
                   {/* Section 2: Sub-Class Breakdown with Holding Targets */}
                   <div className="space-y-3">
@@ -1500,6 +1547,7 @@ export default function AllocationPage() {
                                       }
                                       sharedPendingEdits={assetClassPendingEdits}
                                       onSharedPendingChange={setAssetClassPendingEdits}
+                                      isStrictMode={isStrictMode}
                                     />
                                   </div>
                                 </div>

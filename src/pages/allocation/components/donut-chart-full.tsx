@@ -86,7 +86,7 @@ export function DonutChartFull({
         endAngle={360}
         isBalanceHidden={isBalanceHidden}
         status={pieData[activeIndex]?.status}
-        minSliceAngle={8}
+        minSliceAngle={2}
       />
     </div>
   );
