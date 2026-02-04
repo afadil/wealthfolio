@@ -12,7 +12,7 @@ use wealthfolio_core::{
     goals::GoalServiceTrait,
     portfolio::{
         allocation::AllocationServiceTrait, holdings::HoldingsServiceTrait,
-        valuation::ValuationServiceTrait,
+        performance::PerformanceServiceTrait, valuation::ValuationServiceTrait,
     },
     quotes::QuoteServiceTrait,
     secrets::SecretStore,
@@ -63,6 +63,9 @@ pub trait AiEnvironment: Send + Sync {
 
     /// Get the allocation service for portfolio allocations.
     fn allocation_service(&self) -> Arc<dyn AllocationServiceTrait>;
+
+    /// Get the performance service for portfolio performance metrics.
+    fn performance_service(&self) -> Arc<dyn PerformanceServiceTrait>;
 }
 
 #[cfg(test)]
@@ -81,8 +84,10 @@ pub mod test_env {
         assets::{Asset, ProviderProfile},
         errors::DatabaseError,
         goals::{Goal, GoalServiceTrait, GoalsAllocation, NewGoal},
-        holdings::{Holding, HoldingSummary, HoldingsServiceTrait},
+        holdings::{Holding, HoldingsServiceTrait},
+        accounts::TrackingMode,
         portfolio::allocation::{AllocationHoldings, AllocationServiceTrait, PortfolioAllocations},
+        portfolio::performance::{PerformanceMetrics, PerformanceServiceTrait},
         quotes::{
             LatestQuotePair, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait, QuoteSyncState,
             SymbolSearchResult, SymbolSyncPlan, SyncMode, SyncResult,
@@ -905,6 +910,78 @@ pub mod test_env {
         }
     }
 
+    /// Mock performance service for testing.
+    #[derive(Default)]
+    pub struct MockPerformanceService;
+
+    #[async_trait]
+    impl PerformanceServiceTrait for MockPerformanceService {
+        async fn calculate_performance_history(
+            &self,
+            _item_type: &str,
+            item_id: &str,
+            _start_date: Option<NaiveDate>,
+            _end_date: Option<NaiveDate>,
+            _tracking_mode: Option<TrackingMode>,
+        ) -> CoreResult<PerformanceMetrics> {
+            Ok(PerformanceMetrics {
+                id: item_id.to_string(),
+                returns: Vec::new(),
+                period_start_date: None,
+                period_end_date: None,
+                currency: "USD".to_string(),
+                period_gain: rust_decimal::Decimal::ZERO,
+                period_return: rust_decimal::Decimal::ZERO,
+                cumulative_twr: Some(rust_decimal::Decimal::ZERO),
+                gain_loss_amount: Some(rust_decimal::Decimal::ZERO),
+                annualized_twr: Some(rust_decimal::Decimal::ZERO),
+                simple_return: rust_decimal::Decimal::ZERO,
+                annualized_simple_return: rust_decimal::Decimal::ZERO,
+                cumulative_mwr: Some(rust_decimal::Decimal::ZERO),
+                annualized_mwr: Some(rust_decimal::Decimal::ZERO),
+                volatility: rust_decimal::Decimal::ZERO,
+                max_drawdown: rust_decimal::Decimal::ZERO,
+                is_holdings_mode: false,
+            })
+        }
+
+        async fn calculate_performance_summary(
+            &self,
+            _item_type: &str,
+            item_id: &str,
+            _start_date: Option<NaiveDate>,
+            _end_date: Option<NaiveDate>,
+            _tracking_mode: Option<TrackingMode>,
+        ) -> CoreResult<PerformanceMetrics> {
+            Ok(PerformanceMetrics {
+                id: item_id.to_string(),
+                returns: Vec::new(),
+                period_start_date: None,
+                period_end_date: None,
+                currency: "USD".to_string(),
+                period_gain: rust_decimal::Decimal::ZERO,
+                period_return: rust_decimal::Decimal::ZERO,
+                cumulative_twr: Some(rust_decimal::Decimal::ZERO),
+                gain_loss_amount: Some(rust_decimal::Decimal::ZERO),
+                annualized_twr: Some(rust_decimal::Decimal::ZERO),
+                simple_return: rust_decimal::Decimal::ZERO,
+                annualized_simple_return: rust_decimal::Decimal::ZERO,
+                cumulative_mwr: Some(rust_decimal::Decimal::ZERO),
+                annualized_mwr: Some(rust_decimal::Decimal::ZERO),
+                volatility: rust_decimal::Decimal::ZERO,
+                max_drawdown: rust_decimal::Decimal::ZERO,
+                is_holdings_mode: false,
+            })
+        }
+
+        fn calculate_accounts_simple_performance(
+            &self,
+            _account_ids: &[String],
+        ) -> CoreResult<Vec<wealthfolio_core::performance::SimplePerformanceMetrics>> {
+            Ok(Vec::new())
+        }
+    }
+
     /// Mock environment for testing.
     pub struct MockEnvironment {
         pub base_currency: String,
@@ -918,6 +995,7 @@ pub mod test_env {
         pub chat_repository: Arc<dyn ChatRepositoryTrait>,
         pub quote_service: Arc<dyn QuoteServiceTrait>,
         pub allocation_service: Arc<dyn AllocationServiceTrait>,
+        pub performance_service: Arc<dyn PerformanceServiceTrait>,
     }
 
     impl Default for MockEnvironment {
@@ -940,6 +1018,7 @@ pub mod test_env {
                 chat_repository: Arc::new(MockChatRepository::default()),
                 quote_service: Arc::new(MockQuoteService::default()),
                 allocation_service: Arc::new(MockAllocationService::default()),
+                performance_service: Arc::new(MockPerformanceService::default()),
             }
         }
 
@@ -993,6 +1072,10 @@ pub mod test_env {
 
         fn allocation_service(&self) -> Arc<dyn AllocationServiceTrait> {
             self.allocation_service.clone()
+        }
+
+        fn performance_service(&self) -> Arc<dyn PerformanceServiceTrait> {
+            self.performance_service.clone()
         }
     }
 }

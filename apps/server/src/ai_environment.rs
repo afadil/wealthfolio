@@ -9,8 +9,8 @@ use wealthfolio_ai::{AiEnvironment, ChatRepositoryTrait};
 use wealthfolio_core::{
     accounts::AccountServiceTrait, activities::ActivityServiceTrait,
     allocation::AllocationServiceTrait, goals::GoalServiceTrait, holdings::HoldingsServiceTrait,
-    quotes::QuoteServiceTrait, secrets::SecretStore, settings::SettingsServiceTrait,
-    valuation::ValuationServiceTrait,
+    performance::PerformanceServiceTrait, quotes::QuoteServiceTrait, secrets::SecretStore,
+    settings::SettingsServiceTrait, valuation::ValuationServiceTrait,
 };
 
 /// Server-side implementation of AiEnvironment.
@@ -29,6 +29,7 @@ pub struct ServerAiEnvironment {
     chat_repository: Arc<dyn ChatRepositoryTrait + Send + Sync>,
     quote_service: Arc<dyn QuoteServiceTrait + Send + Sync>,
     allocation_service: Arc<dyn AllocationServiceTrait + Send + Sync>,
+    performance_service: Arc<dyn PerformanceServiceTrait + Send + Sync>,
 }
 
 impl ServerAiEnvironment {
@@ -45,6 +46,7 @@ impl ServerAiEnvironment {
         chat_repository: Arc<dyn ChatRepositoryTrait + Send + Sync>,
         quote_service: Arc<dyn QuoteServiceTrait + Send + Sync>,
         allocation_service: Arc<dyn AllocationServiceTrait + Send + Sync>,
+        performance_service: Arc<dyn PerformanceServiceTrait + Send + Sync>,
     ) -> Self {
         Self {
             base_currency,
@@ -58,6 +60,7 @@ impl ServerAiEnvironment {
             chat_repository,
             quote_service,
             allocation_service,
+            performance_service,
         }
     }
 }
@@ -105,5 +108,9 @@ impl AiEnvironment for ServerAiEnvironment {
 
     fn allocation_service(&self) -> Arc<dyn AllocationServiceTrait> {
         self.allocation_service.clone()
+    }
+
+    fn performance_service(&self) -> Arc<dyn PerformanceServiceTrait> {
+        self.performance_service.clone()
     }
 }

@@ -269,6 +269,10 @@ function PerformanceToolUIContent({ args, result, status }: PerformanceToolUICon
 
   const typedArgs = args as GetPerformanceArgs | undefined;
   const accountLabel = parsed.id ?? typedArgs?.accountId ?? "Portfolio";
+  // Hide UUID-like IDs (e.g., "29628C36-3333-46A2-A1FB-B4D8514D0A74")
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    accountLabel,
+  );
   const isPositiveReturn = parsed.cumulativeTwr >= 0;
   const TrendIcon = isPositiveReturn ? Icons.TrendingUp : Icons.TrendingDown;
 
@@ -278,7 +282,7 @@ function PerformanceToolUIContent({ args, result, status }: PerformanceToolUICon
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <CardTitle className="text-base">Performance</CardTitle>
-            {accountLabel !== "TOTAL" && accountLabel !== "Portfolio" && (
+            {accountLabel !== "TOTAL" && accountLabel !== "Portfolio" && !isUuid && (
               <Badge variant="outline" className="text-xs uppercase">
                 {accountLabel}
               </Badge>

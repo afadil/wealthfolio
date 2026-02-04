@@ -1,4 +1,4 @@
-//! Performance tool - fetch portfolio performance metrics using rig-core Tool trait.
+//! Performance tool - fetch portfolio performance metrics using PerformanceService.
 
 use chrono::{Datelike, Local, NaiveDate};
 use rig::{completion::ToolDefinition, tool::Tool};
@@ -35,25 +35,43 @@ fn default_period() -> String {
 }
 
 /// Output for the get_performance tool.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Field names match what the frontend expects.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct GetPerformanceOutput {
-    /// Percentage return for the period.
-    pub total_return: f64,
-    /// Absolute gain/loss amount.
-    pub total_gain: f64,
-    /// Portfolio value at start of period.
-    pub start_value: f64,
-    /// Current portfolio value.
-    pub end_value: f64,
-    /// The period used.
-    pub period: String,
-    /// Start date of period.
-    pub start_date: String,
-    /// End date of period.
-    pub end_date: String,
+    /// Account or portfolio ID.
+    pub id: String,
+    /// Period start date.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub period_start_date: Option<String>,
+    /// Period end date.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub period_end_date: Option<String>,
     /// Base currency.
     pub currency: String,
+    /// Cumulative time-weighted return (decimal, e.g., 0.05 = 5%).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cumulative_twr: Option<f64>,
+    /// Absolute gain/loss amount.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gain_loss_amount: Option<f64>,
+    /// Annualized TWR.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub annualized_twr: Option<f64>,
+    /// Simple return (decimal).
+    pub simple_return: f64,
+    /// Annualized simple return.
+    pub annualized_simple_return: f64,
+    /// Cumulative money-weighted return.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cumulative_mwr: Option<f64>,
+    /// Annualized MWR.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub annualized_mwr: Option<f64>,
+    /// Portfolio volatility (annualized).
+    pub volatility: f64,
+    /// Maximum drawdown.
+    pub max_drawdown: f64,
 }
 
 // ============================================================================
@@ -82,14 +100,14 @@ impl<E: AiEnvironment> Clone for GetPerformanceTool<E> {
 }
 
 /// Convert a period string to a start date.
-fn period_to_start_date(period: &str, end_date: NaiveDate) -> NaiveDate {
+fn period_to_start_date(period: &str, end_date: NaiveDate) -> Option<NaiveDate> {
     match period.to_uppercase().as_str() {
-        "1M" => end_date - chrono::Duration::days(30),
-        "3M" => end_date - chrono::Duration::days(90),
-        "6M" => end_date - chrono::Duration::days(180),
-        "YTD" => NaiveDate::from_ymd_opt(end_date.year(), 1, 1).unwrap_or(end_date),
-        "1Y" => end_date - chrono::Duration::days(365),
-        "ALL" | _ => NaiveDate::from_ymd_opt(1970, 1, 1).unwrap(),
+        "1M" => Some(end_date - chrono::Duration::days(30)),
+        "3M" => Some(end_date - chrono::Duration::days(90)),
+        "6M" => Some(end_date - chrono::Duration::days(180)),
+        "YTD" => NaiveDate::from_ymd_opt(end_date.year(), 1, 1),
+        "1Y" => Some(end_date - chrono::Duration::days(365)),
+        "ALL" | _ => None, // None means no start date filter
     }
 }
 
@@ -103,7 +121,7 @@ impl<E: AiEnvironment + 'static> Tool for GetPerformanceTool<E> {
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
             name: Self::NAME.to_string(),
-            description: "Get portfolio performance metrics for a specific period. Returns total return percentage, absolute gain/loss, and start/end values. Use account_id='TOTAL' for aggregate performance across all accounts.".to_string(),
+            description: "Get portfolio performance metrics including TWR, MWR, volatility, and max drawdown. Use account_id='TOTAL' for aggregate performance across all accounts.".to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -132,50 +150,32 @@ impl<E: AiEnvironment + 'static> Tool for GetPerformanceTool<E> {
         let end_date = Local::now().date_naive();
         let start_date = period_to_start_date(&period, end_date);
 
-        // Fetch historical valuations
-        let valuations = self
+        // Use PerformanceService to calculate metrics
+        let metrics = self
             .env
-            .valuation_service()
-            .get_historical_valuations(account_id, Some(start_date), Some(end_date))
+            .performance_service()
+            .calculate_performance_history("account", account_id, start_date, Some(end_date), None)
+            .await
             .map_err(|e| AiError::ToolExecutionFailed(e.to_string()))?;
 
-        // Find start and end values
-        let (start_value, actual_start_date, end_value, actual_end_date) = if valuations.is_empty()
-        {
-            (0.0, start_date, 0.0, end_date)
-        } else {
-            // Valuations should be sorted by date, find first and last
-            let first = valuations.first().unwrap();
-            let last = valuations.last().unwrap();
-
-            let start_val = first.total_value.to_f64().unwrap_or(0.0);
-            let end_val = last.total_value.to_f64().unwrap_or(0.0);
-
-            (
-                start_val,
-                first.valuation_date,
-                end_val,
-                last.valuation_date,
-            )
-        };
-
-        // Calculate simple return: (endValue - startValue) / startValue * 100
-        let total_gain = end_value - start_value;
-        let total_return = if start_value > 0.0 {
-            (total_gain / start_value) * 100.0
-        } else {
-            0.0
-        };
-
         Ok(GetPerformanceOutput {
-            total_return,
-            total_gain,
-            start_value,
-            end_value,
-            period,
-            start_date: actual_start_date.to_string(),
-            end_date: actual_end_date.to_string(),
-            currency: self.base_currency.clone(),
+            id: metrics.id,
+            period_start_date: metrics.period_start_date.map(|d| d.to_string()),
+            period_end_date: metrics.period_end_date.map(|d| d.to_string()),
+            currency: if metrics.currency.is_empty() {
+                self.base_currency.clone()
+            } else {
+                metrics.currency
+            },
+            cumulative_twr: metrics.cumulative_twr.and_then(|v| v.to_f64()),
+            gain_loss_amount: metrics.gain_loss_amount.and_then(|v| v.to_f64()),
+            annualized_twr: metrics.annualized_twr.and_then(|v| v.to_f64()),
+            simple_return: metrics.simple_return.to_f64().unwrap_or(0.0),
+            annualized_simple_return: metrics.annualized_simple_return.to_f64().unwrap_or(0.0),
+            cumulative_mwr: metrics.cumulative_mwr.and_then(|v| v.to_f64()),
+            annualized_mwr: metrics.annualized_mwr.and_then(|v| v.to_f64()),
+            volatility: metrics.volatility.to_f64().unwrap_or(0.0),
+            max_drawdown: metrics.max_drawdown.to_f64().unwrap_or(0.0),
         })
     }
 }
@@ -199,7 +199,6 @@ mod tests {
         assert!(result.is_ok());
 
         let output = result.unwrap();
-        assert_eq!(output.period, "YTD");
         assert_eq!(output.currency, "USD");
     }
 
@@ -215,9 +214,6 @@ mod tests {
             })
             .await;
         assert!(result.is_ok());
-
-        let output = result.unwrap();
-        assert_eq!(output.period, "1M");
     }
 
     #[tokio::test]
@@ -226,25 +222,18 @@ mod tests {
 
         // Test YTD
         let ytd_start = period_to_start_date("YTD", today);
-        assert_eq!(ytd_start, NaiveDate::from_ymd_opt(2024, 1, 1).unwrap());
+        assert_eq!(ytd_start, NaiveDate::from_ymd_opt(2024, 1, 1));
 
         // Test 1M (30 days back)
         let one_month_start = period_to_start_date("1M", today);
-        assert_eq!(
-            one_month_start,
-            NaiveDate::from_ymd_opt(2024, 5, 16).unwrap()
-        );
+        assert_eq!(one_month_start, NaiveDate::from_ymd_opt(2024, 5, 16));
 
-        // Test 1Y (365 days back - 2024 is a leap year so 366 days from Jan 1)
+        // Test 1Y (365 days back)
         let one_year_start = period_to_start_date("1Y", today);
-        // 365 days back from June 15, 2024: June 16, 2023 (leap year adjustment)
-        assert_eq!(
-            one_year_start,
-            NaiveDate::from_ymd_opt(2023, 6, 16).unwrap()
-        );
+        assert_eq!(one_year_start, NaiveDate::from_ymd_opt(2023, 6, 16));
 
-        // Test ALL
+        // Test ALL - returns None (no start date filter)
         let all_start = period_to_start_date("ALL", today);
-        assert_eq!(all_start, NaiveDate::from_ymd_opt(1970, 1, 1).unwrap());
+        assert_eq!(all_start, None);
     }
 }

@@ -71,7 +71,7 @@
         }
       },
       "defaultModel": "openai/gpt-oss-120b",
-      "titleModelId": "meta-llama/llama-guard-4-12b",
+      "titleModelId": "groq/compound-mini",
       "documentationUrl": "https://console.groq.com/docs"
     },
     "google": {
