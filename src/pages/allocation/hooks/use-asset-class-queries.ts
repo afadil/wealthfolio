@@ -1,10 +1,10 @@
 import { logger } from "@/adapters";
 import { getHoldings } from "@/commands/portfolio";
 import {
-    deleteAssetClassTarget,
-    getAssetClassTargets,
-    getRebalancingStrategies,
-    saveAssetClassTarget,
+  deleteAssetClassTarget,
+  getAssetClassTargets,
+  getRebalancingStrategies,
+  saveAssetClassTarget,
 } from "@/commands/rebalancing";
 import { QueryKeys } from "@/lib/query-keys";
 import type { AssetClassTarget, NewAssetClassTarget } from "@/lib/types";
@@ -27,12 +27,18 @@ export function useRebalancingStrategy(accountId: string | null) {
       console.log("useRebalancingStrategy - all strategies:", strategies);
       console.log("useRebalancingStrategy - looking for accountId:", accountId);
 
-      // For "TOTAL" (all portfolio), use strategy with accountId === null
-      // For specific accounts, match accountId directly
-      const strategy =
-        accountId === "TOTAL"
-          ? strategies.find((s) => s.accountId === null) || null
-          : strategies.find((s) => s.accountId === accountId) || null;
+      // PRIORITY ORDER:
+      // 1. If accountId starts with "virtual_", it's a virtual strategy ID - match by strategy.id
+      // 2. If accountId is "TOTAL", use strategy with accountId === null
+      // 3. Otherwise, match by strategy.accountId
+      let strategy;
+      if (accountId.startsWith("virtual_")) {
+        strategy = strategies.find((s) => s.id === accountId) || null;
+      } else if (accountId === "TOTAL") {
+        strategy = strategies.find((s) => s.accountId === null) || null;
+      } else {
+        strategy = strategies.find((s) => s.accountId === accountId) || null;
+      }
 
       console.log("useRebalancingStrategy - found strategy:", strategy);
       return strategy;
@@ -83,14 +89,12 @@ export const useAssetClassMutations = () => {
   };
 
   const saveTargetMutation = useMutation({
-    mutationFn: (target: NewAssetClassTarget | AssetClassTarget) =>
-      saveAssetClassTarget(target),
+    mutationFn: (target: NewAssetClassTarget | AssetClassTarget) => saveAssetClassTarget(target),
     onSuccess: (data) => {
       const isNew = !("id" in data);
-      handleSuccess(
-        isNew ? "Asset class target added." : "Asset class target updated.",
-        [[QueryKeys.ASSET_CLASS_TARGETS, data.strategyId]]
-      );
+      handleSuccess(isNew ? "Asset class target added." : "Asset class target updated.", [
+        [QueryKeys.ASSET_CLASS_TARGETS, data.strategyId],
+      ]);
     },
     onError: (_error) => handleError("saving asset class target"),
   });
