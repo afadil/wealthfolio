@@ -1,44 +1,66 @@
-# Current State - January 20, 2026, 23:00
+# Current Implementation State - Allocation Feature
 
-## ✅ Completed
-1. All planning documentation created (9 files)
-2. Database migration created and run successfully
-3. Schema fixed: `asset_id` instead of `symbol`
-4. Migration on `allocations-v2` branch
-5. Fresh start from main branch
+**Last Updated**: [Today's date]
+**Status**: MVP Complete - Ready for Phase 2
 
-## 🔧 Current Issue
-Build errors - `goals_allocation` table referenced but doesn't exist
+## ✅ Completed Features
 
-**Fix:** Find and remove/comment out goals_allocation references:
-```bash
-grep -r "goals_allocation" src-core/src/ --include="*.rs"
-```
+### Tier 1 (Asset Classes) - FULLY COMPLETE
+- ✅ Create/Read/Update/Delete targets
+- ✅ Per-account target scoping
+- ✅ Proportional allocation adjustment
+- ✅ 2-decimal precision with validation
+- ✅ Lock/unlock structure (Phase 2 ready)
 
-Then comment out those lines.
+### Tier 2 (Holdings Breakdown) - FULLY COMPLETE
+- ✅ Collapsible holdings by sub-asset class
+- ✅ Clickable holdings linking to detail pages
+- ✅ Sorted by market value (descending)
+- ✅ Progress bars with percentage display
+- ✅ Composition tab styling match
 
-## 📊 Database State
-- Migration `20260120000001` ran successfully
-- Tables exist: rebalancing_strategies, asset_class_targets, holding_targets
-- Schema uses asset_id (correct)
+### UI/UX Polish - COMPLETE
+- ✅ Allocation Overview as default tab
+- ✅ Status icons (ArrowUp/Down/Minus)
+- ✅ Horizontal Target Status layout
+- ✅ Delete targets via trash icon
+- ✅ "+ Add Target" button in card header
+- ✅ Slider overlays for target % adjustment
+- ✅ Floating-point precision fixed via integer arithmetic
 
-## 🎯 Next Steps (After Build Works)
-1. Create Rust backend commands in `src-tauri/src/commands/rebalancing.rs`
-2. Create TypeScript wrappers in `src/commands/rebalancing.ts`
-3. Create basic UI page
+## 🎯 Next Steps (Phase 2)
 
-## 🔑 Key Commands
-```bash
-# Build
-pnpm tauri dev
+1. **Rebalancing Suggestions Tab**
+   - User enters cash amount to deploy
+   - System suggests optimal allocations
+   - Trade list generation for broker execution
 
-# Regenerate schema
-cd src-core
-DATABASE_URL='sqlite:///Users/admin/Library/Application Support/com.teymz.wealthfolio/app.db' diesel print-schema > src/schema.rs
+2. **Per-Holding Lock Feature**
+   - Structure already in place (ui components ready)
+   - Prevent specific holdings from being rebalanced
 
-# Migration
-DATABASE_URL='sqlite:///Users/admin/Library/Application Support/com.teymz.wealthfolio/app.db' diesel migration run
-```
+3. **Advanced Rebalancing**
+   - Tax-aware rebalancing
+   - Multi-account optimization
+   - Trade cost simulation
+
+## 🔧 Technical Notes
+
+### Integer Arithmetic for Decimals
+- Prevents floating-point precision errors
+- Converts to hundredths (multiply by 100) for calculations
+- All validation uses integer math internally
+
+### Component Architecture
+- `allocation-pie-chart-view.tsx` - Main container
+- `donut-chart-full.tsx` - Pie chart visualization
+- `asset-class-target-card.tsx` - Target editing
+- `allocation-overview.tsx` - Overview comparison
+- Side panel uses `use-current-allocation.ts` for composition data
+
+### Known Limitations
+- UI package has pre-existing TypeScript errors in data-table component (unrelated to allocation feature)
+- Rebalancing Suggestions tab exists as stub only
 
 ## 📦 Backups
 - Database: ~/Documents/wealthfolio_backup/
@@ -46,4 +68,4 @@ DATABASE_URL='sqlite:///Users/admin/Library/Application Support/com.teymz.wealth
 - Old work preserved in: allocations branch
 
 ## 💬 To Continue
-Start new chat with: "I'm working on allocations feature for Wealthfolio, currently on allocations-v2 branch. Build has errors about goals_allocation table. Here's the current state..." and attach this file.
+Start new chat with: "I'm working on allocations feature for Wealthfolio, currently on allocations-v2 branch. Here's the current state..." and attach this file.

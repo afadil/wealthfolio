@@ -1,269 +1,211 @@
-import { Button } from "@wealthfolio/ui";
-import { ChevronDown, Lock, LockOpen } from "lucide-react";
-import { useRef, useState } from "react";
-import { AssetClassComposition } from "../hooks/use-current-allocation";
-import { getDriftStatus } from "../hooks/use-drift-status";
+import type { AssetClassTarget } from "@/lib/types";
+import { Button, Card, TargetPercentSlider } from "@wealthfolio/ui";
+import { useState } from "react";
+import { useProportionalAllocation } from "../hooks";
+import type { AssetClassComposition } from "../hooks/use-current-allocation";
 
 interface AssetClassTargetCardProps {
   composition: AssetClassComposition;
+  targetPercent: number;
+  allTargets?: AssetClassTarget[];
   onEdit: () => void;
   onDelete: () => void;
-  onQuickAdjust?: (percent: number) => void;
+  onTargetChange: (newPercent: number) => Promise<void>;
+  onProportionalChange?: (targets: AssetClassTarget[]) => Promise<void>;
   isLoading?: boolean;
-  totalAllocated?: number;
 }
 
 export function AssetClassTargetCard({
   composition,
+  targetPercent,
+  allTargets = [],
   onEdit,
   onDelete,
-  onQuickAdjust,
+  onTargetChange,
+  onProportionalChange,
   isLoading = false,
-  totalAllocated = 0,
 }: AssetClassTargetCardProps) {
-  const { assetClass, targetPercent, actualPercent } = composition;
-  const [isTargetHovered, setIsTargetHovered] = useState(false);
-  const [isTargetLocked, setIsTargetLocked] = useState(false);
-  const [quickAdjustPercent, setQuickAdjustPercent] = useState(targetPercent);
-  const [isEditingPercent, setIsEditingPercent] = useState(false);
-  const [editValue, setEditValue] = useState(targetPercent.toFixed(1));
-  const [isExpanded, setIsExpanded] = useState(true);
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const { assetClass, actualPercent } = composition;
+  const [localTarget, setLocalTarget] = useState(targetPercent);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isEditingTarget, setIsEditingTarget] = useState(false);
+  const [editValue, setEditValue] = useState(localTarget.toFixed(1));
+  const [isLocked, setIsLocked] = useState(false);
+  const { calculateProportionalTargets } = useProportionalAllocation();
 
-  const driftStatus = getDriftStatus(actualPercent, targetPercent);
-  const isOverAllocated = totalAllocated > 100;
+  const handleSliderChange = async (newValue: number) => {
+    setLocalTarget(newValue);
+    setEditValue(newValue.toFixed(1));
 
-  const handleQuickAdjust = (value: number) => {
-    if (isTargetLocked) return;
+    // If proportional adjustment enabled and we have all targets
+    if (onProportionalChange && allTargets.length > 0) {
+      const proportionalTargets = calculateProportionalTargets(
+        allTargets,
+        assetClass,
+        newValue
+      );
 
-    // Update UI immediately (smooth slider feedback)
-    setQuickAdjustPercent(value);
-
-    // Debounce API call (don't fire on every pixel drag)
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
+      setIsSaving(true);
+      try {
+        await onProportionalChange(proportionalTargets);
+      } catch (err) {
+        console.error("Failed to update targets proportionally:", err);
+        setLocalTarget(targetPercent);
+        setEditValue(targetPercent.toFixed(1));
+      } finally {
+        setIsSaving(false);
+      }
+    } else {
+      // Fallback: simple update without proportional adjustment
+      setIsSaving(true);
+      try {
+        await onTargetChange(newValue);
+      } catch (err) {
+        console.error("Failed to update target:", err);
+        setLocalTarget(targetPercent);
+        setEditValue(targetPercent.toFixed(1));
+      } finally {
+        setIsSaving(false);
+      }
     }
-    debounceRef.current = setTimeout(() => {
-      onQuickAdjust?.(value);
-    }, 300); // Wait 300ms after user stops dragging
   };
 
-  const handleEditPercent = (value: string) => {
-    const numValue = parseFloat(value) || 0;
-    const clamped = Math.min(100, Math.max(0, numValue));
-    setEditValue(clamped.toFixed(1));
-    handleQuickAdjust(clamped);
-    setIsEditingPercent(false);
+  const handleTargetInputChange = (value: string) => {
+    // Allow only numbers and one decimal point
+    const sanitized = value.replace(/[^0-9.]/g, '');
+    // Prevent leading zeros (e.g., "020" → "20")
+    const cleaned = sanitized.replace(/^0+(?=\d)/, '');
+    setEditValue(cleaned || '0');
   };
+
+  const handleTargetInputBlur = async () => {
+    const numValue = parseFloat(editValue) || 0;
+    const clamped = Math.max(0, Math.min(100, numValue)); // Clamp 0-100
+    setLocalTarget(clamped);
+    setEditValue(clamped.toFixed(1));
+    setIsEditingTarget(false);
+    setIsSaving(true);
+    try {
+      await onTargetChange(clamped);
+    } catch (err) {
+      console.error("Failed to update target:", err);
+      setLocalTarget(targetPercent);
+      setEditValue(targetPercent.toFixed(1));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const drift = actualPercent - localTarget;
+  const driftColor = Math.abs(drift) < 2 ? "text-green-600 dark:text-green-400" : drift > 0 ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400";
 
   return (
-    <div className="rounded-lg border border-border bg-card transition-all">
-      {/* Header (Always Visible) - Clickable to Expand/Collapse */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors text-left"
-      >
-        <div className="flex items-center gap-3 flex-1">
-          {/* Chevron Icon */}
-          <ChevronDown
-            className={`h-5 w-5 text-muted-foreground transition-transform ${
-              isExpanded ? "rotate-0" : "-rotate-90"
-            }`}
-          />
-
-          {/* Class Name + Status Badge */}
-          <div className="flex items-center gap-3">
-            <h3 className="text-base font-semibold text-foreground">{assetClass}</h3>
-            <div
-              className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold ${driftStatus.statusBgColor}`}
-            >
-              <span className={driftStatus.statusColor}>{driftStatus.icon}</span>
-              <span className={driftStatus.statusColor}>{driftStatus.label}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Always-Visible Percentages (Right Side) */}
-        <div className={`flex items-center gap-6 text-sm transition-colors ${isOverAllocated ? 'text-orange-700 dark:text-orange-400' : 'text-foreground'}`}>
-          <div>
-            <span className="text-muted-foreground">Target: </span>
-            {isEditingPercent ? (
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                onBlur={() => handleEditPercent(editValue)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleEditPercent(editValue);
-                  if (e.key === "Escape") {
-                    setEditValue(quickAdjustPercent.toFixed(1));
-                    setIsEditingPercent(false);
-                  }
-                }}
-                autoFocus
-                onClick={(e) => e.stopPropagation()} // Prevent card collapse on input click
-                disabled={isLoading || isTargetLocked}
-                className="w-14 rounded-md border border-primary bg-background px-1 py-0.5 text-sm font-semibold text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
-              />
-            ) : (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation(); // Prevent card collapse on click
-                  if (!isTargetLocked && !isLoading) {
-                    setEditValue(quickAdjustPercent.toFixed(1));
-                    setIsEditingPercent(true);
-                  }
-                }}
-                disabled={isLoading || isTargetLocked}
-                className="font-semibold tabular-nums rounded px-1 py-0.5 hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                title="Click to edit target %"
-              >
-                {quickAdjustPercent.toFixed(1)}%
-              </button>
-            )}
-          </div>
-          <div>
-            <span className="text-muted-foreground">Actual: </span>
-            <span className="font-semibold tabular-nums">{actualPercent.toFixed(1)}%</span>
-          </div>
-        </div>
-      </button>
-
-      {/* Expandable Content (Hidden when collapsed) */}
-      {isExpanded && (
-        <div className="space-y-4 p-4 border-t border-border">
-          {/* Alert: Over-allocated warning */}
-          {isOverAllocated && (
-            <div className="rounded-md bg-orange-100 dark:bg-orange-900/30 border border-orange-300 dark:border-orange-700 p-2">
-              <p className="text-xs font-semibold text-orange-800 dark:text-orange-300">
-                ⚠ Over-allocated: {totalAllocated.toFixed(1)}% (max 100%)
-              </p>
-            </div>
-          )}
-
-          {/* Target Bar with Overlaid Slider */}
-          <div
-            className="space-y-2"
-            onMouseEnter={() => setIsTargetHovered(true)}
-            onMouseLeave={() => setIsTargetHovered(false)}
+    <Card className="p-6 space-y-4 hover:shadow-md transition-shadow">
+      {/* Header: Name + Actions */}
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="font-semibold text-base">{assetClass}</h3>
+        <div className="flex gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onEdit}
+            disabled={isLoading || isSaving}
+            className="h-7 w-7 p-0"
           >
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-xs text-muted-foreground font-medium">Target</div>
-
-              {/* Lock/Unlock Button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsTargetLocked(!isTargetLocked);
-                }}
-                disabled={isLoading}
-                className="p-1 rounded hover:bg-muted transition-colors disabled:opacity-50"
-                title={isTargetLocked ? "Unlock target" : "Lock target"}
-              >
-                {isTargetLocked ? (
-                  <Lock className="h-4 w-4 text-orange-500" />
-                ) : (
-                  <LockOpen className="h-4 w-4 text-muted-foreground" />
-                )}
-              </button>
-            </div>
-
-            {/* Target Progress Bar Container with Overlay Slider */}
-            <div
-              className="relative h-8 bg-muted rounded-lg overflow-visible group"
-              onMouseEnter={() => setIsTargetHovered(true)}
-              onMouseLeave={() => setIsTargetHovered(false)}
-            >
-              {/* Background bar (static) */}
-              <div
-                className="absolute h-8 bg-gray-400 dark:bg-gray-600 rounded-lg transition-all"
-                style={{ width: `${targetPercent}%` }}
-              />
-
-              {/* Overlay Slider (appears on hover, only if unlocked) */}
-              {isTargetHovered && !isTargetLocked && (
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  value={quickAdjustPercent}
-                  onChange={(e) => handleQuickAdjust(parseFloat(e.target.value))}
-                  disabled={isLoading}
-                  className="absolute inset-0 w-full h-full cursor-pointer opacity-0 z-10 disabled:cursor-not-allowed"
-                  style={{
-                    WebkitAppearance: "none",
-                    appearance: "none",
-                    width: "100%",
-                    height: "100%",
-                    background: "transparent",
-                    padding: "0",
-                  }}
-                  title="Drag to adjust target allocation"
-                />
-              )}
-
-              {/* Label overlay (always visible) */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <span className="text-xs font-semibold text-foreground">
-                  {quickAdjustPercent.toFixed(1)}%
-                </span>
-              </div>
-            </div>
-
-            {/* Lock Status Indicator */}
-            {isTargetLocked && (
-              <div className="text-xs text-orange-600 dark:text-orange-400 font-medium">
-                🔒 Target locked — click unlock icon to adjust
-              </div>
-            )}
-          </div>
-
-          {/* Actual Bar with Drift Color */}
-          <div className="space-y-2">
-            <div className="text-xs text-muted-foreground font-medium">Actual</div>
-            <div className="h-2 bg-muted rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${driftStatus.barColor}`}
-                style={{ width: `${actualPercent}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 justify-end pt-2 border-t border-border/50">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit();
-              }}
-              disabled={isLoading || isTargetLocked}
-              className="text-xs"
-              title="Edit allocation target in dialog"
-            >
-              Edit
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-              disabled={isLoading}
-              className="text-xs text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/50"
-              title="Delete allocation target"
-            >
-              Delete
-            </Button>
-          </div>
+            ✎
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onDelete}
+            disabled={isLoading || isSaving}
+            className="h-7 w-7 p-0"
+          >
+            ✕
+          </Button>
         </div>
-      )}
-    </div>
+      </div>
+
+      {/* Target vs Actual - EDITABLE TARGET */}
+      <div className="flex items-center justify-between text-sm">
+        <div>
+          <p className="text-muted-foreground text-xs">Target</p>
+          {isEditingTarget ? (
+            <input
+              type="text"
+              value={editValue}
+              onChange={(e) => handleTargetInputChange(e.target.value)}
+              onBlur={handleTargetInputBlur}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleTargetInputBlur();
+                if (e.key === 'Escape') {
+                  setIsEditingTarget(false);
+                  setEditValue(localTarget.toFixed(1));
+                }
+              }}
+              autoFocus
+              className="w-16 px-2 py-1 border border-primary rounded bg-background text-foreground font-semibold"
+              placeholder="0"
+            />
+          ) : (
+            <p
+              onClick={() => setIsEditingTarget(true)}
+              className="font-semibold cursor-pointer hover:text-primary transition-colors"
+            >
+              {localTarget.toFixed(1)}%
+            </p>
+          )}
+        </div>
+        <div>
+          <p className="text-muted-foreground text-xs">Actual</p>
+          <p className="font-semibold">{actualPercent.toFixed(1)}%</p>
+        </div>
+        <div className="text-right">
+          <p className="text-muted-foreground text-xs">Drift</p>
+          <p className={`font-semibold ${driftColor}`}>
+            {drift > 0 ? '+' : ''}{drift.toFixed(1)}%
+          </p>
+        </div>
+      </div>
+
+      {/* Two Bars: Target + Actual (Sector Allocation Style) */}
+      <div className="space-y-3">
+        {/* Target Bar - Overlay Slider */}
+        <div className="flex items-center gap-2">
+          <TargetPercentSlider
+            value={localTarget}
+            onChange={(val) => setLocalTarget(val)}
+            onChangeEnd={(val) => handleSliderChange(val)}
+            label="Target"
+            disabled={isLoading || isSaving}
+            showValue={false}
+            isLocked={isLocked}
+            onToggleLock={() => setIsLocked(!isLocked)}
+            overlay={true}
+            barColor="bg-chart-2"
+          />
+        </div>
+
+        {/* Actual Bar */}
+        <div className="flex items-center gap-2">
+          <div className="bg-secondary relative h-6 flex-1 overflow-hidden rounded flex items-center justify-between">
+            <div
+              className="bg-green-600 dark:bg-green-500 absolute top-0 left-0 h-full rounded transition-all"
+              style={{ width: `${Math.min(actualPercent, 100)}%` }}
+            />
+            {/* Label on left (inside colored portion) */}
+            <div className="text-background absolute top-0 left-0 flex h-full items-center px-2 text-xs font-medium z-10">
+              <span className="whitespace-nowrap">Actual</span>
+            </div>
+            {/* Percentage on right (inside bar, at end of colored portion) */}
+            <div className="text-foreground absolute top-0 right-0 flex h-full items-center px-2 text-xs font-medium z-10">
+              <span className="whitespace-nowrap">{actualPercent.toFixed(1)}%</span>
+            </div>
+          </div>
+          {/* Placeholder for lock icon to align bars */}
+          <div className="h-6 w-6 flex-shrink-0" />
+        </div>
+      </div>
+    </Card>
   );
 }

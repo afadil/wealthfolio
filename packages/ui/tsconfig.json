@@ -9,11 +9,15 @@
 
     // UI-specific settings
     "noImplicitOverride": false, // Allow class components without override
-
-    // Path mapping for UI package
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/components/*": ["src/components/*"],
+      "@/lib/*": ["src/lib/*"],
+      "@/hooks/*": ["src/hooks/*"]
     }
   },
   "include": ["src/**/*"],

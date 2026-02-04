@@ -1,8 +1,8 @@
 # Portfolio Allocation Rebalancing - Implementation Review & Roadmap
 
-**Original Date**: January 19, 2026  
-**Last Updated**: January 21, 2026  
-**Branch**: `allocations-v2`  
+**Original Date**: January 19, 2026
+**Last Updated**: January 21, 2026
+**Branch**: `allocations-v2`
 **Status**: ✅ Phase 2 COMPLETE - Backend Implementation Working
 
 ---
@@ -45,8 +45,8 @@ src-core/src/rebalancing/
 ### Current Phase ⏳
 
 #### Phase 3: Tauri Commands (IN PROGRESS)
-**Status:** User creating manually  
-**Next File:** `src-tauri/src/commands/rebalancing.rs`  
+**Status:** User creating manually
+**Next File:** `src-tauri/src/commands/rebalancing.rs`
 **Commands Needed:** 10 functions (get/save/delete for each entity)
 
 ### Pending Phases 📅
@@ -158,3 +158,123 @@ CREATE TABLE holding_targets (
 **Status:** ✅ Implemented and working
 
 ---
+
+## Session 3 - MVP Completion (Latest)
+
+**Duration**: [Start to End]
+**Branch**: allocations
+**Status**: ✅ COMPLETE - All MVP features implemented and tested
+
+### Key Achievements
+1. ✅ Collapsible holdings in side panel with composition-style layout
+2. ✅ Clickable holdings navigation to detail pages
+3. ✅ Horizontal Target Status card layout
+4. ✅ Status icons with proper colors
+5. ✅ Fixed floating-point precision via integer arithmetic
+6. ✅ Decimal input support (2-place limit)
+7. ✅ Default tab changed to Allocation Overview
+8. ✅ Header text removed for consistency
+9. ✅ Progress bar styling fixed
+
+### Build Status
+- ✅ Frontend builds successfully
+- ⚠️ UI package has pre-existing data-table TypeScript errors (unrelated)
+- ✅ All allocation code compiles and runs
+
+### Test Coverage
+- Manual testing on both Targets and Allocation Overview tabs
+- Validated decimal precision with edge cases (98.1 + 1.9 = 100.0)
+- Verified clickable holdings navigation
+- Tested proportional allocation adjustment
+- Confirmed responsive design across screen sizes
+
+---
+
+## Session 3 Summary - Allocation Feature MVP
+
+## Overview
+Completed all remaining UI/UX features for the Allocation page MVP, focusing on side panel enhancements, number input fixes, and visual consistency.
+
+## Features Implemented
+
+### 1. Collapsible Holdings in Side Panel
+- **What**: When user clicks donut chart slice, side panel shows holdings grouped by sub-asset class
+- **How**: Used `<details>` element with collapsible sections matching Composition tab style
+- **Status**: ✅ Complete and tested
+
+### 2. Clickable Holdings Navigation
+- **What**: Holding names are clickable links to detail pages
+- **How**: Navigate to `/holdings/:symbol` using React Router
+- **Status**: ✅ Complete and tested
+
+### 3. Numeric Input Improvements
+- **Fixed**: Decimal support (e.g., 30.45%)
+- **Fixed**: Full deletion of input (no stuck "0")
+- **Implementation**: Changed from `type="number"` to `type="text"` with `inputMode="decimal"`
+- **Validation**: Regex limits to 2 decimals max
+- **Status**: ✅ Complete and tested
+
+### 4. Floating-Point Precision
+- **Problem**: 98.1 + 1.9 = 100.00000000001 in JavaScript
+- **Solution**: Integer arithmetic (multiply by 100, calculate, divide by 100)
+- **Impact**: Users can now enter exact totals to 100%
+- **Status**: ✅ Complete and verified
+
+### 5. Visual & Layout Fixes
+- Progress bars start at left edge (removed grey padding)
+- Status icons (ArrowUp/Down/Minus)
+- Horizontal Target Status layout
+- Default tab changed to Allocation Overview
+- Header text removed
+- **Status**: ✅ Complete
+
+## Technical Details
+
+### Files Created (8)
+1. `donut-chart-expandable.tsx` - Reusable pie chart component
+2. `target-percent-slider.tsx` - Interactive slider with overlay mode
+3. `allocation-pie-chart-view.tsx` - Main allocation page container
+4. `donut-chart-full.tsx` - Full pie chart implementation
+5. `target-percent-input.tsx` - Decimal input with validation
+6. `rebalancing-advisor.tsx` - Phase 2 stub
+7. `use-proportional-allocation.ts` - Proportional adjustment logic
+8. `currency-format.ts` - Currency formatting utility
+
+### Files Modified (16)
+- UI components for icons, charts, and styling
+- Allocation hooks and pages
+- Style updates for consistency
+
+### Build Status
+✅ Frontend: Clean build
+⚠️ UI Package: Pre-existing TypeScript errors in data-table (unrelated to allocation)
+
+## Git Workflow
+
+Commit message includes:
+- Feature summary
+- Detailed changelog
+- Component architecture notes
+- UI/UX improvements
+
+## Next Phase
+
+Ready to implement **Phase 2 - Rebalancing Suggestions**:
+- Cash deployment calculator
+- Optimal allocation suggestions
+- Trade list export
+
+Stub already exists at `src/pages/allocation/components/rebalancing-advisor.tsx`
+
+## Testing Notes
+
+✅ Decimal input: 30.45, 50.1, 100 all work
+✅ Full deletion: Can clear field completely
+✅ Proportional: Dragging slider adjusts others proportionally
+✅ Holdings: Click navigates to detail page
+✅ Responsive: Works on mobile and desktop
+✅ Precision: 98.1 + 1.9 = exactly 100.0
+
+---
+
+**Ready for**: Code review, testing on production build, Phase 2 planning

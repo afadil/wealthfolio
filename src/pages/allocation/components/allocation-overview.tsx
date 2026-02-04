@@ -2,10 +2,10 @@ import type { AssetClassTarget } from "@/lib/types";
 import { formatAmount } from "@/lib/utils";
 import { Button, Icons } from "@wealthfolio/ui";
 import { useMemo } from "react";
-import type { AssetClassAllocation } from "../hooks/use-current-allocation";
+import type { AssetClassComposition } from "../hooks/use-current-allocation";
 
 interface AllocationOverviewProps {
-  currentAllocation: AssetClassAllocation[];
+  currentAllocation: AssetClassComposition[];
   targets: AssetClassTarget[];
   totalValue: number;
   baseCurrency: string;
@@ -35,7 +35,7 @@ export function AllocationOverview({
         assetClass: allocation.assetClass,
         current: {
           value: allocation.currentValue,
-          percent: allocation.currentPercent,
+          percent: allocation.actualPercent, // ← CHANGED: currentPercent → actualPercent
         },
         target: { value: 0, percent: 0 },
         difference: { value: 0, percent: 0 },
@@ -179,9 +179,9 @@ interface ComparisonCardProps {
 
 function ComparisonCard({ data, baseCurrency }: ComparisonCardProps) {
   const statusColor = {
-    "over": "text-blue-600",
-    "under": "text-orange-600",
-    "on-target": "text-green-600",
+    "over": "text-blue-600 dark:text-blue-400",
+    "under": "text-orange-600 dark:text-orange-400",
+    "on-target": "text-green-600 dark:text-green-400",
   }[data.status];
 
   const statusIcon = {
@@ -198,55 +198,66 @@ function ComparisonCard({ data, baseCurrency }: ComparisonCardProps) {
 
   return (
     <div className="rounded-lg border bg-card p-4">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-4">
         <h4 className="font-semibold text-lg">{data.assetClass}</h4>
         <span className={`text-sm font-medium ${statusColor}`}>
           {statusIcon} {statusText}
         </span>
       </div>
 
-      {/* Current */}
-      <div className="mb-2">
-        <div className="flex items-center justify-between text-sm mb-1">
-          <span className="text-muted-foreground">Current</span>
-          <span className="font-medium">
-            {formatAmount(data.current.value, baseCurrency)} ({data.current.percent.toFixed(1)}%)
-          </span>
+      {/* Top Row: Current vs Target vs Drift */}
+      <div className="flex items-center justify-between text-sm mb-4">
+        <div>
+          <p className="text-muted-foreground text-xs">Current</p>
+          <p className="font-semibold">{data.current.percent.toFixed(1)}%</p>
         </div>
-        <div className="bg-muted h-2 w-full overflow-hidden rounded-full">
+        <div>
+          <p className="text-muted-foreground text-xs">Target</p>
+          <p className="font-semibold">{data.target.percent.toFixed(1)}%</p>
+        </div>
+        <div className="text-right">
+          <p className="text-muted-foreground text-xs">Drift</p>
+          <p className={`font-semibold ${statusColor}`}>
+            {data.difference.percent > 0 ? "+" : ""}{data.difference.percent.toFixed(1)}%
+          </p>
+        </div>
+      </div>
+
+      {/* Current Bar */}
+      <div className="mb-3">
+        <div className="bg-secondary relative h-4 flex-1 overflow-hidden rounded">
           <div
-            className="bg-blue-500 h-full transition-all"
+            className="bg-chart-2 absolute top-0 left-0 h-full rounded transition-all"
             style={{ width: `${Math.min(data.current.percent, 100)}%` }}
           />
+          <div className="text-background absolute top-0 left-0 flex h-full items-center px-2 text-xs font-medium">
+            <span className="whitespace-nowrap">{data.current.percent.toFixed(1)}%</span>
+          </div>
         </div>
       </div>
 
-      {/* Target */}
-      <div className="mb-3">
-        <div className="flex items-center justify-between text-sm mb-1">
-          <span className="text-muted-foreground">Target</span>
-          <span className="font-medium">
-            {formatAmount(data.target.value, baseCurrency)} ({data.target.percent.toFixed(1)}%)
-          </span>
-        </div>
-        <div className="bg-muted h-2 w-full overflow-hidden rounded-full">
+      {/* Target Bar */}
+      <div className="mb-4">
+        <div className="bg-secondary relative h-4 flex-1 overflow-hidden rounded">
           <div
-            className="bg-primary h-full transition-all"
+            className="bg-chart-2 absolute top-0 left-0 h-full rounded transition-all"
             style={{ width: `${Math.min(data.target.percent, 100)}%` }}
           />
+          <div className="text-background absolute top-0 left-0 flex h-full items-center px-2 text-xs font-medium">
+            <span className="whitespace-nowrap">{data.target.percent.toFixed(1)}%</span>
+          </div>
         </div>
       </div>
 
-      {/* Difference */}
+      {/* Difference Alert */}
       {data.status !== "on-target" && (
         <div className={`text-sm p-2 rounded ${
-          data.status === "over" ? "bg-blue-50 text-blue-700" : "bg-orange-50 text-orange-700"
+          data.status === "over" ? "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400" : "bg-orange-50 dark:bg-orange-950 text-orange-700 dark:text-orange-400"
         }`}>
           {data.status === "over" ? "Over-allocated" : "Need to add"}:{" "}
           <span className="font-semibold">
             {formatAmount(Math.abs(data.difference.value), baseCurrency)}
           </span>
-          {" "}({Math.abs(data.difference.percent).toFixed(1)}%)
         </div>
       )}
     </div>
@@ -258,7 +269,7 @@ function ComparisonCard({ data, baseCurrency }: ComparisonCardProps) {
 // ============================================================================
 
 interface CurrentOnlyCardProps {
-  allocation: AssetClassAllocation;
+  allocation: AssetClassComposition;
   baseCurrency: string;
 }
 
@@ -267,13 +278,13 @@ function CurrentOnlyCard({ allocation, baseCurrency }: CurrentOnlyCardProps) {
     <div className="rounded-lg border bg-card p-4">
       <div className="flex items-center justify-between mb-2">
         <h4 className="font-semibold">{allocation.assetClass}</h4>
-        <span className="text-lg font-semibold">{allocation.currentPercent.toFixed(1)}%</span>
+        <span className="text-lg font-semibold">{allocation.actualPercent.toFixed(1)}%</span>
       </div>
 
       <div className="bg-muted h-3 w-full overflow-hidden rounded-full mb-2">
         <div
           className="bg-primary h-full transition-all"
-          style={{ width: `${Math.min(allocation.currentPercent, 100)}%` }}
+          style={{ width: `${Math.min(allocation.actualPercent, 100)}%` }}
         />
       </div>
 

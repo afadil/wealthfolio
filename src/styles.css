@@ -774,3 +774,58 @@ textarea,
   pointer-events: none;
   z-index: 1;
 }
+
+details summary {
+  list-style: none;
+}
+
+details summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Custom slider styling */
+.slider-thumb::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: hsl(var(--primary));
+  cursor: pointer;
+  border: 2px solid hsl(var(--background));
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  opacity: 1; /* ← Thumb always visible */
+}
+
+.slider-thumb::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: hsl(var(--primary));
+  cursor: pointer;
+  border: 2px solid hsl(var(--background));
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  opacity: 1;
+}
+
+.slider-thumb:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Grey color for target bars */
+.bg-grey-400 {
+  background-color: #d2d5db; /* grey-300 */
+}
+
+.dark\.bg-grey-500 {
+  background-color: #6b7280; /* grey-500 */
+}
+
+/* Expandable donut chart styling - only affects charts with this class */
+.expandable-donut .recharts-responsive-container {
+  height: 100% !important;
+}
+
+.expandable-donut .recharts-wrapper {
+  height: 100% !important;
+}

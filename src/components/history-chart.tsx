@@ -137,7 +137,7 @@ export function HistoryChart({
           position={{ y: -20 }}
           content={(props) => (
             <CustomTooltip
-              {...(props as TooltipBaseProps)}
+              {...((props as unknown) as TooltipBaseProps)}
               isBalanceHidden={isBalanceHidden}
               isChartHovered={isChartHovered}
             />
