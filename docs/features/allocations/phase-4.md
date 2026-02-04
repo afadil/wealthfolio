@@ -511,14 +511,16 @@ export function useStrictModeValidation(
 
 ## 4. Implementation Plan
 
-### Sprint 1: Settings Infrastructure (1-2 days)
+### Sprint 1: Settings Infrastructure ✅ COMPLETE (2 days)
+
+**Completed:** February 1, 2026
 
 **Backend (Rust):**
 
 - ✅ Add new setting keys to `SettingsService`
 - ✅ Update `Settings` model with new fields:
   - `allocation_holding_target_mode`
-  - `allocation_rebalancing_default_view`
+  - `allocation_default_view` (renamed from `allocation_rebalancing_default_view`)
   - `allocation_settings_banner_dismissed`
 - ✅ Add default values in repository
 - ✅ Test settings CRUD operations
@@ -530,23 +532,39 @@ export function useStrictModeValidation(
   export interface Settings {
     // ... existing fields
     allocationHoldingTargetMode?: "preview" | "strict";
-    allocationRebalancingDefaultView?: "overview" | "detailed";
+    allocationDefaultView?: "overview" | "holdings-table";
     allocationSettingsBannerDismissed?: "true" | "false";
   }
   ```
-- ✅ Create `use-allocation-settings.ts` hook
-- ✅ Create `allocation-settings-page.tsx` in Settings
+- ✅ Create `useAllocationSettings.ts` hook
+- ✅ Create tabbed Settings > Allocation page with two tabs:
+  - **Preferences Tab:** Holding Target Mode + Allocation Default View settings
+  - **Maintenance Tab:** Virtual Portfolio Cleanup section
 - ✅ Add "Allocation" section to Settings navigation
 - ✅ Implement radio buttons and save functionality
 - ✅ Test settings persistence and retrieval
 
+**Additional Enhancements:**
+
+- ✅ **Tabbed Interface:** Split settings into Preferences and Maintenance tabs (similar to exports page)
+- ✅ **Virtual Portfolio Cleanup Improvements:**
+  - ✅ Add backend endpoint to get full list of unused virtual strategies (not just count)
+  - ✅ Add backend endpoint to delete individual virtual strategies with validation
+  - ✅ Create collapsible list showing unused portfolios with account names
+  - ✅ Individual delete buttons per portfolio (trash icon)
+  - ✅ Extract and display account names instead of technical UUIDs
+  - ✅ Real-time updates when virtual portfolios created/deleted
+- ✅ **Icon Consistency:** Changed Allocations menu icon to PieChart (matches Settings icon)
+
 **Deliverables:**
 
-- Database can store/retrieve allocation settings
-- Settings page shows Allocation section
-- Users can toggle between Preview/Strict mode
-- Users can set default rebalancing view
-- Changes persist across sessions
+- ✅ Database can store/retrieve allocation settings
+- ✅ Settings page shows Allocation section with two tabs
+- ✅ Users can toggle between Preview/Strict mode
+- ✅ Users can set default allocation view
+- ✅ Virtual portfolio cleanup with individual and bulk delete options
+- ✅ Changes persist across sessions
+- ✅ Real-time query invalidation ensures fresh data
 
 ---
 
@@ -1235,22 +1253,29 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 
 ## 9. Sprint Status & Progress Tracking
 
-### Sprint 1: Settings Infrastructure ⏳ NOT STARTED
+### Sprint 1: Settings Infrastructure ✅ COMPLETE
 
-**Status:** Planning phase
+**Status:** Completed February 1, 2026
 
-**Tasks:**
+**Completed Tasks:**
 
-- [ ] Backend: Add settings keys to SettingsService
-- [ ] Backend: Update Settings model with new fields
-- [ ] Frontend: Update Settings TypeScript type
-- [ ] Frontend: Create useAllocationSettings hook
-- [ ] Settings Page: Create Allocation section
-- [ ] Settings Page: Radio buttons for preferences
-- [ ] Settings Page: Save functionality
-- [ ] Test: Settings persistence
+- [x] Backend: Add settings keys to SettingsService
+- [x] Backend: Update Settings model with new fields
+- [x] Frontend: Update Settings TypeScript type
+- [x] Frontend: Create useAllocationSettings hook
+- [x] Settings Page: Create tabbed Allocation section (Preferences + Maintenance)
+- [x] Settings Page: Radio buttons for preferences
+- [x] Settings Page: Save functionality
+- [x] Test: Settings persistence
+- [x] **Bonus:** Enhanced virtual portfolio cleanup with individual delete
+- [x] **Bonus:** Real-time query invalidation
+- [x] **Bonus:** Icon consistency (PieChart icon)
 
-**Estimated Duration:** 1-2 days
+**Actual Duration:** 2 days
+
+**Commits:**
+- `d46f778a` - feat(allocation): enhance Settings > Allocation with tabbed interface and individual cleanup
+- `c40469e5` - fix(allocation): ensure unused virtual portfolios list updates in real-time
 
 ---
 
