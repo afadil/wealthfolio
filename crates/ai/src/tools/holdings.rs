@@ -20,10 +20,21 @@ pub struct GetHoldingsArgs {
     /// Account ID, or "TOTAL" for all accounts.
     #[serde(default = "default_account_id")]
     pub account_id: String,
+
+    /// View mode: "table", "treemap", or "both". Default is "treemap".
+    /// - "table": Show holdings as a detailed list with values and gains
+    /// - "treemap": Show portfolio composition chart with daily performance colors
+    /// - "both": Show treemap first, then table below
+    #[serde(default = "default_view_mode")]
+    pub view_mode: String,
 }
 
 fn default_account_id() -> String {
     "TOTAL".to_string()
+}
+
+fn default_view_mode() -> String {
+    "treemap".to_string()
 }
 
 /// DTO for holding data in tool output.
@@ -51,6 +62,8 @@ pub struct GetHoldingsOutput {
     pub total_value: f64,
     pub currency: String,
     pub account_scope: String,
+    /// View mode requested: "table", "treemap", or "both"
+    pub view_mode: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub truncated: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -92,7 +105,7 @@ impl<E: AiEnvironment + 'static> Tool for GetHoldingsTool<E> {
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
             name: Self::NAME.to_string(),
-            description: "Get portfolio holdings for an account or all accounts. Returns symbol, quantity, market value, cost basis, and gain/loss for each holding. Use account_id='TOTAL' for aggregate holdings across all accounts.".to_string(),
+            description: "Get portfolio holdings for an account or all accounts. Returns symbol, quantity, market value, cost basis, and gain/loss for each holding. Use account_id='TOTAL' for aggregate holdings across all accounts. Use viewMode to control display: 'treemap' for visual composition chart with daily performance, 'table' for detailed list, or 'both' to show both views.".to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -100,6 +113,12 @@ impl<E: AiEnvironment + 'static> Tool for GetHoldingsTool<E> {
                         "type": "string",
                         "description": "Account ID to get holdings for, or 'TOTAL' for all accounts",
                         "default": "TOTAL"
+                    },
+                    "viewMode": {
+                        "type": "string",
+                        "enum": ["table", "treemap", "both"],
+                        "description": "Display mode: 'treemap' for composition chart with daily gains (best for 'how is my portfolio today?'), 'table' for detailed list, 'both' for treemap + table",
+                        "default": "treemap"
                     }
                 },
                 "required": []
@@ -164,6 +183,7 @@ impl<E: AiEnvironment + 'static> Tool for GetHoldingsTool<E> {
             total_value,
             currency: self.base_currency.clone(),
             account_scope: account_id.clone(),
+            view_mode: args.view_mode.clone(),
             truncated: if truncated { Some(true) } else { None },
             original_count: if truncated {
                 Some(original_count)
@@ -187,6 +207,7 @@ mod tests {
         let result = tool
             .call(GetHoldingsArgs {
                 account_id: "TOTAL".to_string(),
+                view_mode: "treemap".to_string(),
             })
             .await;
         assert!(result.is_ok());
@@ -194,6 +215,7 @@ mod tests {
         let output = result.unwrap();
         assert_eq!(output.account_scope, "TOTAL");
         assert_eq!(output.currency, "USD");
+        assert_eq!(output.view_mode, "treemap");
     }
 
     #[tokio::test]
@@ -204,11 +226,13 @@ mod tests {
         let result = tool
             .call(GetHoldingsArgs {
                 account_id: "acc-123".to_string(),
+                view_mode: "table".to_string(),
             })
             .await;
         assert!(result.is_ok());
 
         let output = result.unwrap();
         assert_eq!(output.account_scope, "acc-123");
+        assert_eq!(output.view_mode, "table");
     }
 }
