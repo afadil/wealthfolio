@@ -62,13 +62,8 @@ impl NetWorthService {
     fn categorize_by_account_type(account_type: &str) -> AssetCategory {
         match account_type {
             account_types::SECURITIES | account_types::CRYPTOCURRENCY => AssetCategory::Investment,
-            account_types::PROPERTY => AssetCategory::Property,
-            account_types::VEHICLE => AssetCategory::Vehicle,
-            account_types::COLLECTIBLE => AssetCategory::Collectible,
-            account_types::PRECIOUS => AssetCategory::PreciousMetal,
-            account_types::LIABILITY => AssetCategory::Liability,
             account_types::CASH => AssetCategory::Cash,
-            account_types::OTHER | _ => AssetCategory::Other,
+            _ => AssetCategory::Investment,
         }
     }
 
