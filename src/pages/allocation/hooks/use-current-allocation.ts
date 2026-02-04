@@ -1,8 +1,5 @@
-import { getHoldings } from "@/commands/portfolio";
-import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
-import { QueryKeys } from "@/lib/query-keys";
 import type { AssetClassTarget, Holding } from "@/lib/types";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 
 export interface AssetClassAllocation {
   assetClass: string;
@@ -17,97 +14,13 @@ export interface CurrentAllocation {
   hasData: boolean;
 }
 
-/**
- * Calculate current portfolio allocation from holdings
- * Groups holdings by asset class and calculates percentages
- */
-export function useCurrentAllocation(accountId: string = PORTFOLIO_ACCOUNT_ID) {
-  const { data: holdings = [], isLoading, error } = useQuery<Holding[], Error>({
-    queryKey: [QueryKeys.HOLDINGS, accountId],
-    queryFn: () => getHoldings(accountId),
-  });
-
-  const currentAllocation: CurrentAllocation = {
-    totalValue: 0,
-    assetClasses: [],
-    hasData: false,
-  };
-
-  if (!holdings || holdings.length === 0) {
-    return { currentAllocation, isLoading, error };
-  }
-
-  // Filter out cash holdings for asset class calculation
-  const nonCashHoldings = holdings.filter(
-    (h) => h.holdingType?.toLowerCase() !== "cash"
-  );
-
-  // Calculate total portfolio value (including cash) using marketValue.base
-  const totalValue = holdings.reduce((sum, h) => sum + (h.marketValue?.base || 0), 0);
-
-  // Group holdings by asset class
-  const holdingsByClass = nonCashHoldings.reduce((acc, holding) => {
-    // Get asset class from holding (fallback to "Other" if not set)
-    const assetClass = holding.instrument?.assetClass || "Other";
-
-    if (!acc[assetClass]) {
-      acc[assetClass] = [];
-    }
-    acc[assetClass].push(holding);
-    return acc;
-  }, {} as Record<string, Holding[]>);
-
-  // Calculate percentages for each asset class
-  const assetClasses: AssetClassAllocation[] = Object.entries(holdingsByClass).map(
-    ([assetClass, classHoldings]) => {
-      const currentValue = classHoldings.reduce((sum, h) => {
-        return sum + (h.marketValue?.base || 0);
-      }, 0);
-
-      return {
-        assetClass,
-        currentValue,
-        currentPercent: totalValue > 0 ? (currentValue / totalValue) * 100 : 0,
-        holdings: classHoldings,
-      };
-    }
-  );
-
-  // Sort by value descending
-  assetClasses.sort((a, b) => b.currentValue - a.currentValue);
-
-  // Handle cash separately if exists
-  const cashHoldings = holdings.filter(
-    (h) => h.holdingType?.toLowerCase() === "cash"
-  );
-
-  if (cashHoldings.length > 0) {
-    const cashValue = cashHoldings.reduce((sum, h) => {
-      return sum + (h.marketValue?.base || 0);
-    }, 0);
-
-    assetClasses.push({
-      assetClass: "Cash",
-      currentValue: cashValue,
-      currentPercent: totalValue > 0 ? (cashValue / totalValue) * 100 : 0,
-      holdings: cashHoldings,
-    });
-  }
-
-  currentAllocation.totalValue = totalValue;
-  currentAllocation.assetClasses = assetClasses;
-  currentAllocation.hasData = assetClasses.length > 0;
-
-  return { currentAllocation, isLoading, error };
-}
-
 export interface AssetClassComposition {
   assetClass: string;
   targetPercent: number;
   actualPercent: number;
   actualValue: number;
-  drift: number; // actual - target
   status: "on-target" | "underweight" | "overweight";
+  drift: number;
 }
 
 export interface HoldingsBySubClass {
@@ -118,7 +31,30 @@ export interface HoldingsBySubClass {
 }
 
 /**
- * Calculate Tier 1: Strategic allocation (targets vs actuals)
+ * Determine asset class for a holding based on:
+ * 1. instrument.assetClass (explicit classification from data)
+ * 2. holdingType (CASH → "Cash")
+ * 3. Default to "Unclassified" (user can manually map later)
+ */
+function getAssetClassForHolding(holding: Holding): string {
+  // Explicit asset class from instrument metadata
+  if (holding.instrument?.assetClass) {
+    return holding.instrument.assetClass;
+  }
+
+  // Check HoldingType enum - compare properly
+  // Note: HoldingType may be "CASH" or "Cash" - will verify with grep output
+  const holdingTypeStr = String(holding.holdingType).toUpperCase();
+  if (holdingTypeStr === "CASH") {
+    return "Cash";
+  }
+
+  // Unclassified — user can manually map via UI later
+  return "Unclassified";
+}
+
+/**
+ * Helper: Calculate asset class composition from targets and holdings
  */
 export function calculateAssetClassComposition(
   targets: AssetClassTarget[],
@@ -130,7 +66,7 @@ export function calculateAssetClassComposition(
   // Group holdings by asset_class
   const holdingsByClass = new Map<string, Holding[]>();
   holdings.forEach((h) => {
-    const cls = h.instrument?.assetClass || "Unclassified";
+    const cls = getAssetClassForHolding(h);
     if (!holdingsByClass.has(cls)) {
       holdingsByClass.set(cls, []);
     }
@@ -155,12 +91,102 @@ export function calculateAssetClassComposition(
     return {
       assetClass: target.assetClass,
       targetPercent: target.targetPercent,
-      actualPercent: Math.round(actualPercent * 10) / 10, // 1 decimal place
+      actualPercent,
       actualValue,
-      drift: Math.round(drift * 10) / 10,
       status,
+      drift,
     };
   });
+}
+
+/**
+ * Hook: useHoldingsByAssetClass
+ * Calculates asset class composition from targets and holdings
+ * Returns array of composition data ready for DriftGauge
+ *
+ * NOTE: Holdings parameter should already be filtered by account
+ */
+export function useHoldingsByAssetClass(
+  targets: AssetClassTarget[],
+  holdings: Holding[]
+): AssetClassComposition[] {
+  return useMemo(() => {
+    // Ensure we're calculating with account-filtered holdings
+    const totalValue = holdings.reduce(
+      (sum, h) => sum + (h.marketValue?.base || 0),
+      0
+    );
+
+    // Only calculate composition if we have holdings
+    if (totalValue === 0 && holdings.length === 0) {
+      return targets.map((t) => ({
+        assetClass: t.assetClass,
+        targetPercent: t.targetPercent,
+        actualPercent: 0,
+        actualValue: 0,
+        status: "underweight" as const,
+        drift: -t.targetPercent,
+      }));
+    }
+
+    return calculateAssetClassComposition(targets, holdings, totalValue);
+  }, [targets, holdings]);
+}
+
+/**
+ * Hook: useCurrentAllocation
+ * Groups holdings by asset class and calculates percentages
+ * Used by Composition tab to display Tier 1 & Tier 2 breakdown
+ */
+export function useCurrentAllocation(
+  holdings: Holding[]
+): { currentAllocation: CurrentAllocation } {
+  const currentAllocation = useMemo(() => {
+    // Calculate total portfolio value
+    const totalValue = holdings.reduce(
+      (sum, h) => sum + (h.marketValue?.base || 0),
+      0
+    );
+
+    // Group holdings by asset class using smart classification
+    const holdingsByClass = new Map<string, Holding[]>();
+    holdings.forEach((h) => {
+      const assetClass = getAssetClassForHolding(h);
+      if (!holdingsByClass.has(assetClass)) {
+        holdingsByClass.set(assetClass, []);
+      }
+      holdingsByClass.get(assetClass)!.push(h);
+    });
+
+    // Build asset class allocations
+    const assetClasses: AssetClassAllocation[] = Array.from(
+      holdingsByClass.entries()
+    ).map(([assetClass, classHoldings]) => {
+      const currentValue = classHoldings.reduce(
+        (sum, h) => sum + (h.marketValue?.base || 0),
+        0
+      );
+      const currentPercent = totalValue > 0 ? (currentValue / totalValue) * 100 : 0;
+
+      return {
+        assetClass,
+        currentValue,
+        currentPercent,
+        holdings: classHoldings,
+      };
+    });
+
+    // Sort by value (highest first)
+    assetClasses.sort((a, b) => b.currentValue - a.currentValue);
+
+    return {
+      totalValue,
+      assetClasses,
+      hasData: holdings.length > 0,
+    };
+  }, [holdings]);
+
+  return { currentAllocation };
 }
 
 /**
@@ -195,4 +221,58 @@ export function getHoldingsBySubClass(
       percentOfClass: (value / classTotal) * 100,
     };
   });
+}
+
+/**
+ * Get display name for a holding
+ * Priority:
+ * 1. holding.instrument.name (security name)
+ * 2. holding.instrument.symbol (ticker)
+ * 3. For CASH holdings: account name (passed separately)
+ * 4. Fallback: "Unnamed Holding"
+ */
+export function getHoldingDisplayName(
+  holding: Holding,
+  accountName?: string
+): string {
+  // Security with name
+  if (holding.instrument?.name) {
+    return holding.instrument.name;
+  }
+
+  // Security with symbol
+  if (holding.instrument?.symbol) {
+    return holding.instrument.symbol;
+  }
+
+  // Cash holding — use account name or fallback
+  // Check if holding has no instrument (cash) or account name provided
+  if (!holding.instrument) {
+    return accountName ? `${accountName} - Cash` : "Cash Holding";
+  }
+
+  return "Unnamed Holding";
+}
+
+/**
+ * Get all unique asset classes present in holdings
+ * Returns sorted array of asset class names
+ */
+export function getAvailableAssetClasses(holdings: Holding[]): string[] {
+  const assetClasses = new Set<string>();
+
+  holdings.forEach((h) => {
+    const assetClass = getAssetClassForHolding(h);
+    assetClasses.add(assetClass);
+  });
+
+  // Sort alphabetically, but put Cash first
+  const sorted = Array.from(assetClasses).sort();
+  const cashIndex = sorted.indexOf("Cash");
+  if (cashIndex > -1) {
+    sorted.splice(cashIndex, 1);
+    sorted.unshift("Cash");
+  }
+
+  return sorted;
 }

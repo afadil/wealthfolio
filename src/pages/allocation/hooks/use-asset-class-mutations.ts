@@ -1,13 +1,13 @@
 import { deleteAssetClassTarget, saveAssetClassTarget } from "@/commands/rebalancing";
 import { toast } from "@/components/ui/use-toast";
 import { QueryKeys } from "@/lib/query-keys";
+import type { AssetClassTarget } from "@/lib/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-interface SaveTargetPayload {
-  strategyId: string;
-  assetClass: string;
-  targetPercent: number;
-}
+// Payload matches what backend expects (NewAssetClassTarget | AssetClassTarget)
+type SaveTargetPayload = Omit<AssetClassTarget, "createdAt" | "updatedAt"> & {
+  id?: string;
+};
 
 export function useAssetClassMutations() {
   const queryClient = useQueryClient();
@@ -15,7 +15,7 @@ export function useAssetClassMutations() {
   const saveTargetMutation = useMutation({
     mutationFn: async (payload: SaveTargetPayload) => {
       console.log("Sending save payload:", payload);
-      const result = await saveAssetClassTarget(payload);
+      const result = await saveAssetClassTarget(payload as any);
       console.log("Save result:", result);
       return result;
     },
@@ -30,10 +30,10 @@ export function useAssetClassMutations() {
       });
     },
     onError: (error) => {
-      console.error("Save mutation error:", error);
+      console.error("Save failed:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save target",
+        description: "Failed to save allocation target",
         variant: "destructive",
       });
     },
@@ -41,13 +41,9 @@ export function useAssetClassMutations() {
 
   const deleteTargetMutation = useMutation({
     mutationFn: async (targetId: string) => {
-      console.log("Deleting target:", targetId);
-      const result = await deleteAssetClassTarget(targetId);
-      console.log("Delete result:", result);
-      return result;
+      return deleteAssetClassTarget(targetId);
     },
     onSuccess: () => {
-      console.log("Delete succeeded, invalidating queries");
       toast({
         title: "Success",
         description: "Allocation target deleted successfully",
@@ -57,17 +53,14 @@ export function useAssetClassMutations() {
       });
     },
     onError: (error) => {
-      console.error("Delete mutation error:", error);
+      console.error("Delete failed:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to delete target",
+        description: "Failed to delete allocation target",
         variant: "destructive",
       });
     },
   });
 
-  return {
-    saveTargetMutation,
-    deleteTargetMutation,
-  };
+  return { saveTargetMutation, deleteTargetMutation };
 }
