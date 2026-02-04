@@ -36,11 +36,15 @@ export function SubPieChart({ holdings, baseCurrency }: SubPieChartProps) {
 
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const handleSectionClick = (sectionData: PieDataItem, index: number) => {
+  const handleSectionClick = (
+    _sectionData: { name: string; value: number; currency: string },
+    index: number,
+  ) => {
     setActiveIndex(index);
     // Navigate to holding detail page on click
-    if (sectionData.symbol) {
-      navigate(`/holdings/${sectionData.symbol}`);
+    const item = pieData[index];
+    if (item?.symbol) {
+      navigate(`/holdings/${item.symbol}`);
     }
   };
 
