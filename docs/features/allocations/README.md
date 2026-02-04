@@ -1,369 +1,144 @@
-# Portfolio Allocation Rebalancing - Documentation Index
+# Allocation Feature Documentation
 
-**Last Updated:** January 19, 2026
-**Status:** Planning Phase Complete ✅
-**Next Phase:** Pre-Implementation Setup (Phase 0)
+This folder contains documentation for the Wealthfolio Allocation feature, which enables users to set target percentages for asset classes and individual holdings, with a live rebalancing advisor.
 
 ---
 
-## 📚 Document Overview
+## Quick Navigation
 
-This folder contains comprehensive documentation for implementing the portfolio rebalancing feature in Wealthfolio.
+### 📘 Master Documentation
+- **[phase-3.md](phase-3.md)** — Complete Phase 3 specification
+  - Architecture decisions (data model, rebalancing, portfolio/multi-account)
+  - UI/UX decisions
+  - Component architecture
+  - Implementation plan (Sprint 1-3)
+  - Portfolio feature implementation (section 1.4 - **complete before Sprint 2**)
+  - Sprint status tracking
+  - Known issues
+  - Testing strategy
 
-### Quick Navigation
-
-**👉 START HERE:**
-1. [`executive-summary.md`](./executive-summary.md) - Read this first! (15 min)
-2. [`quick-start-checklist.md`](./quick-start-checklist.md) - Your action items (5 min)
-3. ['AGENTS.md](/Users/admin/Desktop/wealthfolio/AGENTS.md) - VERY IMPORTANT!
-
-**📖 CORE DOCUMENTATION:**
-- [`implementation-review.md`](./implementation-review.md) - Complete implementation plan (45 min)
-- [`database-schema-fixes.md`](./database-schema-fixes.md) - Critical schema corrections (20 min)
-- [`phase-0-setup-guide.md`](./phase-0-setup-guide.md) - Pre-implementation tasks (20 min)
-
-**📝 ORIGINAL PLANNING:**
-- [`conversation_summary.md`](./conversation_summary.md) - Feature design decisions
-- [`allocations_project_spec.md`](./allocations_project_spec.md) - Project specification (needs revision)
-- [`selected-features-difficulty.md`](./selected-features-difficulty.md) - Complexity assessment
+### 📚 Historical Reference
+- **[phase-2.md](phase-2.md)** — Phase 2: Asset Class Allocation summary
+- **[archive/](archive/)** — Historical documents and planning artifacts
 
 ---
 
-## 🎯 Reading Order
+## Feature Overview
 
-### For Understanding the Project (2 hours)
+**What is the Allocation feature?**
 
-1. **Executive Summary** (15 min)
-   - High-level overview
-   - Critical issues identified
-   - Recommendations
+The Allocation feature helps users:
+1. Set target allocation percentages for asset classes (e.g., 60% Equity, 40% Fixed Income)
+2. Set target percentages for individual holdings within each asset class
+3. Get automated rebalancing advice (which holdings to buy/sell)
+4. View allocation across portfolios (multiple accounts grouped together)
 
-2. **Database Schema Fixes** (20 min)
-   - **CRITICAL:** Understand what was wrong
-   - **CRITICAL:** Understand what was fixed
-   - Why it matters
-
-3. **Implementation Review** (45 min)
-   - Complete roadmap
-   - Week-by-week plan
-   - Testing strategy
-
-4. **Original Planning Docs** (40 min)
-   - Conversation summary
-   - Project spec
-   - Difficulty assessment
-
-### For Taking Action (1 hour)
-
-1. **Quick Start Checklist** (5 min)
-   - Immediate action items
-   - Time tracking
-
-2. **Phase 0 Setup Guide** (30 min)
-   - Step-by-step instructions
-   - Codebase study guide
-
-3. **Implementation Review** (25 min)
-   - Review Phase 1 plan
-   - Prepare questions
+**Current Status**: Phase 3 Sprint 2 (85% complete)
 
 ---
 
-## 📁 File Descriptions
+## Development Status
 
-### `executive-summary.md`
-**Purpose:** High-level review of the project
-**Audience:** You (the developer)
-**Key Info:**
-- What's good about your plan
-- What needs fixing
-- Overall confidence level
-- Recommended path forward
+### Phase 3: Per-Holding Target Allocation
 
-**Read this:** Before doing anything else
+**Sprint 1: Backend Foundation** ✅ COMPLETE
+- Database schema, Rust commands, migrations
 
----
+**Sprint 2: Enhanced Side Panel UI** 🔄 85% COMPLETE
+- HoldingTargetRow component with text input
+- Lock/delete functionality
+- Custom toast notifications
+- Proportional calculations
 
-### `quick-start-checklist.md`
-**Purpose:** One-page action list
-**Audience:** You (for daily reference)
-**Key Info:**
-- Daily tasks
-- Time tracking
-- Status updates
-- Checkpoint questions
+**Remaining for Sprint 2**:
+- Live Preview functionality (bold vs italic)
+- "Save All Targets" button
+- Total % indicator
 
-**Use this:** Every day to track progress
+**Sprint 3: Rebalancing Integration** ⏳ NOT STARTED
 
 ---
 
-### `implementation-review.md`
-**Purpose:** Complete implementation guide
-**Audience:** You (for implementation)
-**Key Info:**
-- Corrected database schema
-- Phase-by-phase plan
-- Code templates
-- Testing strategy
-- Success metrics
+## Architecture Highlights
 
-**Use this:** As your main implementation reference
-
----
-
-### `database-schema-fixes.md`
-**Purpose:** Schema comparison and fixes
-**Audience:** You (for database work)
-**Key Info:**
-- Side-by-side wrong vs. right
-- Why each fix matters
-- Testing procedures
-- Quick reference
-
-**Use this:** When creating the migration
-
----
-
-### `phase-0-setup-guide.md`
-**Purpose:** Pre-implementation preparation
-**Audience:** You (for this week)
-**Key Info:**
-- Backup procedures
-- Codebase study guide
-- Test environment setup
-- Validation checklist
-
-**Use this:** This week, before coding
-
----
-
-### `conversation_summary.md`
-**Purpose:** Original feature planning
-**Audience:** Historical reference
-**Key Info:**
-- Feature selection rationale
-- Algorithm explanations
-- UI design vision
-- Design decisions
-
-**Status:** ✅ Good, keep as reference
-**Action:** None, for context only
-
----
-
-### `allocations_project_spec.md`
-**Purpose:** Technical specification
-**Audience:** Historical reference
-**Key Info:**
-- Database schema (OUTDATED)
-- Implementation phases
-- Algorithms
-
-**Status:** ⚠️ Needs revision
-**Action:** Don't use database schema from this document
-
----
-
-### `selected-features-difficulty.md`
-**Purpose:** Complexity assessment
-**Audience:** Planning reference
-**Key Info:**
-- Time estimates
-- Difficulty ratings
-- Feature-by-feature analysis
-
-**Status:** ✅ Good, accurate estimates
-**Action:** Use for planning
-
----
-
-## 🗺️ Implementation Roadmap
-
-### Current Phase: Phase 0 (This Week)
-**Goal:** Prepare without coding
-**Duration:** 1 week
-**Documents:**
-- Phase 0 Setup Guide
-- Quick Start Checklist
-
-**Deliverables:**
-- [ ] Backups created
-- [ ] Codebase studied
-- [ ] Test environment ready
-- [ ] Questions answered
-
----
-
-### Next Phase: Phase 1 (Next Week, if ready)
-**Goal:** Database and backend
-**Duration:** 3-4 days
-**Documents:**
-- Implementation Review (Phase 1 section)
-- Database Schema Fixes
-
-**Deliverables:**
-- [ ] Migration created and tested
-- [ ] Rust commands implemented
-- [ ] TypeScript integration working
-- [ ] Data persists correctly
-
----
-
-### Future Phases: Phase 2-4 (Weeks 3-4)
-**Goal:** UI and advanced features
-**Documents:**
-- Implementation Review (Phase 2-4 sections)
-- Conversation Summary (for UI reference)
-
-**Deliverables:**
-- [ ] Basic UI with visual bars
-- [ ] Deposit planner
-- [ ] Advanced features (if time)
-
----
-
-## ✅ Success Metrics
-
-### Documentation Success
-- [x] All critical issues identified
-- [x] Corrected schema provided
-- [x] Step-by-step guide created
-- [x] Code templates provided
-- [x] Testing strategy defined
-
-### Implementation Success (Future)
-- [ ] Migration runs without errors
-- [ ] Can set allocation targets
-- [ ] Visual comparison works
-- [ ] Deposit planner calculates correctly
-- [ ] Data persists correctly
-- [ ] No database errors
-
----
-
-## 🔄 Document Updates
-
-This documentation will be updated as implementation progresses:
-
-- **After Phase 0:** Update with findings from codebase study
-- **After Phase 1:** Update with actual migration results
-- **After Phase 2:** Update with UI patterns discovered
-- **After Completion:** Add retrospective and lessons learned
-
----
-
-## 📞 Getting Help
-
-### When to Refer to Docs
-- Before asking questions (check if answered here)
-- During implementation (use as reference)
-- When stuck (review relevant section)
-
-### When to Ask Claude
-- After reading all relevant docs
-- When encountering unexpected errors
-- For architecture decisions
-- For pattern clarifications
-
-### Questions to Ask Yourself First
-1. Have I read the relevant documentation?
-2. Have I followed the step-by-step guide?
-3. Have I checked the troubleshooting section?
-4. Can I describe exactly what I tried?
-
----
-
-## 🎯 Key Takeaways
-
-### Critical Points
-1. **Database schema MUST use `asset_id`, not `symbol`**
-2. **Must have CASCADE rules for foreign keys**
-3. **Must study existing codebase patterns first**
-4. **Must create backups before implementing**
-5. **Must test migration thoroughly**
-
-### Remember
-- Slow and careful beats fast and broken
-- Understanding beats memorization
-- Testing beats hoping
-- Backups beat regrets
-
----
-
-## 📈 Progress Tracking
-
-Use this section to track your progress:
-
-### Phase 0: Pre-Implementation
-- [x] Documentation reviewed (Date: _______)
-- [ ] Backups created (Date: _______)
-- [ ] Codebase studied (Date: _______)
-- [ ] Test environment ready (Date: _______)
-- [ ] Ready for Phase 1 (Date: _______)
-
-### Phase 1: Database & Backend
-- [ ] Migration created (Date: _______)
-- [ ] Migration tested (Date: _______)
-- [ ] Rust commands written (Date: _______)
-- [ ] TypeScript integration (Date: _______)
-- [ ] Phase 1 complete (Date: _______)
-
-### Phase 2: UI
-- [ ] Page structure created (Date: _______)
-- [ ] Visual bars working (Date: _______)
-- [ ] Editing functional (Date: _______)
-- [ ] Phase 2 complete (Date: _______)
-
-### Phase 3: Deposit Planner
-- [ ] Algorithm implemented (Date: _______)
-- [ ] UI created (Date: _______)
-- [ ] Testing complete (Date: _______)
-- [ ] Phase 3 complete (Date: _______)
-
----
-
-## 🎓 Learning Resources
-
-### Internal References
-- `/src-tauri/src/commands/budget.rs` - Similar command pattern
-- `/src-tauri/src/commands/goal.rs` - Similar feature structure
-- `/src/pages/settings/goals/goals-page.tsx` - Similar UI pattern
-- `/src-core/migrations/` - Migration examples
-
-### External Resources
-- [Diesel ORM Docs](https://diesel.rs/)
-- [Tauri Docs](https://tauri.app/)
-- [React Query Docs](https://tanstack.com/query/latest)
-- [SQLite Foreign Keys](https://www.sqlite.org/foreignkeys.html)
-
----
-
-## 📝 Notes
-
-Use this space for personal notes:
-
+### Multi-Level Target System
 ```
-Date: _______
-
-Notes:
--
--
--
-
-Questions:
--
--
--
+Portfolio (All Accounts)
+└── Asset Class Target: 60% Equity
+    └── Holding Target: 40% VWCE
+    └── Holding Target: 60% VTI
 ```
 
+### Portfolio & Multi-Account Support
+- Create named portfolios combining 2+ accounts
+- View allocation strategies at the portfolio level
+- Quick multi-select accounts for ad-hoc exploration
+- Independent strategies per portfolio/account
+
+### Rebalancing Model: Cash-First Allocation
+- User has cash to invest → system suggests which holdings to buy
+- Prioritizes largest gaps from target allocation
+- No sell suggestions (tax-efficient, long-term investing)
+
 ---
 
-**Created:** January 19, 2026
-**Status:** 🟢 Complete and ready for use
-**Next Update:** After Phase 0 completion
+## Key Files
+
+**Frontend:**
+- `src/pages/allocation/index.tsx` — Main allocation page
+- `src/pages/allocation/components/allocation-pie-chart-view.tsx` — Target vs Actual section
+- `src/pages/allocation/components/holding-target-row.tsx` — Side panel holding row
+- `src/pages/allocation/hooks/use-holding-target-mutations.ts` — Mutation hooks
+
+**Backend:**
+- `src-core/src/models/holding_target.rs` — Core data model
+- `src-core/src/asset/holding_service.rs` — Business logic
+- `src-tauri/src/commands/holding.rs` — Tauri commands
+
+**Database:**
+- `src-core/migrations/*_create_holding_targets.sql` — Schema
 
 ---
 
-**Happy Building! 🚀**
+## Getting Started
 
-Remember: The goal is not to build fast, but to build right. Take your time, follow the plan, and don't hesitate to ask for help.
+### For Developers
+1. Read [phase-3.md](phase-3.md) sections 1-4 for architecture understanding
+2. **PRIORITY**: Complete section 1.4 (Portfolio Implementation) before Sprint 2
+3. Review Sprint Status (section 9) for current progress
+4. Check Known Issues (section 10) before reporting bugs
+5. See User Workflows (section 6) for feature usage patterns
+
+### For QA/Testing
+1. Review Testing Strategy (phase-3.md section 7)
+2. Test Portfolio feature scenarios (phase-3.md section 1.4)
+3. Check Sprint 2 checklist for features to test
+4. Known issue: Toast appears behind side panel (minor UX issue)
+
+### For Product/Planning
+1. Read Overview and Architecture Highlights above
+2. Review Sprint Status to see what's complete vs in-progress
+3. See phase-3.md section 8 for Phase 4 scope
+4. Portfolio feature (section 1.4) required before Sprint 2 completion
+
+---
+
+## Contributing
+
+When working on the Allocation feature:
+- Follow frontend rules in `.cursor/rules/frontend-rules.mdc`
+- Follow Rust backend rules in `.cursor/rules/rust-rules.mdc`
+- **Complete Portfolio implementation (phase-3.md section 1.4) before Sprint 2**
+- Update phase-3.md Sprint Status when completing tasks
+- Document known issues in section 10
+- Keep readme.md updated as entry point
+
+---
+
+## Document History
+
+- **Jan 2025**: Documentation consolidation — merged 20 files into single master phase-3.md
+- **Dec 2024**: Phase 3 Sprint 2 implementation
+- **Nov 2024**: Phase 2 completion (asset class allocation)
+
+For historical documents, see [archive/](archive/).

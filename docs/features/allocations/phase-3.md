@@ -60,6 +60,175 @@ CREATE TABLE holding_targets (
 4. Suggest buys for all positive gaps, prioritizing largest gaps
 5. Show "Would need $Y more to reach targets" if cash insufficient
 
+### 1.3 Portfolio & Multi-Account Architecture
+
+**Overview:**
+Portfolios are lightweight groupings of accounts that enable unified allocation management without data duplication.
+
+**Key Features:**
+- Create named portfolios combining 2+ accounts
+- View allocation strategies at the portfolio level
+- Quick multi-select accounts for ad-hoc exploration
+- Save multi-select combinations as portfolios for future use
+
+**Key Benefits:**
+- **Independent Strategies**: Each portfolio/account gets its own separate allocation strategy
+- **No Data Duplication**: Portfolios reference accounts, all data stays in accounts table
+- **Flexible UX**: Support both quick exploration (multi-select) and persistent portfolios
+- **Multi-Feature Support**: Portfolios can be used across Allocation, Insights, Performance pages
+- **Clear Separation**: Portfolios ≠ Accounts (no confusion about trading accounts)
+
+**Account Selector UI:**
+```
+┌──────────────────────────────────────┐
+│ Select View                        ▼ │
+├──────────────────────────────────────┤
+│ ● All Portfolios                     │ ← Virtual aggregate
+├──────────────────────────────────────┤
+│ Portfolios                           │ ← Saved portfolios section
+│   ○ Family Portfolio                 │ ← Click to activate
+│   ○ Retirement Strategy              │
+├──────────────────────────────────────┤
+│ Accounts                             │ ← Individual accounts (multi-select)
+│   ☑ Degiro                           │ ← Checkboxes
+│   ☑ Interactive Brokers              │
+│   □ Revolut                          │
+│   □ Trading212                       │
+└──────────────────────────────────────┘
+```
+
+**Visual States:**
+- **● Portfolio X** → Active portfolio (exact match)
+- **○ Portfolio Y** → Inactive portfolio (click to activate)
+- **☑ Account** → Checked (part of current selection)
+- **□ Account** → Unchecked
+
+**Auto-Matching Behavior:**
+- When user multi-selects accounts that exactly match a saved portfolio → auto-activates that portfolio
+- Order-independent matching (A+B+C = C+B+A)
+- Toast notification: "✓ Matched Portfolio X"
+
+**User Workflows:**
+
+**Create Portfolio (Settings):**
+1. Navigate to Settings → Portfolios
+2. Click [+ New Portfolio]
+3. Enter name, select 2+ accounts
+4. Click [Create Portfolio]
+
+**Save Multi-Select as Portfolio:**
+1. Multi-select accounts (e.g., A + C)
+2. Banner shows: "💡 Viewing 2 accounts — [Save as Portfolio]"
+3. Click [Save as Portfolio]
+4. Name auto-filled, user can edit
+5. Portfolio created and auto-activated
+
+**Edge Cases Handled:**
+- **Account Deletion**: Portfolio shows warning "⚠️ Incomplete"
+- **Account Renaming**: Portfolio name auto-updates
+- **Duplicate Names**: Validation prevents duplicate portfolio names
+- **Minimum Accounts**: Enforces 2+ accounts per portfolio
+- **Subset/Superset Selection**: Portfolio deactivates, shows banner
+
+### 1.4 Portfolio Feature Implementation Plan
+
+**Status**: 🔄 Required before Sprint 2 completion
+
+This section outlines the implementation steps for the Portfolio feature. **Complete these tasks before continuing Sprint 2** as the multi-account strategy is foundational to the allocation system.
+
+#### Database Schema
+
+```sql
+CREATE TABLE portfolios (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    account_ids TEXT NOT NULL,  -- JSON array: ["id1", "id2", "id3"]
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX idx_portfolios_name ON portfolios(name);
+```
+
+#### Implementation Tasks
+
+**Backend (Rust):**
+1. Create `portfolios` table migration
+2. Add models: `Portfolio`, `NewPortfolio`, `PortfolioDB`
+3. Add repository methods:
+   - `get_all_portfolios()` - List all portfolios
+   - `get_portfolio(id)` - Get by ID
+   - `create_portfolio(name, account_ids)` - Create new
+   - `update_portfolio(id, name, account_ids)` - Update existing
+   - `delete_portfolio(id)` - Delete
+   - `find_portfolio_by_accounts(account_ids)` - Auto-match
+4. Add Tauri commands + Axum endpoints
+5. Add validation: minimum 2 accounts, unique names
+
+**Frontend:**
+1. Create Settings → Portfolios page
+2. Create portfolio CRUD hooks (`use-portfolio-queries`, `use-portfolio-mutations`)
+3. Update account selector component:
+   - Add portfolios section
+   - Add multi-select checkboxes
+   - Add auto-matching logic
+4. Add banners:
+   - "Save as Portfolio" banner
+   - "Modified selection" banner
+   - Auto-match toast notification
+5. Handle edge cases (deletion, renaming, validation)
+
+#### Test Scenarios (Must Pass)
+
+**Scenario 1: Create Portfolio in Settings**
+- Navigate to Settings → Portfolios
+- Click [+ New Portfolio]
+- Enter name: "Family Portfolio"
+- Select Account A + Account B
+- Click [Create Portfolio]
+- ✅ Portfolio created with unique name
+- ✅ Accounts saved: A + B
+- ✅ Portfolio appears in list
+
+**Scenario 2: Multi-Select Auto-Matching**
+- Deselect all accounts
+- Check Account A
+- Check Account B
+- ✅ Auto-switches to "● Family Portfolio"
+- ✅ Toast: "✓ Matched Family Portfolio"
+- ✅ Loads existing targets
+
+**Scenario 3: Save Multi-Select as Portfolio**
+- Multi-select: Check A + C (not a saved portfolio)
+- ✅ Banner shows: "💡 Viewing 2 accounts — [Save as Portfolio]"
+- Click [Save as Portfolio]
+- Name auto-filled: "Account A + Account C"
+- Edit name: "Investment Portfolio"
+- Save
+- ✅ Portfolio created and auto-activated
+
+**Scenario 4: Account Deletion Handling**
+- Create Portfolio Y (A+B+D)
+- Delete Account D from Settings → Accounts
+- View Portfolio Y
+- ✅ Shows warning: "⚠️ Incomplete (Account D deleted)"
+- ✅ Options: [Update Portfolio] [Delete Portfolio]
+
+**Scenario 5: Duplicate Name Validation**
+- Try creating "Family Portfolio" (exists)
+- ✅ Validation error: "Name already exists"
+- ✅ Create button disabled until valid name
+
+**Scenario 6: Minimum Accounts Validation**
+- Try creating with 1 account
+- ✅ Error: "Minimum 2 accounts required"
+- Select 2 accounts
+- ✅ Button enabled, can create
+
+**Priority**: Complete Portfolio feature implementation before Sprint 2 Live Preview work.
+
+For detailed UX patterns and additional test scenarios, see [archive/portfolio_architecture.md](archive/portfolio_architecture.md).
+
 ---
 
 ## 2. UI/UX Decisions
@@ -560,7 +729,121 @@ if (mode === 'preview') {
 
 ---
 
-## 9. Success Criteria
+## 9. Sprint Status & Progress Tracking
+
+### Portfolio Feature Implementation � 90% COMPLETE
+
+**Status**: Nearly complete - see remaining tasks below
+
+Portfolio foundation implemented! Most core functionality working. Focus on finishing UX polish and test validation.
+
+**Completed Tasks:**
+- ✅ Database migration (portfolios table) - `2026-01-29-044552-0000_create_portfolios_table`
+- ✅ Database fields added (is_combined_portfolio, component_account_ids to accounts table)
+- ✅ Rust backend models (Portfolio, NewPortfolio in types)
+- ✅ Rust backend repository (`find_or_create_combined_portfolio` in accounts service)
+- ✅ Tauri commands + Axum endpoints (createPortfolio, listPortfolios, deletePortfolio, etc.)
+- ✅ Settings → Portfolios page (`src/pages/settings/portfolios/portfolios-page.tsx`)
+- ✅ Portfolio CRUD components:
+  - ✅ portfolio-form.tsx (create/edit)
+  - ✅ portfolio-item.tsx (list display)
+  - ✅ portfolio-operations.tsx (actions)
+  - ✅ portfolio-edit-modal.tsx (edit dialog)
+- ✅ Portfolio hooks (`src/hooks/use-portfolios.ts` with mutations)
+- ✅ Command wrappers (`src/commands/portfolio.ts` - desktop/web support)
+- ✅ Account selector enhanced (supports "All Portfolio" view)
+- ✅ Validation logic (minimum 2 accounts, unique names)
+
+- ✅ Validation logic (minimum 2 accounts, unique names)
+
+**Remaining Tasks:**
+- ⏳ Multi-select checkboxes in account selector (allocation page)
+- ⏳ Auto-matching logic (detect portfolio from multi-select)
+- ⏳ "Save as Portfolio" banner (multi-select → create portfolio flow)
+- ⏳ "Modified selection" banner (subset/superset handling)
+- ⏳ Auto-match toast notification
+- ⏳ Test all 6 scenarios (see section 1.4)
+
+**Test Scenarios Status:**
+- [ ] **Scenario 1**: Create Portfolio in Settings (Settings page exists, needs testing)
+- [ ] **Scenario 2**: Multi-Select Auto-Matching (needs implementation)
+- [ ] **Scenario 3**: Save Multi-Select as Portfolio (needs banner + flow)
+- [ ] **Scenario 4**: Account Deletion Handling (backend supports, needs UX)
+- [ ] **Scenario 5**: Duplicate Name Validation (validation exists, needs testing)
+- [ ] **Scenario 6**: Minimum Accounts Validation (validation exists, needs testing)
+
+**Definition of Done (Remaining):**
+- All 6 test scenarios verified and passing
+- Multi-select UI in allocation page account selector
+- Auto-matching logic working correctly
+- Banners display appropriately (save, modified)
+- Edge cases handled gracefully
+
+**Next Actions:**
+1. Add multi-select checkboxes to account selector (allocation page)
+2. Implement auto-matching logic (exact account set detection)
+3. Add "Save as Portfolio" banner for multi-select
+4. Verify all 6 test scenarios
+5. Polish UX (banners, toasts, warnings)
+
+---
+
+### Sprint 1: Backend Foundation ✅ COMPLETE
+- ✅ Database schema (holding_targets table) - Migration `2026-01-20-000001`
+- ✅ is_locked added to holding_targets - Migration `2026-01-28-101335-0000`
+- ✅ is_locked added to asset_class_targets - Migration `2026-01-28-120000-0000`
+- ✅ Rust backend commands (get_holding_targets, save_holding_target, toggle_holding_target_lock)
+- ✅ TypeScript types (HoldingTarget, AssetClassTarget)
+- ✅ Migrations applied
+- ✅ Core data layer working (rebalancing repository/service)
+
+### Sprint 2: Enhanced Side Panel UI 🔄 85% COMPLETE
+
+**Completed:**
+- ✅ React Query hooks (use-holding-target-queries, use-holding-target-mutations)
+- ✅ HoldingTargetRow component with text input (`src/pages/allocation/components/holding-target-row.tsx`)
+- ✅ Side panel integration with sub-asset class grouping (allocation-pie-chart-view.tsx)
+- ✅ Lock/delete functionality for holdings
+- ✅ Visual progress bars (h-3 compact size)
+- ✅ Custom toast notifications for lock/unlock actions (with holding names)
+- ✅ Lock state synchronization fixes (localStorage + database persistence)
+- ✅ Proportional calculation respects locks (proportional auto-adjustment)
+- ✅ Navigation to holding detail pages (clickable holding names)
+- ✅ Lock toggle shows custom toast: "VTI is now locked" (not generic "updated" message)
+
+**In Progress:**
+- 🔄 Live Preview functionality (bold vs italic styling)
+- 🔄 Auto-distribution calculation display
+- 🔄 "Save All Targets" button (batch save)
+- 🔄 Total % indicator: "Total: 100% ✓"
+
+**Blocked/Known Issues:**
+- ⚠️ Toast notification appears behind side panel Sheet overlay (minor UX issue - toast visible when sheet closes)
+
+### Sprint 3: Rebalancing Integration ⏳ NOT STARTED
+- ⏳ Per-holding buy suggestions
+- ⏳ Cash allocation logic
+- ⏳ Rebalancing advisor UI updates
+- ⏳ Integration tests
+
+---
+
+## 10. Known Issues & Technical Debt
+
+### Minor UX Issues
+1. **Toast Behind Side Panel**: Lock/unlock toast notification appears behind Sheet overlay
+   - **Impact**: Low - toast becomes visible when sheet closes
+   - **Root Cause**: Shadcn Sheet and Toast z-index layering
+   - **Status**: Deferred - not blocking Sprint 2 completion
+
+### Future Enhancements
+- Consider adding undo/redo for target changes
+- Explore keyboard shortcuts for power users (Tab to navigate, Enter to save)
+- Add visual indicator when targets are being auto-distributed vs user-set
+
+---
+
+## 11. Success Criteria
 
 **Phase 3 is complete when:**
 - ✅ User can set target percentages for individual holdings within asset classes
