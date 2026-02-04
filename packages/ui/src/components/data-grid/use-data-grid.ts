@@ -319,6 +319,20 @@ function useDataGrid<TData>({
       .filter((id): id is string => Boolean(id));
   }, [columns]);
 
+  // Map column ID to accessor key for data updates
+  // When a column has both id and accessorKey, we need to use accessorKey for data updates
+  const columnIdToAccessorKey = React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const col of columns) {
+      const id = col.id ?? ("accessorKey" in col ? (col.accessorKey as string) : undefined);
+      const accessorKey = "accessorKey" in col ? (col.accessorKey as string) : id;
+      if (id && accessorKey) {
+        map.set(id, accessorKey);
+      }
+    }
+    return map;
+  }, [columns]);
+
   const navigableColumnIds = React.useMemo(() => {
     return columnIds.filter((c) => !NON_NAVIGABLE_COLUMN_IDS.includes(c));
   }, [columnIds]);
@@ -375,7 +389,9 @@ function useDataGrid<TData>({
           const baseRow = existingRow ?? tableRow?.original ?? ({} as TData);
           const updatedRow = { ...baseRow } as Record<string, unknown>;
           for (const { columnId, value } of updates) {
-            updatedRow[columnId] = value;
+            // Use accessorKey if available, otherwise fall back to columnId
+            const fieldKey = columnIdToAccessorKey.get(columnId) ?? columnId;
+            updatedRow[fieldKey] = value;
           }
           newData[i] = updatedRow as TData;
         } else {
@@ -385,7 +401,7 @@ function useDataGrid<TData>({
 
       propsRef.current.onDataChange?.(newData);
     },
-    [propsRef],
+    [propsRef, columnIdToAccessorKey],
   );
 
   const getIsCellSelected = React.useCallback(
