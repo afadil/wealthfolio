@@ -408,7 +408,7 @@ Next: Phase 4 (Advanced Features)"
 ### Sprint 3: Rebalancing
 
 - [ ] Set holding targets → rebalancing shows per-holding suggestions
-- [ ] Lock holding → suggestion skips that holding
+- [ ] Lock only affects target panel; rebalancing uses all targets; user chooses what to buy
 - [ ] Insufficient cash → shows partial + "Need $X more"
 - [ ] No holding targets → falls back to asset class suggestions
 

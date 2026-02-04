@@ -48,8 +48,14 @@ export function RebalancingAdvisor({
   isLoading = false,
   baseCurrency = "USD",
 }: RebalancingAdvisorProps) {
-  const [availableCash, setAvailableCash] = useState<number>(0);
+  const [availableCashInput, setAvailableCashInput] = useState<string>('');
   const [suggestions, setSuggestions] = useState<AllocationSuggestion[]>([]);
+  // Parsed number (max 2 decimals) for calculations; 0 when empty or invalid
+  const availableCash = (() => {
+    const n = parseFloat(availableCashInput);
+    if (Number.isNaN(n) || availableCashInput.trim() === '') return 0;
+    return Math.round(n * 100) / 100;
+  })();
   const [holdingSuggestions, setHoldingSuggestions] = useState<HoldingSuggestion[]>([]);
   const [viewMode, setViewMode] = useState<'overview' | 'detailed'>('detailed');
   const [expandedAssetClasses, setExpandedAssetClasses] = useState<Record<string, boolean>>({});
@@ -407,17 +413,17 @@ export function RebalancingAdvisor({
             <input
               type="text"
               inputMode="decimal"
-              value={availableCash === 0 ? '' : availableCash}
+              value={availableCashInput}
               onChange={(e) => {
-                // Remove any non-numeric characters except decimal point
+                // Allow digits and one decimal point
                 const sanitized = e.target.value.replace(/[^0-9.]/g, '');
-                // Remove leading zeros (but keep "0" if it's just "0" or "0.X")
-                const cleaned = sanitized.replace(/^0+(?=\d)/, '');
-                // Limit to 2 decimal places
-                const limited = cleaned.includes('.')
-                  ? cleaned.split('.')[0] + '.' + (cleaned.split('.')[1]?.substring(0, 2) || '')
-                  : cleaned;
-                setAvailableCash(parseFloat(limited) || 0);
+                const parts = sanitized.split('.');
+                // At most one decimal point, max 2 digits after it; keep "12." while typing
+                const afterDecimal = parts.length > 1 ? parts.slice(1).join('').substring(0, 2) : '';
+                const oneDecimal = parts.length > 1 ? parts[0] + '.' + afterDecimal : sanitized;
+                // Remove leading zeros (but keep "0" or "0.xx")
+                const cleaned = oneDecimal.replace(/^0+(?=\d)/, '');
+                setAvailableCashInput(cleaned);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
