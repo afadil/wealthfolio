@@ -56,11 +56,11 @@ interface ImportLocalTransaction {
   symbol?: string;
   /** Resolved exchange MIC for the symbol */
   exchangeMic?: string;
-  quantity?: number;
-  unitPrice?: number;
-  amount?: number;
-  fee?: number;
-  fxRate?: number;
+  quantity?: string | number | null;
+  unitPrice?: string | number | null;
+  amount?: string | number | null;
+  fee?: string | number | null;
+  fxRate?: string | number | null;
   currency?: string;
   comment?: string;
   // Row index for display
@@ -85,11 +85,14 @@ interface BackendActivityDraft {
   symbol?: string;
   exchange_mic?: string;
   exchangeMic?: string;
-  quantity?: number;
-  unit_price?: number;
-  unitPrice?: number;
-  amount?: number;
-  fee?: number;
+  quantity?: string | number | null;
+  unit_price?: string | number | null;
+  unitPrice?: string | number | null;
+  amount?: string | number | null;
+  fee?: string | number | null;
+  fx_rate?: string | number | null;
+  fxRate?: string | number | null;
+  subtype?: string;
   currency?: string;
   notes?: string;
   comment?: string;
@@ -99,6 +102,18 @@ interface BackendActivityDraft {
   isValid?: boolean;
   errors?: string[];
   warnings?: string[];
+}
+
+function normalizeDecimal(value: unknown): string | number | null | undefined {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value.toString() : undefined;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed === "" ? undefined : trimmed;
+  }
+  return undefined;
 }
 
 function normalizeActivityDraft(raw: BackendActivityDraft, index: number): ImportCsvActivityDraft {
@@ -121,15 +136,14 @@ function normalizeActivityDraft(raw: BackendActivityDraft, index: number): Impor
     activityDate: raw.activity_date ?? raw.activityDate,
     symbol: raw.symbol,
     exchangeMic: raw.exchange_mic ?? raw.exchangeMic,
-    quantity: raw.quantity != null ? Number(raw.quantity) : undefined,
-    unitPrice:
-      (raw.unit_price ?? raw.unitPrice != null)
-        ? Number(raw.unit_price ?? raw.unitPrice)
-        : undefined,
-    amount: raw.amount != null ? Number(raw.amount) : undefined,
-    fee: raw.fee != null ? Number(raw.fee) : undefined,
+    quantity: normalizeDecimal(raw.quantity),
+    unitPrice: normalizeDecimal(raw.unit_price ?? raw.unitPrice),
+    amount: normalizeDecimal(raw.amount),
+    fee: normalizeDecimal(raw.fee),
+    fxRate: normalizeDecimal(raw.fx_rate ?? raw.fxRate),
     currency: raw.currency,
     comment: raw.notes ?? raw.comment,
+    subtype: raw.subtype,
     validationStatus,
     validationErrors: [...errors, ...warnings],
     sourceRow: raw.row_number ?? raw.rowNumber ?? index + 1,
@@ -259,7 +273,7 @@ function toLocalTransaction(draft: ImportCsvActivityDraft, index: number): Impor
     isNew: true,
     accountId: draft.accountId,
     activityType: draft.activityType,
-    subtype: draftAny.subtype as string | undefined,
+    subtype: draft.subtype ?? (draftAny.subtype as string | undefined),
     isExternal: draftAny.isExternal as boolean | undefined,
     activityDate: draft.activityDate,
     symbol: draft.symbol,
@@ -268,7 +282,7 @@ function toLocalTransaction(draft: ImportCsvActivityDraft, index: number): Impor
     unitPrice: draft.unitPrice,
     amount: draft.amount,
     fee: draft.fee,
-    fxRate: draftAny.fxRate as number | undefined,
+    fxRate: draft.fxRate ?? (draftAny.fxRate as string | number | null | undefined),
     currency: draft.currency,
     comment: draft.comment,
     rowIndex: index,

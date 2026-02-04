@@ -9,7 +9,7 @@ use reqwest::Client as HttpClient;
 use rig::{
     client::{CompletionClient, Nothing},
     completion::Prompt,
-    providers::{anthropic, gemini, groq, ollama, openai},
+    providers::{anthropic, gemini, groq, ollama, openai, openrouter},
 };
 
 use crate::env::AiEnvironment;
@@ -154,6 +154,17 @@ Title:",
                 let client = builder
                     .build()
                     .map_err(|e| AiError::Provider(e.to_string()))?;
+                client
+                    .agent(&model_id)
+                    .build()
+                    .prompt(&prompt)
+                    .await
+                    .map_err(|e| AiError::Provider(e.to_string()))?
+            }
+            "openrouter" => {
+                let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
+                let client: openrouter::Client<HttpClient> =
+                    openrouter::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))?;
                 client
                     .agent(&model_id)
                     .build()

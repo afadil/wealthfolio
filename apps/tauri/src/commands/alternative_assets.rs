@@ -166,9 +166,12 @@ pub struct NetWorthResponse {
 #[serde(rename_all = "camelCase")]
 pub struct NetWorthHistoryPoint {
     pub date: String,
-    pub total_assets: String,
+    pub portfolio_value: String,
+    pub alternative_assets_value: String,
     pub total_liabilities: String,
+    pub total_assets: String,
     pub net_worth: String,
+    pub net_contribution: String,
     pub currency: String,
 }
 
@@ -505,9 +508,12 @@ pub fn get_net_worth_history(
         .into_iter()
         .map(|point| NetWorthHistoryPoint {
             date: point.date.to_string(),
-            total_assets: point.total_assets.to_string(),
+            portfolio_value: point.portfolio_value.to_string(),
+            alternative_assets_value: point.alternative_assets_value.to_string(),
             total_liabilities: point.total_liabilities.to_string(),
+            total_assets: point.total_assets.to_string(),
             net_worth: point.net_worth.to_string(),
+            net_contribution: point.net_contribution.to_string(),
             currency: point.currency,
         })
         .collect();

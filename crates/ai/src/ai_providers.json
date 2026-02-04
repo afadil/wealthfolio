@@ -60,18 +60,18 @@
         }
       ],
       "models": {
+        "groq/compound": {
+          "capabilities": { "tools": false, "thinking": false, "vision": false }
+        },
         "openai/gpt-oss-120b": {
           "capabilities": { "tools": true, "thinking": true, "vision": false }
         },
         "moonshotai/kimi-k2-instruct-0905": {
           "capabilities": { "tools": true, "thinking": false, "vision": false }
-        },
-        "llama-3.3-70b-versatile": {
-          "capabilities": { "tools": true, "thinking": false, "vision": false }
         }
       },
-      "defaultModel": "llama-3.3-70b-versatile",
-      "titleModelId": "llama-3.3-70b-versatile",
+      "defaultModel": "openai/gpt-oss-120b",
+      "titleModelId": "meta-llama/llama-guard-4-12b",
       "documentationUrl": "https://console.groq.com/docs"
     },
     "google": {
@@ -105,7 +105,7 @@
         }
       },
       "defaultModel": "gemini-2.5-flash",
-      "titleModelId": "gemini-2.5-flash",
+      "titleModelId": "gemini-2.5-flash-lite",
       "documentationUrl": "https://ai.google.dev/docs"
     },
     "anthropic": {
@@ -162,24 +162,21 @@
         }
       ],
       "models": {
-        "gpt-4o": {
+        "gpt-5.2": {
+          "capabilities": { "tools": true, "thinking": true, "vision": true }
+        },
+        "gpt-5": {
+          "capabilities": { "tools": true, "thinking": true, "vision": true }
+        },
+        "gpt-5-mini": {
           "capabilities": { "tools": true, "thinking": false, "vision": true }
         },
-        "gpt-4o-mini": {
-          "capabilities": { "tools": true, "thinking": false, "vision": true }
-        },
-        "o1": {
-          "capabilities": { "tools": false, "thinking": true, "vision": false }
-        },
-        "o1-mini": {
-          "capabilities": { "tools": false, "thinking": true, "vision": false }
-        },
-        "gpt-4-turbo": {
-          "capabilities": { "tools": true, "thinking": false, "vision": true }
+        "gpt-5-nano": {
+          "capabilities": { "tools": true, "thinking": false, "vision": false }
         }
       },
-      "defaultModel": "gpt-4o-mini",
-      "titleModelId": "gpt-4o-mini",
+      "defaultModel": "gpt-5-mini",
+      "titleModelId": "gpt-5-nano",
       "documentationUrl": "https://platform.openai.com/docs/introduction"
     },
     "openrouter": {
@@ -202,21 +199,21 @@
         }
       ],
       "models": {
-        "anthropic/claude-3.5-sonnet": {
+        "openrouter/free": {
           "capabilities": { "tools": true, "thinking": false, "vision": true }
         },
-        "openai/gpt-4o": {
+        "qwen/qwq-32b:free": {
           "capabilities": { "tools": true, "thinking": false, "vision": true }
         },
-        "google/gemini-pro-1.5": {
+        "openai/gpt-oss-120b:free": {
           "capabilities": { "tools": true, "thinking": false, "vision": true }
         },
-        "meta-llama/llama-3.1-70b-instruct": {
-          "capabilities": { "tools": true, "thinking": false, "vision": false }
+        "google/gemma-3-27b-it:free": {
+          "capabilities": { "tools": false, "thinking": false, "vision": false }
         }
       },
-      "defaultModel": "openai/gpt-4o",
-      "titleModelId": "openai/gpt-4o-mini",
+      "defaultModel": "openrouter/free",
+      "titleModelId": "openrouter/free",
       "documentationUrl": "https://openrouter.ai/docs"
     }
   },

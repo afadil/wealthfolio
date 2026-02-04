@@ -352,7 +352,7 @@ export function ProviderSettingsCard({
                         id={`apikey-${provider.id}`}
                         type={showApiKey ? "text" : "password"}
                         value={
-                          hasLoadedKey
+                          hasLoadedKey || apiKeyValue
                             ? apiKeyValue
                             : provider.hasApiKey
                               ? "••••••••••••••••••••••••"
@@ -381,7 +381,12 @@ export function ProviderSettingsCard({
                         )}
                       </Button>
                     </div>
-                    <Button onClick={handleSaveApiKey} size="default" className="shrink-0">
+                    <Button
+                      onClick={handleSaveApiKey}
+                      size="default"
+                      className="shrink-0"
+                      disabled={!hasLoadedKey && provider.hasApiKey}
+                    >
                       Save
                     </Button>
                   </div>

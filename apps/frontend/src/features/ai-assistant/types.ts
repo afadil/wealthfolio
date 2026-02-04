@@ -510,12 +510,14 @@ export interface ImportCsvActivityDraft {
   symbol?: string;
   /** Resolved exchange MIC for the symbol (e.g., "XNAS", "XNYS") */
   exchangeMic?: string;
-  quantity?: number;
-  unitPrice?: number;
-  amount?: number;
-  fee?: number;
+  quantity?: string | number | null;
+  unitPrice?: string | number | null;
+  amount?: string | number | null;
+  fee?: string | number | null;
+  fxRate?: string | number | null;
   currency?: string;
   comment?: string;
+  subtype?: string;
   /** Validation status for this row */
   validationStatus: "valid" | "warning" | "error";
   /** Validation error messages for this row */

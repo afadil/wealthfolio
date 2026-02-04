@@ -22,7 +22,7 @@ use rig::{
     providers::{
         anthropic, gemini, groq,
         groq::{GroqAdditionalParameters, ReasoningFormat},
-        ollama, openai,
+        ollama, openai, openrouter,
     },
     streaming::{StreamedAssistantContent, StreamedUserContent, StreamingChat},
     OneOrMany,
@@ -582,19 +582,31 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     }
 
     // Provider-specific reasoning params using rig-core native types where available:
-    // - Groq: GroqAdditionalParameters with reasoning_format and include_reasoning
+    // - Groq: GroqAdditionalParameters with reasoning_format OR include_reasoning (mutually exclusive!)
+    //   Note: gpt-oss models don't support reasoning_format - they include reasoning by default
     // - Ollama: Raw JSON with think: true/false
     // - Gemini: GenerationConfig with ThinkingConfig
     // - Anthropic: Raw JSON (no native rig-core struct)
     // - OpenAI: Raw JSON (Reasoning struct is for responses_api only)
-    let groq_reasoning_params_with_tools: Option<serde_json::Value> = if capabilities.thinking {
+    let is_groq_gpt_oss = model_id.contains("gpt-oss");
+
+    // Groq params: reasoning_format and include_reasoning are MUTUALLY EXCLUSIVE
+    // For gpt-oss models: don't send reasoning_format (not supported), reasoning is on by default
+    // For other models: use reasoning_format to control output format
+    let groq_reasoning_params_with_tools: Option<serde_json::Value> = if is_groq_gpt_oss {
+        // gpt-oss models don't support reasoning_format, reasoning is included by default
+        // When tools are used, reasoning is automatically hidden in the response
+        None
+    } else if capabilities.thinking {
+        // Use reasoning_format only (not include_reasoning) - they're mutually exclusive
         serde_json::to_value(GroqAdditionalParameters {
-            reasoning_format: Some(ReasoningFormat::Hidden), // Model reasons but output hidden
-            include_reasoning: Some(true),
+            reasoning_format: Some(ReasoningFormat::Hidden), // Model reasons but output hidden with tools
+            include_reasoning: None,
             extra: None,
         })
         .ok()
     } else {
+        // Disable reasoning entirely
         serde_json::to_value(GroqAdditionalParameters {
             reasoning_format: None,
             include_reasoning: Some(false),
@@ -603,14 +615,19 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         .ok()
     };
 
-    let groq_reasoning_params_no_tools: Option<serde_json::Value> = if capabilities.thinking {
+    let groq_reasoning_params_no_tools: Option<serde_json::Value> = if is_groq_gpt_oss {
+        // gpt-oss models include reasoning by default in the reasoning field
+        None
+    } else if capabilities.thinking {
+        // Use reasoning_format only (not include_reasoning) - they're mutually exclusive
         serde_json::to_value(GroqAdditionalParameters {
             reasoning_format: Some(ReasoningFormat::Parsed), // Reasoning exposed in response
-            include_reasoning: Some(true),
+            include_reasoning: None,
             extra: None,
         })
         .ok()
     } else {
+        // Disable reasoning entirely
         serde_json::to_value(GroqAdditionalParameters {
             reasoning_format: None,
             include_reasoning: Some(false),
@@ -640,15 +657,15 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     };
 
     // OpenAI: reasoning_effort for o1/o3 models
-    // Use "low" when thinking disabled, "medium" when enabled
-    let openai_thinking_params: Option<serde_json::Value> = if capabilities.thinking {
+    // NOTE: Reasoning with tool calls causes "reasoning item without required following item" errors
+    // in multi-turn conversations. Only enable reasoning when NOT using tools.
+    // See: https://community.openai.com/t/error-badrequesterror-400-item-of-type-reasoning-was-provided-without-its-required-following-item/1303809
+    let openai_thinking_params_no_tools: Option<serde_json::Value> = if capabilities.thinking {
         Some(serde_json::json!({
             "reasoning_effort": "medium"
         }))
     } else {
-        Some(serde_json::json!({
-            "reasoning_effort": "low"
-        }))
+        None // Don't send reasoning_effort when thinking disabled
     };
 
     // Gemini: Only pass thinking_config to avoid sending unsupported fields.
@@ -687,8 +704,13 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
                 build_with_tools_and_stream!(client, ollama_thinking_params.clone())
             }
             "openai" => {
+                // Don't pass reasoning params with tools - causes multi-turn errors
                 let client = create_openai_client(api_key, &provider_id)?;
-                build_with_tools_and_stream!(client, openai_thinking_params.clone())
+                build_with_tools_and_stream!(client, None::<serde_json::Value>)
+            }
+            "openrouter" => {
+                let client = create_openrouter_client(api_key, &provider_id)?;
+                build_with_tools_and_stream!(client, None::<serde_json::Value>)
             }
             _ => {
                 let client = create_openai_client(api_key, &provider_id)?;
@@ -714,8 +736,13 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
                 build_without_tools_and_stream!(client, ollama_thinking_params.clone())
             }
             "openai" => {
+                // Reasoning params OK without tools
                 let client = create_openai_client(api_key, &provider_id)?;
-                build_without_tools_and_stream!(client, openai_thinking_params.clone())
+                build_without_tools_and_stream!(client, openai_thinking_params_no_tools.clone())
+            }
+            "openrouter" => {
+                let client = create_openrouter_client(api_key, &provider_id)?;
+                build_without_tools_and_stream!(client, None::<serde_json::Value>)
             }
             _ => {
                 let client = create_openai_client(api_key, &provider_id)?;
@@ -753,12 +780,26 @@ fn create_groq_client(
     groq::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))
 }
 
+/// Create OpenAI client using Completions API (not Responses API).
+/// Responses API has issues with reasoning items in multi-turn conversations.
+/// See: https://community.openai.com/t/error-badrequesterror-400-item-of-type-reasoning-was-provided-without-its-required-following-item/1303809
 fn create_openai_client(
     api_key: Option<String>,
     provider_id: &str,
-) -> Result<openai::Client<HttpClient>, AiError> {
+) -> Result<openai::CompletionsClient<HttpClient>, AiError> {
     let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-    openai::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))
+    openai::CompletionsClient::builder()
+        .api_key(&key)
+        .build()
+        .map_err(|e| AiError::Provider(e.to_string()))
+}
+
+fn create_openrouter_client(
+    api_key: Option<String>,
+    provider_id: &str,
+) -> Result<openrouter::Client<HttpClient>, AiError> {
+    let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
+    openrouter::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))
 }
 
 fn create_ollama_client(
@@ -1028,9 +1069,10 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
             }
 
             // Tool call
-            Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::ToolCall(
-                RigToolCall { id, function, .. },
-            ))) => {
+            Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::ToolCall {
+                tool_call: RigToolCall { id, function, .. },
+                ..
+            })) => {
                 // Flush any accumulated text BEFORE the tool call to preserve order
                 if !accumulated_text.is_empty() {
                     content_parts.push(ChatMessagePart::Text {
@@ -1075,9 +1117,10 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
             }
 
             // Tool result
-            Ok(MultiTurnStreamItem::StreamUserItem(StreamedUserContent::ToolResult(
+            Ok(MultiTurnStreamItem::StreamUserItem(StreamedUserContent::ToolResult {
                 tool_result,
-            ))) => {
+                ..
+            })) => {
                 let content_to_string = |content: ToolResultContent| -> String {
                     match content {
                         ToolResultContent::Text(Text { text }) => text,
