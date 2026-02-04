@@ -1,77 +1,71 @@
-import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import type { Holding, HoldingTarget } from "@/lib/types";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import type { Holding } from "@/lib/types";
+import { DonutChartCompact } from "@wealthfolio/ui";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 interface SubPieChartProps {
-  holdingTargets: HoldingTarget[];
   holdings: Holding[];
-  assetClassName: string;
+  baseCurrency: string;
 }
 
-export function SubPieChart({ holdingTargets, holdings }: SubPieChartProps) {
-  // Prepare data
-  const data = holdingTargets.map((target) => {
-    const holding = holdings.find((h) => h.id === target.assetId);
-    return {
-      name: holding?.instrument?.symbol || "Unknown",
-      value: target.targetPercentOfClass,
-      displayName: holding?.instrument?.name || holding?.instrument?.symbol || "Unknown",
-    };
-  });
+interface PieDataItem {
+  name: string;
+  value: number;
+  currency: string;
+  symbol: string;
+}
 
-  // Green color palette (lighter to darker) - consistent with asset class colors
-  const COLORS = [
-    "#86efac", // green-300
-    "#4ade80", // green-400
-    "#22c55e", // green-500
-    "#16a34a", // green-600
-    "#15803d", // green-700
-    "#166534", // green-800
-    "#14532d", // green-900
-  ];
+export function SubPieChart({ holdings, baseCurrency }: SubPieChartProps) {
+  const { isBalanceHidden } = useBalancePrivacy();
+  const navigate = useNavigate();
+
+  const pieData = useMemo<PieDataItem[]>(() => {
+    const data = holdings
+      .filter((h) => h.marketValue?.base && h.marketValue.base > 0)
+      .map((holding) => ({
+        name: holding.instrument?.symbol || "Unknown",
+        value: holding.marketValue?.base || 0,
+        currency: baseCurrency,
+        symbol: holding.instrument?.symbol || "",
+      }))
+      .sort((a, b) => b.value - a.value);
+
+    return data;
+  }, [holdings, baseCurrency]);
+
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const handleSectionClick = (sectionData: PieDataItem, index: number) => {
+    setActiveIndex(index);
+    // Navigate to holding detail page on click
+    if (sectionData.symbol) {
+      navigate(`/holdings/${sectionData.symbol}`);
+    }
+  };
 
   // Empty state
-  if (data.length === 0) {
+  if (pieData.length === 0) {
     return (
       <div className="text-muted-foreground py-4 text-center text-sm">
-        Set holding targets to see breakdown
+        No holdings in this asset class
       </div>
     );
   }
 
   return (
-    <div className="w-full">
-      <ResponsiveContainer width="100%" height={250}>
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            labelLine={false}
-            outerRadius={80}
-            fill="#8884d8"
-            dataKey="value"
-          >
-            {data.map((_entry, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-            ))}
-          </Pie>
-          <Tooltip
-            formatter={(value) => `${Number(value).toFixed(1)}%`}
-            contentStyle={{
-              background: "hsl(var(--card))",
-              border: "1px solid hsl(var(--border))",
-              borderRadius: "0.5rem",
-            }}
-          />
-          <Legend
-            verticalAlign="bottom"
-            height={36}
-            formatter={(_value, entry: any) =>
-              `${entry.payload.name} (${entry.payload.value.toFixed(1)}%)`
-            }
-          />
-        </PieChart>
-      </ResponsiveContainer>
+    <div className="flex w-full items-center justify-center py-2">
+      <div style={{ width: "200px", height: "200px" }}>
+        <DonutChartCompact
+          data={pieData}
+          activeIndex={activeIndex}
+          onSectionClick={handleSectionClick}
+          startAngle={0}
+          endAngle={360}
+          isBalanceHidden={isBalanceHidden}
+          minSliceAngle={1}
+        />
+      </div>
     </div>
   );
 }
