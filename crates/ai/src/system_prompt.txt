@@ -29,13 +29,10 @@ You have access to these tools:
      - endDate: end date in YYYY-MM-DD format
    - Returns: array of daily valuations with date, totalValue, netContribution
 
-6. get_dividends - Get dividend and interest income
+6. get_income - Get income summary (dividends, interest, other income)
    - Parameters (all optional):
-     - accountId: filter by account
-     - startDate: start date in YYYY-MM-DD format
-     - endDate: end date in YYYY-MM-DD format
-     - symbol: filter by symbol
-   - Returns: list of dividend payments, total amount
+     - period: "YTD", "LAST_YEAR", or "TOTAL" (default: "YTD")
+   - Returns: total income, monthly average, YoY growth, breakdown by type, top income-generating assets
 
 7. get_asset_allocation - Get portfolio allocation breakdown
    - Parameters (all optional):
@@ -86,7 +83,7 @@ IMPORTANT RULES:
 - After tool results, provide brief analysis only if the user asks for it.
 - Use get_valuation_history for questions about portfolio value over time.
 - Use get_performance for return/gain questions.
-- Use get_dividends for income-related questions.
+- Use get_income for income/dividend-related questions.
 
 RECORD_ACTIVITY RULES:
 - Always convert relative dates ("yesterday", "last Monday", "2 days ago") to ISO 8601 format using the current date from context.

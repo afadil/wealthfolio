@@ -7,7 +7,7 @@
 //! - GetPerformanceTool: Fetch portfolio performance metrics
 //! - GetValuationHistoryTool: Fetch portfolio valuation history
 //! - SearchActivitiesTool: Search transactions
-//! - GetDividendsTool: Fetch dividend and interest payments
+//! - GetIncomeTool: Fetch income summaries (dividends, interest, other income)
 //! - GetGoalsTool: Fetch investment goals with progress
 //! - RecordActivityTool: Create activity drafts from natural language
 //!
@@ -17,10 +17,10 @@ pub mod accounts;
 pub mod activities;
 pub mod allocation;
 pub mod constants;
-pub mod dividends;
 pub mod goals;
 pub mod holdings;
 pub mod import_csv;
+pub mod income;
 pub mod performance;
 pub mod record_activity;
 pub mod valuation;
@@ -32,10 +32,10 @@ pub use constants::*;
 pub use accounts::GetAccountsTool;
 pub use activities::SearchActivitiesTool;
 pub use allocation::GetAssetAllocationTool;
-pub use dividends::GetDividendsTool;
 pub use goals::GetGoalsTool;
 pub use holdings::GetHoldingsTool;
 pub use import_csv::ImportCsvTool;
+pub use income::GetIncomeTool;
 pub use performance::GetPerformanceTool;
 pub use record_activity::RecordActivityTool;
 pub use valuation::GetValuationHistoryTool;
@@ -50,7 +50,7 @@ pub struct ToolSet<E: AiEnvironment> {
     pub allocation: GetAssetAllocationTool<E>,
     pub accounts: GetAccountsTool<E>,
     pub activities: SearchActivitiesTool<E>,
-    pub dividends: GetDividendsTool<E>,
+    pub income: GetIncomeTool<E>,
     pub valuation: GetValuationHistoryTool<E>,
     pub goals: GetGoalsTool<E>,
     pub performance: GetPerformanceTool<E>,
@@ -66,7 +66,7 @@ impl<E: AiEnvironment> ToolSet<E> {
             allocation: GetAssetAllocationTool::new(env.clone(), base_currency.clone()),
             accounts: GetAccountsTool::new(env.clone()),
             activities: SearchActivitiesTool::new(env.clone()),
-            dividends: GetDividendsTool::new(env.clone()),
+            income: GetIncomeTool::new(env.clone()),
             valuation: GetValuationHistoryTool::new(env.clone(), base_currency.clone()),
             goals: GetGoalsTool::new(env.clone()),
             performance: GetPerformanceTool::new(env.clone(), base_currency.clone()),

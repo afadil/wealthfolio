@@ -290,7 +290,7 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
             "search_activities".to_string(),
             "get_goals".to_string(),
             "get_valuation_history".to_string(),
-            "get_dividends".to_string(),
+            "get_income".to_string(),
             "get_asset_allocation".to_string(),
             "get_performance".to_string(),
             "record_activity".to_string(),
@@ -529,7 +529,10 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
 
     // Helper macro to build agent WITH tools and stream
     macro_rules! build_with_tools_and_stream {
-        ($client:expr, $thinking_params:expr) => {{
+        ($client:expr, $thinking_params:expr) => {
+            build_with_tools_and_stream!($client, $thinking_params, None::<u64>)
+        };
+        ($client:expr, $thinking_params:expr, $max_tokens:expr) => {{
             let tools = ToolSet::new(env.clone(), env.base_currency());
             let mut builder = $client
                 .agent(&model_id)
@@ -539,7 +542,7 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
                 .tool(tools.activities)
                 .tool(tools.goals)
                 .tool(tools.valuation)
-                .tool(tools.dividends)
+                .tool(tools.income)
                 .tool(tools.allocation)
                 .tool(tools.performance)
                 .tool(tools.record_activity)
@@ -550,6 +553,10 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
             // temperatures; use a deterministic temperature to improve tool-call reliability.
             if provider_id == "ollama" {
                 builder = builder.temperature(0.0);
+            }
+
+            if let Some(tokens) = Into::<Option<u64>>::into($max_tokens) {
+                builder = builder.max_tokens(tokens);
             }
 
             if let Some(params) = $thinking_params {
@@ -566,8 +573,15 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
 
     // Helper macro to build agent WITHOUT tools and stream
     macro_rules! build_without_tools_and_stream {
-        ($client:expr, $thinking_params:expr) => {{
+        ($client:expr, $thinking_params:expr) => {
+            build_without_tools_and_stream!($client, $thinking_params, None::<u64>)
+        };
+        ($client:expr, $thinking_params:expr, $max_tokens:expr) => {{
             let mut builder = $client.agent(&model_id).preamble(&preamble);
+
+            if let Some(tokens) = Into::<Option<u64>>::into($max_tokens) {
+                builder = builder.max_tokens(tokens);
+            }
 
             if let Some(params) = $thinking_params {
                 builder = builder.additional_params(params);
@@ -592,7 +606,8 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
 
     // Groq params: reasoning_format and include_reasoning are MUTUALLY EXCLUSIVE
     // For gpt-oss models: don't send reasoning_format (not supported), reasoning is on by default
-    // For other models: use reasoning_format to control output format
+    // For reasoning-capable models: use reasoning_format to control output format
+    // For non-reasoning models (compound, etc.): don't send any reasoning params
     let groq_reasoning_params_with_tools: Option<serde_json::Value> = if is_groq_gpt_oss {
         // gpt-oss models don't support reasoning_format, reasoning is included by default
         // When tools are used, reasoning is automatically hidden in the response
@@ -606,13 +621,8 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         })
         .ok()
     } else {
-        // Disable reasoning entirely
-        serde_json::to_value(GroqAdditionalParameters {
-            reasoning_format: None,
-            include_reasoning: Some(false),
-            extra: None,
-        })
-        .ok()
+        // Non-reasoning models don't support reasoning params at all
+        None
     };
 
     let groq_reasoning_params_no_tools: Option<serde_json::Value> = if is_groq_gpt_oss {
@@ -627,13 +637,8 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         })
         .ok()
     } else {
-        // Disable reasoning entirely
-        serde_json::to_value(GroqAdditionalParameters {
-            reasoning_format: None,
-            include_reasoning: Some(false),
-            extra: None,
-        })
-        .ok()
+        // Non-reasoning models don't support reasoning params at all
+        None
     };
 
     // Ollama: pass think parameter to enable/disable thinking mode
@@ -655,6 +660,9 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     } else {
         None
     };
+    // Anthropic requires max_tokens on the CompletionRequest (not in additional_params).
+    // With thinking enabled, budget_tokens counts against max_tokens so it must be larger.
+    let anthropic_max_tokens: u64 = if capabilities.thinking { 16000 } else { 8096 };
 
     // OpenAI: reasoning_effort for o1/o3 models
     // NOTE: Reasoning with tool calls causes "reasoning item without required following item" errors
@@ -689,7 +697,7 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         match provider_id.as_str() {
             "anthropic" => {
                 let client = create_anthropic_client(api_key, &provider_id)?;
-                build_with_tools_and_stream!(client, anthropic_thinking_params.clone())
+                build_with_tools_and_stream!(client, anthropic_thinking_params.clone(), Some(anthropic_max_tokens))
             }
             "gemini" | "google" => {
                 let client = create_gemini_client(api_key, &provider_id)?;
@@ -721,7 +729,7 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         match provider_id.as_str() {
             "anthropic" => {
                 let client = create_anthropic_client(api_key, &provider_id)?;
-                build_without_tools_and_stream!(client, anthropic_thinking_params.clone())
+                build_without_tools_and_stream!(client, anthropic_thinking_params.clone(), Some(anthropic_max_tokens))
             }
             "gemini" | "google" => {
                 let client = create_gemini_client(api_key, &provider_id)?;

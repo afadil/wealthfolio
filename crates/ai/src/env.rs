@@ -12,7 +12,8 @@ use wealthfolio_core::{
     goals::GoalServiceTrait,
     portfolio::{
         allocation::AllocationServiceTrait, holdings::HoldingsServiceTrait,
-        performance::PerformanceServiceTrait, valuation::ValuationServiceTrait,
+        income::IncomeServiceTrait, performance::PerformanceServiceTrait,
+        valuation::ValuationServiceTrait,
     },
     quotes::QuoteServiceTrait,
     secrets::SecretStore,
@@ -66,6 +67,9 @@ pub trait AiEnvironment: Send + Sync {
 
     /// Get the performance service for portfolio performance metrics.
     fn performance_service(&self) -> Arc<dyn PerformanceServiceTrait>;
+
+    /// Get the income service for income/dividend summaries.
+    fn income_service(&self) -> Arc<dyn IncomeServiceTrait>;
 }
 
 #[cfg(test)]
@@ -87,6 +91,7 @@ pub mod test_env {
         holdings::{Holding, HoldingsServiceTrait},
         accounts::TrackingMode,
         portfolio::allocation::{AllocationHoldings, AllocationServiceTrait, PortfolioAllocations},
+        portfolio::income::{IncomeSummary, IncomeServiceTrait},
         portfolio::performance::{PerformanceMetrics, PerformanceServiceTrait},
         quotes::{
             LatestQuotePair, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait, QuoteSyncState,
@@ -910,6 +915,20 @@ pub mod test_env {
         }
     }
 
+    /// Mock income service for testing.
+    #[derive(Default)]
+    pub struct MockIncomeService;
+
+    impl IncomeServiceTrait for MockIncomeService {
+        fn get_income_summary(&self) -> CoreResult<Vec<IncomeSummary>> {
+            Ok(vec![
+                IncomeSummary::new("TOTAL", "USD".to_string()),
+                IncomeSummary::new("YTD", "USD".to_string()),
+                IncomeSummary::new("LAST_YEAR", "USD".to_string()),
+            ])
+        }
+    }
+
     /// Mock performance service for testing.
     #[derive(Default)]
     pub struct MockPerformanceService;
@@ -996,6 +1015,7 @@ pub mod test_env {
         pub quote_service: Arc<dyn QuoteServiceTrait>,
         pub allocation_service: Arc<dyn AllocationServiceTrait>,
         pub performance_service: Arc<dyn PerformanceServiceTrait>,
+        pub income_service: Arc<dyn IncomeServiceTrait>,
     }
 
     impl Default for MockEnvironment {
@@ -1019,6 +1039,7 @@ pub mod test_env {
                 quote_service: Arc::new(MockQuoteService::default()),
                 allocation_service: Arc::new(MockAllocationService::default()),
                 performance_service: Arc::new(MockPerformanceService::default()),
+                income_service: Arc::new(MockIncomeService::default()),
             }
         }
 
@@ -1076,6 +1097,10 @@ pub mod test_env {
 
         fn performance_service(&self) -> Arc<dyn PerformanceServiceTrait> {
             self.performance_service.clone()
+        }
+
+        fn income_service(&self) -> Arc<dyn IncomeServiceTrait> {
+            self.income_service.clone()
         }
     }
 }

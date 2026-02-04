@@ -8,10 +8,10 @@
 import { AccountsToolUI } from "./accounts-tool-ui";
 import { ActivitiesToolUI } from "./activities-tool-ui";
 import { AllocationToolUI } from "./allocation-tool-ui";
-import { DividendsToolUI } from "./dividends-tool-ui";
 import { GoalsToolUI } from "./goals-tool-ui";
 import { HoldingsToolUI } from "./holdings-tool-ui";
 import { ImportCsvToolUI } from "./import-csv-tool-ui";
+import { IncomeToolUI } from "./income-tool-ui";
 import { PerformanceToolUI } from "./performance-tool-ui";
 import { RecordActivityToolUI } from "./record-activity-tool-ui";
 import { ValuationToolUI } from "./valuation-tool-ui";
@@ -23,9 +23,9 @@ import { ValuationToolUI } from "./valuation-tool-ui";
 export const toolUIs = {
   get_accounts: AccountsToolUI,
   get_asset_allocation: AllocationToolUI,
-  get_dividends: DividendsToolUI,
   get_goals: GoalsToolUI,
   get_holdings: HoldingsToolUI,
+  get_income: IncomeToolUI,
   get_performance: PerformanceToolUI,
   get_valuation_history: ValuationToolUI,
   import_csv: ImportCsvToolUI,
@@ -40,10 +40,10 @@ export {
   AccountsToolUI,
   ActivitiesToolUI,
   AllocationToolUI,
-  DividendsToolUI,
   GoalsToolUI,
   HoldingsToolUI,
   ImportCsvToolUI,
+  IncomeToolUI,
   PerformanceToolUI,
   RecordActivityToolUI,
   ValuationToolUI,

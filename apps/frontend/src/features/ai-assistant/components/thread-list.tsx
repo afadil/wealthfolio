@@ -398,6 +398,7 @@ const ThreadListItemCustom: FC<ThreadListItemCustomProps> = ({
             isPending={isDeleting ?? false}
             pendingText="Deleting..."
             handleConfirm={() => onDelete(thread.id)}
+            side="right"
             button={
               <Button
                 variant="ghost"

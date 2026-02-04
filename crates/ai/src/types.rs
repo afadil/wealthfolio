@@ -31,7 +31,7 @@ pub const DEFAULT_TOOLS_ALLOWLIST: &[&str] = &[
     "get_performance",
     "search_activities",
     "get_valuations",
-    "get_dividends",
+    "get_income",
     "get_asset_allocation",
     "record_activity",
 ];

@@ -4,7 +4,7 @@ import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { EmptyPlaceholder } from "@wealthfolio/ui";
+import { Badge, EmptyPlaceholder } from "@wealthfolio/ui";
 import {
   Sheet,
   SheetContent,
@@ -21,10 +21,10 @@ import {
   AccountsToolUI,
   ActivitiesToolUI,
   AllocationToolUI,
-  DividendsToolUI,
   GoalsToolUI,
   HoldingsToolUI,
   ImportCsvToolUI,
+  IncomeToolUI,
   PerformanceToolUI,
   RecordActivityToolUI,
   ValuationToolUI,
@@ -132,6 +132,16 @@ function Header({
       </ButtonWithTooltip>
       <ProviderPicker />
       <div className="flex-1" />
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge variant="warning" className="cursor-default">
+            Beta
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">
+          This feature is in beta. Results may vary as we continue to improve.
+        </TooltipContent>
+      </Tooltip>
     </header>
   );
 }
@@ -202,7 +212,7 @@ function ChatShellInner({ className }: ChatShellProps) {
         <ActivitiesToolUI />
         <GoalsToolUI />
         <ValuationToolUI />
-        <DividendsToolUI />
+        <IncomeToolUI />
         <AllocationToolUI />
         <PerformanceToolUI />
         <RecordActivityToolUI />
