@@ -36,6 +36,7 @@ pub struct HoldingTarget {
     pub asset_class_id: String,
     pub asset_id: String,
     pub target_percent_of_class: f32,
+    pub is_locked: bool,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -99,6 +100,8 @@ pub struct NewHoldingTarget {
     pub asset_class_id: String,
     pub asset_id: String,
     pub target_percent_of_class: f32,
+    #[serde(default)]
+    pub is_locked: bool,
 }
 
 impl NewHoldingTarget {
@@ -187,6 +190,7 @@ pub struct HoldingTargetDB {
     pub asset_class_id: String,
     pub asset_id: String,
     pub target_percent_of_class: f32,
+    pub is_locked: i32,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -212,7 +216,9 @@ impl From<NewRebalancingStrategy> for RebalancingStrategyDB {
     fn from(domain: NewRebalancingStrategy) -> Self {
         let now = chrono::Utc::now().to_rfc3339();
         Self {
-            id: domain.id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
+            id: domain
+                .id
+                .unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
             name: domain.name,
             account_id: domain.account_id,
             is_active: if domain.is_active { 1 } else { 0 },
@@ -239,7 +245,9 @@ impl From<NewAssetClassTarget> for AssetClassTargetDB {
     fn from(domain: NewAssetClassTarget) -> Self {
         let now = chrono::Utc::now().to_rfc3339();
         Self {
-            id: domain.id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
+            id: domain
+                .id
+                .unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
             strategy_id: domain.strategy_id,
             asset_class: domain.asset_class,
             target_percent: domain.target_percent,
@@ -256,6 +264,7 @@ impl From<HoldingTargetDB> for HoldingTarget {
             asset_class_id: db.asset_class_id,
             asset_id: db.asset_id,
             target_percent_of_class: db.target_percent_of_class,
+            is_locked: db.is_locked != 0,
             created_at: db.created_at,
             updated_at: db.updated_at,
         }
@@ -266,10 +275,13 @@ impl From<NewHoldingTarget> for HoldingTargetDB {
     fn from(domain: NewHoldingTarget) -> Self {
         let now = chrono::Utc::now().to_rfc3339();
         Self {
-            id: domain.id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
+            id: domain
+                .id
+                .unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
             asset_class_id: domain.asset_class_id,
             asset_id: domain.asset_id,
             target_percent_of_class: domain.target_percent_of_class,
+            is_locked: if domain.is_locked { 1 } else { 0 },
             created_at: now.clone(),
             updated_at: now,
         }

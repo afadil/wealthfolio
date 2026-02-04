@@ -39,6 +39,7 @@ pub trait RebalancingRepository: Send + Sync {
     async fn create_holding_target(&self, target: NewHoldingTarget) -> Result<HoldingTarget>;
     async fn update_holding_target(&self, target: NewHoldingTarget) -> Result<HoldingTarget>;
     async fn delete_holding_target(&self, id: &str) -> Result<()>;
+    async fn toggle_holding_target_lock(&self, id: &str) -> Result<HoldingTarget>;
 
     /// Get the active strategy for a specific account
     async fn get_active_strategy_for_account(
@@ -64,6 +65,7 @@ pub trait RebalancingService: Send + Sync {
     async fn get_holding_targets(&self, asset_class_id: &str) -> Result<Vec<HoldingTarget>>;
     async fn save_holding_target(&self, target: NewHoldingTarget) -> Result<HoldingTarget>;
     async fn delete_holding_target(&self, id: &str) -> Result<()>;
+    async fn toggle_holding_target_lock(&self, id: &str) -> Result<HoldingTarget>;
 
     /// Get the active strategy for a specific account
     async fn get_active_strategy_for_account(

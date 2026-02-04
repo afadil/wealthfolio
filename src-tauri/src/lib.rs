@@ -225,6 +225,7 @@ pub fn run() {
             commands::rebalancing::get_holding_targets,
             commands::rebalancing::save_holding_target,
             commands::rebalancing::delete_holding_target,
+            commands::rebalancing::toggle_holding_target_lock,
             // Contribution limit commands
             commands::limits::get_contribution_limits,
             commands::limits::create_contribution_limit,

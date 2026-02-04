@@ -233,6 +233,34 @@ impl RebalancingRepository for RebalancingRepositoryImpl {
             .await
     }
 
+    async fn toggle_holding_target_lock(&self, id: &str) -> Result<HoldingTarget> {
+        let id = id.to_string();
+
+        self.writer
+            .exec(move |conn| {
+                // Get current holding target
+                let current = holding_targets::table
+                    .find(&id)
+                    .first::<HoldingTargetDB>(conn)?;
+
+                // Toggle the lock status
+                let new_lock_status = if current.is_locked == 0 { 1 } else { 0 };
+
+                // Update
+                diesel::update(holding_targets::table.find(&id))
+                    .set(holding_targets::is_locked.eq(new_lock_status))
+                    .execute(conn)?;
+
+                // Return updated holding target
+                let updated = holding_targets::table
+                    .find(&id)
+                    .first::<HoldingTargetDB>(conn)?;
+
+                Ok(updated.into())
+            })
+            .await
+    }
+
     /// Get the active strategy for a specific account
     async fn get_active_strategy_for_account(
         &self,

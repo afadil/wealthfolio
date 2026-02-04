@@ -236,6 +236,7 @@ diesel::table! {
         asset_class_id -> Text,
         asset_id -> Text,
         target_percent_of_class -> Float,
+        is_locked -> Integer,
         created_at -> Text,
         updated_at -> Text,
     }

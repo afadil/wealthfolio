@@ -154,3 +154,15 @@ pub async fn delete_holding_target(
         .await
         .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn toggle_holding_target_lock(
+    id: String,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<HoldingTarget, String> {
+    state
+        .rebalancing_service
+        .toggle_holding_target_lock(&id)
+        .await
+        .map_err(|e| e.to_string())
+}

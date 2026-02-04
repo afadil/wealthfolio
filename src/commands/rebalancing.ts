@@ -10,12 +10,12 @@
 
 import { getRunEnv, invokeTauri, logger, RUN_ENV } from "@/adapters";
 import type {
-  AssetClassTarget,
-  HoldingTarget,
-  NewAssetClassTarget,
-  NewHoldingTarget,
-  NewRebalancingStrategy,
-  RebalancingStrategy,
+    AssetClassTarget,
+    HoldingTarget,
+    NewAssetClassTarget,
+    NewHoldingTarget,
+    NewRebalancingStrategy,
+    RebalancingStrategy,
 } from "@/lib/types";
 
 // ============================================================================
@@ -191,7 +191,7 @@ export const getHoldingTargets = async (assetClassId: string): Promise<HoldingTa
       case RUN_ENV.DESKTOP:
         return invokeTauri("get_holding_targets", { assetClassId });
       case RUN_ENV.WEB:
-        const response = await fetch(`/api/v1/rebalancing/target/${assetClassId}/holdings`);
+        const response = await fetch(`/api/v1/rebalancing/holding-targets/${assetClassId}`);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json();
       default:
@@ -211,12 +211,8 @@ export const saveHoldingTarget = async (
       case RUN_ENV.DESKTOP:
         return invokeTauri("save_holding_target", { target });
       case RUN_ENV.WEB:
-        const method = "id" in target ? "PUT" : "POST";
-        const endpoint = "id" in target
-          ? `/api/v1/rebalancing/holding/${target.id}`
-          : "/api/v1/rebalancing/holding";
-        const response = await fetch(endpoint, {
-          method,
+        const response = await fetch("/api/v1/rebalancing/holding-targets", {
+          method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(target),
         });
@@ -238,7 +234,7 @@ export const deleteHoldingTarget = async (id: string): Promise<void> => {
         await invokeTauri("delete_holding_target", { id });
         return;
       case RUN_ENV.WEB:
-        const response = await fetch(`/api/v1/rebalancing/holding/${id}`, {
+        const response = await fetch(`/api/v1/rebalancing/holding-targets/${id}`, {
           method: "DELETE",
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -248,6 +244,26 @@ export const deleteHoldingTarget = async (id: string): Promise<void> => {
     }
   } catch (error) {
     logger.error(`Error deleting holding target ${id}.`);
+    throw error;
+  }
+};
+
+export const toggleHoldingTargetLock = async (id: string): Promise<HoldingTarget> => {
+  try {
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri("toggle_holding_target_lock", { id });
+      case RUN_ENV.WEB:
+        const response = await fetch(`/api/v1/rebalancing/holding-targets/${id}/toggle-lock`, {
+          method: "PUT",
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      default:
+        throw new Error("Unsupported environment");
+    }
+  } catch (error) {
+    logger.error(`Error toggling lock for holding target ${id}.`);
     throw error;
   }
 };

@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 
-use crate::Result;
+use crate::{errors::ValidationError, Error, Result};
 
 use super::rebalancing_model::{
     AssetClassTarget, HoldingTarget, NewAssetClassTarget, NewHoldingTarget, NewRebalancingStrategy,
@@ -65,6 +65,30 @@ impl RebalancingService for RebalancingServiceImpl {
     }
 
     async fn save_holding_target(&self, target: NewHoldingTarget) -> Result<HoldingTarget> {
+        // Validate that sum of all holding targets equals 100%
+        let existing_targets = self
+            .repository
+            .get_holding_targets(&target.asset_class_id)
+            .await?;
+
+        // Calculate total, excluding the one being updated
+        let mut total: f32 = existing_targets
+            .iter()
+            .filter(|t| target.id.is_none() || target.id.as_ref() != Some(&t.id))
+            .map(|t| t.target_percent_of_class)
+            .sum();
+
+        // Add the new/updated target
+        total += target.target_percent_of_class;
+
+        // Allow small floating-point errors (within 0.01%)
+        if (total - 100.0).abs() > 0.01 {
+            return Err(Error::Validation(ValidationError::InvalidInput(format!(
+                "Holding targets must sum to 100%. Current sum: {:.2}%",
+                total
+            ))));
+        }
+
         if target.id.is_some() {
             self.repository.update_holding_target(target).await
         } else {
@@ -74,6 +98,10 @@ impl RebalancingService for RebalancingServiceImpl {
 
     async fn delete_holding_target(&self, id: &str) -> Result<()> {
         self.repository.delete_holding_target(id).await
+    }
+
+    async fn toggle_holding_target_lock(&self, id: &str) -> Result<HoldingTarget> {
+        self.repository.toggle_holding_target_lock(id).await
     }
 
     async fn get_active_strategy_for_account(
