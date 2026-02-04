@@ -223,54 +223,76 @@ cleanup).
 
 **Tab Label:** "Holdings Table"
 
+**Purpose:** Quick access to view and edit holding targets for users who have
+already set up their asset class allocations. Provides a flat table view across
+all holdings with inline editing capabilities.
+
 **Table Columns:**
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │ Symbol │ Name              │ Asset Class │ Type      │ Target % │ Target % │ Current % │
-│        │                   │             │           │ (Class)  │ (Total)  │ (Total)   │
+│ (link) │                   │             │           │ (Class)  │ (Total)  │ (Total)   │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
-│ VTI    │ Vanguard Total... │ Equity      │ Equity ETF│  50.0%   │  30.0%   │  28.5%    │
-│ VOO    │ Vanguard S&P...   │ Equity      │ Equity ETF│  30.0%   │  18.0%   │  16.2%    │
-│ VXUS   │ Vanguard Total... │ Equity      │ Equity ETF│  20.0%   │  12.0%   │  11.8%    │
-│ BND    │ Vanguard Total... │ Fixed Income│ Bond ETF  │  60.0%   │  18.0%   │  19.5%    │
-│ BNDX   │ Vanguard Total... │ Fixed Income│ Bond ETF  │  40.0%   │  12.0%   │  10.5%    │
+│ VTI    │ Vanguard Total... │ Equity      │ Equity ETF│ [50.0%]  │  30.0%   │  28.5%    │
+│ VOO    │ Vanguard S&P...   │ Equity      │ Equity ETF│ *30.0%*  │  18.0%   │  16.2%    │
+│ VXUS   │ Vanguard Total... │ Equity      │ Equity ETF│ *20.0%*  │  12.0%   │  11.8%    │
+│ BND    │ Vanguard Total... │ Fixed Income│ Bond ETF  │ [60.0%]  │  18.0%   │  19.5%    │
+│ BNDX   │ Vanguard Total... │ Fixed Income│ Bond ETF  │ *40.0%*  │  12.0%   │  10.5%    │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 
+Legend: [50.0%] = saved target, *30.0%* = auto-distributed preview (italicized)
+
 Additional Columns (scroll right):
-│ Deviation │ Value      │ Target Value │ Locked │ Actions        │
-├───────────────────────────────────────────────────────────────────┤
-│  -1.5%    │ $14,250    │ $15,000      │  🔒    │ [View Details] │
-│  -1.8%    │  $8,100    │  $9,000      │        │ [View Details] │
-│  -0.2%    │  $5,900    │  $6,000      │        │ [View Details] │
-│  +1.5%    │  $9,750    │  $9,000      │        │ [View Details] │
-│  -1.5%    │  $5,250    │  $6,000      │  🔒    │ [View Details] │
-└───────────────────────────────────────────────────────────────────┘
+│ Deviation │ Value      │ Locked │
+├────────────────────────────────────┤
+│  -1.5%    │ $14,250    │  🔒    │  ← clickable lock icon
+│  -1.8%    │  $8,100    │  🔓    │
+│  -0.2%    │  $5,900    │  🔓    │
+│  +1.5%    │  $9,750    │  🔓    │
+│  -1.5%    │  $5,250    │  🔒    │
+└────────────────────────────────────┘
 ```
 
 **Features:**
 
-- **Reuse existing component**: Adapt `HoldingsTable` from
-  `src/pages/holdings/components/holdings-table.tsx`
+- **Clickable Symbol**: Click symbol to navigate to holding detail page (no
+  separate "View" button)
+- **Editable Target % (Class)**: Inline text input with individual auto-save
+- **Clickable Lock Icon**: Toggle lock state directly in table
+- **Auto-distribution**: Same behavior as side panel (respects Preview/Strict
+  mode)
+- **Visual distinction for auto-distributed values**: Italicized/muted style for
+  calculated previews vs saved targets
 - **Filtering**: By asset class, type, locked status
 - **Sorting**: All columns sortable
 - **Search**: Filter by symbol or name
 - **Color coding**: Deviation column shows red (under-allocated) / green
   (over-allocated)
-- **Lock indicator**: 🔒 icon for locked holdings
-- **Click to edit**: "View Details" navigates to holding detail page
-- **Read-only mode**: This view is for analysis; editing happens in side panel
-  (Allocation Overview tab)
+- **Validation**: Warn/block save if total exceeds 100% for asset class
+
+**Save Behavior (Different from Side Panel):**
+
+| View           | Save Behavior                         | Auto-Distribution After Save                       |
+| -------------- | ------------------------------------- | -------------------------------------------------- |
+| Side Panel     | "Save All" → saves everything at once | All values get persisted                           |
+| Holdings Table | Individual auto-save on blur/Enter    | Only edited value saved, others remain as previews |
+
+**Why Different?**
+
+- Side panel: User is focused on one asset class, wants to finalize all holdings
+- Holdings table: User wants quick edits across multiple asset classes, only
+  save what they explicitly change
 
 **Empty State:**
 
 ```
 ┌─────────────────────────────────────────────────┐
 │                                                 │
-│           No Holding Targets Set                │
+│           No holdings found                     │
 │                                                 │
-│   Go to "Allocation Overview" to set targets   │
-│   for individual holdings within asset classes. │
+│   Add holdings to your portfolio to see         │
+│   allocation data.                              │
 │                                                 │
 │   [Go to Allocation Overview]                   │
 │                                                 │
@@ -1212,18 +1234,24 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 
 ## 8. Known Constraints & Trade-offs
 
-### 8.1 Table View is Read-Only
+### 8.1 Table View Has Different Save Behavior Than Side Panel
 
-**Decision:** Holdings Table tab is for analysis only, not editing.
+**Decision:** Holdings Table uses individual auto-save; Side Panel uses batch
+"Save All".
 
 **Rationale:**
 
-- Editing happens in side panel (Allocation Overview tab)
-- Avoids duplication of edit UI
-- Table optimized for sorting, filtering, comparison
-- Side panel optimized for focused editing with visual feedback
+- Table view: Users want quick edits across multiple asset classes without
+  switching contexts. Individual auto-save (on blur/Enter) provides immediate
+  feedback.
+- Side panel: Users are focused on one asset class, setting up all holdings at
+  once. Batch save allows reviewing all changes before committing.
+- Auto-distributed values: In table view, only explicitly edited values are
+  saved. In side panel, "Save All" persists everything including auto-distributed
+  values.
 
-**User Impact:** Users must switch to Allocation Overview to edit targets.
+**User Impact:** Both views stay in sync (same underlying data), but the editing
+experience differs based on the use case.
 
 ### 8.2 Strict Mode Applies to Both Levels
 
@@ -1353,6 +1381,62 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 
 ---
 
+### Sprint 4: Editable Holdings Table ✅ COMPLETE
+
+**Status:** Complete
+
+**Goal:** Enable inline editing of holding targets directly in the Holdings
+Table, with mode-specific save behavior matching the side panel.
+
+**Tasks:**
+
+- [x] Make Symbol clickable to navigate to holding page (remove View button)
+- [x] Add editable Target % (Class) column with inline text input
+- [x] Add clickable lock icon to toggle lock state
+- [x] Integrate auto-distribution calculation (Preview mode only)
+- [x] Visual distinction: italicized/muted style for auto-distributed previews
+- [x] Validation: red warning banner when asset class total ≠ 100%
+- [x] Preview mode: individual auto-save on blur/Enter
+- [x] Strict mode: pending edits with auto-save when total = 100%
+- [x] Strict mode: red border highlight for holdings needing values
+- [x] Strict mode: "Fill Remaining" button to auto-distribute remaining %
+- [x] Reset functionality: clear field to delete target
+- [x] Context-aware "Reset Targets" button (respects active filters)
+- [x] DataTable onFilterChange callback for filter-aware actions
+- [x] Disable editing for $CASH holdings (no allocation targets for cash)
+- [x] Test data sync between Holdings Table and Side Panel
+- [x] Test Preview mode vs Strict mode behavior
+
+**Technical Details:**
+
+- Reuse `useHoldingTargets` and `useHoldingTargetMutations` hooks
+- Reuse `calculateAutoDistribution` from `lib/auto-distribution.ts`
+- Preview mode: save immediately on blur/Enter
+- Strict mode: pending edits stored in component state, auto-save when 100%
+- Lock toggle: call `toggleLockMutation` on click
+- Reset: clear input field triggers delete (value = -1 signals delete)
+- Filter-aware reset: DataTable exposes filters via `onFilterChange` callback
+
+**Key Differences from Side Panel:**
+
+| Aspect              | Side Panel                  | Holdings Table                |
+| ------------------- | --------------------------- | ----------------------------- |
+| Save trigger        | "Save All" button           | Auto-save (mode-dependent)    |
+| Preview mode        | Auto-distribute + Save All  | Auto-distribute + auto-save   |
+| Strict mode         | Manual + Save All           | Pending + auto-save at 100%   |
+| Auto-distributed    | Saved with "Save All"       | Remain as previews            |
+| Focus               | One asset class at a time   | All holdings across classes   |
+| Reset               | Per-holding in list         | Filter-aware bulk reset       |
+
+**Files Modified:**
+
+- `src/pages/allocation/components/holdings-allocation-table.tsx` - Major rewrite
+- `packages/ui/src/components/ui/data-table/index.tsx` - Added onFilterChange
+
+**Estimated Duration:** 2 days (actual)
+
+---
+
 ### Optional: One-Time Banner ⏳ DEFERRED
 
 **Status:** Nice-to-have, implement if time permits
@@ -1388,6 +1472,10 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 - ✅ All tests pass (unit + integration)
 - ✅ Desktop and web modes both work
 - ✅ No regressions in Phase 3 functionality
+- ✅ Holdings Table supports inline editing of Target % (Class)
+- ✅ Holdings Table respects Preview/Strict mode save behavior
+- ✅ Context-aware reset button respects active filters
+- ✅ Cash holdings are non-editable (no allocation targets)
 
 **Optional (nice-to-have):**
 

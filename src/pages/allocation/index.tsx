@@ -105,24 +105,34 @@ function HoldingsTargetList({
   const shouldAutoDistribute = hasAnyTargets && !isStrictMode;
 
   // Calculate distribution across ALL holdings in asset class
+  // In strict mode: show saved targets without auto-distribution
+  // In preview mode: use auto-distribution algorithm
   const distribution = shouldAutoDistribute
     ? calculateAutoDistribution(allHoldings, holdingTargets, sharedPendingEdits, assetClassValue)
     : {
         holdings: allHoldings
-          .map((holding) => ({
-            assetId: holding.instrument?.id || "",
-            symbol: holding.instrument?.symbol || "",
-            displayName: holding.instrument?.name || holding.instrument?.symbol || "Unknown",
-            currentValue: holding.marketValue?.base || 0,
-            currentPercent:
-              assetClassValue > 0 ? ((holding.marketValue?.base || 0) / assetClassValue) * 100 : 0,
-            targetPercent: 0,
-            isUserSet: false,
-            isLocked: false,
-          }))
+          .map((holding) => {
+            const assetId = holding.instrument?.id || "";
+            const savedTarget = holdingTargets.find((t) => t.assetId === assetId);
+            const pendingValue = sharedPendingEdits.get(assetId);
+            return {
+              assetId,
+              symbol: holding.instrument?.symbol || "",
+              displayName: holding.instrument?.name || holding.instrument?.symbol || "Unknown",
+              currentValue: holding.marketValue?.base || 0,
+              currentPercent:
+                assetClassValue > 0
+                  ? ((holding.marketValue?.base || 0) / assetClassValue) * 100
+                  : 0,
+              // In strict mode: use pending edit > saved target > 0
+              targetPercent: pendingValue ?? savedTarget?.targetPercentOfClass ?? 0,
+              isUserSet: pendingValue !== undefined || savedTarget !== undefined,
+              isLocked: savedTarget?.isLocked ?? false,
+            };
+          })
           .sort((a, b) => b.currentValue - a.currentValue),
-        totalUserSet: 0,
-        remainder: 100,
+        totalUserSet: holdingTargets.reduce((sum, t) => sum + t.targetPercentOfClass, 0),
+        remainder: 100 - holdingTargets.reduce((sum, t) => sum + t.targetPercentOfClass, 0),
       };
 
   const handlePendingChange = (assetId: string, percent: number | null) => {

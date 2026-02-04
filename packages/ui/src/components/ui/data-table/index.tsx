@@ -33,6 +33,7 @@ interface DataTableProps<TData, TValue> {
   scrollable?: boolean;
   showColumnToggle?: boolean;
   toolbarActions?: React.ReactNode;
+  onFilterChange?: (filters: ColumnFiltersState) => void;
 }
 
 export function DataTable<TData, TValue>({
@@ -47,15 +48,28 @@ export function DataTable<TData, TValue>({
   scrollable = false,
   showColumnToggle = false,
   toolbarActions,
+  onFilterChange,
 }: DataTableProps<TData, TValue>) {
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] = storageKey
     ? usePersistentState<VisibilityState>(`${storageKey}:column-visibility`, defaultColumnVisibility || {})
     : React.useState<VisibilityState>(defaultColumnVisibility || {});
-  const [columnFilters, setColumnFilters] = storageKey
+  const [columnFilters, setColumnFiltersInternal] = storageKey
     ? usePersistentState<ColumnFiltersState>(`${storageKey}:column-filters`, [])
     : React.useState<ColumnFiltersState>([]);
   const [sorting, setSorting] = React.useState<SortingState>(defaultSorting || []);
+
+  // Wrap setColumnFilters to also call onFilterChange
+  const setColumnFilters = React.useCallback(
+    (updater: ColumnFiltersState | ((old: ColumnFiltersState) => ColumnFiltersState)) => {
+      setColumnFiltersInternal((old) => {
+        const newFilters = typeof updater === "function" ? updater(old) : updater;
+        onFilterChange?.(newFilters);
+        return newFilters;
+      });
+    },
+    [onFilterChange, setColumnFiltersInternal],
+  );
 
   const table = useReactTable({
     data,
