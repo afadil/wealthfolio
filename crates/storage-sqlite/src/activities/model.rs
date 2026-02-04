@@ -2,7 +2,6 @@
 
 use chrono::{NaiveDate, NaiveDateTime, TimeZone, Utc};
 use diesel::prelude::*;
-use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -16,24 +15,16 @@ use wealthfolio_core::activities::{
 fn parse_decimal_string_tolerant(value_str: &str, field_name: &str) -> Decimal {
     match Decimal::from_str(value_str) {
         Ok(d) => d,
-        Err(e_decimal) => match f64::from_str(value_str) {
-            Ok(f_val) => match Decimal::from_f64(f_val) {
-                Some(dec_val) => dec_val,
-                None => {
-                    log::error!(
-                        "Failed to convert {} '{}' (parsed as f64: {}) to Decimal.",
-                        field_name,
-                        value_str,
-                        f_val
-                    );
-                    Decimal::ZERO
-                }
-            },
-            Err(e_f64) => {
+        Err(e_decimal) => match Decimal::from_scientific(value_str) {
+            Ok(d) => d,
+            Err(e_scientific) => {
                 log::error!(
-                        "Failed to parse {} '{}': as Decimal (err: {}), and as f64 (err: {}). Falling back to ZERO.",
-                        field_name, value_str, e_decimal, e_f64
-                    );
+                    "Failed to parse {} '{}': as Decimal (err: {}), and as scientific (err: {}). Falling back to ZERO.",
+                    field_name,
+                    value_str,
+                    e_decimal,
+                    e_scientific
+                );
                 Decimal::ZERO
             }
         },
@@ -83,6 +74,7 @@ pub struct ActivityDB {
     #[diesel(treat_none_as_null = true)]
     pub fee: Option<String>,
     pub currency: String,
+    #[diesel(treat_none_as_null = true)]
     pub fx_rate: Option<String>,
 
     // Metadata
@@ -262,10 +254,10 @@ impl From<ActivityDetailsDB> for wealthfolio_core::activities::ActivityDetails {
             subtype: db.subtype,
             status,
             date: db.date,
-            quantity: db.quantity.unwrap_or_else(|| "0".to_string()),
-            unit_price: db.unit_price.unwrap_or_else(|| "0".to_string()),
+            quantity: db.quantity,
+            unit_price: db.unit_price,
             currency: db.currency,
-            fee: db.fee.unwrap_or_else(|| "0".to_string()),
+            fee: db.fee,
             amount: db.amount,
             needs_review: db.needs_review != 0,
             comment: db.notes,
@@ -566,12 +558,12 @@ impl From<ActivityUpdate> for ActivityDB {
             settlement_date: None,
 
             // Quantities
-            quantity: domain.quantity.map(|d| d.to_string()),
-            unit_price: domain.unit_price.map(|d| d.to_string()),
-            amount: domain.amount.map(|d| d.to_string()),
-            fee: domain.fee.map(|d| d.to_string()),
+            quantity: domain.quantity.flatten().map(|d| d.to_string()),
+            unit_price: domain.unit_price.flatten().map(|d| d.to_string()),
+            amount: domain.amount.flatten().map(|d| d.to_string()),
+            fee: domain.fee.flatten().map(|d| d.to_string()),
             currency: domain.currency,
-            fx_rate: domain.fx_rate.map(|d| d.to_string()),
+            fx_rate: domain.fx_rate.flatten().map(|d| d.to_string()),
 
             // Metadata
             notes: domain.notes,

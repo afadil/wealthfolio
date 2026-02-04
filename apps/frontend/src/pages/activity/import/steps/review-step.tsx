@@ -49,29 +49,94 @@ function parseNumericValue(
   value: string | undefined,
   decimalSeparator: string,
   thousandsSeparator: string,
-): number | undefined {
+): string | undefined {
   if (!value || value.trim() === "") return undefined;
 
   let normalized = value.trim();
+  let isNegative = false;
 
-  // Handle auto-detection or explicit separators
-  if (thousandsSeparator !== "none" && thousandsSeparator !== "auto") {
-    normalized = normalized.replace(new RegExp(`\\${thousandsSeparator}`, "g"), "");
+  if (normalized.startsWith("(") && normalized.endsWith(")")) {
+    isNegative = true;
+    normalized = normalized.slice(1, -1);
   }
 
-  if (decimalSeparator === "," || (decimalSeparator === "auto" && normalized.includes(","))) {
-    // Check if comma is likely a decimal separator
-    const commaMatch = /,(\d{1,2})$/.exec(normalized);
-    if (commaMatch) {
-      normalized = normalized.replace(",", ".");
+  let mantissa = normalized;
+  let exponent = "";
+  const expIndex = normalized.search(/[eE]/);
+  if (expIndex >= 0) {
+    mantissa = normalized.slice(0, expIndex);
+    exponent = normalized.slice(expIndex + 1);
+  }
+
+  const lastComma = mantissa.lastIndexOf(",");
+  const lastDot = mantissa.lastIndexOf(".");
+  let resolvedDecimal = decimalSeparator;
+  if (decimalSeparator === "auto") {
+    if (lastComma !== -1 && lastDot !== -1) {
+      resolvedDecimal = lastComma > lastDot ? "," : ".";
+    } else if (lastComma !== -1) {
+      resolvedDecimal = ",";
+    } else {
+      resolvedDecimal = ".";
     }
   }
 
-  // Remove any remaining non-numeric characters except decimal point and minus
-  normalized = normalized.replace(/[^\d.-]/g, "");
+  let cleaned = mantissa.replace(/[^\d.,+-]/g, "");
 
-  const result = parseFloat(normalized);
-  return isNaN(result) ? undefined : result;
+  if (thousandsSeparator !== "none" && thousandsSeparator !== "auto") {
+    cleaned = cleaned.replace(new RegExp(`\\${thousandsSeparator}`, "g"), "");
+  } else {
+    const defaultThousands = resolvedDecimal === "," ? "." : ",";
+    cleaned = cleaned.replace(new RegExp(`\\${defaultThousands}`, "g"), "");
+  }
+
+  if (resolvedDecimal === ",") {
+    const parts = cleaned.split(",");
+    if (parts.length > 1) {
+      const decimalPart = parts.pop() ?? "";
+      cleaned = `${parts.join("")}.${decimalPart}`;
+    }
+  } else {
+    const parts = cleaned.split(".");
+    if (parts.length > 1) {
+      const decimalPart = parts.pop() ?? "";
+      cleaned = `${parts.join("")}.${decimalPart}`;
+    }
+  }
+
+  const expClean = exponent.replace(/[^\d+-]/g, "");
+  let candidate = cleaned;
+  if (isNegative && candidate && !candidate.startsWith("-")) {
+    candidate = `-${candidate}`;
+  }
+  if (expClean) {
+    candidate = `${candidate}e${expClean}`;
+  }
+
+  if (candidate === "" || candidate === "-" || candidate === "+") {
+    return undefined;
+  }
+
+  const numericCheck = Number(candidate);
+  return Number.isFinite(numericCheck) ? candidate : undefined;
+}
+
+function toNumber(value: string | number | null | undefined): number | undefined {
+  if (value === null || value === undefined || value === "") {
+    return undefined;
+  }
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function hasPositiveValue(value: string | number | null | undefined): boolean {
+  const parsed = toNumber(value);
+  return parsed !== undefined && parsed > 0;
+}
+
+function hasNonZeroValue(value: string | number | null | undefined): boolean {
+  const parsed = toNumber(value);
+  return parsed !== undefined && parsed !== 0;
 }
 
 /**
@@ -193,10 +258,10 @@ function validateDraft(draft: Partial<DraftActivity>): {
     if (!draft.symbol) {
       errors.symbol = ["Symbol is required for trade activities"];
     }
-    if (draft.quantity === undefined || draft.quantity <= 0) {
+    if (!hasPositiveValue(draft.quantity)) {
       errors.quantity = ["Quantity must be greater than 0"];
     }
-    if (draft.unitPrice === undefined || draft.unitPrice <= 0) {
+    if (!hasPositiveValue(draft.unitPrice)) {
       errors.unitPrice = ["Unit price must be greater than 0"];
     }
   }
@@ -211,27 +276,27 @@ function validateDraft(draft: Partial<DraftActivity>): {
       // DRIP: cash dividend → reinvested as BUY of same ticker
       // Needs: quantity (shares received), unit price (reinvest price)
       // Amount is optional (dividend cash amount)
-      if (draft.quantity === undefined || draft.quantity <= 0) {
+      if (!hasPositiveValue(draft.quantity)) {
         errors.quantity = ["Quantity is required for DRIP (shares received)"];
       }
-      if (draft.unitPrice === undefined || draft.unitPrice <= 0) {
+      if (!hasPositiveValue(draft.unitPrice)) {
         errors.unitPrice = ["Unit price is required for DRIP (reinvestment price)"];
       }
     } else if (subtype === ACTIVITY_SUBTYPES.DIVIDEND_IN_KIND) {
       // DIVIDEND_IN_KIND: dividend paid in asset (not cash)
       // Needs: symbol (received asset), quantity, unit price (FMV), amount (value)
-      if (draft.quantity === undefined || draft.quantity <= 0) {
+      if (!hasPositiveValue(draft.quantity)) {
         errors.quantity = ["Quantity is required for dividend in kind (shares received)"];
       }
-      if (draft.unitPrice === undefined || draft.unitPrice <= 0) {
+      if (!hasPositiveValue(draft.unitPrice)) {
         errors.unitPrice = ["Unit price is required for dividend in kind (FMV at receipt)"];
       }
-      if (draft.amount === undefined || draft.amount === 0) {
+      if (!hasNonZeroValue(draft.amount)) {
         errors.amount = ["Amount is required for dividend in kind (value of shares)"];
       }
     } else {
       // Regular cash dividend - amount is required
-      if (draft.amount === undefined || draft.amount === 0) {
+      if (!hasNonZeroValue(draft.amount)) {
         errors.amount = ["Amount is required for dividend activities"];
       }
     }
@@ -244,16 +309,16 @@ function validateDraft(draft: Partial<DraftActivity>): {
       if (!draft.symbol) {
         errors.symbol = ["Symbol is required for staking rewards"];
       }
-      if (draft.quantity === undefined || draft.quantity <= 0) {
+      if (!hasPositiveValue(draft.quantity)) {
         errors.quantity = ["Quantity is required for staking rewards (tokens received)"];
       }
       // Amount is optional for staking - can be calculated from quantity * price
-      if (draft.amount === undefined && (draft.unitPrice === undefined || draft.unitPrice <= 0)) {
+      if (!hasNonZeroValue(draft.amount) && !hasPositiveValue(draft.unitPrice)) {
         warnings.amount = ["Either amount or unit price is recommended for staking rewards"];
       }
     } else {
       // Regular interest - amount is required
-      if (draft.amount === undefined || draft.amount === 0) {
+      if (!hasNonZeroValue(draft.amount)) {
         errors.amount = ["Amount is required for interest activities"];
       }
     }
@@ -261,15 +326,15 @@ function validateDraft(draft: Partial<DraftActivity>): {
 
   // DEPOSIT/WITHDRAWAL - amount is required
   if (activityType === ActivityType.DEPOSIT || activityType === ActivityType.WITHDRAWAL) {
-    if (draft.amount === undefined || draft.amount === 0) {
+    if (!hasNonZeroValue(draft.amount)) {
       errors.amount = ["Amount is required for deposit/withdrawal activities"];
     }
   }
 
   // FEE validation - either fee or amount required
   if (activityType === ActivityType.FEE) {
-    const hasFee = draft.fee !== undefined && draft.fee > 0;
-    const hasAmount = draft.amount !== undefined && draft.amount > 0;
+    const hasFee = hasPositiveValue(draft.fee);
+    const hasAmount = hasPositiveValue(draft.amount);
     if (!hasFee && !hasAmount) {
       errors.fee = ["Either fee or amount is required for fee activities"];
     }
@@ -277,8 +342,8 @@ function validateDraft(draft: Partial<DraftActivity>): {
 
   // TAX validation - amount is required
   if (activityType === ActivityType.TAX) {
-    const hasFee = draft.fee !== undefined && draft.fee > 0;
-    const hasAmount = draft.amount !== undefined && draft.amount > 0;
+    const hasFee = hasPositiveValue(draft.fee);
+    const hasAmount = hasPositiveValue(draft.amount);
     if (!hasFee && !hasAmount) {
       errors.amount = ["Amount or fee is required for tax activities"];
     }
@@ -286,8 +351,8 @@ function validateDraft(draft: Partial<DraftActivity>): {
 
   // TRANSFER_IN/TRANSFER_OUT - amount or quantity required
   if (activityType === ActivityType.TRANSFER_IN || activityType === ActivityType.TRANSFER_OUT) {
-    const hasAmount = draft.amount !== undefined && draft.amount > 0;
-    const hasQuantity = draft.quantity !== undefined && draft.quantity > 0;
+    const hasAmount = hasPositiveValue(draft.amount);
+    const hasQuantity = hasPositiveValue(draft.quantity);
     if (!hasAmount && !hasQuantity) {
       errors.amount = ["Amount or quantity is required for transfer activities"];
     }
@@ -298,14 +363,14 @@ function validateDraft(draft: Partial<DraftActivity>): {
     if (!draft.symbol) {
       errors.symbol = ["Symbol is required for split activities"];
     }
-    if (draft.amount === undefined) {
+    if (toNumber(draft.amount) === undefined) {
       errors.amount = ["Amount (split ratio) is required for split activities"];
     }
   }
 
   // CREDIT validation
   if (activityType === ActivityType.CREDIT) {
-    if (draft.amount === undefined || draft.amount === 0) {
+    if (!hasNonZeroValue(draft.amount)) {
       errors.amount = ["Amount is required for credit activities"];
     }
   }
@@ -555,15 +620,17 @@ export function ReviewStep() {
                   date: draft.activityDate || "",
                   symbol:
                     draft.symbol || "$CASH-" + (draft.currency || parseConfig.defaultCurrency),
-                  quantity: draft.quantity ?? 0,
-                  unitPrice: draft.unitPrice ?? 0,
-                  amount: draft.amount ?? 0,
+                  quantity: draft.quantity,
+                  unitPrice: draft.unitPrice,
+                  amount: draft.amount,
                   currency: draft.currency || parseConfig.defaultCurrency,
-                  fee: draft.fee ?? 0,
+                  fee: draft.fee,
                   isDraft: true,
                   isValid: draft.status === "valid" || draft.status === "warning",
                   lineNumber: draft.rowIndex + 1,
                   comment: draft.comment,
+                  fxRate: draft.fxRate,
+                  subtype: draft.subtype,
                 }) satisfies Partial<ActivityImport>,
             ) as ActivityImport[];
 
@@ -672,9 +739,9 @@ export function ReviewStep() {
           activityType: draft.activityType,
           activityDate: draft.activityDate,
           assetId: draft.symbol || undefined,
-          quantity: draft.quantity,
-          unitPrice: draft.unitPrice,
-          amount: draft.amount,
+          quantity: toNumber(draft.quantity),
+          unitPrice: toNumber(draft.unitPrice),
+          amount: toNumber(draft.amount),
           currency: draft.currency || defaultCurrency,
           description: draft.comment,
         }));

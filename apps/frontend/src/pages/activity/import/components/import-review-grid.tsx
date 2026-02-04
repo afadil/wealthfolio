@@ -347,7 +347,7 @@ function useImportReviewColumns({
         header: "Quantity",
         size: 120,
         enableSorting: false,
-        meta: { cell: { variant: "number", step: 0.000001 } },
+        meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },
       },
       // 9. Price
       {
@@ -356,7 +356,7 @@ function useImportReviewColumns({
         header: "Price",
         size: 120,
         enableSorting: false,
-        meta: { cell: { variant: "number", step: 0.000001 } },
+        meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },
       },
       // 10. Amount
       {
@@ -365,7 +365,7 @@ function useImportReviewColumns({
         header: "Amount",
         size: 120,
         enableSorting: false,
-        meta: { cell: { variant: "number", step: 0.000001 } },
+        meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },
       },
       // 11. Currency
       {
@@ -383,7 +383,7 @@ function useImportReviewColumns({
         header: "Fee",
         size: 100,
         enableSorting: false,
-        meta: { cell: { variant: "number", step: 0.000001 } },
+        meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },
       },
       // 13. FX Rate
       {
@@ -392,7 +392,7 @@ function useImportReviewColumns({
         header: "FX Rate",
         size: 100,
         enableSorting: false,
-        meta: { cell: { variant: "number", step: 0.000001 } },
+        meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },
       },
 
       // === Notes ===

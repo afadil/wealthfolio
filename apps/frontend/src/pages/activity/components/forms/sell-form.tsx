@@ -82,22 +82,6 @@ interface SellFormProps {
   assetCurrency?: string;
 }
 
-/**
- * Calculates the expected amount from quantity, price, and fee.
- * For SELL: Amount = (quantity * price) - fee
- * Values may be strings when editing existing activities (from ActivityDetails).
- */
-function calculateAmount(
-  quantity: number | string | undefined,
-  unitPrice: number | string | undefined,
-  fee: number | string | undefined,
-): number {
-  const qty = Number(quantity) || 0;
-  const price = Number(unitPrice) || 0;
-  const feeVal = Number(fee) || 0;
-  return Math.max(0, qty * price - feeVal);
-}
-
 export function SellForm({
   accounts,
   defaultValues,
@@ -146,8 +130,6 @@ export function SellForm({
   const assetId = watch("assetId");
   const quantity = watch("quantity");
   const unitPrice = watch("unitPrice");
-  const fee = watch("fee");
-  const currency = watch("currency");
   const pricingMode = watch("pricingMode");
   const isManualAsset = pricingMode === PricingMode.MANUAL;
 
@@ -173,12 +155,6 @@ export function SellForm({
     if (!quantity || quantity <= 0 || !assetId) return false;
     return quantity > currentHoldingQuantity;
   }, [quantity, currentHoldingQuantity, assetId]);
-
-  // Calculate expected amount
-  const calculatedAmount = useMemo(
-    () => calculateAmount(quantity, unitPrice, fee),
-    [quantity, unitPrice, fee],
-  );
 
   const handleSubmit = form.handleSubmit(async (data) => {
     await onSubmit(data);
@@ -221,13 +197,6 @@ export function SellForm({
               <AmountInput name="unitPrice" label="Price" maxDecimalPlaces={4} />
               <AmountInput name="fee" label="Fee" />
             </div>
-
-            {calculatedAmount > 0 && (
-              <p className="text-muted-foreground text-sm">
-                Amount: {calculatedAmount.toFixed(2)}
-                {currency && ` ${currency}`}
-              </p>
-            )}
 
             {/* Warning for selling more than holdings */}
             {isSellingMoreThanHoldings && (

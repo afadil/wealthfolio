@@ -29,12 +29,12 @@ export interface ImportRowData {
   isExternal?: boolean;
   symbol?: string;
   assetSymbol?: string;
-  quantity?: number;
-  unitPrice?: number;
-  amount?: number;
+  quantity?: string | number | null;
+  unitPrice?: string | number | null;
+  amount?: string | number | null;
   currency?: string;
-  fee?: number;
-  fxRate?: number;
+  fee?: string | number | null;
+  fxRate?: string | number | null;
   accountId?: string;
   comment?: string;
 
@@ -272,7 +272,7 @@ export function useImportColumns<T extends ImportRowData>({
       header: "Quantity",
       size: 120,
       enableSorting: false,
-      meta: { cell: { variant: "number", step: 0.000001 } },
+      meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },
     });
 
     // 10. Price
@@ -282,7 +282,7 @@ export function useImportColumns<T extends ImportRowData>({
       header: "Price",
       size: 120,
       enableSorting: false,
-      meta: { cell: { variant: "number", step: 0.000001 } },
+      meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },
     });
 
     // 11. Amount
@@ -292,7 +292,7 @@ export function useImportColumns<T extends ImportRowData>({
       header: "Amount",
       size: 120,
       enableSorting: false,
-      meta: { cell: { variant: "number", step: 0.000001 } },
+      meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },
     });
 
     // 12. Currency
@@ -312,7 +312,7 @@ export function useImportColumns<T extends ImportRowData>({
       header: "Fee",
       size: 100,
       enableSorting: false,
-      meta: { cell: { variant: "number", step: 0.000001 } },
+      meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },
     });
 
     // 14. FX Rate
@@ -322,7 +322,7 @@ export function useImportColumns<T extends ImportRowData>({
       header: "FX Rate",
       size: 100,
       enableSorting: false,
-      meta: { cell: { variant: "number", step: 0.000001 } },
+      meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },
     });
 
     // 15. Comment

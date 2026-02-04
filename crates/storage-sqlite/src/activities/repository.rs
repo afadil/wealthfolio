@@ -34,6 +34,17 @@ pub struct ActivityRepository {
     writer: WriteHandle,
 }
 
+fn apply_decimal_patch(
+    existing: Option<String>,
+    patch: Option<Option<Decimal>>,
+) -> Option<String> {
+    match patch {
+        None => existing,
+        Some(None) => None,
+        Some(Some(value)) => Some(value.to_string()),
+    }
+}
+
 // Inherent methods for ActivityRepository
 impl ActivityRepository {
     /// Creates a new ActivityRepository instance
@@ -282,6 +293,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
     async fn update_activity(&self, activity_update: ActivityUpdate) -> Result<Activity> {
         activity_update.validate()?;
+        let activity_update_owned = activity_update.clone();
         let activity_db_owned: ActivityDB = activity_update.into();
         let activity_id_owned = activity_db_owned.id.clone();
 
@@ -308,13 +320,20 @@ impl ActivityRepositoryTrait for ActivityRepository {
                     subtype,
                     settlement_date,
                     metadata,
+                    quantity,
+                    unit_price,
+                    amount,
+                    fee,
                     ..
                 } = existing;
 
                 activity_to_update.created_at = created_at;
-                if activity_to_update.fx_rate.is_none() {
-                    activity_to_update.fx_rate = fx_rate;
-                }
+                activity_to_update.quantity = apply_decimal_patch(quantity, activity_update_owned.quantity);
+                activity_to_update.unit_price =
+                    apply_decimal_patch(unit_price, activity_update_owned.unit_price);
+                activity_to_update.amount = apply_decimal_patch(amount, activity_update_owned.amount);
+                activity_to_update.fee = apply_decimal_patch(fee, activity_update_owned.fee);
+                activity_to_update.fx_rate = apply_decimal_patch(fx_rate, activity_update_owned.fx_rate);
                 // Preserve source identity fields
                 if activity_to_update.source_system.is_none() {
                     activity_to_update.source_system = source_system;
@@ -400,7 +419,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
                     for update in updates {
                         update.validate()?;
-                        let mut activity_db: ActivityDB = update.clone().into();
+                        let update_owned = update.clone();
+                        let mut activity_db: ActivityDB = update.into();
                         let existing = activities::table
                             .select(ActivityDB::as_select())
                             .find(&activity_db.id)
@@ -410,7 +430,6 @@ impl ActivityRepositoryTrait for ActivityRepository {
                         // Preserve fields from existing record
                         let ActivityDB {
                             created_at,
-                            fx_rate,
                             source_system,
                             source_record_id,
                             source_group_id,
@@ -421,13 +440,20 @@ impl ActivityRepositoryTrait for ActivityRepository {
                             subtype,
                             settlement_date,
                             metadata,
+                            quantity,
+                            unit_price,
+                            amount,
+                            fee,
+                            fx_rate,
                             ..
                         } = existing;
 
                         activity_db.created_at = created_at;
-                        if activity_db.fx_rate.is_none() {
-                            activity_db.fx_rate = fx_rate;
-                        }
+                        activity_db.quantity = apply_decimal_patch(quantity, update_owned.quantity);
+                        activity_db.unit_price = apply_decimal_patch(unit_price, update_owned.unit_price);
+                        activity_db.amount = apply_decimal_patch(amount, update_owned.amount);
+                        activity_db.fee = apply_decimal_patch(fee, update_owned.fee);
+                        activity_db.fx_rate = apply_decimal_patch(fx_rate, update_owned.fx_rate);
                         if activity_db.source_system.is_none() {
                             activity_db.source_system = source_system;
                         }

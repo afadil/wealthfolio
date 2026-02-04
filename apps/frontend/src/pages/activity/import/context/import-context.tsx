@@ -31,15 +31,15 @@ export interface DraftActivity {
   activityType: string;
   symbol?: string;
   assetId?: string;
-  quantity?: number;
-  unitPrice?: number;
-  amount?: number;
+  quantity?: string | null;
+  unitPrice?: string | null;
+  amount?: string | null;
   currency: string;
-  fee?: number;
+  fee?: string | null;
   accountId: string;
   comment?: string;
   subtype?: string;
-  fxRate?: number;
+  fxRate?: string | null;
   /** Whether this is an external transfer (for TRANSFER_IN/TRANSFER_OUT) */
   isExternal?: boolean;
 

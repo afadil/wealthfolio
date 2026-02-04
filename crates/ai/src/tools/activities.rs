@@ -159,9 +159,9 @@ impl<E: AiEnvironment + 'static> Tool for SearchActivitiesTool<E> {
             .take(MAX_ACTIVITIES_ROWS)
             .map(|a| {
                 // Parse numeric strings to f64
-                let quantity = a.quantity.parse::<f64>().ok();
-                let unit_price = a.unit_price.parse::<f64>().ok();
-                let fee = a.fee.parse::<f64>().ok();
+                let quantity = a.quantity.as_ref().and_then(|v| v.parse::<f64>().ok());
+                let unit_price = a.unit_price.as_ref().and_then(|v| v.parse::<f64>().ok());
+                let fee = a.fee.as_ref().and_then(|v| v.parse::<f64>().ok());
                 let amount = a.amount.as_ref().and_then(|s| s.parse::<f64>().ok());
 
                 ActivityDto {

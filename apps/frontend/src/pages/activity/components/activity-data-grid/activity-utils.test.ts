@@ -64,15 +64,14 @@ describe("activity-utils", () => {
         expect(valuesAreEqual("unitPrice", 100.5, "100.5")).toBe(true);
       });
 
-      it("should handle undefined/null as 0", () => {
-        expect(valuesAreEqual("quantity", undefined, 0)).toBe(true);
-        expect(valuesAreEqual("fee", null, 0)).toBe(true);
+      it("should treat undefined/null as distinct from 0", () => {
+        expect(valuesAreEqual("quantity", undefined, 0)).toBe(false);
+        expect(valuesAreEqual("fee", null, 0)).toBe(false);
       });
 
       it("should handle NaN cases", () => {
         expect(valuesAreEqual("amount", NaN, NaN)).toBe(true);
-        // NaN normalizes to "0" in string representation, so NaN and 0 are equal
-        expect(valuesAreEqual("amount", NaN, 0)).toBe(true);
+        expect(valuesAreEqual("amount", NaN, 0)).toBe(false);
       });
     });
 
@@ -179,14 +178,14 @@ describe("activity-utils", () => {
       expect(draft.activityType).toBe(ActivityType.BUY);
     });
 
-    it("should initialize numeric values to 0", () => {
+    it("should initialize numeric values to null", () => {
       const accounts = [createMockAccount()];
       const draft = createDraftTransaction(accounts, "USD");
 
-      expect(draft.quantity).toBe("0");
-      expect(draft.unitPrice).toBe("0");
-      expect(draft.amount).toBe("0");
-      expect(draft.fee).toBe("0");
+      expect(draft.quantity).toBeNull();
+      expect(draft.unitPrice).toBeNull();
+      expect(draft.amount).toBeNull();
+      expect(draft.fee).toBeNull();
     });
   });
 

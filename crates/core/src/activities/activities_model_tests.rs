@@ -382,11 +382,11 @@ mod tests {
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
-            quantity: Some(dec!(10)),
-            unit_price: Some(dec!(150)),
+            quantity: Some(Some(dec!(10))),
+            unit_price: Some(Some(dec!(150))),
             currency: "USD".to_string(),
-            fee: Some(dec!(5)),
-            amount: Some(dec!(1505)),
+            fee: Some(Some(dec!(5))),
+            amount: Some(Some(dec!(1505))),
             status: None,
             notes: None,
             fx_rate: None,
@@ -439,6 +439,52 @@ mod tests {
 
         let result = update.validate();
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_activity_update_deserializes_scientific_and_nulls() {
+        let input = json!({
+            "id": "activity-1",
+            "accountId": "account-1",
+            "activityType": "BUY",
+            "activityDate": "2024-01-15",
+            "currency": "USD",
+            "quantity": "1e-7",
+            "unitPrice": 2.5e3,
+            "fee": null
+        });
+
+        let parsed: ActivityUpdate = serde_json::from_value(input).unwrap();
+
+        assert_eq!(
+            parsed.quantity,
+            Some(Some(Decimal::from_scientific("1e-7").unwrap()))
+        );
+        assert_eq!(
+            parsed.unit_price,
+            Some(Some(Decimal::from_scientific("2.5e3").unwrap()))
+        );
+        assert_eq!(parsed.fee, Some(None));
+        assert_eq!(parsed.amount, None);
+    }
+
+    #[test]
+    fn test_new_activity_deserializes_scientific_and_empty() {
+        let input = json!({
+            "accountId": "account-1",
+            "activityType": "DEPOSIT",
+            "activityDate": "2024-01-15",
+            "currency": "USD",
+            "amount": "9.7e-7",
+            "fee": ""
+        });
+
+        let parsed: NewActivity = serde_json::from_value(input).unwrap();
+        assert_eq!(
+            parsed.amount,
+            Some(Decimal::from_scientific("9.7e-7").unwrap())
+        );
+        assert_eq!(parsed.fee, None);
     }
 
     // ============================================================================

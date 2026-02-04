@@ -86,6 +86,30 @@ export const newGoalSchema = z.object({
   isAchieved: z.boolean().optional(),
 });
 
+const parseNumberLike = (value: unknown): number | undefined => {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+};
+
+const decimalLikeSchema = z.union([
+  z.number(),
+  z.string().refine((val) => {
+    const trimmed = val.trim();
+    if (!trimmed) return false;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed);
+  }),
+]);
+
 export const importActivitySchema = z
   .object({
     id: z.string().uuid().optional(),
@@ -106,33 +130,10 @@ export const importActivitySchema = z
       .refine((val) => /^(\$CASH-[A-Z]{3}|[A-Z0-9]{1,10}([.-][A-Z0-9]+){0,2})$/.test(val.trim()), {
         message: "Invalid symbol format",
       }),
-    amount: z.coerce
-      .number({
-        required_error: "Should be a valid amount.",
-        invalid_type_error: "Amount must be a number.",
-      })
-      .optional(),
-    quantity: z.coerce
-      .number({
-        required_error: "Please enter a valid quantity.",
-        invalid_type_error: "Quantity must be a number.",
-      })
-      .min(0, { message: "Quantity must be a non-negative number." })
-      .optional(),
-    unitPrice: z.coerce
-      .number({
-        required_error: "Please enter a valid price.",
-        invalid_type_error: "Price must be a non-negative number.",
-      })
-      .min(0, { message: "Price must be a non-negative number." })
-      .optional(),
-    fee: z.coerce
-      .number({
-        required_error: "Please enter a valid fee.",
-        invalid_type_error: "Fee must be a positive number.",
-      })
-      .min(0, { message: "Fee must be a non-negative number." })
-      .optional(),
+    amount: decimalLikeSchema.nullable().optional(),
+    quantity: decimalLikeSchema.nullable().optional(),
+    unitPrice: decimalLikeSchema.nullable().optional(),
+    fee: decimalLikeSchema.nullable().optional(),
     accountName: z.string().optional(),
     symbolName: z.string().optional(),
     /** Resolved exchange MIC for the symbol (populated during validation) */
@@ -142,9 +143,49 @@ export const importActivitySchema = z
     lineNumber: z.number().optional(),
     isDraft: z.boolean(),
     comment: z.string().optional(),
-    fxRate: z.coerce.number().positive().optional(),
+    fxRate: decimalLikeSchema.nullable().optional(),
     subtype: z.string().optional(),
   })
+  .refine(
+    (data) => {
+      const quantity = parseNumberLike(data.quantity);
+      return quantity === undefined || quantity >= 0;
+    },
+    {
+      message: "Quantity must be a non-negative number.",
+      path: ["quantity"],
+    },
+  )
+  .refine(
+    (data) => {
+      const unitPrice = parseNumberLike(data.unitPrice);
+      return unitPrice === undefined || unitPrice >= 0;
+    },
+    {
+      message: "Price must be a non-negative number.",
+      path: ["unitPrice"],
+    },
+  )
+  .refine(
+    (data) => {
+      const fee = parseNumberLike(data.fee);
+      return fee === undefined || fee >= 0;
+    },
+    {
+      message: "Fee must be a non-negative number.",
+      path: ["fee"],
+    },
+  )
+  .refine(
+    (data) => {
+      const fxRate = parseNumberLike(data.fxRate);
+      return fxRate === undefined || fxRate > 0;
+    },
+    {
+      message: "FX rate must be a positive number.",
+      path: ["fxRate"],
+    },
+  )
   .refine(
     (data) => {
       // For cash activities, income activities or cash transfers, either amount or both quantity and unit price must be provided
@@ -155,9 +196,9 @@ export const importActivitySchema = z
         (data.symbol && isCashTransfer(data.activityType as string, data.symbol));
 
       if (isCashOrIncomeActivity) {
-        const hasAmount = data.amount !== undefined && data.amount !== 0;
-        const hasQuantity = data.quantity !== undefined && data.quantity !== 0;
-        const hasUnitPrice = data.unitPrice !== undefined && data.unitPrice !== 0;
+        const hasAmount = (parseNumberLike(data.amount) ?? 0) !== 0;
+        const hasQuantity = (parseNumberLike(data.quantity) ?? 0) !== 0;
+        const hasUnitPrice = (parseNumberLike(data.unitPrice) ?? 0) !== 0;
 
         // For cash activities, at least one of: amount, quantity, or unit price must be specified
         return hasAmount || hasQuantity || hasUnitPrice;
@@ -174,8 +215,8 @@ export const importActivitySchema = z
     (data) => {
       // Fee activity validations
       if (data.activityType === ActivityType.FEE) {
-        const hasFee = data.fee !== undefined && data.fee !== 0;
-        const hasAmount = data.amount !== undefined && data.amount !== 0;
+        const hasFee = (parseNumberLike(data.fee) ?? 0) !== 0;
+        const hasAmount = (parseNumberLike(data.amount) ?? 0) !== 0;
 
         // For fee activities, at least one of: fee or amount must be specified
         return hasFee || hasAmount;
@@ -191,7 +232,8 @@ export const importActivitySchema = z
     (data) => {
       // Trade activity unit price validations
       if (isTradeActivity(data.activityType as string)) {
-        return data.unitPrice !== undefined && data.unitPrice > 0;
+        const unitPrice = parseNumberLike(data.unitPrice);
+        return unitPrice !== undefined && unitPrice > 0;
       }
       return true;
     },
@@ -212,7 +254,8 @@ export const importActivitySchema = z
         !isSplitActivity(data.activityType as string);
 
       if (isNonCashNonTradeActivity) {
-        return data.quantity !== undefined && data.quantity > 0;
+        const quantity = parseNumberLike(data.quantity);
+        return quantity !== undefined && quantity > 0;
       }
       return true;
     },

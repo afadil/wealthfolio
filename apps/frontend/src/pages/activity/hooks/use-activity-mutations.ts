@@ -14,6 +14,12 @@ export function useActivityMutations(
   onSuccess?: (activity: { accountId?: string | null }) => void,
 ) {
   const queryClient = useQueryClient();
+  const toDecimalPayload = (value: unknown): string | null | undefined => {
+    if (value === null) return null;
+    if (value === undefined) return undefined;
+    const str = String(value).trim();
+    return str === "" ? undefined : str;
+  };
 
   const createMutationOptions = (action: string) => ({
     onSuccess: (activity: { accountId?: string | null }) => {
@@ -44,10 +50,20 @@ export function useActivityMutations(
           pricingMode?: string;
           assetKind?: string;
         };
+      const quantity = "quantity" in rest ? rest.quantity : undefined;
+      const unitPrice = "unitPrice" in rest ? rest.unitPrice : undefined;
+      const amount = "amount" in rest ? rest.amount : undefined;
+      const fee = "fee" in rest ? rest.fee : undefined;
+      const fxRate = "fxRate" in rest ? rest.fxRate : undefined;
 
       // Build nested asset object
       const createPayload: ActivityCreate = {
         ...rest,
+        quantity: toDecimalPayload(quantity),
+        unitPrice: toDecimalPayload(unitPrice),
+        amount: toDecimalPayload(amount),
+        fee: toDecimalPayload(fee),
+        fxRate: toDecimalPayload(fxRate),
         // Use nested asset object (preferred over flat fields)
         asset: {
           symbol: assetId,
@@ -80,10 +96,20 @@ export function useActivityMutations(
           pricingMode?: string;
           assetKind?: string;
         };
+      const quantity = "quantity" in rest ? rest.quantity : undefined;
+      const unitPrice = "unitPrice" in rest ? rest.unitPrice : undefined;
+      const amount = "amount" in rest ? rest.amount : undefined;
+      const fee = "fee" in rest ? rest.fee : undefined;
+      const fxRate = "fxRate" in rest ? rest.fxRate : undefined;
 
       // Build nested asset object
       const updatePayload: ActivityUpdate = {
         ...rest,
+        quantity: toDecimalPayload(quantity),
+        unitPrice: toDecimalPayload(unitPrice),
+        amount: toDecimalPayload(amount),
+        fee: toDecimalPayload(fee),
+        fxRate: toDecimalPayload(fxRate),
         // Use nested asset object (preferred over flat fields)
         asset: {
           id: assetId, // For updates, assetId may be the canonical ID
@@ -124,17 +150,16 @@ export function useActivityMutations(
     } = activityToDuplicate;
 
     // For duplicating, use nested asset object
-    // Convert string fields to numbers for ActivityCreate
     const createPayload: ActivityCreate = {
       accountId: restOfActivityData.accountId,
       activityType: restOfActivityData.activityType,
       subtype: restOfActivityData.subtype,
       currency: restOfActivityData.currency,
-      quantity: Number(restOfActivityData.quantity),
-      unitPrice: Number(restOfActivityData.unitPrice),
-      amount: Number(restOfActivityData.amount),
-      fee: Number(restOfActivityData.fee),
-      fxRate: restOfActivityData.fxRate ? Number(restOfActivityData.fxRate) : undefined,
+      quantity: restOfActivityData.quantity,
+      unitPrice: restOfActivityData.unitPrice,
+      amount: restOfActivityData.amount,
+      fee: restOfActivityData.fee,
+      fxRate: restOfActivityData.fxRate ?? undefined,
       activityDate: date,
       comment: "Duplicated",
       // Use nested asset object

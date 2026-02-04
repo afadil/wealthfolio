@@ -423,6 +423,44 @@ function useDataGrid<TData>({
     });
   }, [store]);
 
+  const clearCells = React.useCallback(
+    (cellsToClear: string[]) => {
+      if (cellsToClear.length === 0) return;
+
+      const currentTable = tableRef.current;
+      const tableColumns = currentTable?.getAllColumns() ?? [];
+      const updates: UpdateCell[] = [];
+
+      for (const cellKey of cellsToClear) {
+        const { rowIndex, columnId } = parseCellKey(cellKey);
+        const column = tableColumns.find((c) => c.id === columnId);
+        const cellVariant = column?.columnDef?.meta?.cell?.variant;
+
+        let emptyValue: unknown = "";
+        if (cellVariant === "multi-select" || cellVariant === "file") {
+          emptyValue = [];
+        } else if (cellVariant === "number" || cellVariant === "date") {
+          emptyValue = null;
+        } else if (cellVariant === "checkbox") {
+          emptyValue = false;
+        }
+
+        updates.push({ rowIndex, columnId, value: emptyValue });
+      }
+
+      onDataUpdate(updates);
+
+      const currentState = store.getState();
+      if (currentState.selectionState.selectedCells.size > 0) {
+        clearSelection();
+      }
+      if (currentState.cutCells.size > 0) {
+        store.setState("cutCells", new Set());
+      }
+    },
+    [tableRef, onDataUpdate, store, clearSelection],
+  );
+
   const selectAll = React.useCallback(() => {
     const allCells = new Set<string>();
     const currentTable = tableRef.current;
@@ -772,6 +810,29 @@ function useDataGrid<TData>({
                 }
                 break;
               }
+              case "date-input": {
+                if (!trimmedClipboard) {
+                  processedValue = null;
+                } else {
+                  const date = new Date(trimmedClipboard);
+                  if (Number.isNaN(date.getTime())) shouldSkip = true;
+                  else processedValue = date;
+                }
+                break;
+              }
+              case "datetime": {
+                if (!trimmedClipboard) {
+                  processedValue = null;
+                } else {
+                  const normalized = trimmedClipboard.includes(" ") && !trimmedClipboard.includes("T")
+                    ? trimmedClipboard.replace(" ", "T")
+                    : trimmedClipboard;
+                  const date = new Date(normalized);
+                  if (Number.isNaN(date.getTime())) shouldSkip = true;
+                  else processedValue = date;
+                }
+                break;
+              }
               case "select": {
                 const rawOptions = cellOpts?.options ?? [];
                 const rowData = rows[rowIndex]?.original;
@@ -932,6 +993,29 @@ function useDataGrid<TData>({
                   processedValue = null;
                 } else {
                   const date = new Date(pastedValue);
+                  if (Number.isNaN(date.getTime())) shouldSkip = true;
+                  else processedValue = date;
+                }
+                break;
+              }
+              case "date-input": {
+                if (!pastedValue) {
+                  processedValue = null;
+                } else {
+                  const date = new Date(pastedValue);
+                  if (Number.isNaN(date.getTime())) shouldSkip = true;
+                  else processedValue = date;
+                }
+                break;
+              }
+              case "datetime": {
+                if (!pastedValue) {
+                  processedValue = null;
+                } else {
+                  const normalized = pastedValue.includes(" ") && !pastedValue.includes("T")
+                    ? pastedValue.replace(" ", "T")
+                    : pastedValue;
+                  const date = new Date(normalized);
                   if (Number.isNaN(date.getTime())) shouldSkip = true;
                   else processedValue = date;
                 }
@@ -2479,43 +2563,7 @@ function useDataGrid<TData>({
 
         if (cellsToClear.length > 0) {
           event.preventDefault();
-
-          const updates: {
-            rowIndex: number;
-            columnId: string;
-            value: unknown;
-          }[] = [];
-
-          const currentTable = tableRef.current;
-          const tableColumns = currentTable?.getAllColumns() ?? [];
-
-          for (const cellKey of cellsToClear) {
-            const { rowIndex, columnId } = parseCellKey(cellKey);
-
-            const column = tableColumns.find((c) => c.id === columnId);
-            const cellVariant = column?.columnDef?.meta?.cell?.variant;
-
-            let emptyValue: unknown = "";
-            if (cellVariant === "multi-select" || cellVariant === "file") {
-              emptyValue = [];
-            } else if (cellVariant === "number" || cellVariant === "date") {
-              emptyValue = null;
-            } else if (cellVariant === "checkbox") {
-              emptyValue = false;
-            }
-
-            updates.push({ rowIndex, columnId, value: emptyValue });
-          }
-
-          onDataUpdate(updates);
-
-          if (currentState.selectionState.selectedCells.size > 0) {
-            clearSelection();
-          }
-
-          if (currentState.cutCells.size > 0) {
-            store.setState("cutCells", new Set());
-          }
+          clearCells(cellsToClear);
         }
         return;
       }
@@ -2876,6 +2924,7 @@ function useDataGrid<TData>({
       onCellsCut,
       onCellsPaste,
       onDataUpdate,
+      clearCells,
       clearSelection,
       navigableColumnIds,
       selectRange,
@@ -2983,6 +3032,41 @@ function useDataGrid<TData>({
       window.removeEventListener("keydown", onGlobalKeyDown, true);
     };
   }, [propsRef, onSearchOpenChange, store, clearSelection]);
+
+  React.useEffect(() => {
+    function onGlobalBackspace(event: KeyboardEvent) {
+      const dataGridElement = dataGridRef.current;
+      if (!dataGridElement) return;
+
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      const { key, ctrlKey, metaKey } = event;
+      if (key !== "Backspace" && key !== "Delete") return;
+      if (ctrlKey || metaKey) return;
+
+      const isEditableTarget =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable;
+      if (isEditableTarget) return;
+
+      const isInDataGrid = dataGridElement.contains(target);
+      if (isInDataGrid) return;
+
+      const currentState = store.getState();
+      if (currentState.selectionState.selectedCells.size === 0) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      clearCells(Array.from(currentState.selectionState.selectedCells));
+    }
+
+    window.addEventListener("keydown", onGlobalBackspace, true);
+    return () => {
+      window.removeEventListener("keydown", onGlobalBackspace, true);
+    };
+  }, [store, clearCells]);
 
   React.useEffect(() => {
     const currentState = store.getState();

@@ -38,6 +38,7 @@ export type CellOpts =
       min?: number;
       max?: number;
       step?: number;
+      valueType?: "number" | "string";
     }
   | {
       variant: "select";

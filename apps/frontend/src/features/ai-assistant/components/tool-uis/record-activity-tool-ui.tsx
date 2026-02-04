@@ -442,7 +442,6 @@ function DraftForm({
   toolCallId,
   onSuccess,
 }: DraftFormProps) {
-  const { isBalanceHidden } = useBalancePrivacy();
   const runtime = useRuntimeContext();
   const threadId = runtime.currentThreadId;
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -510,7 +509,6 @@ function DraftForm({
   const activityType = watch("activityType");
   const quantity = watch("quantity");
   const unitPrice = watch("unitPrice");
-  const fee = watch("fee");
   const accountId = watch("accountId");
   const amount = watch("amount");
   const activityDate = watch("activityDate");
@@ -529,14 +527,6 @@ function DraftForm({
     }));
   }, [activityType, availableSubtypes]);
 
-  // Calculate amount from quantity and price
-  const calculatedAmount = useMemo(() => {
-    if (quantity !== undefined && unitPrice !== undefined) {
-      return quantity * unitPrice + (fee ?? 0);
-    }
-    return undefined;
-  }, [quantity, unitPrice, fee]);
-
   // Get selected account (for reference)
   const selectedAccount = useMemo(
     () => availableAccounts.find((a) => a.id === accountId),
@@ -545,19 +535,6 @@ function DraftForm({
 
   // Use watched form currency (user can override in Advanced Options)
   const currency = formCurrency;
-
-  // Format currency value with privacy
-  const formatAmount = useCallback(
-    (value: number | undefined) => {
-      if (value === undefined) return "";
-      if (isBalanceHidden) return "\u2022\u2022\u2022\u2022\u2022";
-      return new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency,
-      }).format(value);
-    },
-    [currency, isBalanceHidden],
-  );
 
   // Get current form values for error checking
   const currentFormValues = useMemo(
@@ -689,7 +666,7 @@ function DraftForm({
           : undefined,
         quantity: formValues.quantity,
         unitPrice: formValues.unitPrice,
-        amount: formValues.amount ?? calculatedAmount,
+        amount: formValues.amount,
         currency: formValues.currency,
         fee: formValues.fee,
         comment: formValues.notes || undefined,
@@ -729,7 +706,6 @@ function DraftForm({
     form,
     selectedSymbol,
     selectedExchangeMic,
-    calculatedAmount,
     threadId,
     toolCallId,
     onSuccess,
@@ -1005,15 +981,6 @@ function DraftForm({
               )}
             />
           )}
-
-          {/* Calculated Total (for BUY/SELL) */}
-          {(activityType === ActivityType.BUY || activityType === ActivityType.SELL) &&
-            calculatedAmount !== undefined && (
-              <div className="bg-muted/50 flex items-center justify-between rounded-md p-3">
-                <span className="text-muted-foreground text-sm">Total</span>
-                <span className="text-lg font-medium">{formatAmount(calculatedAmount)}</span>
-              </div>
-            )}
 
           {/* Advanced Options (collapsible) */}
           {

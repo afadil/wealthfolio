@@ -4,39 +4,26 @@ use crate::activities::activities_errors::ActivityError;
 use crate::activities::csv_parser::ParseConfig;
 use crate::Result;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
-use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::str::FromStr;
 
 /// Helper function to parse a string into a Decimal,
-/// with a fallback for scientific notation by parsing as f64 first.
+/// with support for scientific notation.
 pub fn parse_decimal_string_tolerant(value_str: &str, field_name: &str) -> Decimal {
     // Attempt to parse directly as Decimal
     match Decimal::from_str(value_str) {
         Ok(d) => d,
         Err(e_decimal) => {
-            // If direct parsing fails, try parsing as f64 (to handle scientific notation)
-            // and then convert to Decimal
-            match f64::from_str(value_str) {
-                Ok(f_val) => match Decimal::from_f64(f_val) {
-                    Some(dec_val) => dec_val,
-                    None => {
-                        log::error!(
-                            "Failed to convert {} '{}' (parsed as f64: {}) to Decimal.",
-                            field_name,
-                            value_str,
-                            f_val
-                        );
-                        Decimal::ZERO
-                    }
-                },
-                Err(e_f64) => {
-                    // If both attempts fail, log the original decimal error and the f64 error.
+            // If direct parsing fails, try scientific notation parsing
+            match Decimal::from_scientific(value_str) {
+                Ok(d) => d,
+                Err(e_scientific) => {
+                    // If both attempts fail, log the original decimal error and the scientific error.
                     log::error!(
-                        "Failed to parse {} '{}': as Decimal (err: {}), and as f64 (err: {}). Falling back to ZERO.",
-                        field_name, value_str, e_decimal, e_f64
+                        "Failed to parse {} '{}': as Decimal (err: {}), and as scientific (err: {}). Falling back to ZERO.",
+                        field_name, value_str, e_decimal, e_scientific
                     );
                     Decimal::ZERO
                 }
@@ -209,13 +196,18 @@ pub struct NewActivity {
     pub activity_type: String,
     pub subtype: Option<String>, // Semantic variation (DRIP, STAKING_REWARD, etc.)
     pub activity_date: String,
+    #[serde(default, deserialize_with = "decimal_input_format::deserialize_option_decimal")]
     pub quantity: Option<Decimal>,
+    #[serde(default, deserialize_with = "decimal_input_format::deserialize_option_decimal")]
     pub unit_price: Option<Decimal>,
     pub currency: String,
+    #[serde(default, deserialize_with = "decimal_input_format::deserialize_option_decimal")]
     pub fee: Option<Decimal>,
+    #[serde(default, deserialize_with = "decimal_input_format::deserialize_option_decimal")]
     pub amount: Option<Decimal>,
     pub status: Option<ActivityStatus>,
     pub notes: Option<String>,
+    #[serde(default, deserialize_with = "decimal_input_format::deserialize_option_decimal")]
     pub fx_rate: Option<Decimal>,
     // Sync-related fields
     pub metadata: Option<String>,         // JSON blob for sync metadata
@@ -292,14 +284,19 @@ pub struct ActivityUpdate {
     pub activity_type: String,
     pub subtype: Option<String>, // Semantic variation (DRIP, STAKING_REWARD, etc.)
     pub activity_date: String,
-    pub quantity: Option<Decimal>,
-    pub unit_price: Option<Decimal>,
+    #[serde(default, deserialize_with = "decimal_input_format::deserialize_patch_decimal")]
+    pub quantity: Option<Option<Decimal>>,
+    #[serde(default, deserialize_with = "decimal_input_format::deserialize_patch_decimal")]
+    pub unit_price: Option<Option<Decimal>>,
     pub currency: String,
-    pub fee: Option<Decimal>,
-    pub amount: Option<Decimal>,
+    #[serde(default, deserialize_with = "decimal_input_format::deserialize_patch_decimal")]
+    pub fee: Option<Option<Decimal>>,
+    #[serde(default, deserialize_with = "decimal_input_format::deserialize_patch_decimal")]
+    pub amount: Option<Option<Decimal>>,
     pub status: Option<ActivityStatus>,
     pub notes: Option<String>,
-    pub fx_rate: Option<Decimal>,
+    #[serde(default, deserialize_with = "decimal_input_format::deserialize_patch_decimal")]
+    pub fx_rate: Option<Option<Decimal>>,
     pub metadata: Option<String>, // JSON blob for metadata (e.g., flow.is_external)
 }
 
@@ -407,10 +404,10 @@ pub struct ActivityDetails {
     pub subtype: Option<String>,
     pub status: ActivityStatus,
     pub date: String,
-    pub quantity: String,
-    pub unit_price: String,
+    pub quantity: Option<String>,
+    pub unit_price: Option<String>,
     pub currency: String,
-    pub fee: String,
+    pub fee: Option<String>,
     pub amount: Option<String>,
     pub needs_review: bool,
     pub comment: Option<String>,
@@ -433,15 +430,24 @@ pub struct ActivityDetails {
 
 impl ActivityDetails {
     pub fn get_quantity(&self) -> Decimal {
-        parse_decimal_string_tolerant(&self.quantity, "quantity")
+        self.quantity
+            .as_ref()
+            .map(|s| parse_decimal_string_tolerant(s, "quantity"))
+            .unwrap_or(Decimal::ZERO)
     }
 
     pub fn get_unit_price(&self) -> Decimal {
-        parse_decimal_string_tolerant(&self.unit_price, "unit_price")
+        self.unit_price
+            .as_ref()
+            .map(|s| parse_decimal_string_tolerant(s, "unit_price"))
+            .unwrap_or(Decimal::ZERO)
     }
 
     pub fn get_fee(&self) -> Decimal {
-        parse_decimal_string_tolerant(&self.fee, "fee")
+        self.fee
+            .as_ref()
+            .map(|s| parse_decimal_string_tolerant(s, "fee"))
+            .unwrap_or(Decimal::ZERO)
     }
 
     pub fn get_amount(&self) -> Option<Decimal> {
@@ -489,10 +495,14 @@ pub struct ActivityImport {
     pub date: String,
     pub symbol: String,
     pub activity_type: String,
-    pub quantity: Decimal,
-    pub unit_price: Decimal,
+    #[serde(default, deserialize_with = "decimal_input_format::deserialize_option_decimal")]
+    pub quantity: Option<Decimal>,
+    #[serde(default, deserialize_with = "decimal_input_format::deserialize_option_decimal")]
+    pub unit_price: Option<Decimal>,
     pub currency: String,
-    pub fee: Decimal,
+    #[serde(default, deserialize_with = "decimal_input_format::deserialize_option_decimal")]
+    pub fee: Option<Decimal>,
+    #[serde(default, deserialize_with = "decimal_input_format::deserialize_option_decimal")]
     pub amount: Option<Decimal>,
     pub comment: Option<String>,
     pub account_id: Option<String>,
@@ -504,6 +514,7 @@ pub struct ActivityImport {
     pub is_draft: bool,
     pub is_valid: bool,
     pub line_number: Option<i32>,
+    #[serde(default, deserialize_with = "decimal_input_format::deserialize_option_decimal")]
     pub fx_rate: Option<Decimal>,
     pub subtype: Option<String>,
 }
@@ -746,6 +757,76 @@ mod timestamp_format {
     }
 }
 
+// Custom deserialization for Decimal inputs to support strings, numbers, nulls, and scientific notation
+mod decimal_input_format {
+    use rust_decimal::Decimal;
+    use serde::{self, Deserialize, Deserializer};
+    use serde_json::Number;
+    use std::str::FromStr;
+
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum DecimalInput {
+        String(String),
+        Number(Number),
+        Null,
+    }
+
+    fn parse_decimal_value(value: &str) -> Result<Decimal, String> {
+        let trimmed = value.trim();
+        Decimal::from_str(trimmed)
+            .or_else(|_| Decimal::from_scientific(trimmed))
+            .map_err(|e| format!("Invalid decimal value '{}': {}", value, e))
+    }
+
+    pub fn deserialize_option_decimal<'de, D>(deserializer: D) -> Result<Option<Decimal>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let raw = Option::<DecimalInput>::deserialize(deserializer)?;
+        match raw {
+            None | Some(DecimalInput::Null) => Ok(None),
+            Some(DecimalInput::String(s)) => {
+                let trimmed = s.trim();
+                if trimmed.is_empty() {
+                    return Ok(None);
+                }
+                parse_decimal_value(trimmed)
+                    .map(Some)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some(DecimalInput::Number(n)) => parse_decimal_value(&n.to_string())
+                .map(Some)
+                .map_err(serde::de::Error::custom),
+        }
+    }
+
+    pub fn deserialize_patch_decimal<'de, D>(
+        deserializer: D,
+    ) -> Result<Option<Option<Decimal>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        match raw {
+            serde_json::Value::Null => Ok(Some(None)),
+            serde_json::Value::String(s) => {
+                let trimmed = s.trim();
+                if trimmed.is_empty() {
+                    return Ok(Some(None));
+                }
+                parse_decimal_value(trimmed)
+                    .map(|value| Some(Some(value)))
+                    .map_err(serde::de::Error::custom)
+            }
+            serde_json::Value::Number(n) => parse_decimal_value(&n.to_string())
+                .map(|value| Some(Some(value)))
+                .map_err(serde::de::Error::custom),
+            _ => Err(serde::de::Error::custom("Invalid decimal value type")),
+        }
+    }
+}
+
 // Custom serialization for optional Decimal fields to handle string representation
 mod optional_decimal_format {
     use rust_decimal::Decimal;
@@ -778,9 +859,16 @@ mod optional_decimal_format {
         match Option::<DecimalOrString>::deserialize(deserializer)? {
             Some(DecimalOrString::Decimal(d)) => Ok(Some(d)),
             Some(DecimalOrString::String(s)) if s.is_empty() => Ok(None),
-            Some(DecimalOrString::String(s)) => Decimal::from_str(&s)
-                .map(Some)
-                .map_err(serde::de::Error::custom),
+            Some(DecimalOrString::String(s)) => {
+                let trimmed = s.trim();
+                if trimmed.is_empty() {
+                    return Ok(None);
+                }
+                Decimal::from_str(trimmed)
+                    .or_else(|_| Decimal::from_scientific(trimmed))
+                    .map(Some)
+                    .map_err(serde::de::Error::custom)
+            }
             Some(DecimalOrString::Null) | None => Ok(None),
         }
     }

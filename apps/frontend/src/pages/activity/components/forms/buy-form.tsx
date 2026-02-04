@@ -80,22 +80,6 @@ interface BuyFormProps {
   assetCurrency?: string;
 }
 
-/**
- * Calculates the expected amount from quantity, price, and fee.
- * Amount = (quantity * price) + fee
- * Values may be strings when editing existing activities (from ActivityDetails).
- */
-function calculateAmount(
-  quantity: number | string | undefined,
-  unitPrice: number | string | undefined,
-  fee: number | string | undefined,
-): number {
-  const qty = Number(quantity) || 0;
-  const price = Number(unitPrice) || 0;
-  const feeVal = Number(fee) || 0;
-  return qty * price + feeVal;
-}
-
 export function BuyForm({
   accounts,
   defaultValues,
@@ -155,12 +139,6 @@ export function BuyForm({
   );
   const accountCurrency = selectedAccount?.currency;
 
-  // Calculate expected amount
-  const calculatedAmount = useMemo(
-    () => calculateAmount(quantity, unitPrice, fee),
-    [quantity, unitPrice, fee],
-  );
-
   const handleSubmit = form.handleSubmit(async (data) => {
     await onSubmit(data);
   });
@@ -195,12 +173,6 @@ export function BuyForm({
               <AmountInput name="unitPrice" label="Price" maxDecimalPlaces={4} />
               <AmountInput name="fee" label="Fee" />
             </div>
-            {calculatedAmount > 0 && (
-              <p className="text-muted-foreground text-sm">
-                Amount: {calculatedAmount.toFixed(2)}
-                {currency && ` ${currency}`}
-              </p>
-            )}
 
             {/* Advanced Options */}
             <AdvancedOptionsSection

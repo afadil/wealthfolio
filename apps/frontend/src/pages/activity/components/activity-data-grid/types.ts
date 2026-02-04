@@ -121,11 +121,11 @@ interface ActivityBasePayload {
 
   // Activity data
   subtype?: string;
-  quantity?: string;
-  unitPrice?: string;
-  amount?: string;
+  quantity?: string | null;
+  unitPrice?: string | null;
+  amount?: string | null;
   currency?: string;
-  fee?: string;
+  fee?: string | null;
   fxRate?: string | null;
   notes?: string | null;
   /** JSON blob for metadata (e.g., flow.is_external for transfers) */

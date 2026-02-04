@@ -32,9 +32,7 @@ export {
   HOLDING_GROUP_ORDER,
   HoldingType,
   ImportFormat,
-  isAlternativeAssetType,
   PricingMode,
-  isLiabilityType,
   SUBTYPE_DISPLAY_NAMES,
 } from "./constants";
 
@@ -104,12 +102,12 @@ export interface Activity {
   settlementDate?: string;
 
   // Quantities (strings to preserve decimal precision)
-  quantity?: string;
-  unitPrice?: string;
-  amount?: string;
-  fee?: string;
+  quantity?: string | null;
+  unitPrice?: string | null;
+  amount?: string | null;
+  fee?: string | null;
   currency: string;
-  fxRate?: string;
+  fxRate?: string | null;
 
   // Metadata
   notes?: string;
@@ -164,10 +162,10 @@ export interface ActivityDetails {
   subtype?: string | null;
   status?: ActivityStatus;
   date: Date;
-  quantity: string;
-  unitPrice: string;
-  amount: string;
-  fee: string;
+  quantity: string | null;
+  unitPrice: string | null;
+  amount: string | null;
+  fee: string | null;
   currency: string;
   needsReview: boolean;
   comment?: string;
@@ -237,13 +235,13 @@ export interface ActivityCreate {
   exchangeMic?: string;
   assetKind?: string;
   pricingMode?: PricingMode;
-  quantity?: number;
-  unitPrice?: number;
-  amount?: number;
+  quantity?: string | number | null;
+  unitPrice?: string | number | null;
+  amount?: string | number | null;
   currency?: string;
-  fee?: number;
+  fee?: string | number | null;
   comment?: string | null;
-  fxRate?: number | null;
+  fxRate?: string | number | null;
   metadata?: string | Record<string, unknown>; // Metadata (serialized to JSON string before sending)
 }
 
@@ -270,13 +268,13 @@ export interface ActivityUpdate {
   exchangeMic?: string;
   assetKind?: string;
   pricingMode?: PricingMode;
-  quantity?: number;
-  unitPrice?: number;
-  amount?: number;
+  quantity?: string | number | null;
+  unitPrice?: string | number | null;
+  amount?: string | number | null;
   currency?: string;
-  fee?: number;
+  fee?: string | number | null;
   comment?: string | null;
-  fxRate?: number | null;
+  fxRate?: string | number | null;
   metadata?: string | Record<string, unknown>; // Metadata (serialized to JSON string before sending)
 }
 

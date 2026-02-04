@@ -282,20 +282,27 @@ export function normalizeCurrency(currency: string | undefined): string | undefi
   return MINOR_CURRENCY_MAP[currency] ?? currency;
 }
 
-export function formatAmount(amount: number, currency: string, displayCurrency = true) {
+export function formatAmount(
+  amount: number | string | null | undefined,
+  currency: string,
+  displayCurrency = true,
+) {
+  if (amount == null) return "-";
+  const numericAmount = typeof amount === "string" ? Number(amount) : amount;
+  if (!Number.isFinite(numericAmount)) return "-";
   const rawCurrency = currency ?? "USD";
   const isPenceCurrency = rawCurrency === "GBp" || rawCurrency === "GBX";
 
   if (isPenceCurrency) {
-    const formattedNumber = decimalFormatter.format(amount);
+    const formattedNumber = decimalFormatter.format(numericAmount);
     return displayCurrency ? `${formattedNumber}p` : formattedNumber;
   }
 
   if (!displayCurrency) {
-    return decimalFormatter.format(amount);
+    return decimalFormatter.format(numericAmount);
   }
 
-  return getCurrencyFormatter(rawCurrency).format(amount);
+  return getCurrencyFormatter(rawCurrency).format(numericAmount);
 }
 
 export function formatPercent(value: number | null | undefined) {
@@ -486,17 +493,24 @@ export function toPayloadNumber(value: unknown, precision = 6): number | undefin
 
 /**
  * Normalize decimal string for storage: trim whitespace, remove trailing zeros.
- * Returns "0" for empty/invalid input. Used for storing numeric values as strings.
+ * Returns null for empty/invalid input. Used for storing numeric values as strings.
  */
-export function normalizeDecimalString(value: unknown): string {
-  if (value == null || value === "") return "0";
+export function normalizeDecimalString(value: unknown): string | null {
+  if (value == null || value === "") return null;
   // Only accept string or number primitives
-  if (typeof value !== "string" && typeof value !== "number") return "0";
-  const str = String(value).trim();
-  if (!/^-?\d*\.?\d*$/.test(str) || str === "." || str === "-" || str === "") return "0";
-  // Remove unnecessary trailing zeros: "50.00" → "50", "1.10" → "1.1"
-  if (str.includes(".")) {
-    return str.replace(/\.?0+$/, "") || "0";
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const raw = String(value).trim();
+  if (raw === "" || raw === "." || raw === "-") return null;
+  const normalized = raw.toLowerCase();
+  const decimalPattern = /^-?(?:\d+|\d*\.\d+)(?:e[+-]?\d+)?$/i;
+  if (!decimalPattern.test(normalized)) return null;
+  if (normalized.includes("e")) {
+    return normalized;
   }
-  return str;
+  const trimmed =
+    normalized.endsWith(".") ? normalized.slice(0, -1) : normalized;
+  if (trimmed.includes(".")) {
+    return trimmed.replace(/\.?0+$/, "") || "0";
+  }
+  return trimmed;
 }

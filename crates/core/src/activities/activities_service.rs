@@ -606,7 +606,7 @@ impl ActivityService {
 
                 // Create manual quote for MANUAL pricing mode assets
                 if requested_mode == "MANUAL" {
-                    if let Some(unit_price) = activity.unit_price {
+                    if let Some(Some(unit_price)) = activity.unit_price {
                         self.create_manual_quote_from_activity(
                             asset_id,
                             unit_price,
@@ -654,18 +654,18 @@ impl ActivityService {
         // Normalize minor currency units (e.g., GBp -> GBP) and convert amounts
         // This ensures activities are stored with major currency and properly scaled amounts
         if get_normalization_rule(&activity.currency).is_some() {
-            if let Some(unit_price) = activity.unit_price {
+            if let Some(Some(unit_price)) = activity.unit_price {
                 let (normalized_price, _) = normalize_amount(unit_price, &activity.currency);
-                activity.unit_price = Some(normalized_price);
+                activity.unit_price = Some(Some(normalized_price));
             }
-            if let Some(amount) = activity.amount {
+            if let Some(Some(amount)) = activity.amount {
                 let (normalized_amount, _) = normalize_amount(amount, &activity.currency);
-                activity.amount = Some(normalized_amount);
+                activity.amount = Some(Some(normalized_amount));
             }
-            if let Some(fee) = activity.fee {
+            if let Some(Some(fee)) = activity.fee {
                 let (normalized_fee, normalized_currency) =
                     normalize_amount(fee, &activity.currency);
-                activity.fee = Some(normalized_fee);
+                activity.fee = Some(Some(normalized_fee));
                 activity.currency = normalized_currency.to_string();
             } else {
                 let (_, normalized_currency) =
@@ -1328,10 +1328,10 @@ impl ActivityServiceTrait for ActivityService {
                     activity_type: activity.activity_type.clone(),
                     subtype: activity.subtype.clone(),
                     activity_date: activity.date.clone(),
-                    quantity: Some(activity.quantity),
-                    unit_price: Some(activity.unit_price),
+                    quantity: activity.quantity,
+                    unit_price: activity.unit_price,
                     currency: activity.currency.clone(),
-                    fee: Some(activity.fee),
+                    fee: activity.fee,
                     amount: activity.amount,
                     status: if activity.is_draft {
                         Some(crate::activities::ActivityStatus::Draft)
@@ -1541,9 +1541,11 @@ impl ActivityService {
 
         fn transfer_match_key(activity: &ActivityImport) -> Option<TransferMatchKey> {
             let date = parse_activity_date(&activity.date)?;
-            let amount = activity
-                .amount
-                .unwrap_or(activity.quantity * activity.unit_price);
+            let amount = activity.amount.or_else(|| {
+                let quantity = activity.quantity?;
+                let unit_price = activity.unit_price?;
+                Some(quantity * unit_price)
+            })?;
             if amount.is_zero() {
                 return None;
             }

@@ -102,6 +102,8 @@ function draftToActivityImport(draft: DraftActivity): ActivityImport {
     quantity: draft.quantity,
     unitPrice: draft.unitPrice,
     fee: draft.fee,
+    fxRate: draft.fxRate,
+    subtype: draft.subtype,
     exchangeMic: undefined,
     errors: draft.errors,
     isValid: draft.status === "valid" || draft.status === "warning",

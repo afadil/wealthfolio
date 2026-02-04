@@ -53,20 +53,33 @@ const getFieldErrorMessage = (activity: ActivityImport, fieldName: string): stri
   return [];
 };
 
+const toNumber = (value: string | number | null | undefined): number | undefined => {
+  if (value === null || value === undefined || value === "") {
+    return undefined;
+  }
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
 // Helper function to safely format numbers, handling NaN/null/undefined values
-const safeFormatAmount = (value: number | null | undefined, currency: string): string => {
-  if (value === null || value === undefined || isNaN(value)) {
+const safeFormatAmount = (
+  value: string | number | null | undefined,
+  currency: string,
+): string => {
+  const parsed = toNumber(value);
+  if (parsed === undefined) {
     return "-";
   }
-  return formatAmount(value, currency);
+  return formatAmount(parsed, currency);
 };
 
 // Helper function to safely display number values
-const safeDisplayNumber = (value: number | null | undefined): string => {
-  if (value === null || value === undefined || isNaN(value)) {
+const safeDisplayNumber = (value: string | number | null | undefined): string => {
+  const parsed = toNumber(value);
+  if (parsed === undefined) {
     return "-";
   }
-  return value.toString();
+  return parsed.toString();
 };
 
 export const ImportPreviewTable = ({
@@ -433,7 +446,9 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
             <div className="text-right font-medium tabular-nums">
-              {activityType === "SPLIT" ? "-" : safeDisplayNumber(Number(quantity))}
+              {activityType === "SPLIT"
+                ? "-"
+                : safeDisplayNumber(quantity as string | number | null | undefined)}
             </div>
           </ErrorCell>
         );
@@ -458,11 +473,11 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
             <div className="text-right font-medium tabular-nums">
               {activityType === "SPLIT"
-                ? (isNaN(Number(unitPrice)) ? "-" : Number(unitPrice).toFixed(0)) + " : 1"
-                : safeFormatAmount(
-                    Number(unitPrice),
-                    typeof currency === "string" ? currency : "USD",
-                  )}
+                ? (() => {
+                    const ratio = toNumber(unitPrice);
+                    return ratio === undefined ? "-" : `${ratio.toFixed(0)} : 1`;
+                  })()
+                : safeFormatAmount(unitPrice, typeof currency === "string" ? currency : "USD")}
             </div>
           </ErrorCell>
         );
@@ -488,7 +503,7 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
             <div className="text-right font-medium tabular-nums">
               {activityType === "SPLIT"
                 ? "-"
-                : safeFormatAmount(Number(amount), typeof currency === "string" ? currency : "USD")}
+                : safeFormatAmount(amount, typeof currency === "string" ? currency : "USD")}
             </div>
           </ErrorCell>
         );
@@ -514,7 +529,7 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
             <div className="text-muted-foreground text-right tabular-nums">
               {activityType === "SPLIT"
                 ? "-"
-                : safeFormatAmount(Number(fee), typeof currency === "string" ? currency : "USD")}
+                : safeFormatAmount(fee, typeof currency === "string" ? currency : "USD")}
             </div>
           </ErrorCell>
         );

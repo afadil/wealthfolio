@@ -126,7 +126,7 @@ export function ContributionLimitItem({
                   year: "numeric",
                 })}
               </span>
-              {daysRemaining !== null && daysRemaining <= 60 && (
+              {daysRemaining !== null && daysRemaining > 0 && daysRemaining <= 60 && (
                 <span
                   className={`shrink-0 rounded-full px-2 py-0.5 ${
                     daysRemaining <= 30 ? "bg-amber-100 text-amber-800" : "bg-blue-50 text-blue-700"
@@ -155,7 +155,7 @@ export function ContributionLimitItem({
                   {new Date(limit.startDate).toLocaleDateString()} →{" "}
                   {new Date(limit.endDate).toLocaleDateString()}
                 </span>
-                {daysRemaining !== null && daysRemaining <= 60 && (
+                {daysRemaining !== null && daysRemaining > 0 && daysRemaining <= 60 && (
                   <span
                     className={`ml-2 rounded-full px-2 py-0.5 text-xs ${
                       daysRemaining <= 30

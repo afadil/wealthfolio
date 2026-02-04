@@ -39,20 +39,27 @@ const getCurrencyFormatter = (currency: string) => {
   return formatter;
 };
 
-export function formatAmount(amount: number, currency: string, displayCurrency = true) {
+export function formatAmount(
+  amount: number | string | null | undefined,
+  currency: string,
+  displayCurrency = true,
+) {
+  if (amount == null) return "-";
+  const numericAmount = typeof amount === "string" ? Number(amount) : amount;
+  if (!Number.isFinite(numericAmount)) return "-";
   const rawCurrency = currency ?? "USD";
   const isPenceCurrency = rawCurrency === "GBp" || rawCurrency === "GBX";
 
   if (isPenceCurrency) {
-    const formattedNumber = decimalFormatter.format(amount);
+    const formattedNumber = decimalFormatter.format(numericAmount);
     return displayCurrency ? `${formattedNumber}p` : formattedNumber;
   }
 
   if (!displayCurrency) {
-    return decimalFormatter.format(amount);
+    return decimalFormatter.format(numericAmount);
   }
 
-  return getCurrencyFormatter(rawCurrency).format(amount);
+  return getCurrencyFormatter(rawCurrency).format(numericAmount);
 }
 
 /**
@@ -74,7 +81,8 @@ export function formatPercent(value: number | null | undefined) {
   }
 }
 
-export function formatQuantity(quantity: string | number): string {
+export function formatQuantity(quantity: string | number | null | undefined): string {
+  if (quantity == null) return "-";
   const numQuantity = parseFloat(String(quantity));
   if (!Number.isFinite(numQuantity)) return "-";
   return new Intl.NumberFormat("en-US", {

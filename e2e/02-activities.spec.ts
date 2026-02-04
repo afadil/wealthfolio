@@ -396,7 +396,7 @@ test.describe("Activity Creation Tests", () => {
 
   test("2. Create test accounts", async () => {
     await page.goto(`${BASE_URL}/settings/accounts`, { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: "Accounts" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Accounts", exact: true })).toBeVisible();
 
     for (const account of TEST_DATA.accounts) {
       // Check if account already exists

@@ -19,15 +19,14 @@ const NUMERIC_FIELDS = new Set(["quantity", "unitPrice", "amount", "fee", "fxRat
 
 /**
  * Converts a value to a string for API payloads.
- * Returns undefined for null/undefined/empty/"0" values (so they are omitted from JSON).
+ * Returns null for explicit null (clear), undefined for missing/invalid values.
  */
-function toDecimalString(value: unknown): string | undefined {
-  if (value == null) return undefined;
-  // Only accept string or number primitives
-  if (typeof value !== "string" && typeof value !== "number") return undefined;
-  const str = String(value).trim();
-  if (str === "" || str === "0") return undefined;
-  return str;
+function toDecimalString(value: unknown): string | null | undefined {
+  if (value === null) return null;
+  if (value === undefined) return undefined;
+  if (typeof value === "string" && value.trim() === "") return null;
+  const normalized = normalizeDecimalString(value);
+  return normalized ?? undefined;
 }
 
 /**
@@ -47,7 +46,12 @@ function toTimestamp(value: unknown): number | null {
  */
 export function valuesAreEqual(field: string, prevValue: unknown, nextValue: unknown): boolean {
   if (NUMERIC_FIELDS.has(field)) {
-    return normalizeDecimalString(prevValue) === normalizeDecimalString(nextValue);
+    const normalizeForCompare = (value: unknown): string | null => {
+      if (value == null) return null;
+      if (typeof value === "string" && value.trim() === "") return null;
+      return normalizeDecimalString(value);
+    };
+    return normalizeForCompare(prevValue) === normalizeForCompare(nextValue);
   }
   // Handle date field comparison by timestamp
   if (field === "date") {
@@ -104,10 +108,10 @@ export function createDraftTransaction(
     activityType: ActivityType.BUY,
     // Use ISO string to match server data format for consistent sorting
     date: now.toISOString() as unknown as Date,
-    quantity: "0",
-    unitPrice: "0",
-    amount: "0",
-    fee: "0",
+    quantity: null,
+    unitPrice: null,
+    amount: null,
+    fee: null,
     currency: defaultAccount?.currency ?? fallbackCurrency,
     needsReview: false,
     comment: "",
@@ -148,8 +152,8 @@ function applyCashDefaults(
     // Clear assetId - backend generates the canonical ID
     assetId: "",
     currency: derivedCurrency.toUpperCase(),
-    quantity: "0",
-    unitPrice: "0",
+    quantity: null,
+    unitPrice: null,
   };
 }
 
@@ -163,8 +167,8 @@ function applySplitDefaults(transaction: LocalTransaction): LocalTransaction {
   }
   return {
     ...transaction,
-    quantity: "0",
-    unitPrice: "0",
+    quantity: null,
+    unitPrice: null,
   };
 }
 
@@ -183,6 +187,10 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
   } = params;
 
   let updated: LocalTransaction = { ...transaction };
+  const normalizedDecimalOrNull = (value: unknown): string | null => {
+    if (value == null || value === "") return null;
+    return normalizeDecimalString(value) ?? null;
+  };
 
   if (field === "date") {
     if (typeof value === "string") {
@@ -191,23 +199,26 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
       updated = { ...updated, date: value };
     }
   } else if (field === "quantity") {
-    updated = { ...updated, quantity: normalizeDecimalString(value) };
+    updated = { ...updated, quantity: normalizedDecimalOrNull(value) };
     updated = applySplitDefaults(updated);
   } else if (field === "unitPrice") {
-    const newUnitPrice = normalizeDecimalString(value);
+    const newUnitPrice = normalizedDecimalOrNull(value);
     updated = { ...updated, unitPrice: newUnitPrice };
-    if (isCashActivity(updated.activityType) || isIncomeActivity(updated.activityType)) {
+    if (
+      newUnitPrice != null &&
+      (isCashActivity(updated.activityType) || isIncomeActivity(updated.activityType))
+    ) {
       updated = { ...updated, amount: newUnitPrice };
     }
     updated = applySplitDefaults(updated);
   } else if (field === "amount") {
     if (value == null || value === "") {
-      updated = { ...updated, amount: null as unknown as string };
+      updated = { ...updated, amount: null };
     } else {
-      updated = { ...updated, amount: normalizeDecimalString(value) };
+      updated = { ...updated, amount: normalizeDecimalString(value) ?? null };
     }
   } else if (field === "fee") {
-    updated = { ...updated, fee: normalizeDecimalString(value) };
+    updated = { ...updated, fee: normalizedDecimalOrNull(value) };
   } else if (field === "assetSymbol") {
     const upper = (typeof value === "string" ? value : "").trim().toUpperCase();
     // Only update assetSymbol, NOT assetId
@@ -387,6 +398,8 @@ export function buildSavePayload(
     }
 
     // Common payload fields (shared between create and update)
+    const fxRate =
+      transaction.fxRate === undefined ? undefined : toDecimalString(transaction.fxRate);
     const basePayload = {
       id: transaction.id,
       accountId: transaction.accountId,
@@ -402,7 +415,7 @@ export function buildSavePayload(
       amount: toDecimalString(transaction.amount),
       currency: currencyForPayload,
       fee: toDecimalString(transaction.fee),
-      fxRate: transaction.fxRate != null ? toDecimalString(transaction.fxRate) : null,
+      fxRate,
       notes: transaction.comment?.trim() || undefined,
       metadata: metadataJson,
     };
