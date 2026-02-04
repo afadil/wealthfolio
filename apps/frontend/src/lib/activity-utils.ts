@@ -86,7 +86,7 @@ export const isSplitActivity = (activityType: string): boolean => {
  * @returns The fee amount
  */
 export const getFee = (activity: ActivityDetails): number => {
-  return activity.fee;
+  return Number(activity.fee);
 };
 
 /**
@@ -95,7 +95,7 @@ export const getFee = (activity: ActivityDetails): number => {
  * @returns The amount or 0 if not provided
  */
 export const getAmount = (activity: ActivityDetails): number => {
-  return activity.amount ?? 0;
+  return Number(activity.amount ?? 0);
 };
 
 /**
@@ -104,7 +104,7 @@ export const getAmount = (activity: ActivityDetails): number => {
  * @returns The quantity
  */
 export const getQuantity = (activity: ActivityDetails): number => {
-  return activity.quantity;
+  return Number(activity.quantity);
 };
 
 /**
@@ -113,7 +113,7 @@ export const getQuantity = (activity: ActivityDetails): number => {
  * @returns The unit price
  */
 export const getUnitPrice = (activity: ActivityDetails): number => {
-  return activity.unitPrice;
+  return Number(activity.unitPrice);
 };
 
 /**

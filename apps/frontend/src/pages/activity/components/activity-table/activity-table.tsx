@@ -224,7 +224,7 @@ export const ActivityTable = ({
             isCashTransfer(activityType, assetSymbol) ||
             isIncomeActivity(activityType)
           ) {
-            return <div className="text-right">{formatAmount(amount, currency)}</div>;
+            return <div className="text-right">{formatAmount(Number(amount), currency)}</div>;
           }
 
           return <div className="text-right">{formatAmount(unitPrice, currency)}</div>;

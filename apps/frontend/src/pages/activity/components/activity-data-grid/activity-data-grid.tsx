@@ -1,8 +1,9 @@
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 import { useSettingsContext } from "@/lib/settings-provider";
 import type { Account, ActivityDetails } from "@/lib/types";
 import { useAssets } from "@/pages/asset/hooks/use-assets";
-import type { SortingState, Updater } from "@tanstack/react-table";
+import type { SortingState, Updater, VisibilityState } from "@tanstack/react-table";
 import { DataGrid, useDataGrid, type SymbolSearchResult } from "@wealthfolio/ui";
 import { useCallback, useMemo, useState } from "react";
 import { CreateCustomAssetDialog } from "@/components/create-custom-asset-dialog";
@@ -69,6 +70,16 @@ export function ActivityDataGrid({
     markForDeletionBatch,
     resetChangeState,
   } = useActivityGridState({ activities });
+
+  // Persist column visibility preferences
+  const [columnVisibility, setColumnVisibility] = usePersistentState<VisibilityState>(
+    "activity-datagrid-column-visibility",
+    {
+      subtype: true,
+      isExternal: true,
+      activityStatus: false,
+    },
+  );
 
   const { assets } = useAssets();
   const { settings } = useSettingsContext();
@@ -325,19 +336,19 @@ export function ActivityDataGrid({
     enableColumnFilters: true,
     enableSearch: true,
     enablePaste: true,
+    manualSorting: true, // Server-side sorting - prevents row reordering during edits
     onDataChange,
     onRowAdd,
     onRowsAdd,
     onRowsDelete,
     onSortingChange,
+    onColumnVisibilityChange: setColumnVisibility,
+    state: {
+      columnVisibility,
+    },
     initialState: {
       sorting,
       columnPinning: { left: [...PINNED_COLUMNS.left], right: [...PINNED_COLUMNS.right] },
-      columnVisibility: {
-        subtype: true,
-        isExternal: true,
-        activityStatus: false,
-      },
     },
   });
 

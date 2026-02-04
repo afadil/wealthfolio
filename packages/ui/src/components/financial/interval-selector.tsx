@@ -148,7 +148,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
   );
 };
 
-/** Helper to get initial interval data - use this to initialize parent state */
+/** Helper to get interval data for a given code - use to derive range/description from a code */
 const getInitialIntervalData = (code: TimePeriod = DEFAULT_INTERVAL_CODE) => {
   const data = getIntervalData(code);
   return {

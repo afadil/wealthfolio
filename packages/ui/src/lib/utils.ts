@@ -74,11 +74,12 @@ export function formatPercent(value: number | null | undefined) {
   }
 }
 
-export function formatQuantity(quantity: string | number) {
+export function formatQuantity(quantity: string | number): string {
   const numQuantity = parseFloat(String(quantity));
-  if (Number.isInteger(numQuantity)) {
-    return numQuantity.toString();
-  } else {
-    return numQuantity.toFixed(6);
-  }
+  if (!Number.isFinite(numQuantity)) return "-";
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 6,
+    useGrouping: true,
+  }).format(numQuantity);
 }

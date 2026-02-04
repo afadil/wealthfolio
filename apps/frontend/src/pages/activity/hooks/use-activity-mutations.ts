@@ -124,8 +124,17 @@ export function useActivityMutations(
     } = activityToDuplicate;
 
     // For duplicating, use nested asset object
+    // Convert string fields to numbers for ActivityCreate
     const createPayload: ActivityCreate = {
-      ...restOfActivityData,
+      accountId: restOfActivityData.accountId,
+      activityType: restOfActivityData.activityType,
+      subtype: restOfActivityData.subtype,
+      currency: restOfActivityData.currency,
+      quantity: Number(restOfActivityData.quantity),
+      unitPrice: Number(restOfActivityData.unitPrice),
+      amount: Number(restOfActivityData.amount),
+      fee: Number(restOfActivityData.fee),
+      fxRate: restOfActivityData.fxRate ? Number(restOfActivityData.fxRate) : undefined,
       activityDate: date,
       comment: "Duplicated",
       // Use nested asset object

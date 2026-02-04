@@ -9,10 +9,10 @@ const createMockActivity = (overrides: Partial<ActivityDetails> = {}): ActivityD
   id: `activity-${Math.random().toString(36).substring(7)}`,
   activityType: ActivityType.BUY,
   date: new Date("2024-01-15T10:00:00Z"),
-  quantity: 10,
-  unitPrice: 100,
-  amount: 1000,
-  fee: 5,
+  quantity: "10",
+  unitPrice: "100",
+  amount: "1000",
+  fee: "5",
   currency: "USD",
   needsReview: false,
   comment: "",
@@ -312,7 +312,7 @@ describe("useActivityGridState", () => {
 
   describe("server sync", () => {
     it("should preserve dirty changes when server data updates", () => {
-      const initialActivities = [createMockActivity({ id: "act-1", quantity: 10 })];
+      const initialActivities = [createMockActivity({ id: "act-1", quantity: "10" })];
       const { result, rerender } = renderHook(
         ({ activities }) => useActivityGridState({ activities }),
         { initialProps: { activities: initialActivities } },
@@ -321,25 +321,25 @@ describe("useActivityGridState", () => {
       // Mark as dirty with local changes
       act(() => {
         result.current.setLocalTransactions((prev) =>
-          prev.map((t) => (t.id === "act-1" ? { ...t, quantity: 20 } : t)),
+          prev.map((t) => (t.id === "act-1" ? { ...t, quantity: "20" } : t)),
         );
         result.current.markDirty("act-1");
       });
 
-      expect(result.current.localTransactions[0].quantity).toBe(20);
+      expect(result.current.localTransactions[0].quantity).toBe("20");
 
       // Simulate server update
-      const updatedActivities = [createMockActivity({ id: "act-1", quantity: 15 })];
+      const updatedActivities = [createMockActivity({ id: "act-1", quantity: "15" })];
       rerender({ activities: updatedActivities });
 
       // Local dirty changes should be preserved
-      expect(result.current.localTransactions[0].quantity).toBe(20);
+      expect(result.current.localTransactions[0].quantity).toBe("20");
     });
 
     it("should update non-dirty transactions from server", () => {
       const initialActivities = [
-        createMockActivity({ id: "act-1", quantity: 10 }),
-        createMockActivity({ id: "act-2", quantity: 5 }),
+        createMockActivity({ id: "act-1", quantity: "10" }),
+        createMockActivity({ id: "act-2", quantity: "5" }),
       ];
       const { result, rerender } = renderHook(
         ({ activities }) => useActivityGridState({ activities }),
@@ -349,22 +349,22 @@ describe("useActivityGridState", () => {
       // Mark only act-1 as dirty
       act(() => {
         result.current.setLocalTransactions((prev) =>
-          prev.map((t) => (t.id === "act-1" ? { ...t, quantity: 20 } : t)),
+          prev.map((t) => (t.id === "act-1" ? { ...t, quantity: "20" } : t)),
         );
         result.current.markDirty("act-1");
       });
 
       // Simulate server update for both
       const updatedActivities = [
-        createMockActivity({ id: "act-1", quantity: 15 }),
-        createMockActivity({ id: "act-2", quantity: 8 }),
+        createMockActivity({ id: "act-1", quantity: "15" }),
+        createMockActivity({ id: "act-2", quantity: "8" }),
       ];
       rerender({ activities: updatedActivities });
 
       // act-1 should keep local value (dirty)
-      expect(result.current.localTransactions.find((t) => t.id === "act-1")?.quantity).toBe(20);
+      expect(result.current.localTransactions.find((t) => t.id === "act-1")?.quantity).toBe("20");
       // act-2 should update from server (not dirty)
-      expect(result.current.localTransactions.find((t) => t.id === "act-2")?.quantity).toBe(8);
+      expect(result.current.localTransactions.find((t) => t.id === "act-2")?.quantity).toBe("8");
     });
 
     it("should preserve new (draft) transactions across server updates", () => {
@@ -582,8 +582,8 @@ describe("useActivityGridState", () => {
 
       // Simulate server update (maybe other data changed)
       const updatedActivities = [
-        createMockActivity({ id: "act-1", quantity: 999 }),
-        createMockActivity({ id: "act-2", quantity: 888 }),
+        createMockActivity({ id: "act-1", quantity: "999" }),
+        createMockActivity({ id: "act-2", quantity: "888" }),
       ];
       rerender({ activities: updatedActivities });
 

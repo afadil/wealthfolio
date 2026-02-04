@@ -96,7 +96,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
       quantity: activity?.quantity,
       unitPrice: activity?.unitPrice,
       amount: activity?.amount,
-      fee: activity?.fee ?? 0,
+      fee: activity?.fee ?? "0",
       pricingMode:
         activity?.assetPricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET,
       // Advanced options
@@ -132,7 +132,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
       quantity: activity?.quantity,
       unitPrice: activity?.unitPrice,
       amount: activity?.amount,
-      fee: activity?.fee ?? 0,
+      fee: activity?.fee ?? "0",
       pricingMode:
         activity?.assetPricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET,
       // Advanced options

@@ -6,7 +6,14 @@ import { useSettingsContext } from "@/lib/settings-provider";
 import { DateRange, TimePeriod } from "@/lib/types";
 import { calculatePerformanceMetrics } from "@/lib/utils";
 import { PortfolioUpdateTrigger } from "@/pages/dashboard/portfolio-update-trigger";
-import { GainAmount, GainPercent, IntervalSelector, getInitialIntervalData } from "@wealthfolio/ui";
+import {
+  GainAmount,
+  GainPercent,
+  IntervalSelector,
+  getInitialIntervalData,
+  usePersistentState,
+} from "@wealthfolio/ui";
+import type { TimePeriod as UITimePeriod } from "@wealthfolio/ui";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useMemo, useState } from "react";
 import { AccountsSummary } from "./accounts-summary";
@@ -14,15 +21,21 @@ import Balance from "./balance";
 import SavingGoals from "./goals";
 import TopHoldings from "./top-holdings";
 
-const INITIAL_INTERVAL = "3M" as const;
+const DEFAULT_INTERVAL: UITimePeriod = "3M";
+const INTERVAL_STORAGE_KEY = "dashboard-interval";
 
 export function DashboardContent() {
-  const initialData = getInitialIntervalData(INITIAL_INTERVAL);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(initialData.range);
-  const [selectedIntervalDescription, setSelectedIntervalDescription] = useState<string>(
-    initialData.description,
+  // Use the same persisted state as IntervalSelector for the interval code
+  const [intervalCode] = usePersistentState<UITimePeriod>(INTERVAL_STORAGE_KEY, DEFAULT_INTERVAL);
+
+  // Derive initial values from the persisted interval code
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(
+    () => getInitialIntervalData(intervalCode).range,
   );
-  const [isAllTime, setIsAllTime] = useState<boolean>(false);
+  const [selectedIntervalDescription, setSelectedIntervalDescription] = useState<string>(
+    () => getInitialIntervalData(intervalCode).description,
+  );
+  const [isAllTime, setIsAllTime] = useState<boolean>(() => intervalCode === "ALL");
 
   const { holdings: allHoldings, isLoading: isHoldingsLoading } = useHoldings(PORTFOLIO_ACCOUNT_ID);
 
@@ -142,8 +155,8 @@ export function DashboardContent() {
               className="pointer-events-auto relative z-20 w-full max-w-screen-sm sm:max-w-screen-md md:max-w-2xl lg:max-w-3xl"
               onIntervalSelect={handleIntervalSelect}
               isLoading={isValuationHistoryLoading}
-              storageKey="dashboard-interval"
-              defaultValue="3M"
+              storageKey={INTERVAL_STORAGE_KEY}
+              defaultValue={DEFAULT_INTERVAL}
             />
           </div>
         )}

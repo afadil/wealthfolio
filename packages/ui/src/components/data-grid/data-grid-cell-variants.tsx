@@ -354,7 +354,7 @@ export function NumberCell<TData>({
   readOnly,
   cellState,
 }: DataGridCellProps<TData>) {
-  const initialValue = cell.getValue() as number;
+  const initialValue = cell.getValue() as string;
   const [value, setValue] = React.useState(String(initialValue ?? ""));
   const inputRef = React.useRef<HTMLInputElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -371,9 +371,9 @@ export function NumberCell<TData>({
   }
 
   const onBlur = React.useCallback(() => {
-    const numValue = value === "" ? null : Number(value);
-    if (!readOnly && numValue !== initialValue) {
-      tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: numValue });
+    const strValue = value === "" ? null : value.trim();
+    if (!readOnly && strValue !== initialValue) {
+      tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: strValue });
     }
     tableMeta?.onCellEditingStop?.();
   }, [tableMeta, rowIndex, columnId, initialValue, value, readOnly]);
@@ -387,16 +387,16 @@ export function NumberCell<TData>({
       if (isEditing) {
         if (event.key === "Enter") {
           event.preventDefault();
-          const numValue = value === "" ? null : Number(value);
-          if (numValue !== initialValue) {
-            tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: numValue });
+          const strValue = value === "" ? null : value.trim();
+          if (strValue !== initialValue) {
+            tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: strValue });
           }
           tableMeta?.onCellEditingStop?.({ moveToNextRow: true });
         } else if (event.key === "Tab") {
           event.preventDefault();
-          const numValue = value === "" ? null : Number(value);
-          if (numValue !== initialValue) {
-            tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: numValue });
+          const strValue = value === "" ? null : value.trim();
+          if (strValue !== initialValue) {
+            tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: strValue });
           }
           tableMeta?.onCellEditingStop?.({
             direction: event.shiftKey ? "left" : "right",
@@ -433,9 +433,9 @@ export function NumberCell<TData>({
     // When editing stops (transitions from true to false), save the value
     if (wasEditingRef.current && !isEditing) {
       const currentValue = valueRef.current;
-      const numValue = currentValue === "" ? null : Number(currentValue);
-      if (!readOnly && numValue !== initialValue) {
-        tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: numValue });
+      const strValue = currentValue === "" ? null : currentValue.trim();
+      if (!readOnly && strValue !== initialValue) {
+        tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: strValue });
       }
       startedByTypingRef.current = false;
     }

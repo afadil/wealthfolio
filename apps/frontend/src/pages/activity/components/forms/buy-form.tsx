@@ -83,15 +83,16 @@ interface BuyFormProps {
 /**
  * Calculates the expected amount from quantity, price, and fee.
  * Amount = (quantity * price) + fee
+ * Values may be strings when editing existing activities (from ActivityDetails).
  */
 function calculateAmount(
-  quantity: number | undefined,
-  unitPrice: number | undefined,
-  fee: number | undefined,
+  quantity: number | string | undefined,
+  unitPrice: number | string | undefined,
+  fee: number | string | undefined,
 ): number {
-  const qty = quantity || 0;
-  const price = unitPrice || 0;
-  const feeVal = fee || 0;
+  const qty = Number(quantity) || 0;
+  const price = Number(unitPrice) || 0;
+  const feeVal = Number(fee) || 0;
   return qty * price + feeVal;
 }
 

@@ -51,10 +51,10 @@ describe("Activity Utilities", () => {
       id: "1",
       activityType: ActivityType.BUY,
       date: new Date(),
-      quantity: 10,
-      unitPrice: 100,
-      amount: 0,
-      fee: 10,
+      quantity: "10",
+      unitPrice: "100",
+      amount: "0",
+      fee: "10",
       currency: "USD",
       needsReview: false,
       createdAt: new Date(),
@@ -70,9 +70,9 @@ describe("Activity Utilities", () => {
     it("should calculate BUY activity value correctly", () => {
       const activity = createActivity({
         activityType: ActivityType.BUY,
-        quantity: 10,
-        unitPrice: 100,
-        fee: 10,
+        quantity: "10",
+        unitPrice: "100",
+        fee: "10",
       });
 
       // (10 * 100) + 10 = 1010
@@ -82,9 +82,9 @@ describe("Activity Utilities", () => {
     it("should calculate SELL activity value correctly", () => {
       const activity = createActivity({
         activityType: ActivityType.SELL,
-        quantity: 10,
-        unitPrice: 100,
-        fee: 10,
+        quantity: "10",
+        unitPrice: "100",
+        fee: "10",
       });
 
       // (10 * 100) - 10 = 990
@@ -94,8 +94,8 @@ describe("Activity Utilities", () => {
     it("should calculate DEPOSIT activity value correctly", () => {
       const activity = createActivity({
         activityType: ActivityType.DEPOSIT,
-        amount: 1000,
-        fee: 10,
+        amount: "1000",
+        fee: "10",
       });
 
       // 1000 - 10 = 990
@@ -105,8 +105,8 @@ describe("Activity Utilities", () => {
     it("should calculate INTEREST activity value correctly", () => {
       const activity = createActivity({
         activityType: ActivityType.INTEREST,
-        amount: 500,
-        fee: 5,
+        amount: "500",
+        fee: "5",
       });
 
       // 500 - 5 = 495
@@ -116,8 +116,8 @@ describe("Activity Utilities", () => {
     it("should calculate DIVIDEND activity value correctly", () => {
       const activity = createActivity({
         activityType: ActivityType.DIVIDEND,
-        amount: 300,
-        fee: 3,
+        amount: "300",
+        fee: "3",
       });
 
       // 300 - 3 = 297
@@ -127,8 +127,8 @@ describe("Activity Utilities", () => {
     it("should calculate WITHDRAWAL activity value correctly", () => {
       const activity = createActivity({
         activityType: ActivityType.WITHDRAWAL,
-        amount: 1000,
-        fee: 10,
+        amount: "1000",
+        fee: "10",
       });
 
       // 1000 + 10 = 1010
@@ -138,7 +138,7 @@ describe("Activity Utilities", () => {
     it("should calculate FEE activity value correctly", () => {
       const activity = createActivity({
         activityType: ActivityType.FEE,
-        fee: 10,
+        fee: "10",
       });
 
       expect(calculateActivityValue(activity)).toBe(10);
@@ -147,7 +147,7 @@ describe("Activity Utilities", () => {
     it("should calculate SPLIT activity value correctly", () => {
       const activity = createActivity({
         activityType: ActivityType.SPLIT,
-        amount: 2, // 2:1 split
+        amount: "2", // 2:1 split
       });
 
       expect(calculateActivityValue(activity)).toBe(0);
@@ -157,8 +157,8 @@ describe("Activity Utilities", () => {
       const transferIn = createActivity({
         activityType: ActivityType.TRANSFER_IN,
         assetSymbol: "$CASH-USD",
-        amount: 1000,
-        fee: 10,
+        amount: "1000",
+        fee: "10",
       });
 
       expect(calculateActivityValue(transferIn)).toBe(990);
@@ -166,8 +166,8 @@ describe("Activity Utilities", () => {
       const transferOut = createActivity({
         activityType: ActivityType.TRANSFER_OUT,
         assetSymbol: "$CASH-USD",
-        amount: 1000,
-        fee: 10,
+        amount: "1000",
+        fee: "10",
       });
 
       expect(calculateActivityValue(transferOut)).toBe(1010);

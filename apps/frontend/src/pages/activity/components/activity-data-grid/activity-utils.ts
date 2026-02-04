@@ -1,7 +1,7 @@
 import { isCashActivity, isCashTransfer, isIncomeActivity } from "@/lib/activity-utils";
 import { ActivityType } from "@/lib/constants";
 import type { Account } from "@/lib/types";
-import { parseDecimalInput, parseLocalDateTime } from "@/lib/utils";
+import { normalizeDecimalString, parseLocalDateTime } from "@/lib/utils";
 import type {
   ActivityCreatePayload,
   ActivityUpdatePayload,
@@ -18,32 +18,16 @@ import { generateTempActivityId } from "./use-activity-grid-state";
 const NUMERIC_FIELDS = new Set(["quantity", "unitPrice", "amount", "fee", "fxRate"]);
 
 /**
- * Converts a number to a string for API payloads, preserving full precision.
- * Returns undefined for null/undefined/NaN values (so they are omitted from JSON).
+ * Converts a value to a string for API payloads.
+ * Returns undefined for null/undefined/empty/"0" values (so they are omitted from JSON).
  */
 function toDecimalString(value: unknown): string | undefined {
   if (value == null) return undefined;
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) return undefined;
-    return value.toString();
-  }
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (trimmed === "") return undefined;
-    const parsed = Number.parseFloat(trimmed);
-    if (!Number.isFinite(parsed)) return undefined;
-    return trimmed; // Keep original string to preserve precision
-  }
-  return undefined;
-}
-
-/**
- * Safely converts a value to a number for comparison
- */
-function toNumber(value: unknown): number {
-  if (typeof value === "number") return value;
-  if (typeof value === "string") return parseFloat(value) || 0;
-  return 0;
+  // Only accept string or number primitives
+  if (typeof value !== "string" && typeof value !== "number") return undefined;
+  const str = String(value).trim();
+  if (str === "" || str === "0") return undefined;
+  return str;
 }
 
 /**
@@ -63,10 +47,7 @@ function toTimestamp(value: unknown): number | null {
  */
 export function valuesAreEqual(field: string, prevValue: unknown, nextValue: unknown): boolean {
   if (NUMERIC_FIELDS.has(field)) {
-    const prevNum = toNumber(prevValue);
-    const nextNum = toNumber(nextValue);
-    if (Number.isNaN(prevNum) && Number.isNaN(nextNum)) return true;
-    return prevNum === nextNum;
+    return normalizeDecimalString(prevValue) === normalizeDecimalString(nextValue);
   }
   // Handle date field comparison by timestamp
   if (field === "date") {
@@ -123,10 +104,10 @@ export function createDraftTransaction(
     activityType: ActivityType.BUY,
     // Use ISO string to match server data format for consistent sorting
     date: now.toISOString() as unknown as Date,
-    quantity: 0,
-    unitPrice: 0,
-    amount: 0,
-    fee: 0,
+    quantity: "0",
+    unitPrice: "0",
+    amount: "0",
+    fee: "0",
     currency: defaultAccount?.currency ?? fallbackCurrency,
     needsReview: false,
     comment: "",
@@ -167,8 +148,8 @@ function applyCashDefaults(
     // Clear assetId - backend generates the canonical ID
     assetId: "",
     currency: derivedCurrency.toUpperCase(),
-    quantity: 0,
-    unitPrice: 0,
+    quantity: "0",
+    unitPrice: "0",
   };
 }
 
@@ -182,8 +163,8 @@ function applySplitDefaults(transaction: LocalTransaction): LocalTransaction {
   }
   return {
     ...transaction,
-    quantity: 0,
-    unitPrice: 0,
+    quantity: "0",
+    unitPrice: "0",
   };
 }
 
@@ -210,35 +191,23 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
       updated = { ...updated, date: value };
     }
   } else if (field === "quantity") {
-    // Use high precision (18) to support crypto quantities like 0.000000099
-    // Empty string or null defaults to 0 (ActivityDetails type requires number)
-    const parsed =
-      value != null && value !== "" ? parseDecimalInput(value as string | number, 18) : 0;
-    updated = { ...updated, quantity: parsed };
+    updated = { ...updated, quantity: normalizeDecimalString(value) };
     updated = applySplitDefaults(updated);
   } else if (field === "unitPrice") {
-    // Use high precision (18) to support crypto prices
-    // Empty string or null defaults to 0 (ActivityDetails type requires number)
-    const newUnitPrice =
-      value != null && value !== "" ? parseDecimalInput(value as string | number, 18) : 0;
+    const newUnitPrice = normalizeDecimalString(value);
     updated = { ...updated, unitPrice: newUnitPrice };
     if (isCashActivity(updated.activityType) || isIncomeActivity(updated.activityType)) {
       updated = { ...updated, amount: newUnitPrice };
     }
     updated = applySplitDefaults(updated);
   } else if (field === "amount") {
-    // Use high precision (18) to support crypto amounts
-    // Empty string or null clears the value so the backend can persist NULL (via treat_none_as_null)
     if (value == null || value === "") {
-      updated = { ...updated, amount: null as unknown as number };
+      updated = { ...updated, amount: null as unknown as string };
     } else {
-      updated = { ...updated, amount: parseDecimalInput(value as string | number, 18) };
+      updated = { ...updated, amount: normalizeDecimalString(value) };
     }
   } else if (field === "fee") {
-    // Empty string or null defaults to 0 (ActivityDetails type requires number)
-    const parsed =
-      value != null && value !== "" ? parseDecimalInput(value as string | number, 12) : 0;
-    updated = { ...updated, fee: parsed };
+    updated = { ...updated, fee: normalizeDecimalString(value) };
   } else if (field === "assetSymbol") {
     const upper = (typeof value === "string" ? value : "").trim().toUpperCase();
     // Only update assetSymbol, NOT assetId
@@ -283,8 +252,7 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
   } else if (field === "comment") {
     updated = { ...updated, comment: typeof value === "string" ? value : "" };
   } else if (field === "fxRate") {
-    // Use high precision for FX rates
-    updated = { ...updated, fxRate: parseDecimalInput(value as string | number, 12) };
+    updated = { ...updated, fxRate: normalizeDecimalString(value) };
   } else if (field === "subtype") {
     // Subtype is optional, can be string or null/undefined
     updated = { ...updated, subtype: typeof value === "string" && value ? value : undefined };
@@ -594,7 +562,7 @@ function validateTransaction(transaction: LocalTransaction): TransactionValidati
   }
 
   // Validate non-negative values for certain fields
-  if (transaction.fee != null && transaction.fee < 0) {
+  if (transaction.fee != null && parseFloat(transaction.fee) < 0) {
     errors.push({
       transactionId: transaction.id,
       field: "fee",
@@ -602,7 +570,7 @@ function validateTransaction(transaction: LocalTransaction): TransactionValidati
     });
   }
 
-  if (transaction.fxRate != null && transaction.fxRate < 0) {
+  if (transaction.fxRate != null && parseFloat(transaction.fxRate) < 0) {
     errors.push({
       transactionId: transaction.id,
       field: "fxRate",

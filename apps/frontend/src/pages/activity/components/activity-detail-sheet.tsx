@@ -139,7 +139,7 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
               <div className="text-right">
                 <div className="text-muted-foreground text-xs">Amount</div>
                 <div className="text-lg font-bold">
-                  <AmountDisplay value={activity.amount} currency={activity.currency} />
+                  <AmountDisplay value={Number(activity.amount)} currency={activity.currency} />
                 </div>
               </div>
             </div>
@@ -162,32 +162,38 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
 
           {/* Financial Details */}
           <DetailSection title="Financial Details" icon={<Icons.DollarSign className="h-4 w-4" />}>
-            {activity.quantity !== 0 && (
+            {Number(activity.quantity) !== 0 && (
               <DetailRow
                 label="Quantity"
-                value={activity.quantity?.toLocaleString(undefined, { maximumFractionDigits: 8 })}
+                value={Number(activity.quantity).toLocaleString(undefined, {
+                  maximumFractionDigits: 8,
+                })}
               />
             )}
-            {activity.unitPrice !== 0 && (
+            {Number(activity.unitPrice) !== 0 && (
               <DetailRow
                 label="Unit Price"
-                value={<AmountDisplay value={activity.unitPrice} currency={activity.currency} />}
+                value={
+                  <AmountDisplay value={Number(activity.unitPrice)} currency={activity.currency} />
+                }
               />
             )}
             <DetailRow
               label="Amount"
-              value={<AmountDisplay value={activity.amount} currency={activity.currency} />}
+              value={<AmountDisplay value={Number(activity.amount)} currency={activity.currency} />}
             />
-            {activity.fee !== 0 && (
+            {Number(activity.fee) !== 0 && (
               <DetailRow
                 label="Fee"
-                value={<AmountDisplay value={activity.fee} currency={activity.currency} />}
+                value={<AmountDisplay value={Number(activity.fee)} currency={activity.currency} />}
               />
             )}
             {activity.fxRate && (
               <DetailRow
                 label="FX Rate"
-                value={activity.fxRate.toLocaleString(undefined, { maximumFractionDigits: 8 })}
+                value={Number(activity.fxRate).toLocaleString(undefined, {
+                  maximumFractionDigits: 8,
+                })}
               />
             )}
             <DetailRow label="Currency" value={activity.currency} />

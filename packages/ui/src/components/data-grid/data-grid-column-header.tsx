@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnSort, Header, SortDirection, SortingState, Table } from "@tanstack/react-table";
+import type { Header, SortDirection, Table } from "@tanstack/react-table";
 import * as React from "react";
 import { Icons } from "../ui/icons";
 
@@ -46,28 +46,20 @@ export function DataGridColumnHeader<TData, TValue>({
 
   const onSortingChange = React.useCallback(
     (direction: SortDirection) => {
-      table.setSorting((prev: SortingState) => {
-        const existingSortIndex = prev.findIndex((sort) => sort.id === column.id);
-        const newSort: ColumnSort = {
+      // Single-column sorting: replace entire array with just this column's sort
+      table.setSorting([
+        {
           id: column.id,
           desc: direction === "desc",
-        };
-
-        if (existingSortIndex >= 0) {
-          const updated = [...prev];
-          updated[existingSortIndex] = newSort;
-          return updated;
-        } else {
-          return [...prev, newSort];
-        }
-      });
+        },
+      ]);
     },
     [column.id, table],
   );
 
   const onSortRemove = React.useCallback(() => {
-    table.setSorting((prev: SortingState) => prev.filter((sort) => sort.id !== column.id));
-  }, [column.id, table]);
+    table.setSorting([]);
+  }, [table]);
 
   const onLeftPin = React.useCallback(() => {
     column.pin("left");

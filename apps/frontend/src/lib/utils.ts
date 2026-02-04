@@ -321,19 +321,18 @@ export function toPascalCase(input: string) {
     .join("");
 }
 
-export function formatQuantity(quantity: number | null | undefined): string {
+export function formatQuantity(quantity: number | string | null | undefined): string {
   if (quantity === null || quantity === undefined) {
     return "-";
   }
+  const numQuantity = typeof quantity === "string" ? parseFloat(quantity) : quantity;
+  if (!Number.isFinite(numQuantity)) return "-";
 
-  // Use Intl.NumberFormat for consistent number formatting
-  // Minimum fraction digits of 0 allows whole numbers to show without decimals
-  // Maximum of 4 decimal places when needed
   return new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 4,
     useGrouping: true,
-  }).format(quantity);
+  }).format(numQuantity);
 }
 
 /**
@@ -483,4 +482,21 @@ export function toPayloadNumber(value: unknown, precision = 6): number | undefin
     return undefined;
   }
   return roundDecimal(parsed, precision);
+}
+
+/**
+ * Normalize decimal string for storage: trim whitespace, remove trailing zeros.
+ * Returns "0" for empty/invalid input. Used for storing numeric values as strings.
+ */
+export function normalizeDecimalString(value: unknown): string {
+  if (value == null || value === "") return "0";
+  // Only accept string or number primitives
+  if (typeof value !== "string" && typeof value !== "number") return "0";
+  const str = String(value).trim();
+  if (!/^-?\d*\.?\d*$/.test(str) || str === "." || str === "-" || str === "") return "0";
+  // Remove unnecessary trailing zeros: "50.00" → "50", "1.10" → "1.1"
+  if (str.includes(".")) {
+    return str.replace(/\.?0+$/, "") || "0";
+  }
+  return str;
 }

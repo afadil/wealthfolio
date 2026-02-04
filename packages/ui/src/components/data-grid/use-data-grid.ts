@@ -139,6 +139,8 @@ interface UseDataGridProps<TData> extends Omit<
   enableSearch?: boolean;
   enablePaste?: boolean;
   readOnly?: boolean;
+  /** When true, sorting is handled externally (server-side). Rows won't re-sort during edits. */
+  manualSorting?: boolean;
 }
 
 function useDataGrid<TData>({
@@ -2134,7 +2136,7 @@ function useDataGrid<TData>({
   );
 
   const tableOptions = React.useMemo<TableOptions<TData>>(() => {
-    return {
+    const options: TableOptions<TData> = {
       ...propsRef.current,
       data,
       columns,
@@ -2148,9 +2150,15 @@ function useDataGrid<TData>({
       columnResizeDirection: dir,
       getCoreRowModel: getMemoizedCoreRowModel,
       getFilteredRowModel: getMemoizedFilteredRowModel,
-      getSortedRowModel: getMemoizedSortedRowModel,
       meta: tableMeta,
     };
+    // When manualSorting is true, sorting is handled externally (server-side)
+    if (propsRef.current.manualSorting) {
+      options.manualSorting = true;
+    } else {
+      options.getSortedRowModel = getMemoizedSortedRowModel;
+    }
+    return options;
   }, [
     propsRef,
     data,

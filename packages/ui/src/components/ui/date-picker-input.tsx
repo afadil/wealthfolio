@@ -119,7 +119,7 @@ export function DatePickerInput({
     >
       <Group
         className={cn(
-          "dark:bg-input/30 border-input ring-offset-background bg-input-bg h-input-height flex w-full items-center rounded-md border px-3 py-1 text-sm",
+          "dark:bg-input/30 border-input ring-offset-background bg-input-bg h-input-height flex w-full flex-nowrap items-center whitespace-nowrap rounded-md border px-3 py-1 text-sm",
           "focus-within:ring-ring focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2",
           disabled && "cursor-not-allowed opacity-50",
         )}

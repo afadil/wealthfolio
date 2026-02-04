@@ -214,17 +214,17 @@ export const ActivityTableMobile = ({
                         : isCashActivity(activity.activityType) ||
                             isCashTransfer(activity.activityType, symbol) ||
                             isIncomeActivity(activity.activityType)
-                          ? formatAmount(activity.amount, activity.currency)
-                          : formatAmount(activity.unitPrice, activity.currency)}
+                          ? formatAmount(Number(activity.amount), activity.currency)
+                          : formatAmount(Number(activity.unitPrice), activity.currency)}
                   </span>
                 </div>
 
                 {/* Fee (if applicable) */}
-                {activity.fee > 0 && activity.activityType !== "SPLIT" && (
+                {Number(activity.fee) > 0 && activity.activityType !== "SPLIT" && (
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Fee</span>
                     <span className="font-medium">
-                      {formatAmount(activity.fee, activity.currency)}
+                      {formatAmount(Number(activity.fee), activity.currency)}
                     </span>
                   </div>
                 )}
