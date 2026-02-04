@@ -266,6 +266,9 @@ export default function AllocationPage() {
           const strategy = await getOrCreateVirtualStrategy(selectedAccounts);
           setVirtualStrategy(strategy);
           console.log("Using virtual strategy:", strategy);
+          // Invalidate unused strategies queries in case this created a new virtual portfolio
+          queryClient.invalidateQueries({ queryKey: ["unused-virtual-strategies-count"] });
+          queryClient.invalidateQueries({ queryKey: ["unused-virtual-strategies"] });
         } catch (err) {
           console.error("Failed to create virtual strategy:", err);
         }

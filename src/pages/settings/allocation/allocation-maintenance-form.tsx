@@ -27,7 +27,7 @@ export function AllocationMaintenanceForm() {
   const { data: unusedStrategies = [], refetch: refetchList } = useQuery<RebalancingStrategy[]>({
     queryKey: ["unused-virtual-strategies"],
     queryFn: getUnusedVirtualStrategies,
-    enabled: isOpen, // Only fetch when collapsible is open
+    // Always enabled so data is fresh, React Query will cache it
   });
 
   // Mutation for cleanup all
