@@ -28,15 +28,22 @@ export function useRebalancingStrategy(accountId: string | null) {
       console.log("useRebalancingStrategy - looking for accountId:", accountId);
 
       // PRIORITY ORDER:
-      // 1. If accountId starts with "virtual_", it's a virtual strategy ID - match by strategy.id
+      // 1. Try to find by strategy.id first (for virtual portfolios and direct lookups)
       // 2. If accountId is "TOTAL", use strategy with accountId === null
-      // 3. Otherwise, match by strategy.accountId
+      // 3. Otherwise, match by strategy.accountId (for regular accounts)
       let strategy;
-      if (accountId.startsWith("virtual_")) {
-        strategy = strategies.find((s) => s.id === accountId) || null;
-      } else if (accountId === "TOTAL") {
-        strategy = strategies.find((s) => s.accountId === null) || null;
-      } else {
+
+      // First, try to find by ID (works for both virtual strategies and direct ID lookups)
+      strategy = strategies.find((s) => s.id === accountId) || null;
+
+      // If not found and it's "TOTAL", look for the All Accounts strategy
+      if (!strategy && accountId === "TOTAL") {
+        strategy =
+          strategies.find((s) => s.accountId === null && s.name === "All Accounts") || null;
+      }
+
+      // If still not found, try matching by accountId (for regular accounts)
+      if (!strategy) {
         strategy = strategies.find((s) => s.accountId === accountId) || null;
       }
 

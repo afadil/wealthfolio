@@ -31,7 +31,6 @@ export function generateVirtualPortfolioName(accounts: Account[]): string {
  * - Avoids "Record not found" errors when trying to UPDATE non-existent ID
  */
 export async function getOrCreateVirtualStrategy(
-  accountIds: string[],
   accounts: Account[],
 ): Promise<RebalancingStrategy> {
   // Generate deterministic name

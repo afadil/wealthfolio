@@ -49,6 +49,6 @@ CREATE TABLE holding_targets (
 CREATE INDEX idx_holding_targets_asset_class_id ON holding_targets(asset_class_id);
 CREATE INDEX idx_holding_targets_asset_id ON holding_targets(asset_id);
 
--- Create default "All Portfolio" strategy
+-- Create default "All Accounts" strategy
 INSERT INTO rebalancing_strategies (id, name, account_id, is_active)
-VALUES ('default-all-portfolio', 'All Portfolio', NULL, 1);
+VALUES ('default-all-portfolio', 'All Accounts', NULL, 1);

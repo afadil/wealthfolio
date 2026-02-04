@@ -263,7 +263,7 @@ export default function AllocationPage() {
       // CASE 1: Multiple accounts selected (not a saved portfolio)
       if (isMultiAccountView && selectedAccounts.length > 1) {
         try {
-          const strategy = await getOrCreateVirtualStrategy(selectedAccountIds, selectedAccounts);
+          const strategy = await getOrCreateVirtualStrategy(selectedAccounts);
           setVirtualStrategy(strategy);
           console.log("Using virtual strategy:", strategy);
         } catch (err) {
