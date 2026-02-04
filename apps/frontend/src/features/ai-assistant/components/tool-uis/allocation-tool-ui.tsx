@@ -164,8 +164,8 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
   const { isBalanceHidden } = useBalancePrivacy();
   const parsed = normalizeResult(result);
 
-  // Detect drill-down mode
-  const isDrillDown = parsed?.holdings && parsed.holdings.length > 0;
+  // Detect drill-down mode (holdings may be empty for a valid category)
+  const isDrillDown = parsed?.holdings !== undefined;
 
   // Sort categories by value descending
   const sortedCategories = useMemo(() => {
