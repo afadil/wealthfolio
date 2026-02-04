@@ -5,11 +5,12 @@ import { AccountPortfolioSelector } from "@/components/account-portfolio-selecto
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/use-toast";
 import { useAccounts } from "@/hooks/use-accounts";
+import { usePortfolios } from "@/hooks/use-portfolios";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { formatCurrencyDisplay } from "@/lib/currency-format";
 import { QueryKeys } from "@/lib/query-keys";
 import { useSettingsContext } from "@/lib/settings-provider";
-import type { Account, AccountType, Holding } from "@/lib/types";
+import type { Account, AccountType, Holding, Portfolio } from "@/lib/types";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { Button, Sheet, SheetContent, SheetHeader, SheetTitle } from "@wealthfolio/ui";
 import { ChevronDown } from "lucide-react";
@@ -20,6 +21,7 @@ import { AssetClassFormDialog } from "./components/asset-class-form-dialog";
 import { AssetClassTargetCard } from "./components/asset-class-target-card";
 import { HoldingTargetRow } from "./components/holding-target-row";
 import { RebalancingAdvisor } from './components/rebalancing-advisor';
+import { SaveAsPortfolioModal } from './components/save-as-portfolio-modal';
 import { TargetPercentInput } from "./components/target-percent-input";
 import {
   useAssetClassMutations,
@@ -195,6 +197,7 @@ function HoldingsTargetList({
 
 export default function AllocationPage() {
   const { accounts } = useAccounts(false, false);
+  const { data: portfolios = [] } = usePortfolios();
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([PORTFOLIO_ACCOUNT_ID]);
   // const [activePortfolioId, setActivePortfolioId] = useState<string | null>(null); // TODO: Will be used for portfolio-specific allocation strategies
   const [formOpen, setFormOpen] = useState(false);
@@ -208,6 +211,8 @@ export default function AllocationPage() {
   const [showHiddenTargets, setShowHiddenTargets] = useState(false);
   const [combinedPortfolio, setCombinedPortfolio] = useState<Account | null>(null);
   const [isLoadingCombinedPortfolio, setIsLoadingCombinedPortfolio] = useState(false);
+  const [showSaveAsPortfolioModal, setShowSaveAsPortfolioModal] = useState(false);
+  const lastToastPortfolioId = useRef<string>('');
   const queryClient = useQueryClient();
   const { settings } = useSettingsContext(); // ← NEW: Get base currency
 
@@ -327,6 +332,42 @@ export default function AllocationPage() {
 
     ensureStrategy();
   }, [selectedAccountId, primaryAccount, queryClient]);
+
+  // Auto-match portfolio detection and toast notification
+  useEffect(() => {
+    if (!portfolios || selectedAccountIds.length === 0 || selectedAccountIds.includes(PORTFOLIO_ACCOUNT_ID)) {
+      lastToastPortfolioId.current = '';
+      return;
+    }
+
+    // Check if current selection matches any portfolio (order-independent)
+    const matchedPortfolio = portfolios.find((portfolio: Portfolio) => {
+      const portfolioSet = new Set(portfolio.accountIds);
+      const selectedSet = new Set(selectedAccountIds);
+
+      if (portfolioSet.size !== selectedSet.size) return false;
+
+      for (const id of selectedSet) {
+        if (!portfolioSet.has(id)) return false;
+      }
+
+      return true;
+    });
+
+    // Show toast only once per matched portfolio
+    if (matchedPortfolio) {
+      if (lastToastPortfolioId.current !== matchedPortfolio.id) {
+        toast({
+          title: `✓ Matched Portfolio "${matchedPortfolio.name}"`,
+          description: "Loading allocation targets...",
+          variant: 'success',
+        });
+        lastToastPortfolioId.current = matchedPortfolio.id;
+      }
+    } else {
+      lastToastPortfolioId.current = '';
+    }
+  }, [selectedAccountIds, portfolios]);
 
   // React Query automatically refetches when selectedAccountId changes via queryKey
   // No need for manual invalidation here
@@ -631,6 +672,24 @@ export default function AllocationPage() {
     }
   };
 
+  // Helper: Check if selection has no exact match and has 2+ accounts
+  // Find the exact matching portfolio (if any)
+  const exactMatchingPortfolio = useMemo(() => {
+    if (selectedAccountIds.length < 2 || selectedAccountIds.includes(PORTFOLIO_ACCOUNT_ID)) {
+      return null;
+    }
+
+    const selectedSet = new Set(selectedAccountIds);
+    return portfolios.find((portfolio: Portfolio) => {
+      const portfolioSet = new Set(portfolio.accountIds);
+      if (portfolioSet.size !== selectedSet.size) return false;
+      for (const id of selectedSet) {
+        if (!portfolioSet.has(id)) return false;
+      }
+      return true;
+    }) || null;
+  }, [selectedAccountIds, portfolios]);
+
   return (
     <div className="space-y-6 p-8">
       {/* Account/Portfolio Selector - Fixed position in top right corner */}
@@ -677,29 +736,65 @@ export default function AllocationPage() {
         ))}
       </nav>
 
-      {/* Tab Content */}
-      <div className="mt-6">
-        {/* Combined portfolio info banner */}
-        {isMultiAccountView && combinedPortfolio && (viewTab === 'targets' || viewTab === 'pie-chart') && (
-          <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/30 p-4">
-            <div className="flex items-start gap-3">
-              <div className="text-blue-600 dark:text-blue-400 mt-0.5">
-                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                  Managing allocation for: {combinedPortfolio.name}
-                </p>
-                <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
-                  Your allocation targets for this account combination will be saved separately.
-                </p>
+      {/* Banners - Portfolio-related notifications */}
+      <div className="space-y-3">
+        {/* Single Portfolio Banner - Shows either exact match or save option */}
+        {selectedAccountIds.length >= 2 && !selectedAccountIds.includes(PORTFOLIO_ACCOUNT_ID) && (
+          exactMatchingPortfolio ? (
+            // Show portfolio composition when exact match found
+            <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/30 p-4">
+              <div className="flex items-start gap-3">
+                <div className="text-blue-600 dark:text-blue-400 mt-0.5">
+                  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    {exactMatchingPortfolio.name}
+                  </p>
+                  <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+                    Includes: {selectedAccountIds.map(id => accounts?.find(a => a.id === id)?.name).filter(Boolean).join(', ')}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            // Show save as portfolio option when no exact match
+            <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/30 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3 flex-1">
+                  <div className="text-blue-600 dark:text-blue-400 mt-0.5">
+                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                      <path fillRule="evenodd" d="M4 5a2 2 0 012-2 1 1 0 000 2 1 1 0 100 2H3a1 1 0 00-1 1v6a1 1 0 001 1h14a1 1 0 001-1V9a1 1 0 00-1-1h-3a1 1 0 100-2 1 1 0 000-2 2 2 0 00-2-2H4zm4 0a1 1 0 000 2h2a1 1 0 000-2H8zm6 11a1 1 0 110 2 1 1 0 010-2z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                      Viewing {selectedAccountIds.length} accounts
+                    </p>
+                    <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+                      Save this selection as a portfolio for quick access later.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowSaveAsPortfolioModal(true)}
+                  className="shrink-0"
+                >
+                  Save as Portfolio
+                </Button>
+              </div>
+            </div>
+          )
         )}
+      </div>
 
+      {/* Tab Content */}
+      <div className="mt-6">
         {/* Loading indicator for combined portfolio */}
         {isLoadingCombinedPortfolio && (
           <div className="mb-4 rounded-lg border border-muted bg-muted/30 p-4">
@@ -1297,6 +1392,13 @@ export default function AllocationPage() {
           </SheetContent>
         </Sheet>
       )}
+
+      {/* Save as Portfolio Modal */}
+      <SaveAsPortfolioModal
+        open={showSaveAsPortfolioModal}
+        onOpenChange={setShowSaveAsPortfolioModal}
+        selectedAccountIds={selectedAccountIds}
+      />
     </div>
   );
 }

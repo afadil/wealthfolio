@@ -484,6 +484,57 @@ cargo check --manifest-path=src-core/Cargo.toml
 
 ---
 
+## File Management Rules
+
+**Philosophy**: "Less is more" - consolidate documentation, avoid scattered summary files.
+
+### Creating New Files
+
+**Before creating any new file**, ask yourself:
+- Is this truly **technical documentation** (e.g., architecture decision, tricky algorithm)?
+- Or is this a **summary/checklist** (which belongs in phase-3.md)?
+
+**Rules**:
+1. **Update existing phase file first** - Add to the current `phase-N.md` file before creating new files
+2. **File naming**: Use `lowercase_with_underscores`, not `UPPERCASE-WITH-HYPHENS`
+3. **Phase files are canonical** - Each phase has ONE file: `phase-1.md`, `phase-2.md`, `phase-3.md`, etc.
+4. **Archive folder** (`archive/`) - Use ONLY for truly important technical documentation:
+   - Complex algorithm explanations (not just implementation)
+   - Architecture diagrams and decision records
+   - Historical technical notes for understanding code
+   - Do NOT archive checklists, summaries, or process docs
+5. **Get approval first** - Ask before creating new files outside phase files
+
+### What Goes Where
+
+| Type | Location | Notes |
+|------|----------|-------|
+| Test scenarios | `phase-N.md` section 7.x | Consolidated into main phase file |
+| Implementation checklist | `phase-N.md` section 9 | Sprint status section |
+| UI visual reference | Inline in test scenarios or phase file | Keep descriptions in test scenarios |
+| Architecture decisions | `allocation-agents.md` | This file for patterns, core decisions |
+| Tricky algorithms | `archive/` + reference from code | Only if truly complex |
+| Temporary planning docs | Delete when done | Don't commit temporary files |
+| Summary/delivery notes | `phase-N.md` section 9 | Update sprint status, not separate file |
+
+### Recent Consolidation (Phase 3)
+
+Consolidated into [phase-3.md](phase-3.md):
+- Test scenarios (section 7.4)
+- Implementation completion details (section 9 Portfolio Feature)
+- Completion summary (section 9)
+- Testing checklist (section 7.4)
+
+Files deleted:
+- `TESTING_CHECKLIST.md` (consolidated)
+- `COMPLETION_SUMMARY.md` (consolidated)
+- `IMPLEMENTATION_CHECKLIST.md` (consolidated)
+- `UI_VISUAL_REFERENCE.md` (consolidat)
+- `PHASE3_DELIVERY.md` (consolidated)
+- `documentation_cleanup_plan.md` (temporary)
+
+---
+
 ## Next Steps (Current Priority)
 
 🚨 **PRIORITY 1**: Portfolio Feature Implementation (section 1.4)

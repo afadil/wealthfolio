@@ -1,5 +1,31 @@
 # Portfolio Architecture & Implementation Plan
 
+> **⚠️ IMPLEMENTATION STATUS (January 29, 2026)**
+>
+> This document represents the **original design specification**. The actual implementation differs in some UI details:
+>
+> **✅ Implemented (90% Complete):**
+> - Database schema (portfolios table)
+> - Backend CRUD operations (Rust repository, Tauri commands, Axum endpoints)
+> - Settings → Portfolios page (4 components)
+> - Portfolio hooks (use-portfolios.ts with mutations)
+> - Account selector component (AccountPortfolioSelector)
+> - Multi-select state management
+> - Validation (2+ accounts, unique names)
+>
+> **🔄 UI Differences from Spec:**
+> - **Selector UI**: Uses shadcn Command/CommandItem pattern (NOT checkboxes)
+> - **Reasoning**: Matches Insights page style, better UX consistency
+> - **Visual**: Check icons instead of checkbox controls
+>
+> **⏳ Remaining (10%):**
+> - Auto-matching toast notification
+> - "Save as Portfolio" banner
+> - "Modified selection" banner
+> - Test all 15 scenarios
+>
+> See [phase-3.md](../phase-3.md) section 1.4 for current implementation status.
+
 ## Overview
 This document outlines the architecture, UX patterns, and implementation plan for the Portfolio feature, which allows users to create and manage allocation strategies across multiple accounts as logical groupings.
 
@@ -231,25 +257,43 @@ Portfolios are lightweight groupings of accounts that enable unified allocation 
 
 ### 1. Allocation Page - Account Selector
 
+**IMPLEMENTATION NOTE**: The original design spec used checkboxes, but the **actual implementation uses shadcn Command/CommandItem pattern** to match the Insights page style and maintain consistency across the app.
+
+**Implementation Choice (shadcn Command Pattern):**
 ```
 ┌──────────────────────────────────────┐
-│ Select View                        ▼ │
+│ Search...                          ▼ │
 ├──────────────────────────────────────┤
-│ ● All Portfolios                     │ ← Virtual aggregate (always available)
+│ ○ All Accounts                 ✓    │ ← CommandItem (click to select)
 ├──────────────────────────────────────┤
-│ Portfolios                           │ ← Saved portfolios section
-│   ○ Family Portfolio                 │ ← Click to activate
+│ Portfolios                           │
+│   ○ Family Portfolio           ✓    │ ← Check icon when active
 │   ○ Retirement Strategy              │
 ├──────────────────────────────────────┤
-│ Accounts                             │ ← Individual accounts (multi-select)
-│   ☑ Degiro                           │ ← Checkboxes
-│   ☑ Interactive Brokers              │
-│   □ Revolut                          │
-│   □ Trading212                       │
+│ Accounts                             │
+│   ○ Degiro                     ✓    │ ← Click toggles, Check shows when selected
+│   ○ Interactive Brokers        ✓    │
+│   ○ Revolut                          │
+│   ○ Trading212                       │
 └──────────────────────────────────────┘
 ```
 
-**Visual States:**
+**Why Command Pattern Instead of Checkboxes:**
+- ✅ Matches Insights page account selector (consistency)
+- ✅ Uses shadcn Command component (already in design system)
+- ✅ Check icon appears on selected items (cleaner than checkbox styling)
+- ✅ Click-to-toggle UX (familiar from Insights)
+- ✅ Better mobile responsiveness
+- ✅ Cleaner visual hierarchy without checkbox visual weight
+
+**Implementation Details:**
+- Component: `src/components/account-portfolio-selector.tsx`
+- Pattern: Popover → Command → CommandList → CommandGroup → CommandItem
+- Selection state: Array of account IDs (`selectedAccountIds: string[]`)
+- Toggle logic: Click adds/removes ID from array
+- Visual feedback: Check icon opacity (100% selected, 0% unselected)
+
+**Original Design (NOT Implemented - for reference):**
 - **● Portfolio X** → Active portfolio (exact match)
 - **○ Portfolio Y** → Inactive portfolio (click to activate)
 - **☑ Account** → Checked (part of current selection)
