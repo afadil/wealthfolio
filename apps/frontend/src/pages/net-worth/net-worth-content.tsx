@@ -17,6 +17,7 @@ import {
   IntervalSelector,
   PrivacyAmount,
   getInitialIntervalData,
+  usePersistentState,
   type TimePeriod,
 } from "@wealthfolio/ui";
 import { useNetWorth, useNetWorthHistory } from "@/hooks/use-alternative-assets";
@@ -28,9 +29,9 @@ import type { DateRange } from "@/lib/types";
 import { NetWorthChart } from "./net-worth-chart";
 import Balance from "@/pages/dashboard/balance";
 
-// Muted tan/gold for net worth theme (matches chart)
-const THEME_COLOR = "hsl(35 45% 65%)";
-const THEME_COLOR_LIGHT = "hsl(35 45% 65% / 0.12)";
+// Goldish orange for net worth theme (matches chart)
+const THEME_COLOR = "hsl(38 75% 50%)";
+const THEME_COLOR_LIGHT = "hsl(38 75% 50% / 0.12)";
 
 // Color classes for category items (Tailwind classes for dots)
 const CATEGORY_COLORS: Record<string, string> = {
@@ -282,7 +283,8 @@ function CompositionWidget({ data, isLoading }: CompositionWidgetProps) {
   );
 }
 
-const INITIAL_INTERVAL = "ALL" as const;
+const DEFAULT_INTERVAL: TimePeriod = "ALL";
+const INTERVAL_STORAGE_KEY = "networth-interval";
 
 /**
  * Net Worth Content - Embeddable content for the combined portfolio page
@@ -291,11 +293,15 @@ export function NetWorthContent() {
   const { settings } = useSettingsContext();
   const { data: netWorthData, isLoading, isError, error } = useNetWorth();
 
-  // Chart date range state
-  const initialData = getInitialIntervalData(INITIAL_INTERVAL);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(initialData.range);
+  // Use the same persisted state as IntervalSelector for the interval code
+  const [intervalCode] = usePersistentState<TimePeriod>(INTERVAL_STORAGE_KEY, DEFAULT_INTERVAL);
+
+  // Derive initial values from the persisted interval code
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(
+    () => getInitialIntervalData(intervalCode).range,
+  );
   const [selectedIntervalDescription, setSelectedIntervalDescription] = useState<string>(
-    initialData.description,
+    () => getInitialIntervalData(intervalCode).description,
   );
 
   // Compute ISO date strings for the history query
@@ -352,7 +358,7 @@ export function NetWorthContent() {
     };
   }, [netWorthData]);
 
-  // Calculate gain/loss from history data using contribution-adjusted calculation
+  // Calculate net worth change using simple delta (industry standard for net worth tracking)
   const { gainLossAmount, gainLossPercent } = useMemo(() => {
     if (!historyData || historyData.length < 2) {
       return { gainLossAmount: 0, gainLossPercent: 0 };
@@ -361,36 +367,18 @@ export function NetWorthContent() {
     const first = historyData[0];
     const last = historyData[historyData.length - 1];
 
-    // Parse values
-    const firstPortfolioValue = parseFloat(first.portfolioValue) || 0;
-    const lastPortfolioValue = parseFloat(last.portfolioValue) || 0;
-    const firstNetContribution = parseFloat(first.netContribution) || 0;
-    const lastNetContribution = parseFloat(last.netContribution) || 0;
-    const firstAltAssets = parseFloat(first.alternativeAssetsValue) || 0;
-    const lastAltAssets = parseFloat(last.alternativeAssetsValue) || 0;
-    const firstLiabilities = parseFloat(first.totalLiabilities) || 0;
-    const lastLiabilities = parseFloat(last.totalLiabilities) || 0;
     const firstNetWorth = parseFloat(first.netWorth) || 0;
+    const lastNetWorth = parseFloat(last.netWorth) || 0;
 
-    // Portfolio gain = (last.portfolioValue - last.netContribution) - (first.portfolioValue - first.netContribution)
-    // This removes the effect of deposits/withdrawals
-    const portfolioGain =
-      lastPortfolioValue - lastNetContribution - (firstPortfolioValue - firstNetContribution);
+    // Simple delta: how much did total wealth change?
+    const change = lastNetWorth - firstNetWorth;
 
-    // Alternative asset gain = simple delta (no contribution tracking)
-    const altAssetGain = lastAltAssets - firstAltAssets;
+    // Percent change relative to starting net worth
+    // Use absolute value for negative starting net worth to get meaningful percentage
+    const base = firstNetWorth !== 0 ? Math.abs(firstNetWorth) : 1;
+    const percent = change / base;
 
-    // Liability reduction = positive value (debt paid down is gain)
-    const liabilityReduction = firstLiabilities - lastLiabilities;
-
-    // Total gain
-    const totalGain = portfolioGain + altAssetGain + liabilityReduction;
-
-    // Percent based on starting net worth (or starting assets if net worth is zero/negative)
-    const startingBase = firstNetWorth > 0 ? firstNetWorth : Math.abs(firstNetWorth) || 1;
-    const percent = totalGain / startingBase;
-
-    return { gainLossAmount: totalGain, gainLossPercent: percent };
+    return { gainLossAmount: change, gainLossPercent: percent };
   }, [historyData]);
 
   const currency = netWorthData?.currency || settings?.baseCurrency || "USD";
@@ -505,18 +493,18 @@ export function NetWorthContent() {
               className="pointer-events-auto relative z-20 w-full max-w-screen-sm sm:max-w-screen-md md:max-w-2xl lg:max-w-3xl"
               onIntervalSelect={handleIntervalSelect}
               isLoading={isHistoryLoading}
-              storageKey="networth-interval"
-              defaultValue="ALL"
+              storageKey={INTERVAL_STORAGE_KEY}
+              defaultValue={DEFAULT_INTERVAL}
             />
           </div>
         )}
       </div>
 
-      {/* Content section with gradient background */}
+      {/* Content section with gradient background - starts at 0.15 to match chart bottom */}
       <div
-        className="bg-linear-to-t grow px-4 pt-4 md:px-6 md:pt-6 lg:px-10 lg:pt-8"
+        className="grow px-4 pt-4 md:px-6 md:pt-6 lg:px-10 lg:pt-8"
         style={{
-          backgroundImage: `linear-gradient(to top, ${THEME_COLOR.replace(")", " / 0.30)")}, ${THEME_COLOR.replace(")", " / 0.15)")}, ${THEME_COLOR.replace(")", " / 0.10)")})`,
+          backgroundImage: `linear-gradient(to bottom, ${THEME_COLOR.replace(")", " / 0.15)")}, ${THEME_COLOR.replace(")", " / 0.08)")} 50%, ${THEME_COLOR.replace(")", " / 0)")} 100%)`,
         }}
       >
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:gap-20">

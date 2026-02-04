@@ -6,8 +6,8 @@ import { AmountDisplay } from "@wealthfolio/ui";
 import { Area, AreaChart, Tooltip, YAxis } from "recharts";
 import type { NetWorthHistoryPoint } from "@/lib/types";
 
-// Muted tan/gold for net worth chart (consistent across light/dark modes)
-const CHART_COLOR = "hsl(35, 45%, 65%)";
+// Goldish orange for net worth chart (consistent across light/dark modes)
+const CHART_COLOR = "hsl(38, 75%, 50%)";
 
 interface ChartDataPoint {
   date: string;
@@ -138,8 +138,8 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
       >
         <defs>
           <linearGradient id="netWorthGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={CHART_COLOR} stopOpacity={0.2} />
-            <stop offset="95%" stopColor={CHART_COLOR} stopOpacity={0.1} />
+            <stop offset="5%" stopColor={CHART_COLOR} stopOpacity={0.4} />
+            <stop offset="95%" stopColor={CHART_COLOR} stopOpacity={0.15} />
           </linearGradient>
         </defs>
         <Tooltip
