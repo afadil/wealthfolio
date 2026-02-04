@@ -239,37 +239,46 @@ export const useToggleHoldingTargetLock = () => {...}
 - Test Axum endpoints in web mode
 - Verify 100% sum constraint enforcement
 
-### Sprint 2: Enhanced Side Panel UI (2-3 days)
+### Sprint 2: Enhanced Side Panel UI with Live Preview (2-3 days)
 
 **Tasks:**
-1. Create `AssetClassSidePanel.tsx`:
-   - Read-only asset class header
-   - Holdings breakdown section
-   - Integration with Sheet component
-2. Create `HoldingTargetRow.tsx`:
-   - Text input for target percentage
-   - Visual progress bar
-   - Lock/delete buttons
-   - Clickable holding name (navigation)
-   - Validation feedback
-3. Create React Query hooks:
-   - `use-holding-target-queries.ts`
-   - `use-holding-target-mutations.ts`
-   - `use-cascading-percentages.ts`
-4. Update `allocation-pie-chart-view.tsx`:
-   - Pass selected asset class to side panel
-   - Replace current side panel content with `AssetClassSidePanel`
-5. Update `index.tsx`:
-   - Import new components
-   - Wire up data flow
+1. ✅ Create React Query hooks:
+   - `use-holding-target-queries.ts` - Fetch holding targets
+   - `use-holding-target-mutations.ts` - Save/delete/lock mutations
+   - `use-cascading-percentages.ts` - Calculate portfolio %
+2. ✅ Create `HoldingTargetRow.tsx`:
+   - Text input for target percentage (inline editing)
+   - Visual progress bar (h-3, compact)
+   - Lock/delete buttons (only show when target exists)
+   - Clickable holding name with price → navigation
+   - Lock styling: `bg-gray-800 dark:bg-gray-700 text-gray-300` (darker)
+3. ✅ Integrate into side panel (index.tsx):
+   - Replace simple holding list with HoldingTargetRow components
+   - Organize by sub-asset class (collapsible sections)
+   - Preserve total price per sub-class
+4. 🔄 Add Live Preview functionality:
+   - Calculate auto-distributed % for unset holdings
+   - Display user-set values in bold
+   - Display auto-calculated previews in italic/grey with "→" indicator
+   - Add "Save All Targets" button (batch save)
+   - Show total % indicator (e.g., "Total: 100% ✓")
+5. 🔄 Update mutation logic:
+   - On save: collect all user-set + auto-calculated values
+   - Batch save all targets in one mutation
+   - Toast notification: "Saved X targets (Y auto-distributed)"
+6. 🔄 Polish UI:
+   - Reduce all progress bar heights to h-3 (compact)
+   - Add market value display next to holding names
+   - Improve spacing and visual hierarchy
 
 **Validation:**
-- Click pie slice → side panel opens with holdings
-- Enter target percentage → saves to backend
-- Lock holding → prevents auto-adjustment
-- Delete holding target → proportional auto-fill
-- Click holding name → navigates to detail page
-- Sum validation: cannot save if holdings don't sum to 100%
+- ✅ Click pie slice → side panel opens with holdings grouped by sub-class
+- ✅ Enter target percentage → input works, no strict validation
+- 🔄 See live preview of auto-calculated % (italic, grey)
+- 🔄 Click "Save All Targets" → saves user + auto values
+- 🔄 Lock holding → prevents auto-preview calculation
+- ✅ Delete holding target → removed from list
+- ✅ Click holding name → navigates to detail page
 
 ### Sprint 3: Rebalancing Enhancement (1-2 days)
 
@@ -301,33 +310,60 @@ export const useToggleHoldingTargetLock = () => {...}
 
 ## 5. Technical Details
 
-### 5.1 Validation Rules
+### 5.1 Validation Rules (Hybrid #1: Live Preview + Auto-distribute)
+
+**Phase 3 Strategy:**
+- **NO strict 100% validation** - allows incremental target setting
+- Live preview shows what will be saved before user commits
+- Auto-distributes remaining % to unset holdings
+- User sees preview → clicks "Save All Targets" → all saved at once
+- *(Strict mode deferred to Phase 4 as optional setting)*
 
 **Holding Targets (per asset class):**
-- Sum of all holding targets in same asset class must equal 100%
 - Each target: 0.00% to 100.00% (2 decimal places)
 - Locked targets cannot be auto-adjusted
 - Deleting a target redistributes its percentage proportionally to unlocked holdings
+- **User-set targets** displayed in bold
+- **Auto-calculated previews** displayed in italic/grey with "→" indicator
 
-**Auto-Fill Logic:**
+**Auto-Fill Logic (Live Preview):**
 - When user sets target for some holdings but not all:
   - Calculate total allocated: `SUM(set_targets)`
   - Calculate remainder: `100% - total_allocated`
+  - Show preview of auto-distributed % in UI (italic, grey)
   - Distribute remainder proportionally among unset holdings based on current market values
+  - User clicks "Save All Targets" to commit all values (user-set + auto-calculated)
 
-**Example:**
+**Example (Live Preview UX):**
 ```
 Equity Asset Class (4 holdings):
-- VTI: Set to 40% (locked)
-- VOO: Set to 30%
-- VXUS: Not set (current value: $10k)
-- VGT: Not set (current value: $20k)
 
-Auto-fill calculation:
+User Action:
+- VTI: User enters 40% (locked)
+- VOO: User enters 30%
+
+Live Preview Shows:
+┌─────────────────────────────────────┐
+│ VTI: 40% (bold, user-set) [🔒]     │
+│ VOO: 30% (bold, user-set)          │
+│ VXUS: → 10% (grey, italic, auto)   │ ← Preview
+│ VGT: → 20% (grey, italic, auto)    │ ← Preview
+│─────────────────────────────────────│
+│ Total: 100% ✓                      │
+│ [Save All Targets]                  │
+└─────────────────────────────────────┘
+
+Auto-fill calculation (same as before):
 - Allocated: 40% + 30% = 70%
 - Remainder: 100% - 70% = 30%
-- VXUS gets: 30% × ($10k / $30k) = 10%
-- VGT gets: 30% × ($20k / $30k) = 20%
+- VXUS preview: 30% × ($10k / $30k) = 10%
+- VGT preview: 30% × ($20k / $30k) = 20%
+
+When user clicks "Save All Targets":
+- Saves VTI: 40% (locked)
+- Saves VOO: 30%
+- Saves VXUS: 10% (from preview)
+- Saves VGT: 20% (from preview)
 ```
 
 ### 5.2 Cascading Percentage Calculation
@@ -449,9 +485,71 @@ export const calculatePortfolioPercent = (
 
 ---
 
-## 8. Deferred to Phase 4
+## 8. Phase 4 Enhancements (Future)
 
-**Features NOT included in Phase 3:**
+### 8.1 Allocation Preferences (Settings Toggle)
+
+**Goal:** Give users control over holding target behavior via settings.
+
+**Implementation (1-2 days):**
+
+```tsx
+// Settings Page: Allocation Preferences
+┌────────────────────────────────────────┐
+│ Allocation Preferences                 │
+│                                        │
+│ Holding Target Behavior:               │
+│ ● Preview before distributing (default)│ ← Hybrid #1 (Phase 3)
+│ ○ Strict mode (must sum to 100%)      │ ← Option 3 (new)
+└────────────────────────────────────────┘
+```
+
+**Modes:**
+
+1. **Preview Mode (Default - Hybrid #1):**
+   - Shows live preview of auto-distributed %
+   - User clicks "Save All Targets" to commit
+   - Allows partial allocation (< 100%)
+   - Best for casual users
+
+2. **Strict Mode (Opt-in):**
+   - Enforces 100% sum validation
+   - Blocks save if targets don't sum to 100%
+   - Shows error: "Holdings must sum to 100%. Current: X%"
+   - For advanced users who want explicit control
+
+**Storage:**
+```typescript
+// localStorage or user preferences
+{
+  "allocation": {
+    "holdingTargetMode": "preview" | "strict"
+  }
+}
+```
+
+**Mutation Logic Update:**
+```typescript
+const mode = useAllocationPreferences().holdingTargetMode;
+
+if (mode === 'preview') {
+  // Phase 3 behavior: Show preview, allow save
+  showAutoDistributedPreview();
+  allowSave();
+
+} else if (mode === 'strict') {
+  // Phase 4 behavior: Enforce 100%
+  const total = calculateTotal();
+  if (total !== 100) {
+    toast.error(`Must sum to 100%. Current: ${total}%`);
+    preventSave();
+  }
+}
+```
+
+### 8.2 Other Deferred Features
+
+**Not included in Phase 3 or 4:**
 - ❌ Holdings Allocation table view (optional alternative to side panel)
 - ❌ Sub-pie chart visualization in side panel (nice-to-have)
 - ❌ Drag-and-drop reordering of holdings
@@ -503,11 +601,13 @@ export const calculatePortfolioPercent = (
 - Consistent with current panel UX
 - Saves vertical space for more holdings
 
-✅ **Validation Rules:**
-- Holdings within asset class MUST sum to 100%
-- Show error if user tries to save with incorrect total
+✅ **Validation Rules (Phase 3 - Hybrid #1):**
+- NO strict 100% validation in Phase 3 (deferred to Phase 4 settings)
+- Live preview shows auto-distributed % for unset holdings
+- User-set targets in bold, auto-calculated in italic/grey
+- "Save All Targets" button commits all values at once
 - Locked holdings cannot be auto-adjusted
-- Auto-fill distributes remainder proportionally
+- Show total % indicator: "Total: 100% ✓" or "Total: 75% (25% auto)"
 
 ✅ **Lock Behavior:**
 - Lock icon pattern: `bg-secondary text-gray-700` (Phase 2 standard)
@@ -521,9 +621,10 @@ export const calculatePortfolioPercent = (
 - Display both percentages in UI for clarity
 
 ✅ **Backend Validation:**
-- Service layer enforces 100% sum constraint
+- ✅ Phase 3: 100% sum constraint DISABLED (commented out)
 - Repository has foreign key constraints (asset_class_id, asset_id)
 - Use existing `holding_targets` table (confirmed in migrations)
+- TODO: Re-enable strict validation in Phase 4 as optional mode
 
 ✅ **Rebalancing Integration:**
 - Must update rebalancing-advisor.tsx in Sprint 3
@@ -536,6 +637,7 @@ export const calculatePortfolioPercent = (
 - Reuse AlertDialog for locked deletion warnings
 - Icons: Lock, LockOpen, Trash2 (same as Phase 2)
 
-**Last Updated:** January 27, 2026
-**Status:** Planning Complete, Ready for Implementation
-**Next Step:** Sprint 1 - Backend Foundation
+**Last Updated:** January 28, 2026
+**Status:** Sprint 1 Complete ✅, Sprint 2 In Progress 🔄
+**Current Focus:** Live Preview UI (Hybrid #1)
+**Next Step:** Complete Sprint 2 - Add live preview and "Save All Targets" button

@@ -6,7 +6,7 @@ use crate::{
     main_lib::AppState,
 };
 use axum::{
-    extract::State,
+    extract::{Path, State},
     http::StatusCode,
     response::sse::{Event as SseEvent, KeepAlive, Sse},
     routing::{get, post},
@@ -14,6 +14,7 @@ use axum::{
 };
 use futures_core::stream::Stream;
 use tokio_stream::wrappers::{errors::BroadcastStreamRecvError, BroadcastStream};
+use wealthfolio_core::portfolio::portfolio_model::{NewPortfolio, Portfolio, UpdatePortfolio};
 
 async fn update_portfolio(
     State(state): State<Arc<AppState>>,
@@ -73,9 +74,76 @@ async fn stream_events(
     )
 }
 
+// Portfolio Management Endpoints
+
+async fn create_portfolio(
+    State(state): State<Arc<AppState>>,
+    Json(new_portfolio): Json<NewPortfolio>,
+) -> ApiResult<Json<Portfolio>> {
+    let portfolio = state
+        .portfolio_service
+        .create_portfolio(new_portfolio)
+        .await?;
+    Ok(Json(portfolio))
+}
+
+async fn update_portfolio_endpoint(
+    State(state): State<Arc<AppState>>,
+    Json(update_portfolio): Json<UpdatePortfolio>,
+) -> ApiResult<Json<Portfolio>> {
+    let portfolio = state
+        .portfolio_service
+        .update_portfolio(update_portfolio)
+        .await?;
+    Ok(Json(portfolio))
+}
+
+async fn get_portfolio(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Portfolio>> {
+    let portfolio = state.portfolio_service.get_portfolio(&id)?;
+    Ok(Json(portfolio))
+}
+
+async fn list_portfolios(State(state): State<Arc<AppState>>) -> ApiResult<Json<Vec<Portfolio>>> {
+    let portfolios = state.portfolio_service.list_portfolios()?;
+    Ok(Json(portfolios))
+}
+
+async fn delete_portfolio(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> ApiResult<StatusCode> {
+    state.portfolio_service.delete_portfolio(&id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn get_portfolios_containing_account(
+    State(state): State<Arc<AppState>>,
+    Path(account_id): Path<String>,
+) -> ApiResult<Json<Vec<Portfolio>>> {
+    let portfolios = state
+        .portfolio_service
+        .get_portfolios_containing_account(&account_id)?;
+    Ok(Json(portfolios))
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/portfolio/update", post(update_portfolio))
         .route("/portfolio/recalculate", post(recalculate_portfolio))
+        .route("/portfolios", post(create_portfolio))
+        .route("/portfolios", get(list_portfolios))
+        .route("/portfolios/:id", get(get_portfolio))
+        .route(
+            "/portfolios/:id",
+            axum::routing::put(update_portfolio_endpoint),
+        )
+        .route("/portfolios/:id", axum::routing::delete(delete_portfolio))
+        .route(
+            "/portfolios/by-account/:account_id",
+            get(get_portfolios_containing_account),
+        )
         .route("/events/stream", get(stream_events))
 }

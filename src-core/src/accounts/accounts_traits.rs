@@ -37,4 +37,5 @@ pub trait AccountServiceTrait: Send + Sync {
     fn get_all_accounts(&self) -> Result<Vec<Account>>;
     fn get_active_accounts(&self) -> Result<Vec<Account>>;
     fn get_accounts_by_ids(&self, account_ids: &[String]) -> Result<Vec<Account>>;
+    async fn find_or_create_combined_portfolio(&self, account_ids: Vec<String>) -> Result<Account>;
 }

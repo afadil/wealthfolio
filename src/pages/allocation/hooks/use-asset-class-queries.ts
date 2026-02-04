@@ -1,10 +1,10 @@
 import { logger } from "@/adapters";
 import { getHoldings } from "@/commands/portfolio";
 import {
-  deleteAssetClassTarget,
-  getAssetClassTargets,
-  getRebalancingStrategies,
-  saveAssetClassTarget,
+    deleteAssetClassTarget,
+    getAssetClassTargets,
+    getRebalancingStrategies,
+    saveAssetClassTarget,
 } from "@/commands/rebalancing";
 import { QueryKeys } from "@/lib/query-keys";
 import type { AssetClassTarget, NewAssetClassTarget } from "@/lib/types";
@@ -49,7 +49,7 @@ export function useAssetClassTargets(accountId: string | null) {
   const { data: strategy } = useRebalancingStrategy(accountId);
 
   return useQuery<AssetClassTarget[], Error>({
-    queryKey: [QueryKeys.ASSET_CLASS_TARGETS, strategy?.id],
+    queryKey: [QueryKeys.ASSET_CLASS_TARGETS, accountId, strategy?.id],
     queryFn: () => getAssetClassTargets(strategy!.id),
     enabled: !!strategy?.id,
   });

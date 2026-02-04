@@ -26,6 +26,8 @@ export interface Account {
   createdAt: Date;
   updatedAt: Date;
   platformId?: string; // Optional
+  isCombinedPortfolio: boolean;
+  componentAccountIds?: string; // JSON array of account IDs
 }
 
 export interface Activity {
@@ -580,6 +582,7 @@ export interface AssetClassTarget {
   strategyId: string;
   assetClass: string;
   targetPercent: number;
+  isLocked: boolean;
   createdAt: string;
   updatedAt: string;
 }

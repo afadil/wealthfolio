@@ -248,3 +248,81 @@ pub async fn calculate_performance_summary(
         .await
         .map_err(|e| format!("Failed to calculate performance: {}", e))
 }
+
+// ============================================================================
+// Portfolio Management Commands
+// ============================================================================
+
+use wealthfolio_core::portfolio::portfolio_model::{NewPortfolio, Portfolio, UpdatePortfolio};
+
+#[tauri::command]
+pub async fn create_portfolio(
+    state: State<'_, Arc<ServiceContext>>,
+    new_portfolio: NewPortfolio,
+) -> Result<Portfolio, String> {
+    debug!("Creating portfolio: {:?}", new_portfolio);
+    state
+        .portfolio_service()
+        .create_portfolio(new_portfolio)
+        .await
+        .map_err(|e| format!("Failed to create portfolio: {}", e))
+}
+
+#[tauri::command]
+pub async fn update_portfolio_cmd(
+    state: State<'_, Arc<ServiceContext>>,
+    update_portfolio: UpdatePortfolio,
+) -> Result<Portfolio, String> {
+    debug!("Updating portfolio: {:?}", update_portfolio);
+    state
+        .portfolio_service()
+        .update_portfolio(update_portfolio)
+        .await
+        .map_err(|e| format!("Failed to update portfolio: {}", e))
+}
+
+#[tauri::command]
+pub fn get_portfolio(
+    state: State<'_, Arc<ServiceContext>>,
+    portfolio_id: String,
+) -> Result<Portfolio, String> {
+    debug!("Getting portfolio: {}", portfolio_id);
+    state
+        .portfolio_service()
+        .get_portfolio(&portfolio_id)
+        .map_err(|e| format!("Failed to get portfolio: {}", e))
+}
+
+#[tauri::command]
+pub fn list_portfolios(state: State<'_, Arc<ServiceContext>>) -> Result<Vec<Portfolio>, String> {
+    debug!("Listing all portfolios");
+    state
+        .portfolio_service()
+        .list_portfolios()
+        .map_err(|e| format!("Failed to list portfolios: {}", e))
+}
+
+#[tauri::command]
+pub async fn delete_portfolio(
+    state: State<'_, Arc<ServiceContext>>,
+    portfolio_id: String,
+) -> Result<(), String> {
+    debug!("Deleting portfolio: {}", portfolio_id);
+    state
+        .portfolio_service()
+        .delete_portfolio(&portfolio_id)
+        .await
+        .map_err(|e| format!("Failed to delete portfolio: {}", e))
+}
+
+#[tauri::command]
+pub fn get_portfolios_containing_account(
+    state: State<'_, Arc<ServiceContext>>,
+    account_id: String,
+) -> Result<Vec<Portfolio>, String> {
+    debug!("Getting portfolios containing account: {}", account_id);
+    state
+        .portfolio_service()
+        .get_portfolios_containing_account(&account_id)
+        .map_err(|e| format!("Failed to get portfolios: {}", e))
+}

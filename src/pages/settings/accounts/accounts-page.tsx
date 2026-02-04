@@ -1,7 +1,5 @@
-import { getAccounts } from "@/commands/account";
-import { QueryKeys } from "@/lib/query-keys";
+import { useAccounts } from "@/hooks/use-accounts";
 import type { Account } from "@/lib/types";
-import { useQuery } from "@tanstack/react-query";
 import { Button, EmptyPlaceholder, Icons, Separator, Skeleton } from "@wealthfolio/ui";
 import { useState } from "react";
 import { SettingsHeader } from "../settings-header";
@@ -10,10 +8,8 @@ import { AccountItem } from "./components/account-item";
 import { useAccountMutations } from "./components/use-account-mutations";
 
 const SettingsAccountsPage = () => {
-  const { data: accounts, isLoading } = useQuery<Account[], Error>({
-    queryKey: [QueryKeys.ACCOUNTS],
-    queryFn: getAccounts,
-  });
+  // Show ALL accounts including combined portfolios in settings for management
+  const { accounts, isLoading } = useAccounts(false, true);
 
   const [visibleModal, setVisibleModal] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);

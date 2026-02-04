@@ -175,6 +175,7 @@ pub fn run() {
             commands::account::create_account,
             commands::account::update_account,
             commands::account::delete_account,
+            commands::account::find_or_create_combined_portfolio,
             // Activity commands
             commands::activity::search_activities,
             commands::activity::get_activities,
@@ -212,6 +213,13 @@ pub fn run() {
             commands::portfolio::recalculate_portfolio,
             commands::portfolio::calculate_performance_summary,
             commands::portfolio::calculate_performance_history,
+            // Portfolio Management commands
+            commands::portfolio::create_portfolio,
+            commands::portfolio::update_portfolio_cmd,
+            commands::portfolio::get_portfolio,
+            commands::portfolio::list_portfolios,
+            commands::portfolio::delete_portfolio,
+            commands::portfolio::get_portfolios_containing_account,
             // Rebalancing commands
             commands::rebalancing::get_rebalancing_strategies,
             commands::rebalancing::get_rebalancing_strategy,

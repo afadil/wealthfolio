@@ -25,6 +25,7 @@ pub struct AssetClassTarget {
     pub strategy_id: String,
     pub asset_class: String,
     pub target_percent: f32,
+    pub is_locked: bool,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -74,6 +75,8 @@ pub struct NewAssetClassTarget {
     pub strategy_id: String,
     pub asset_class: String,
     pub target_percent: f32,
+    #[serde(default)]
+    pub is_locked: bool,
 }
 
 impl NewAssetClassTarget {
@@ -167,6 +170,8 @@ pub struct AssetClassTargetDB {
     pub target_percent: f32,
     pub created_at: String,
     pub updated_at: String,
+    pub account_id: Option<String>,
+    pub is_locked: bool,
 }
 
 #[derive(
@@ -190,9 +195,9 @@ pub struct HoldingTargetDB {
     pub asset_class_id: String,
     pub asset_id: String,
     pub target_percent_of_class: f32,
-    pub is_locked: i32,
     pub created_at: String,
     pub updated_at: String,
+    pub is_locked: i32,
 }
 
 // ============================================================================
@@ -235,6 +240,7 @@ impl From<AssetClassTargetDB> for AssetClassTarget {
             strategy_id: db.strategy_id,
             asset_class: db.asset_class,
             target_percent: db.target_percent,
+            is_locked: db.is_locked,
             created_at: db.created_at,
             updated_at: db.updated_at,
         }
@@ -253,6 +259,8 @@ impl From<NewAssetClassTarget> for AssetClassTargetDB {
             target_percent: domain.target_percent,
             created_at: now.clone(),
             updated_at: now,
+            account_id: None,
+            is_locked: domain.is_locked,
         }
     }
 }
@@ -281,9 +289,9 @@ impl From<NewHoldingTarget> for HoldingTargetDB {
             asset_class_id: domain.asset_class_id,
             asset_id: domain.asset_id,
             target_percent_of_class: domain.target_percent_of_class,
-            is_locked: if domain.is_locked { 1 } else { 0 },
             created_at: now.clone(),
             updated_at: now,
+            is_locked: if domain.is_locked { 1 } else { 0 },
         }
     }
 }

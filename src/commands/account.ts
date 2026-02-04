@@ -1,8 +1,7 @@
-import z from "zod";
-import { Account } from "@/lib/types";
+import { getRunEnv, invokeTauri, invokeWeb, logger, RUN_ENV } from "@/adapters";
 import { newAccountSchema } from "@/lib/schemas";
-import { getRunEnv, RUN_ENV, invokeTauri, invokeWeb } from "@/adapters";
-import { logger } from "@/adapters";
+import { Account } from "@/lib/types";
+import z from "zod";
 
 type NewAccount = z.infer<typeof newAccountSchema>;
 
@@ -73,6 +72,25 @@ export const deleteAccount = async (accountId: string): Promise<void> => {
     }
   } catch (error) {
     logger.error("Error deleting account.");
+    throw error;
+  }
+};
+
+// findOrCreateCombinedPortfolio
+export const findOrCreateCombinedPortfolio = async (accountIds: string[]): Promise<Account> => {
+  try {
+    logger.debug(`Finding or creating combined portfolio for accounts: ${accountIds.join(', ')}`);
+
+    switch (getRunEnv()) {
+      case RUN_ENV.DESKTOP:
+        return invokeTauri("find_or_create_combined_portfolio", { accountIds });
+      case RUN_ENV.WEB:
+        return invokeWeb("find_or_create_combined_portfolio", { accountIds });
+      default:
+        throw new Error(`Unsupported environment`);
+    }
+  } catch (error) {
+    logger.error("Error finding or creating combined portfolio.");
     throw error;
   }
 };

@@ -1,11 +1,11 @@
 import { Button } from "@/components/ui/button";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Account } from "@/lib/types";
@@ -31,8 +31,14 @@ const accountTypeIcons: Record<string, Icon> = {
 };
 
 interface AccountSelectorProps {
+  // Single-select mode (existing, backward compatible)
   selectedAccount?: Account | null;
-  setSelectedAccount: (account: Account) => void;
+  setSelectedAccount?: (account: Account) => void;
+  // Multi-select mode (new, opt-in)
+  multiSelect?: boolean;
+  selectedAccounts?: Account[];
+  setSelectedAccounts?: (accounts: Account[]) => void;
+  // Other props
   variant?: "card" | "dropdown" | "button" | "form";
   buttonText?: string;
   filterActive?: boolean;
@@ -58,6 +64,7 @@ function createPortfolioAccount(baseCurrency: string): UIAccount {
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
+    isCombinedPortfolio: false,
   };
 }
 
@@ -106,6 +113,9 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
     {
       selectedAccount,
       setSelectedAccount,
+      multiSelect = false,
+      selectedAccounts = [],
+      setSelectedAccounts,
       variant = "card",
       buttonText = "Select Account",
       filterActive = true,
@@ -293,17 +303,43 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
               )}
             >
               <div className="flex items-center gap-2">
-                {selectedAccount ? (
-                  <>
-                    {(() => {
-                      const IconComponent =
-                        accountTypeIcons[selectedAccount.accountType] ?? Icons.CreditCard;
-                      return <IconComponent className="h-4 w-4 shrink-0 opacity-70" />;
-                    })()}
-                    <span>{selectedAccount.name}</span>
-                  </>
+                {multiSelect ? (
+                  // Multi-select mode: show appropriate text based on selection
+                  selectedAccounts && selectedAccounts.length > 0 ? (
+                    selectedAccounts.length === 1 ? (
+                      // Single account selected: show account name
+                      <>
+                        {(() => {
+                          const IconComponent =
+                            accountTypeIcons[selectedAccounts[0].accountType] ?? Icons.CreditCard;
+                          return <IconComponent className="h-4 w-4 shrink-0 opacity-70" />;
+                        })()}
+                        <span>{selectedAccounts[0].name}</span>
+                      </>
+                    ) : (
+                      // Multiple accounts selected: show count
+                      <>
+                        <Icons.Wallet className="h-4 w-4 shrink-0 opacity-70" />
+                        <span>{selectedAccounts.length} accounts selected</span>
+                      </>
+                    )
+                  ) : (
+                    <span className="text-muted-foreground">Select accounts</span>
+                  )
                 ) : (
-                  <span className="text-muted-foreground">Select an account</span>
+                  // Single-select mode (existing)
+                  selectedAccount ? (
+                    <>
+                      {(() => {
+                        const IconComponent =
+                          accountTypeIcons[selectedAccount.accountType] ?? Icons.CreditCard;
+                        return <IconComponent className="h-4 w-4 shrink-0 opacity-70" />;
+                      })()}
+                      <span>{selectedAccount.name}</span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">Select an account</span>
+                  )
                 )}
               </div>
               <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -395,13 +431,45 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
                       {typeAccounts.map((account) => {
                         const IconComponent =
                           accountTypeIcons[account.accountType] ?? Icons.CreditCard;
+
+                        // Check if account is selected (works for both single and multi mode)
+                        const isSelected = multiSelect
+                          ? selectedAccounts?.some((a) => a.id === account.id) ?? false
+                          : selectedAccount?.id === account.id;
+
                         return (
                           <CommandItem
                             key={account.id}
                             value={`${account.name} ${account.currency} ${account.accountType}`}
                             onSelect={() => {
-                              setSelectedAccount(account);
-                              setOpen(false);
+                              if (multiSelect && setSelectedAccounts) {
+                                // Multi-select mode: toggle account in array
+                                const isCurrentlySelected = selectedAccounts?.some((a) => a.id === account.id);
+                                const isAllPortfolio = account.id === PORTFOLIO_ACCOUNT_ID;
+                                const hasAllPortfolio = selectedAccounts?.some((a) => a.id === PORTFOLIO_ACCOUNT_ID);
+
+                                if (isCurrentlySelected) {
+                                  // Remove account
+                                  setSelectedAccounts(selectedAccounts.filter((a) => a.id !== account.id));
+                                } else {
+                                  // Add account with exclusivity rules
+                                  if (isAllPortfolio) {
+                                    // "All Portfolio" selected: replace all selections with just "All Portfolio"
+                                    setSelectedAccounts([account]);
+                                  } else if (hasAllPortfolio) {
+                                    // Regular account selected while "All Portfolio" is active: replace with this account
+                                    setSelectedAccounts([account]);
+                                  } else {
+                                    // Regular account selection: add to list
+                                    setSelectedAccounts([...(selectedAccounts || []), account]);
+                                  }
+                                }
+                                // Keep dropdown open in multi-select mode
+                              } else if (setSelectedAccount) {
+                                // Single-select mode: set account and close
+                                setSelectedAccount(account);
+                                setOpen(false);
+                              }
                             }}
                             className="flex items-center py-1.5"
                           >
@@ -414,7 +482,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
                             <Icons.Check
                               className={cn(
                                 "ml-auto h-4 w-4",
-                                selectedAccount?.id === account.id ? "opacity-100" : "opacity-0",
+                                isSelected ? "opacity-100" : "opacity-0",
                               )}
                             />
                           </CommandItem>

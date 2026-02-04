@@ -124,6 +124,8 @@ impl SnapshotService {
             created_at: now,
             updated_at: now,
             platform_id: None,
+            is_combined_portfolio: false,
+            component_account_ids: None,
         }
     }
 

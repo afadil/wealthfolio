@@ -2,7 +2,7 @@ import { Icons } from "@/components/ui/icons";
 import { useSettingsContext } from "@/lib/settings-provider";
 import type { AssetClassTarget } from "@/lib/types";
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogTitle, Button, Card, CardContent, CardHeader, CardTitle, TargetPercentSlider } from "@wealthfolio/ui";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useProportionalAllocation } from "../hooks";
 import type { CurrentAllocation } from "../hooks/use-current-allocation";
 import { DonutChartFull } from "./donut-chart-full";
@@ -11,10 +11,11 @@ interface AllocationPieChartViewProps {
   currentAllocation: CurrentAllocation;
   targets: AssetClassTarget[];
   onSliceClick: (assetClass: string) => void;
-  onUpdateTarget?: (assetClass: string, newPercent: number) => Promise<void>;
+  onUpdateTarget?: (assetClass: string, newPercent: number, isLocked?: boolean) => Promise<void>;
   onAddTarget?: () => void;
   onDeleteTarget?: (assetClass: string) => Promise<void>;
-  accountId?: string;
+  showHiddenTargets?: boolean;
+  onToggleHiddenTargets?: () => void;
 }
 
 export function AllocationPieChartView({
@@ -24,12 +25,35 @@ export function AllocationPieChartView({
   onUpdateTarget,
   onAddTarget,
   onDeleteTarget,
-  accountId = '',
+  showHiddenTargets = false,
+  onToggleHiddenTargets,
 }: AllocationPieChartViewProps) {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency || "USD";
   const [isSaving, setIsSaving] = useState(false);
-  const [lockedAssets, setLockedAssets] = useState<Set<string>>(new Set());
+
+  // Initialize locked assets from database instead of empty Set
+  const [lockedAssets, setLockedAssets] = useState<Set<string>>(() => {
+    const locked = new Set<string>();
+    targets.forEach((target) => {
+      if (target.isLocked) {
+        locked.add(target.assetClass);
+      }
+    });
+    return locked;
+  });
+
+  // Sync locked assets state when targets change (e.g., after app restart or account switch)
+  useEffect(() => {
+    const locked = new Set<string>();
+    targets.forEach((target) => {
+      if (target.isLocked) {
+        locked.add(target.assetClass);
+      }
+    });
+    setLockedAssets(locked);
+  }, [targets]);
+
   const [draggingValues, setDraggingValues] = useState<Record<string, number>>({});
   const [editingAsset, setEditingAsset] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
@@ -37,11 +61,17 @@ export function AllocationPieChartView({
   const [isDeleting, setIsDeleting] = useState(false);
   const [lockedDeleteDialogOpen, setLockedDeleteDialogOpen] = useState(false);
   const [lockedDeleteAsset, setLockedDeleteAsset] = useState<string | null>(null);
-  const [lockRefresh, setLockRefresh] = useState(0); // Force re-render when lock changes
   const { calculateProportionalTargets } = useProportionalAllocation();
 
+  // Filter targets to only show those with actual holdings in the current account(s)
+  // This prevents orphaned targets from appearing when switching between accounts
+  const targetsWithHoldings = targets.filter(target =>
+    currentAllocation.assetClasses.some(ac => ac.assetClass === target.assetClass)
+  );
+
   // Use integer arithmetic to avoid floating point precision issues
-  const allocatedPercentageInt = Math.round(targets.reduce((sum, t) => sum + t.targetPercent, 0) * 100);
+  // Calculate from filtered targets only to exclude orphaned targets
+  const allocatedPercentageInt = Math.round(targetsWithHoldings.reduce((sum, t) => sum + t.targetPercent, 0) * 100);
   const allocatedPercentage = allocatedPercentageInt / 100;
   const remaining = (10000 - allocatedPercentageInt) / 100;
 
@@ -55,7 +85,7 @@ export function AllocationPieChartView({
   };
 
   // Sort targets by actual % descending
-  const sortedTargets = [...targets].sort((a, b) => {
+  const sortedTargets = [...targetsWithHoldings].sort((a, b) => {
     const actualA = currentAllocation.assetClasses.find((ac) => ac.assetClass === a.assetClass)?.actualPercent || 0;
     const actualB = currentAllocation.assetClasses.find((ac) => ac.assetClass === b.assetClass)?.actualPercent || 0;
     return actualB - actualA;
@@ -122,16 +152,32 @@ export function AllocationPieChartView({
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm text-muted-foreground">Target vs Actual</CardTitle>
-              {onAddTarget && (
-                <Button
-                  onClick={onAddTarget}
-                  disabled={isSaving || isDeleting}
-                  size="sm"
-                  className="text-xs"
+              <div className="flex items-center gap-1">
+                {onToggleHiddenTargets && (
+                  <button
+                    type="button"
+                    onClick={onToggleHiddenTargets}
+                    className={`h-6 w-6 flex items-center justify-center flex-shrink-0 rounded transition-all ${
+                      showHiddenTargets
+                        ? "bg-secondary text-gray-700"
+                        : "opacity-70 text-muted-foreground hover:text-foreground hover:opacity-100 hover:bg-muted"
+                    }`}
+                    title={showHiddenTargets ? "Hide unused targets" : "Show unused targets"}
+                  >
+                    <Icons.Eye className="h-4 w-4" />
+                  </button>
+                )}
+                {onAddTarget && (
+                  <Button
+                    onClick={onAddTarget}
+                    disabled={isSaving || isDeleting}
+                    size="sm"
+                    className="text-xs"
                 >
                   + Add Target
                 </Button>
               )}
+            </div>
             </div>
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto">
@@ -335,14 +381,28 @@ export function AllocationPieChartView({
                           disabled={isSaving || lockedAssets.has(target.assetClass)}
                           showValue={false}
                           isLocked={lockedAssets.has(target.assetClass)}
-                          onToggleLock={() => {
+                          onToggleLock={async () => {
+                            const isCurrentlyLocked = lockedAssets.has(target.assetClass);
                             const newLocked = new Set(lockedAssets);
-                            if (newLocked.has(target.assetClass)) {
+
+                            if (isCurrentlyLocked) {
                               newLocked.delete(target.assetClass);
                             } else {
                               newLocked.add(target.assetClass);
                             }
+
                             setLockedAssets(newLocked);
+
+                            // Save to database
+                            if (onUpdateTarget) {
+                              try {
+                                await onUpdateTarget(target.assetClass, target.targetPercent, !isCurrentlyLocked);
+                              } catch (error) {
+                                console.error("Failed to update lock state:", error);
+                                // Revert local state on error
+                                setLockedAssets(lockedAssets);
+                              }
+                            }
                           }}
                           overlay={true}
                           barColor="bg-chart-2"
@@ -371,6 +431,50 @@ export function AllocationPieChartView({
                   </div>
                 );
               })}
+
+              {/* Orphaned Targets Section */}
+              {showHiddenTargets && (() => {
+                const orphanedTargets = targets.filter(target =>
+                  !currentAllocation.assetClasses.some(ac => ac.assetClass === target.assetClass)
+                );
+
+                if (orphanedTargets.length === 0) {
+                  return null;
+                }
+
+                return (
+                  <div className="mt-4 pt-4 border-t border-orange-200 dark:border-orange-900">
+                    <div className="text-xs font-medium text-orange-600 dark:text-orange-400 mb-2 flex items-center gap-1.5">
+                      <Icons.AlertTriangle className="w-3 h-3" />
+                      Unused Targets
+                    </div>
+                    <div className="space-y-2">
+                      {orphanedTargets.map(target => (
+                        <div key={target.assetClass} className="rounded-lg bg-orange-50 dark:bg-orange-950/30 p-2">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-medium text-orange-900 dark:text-orange-100">{target.assetClass}</span>
+                            {onDeleteTarget && (
+                              <Button
+                                onClick={async () => {
+                                  await onDeleteTarget(target.assetClass);
+                                }}
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300"
+                              >
+                                Delete
+                              </Button>
+                            )}
+                          </div>
+                          <div className="text-xs text-orange-700 dark:text-orange-300">
+                            Target: {target.targetPercent.toFixed(1)}% • No holdings in this account
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </CardContent>
         </Card>

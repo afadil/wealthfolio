@@ -14,6 +14,7 @@ interface AssetClassTargetCardProps {
   onProportionalChange?: (targets: AssetClassTarget[]) => Promise<void>;
   isLoading?: boolean;
   accountId?: string;
+  isReadOnly?: boolean;
 }
 
 export function AssetClassTargetCard({
@@ -25,7 +26,8 @@ export function AssetClassTargetCard({
   onTargetChange,
   onProportionalChange,
   isLoading = false,
-  accountId = '',
+  accountId: _accountId = '',
+  isReadOnly = false,
 }: AssetClassTargetCardProps) {
   const { assetClass, actualPercent } = composition;
   const [localTarget, setLocalTarget] = useState(targetPercent);
@@ -73,6 +75,7 @@ export function AssetClassTargetCard({
   };
 
   const handleTargetInputChange = (value: string) => {
+    if (isReadOnly) return;
     // Allow only numbers and one decimal point
     const sanitized = value.replace(/[^0-9.]/g, '');
     // Prevent leading zeros (e.g., "020" → "20")
@@ -81,6 +84,7 @@ export function AssetClassTargetCard({
   };
 
   const handleTargetInputBlur = async () => {
+    if (isReadOnly) return;
     const numValue = parseFloat(editValue) || 0;
     const clamped = Math.max(0, Math.min(100, numValue)); // Clamp 0-100
     setLocalTarget(clamped);
@@ -111,7 +115,7 @@ export function AssetClassTargetCard({
             variant="ghost"
             size="sm"
             onClick={onEdit}
-            disabled={isLoading || isSaving}
+            disabled={isLoading || isSaving || isReadOnly}
             className="h-7 w-7 p-0"
           >
             ✎

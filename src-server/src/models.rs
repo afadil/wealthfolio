@@ -16,6 +16,8 @@ pub struct Account {
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
     pub platform_id: Option<String>,
+    pub is_combined_portfolio: bool,
+    pub component_account_ids: Option<String>,
 }
 
 impl From<core_accounts::Account> for Account {
@@ -31,6 +33,8 @@ impl From<core_accounts::Account> for Account {
             created_at: a.created_at,
             updated_at: a.updated_at,
             platform_id: a.platform_id,
+            is_combined_portfolio: a.is_combined_portfolio,
+            component_account_ids: a.component_account_ids,
         }
     }
 }
@@ -47,6 +51,8 @@ pub struct NewAccount {
     pub is_default: bool,
     pub is_active: bool,
     pub platform_id: Option<String>,
+    pub is_combined_portfolio: bool,
+    pub component_account_ids: Option<String>,
 }
 
 impl From<NewAccount> for core_accounts::NewAccount {
@@ -60,6 +66,8 @@ impl From<NewAccount> for core_accounts::NewAccount {
             is_default: a.is_default,
             is_active: a.is_active,
             platform_id: a.platform_id,
+            is_combined_portfolio: a.is_combined_portfolio,
+            component_account_ids: a.component_account_ids,
         }
     }
 }

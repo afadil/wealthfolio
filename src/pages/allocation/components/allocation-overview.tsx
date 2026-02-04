@@ -11,6 +11,7 @@ interface AllocationOverviewProps {
   baseCurrency: string;
   onEditTargets: () => void;
   onDeleteTarget?: (assetClass: string) => Promise<void>;
+  onToggleLock?: (assetClass: string, isLocked: boolean) => Promise<void>; // ← ADDED
   accountId?: string;
 }
 
@@ -21,6 +22,7 @@ export function AllocationOverview({
   baseCurrency,
   onEditTargets,
   onDeleteTarget,
+  onToggleLock, // ← ADDED
   accountId = '',
 }: AllocationOverviewProps) {
   // Merge current and target data
@@ -31,6 +33,7 @@ export function AllocationOverview({
       target: { value: number; percent: number };
       difference: { value: number; percent: number };
       status: "over" | "under" | "on-target";
+      isLocked: boolean; // ← ADDED: Track lock state from database
     }>();
 
     // Add current allocations
@@ -44,6 +47,7 @@ export function AllocationOverview({
         target: { value: 0, percent: 0 },
         difference: { value: 0, percent: 0 },
         status: "on-target",
+        isLocked: false,
       });
     });
 
@@ -64,6 +68,7 @@ export function AllocationOverview({
         existing.status =
           Math.abs(existing.difference.percent) < 0.5 ? "on-target" :
           existing.difference.value > 0 ? "over" : "under";
+        existing.isLocked = target.isLocked || false; // ← ADDED: Get lock state from database
       } else {
         // Target exists but no current holdings
         data.set(target.assetClass, {
@@ -72,6 +77,7 @@ export function AllocationOverview({
           target: { value: targetValue, percent: target.targetPercent },
           difference: { value: -targetValue, percent: -target.targetPercent },
           status: "under",
+          isLocked: target.isLocked || false, // ← ADDED: Get lock state from database
         });
       }
     });
@@ -160,6 +166,7 @@ export function AllocationOverview({
             data={item}
             baseCurrency={baseCurrency}
             onDelete={onDeleteTarget}
+            onToggleLock={onToggleLock} // ← ADDED
             accountId={accountId}
           />
         ))}
@@ -179,27 +186,21 @@ interface ComparisonCardProps {
     target: { value: number; percent: number };
     difference: { value: number; percent: number };
     status: "over" | "under" | "on-target";
+    isLocked: boolean; // ← ADDED
   };
   baseCurrency: string;
   onDelete?: (assetClass: string) => Promise<void>;
+  onToggleLock?: (assetClass: string, isLocked: boolean) => Promise<void>; // ← ADDED
   accountId?: string;
 }
 
-function ComparisonCard({ data, baseCurrency, onDelete, accountId = '' }: ComparisonCardProps) {
-  const { useState } = require('react');
-  const [isLocked, setIsLocked] = useState(() => {
-    const lockKey = `allocation-lock-${accountId}-${data.assetClass}`;
-    return localStorage.getItem(lockKey) === 'true';
-  });
+function ComparisonCard({ data, baseCurrency, onDelete, onToggleLock }: ComparisonCardProps) {
+  // Use lock state from database (via data prop) instead of localStorage
+  const isLocked = data.isLocked;
 
-  const handleToggleLock = () => {
-    const newLockedState = !isLocked;
-    const lockKey = `allocation-lock-${accountId}-${data.assetClass}`;
-    setIsLocked(newLockedState);
-    if (newLockedState) {
-      localStorage.setItem(lockKey, 'true');
-    } else {
-      localStorage.removeItem(lockKey);
+  const handleToggleLock = async () => {
+    if (onToggleLock) {
+      await onToggleLock(data.assetClass, !isLocked);
     }
   };
 

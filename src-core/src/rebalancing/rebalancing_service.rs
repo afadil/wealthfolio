@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 
-use crate::{errors::ValidationError, Error, Result};
+use crate::Result;
 
 use super::rebalancing_model::{
     AssetClassTarget, HoldingTarget, NewAssetClassTarget, NewHoldingTarget, NewRebalancingStrategy,
@@ -65,29 +65,32 @@ impl RebalancingService for RebalancingServiceImpl {
     }
 
     async fn save_holding_target(&self, target: NewHoldingTarget) -> Result<HoldingTarget> {
+        // TODO: Phase 3 - Temporarily disabled 100% validation to allow incremental target setting
+        // Will re-enable with better UX (e.g., bulk edit, auto-distribute, warnings instead of errors)
+
         // Validate that sum of all holding targets equals 100%
-        let existing_targets = self
-            .repository
-            .get_holding_targets(&target.asset_class_id)
-            .await?;
+        // let existing_targets = self
+        //     .repository
+        //     .get_holding_targets(&target.asset_class_id)
+        //     .await?;
 
-        // Calculate total, excluding the one being updated
-        let mut total: f32 = existing_targets
-            .iter()
-            .filter(|t| target.id.is_none() || target.id.as_ref() != Some(&t.id))
-            .map(|t| t.target_percent_of_class)
-            .sum();
+        // // Calculate total, excluding the one being updated
+        // let mut total: f32 = existing_targets
+        //     .iter()
+        //     .filter(|t| target.id.is_none() || target.id.as_ref() != Some(&t.id))
+        //     .map(|t| t.target_percent_of_class)
+        //     .sum();
 
-        // Add the new/updated target
-        total += target.target_percent_of_class;
+        // // Add the new/updated target
+        // total += target.target_percent_of_class;
 
-        // Allow small floating-point errors (within 0.01%)
-        if (total - 100.0).abs() > 0.01 {
-            return Err(Error::Validation(ValidationError::InvalidInput(format!(
-                "Holding targets must sum to 100%. Current sum: {:.2}%",
-                total
-            ))));
-        }
+        // // Allow small floating-point errors (within 0.01%)
+        // if (total - 100.0).abs() > 0.01 {
+        //     return Err(Error::Validation(ValidationError::InvalidInput(format!(
+        //         "Holding targets must sum to 100%. Current sum: {:.2}%",
+        //         total
+        //     ))));
+        // }
 
         if target.id.is_some() {
             self.repository.update_holding_target(target).await

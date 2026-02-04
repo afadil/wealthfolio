@@ -124,3 +124,47 @@ pub async fn delete_account(
 
     Ok(())
 }
+
+#[tauri::command]
+pub async fn find_or_create_combined_portfolio(
+    account_ids: Vec<String>,
+    state: State<'_, Arc<ServiceContext>>,
+    handle: AppHandle,
+) -> Result<Account, String> {
+    debug!(
+        "Finding or creating combined portfolio for accounts: {:?}",
+        account_ids
+    );
+
+    let result = state
+        .account_service()
+        .find_or_create_combined_portfolio(account_ids)
+        .await;
+
+    match result {
+        Ok(combined_account) => {
+            // Emit event if a new combined portfolio was created
+            if combined_account.is_combined_portfolio {
+                emit_resource_changed(
+                    &handle,
+                    ResourceEventPayload::new(
+                        "account",
+                        "combined_portfolio_created",
+                        json!({
+                            "account_id": combined_account.id,
+                            "name": combined_account.name,
+                        }),
+                    ),
+                );
+            }
+            Ok(combined_account)
+        }
+        Err(e) => {
+            error!("Failed to find or create combined portfolio: {}", e);
+            Err(format!(
+                "Failed to find or create combined portfolio: {}",
+                e
+            ))
+        }
+    }
+}

@@ -18,6 +18,8 @@ pub struct Account {
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
     pub platform_id: Option<String>,
+    pub is_combined_portfolio: bool,
+    pub component_account_ids: Option<String>,
 }
 
 /// Input model for creating a new account
@@ -33,6 +35,8 @@ pub struct NewAccount {
     pub is_default: bool,
     pub is_active: bool,
     pub platform_id: Option<String>,
+    pub is_combined_portfolio: bool,
+    pub component_account_ids: Option<String>,
 }
 
 impl NewAccount {
@@ -111,6 +115,8 @@ pub struct AccountDB {
     #[diesel(skip_insertion)]
     pub updated_at: NaiveDateTime,
     pub platform_id: Option<String>,
+    pub is_combined_portfolio: bool,
+    pub component_account_ids: Option<String>,
 }
 
 // Conversion implementations
@@ -127,6 +133,8 @@ impl From<AccountDB> for Account {
             created_at: db.created_at,
             updated_at: db.updated_at,
             platform_id: db.platform_id,
+            is_combined_portfolio: db.is_combined_portfolio,
+            component_account_ids: db.component_account_ids,
         }
     }
 }
@@ -145,6 +153,8 @@ impl From<NewAccount> for AccountDB {
             created_at: now,
             updated_at: now,
             platform_id: domain.platform_id,
+            is_combined_portfolio: domain.is_combined_portfolio,
+            component_account_ids: domain.component_account_ids,
         }
     }
 }
@@ -162,6 +172,8 @@ impl From<AccountUpdate> for AccountDB {
             created_at: NaiveDateTime::default(), // This will be filled from existing record
             updated_at: chrono::Utc::now().naive_utc(),
             platform_id: domain.platform_id,
+            is_combined_portfolio: false, // This will be filled from existing record
+            component_account_ids: None,  // This will be filled from existing record
         }
     }
 }

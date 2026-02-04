@@ -102,4 +102,57 @@ impl<E: DbTransactionExecutor + Send + Sync + Clone> AccountServiceTrait for Acc
         (*self.repository).delete(account_id).await?;
         Ok(())
     }
+
+    /// Finds or creates a combined portfolio for multiple accounts
+    /// Returns the combined portfolio account ID
+    async fn find_or_create_combined_portfolio(&self, account_ids: Vec<String>) -> Result<Account> {
+        // Sort IDs for consistent lookup
+        let mut sorted_ids = account_ids.clone();
+        sorted_ids.sort();
+
+        // Serialize to JSON for storage
+        let ids_json = serde_json::to_string(&sorted_ids).map_err(|e| {
+            crate::Error::Unexpected(format!("Failed to serialize account IDs: {}", e))
+        })?;
+
+        // Try to find existing combined portfolio
+        let all_accounts = self.get_all_accounts()?;
+        if let Some(existing) = all_accounts.iter().find(|a| {
+            a.is_combined_portfolio && a.component_account_ids.as_ref() == Some(&ids_json)
+        }) {
+            debug!("Found existing combined portfolio: {}", existing.id);
+            return Ok(existing.clone());
+        }
+
+        // Get names of component accounts for display
+        let component_accounts = self.get_accounts_by_ids(&sorted_ids)?;
+        let account_names: Vec<String> =
+            component_accounts.iter().map(|a| a.name.clone()).collect();
+        let combined_name = format!("Combined: {}", account_names.join(" + "));
+
+        // Get base currency from first account (or use default)
+        let base_currency = component_accounts
+            .first()
+            .map(|a| a.currency.clone())
+            .unwrap_or_else(|| self.base_currency.read().unwrap().clone());
+
+        // Create new combined portfolio
+        let new_combined = NewAccount {
+            id: None,
+            name: combined_name,
+            account_type: "PORTFOLIO".to_string(),
+            group: Some("Combined Portfolios".to_string()),
+            currency: base_currency,
+            is_default: false,
+            is_active: true,
+            platform_id: None,
+            is_combined_portfolio: true,
+            component_account_ids: Some(ids_json),
+        };
+
+        debug!("Creating new combined portfolio: {:?}", new_combined.name);
+        let created = self.create_account(new_combined).await?;
+
+        Ok(created)
+    }
 }

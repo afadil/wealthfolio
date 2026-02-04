@@ -65,8 +65,30 @@ async fn delete_account(
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[derive(serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+struct CombinedPortfolioRequest {
+    account_ids: Vec<String>,
+}
+
+#[utoipa::path(post, path="/api/v1/accounts/combined", request_body = CombinedPortfolioRequest, responses((status=200, body = Account)))]
+async fn find_or_create_combined_portfolio(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<CombinedPortfolioRequest>,
+) -> ApiResult<Json<Account>> {
+    let combined = state
+        .account_service
+        .find_or_create_combined_portfolio(payload.account_ids)
+        .await?;
+    Ok(Json(Account::from(combined)))
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/accounts", get(list_accounts).post(create_account))
         .route("/accounts/{id}", put(update_account).delete(delete_account))
+        .route(
+            "/accounts/combined",
+            axum::routing::post(find_or_create_combined_portfolio),
+        )
 }
