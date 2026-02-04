@@ -6,14 +6,14 @@ import { useSettingsContext } from "@/lib/settings-provider";
 import { DateRange, TimePeriod } from "@/lib/types";
 import { calculatePerformanceMetrics } from "@/lib/utils";
 import { PortfolioUpdateTrigger } from "@/pages/dashboard/portfolio-update-trigger";
+import type { TimePeriod as UITimePeriod } from "@wealthfolio/ui";
 import {
   GainAmount,
   GainPercent,
-  IntervalSelector,
   getInitialIntervalData,
+  IntervalSelector,
   usePersistentState,
 } from "@wealthfolio/ui";
-import type { TimePeriod as UITimePeriod } from "@wealthfolio/ui";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useMemo, useState } from "react";
 import { AccountsSummary } from "./accounts-summary";
@@ -103,10 +103,10 @@ export function DashboardContent() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <div className="px-4 pb-6 md:px-6 md:pb-8 lg:px-8">
+      <div className="px-4 pb-1 pt-2 md:px-6 md:pb-2 lg:px-8">
         <PortfolioUpdateTrigger lastCalculatedAt={currentValuation?.calculatedAt}>
           <div className="flex items-start gap-2">
-            <div className="min-h-18">
+            <div>
               <Balance
                 isLoading={isHoldingsLoading}
                 targetValue={totalValue}
@@ -147,7 +147,7 @@ export function DashboardContent() {
         </PortfolioUpdateTrigger>
       </div>
 
-      <div className="h-[180px]">
+      <div className="h-[280px]">
         <HistoryChart data={chartData} isLoading={isValuationHistoryLoading} />
         {valuationHistory && chartData.length > 0 && (
           <div className="flex w-full justify-center">

@@ -1,14 +1,14 @@
-import { SwipablePage, SwipablePageView } from "@/components/page";
 import { HealthStatusIndicator } from "@/components/health-status-icon";
+import { SwipablePage, SwipablePageView } from "@/components/page";
 import { PrivacyToggle } from "@/components/privacy-toggle";
 import { useNavigationMode } from "@/pages/layouts/navigation/navigation-mode-context";
-import { Icons, Button } from "@wealthfolio/ui";
-import { Suspense, useMemo } from "react";
-import { DashboardContent } from "./dashboard-content";
-import { DashboardActions } from "./dashboard-actions";
-import { NetWorthContent } from "../net-worth/net-worth-content";
-import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
+import { Button, Icons } from "@wealthfolio/ui";
 import { Card, CardContent, CardHeader } from "@wealthfolio/ui/components/ui/card";
+import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
+import { Suspense, useMemo } from "react";
+import { NetWorthContent } from "../net-worth/net-worth-content";
+import { DashboardActions } from "./dashboard-actions";
+import { DashboardContent } from "./dashboard-content";
 
 // Loading skeleton
 const PageLoader = () => (
@@ -80,5 +80,5 @@ export default function PortfolioPage() {
     [sharedActions],
   );
 
-  return <SwipablePage views={views} defaultView="investments" withPadding={false} />;
+  return <SwipablePage className="pt-0" views={views} defaultView="investments" withPadding={false} />;
 }
