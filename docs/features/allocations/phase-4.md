@@ -520,7 +520,8 @@ export function useStrictModeValidation(
 - ✅ Add new setting keys to `SettingsService`
 - ✅ Update `Settings` model with new fields:
   - `allocation_holding_target_mode`
-  - `allocation_default_view` (renamed from `allocation_rebalancing_default_view`)
+  - `allocation_default_view` (renamed from
+    `allocation_rebalancing_default_view`)
   - `allocation_settings_banner_dismissed`
 - ✅ Add default values in repository
 - ✅ Test settings CRUD operations
@@ -546,15 +547,19 @@ export function useStrictModeValidation(
 
 **Additional Enhancements:**
 
-- ✅ **Tabbed Interface:** Split settings into Preferences and Maintenance tabs (similar to exports page)
+- ✅ **Tabbed Interface:** Split settings into Preferences and Maintenance tabs
+  (similar to exports page)
 - ✅ **Virtual Portfolio Cleanup Improvements:**
-  - ✅ Add backend endpoint to get full list of unused virtual strategies (not just count)
-  - ✅ Add backend endpoint to delete individual virtual strategies with validation
+  - ✅ Add backend endpoint to get full list of unused virtual strategies (not
+    just count)
+  - ✅ Add backend endpoint to delete individual virtual strategies with
+    validation
   - ✅ Create collapsible list showing unused portfolios with account names
   - ✅ Individual delete buttons per portfolio (trash icon)
   - ✅ Extract and display account names instead of technical UUIDs
   - ✅ Real-time updates when virtual portfolios created/deleted
-- ✅ **Icon Consistency:** Changed Allocations menu icon to PieChart (matches Settings icon)
+- ✅ **Icon Consistency:** Changed Allocations menu icon to PieChart (matches
+  Settings icon)
 
 **Deliverables:**
 
@@ -1265,7 +1270,8 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 - [x] Backend: Update Settings model with new fields
 - [x] Frontend: Update Settings TypeScript type
 - [x] Frontend: Create useAllocationSettings hook
-- [x] Settings Page: Create tabbed Allocation section (Preferences + Maintenance)
+- [x] Settings Page: Create tabbed Allocation section (Preferences +
+      Maintenance)
 - [x] Settings Page: Radio buttons for preferences
 - [x] Settings Page: Save functionality
 - [x] Test: Settings persistence
@@ -1276,8 +1282,11 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 **Actual Duration:** 2 days
 
 **Commits:**
-- `d46f778a` - feat(allocation): enhance Settings > Allocation with tabbed interface and individual cleanup
-- `c40469e5` - fix(allocation): ensure unused virtual portfolios list updates in real-time
+
+- `d46f778a` - feat(allocation): enhance Settings > Allocation with tabbed
+  interface and individual cleanup
+- `c40469e5` - fix(allocation): ensure unused virtual portfolios list updates in
+  real-time
 
 ---
 
@@ -1303,6 +1312,7 @@ const columns: ColumnDef<HoldingWithAllocation>[] = [
 **Actual Duration:** 1 day
 
 **Commits:**
+
 - `b4214f04` - feat(allocation): add sub-pie chart and strict mode validation
 
 ---
@@ -1555,7 +1565,36 @@ If Phase 4 needs to be rolled back:
 
 ---
 
-**Last Updated:** February 1, 2026  
+## 15. Pre-Release Checklist
+
+### 15.1 Dark Mode UI Review
+
+Before release, conduct a full dark mode review to ensure all allocation
+components match the rest of the UI:
+
+- [ ] Sub-pie chart colors (grey gradient in light mode, orange gradient in dark
+      mode)
+- [ ] Allocation target bars (Target/Actual bar colors and text contrast)
+- [ ] Side panel backgrounds and borders
+- [ ] Holdings table row styling
+- [ ] Progress bars and status indicators
+- [ ] Validation error message colors
+- [ ] Tab navigation styling
+- [ ] Empty state styling
+- [ ] Banner/notification colors
+
+**Testing approach:**
+
+1. Toggle dark mode in system settings or app settings
+2. Navigate through all allocation views (Targets, Composition, Pie Chart,
+   Holdings Table, Rebalancing)
+3. Open side panel and verify all elements are readable
+4. Check hover/active states on interactive elements
+5. Verify color contrast meets accessibility standards
+
+---
+
+**Last Updated:** February 2, 2026  
 **Status:** Planning Complete - Ready for Sprint 1  
 **Current Focus:** Awaiting approval to begin implementation  
 **Next Step:** Sprint 1 - Settings Infrastructure (1-2 days)
