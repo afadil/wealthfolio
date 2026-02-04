@@ -1,23 +1,58 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@wealthfolio/ui/components/ui/avatar";
-import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Icons, type Icon } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@wealthfolio/ui";
 import type { Account, AccountType, Platform } from "@/lib/types";
 import { Link } from "react-router-dom";
 import { AccountOperations } from "./account-operations";
-import { TrackingModeBadge } from "@/components/tracking-mode-badge";
 
-// Map account types to icons for visual distinction
-const accountTypeIcons: Record<AccountType, Icon> = {
-  SECURITIES: Icons.Briefcase,
-  CASH: Icons.DollarSign,
-  CRYPTOCURRENCY: Icons.Bitcoin,
-  PROPERTY: Icons.Home,
-  VEHICLE: Icons.Activity2,
-  COLLECTIBLE: Icons.Star,
-  PRECIOUS: Icons.HandCoins,
-  LIABILITY: Icons.CreditCard,
-  OTHER: Icons.Package,
+// Map account types to icons and colors for visual distinction
+const accountTypeConfig: Record<AccountType, { icon: Icon; bgClass: string; iconClass: string }> = {
+  SECURITIES: {
+    icon: Icons.Briefcase,
+    bgClass: "bg-blue-500/10",
+    iconClass: "text-blue-500",
+  },
+  CASH: {
+    icon: Icons.DollarSign,
+    bgClass: "bg-green-500/10",
+    iconClass: "text-green-500",
+  },
+  CRYPTOCURRENCY: {
+    icon: Icons.Bitcoin,
+    bgClass: "bg-orange-500/10",
+    iconClass: "text-orange-500",
+  },
+  PROPERTY: {
+    icon: Icons.Home,
+    bgClass: "bg-purple-500/10",
+    iconClass: "text-purple-500",
+  },
+  VEHICLE: {
+    icon: Icons.Activity2,
+    bgClass: "bg-slate-500/10",
+    iconClass: "text-slate-500",
+  },
+  COLLECTIBLE: {
+    icon: Icons.Star,
+    bgClass: "bg-amber-500/10",
+    iconClass: "text-amber-500",
+  },
+  PRECIOUS: {
+    icon: Icons.HandCoins,
+    bgClass: "bg-yellow-500/10",
+    iconClass: "text-yellow-500",
+  },
+  LIABILITY: {
+    icon: Icons.CreditCard,
+    bgClass: "bg-red-500/10",
+    iconClass: "text-red-500",
+  },
+  OTHER: {
+    icon: Icons.Package,
+    bgClass: "bg-muted",
+    iconClass: "text-muted-foreground",
+  },
 };
 
 export interface AccountItemProps {
@@ -26,12 +61,25 @@ export interface AccountItemProps {
   onEdit: (account: Account) => void;
   onDelete: (account: Account) => void;
   onArchive: (account: Account, archive: boolean) => void;
+  onHide: (account: Account, hide: boolean) => void;
 }
 
-export function AccountItem({ account, platform, onEdit, onDelete, onArchive }: AccountItemProps) {
+export function AccountItem({
+  account,
+  platform,
+  onEdit,
+  onDelete,
+  onArchive,
+  onHide,
+}: AccountItemProps) {
   // Check if account is synced from broker (has provider_account_id set)
   const isSynced = !!account.providerAccountId;
-  const IconComponent = accountTypeIcons[account.accountType] ?? Icons.Wallet;
+  const typeConfig = accountTypeConfig[account.accountType] ?? {
+    icon: Icons.Wallet,
+    bgClass: "bg-muted",
+    iconClass: "text-muted-foreground",
+  };
+  const IconComponent = typeConfig.icon;
 
   return (
     <div className="flex items-center justify-between p-4">
@@ -45,8 +93,8 @@ export function AccountItem({ account, platform, onEdit, onDelete, onArchive }: 
               className="bg-white object-contain p-1"
             />
           ) : null}
-          <AvatarFallback className="bg-muted rounded-lg">
-            <IconComponent className="text-muted-foreground h-5 w-5" />
+          <AvatarFallback className={`rounded-lg ${typeConfig.bgClass}`}>
+            <IconComponent className={`h-5 w-5 ${typeConfig.iconClass}`} />
           </AvatarFallback>
         </Avatar>
 
@@ -62,23 +110,68 @@ export function AccountItem({ account, platform, onEdit, onDelete, onArchive }: 
             </Link>
             {isSynced && <Icons.CloudSync2 className="text-muted-foreground h-3.5 w-3.5" />}
           </div>
-          <div className="flex items-center gap-2">
-            <p className="text-muted-foreground text-sm">
-              {account.currency}
-              {account.group && <span> - {account.group}</span>}
-            </p>
+          <div className="text-muted-foreground flex items-center gap-1.5 text-sm">
+            <span>{account.currency}</span>
+            {account.group && (
+              <>
+                <span>·</span>
+                <span>{account.group}</span>
+              </>
+            )}
+            <span>·</span>
+            <TooltipProvider>
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  {account.trackingMode === "HOLDINGS" ? (
+                    <span className="text-success flex cursor-help items-center gap-1">
+                      <Icons.Holdings className="h-3 w-3" />
+                      Holdings
+                    </span>
+                  ) : account.trackingMode === "NOT_SET" ? (
+                    <span className="text-warning flex cursor-help items-center gap-1">
+                      <Icons.AlertTriangle className="h-3 w-3" />
+                      Needs setup
+                    </span>
+                  ) : (
+                    <span className="flex cursor-help items-center gap-1">
+                      <Icons.Receipt className="h-3 w-3" />
+                      Transactions
+                    </span>
+                  )}
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p className="text-xs">
+                    {account.trackingMode === "HOLDINGS"
+                      ? "Add holdings directly as snapshots"
+                      : account.trackingMode === "NOT_SET"
+                        ? "Choose how to track this account"
+                        : "Track every trade for performance analytics"}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
       </div>
-      <div className="flex items-center space-x-4">
-        <TrackingModeBadge account={account} />
-        {account.isArchived && <Badge variant="outline">Archived</Badge>}
-        {!account.isActive && <Badge variant="secondary">Disabled</Badge>}
+      <div className="flex items-center space-x-2">
+        {account.isArchived && (
+          <span className="inline-flex items-center gap-1 rounded-md border border-red-200/40 bg-red-100/30 px-2 py-1 text-xs font-medium text-red-600 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
+            <Icons.FileArchive className="h-3 w-3" />
+            Archived
+          </span>
+        )}
+        {!account.isActive && !account.isArchived && (
+          <span className="inline-flex items-center gap-1 rounded-md border border-orange-200/40 bg-orange-100/30 px-2 py-1 text-xs font-medium text-orange-600 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-400">
+            <Icons.EyeOff className="h-3 w-3" />
+            Hidden
+          </span>
+        )}
         <AccountOperations
           account={account}
           onEdit={onEdit}
           onDelete={onDelete}
           onArchive={onArchive}
+          onHide={onHide}
         />
       </div>
     </div>

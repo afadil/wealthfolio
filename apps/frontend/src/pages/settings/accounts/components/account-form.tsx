@@ -4,7 +4,7 @@ import * as z from "zod";
 import { useState, useCallback } from "react";
 
 import { Button } from "@wealthfolio/ui/components/ui/button";
-import { Switch } from "@wealthfolio/ui/components/ui/switch";
+import { Checkbox } from "@wealthfolio/ui/components/ui/checkbox";
 
 import {
   DialogDescription,
@@ -311,43 +311,43 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
             control={form.control}
             name="isActive"
             render={({ field }) => (
-              <FormItem className="bg-muted/40 flex items-center justify-between rounded-lg border p-3">
-                <div className="space-y-0.5">
-                  <FormLabel className="text-sm font-medium">Active</FormLabel>
-                  <p className="text-muted-foreground text-xs">
-                    Visible and usable. If turned off, the account is hidden but still included in
-                    historical totals.
-                  </p>
-                </div>
+              <FormItem className="flex items-center space-x-3 space-y-0 rounded-lg border p-3">
                 <FormControl>
-                  <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  <Checkbox
+                    checked={!field.value}
+                    onCheckedChange={(checked) => field.onChange(!checked)}
+                  />
                 </FormControl>
+                <FormLabel className="text-sm font-normal">
+                  Hide this account
+                  <span className="text-muted-foreground ml-1 text-xs font-normal">
+                    — keeps in Total & history
+                  </span>
+                </FormLabel>
                 <FormMessage />
               </FormItem>
             )}
           />
 
-          {/* Archived callout - only shown when account is archived */}
-          {defaultValues?.id && defaultValues?.isArchived && (
-            <Alert variant="warning">
-              <Icons.FileArchive className="h-4 w-4" />
-              <AlertDescription className="flex items-center justify-between">
-                <span className="text-sm">
-                  This account is archived and excluded from all calculations.
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    form.setValue("isArchived", false);
-                    form.handleSubmit(onSubmit)();
-                  }}
-                >
-                  Restore
-                </Button>
-              </AlertDescription>
-            </Alert>
+          {defaultValues?.id && (
+            <FormField
+              control={form.control}
+              name="isArchived"
+              render={({ field }) => (
+                <FormItem className="border-destructive/30 flex items-center space-x-3 space-y-0 rounded-lg border p-3">
+                  <FormControl>
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                  <FormLabel className="text-sm font-normal">
+                    Archive this account
+                    <span className="text-muted-foreground ml-1 text-xs font-normal">
+                      — removes from portfolio, can restore later
+                    </span>
+                  </FormLabel>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           )}
         </div>
         <DialogFooter className="gap-2">

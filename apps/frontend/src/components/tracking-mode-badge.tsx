@@ -1,4 +1,5 @@
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import type { Account } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -10,8 +11,8 @@ export interface TrackingModeBadgeProps {
 
 /**
  * Displays a badge indicating the tracking mode for an account.
- * - "Transactions" (default, secondary) - tracking via activity transactions
- * - "Holdings" (success/green) - tracking via manual holdings snapshots
+ * - "Transactions" (blue) - tracking via activity transactions
+ * - "Holdings" (green) - tracking via manual holdings snapshots
  * - "Needs setup" (warning/yellow) - when trackingMode === 'NOT_SET'
  * - "Sync disabled" (muted/gray) - when account is connected but sync is disabled
  */
@@ -33,7 +34,14 @@ export function TrackingModeBadge({ account, syncEnabled, className }: TrackingM
   switch (account.trackingMode) {
     case "TRANSACTIONS":
       return (
-        <Badge variant="secondary" className={cn("rounded-sm", className)}>
+        <Badge
+          variant="outline"
+          className={cn(
+            "rounded-sm border-blue-500/30 text-blue-600 dark:text-blue-400",
+            className,
+          )}
+        >
+          <Icons.Receipt className="mr-1 h-3 w-3" />
           Transactions
         </Badge>
       );
@@ -43,6 +51,7 @@ export function TrackingModeBadge({ account, syncEnabled, className }: TrackingM
           variant="outline"
           className={cn("border-success/30 text-success rounded-sm", className)}
         >
+          <Icons.Holdings className="mr-1 h-3 w-3" />
           Holdings
         </Badge>
       );
@@ -53,6 +62,7 @@ export function TrackingModeBadge({ account, syncEnabled, className }: TrackingM
           variant="outline"
           className={cn("border-warning/30 text-warning rounded-sm", className)}
         >
+          <Icons.AlertTriangle className="mr-1 h-3 w-3" />
           Needs setup
         </Badge>
       );

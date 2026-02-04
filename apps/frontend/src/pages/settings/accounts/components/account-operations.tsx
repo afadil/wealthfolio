@@ -26,6 +26,7 @@ export interface AccountOperationsProps {
   onEdit: (account: Account) => void | undefined;
   onDelete: (account: Account) => void | undefined;
   onArchive: (account: Account, archive: boolean) => void | undefined;
+  onHide: (account: Account, hide: boolean) => void | undefined;
 }
 
 export function AccountOperations({
@@ -33,6 +34,7 @@ export function AccountOperations({
   onEdit,
   onDelete,
   onArchive,
+  onHide,
 }: AccountOperationsProps) {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [showArchiveAlert, setShowArchiveAlert] = useState(false);
@@ -60,6 +62,9 @@ export function AccountOperations({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => onEdit(account)}>Edit</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onHide(account, account.isActive)}>
+            {account.isActive ? "Hide" : "Show"}
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           {account.isArchived ? (
             <DropdownMenuItem onClick={handleRestore}>Restore</DropdownMenuItem>
