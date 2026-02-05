@@ -285,12 +285,7 @@ impl AssetRepositoryTrait for AssetRepository {
                         .ok()
                         .and_then(|meta| {
                             let identifiers = meta.get("identifiers").cloned();
-                            match identifiers {
-                                Some(ids) => {
-                                    Some(serde_json::json!({ "identifiers": ids }).to_string())
-                                }
-                                None => None,
-                            }
+                            identifiers.map(|ids| serde_json::json!({ "identifiers": ids }).to_string())
                         })
                 });
 

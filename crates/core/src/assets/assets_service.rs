@@ -574,7 +574,7 @@ impl AssetServiceTrait for AssetService {
             notes: existing_asset.notes.clone().unwrap_or_default(),
             kind: updated_kind,
             exchange_mic: None, // Keep existing exchange_mic
-            pricing_mode: Some(existing_asset.pricing_mode.clone()),
+            pricing_mode: Some(existing_asset.pricing_mode),
             provider_overrides: existing_asset.provider_overrides.clone(),
             metadata: updated_metadata,
         };

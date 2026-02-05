@@ -23,6 +23,7 @@ impl TaxonomyService {
     }
 
     /// Recursively flatten category JSON into NewCategory records
+    #[allow(clippy::only_used_in_recursion)]
     fn flatten_categories(
         &self,
         taxonomy_id: &str,
@@ -81,6 +82,7 @@ impl TaxonomyService {
         self.build_category_tree(&children_map, None)
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn build_category_tree(
         &self,
         children_map: &std::collections::HashMap<Option<String>, Vec<&Category>>,

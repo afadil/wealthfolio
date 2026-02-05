@@ -10,7 +10,11 @@ use wealthfolio_core::{
     accounts::AccountServiceTrait,
     activities::ActivityServiceTrait,
     goals::GoalServiceTrait,
-    portfolio::{holdings::HoldingsServiceTrait, valuation::ValuationServiceTrait},
+    portfolio::{
+        allocation::AllocationServiceTrait, holdings::HoldingsServiceTrait,
+        income::IncomeServiceTrait, performance::PerformanceServiceTrait,
+        valuation::ValuationServiceTrait,
+    },
     quotes::QuoteServiceTrait,
     secrets::SecretStore,
     settings::SettingsServiceTrait,
@@ -57,6 +61,15 @@ pub trait AiEnvironment: Send + Sync {
 
     /// Get the quote service for symbol search.
     fn quote_service(&self) -> Arc<dyn QuoteServiceTrait>;
+
+    /// Get the allocation service for portfolio allocations.
+    fn allocation_service(&self) -> Arc<dyn AllocationServiceTrait>;
+
+    /// Get the performance service for portfolio performance metrics.
+    fn performance_service(&self) -> Arc<dyn PerformanceServiceTrait>;
+
+    /// Get the income service for income/dividend summaries.
+    fn income_service(&self) -> Arc<dyn IncomeServiceTrait>;
 }
 
 #[cfg(test)]
@@ -76,6 +89,10 @@ pub mod test_env {
         errors::DatabaseError,
         goals::{Goal, GoalServiceTrait, GoalsAllocation, NewGoal},
         holdings::{Holding, HoldingsServiceTrait},
+        accounts::TrackingMode,
+        portfolio::allocation::{AllocationHoldings, AllocationServiceTrait, PortfolioAllocations},
+        portfolio::income::{IncomeSummary, IncomeServiceTrait},
+        portfolio::performance::{PerformanceMetrics, PerformanceServiceTrait},
         quotes::{
             LatestQuotePair, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait, QuoteSyncState,
             SymbolSearchResult, SymbolSyncPlan, SyncMode, SyncResult,
@@ -864,6 +881,126 @@ pub mod test_env {
         }
     }
 
+    /// Mock allocation service for testing.
+    #[derive(Default)]
+    pub struct MockAllocationService;
+
+    #[async_trait]
+    impl AllocationServiceTrait for MockAllocationService {
+        async fn get_portfolio_allocations(
+            &self,
+            _account_id: &str,
+            _base_currency: &str,
+        ) -> CoreResult<PortfolioAllocations> {
+            Ok(PortfolioAllocations::default())
+        }
+
+        async fn get_holdings_by_allocation(
+            &self,
+            _account_id: &str,
+            base_currency: &str,
+            taxonomy_id: &str,
+            category_id: &str,
+        ) -> CoreResult<AllocationHoldings> {
+            Ok(AllocationHoldings {
+                taxonomy_id: taxonomy_id.to_string(),
+                taxonomy_name: "Mock Taxonomy".to_string(),
+                category_id: category_id.to_string(),
+                category_name: "Mock Category".to_string(),
+                color: "#808080".to_string(),
+                holdings: Vec::new(),
+                total_value: rust_decimal::Decimal::ZERO,
+                currency: base_currency.to_string(),
+            })
+        }
+    }
+
+    /// Mock income service for testing.
+    #[derive(Default)]
+    pub struct MockIncomeService;
+
+    impl IncomeServiceTrait for MockIncomeService {
+        fn get_income_summary(&self) -> CoreResult<Vec<IncomeSummary>> {
+            Ok(vec![
+                IncomeSummary::new("TOTAL", "USD".to_string()),
+                IncomeSummary::new("YTD", "USD".to_string()),
+                IncomeSummary::new("LAST_YEAR", "USD".to_string()),
+            ])
+        }
+    }
+
+    /// Mock performance service for testing.
+    #[derive(Default)]
+    pub struct MockPerformanceService;
+
+    #[async_trait]
+    impl PerformanceServiceTrait for MockPerformanceService {
+        async fn calculate_performance_history(
+            &self,
+            _item_type: &str,
+            item_id: &str,
+            _start_date: Option<NaiveDate>,
+            _end_date: Option<NaiveDate>,
+            _tracking_mode: Option<TrackingMode>,
+        ) -> CoreResult<PerformanceMetrics> {
+            Ok(PerformanceMetrics {
+                id: item_id.to_string(),
+                returns: Vec::new(),
+                period_start_date: None,
+                period_end_date: None,
+                currency: "USD".to_string(),
+                period_gain: rust_decimal::Decimal::ZERO,
+                period_return: rust_decimal::Decimal::ZERO,
+                cumulative_twr: Some(rust_decimal::Decimal::ZERO),
+                gain_loss_amount: Some(rust_decimal::Decimal::ZERO),
+                annualized_twr: Some(rust_decimal::Decimal::ZERO),
+                simple_return: rust_decimal::Decimal::ZERO,
+                annualized_simple_return: rust_decimal::Decimal::ZERO,
+                cumulative_mwr: Some(rust_decimal::Decimal::ZERO),
+                annualized_mwr: Some(rust_decimal::Decimal::ZERO),
+                volatility: rust_decimal::Decimal::ZERO,
+                max_drawdown: rust_decimal::Decimal::ZERO,
+                is_holdings_mode: false,
+            })
+        }
+
+        async fn calculate_performance_summary(
+            &self,
+            _item_type: &str,
+            item_id: &str,
+            _start_date: Option<NaiveDate>,
+            _end_date: Option<NaiveDate>,
+            _tracking_mode: Option<TrackingMode>,
+        ) -> CoreResult<PerformanceMetrics> {
+            Ok(PerformanceMetrics {
+                id: item_id.to_string(),
+                returns: Vec::new(),
+                period_start_date: None,
+                period_end_date: None,
+                currency: "USD".to_string(),
+                period_gain: rust_decimal::Decimal::ZERO,
+                period_return: rust_decimal::Decimal::ZERO,
+                cumulative_twr: Some(rust_decimal::Decimal::ZERO),
+                gain_loss_amount: Some(rust_decimal::Decimal::ZERO),
+                annualized_twr: Some(rust_decimal::Decimal::ZERO),
+                simple_return: rust_decimal::Decimal::ZERO,
+                annualized_simple_return: rust_decimal::Decimal::ZERO,
+                cumulative_mwr: Some(rust_decimal::Decimal::ZERO),
+                annualized_mwr: Some(rust_decimal::Decimal::ZERO),
+                volatility: rust_decimal::Decimal::ZERO,
+                max_drawdown: rust_decimal::Decimal::ZERO,
+                is_holdings_mode: false,
+            })
+        }
+
+        fn calculate_accounts_simple_performance(
+            &self,
+            _account_ids: &[String],
+        ) -> CoreResult<Vec<wealthfolio_core::performance::SimplePerformanceMetrics>> {
+            Ok(Vec::new())
+        }
+    }
+
     /// Mock environment for testing.
     pub struct MockEnvironment {
         pub base_currency: String,
@@ -876,6 +1013,9 @@ pub mod test_env {
         pub secret_store: Arc<dyn SecretStore>,
         pub chat_repository: Arc<dyn ChatRepositoryTrait>,
         pub quote_service: Arc<dyn QuoteServiceTrait>,
+        pub allocation_service: Arc<dyn AllocationServiceTrait>,
+        pub performance_service: Arc<dyn PerformanceServiceTrait>,
+        pub income_service: Arc<dyn IncomeServiceTrait>,
     }
 
     impl Default for MockEnvironment {
@@ -897,6 +1037,9 @@ pub mod test_env {
                 secret_store: Arc::new(MockSecretStore::default()),
                 chat_repository: Arc::new(MockChatRepository::default()),
                 quote_service: Arc::new(MockQuoteService::default()),
+                allocation_service: Arc::new(MockAllocationService::default()),
+                performance_service: Arc::new(MockPerformanceService::default()),
+                income_service: Arc::new(MockIncomeService::default()),
             }
         }
 
@@ -946,6 +1089,18 @@ pub mod test_env {
 
         fn quote_service(&self) -> Arc<dyn QuoteServiceTrait> {
             self.quote_service.clone()
+        }
+
+        fn allocation_service(&self) -> Arc<dyn AllocationServiceTrait> {
+            self.allocation_service.clone()
+        }
+
+        fn performance_service(&self) -> Arc<dyn PerformanceServiceTrait> {
+            self.performance_service.clone()
+        }
+
+        fn income_service(&self) -> Arc<dyn IncomeServiceTrait> {
+            self.income_service.clone()
         }
     }
 }

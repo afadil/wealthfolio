@@ -376,13 +376,10 @@ impl SnapshotRepository {
             }
 
             if !anchor_dates.is_empty() {
-                account_specific_snapshots = account_specific_snapshots
-                    .into_iter()
-                    .filter(|s| {
+                account_specific_snapshots.retain(|s| {
                         let date_key = s.snapshot_date.format("%Y-%m-%d").to_string();
                         !anchor_dates.contains(&date_key)
-                    })
-                    .collect();
+                    });
             }
 
             if !account_specific_snapshots.is_empty() {
@@ -658,9 +655,7 @@ impl SnapshotRepository {
                     .map_err(|e| Error::from(StorageError::from(e)))?;
                 Ok(dates.into_iter().collect())
             })
-            .await
-            .map_err(Error::from)
-    }
+            .await}
 
     async fn get_anchor_snapshot_dates_for_account(
         &self,
@@ -680,9 +675,7 @@ impl SnapshotRepository {
                     .map_err(|e| Error::from(StorageError::from(e)))?;
                 Ok(dates.into_iter().collect())
             })
-            .await
-            .map_err(Error::from)
-    }
+            .await}
 
     /// Save or update a single snapshot.
     /// Uses replace_into to handle both insert and update cases.

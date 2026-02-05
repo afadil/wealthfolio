@@ -29,19 +29,25 @@ You have access to these tools:
      - endDate: end date in YYYY-MM-DD format
    - Returns: array of daily valuations with date, totalValue, netContribution
 
-6. get_dividends - Get dividend and interest income
+6. get_income - Get income summary (dividends, interest, other income)
    - Parameters (all optional):
-     - accountId: filter by account
-     - startDate: start date in YYYY-MM-DD format
-     - endDate: end date in YYYY-MM-DD format
-     - symbol: filter by symbol
-   - Returns: list of dividend payments, total amount
+     - period: "YTD", "LAST_YEAR", or "TOTAL" (default: "YTD")
+   - Returns: total income, monthly average, YoY growth, breakdown by type, top income-generating assets
 
 7. get_asset_allocation - Get portfolio allocation breakdown
    - Parameters (all optional):
      - accountId: account ID or "TOTAL" (default: "TOTAL")
-     - groupBy: "type", "class", or "sector" (default: "type")
-   - Returns: allocations with category, value, percentage
+     - groupBy: "class", "sector", "region", "risk", or "security_type" (default: "class")
+     - taxonomyId: for drill-down, use the taxonomyId from a previous allocation response
+     - categoryId: for drill-down, use the categoryId to see holdings in that category
+   - Returns: allocations with categoryId, categoryName, value, percentage, color
+   - When taxonomyId and categoryId are provided: returns holdings in that category
+   - Examples:
+     - "What's my allocation?" → {groupBy: "class"}
+     - "Show by sector" → {groupBy: "sector"}
+     - "Show holdings in Technology" → {taxonomyId: "industries_gics", categoryId: "TECHNOLOGY"}
+     - "What's my risk breakdown?" → {groupBy: "risk"}
+     - "Show regional allocation" → {groupBy: "region"}
 
 8. get_performance - Get portfolio performance metrics
    - Parameters (all optional):
@@ -77,7 +83,7 @@ IMPORTANT RULES:
 - After tool results, provide brief analysis only if the user asks for it.
 - Use get_valuation_history for questions about portfolio value over time.
 - Use get_performance for return/gain questions.
-- Use get_dividends for income-related questions.
+- Use get_income for income/dividend-related questions.
 
 RECORD_ACTIVITY RULES:
 - Always convert relative dates ("yesterday", "last Monday", "2 days ago") to ISO 8601 format using the current date from context.

@@ -86,14 +86,11 @@ pub fn get_golden_scenarios() -> Vec<GoldenScenario> {
             expected_text_contains: vec![],
             multi_round: false,
         },
-        // Scenario 6: Dividend search
+        // Scenario 6: Income summary
         GoldenScenario {
-            name: "dividend_search",
-            user_query: "Show me my recent dividends",
-            expected_tool_sequence: vec![ExpectedToolCall::with_args(
-                "search_activities",
-                vec!["activityType"],
-            )],
+            name: "income_summary",
+            user_query: "Show me my income summary",
+            expected_tool_sequence: vec![ExpectedToolCall::new("get_income")],
             expected_text_contains: vec![],
             multi_round: false,
         },

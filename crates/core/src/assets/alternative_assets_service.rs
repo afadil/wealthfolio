@@ -152,7 +152,7 @@ impl AlternativeAssetService {
             .and_then(|m| m.get("sub_type"))
             .and_then(|v| v.as_str())
             .filter(|s| !s.is_empty())
-            .map(|s| Self::format_subtype(s))
+            .map(Self::format_subtype)
             .unwrap_or_else(|| kind.display_name().to_string())
     }
 

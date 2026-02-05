@@ -19,11 +19,13 @@ use crate::errors::Result;
 /// This is a per-request parameter, NOT a persisted setting. Each sync call
 /// can specify a different mode based on the caller's needs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum SyncMode {
     /// Continue from last_quote_date with overlap, fill gaps to activity_min_date.
     /// This is the default mode for regular sync operations.
     /// - Uses last_quote_date - OVERLAP_DAYS as start (to heal provider corrections)
     /// - Falls back to first_activity_date - BUFFER_DAYS if no quotes exist
+    #[default]
     Incremental,
 
     /// Refetch recent window regardless of existing quotes.
@@ -126,11 +128,6 @@ impl MarketSyncMode {
     }
 }
 
-impl Default for SyncMode {
-    fn default() -> Self {
-        SyncMode::Incremental
-    }
-}
 
 impl std::fmt::Display for SyncMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

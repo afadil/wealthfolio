@@ -1179,7 +1179,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                             schema::holdings_snapshots::source.eq(&snapshot_db.source),
                         ))
                         .execute(conn)
-                        .map_err(|e| StorageError::from(e))?;
+                        .map_err(StorageError::from)?;
                     Ok::<_, wealthfolio_core::errors::Error>(())
                 })
                 .await?;
@@ -1309,8 +1309,7 @@ impl BrokerSyncService {
         // Normalize institution name for matching
         let institution_normalized = institution_name
             .to_uppercase()
-            .replace(' ', "_")
-            .replace('-', "_");
+            .replace([' ', '-'], "_");
 
         // Try exact match first
         for platform in &platforms {
@@ -1332,7 +1331,7 @@ impl BrokerSyncService {
         // Try matching by platform name
         for platform in &platforms {
             if let Some(name) = &platform.name {
-                let name_normalized = name.to_uppercase().replace(' ', "_").replace('-', "_");
+                let name_normalized = name.to_uppercase().replace([' ', '-'], "_");
                 if name_normalized == institution_normalized
                     || institution_normalized.contains(&name_normalized)
                     || name_normalized.contains(&institution_normalized)

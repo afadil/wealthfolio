@@ -27,7 +27,7 @@ pub struct Coverage {
 /// Linear contains check for static slices.
 #[inline]
 fn slice_contains(list: &[&'static str], value: &str) -> bool {
-    list.iter().any(|&x| x == value)
+    list.contains(&value)
 }
 
 impl Coverage {
@@ -60,7 +60,7 @@ impl Coverage {
             // Metal: Apply quote currency filter
             InstrumentId::Metal { quote, .. } => self
                 .metal_quote_ccy_allow
-                .map_or(true, |a| slice_contains(a, quote.as_ref())),
+                .is_none_or(|a| slice_contains(a, quote.as_ref())),
         }
     }
 

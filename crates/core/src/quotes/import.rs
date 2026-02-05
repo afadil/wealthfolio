@@ -75,8 +75,10 @@ impl ImportValidationStatus {
 /// Validation status for a quote import row (used by QuoteImportService).
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub enum ValidationStatus {
     /// Quote passed all validation checks and can be imported.
+    #[default]
     Valid,
     /// Quote is a duplicate of an existing quote.
     Duplicate,
@@ -109,11 +111,6 @@ impl ValidationStatus {
     }
 }
 
-impl Default for ValidationStatus {
-    fn default() -> Self {
-        ValidationStatus::Valid
-    }
-}
 
 // =============================================================================
 // Quote Import (Input)

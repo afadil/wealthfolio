@@ -174,9 +174,8 @@ impl AiProviderService {
     }
 
     /// Check if a provider supports dynamic model listing via API.
-    fn provider_supports_model_listing(provider_id: &str) -> bool {
-        // Anthropic doesn't have a model listing API
-        provider_id != "anthropic"
+    fn provider_supports_model_listing(_provider_id: &str) -> bool {
+        true
     }
 
     /// Apply capability overrides to base capabilities.
@@ -409,35 +408,12 @@ impl AiProviderServiceTrait for AiProviderService {
         // Get provider config (validates provider exists and has API key if needed)
         let config = self.get_provider_config(provider_id)?;
 
-        // Get catalog provider for default base URL and to check if listing is supported
-        let catalog_provider = self.catalog.providers.get(provider_id).ok_or_else(|| {
-            ProviderApiError::UnknownProvider {
-                provider_id: provider_id.to_string(),
-            }
-        })?;
-
-        // Providers that don't support model listing return catalog models
-        // Anthropic doesn't have a model listing API
-        if provider_id == "anthropic" {
-            let models = catalog_provider
-                .models
-                .keys()
-                .map(|id| FetchedModel {
-                    id: id.clone(),
-                    name: None,
-                })
-                .collect();
-            return Ok(ListModelsResponse {
-                models,
-                supports_listing: false,
-            });
-        }
-
         // Build the model list URL based on provider
         let base_url = config
             .base_url
             .as_deref()
-            .unwrap_or_else(|| match provider_id {
+            .unwrap_or(match provider_id {
+                "anthropic" => "https://api.anthropic.com",
                 "openai" => "https://api.openai.com",
                 "groq" => "https://api.groq.com/openai",
                 "openrouter" => "https://openrouter.ai/api",
@@ -460,6 +436,9 @@ impl AiProviderServiceTrait for AiProviderService {
         // Add authorization header based on provider
         if let Some(ref api_key) = config.api_key {
             request = match provider_id {
+                "anthropic" => request
+                    .header("x-api-key", api_key.as_str())
+                    .header("anthropic-version", "2023-06-01"),
                 "google" => request.query(&[("key", api_key.as_str())]),
                 _ => request.header("Authorization", format!("Bearer {}", api_key)),
             };
@@ -483,6 +462,34 @@ impl AiProviderServiceTrait for AiProviderService {
 
         // Parse response based on provider format
         let models = match provider_id {
+            "anthropic" => {
+                // Anthropic format: { "data": [{ "id": "claude-...", "display_name": "Claude ..." }] }
+                #[derive(serde::Deserialize)]
+                struct AnthropicResponse {
+                    data: Vec<AnthropicModel>,
+                }
+                #[derive(serde::Deserialize)]
+                struct AnthropicModel {
+                    id: String,
+                    display_name: Option<String>,
+                }
+
+                let resp: AnthropicResponse =
+                    response
+                        .json()
+                        .await
+                        .map_err(|e| ProviderApiError::ProviderError {
+                            message: format!("Failed to parse Anthropic response: {}", e),
+                        })?;
+
+                resp.data
+                    .into_iter()
+                    .map(|m| FetchedModel {
+                        id: m.id,
+                        name: m.display_name,
+                    })
+                    .collect()
+            }
             "ollama" => {
                 // Ollama format: { "models": [{ "name": "llama3.2", ... }] }
                 #[derive(serde::Deserialize)]

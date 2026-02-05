@@ -71,7 +71,7 @@
         }
       },
       "defaultModel": "openai/gpt-oss-120b",
-      "titleModelId": "meta-llama/llama-guard-4-12b",
+      "titleModelId": "groq/compound-mini",
       "documentationUrl": "https://console.groq.com/docs"
     },
     "google": {
@@ -128,18 +128,18 @@
         }
       ],
       "models": {
-        "claude-3-5-sonnet-20241022": {
+        "claude-sonnet-4-5-20250929": {
           "capabilities": { "tools": true, "thinking": false, "vision": true }
         },
-        "claude-3-5-haiku-20241022": {
+        "claude-haiku-4-5-20251001": {
           "capabilities": { "tools": true, "thinking": false, "vision": true }
         },
-        "claude-3-opus-20240229": {
+        "claude-opus-4-5-20251101": {
           "capabilities": { "tools": true, "thinking": false, "vision": true }
         }
       },
-      "defaultModel": "claude-3-5-sonnet-20241022",
-      "titleModelId": "claude-3-5-haiku-20241022",
+      "defaultModel": "claude-sonnet-4-5-20250929",
+      "titleModelId": "claude-haiku-4-5-20251001",
       "documentationUrl": "https://docs.anthropic.com/en/api/getting-started"
     },
     "openai": {

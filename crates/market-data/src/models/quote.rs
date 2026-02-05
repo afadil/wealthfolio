@@ -70,6 +70,7 @@ impl Quote {
     }
 
     /// Create a full OHLCV quote
+    #[allow(clippy::too_many_arguments)]
     pub fn ohlcv(
         timestamp: DateTime<Utc>,
         open: Decimal,

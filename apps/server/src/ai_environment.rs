@@ -7,9 +7,10 @@ use std::sync::{Arc, RwLock};
 
 use wealthfolio_ai::{AiEnvironment, ChatRepositoryTrait};
 use wealthfolio_core::{
-    accounts::AccountServiceTrait, activities::ActivityServiceTrait, goals::GoalServiceTrait,
-    holdings::HoldingsServiceTrait, quotes::QuoteServiceTrait, secrets::SecretStore,
-    settings::SettingsServiceTrait, valuation::ValuationServiceTrait,
+    accounts::AccountServiceTrait, activities::ActivityServiceTrait,
+    allocation::AllocationServiceTrait, goals::GoalServiceTrait, holdings::HoldingsServiceTrait,
+    income::IncomeServiceTrait, performance::PerformanceServiceTrait, quotes::QuoteServiceTrait,
+    secrets::SecretStore, settings::SettingsServiceTrait, valuation::ValuationServiceTrait,
 };
 
 /// Server-side implementation of AiEnvironment.
@@ -27,6 +28,9 @@ pub struct ServerAiEnvironment {
     secret_store: Arc<dyn SecretStore>,
     chat_repository: Arc<dyn ChatRepositoryTrait + Send + Sync>,
     quote_service: Arc<dyn QuoteServiceTrait + Send + Sync>,
+    allocation_service: Arc<dyn AllocationServiceTrait + Send + Sync>,
+    performance_service: Arc<dyn PerformanceServiceTrait + Send + Sync>,
+    income_service: Arc<dyn IncomeServiceTrait + Send + Sync>,
 }
 
 impl ServerAiEnvironment {
@@ -42,6 +46,9 @@ impl ServerAiEnvironment {
         secret_store: Arc<dyn SecretStore>,
         chat_repository: Arc<dyn ChatRepositoryTrait + Send + Sync>,
         quote_service: Arc<dyn QuoteServiceTrait + Send + Sync>,
+        allocation_service: Arc<dyn AllocationServiceTrait + Send + Sync>,
+        performance_service: Arc<dyn PerformanceServiceTrait + Send + Sync>,
+        income_service: Arc<dyn IncomeServiceTrait + Send + Sync>,
     ) -> Self {
         Self {
             base_currency,
@@ -54,6 +61,9 @@ impl ServerAiEnvironment {
             secret_store,
             chat_repository,
             quote_service,
+            allocation_service,
+            performance_service,
+            income_service,
         }
     }
 }
@@ -97,5 +107,17 @@ impl AiEnvironment for ServerAiEnvironment {
 
     fn quote_service(&self) -> Arc<dyn QuoteServiceTrait> {
         self.quote_service.clone()
+    }
+
+    fn allocation_service(&self) -> Arc<dyn AllocationServiceTrait> {
+        self.allocation_service.clone()
+    }
+
+    fn performance_service(&self) -> Arc<dyn PerformanceServiceTrait> {
+        self.performance_service.clone()
+    }
+
+    fn income_service(&self) -> Arc<dyn IncomeServiceTrait> {
+        self.income_service.clone()
     }
 }

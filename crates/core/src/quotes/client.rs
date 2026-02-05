@@ -302,7 +302,7 @@ impl MarketDataClient {
                 .exchange_mic
                 .as_ref()
                 .and_then(|mic| mic_to_currency(mic))
-                .map(|c| Cow::Borrowed(c))
+                .map(Cow::Borrowed)
         };
 
         // Preferred provider from asset

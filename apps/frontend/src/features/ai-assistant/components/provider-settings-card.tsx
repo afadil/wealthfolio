@@ -61,7 +61,7 @@ const DATA_ACCESS_OPTIONS = [
     label: "Performance",
     description: "Returns and performance metrics",
   },
-  { toolId: "get_dividends", label: "Dividends", description: "Dividend income and history" },
+  { toolId: "get_income", label: "Income", description: "Income summary and breakdown" },
   { toolId: "get_goals", label: "Goals", description: "Investment goals and progress" },
   {
     toolId: "get_asset_allocation",

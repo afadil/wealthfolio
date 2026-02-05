@@ -17,7 +17,7 @@ export function useActivityMutations(
   const toDecimalPayload = (value: unknown): string | null | undefined => {
     if (value === null) return null;
     if (value === undefined) return undefined;
-    const str = String(value).trim();
+    const str = (typeof value === "string" ? value : `${value as number}`).trim();
     return str === "" ? undefined : str;
   };
 

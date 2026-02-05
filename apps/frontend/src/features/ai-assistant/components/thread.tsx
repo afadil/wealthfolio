@@ -55,6 +55,9 @@ export const Thread: FC<ThreadProps> = ({ composerActions }) => {
           <ThreadPrimitive.ViewportFooter className="aui-thread-viewport-footer bg-background max-w-(--thread-max-width) sticky bottom-0 mx-auto mt-4 flex w-full flex-col gap-4 overflow-visible rounded-t-3xl pb-4 md:pb-6">
             <ThreadScrollToBottom />
             <Composer composerActions={composerActions} />
+            <p className="text-muted-foreground/70 text-center text-xs">
+              Responses may be inaccurate. Not financial advice. Consult a qualified advisor.
+            </p>
           </ThreadPrimitive.ViewportFooter>
         </div>
       </ThreadPrimitive.Viewport>

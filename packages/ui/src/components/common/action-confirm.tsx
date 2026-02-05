@@ -14,6 +14,7 @@ interface ActionConfirmProps {
   confirmButtonVariant?: ButtonProps["variant"];
   cancelButtonText?: string;
   pendingText?: string;
+  side?: "top" | "right" | "bottom" | "left";
 }
 
 export const ActionConfirm = ({
@@ -27,6 +28,7 @@ export const ActionConfirm = ({
   confirmButtonVariant = "destructive",
   cancelButtonText = "Cancel",
   pendingText = "In progress...",
+  side,
 }: ActionConfirmProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const wasConfirming = useRef(false);
@@ -55,7 +57,7 @@ export const ActionConfirm = ({
           </Button>
         )}
       </PopoverTrigger>
-      <PopoverContent className="w-80" align="end">
+      <PopoverContent className="w-80" align="end" side={side}>
         <div className="space-y-4">
           <div className="space-y-2">
             <h4 className="font-medium leading-none">{confirmTitle}</h4>

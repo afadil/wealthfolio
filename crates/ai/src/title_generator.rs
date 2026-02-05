@@ -119,6 +119,7 @@ Title:",
                     anthropic::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))?;
                 client
                     .agent(&model_id)
+                    .max_tokens(self.config.max_tokens as u64)
                     .build()
                     .prompt(&prompt)
                     .await

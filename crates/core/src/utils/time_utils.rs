@@ -67,7 +67,7 @@ fn previous_trading_day(date: NaiveDate) -> NaiveDate {
 /// fall back to the UTC date.
 pub fn market_effective_date(now: DateTime<Utc>, mic: Option<&str>) -> NaiveDate {
     let (tz, close_time) = match mic
-        .and_then(|code| exchange_metadata::mic_to_timezone(code))
+        .and_then(exchange_metadata::mic_to_timezone)
         .and_then(|tz_name| tz_name.parse::<Tz>().ok())
     {
         Some(tz) => (tz, mic.and_then(exchange_metadata::mic_to_market_close)),

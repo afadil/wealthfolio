@@ -85,3 +85,26 @@ impl Default for PortfolioAllocations {
         }
     }
 }
+
+/// Holdings within an allocation category.
+/// Returned by get_holdings_by_allocation for drill-down views.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AllocationHoldings {
+    /// Taxonomy ID (e.g., "industries_gics", "asset_classes")
+    pub taxonomy_id: String,
+    /// Display name of the taxonomy (e.g., "Sectors", "Asset Classes")
+    pub taxonomy_name: String,
+    /// Category ID within the taxonomy (e.g., "45", "EQUITY")
+    pub category_id: String,
+    /// Display name of the category (e.g., "Information Technology", "Equity")
+    pub category_name: String,
+    /// Category color for UI
+    pub color: String,
+    /// Holdings in this category
+    pub holdings: Vec<crate::portfolio::holdings::HoldingSummary>,
+    /// Total value of holdings in this category
+    pub total_value: Decimal,
+    /// Base currency
+    pub currency: String,
+}

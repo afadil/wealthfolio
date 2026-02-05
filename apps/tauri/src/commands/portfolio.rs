@@ -15,8 +15,8 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 use wealthfolio_core::{
     accounts::TrackingMode,
-    allocation::PortfolioAllocations,
-    holdings::{Holding, HoldingSummary},
+    allocation::{AllocationHoldings, PortfolioAllocations},
+    holdings::Holding,
     income::IncomeSummary,
     performance::{PerformanceMetrics, SimplePerformanceMetrics},
     portfolio::snapshot::{
@@ -124,7 +124,7 @@ pub async fn get_holdings_by_allocation(
     account_id: String,
     taxonomy_id: String,
     category_id: String,
-) -> Result<Vec<HoldingSummary>, String> {
+) -> Result<AllocationHoldings, String> {
     debug!(
         "Get holdings for category {} in taxonomy {} for account {}",
         category_id, taxonomy_id, account_id
