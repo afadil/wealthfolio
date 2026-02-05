@@ -174,6 +174,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
         let mut skipped = 0;
         let mut created_accounts: Vec<(String, String)> = Vec::new();
         let mut new_accounts_info: Vec<NewAccountInfo> = Vec::new();
+        let base_currency = self.account_service.get_base_currency();
 
         // Get all existing accounts with provider_account_id to check for updates
         let existing_accounts = self.account_service.get_all_accounts()?;
@@ -219,7 +220,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 name: broker_account.display_name(),
                 account_type: broker_account.get_account_type(),
                 group: None,
-                currency: broker_account.get_currency(),
+                currency: broker_account.get_currency(base_currency.as_deref()),
                 is_default: false,
                 is_active: broker_account.status.as_deref() != Some("closed"),
                 platform_id,
@@ -301,6 +302,17 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             return Ok((0, 0, Vec::new(), 0));
         }
 
+        let account = self.account_service.get_account(&account_id)?;
+        let base_currency = self
+            .account_service
+            .get_base_currency()
+            .filter(|c| !c.trim().is_empty());
+        let account_currency = if !account.currency.is_empty() {
+            Some(account.currency.clone())
+        } else {
+            base_currency.clone()
+        };
+
         let now_rfc3339 = chrono::Utc::now().to_rfc3339();
 
         let mut asset_rows: Vec<AssetDB> = Vec::new();
@@ -321,12 +333,11 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 continue;
             }
 
-            let currency_code = activity
+            let activity_currency = activity
                 .currency
                 .as_ref()
                 .and_then(|c| c.code.clone())
-                .filter(|c| !c.trim().is_empty())
-                .unwrap_or_else(|| "USD".to_string());
+                .filter(|c| !c.trim().is_empty());
 
             // Get activity type from API (should be mapped to canonical type on API side)
             let activity_type = activity
@@ -382,6 +393,12 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 .and_then(|s| s.currency.as_ref())
                 .and_then(|c| c.code.clone())
                 .filter(|c| !c.trim().is_empty());
+
+            let currency_code = activity_currency
+                .or_else(|| symbol_currency.clone())
+                .or_else(|| account_currency.clone())
+                .or_else(|| base_currency.clone())
+                .unwrap_or_else(|| "USD".to_string());
 
             // Determine the display symbol based on asset type
             // For crypto: we want the base symbol (e.g., "SOL" not "SOL-USD")

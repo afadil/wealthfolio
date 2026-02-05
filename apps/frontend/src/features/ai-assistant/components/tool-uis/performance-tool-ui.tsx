@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { useSettingsContext } from "@/lib/settings-provider";
 
 // ============================================================================
 // Types
@@ -51,14 +52,14 @@ function safeString(value: unknown, fallback: string): string {
  * Normalizes the result to handle both wrapped and unwrapped formats,
  * as well as snake_case vs camelCase field names from the backend.
  */
-function normalizeResult(result: unknown): PerformanceResult | null {
+function normalizeResult(result: unknown, fallbackCurrency: string): PerformanceResult | null {
   if (!result) {
     return null;
   }
 
   if (typeof result === "string") {
     try {
-      return normalizeResult(JSON.parse(result));
+      return normalizeResult(JSON.parse(result), fallbackCurrency);
     } catch {
       return null;
     }
@@ -72,7 +73,7 @@ function normalizeResult(result: unknown): PerformanceResult | null {
 
   // Handle wrapped format: { data: ..., meta: ... }
   if ("data" in candidate && typeof candidate.data === "object") {
-    return normalizeResult(candidate.data);
+    return normalizeResult(candidate.data, fallbackCurrency);
   }
 
   // Extract and normalize fields (handle both camelCase and snake_case)
@@ -89,7 +90,7 @@ function normalizeResult(result: unknown): PerformanceResult | null {
     currency:
       (candidate.currency as string | undefined) ??
       (candidate.Currency as string | undefined) ??
-      "USD",
+      fallbackCurrency,
     cumulativeTwr: Number(candidate.cumulativeTwr ?? candidate.cumulative_twr ?? 0),
     gainLossAmount:
       candidate.gainLossAmount != null || candidate.gain_loss_amount != null
@@ -196,8 +197,10 @@ type PerformanceToolUIContentProps = ToolCallMessagePartProps<
 >;
 
 function PerformanceToolUIContent({ args, result, status }: PerformanceToolUIContentProps) {
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
   const { isBalanceHidden } = useBalancePrivacy();
-  const parsed = useMemo(() => normalizeResult(result), [result]);
+  const parsed = useMemo(() => normalizeResult(result, baseCurrency), [baseCurrency, result]);
 
   const isLoading = status?.type === "running";
   const isIncomplete = status?.type === "incomplete";
@@ -205,7 +208,7 @@ function PerformanceToolUIContent({ args, result, status }: PerformanceToolUICon
 
   // Format values
   const { formatCurrency, formatPercent, formatPercentSigned } = useMemo(() => {
-    const currency = parsed?.currency ?? "USD";
+    const currency = parsed?.currency ?? baseCurrency;
     return {
       formatCurrency: (value: number) =>
         isBalanceHidden
@@ -230,7 +233,7 @@ function PerformanceToolUIContent({ args, result, status }: PerformanceToolUICon
           signDisplay: "exceptZero",
         }).format(value),
     };
-  }, [parsed?.currency, isBalanceHidden]);
+  }, [parsed?.currency, isBalanceHidden, baseCurrency]);
 
   // Format date range
   const periodLabel = useMemo(() => {

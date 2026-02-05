@@ -22,6 +22,7 @@ import {
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { useMemo, useState, useCallback } from "react";
+import { useSettingsContext } from "@/lib/settings-provider";
 import { searchTicker } from "@/adapters";
 import { saveActivities, updateToolResult } from "@/adapters";
 import { CreateCustomAssetDialog } from "@/components/create-custom-asset-dialog";
@@ -169,11 +170,14 @@ function normalizeValidation(raw: Record<string, unknown>): ImportCsvValidationS
   };
 }
 
-function normalizeAccount(raw: Record<string, unknown>): ImportCsvAccountOption {
+function normalizeAccount(
+  raw: Record<string, unknown>,
+  fallbackCurrency: string,
+): ImportCsvAccountOption {
   return {
     id: (raw.id as string) ?? "",
     name: (raw.name as string) ?? "",
-    currency: (raw.currency as string) ?? "USD",
+    currency: (raw.currency as string) ?? fallbackCurrency,
   };
 }
 
@@ -193,12 +197,12 @@ function normalizeMapping(raw: Record<string, unknown>): ImportCsvMappingData {
   };
 }
 
-function normalizeResult(result: unknown): ImportCsvOutput | null {
+function normalizeResult(result: unknown, fallbackCurrency: string): ImportCsvOutput | null {
   if (!result) return null;
 
   if (typeof result === "string") {
     try {
-      return normalizeResult(JSON.parse(result));
+      return normalizeResult(JSON.parse(result), fallbackCurrency);
     } catch {
       return null;
     }
@@ -209,7 +213,7 @@ function normalizeResult(result: unknown): ImportCsvOutput | null {
   const candidate = result as Record<string, unknown>;
 
   if ("data" in candidate && typeof candidate.data === "object") {
-    return normalizeResult(candidate.data);
+    return normalizeResult(candidate.data, fallbackCurrency);
   }
 
   const activitiesRaw = Array.isArray(candidate.activities) ? candidate.activities : [];
@@ -235,7 +239,9 @@ function normalizeResult(result: unknown): ImportCsvOutput | null {
   const accountsRaw = Array.isArray(candidate.available_accounts ?? candidate.availableAccounts)
     ? (candidate.available_accounts ?? candidate.availableAccounts)
     : [];
-  const availableAccounts = (accountsRaw as Record<string, unknown>[]).map(normalizeAccount);
+  const availableAccounts = (accountsRaw as Record<string, unknown>[]).map((account) =>
+    normalizeAccount(account, fallbackCurrency),
+  );
 
   const detectedHeaders = Array.isArray(candidate.detected_headers ?? candidate.detectedHeaders)
     ? ((candidate.detected_headers ?? candidate.detectedHeaders) as string[])
@@ -483,6 +489,8 @@ interface ImportFormProps {
 function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
   const runtime = useRuntimeContext();
   const threadId = runtime.currentThreadId;
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
 
   // Convert drafts to local transactions
   const initialTransactions = useMemo(
@@ -511,8 +519,8 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
       const account = data.availableAccounts.find((a) => a.id === selectedAccountId);
       if (account) return account.currency;
     }
-    return data.availableAccounts[0]?.currency ?? "USD";
-  }, [selectedAccountId, data.availableAccounts]);
+    return data.availableAccounts[0]?.currency ?? baseCurrency;
+  }, [selectedAccountId, data.availableAccounts, baseCurrency]);
 
   // Symbol selection handler - update transaction with symbol and currency from search result
   const handleSymbolSelect = useCallback(
@@ -866,7 +874,9 @@ function AbstainState({ globalErrors }: AbstainStateProps) {
 type ImportCsvToolUIContentProps = ToolCallMessagePartProps<ImportCsvArgs, ImportCsvOutput>;
 
 function ImportCsvToolUIContent({ result, status, toolCallId }: ImportCsvToolUIContentProps) {
-  const parsed = useMemo(() => normalizeResult(result), [result]);
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
+  const parsed = useMemo(() => normalizeResult(result, baseCurrency), [baseCurrency, result]);
   const [successState, setSuccessState] = useState<{
     submitted: boolean;
     createdActivityIds?: string[];

@@ -37,6 +37,7 @@ import {
 } from "@wealthfolio/ui/components/ui/tooltip";
 import type { Account, ActivityImport } from "@/lib/types";
 import { cn, formatDateTime, toPascalCase } from "@/lib/utils";
+import { useSettingsContext } from "@/lib/settings-provider";
 import { formatAmount } from "@wealthfolio/ui";
 import { motion } from "motion/react";
 
@@ -86,6 +87,9 @@ export const ImportPreviewTable = ({
   activities: ActivityImport[];
   accounts: Account[];
 }) => {
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
+
   const [sorting, setSorting] = useState<SortingState>([
     {
       id: "lineNumber",
@@ -145,7 +149,7 @@ export const ImportPreviewTable = ({
 
   const table = useReactTable({
     data: activities,
-    columns: getColumns(accounts),
+    columns: getColumns(accounts, baseCurrency),
     state: {
       sorting,
       columnFilters,
@@ -272,7 +276,8 @@ const ErrorCell = ({
   );
 };
 
-function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
+function getColumns(accounts: Account[], baseCurrency: string): ColumnDef<ActivityImport>[] {
+  const accountCurrencyLookup = new Map(accounts.map((account) => [account.id, account.currency]));
   return [
     {
       id: "lineNumber",
@@ -462,7 +467,12 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       cell: ({ row }) => {
         const activityType = row.getValue("activityType");
         const unitPrice = row.getValue("unitPrice") as string | number | null | undefined;
-        const currency = row.getValue("currency") || "USD";
+        const currencyValue = row.getValue("currency");
+        const accountCurrency = accountCurrencyLookup.get(row.original.accountId);
+        const currency =
+          typeof currencyValue === "string" && currencyValue
+            ? currencyValue
+            : accountCurrency || baseCurrency;
         const hasError = hasFieldError(row.original, "unitPrice");
         const errorMessages = getFieldErrorMessage(row.original, "unitPrice");
 
@@ -474,7 +484,7 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
                     const ratio = toNumber(unitPrice);
                     return ratio === undefined ? "-" : `${ratio.toFixed(0)} : 1`;
                   })()
-                : safeFormatAmount(unitPrice, typeof currency === "string" ? currency : "USD")}
+                : safeFormatAmount(unitPrice, currency)}
             </div>
           </ErrorCell>
         );
@@ -489,7 +499,12 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       cell: ({ row }) => {
         const activityType = row.getValue("activityType");
         const amount = row.getValue("amount") as string | number | null | undefined;
-        const currency = row.getValue("currency") || "USD";
+        const currencyValue = row.getValue("currency");
+        const accountCurrency = accountCurrencyLookup.get(row.original.accountId);
+        const currency =
+          typeof currencyValue === "string" && currencyValue
+            ? currencyValue
+            : accountCurrency || baseCurrency;
 
         // Check if amount field has errors directly
         const hasError = hasFieldError(row.original, "amount");
@@ -498,9 +513,7 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
             <div className="text-right font-medium tabular-nums">
-              {activityType === "SPLIT"
-                ? "-"
-                : safeFormatAmount(amount, typeof currency === "string" ? currency : "USD")}
+              {activityType === "SPLIT" ? "-" : safeFormatAmount(amount, currency)}
             </div>
           </ErrorCell>
         );
@@ -517,16 +530,19 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       cell: ({ row }) => {
         const activityType = row.getValue("activityType");
         const fee = row.getValue("fee") as string | number | null | undefined;
-        const currency = row.getValue("currency") || "USD";
+        const currencyValue = row.getValue("currency");
+        const accountCurrency = accountCurrencyLookup.get(row.original.accountId);
+        const currency =
+          typeof currencyValue === "string" && currencyValue
+            ? currencyValue
+            : accountCurrency || baseCurrency;
         const hasError = hasFieldError(row.original, "fee");
         const errorMessages = getFieldErrorMessage(row.original, "fee");
 
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
             <div className="text-muted-foreground text-right tabular-nums">
-              {activityType === "SPLIT"
-                ? "-"
-                : safeFormatAmount(fee, typeof currency === "string" ? currency : "USD")}
+              {activityType === "SPLIT" ? "-" : safeFormatAmount(fee, currency)}
             </div>
           </ErrorCell>
         );
@@ -540,7 +556,12 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       cell: ({ row }) => {
         const hasError = hasFieldError(row.original, "currency");
         const errorMessages = getFieldErrorMessage(row.original, "currency");
-        const currency = row.getValue("currency") || "-";
+        const currencyValue = row.getValue("currency");
+        const accountCurrency = accountCurrencyLookup.get(row.original.accountId);
+        const currency =
+          typeof currencyValue === "string" && currencyValue
+            ? currencyValue
+            : accountCurrency || "-";
 
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>

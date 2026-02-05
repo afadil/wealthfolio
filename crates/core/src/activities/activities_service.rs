@@ -83,6 +83,31 @@ impl ActivityService {
         self
     }
 
+    fn get_base_currency_or_usd(&self) -> String {
+        self.account_service
+            .get_base_currency()
+            .filter(|c| !c.trim().is_empty())
+            .unwrap_or_else(|| "USD".to_string())
+    }
+
+    fn resolve_activity_currency(
+        &self,
+        activity_currency: &str,
+        asset_currency: Option<&str>,
+        account_currency: &str,
+    ) -> String {
+        if !activity_currency.is_empty() {
+            return activity_currency.to_string();
+        }
+        if let Some(asset_currency) = asset_currency.filter(|c| !c.is_empty()) {
+            return asset_currency.to_string();
+        }
+        if !account_currency.is_empty() {
+            return account_currency.to_string();
+        }
+        self.get_base_currency_or_usd()
+    }
+
     /// Resolves symbols to exchange MICs in batch.
     /// First checks existing assets in the database, then falls back to quote service
     /// for symbols not found locally.
@@ -328,12 +353,19 @@ impl ActivityService {
 
     async fn prepare_new_activity(&self, mut activity: NewActivity) -> Result<NewActivity> {
         let account: Account = self.account_service.get_account(&activity.account_id)?;
+        let account_currency = if !account.currency.is_empty() {
+            account.currency.clone()
+        } else {
+            self.get_base_currency_or_usd()
+        };
 
         // Determine currency (needed for asset ID generation)
         let currency = if !activity.currency.is_empty() {
             activity.currency.clone()
+        } else if !account_currency.is_empty() {
+            account_currency.clone()
         } else {
-            account.currency.clone()
+            self.get_base_currency_or_usd()
         };
 
         // Extract asset fields from nested `asset` object
@@ -446,29 +478,30 @@ impl ActivityService {
 
             // Register FX pair for activity currency if different from account currency
             // Creates FX:activity_currency:account_currency for converting foreign values to account currency
-            if activity.currency != account.currency {
+            if activity.currency != account_currency {
                 self.fx_service
-                    .register_currency_pair(activity.currency.as_str(), account.currency.as_str())
+                    .register_currency_pair(activity.currency.as_str(), account_currency.as_str())
                     .await?;
             }
 
             // Register FX pair for asset currency if different from account currency
             // This is needed when the asset's native currency differs from the activity currency
             // (e.g., asset is EUR but activity was recorded in account's USD)
-            if asset.currency != account.currency && asset.currency != activity.currency {
+            if asset.currency != account_currency && asset.currency != activity.currency {
                 self.fx_service
-                    .register_currency_pair(asset.currency.as_str(), account.currency.as_str())
+                    .register_currency_pair(asset.currency.as_str(), account_currency.as_str())
                     .await?;
             }
         } else {
             // For pure cash movements without asset, just register FX if needed
             if activity.currency.is_empty() {
-                activity.currency = account.currency.clone();
+                activity.currency =
+                    self.resolve_activity_currency("", None, &account_currency);
             }
 
-            if activity.currency != account.currency {
+            if activity.currency != account_currency {
                 self.fx_service
-                    .register_currency_pair(activity.currency.as_str(), account.currency.as_str())
+                    .register_currency_pair(activity.currency.as_str(), account_currency.as_str())
                     .await?;
             }
         }
@@ -505,12 +538,17 @@ impl ActivityService {
         mut activity: ActivityUpdate,
     ) -> Result<ActivityUpdate> {
         let account: Account = self.account_service.get_account(&activity.account_id)?;
+        let account_currency = if !account.currency.is_empty() {
+            account.currency.clone()
+        } else {
+            self.get_base_currency_or_usd()
+        };
 
         // Determine currency (needed for asset ID generation)
         let currency = if !activity.currency.is_empty() {
             activity.currency.clone()
         } else {
-            account.currency.clone()
+            account_currency.clone()
         };
 
         // Extract asset fields using helper methods (supports both nested `asset` and legacy flat fields)
@@ -624,29 +662,30 @@ impl ActivityService {
 
             // Register FX pair for activity currency if different from account currency
             // Creates FX:activity_currency:account_currency for converting foreign values to account currency
-            if activity.currency != account.currency {
+            if activity.currency != account_currency {
                 self.fx_service
-                    .register_currency_pair(activity.currency.as_str(), account.currency.as_str())
+                    .register_currency_pair(activity.currency.as_str(), account_currency.as_str())
                     .await?;
             }
 
             // Register FX pair for asset currency if different from account currency
             // This is needed when the asset's native currency differs from the activity currency
             // (e.g., asset is EUR but activity was recorded in account's USD)
-            if asset.currency != account.currency && asset.currency != activity.currency {
+            if asset.currency != account_currency && asset.currency != activity.currency {
                 self.fx_service
-                    .register_currency_pair(asset.currency.as_str(), account.currency.as_str())
+                    .register_currency_pair(asset.currency.as_str(), account_currency.as_str())
                     .await?;
             }
         } else {
             // For pure cash movements without asset, just register FX if needed
             if activity.currency.is_empty() {
-                activity.currency = account.currency.clone();
+                activity.currency =
+                    self.resolve_activity_currency("", None, &account_currency);
             }
 
-            if activity.currency != account.currency {
+            if activity.currency != account_currency {
                 self.fx_service
-                    .register_currency_pair(activity.currency.as_str(), account.currency.as_str())
+                    .register_currency_pair(activity.currency.as_str(), account_currency.as_str())
                     .await?;
             }
         }
@@ -689,6 +728,11 @@ impl ActivityService {
         use crate::assets::{
             canonical_asset_id, parse_canonical_asset_id, parse_crypto_pair_symbol, AssetSpec,
         };
+        let account_currency = if !account.currency.is_empty() {
+            account.currency.clone()
+        } else {
+            self.get_base_currency_or_usd()
+        };
 
         let symbol = match activity.get_symbol() {
             Some(s) if !s.is_empty() => s.to_string(),
@@ -724,14 +768,14 @@ impl ActivityService {
                                 } else if !activity.currency.is_empty() {
                                     activity.currency.clone()
                                 } else {
-                                    account.currency.clone()
+                                    account_currency.clone()
                                 }
                             }
                             _ => {
                                 if !activity.currency.is_empty() {
                                     activity.currency.clone()
                                 } else {
-                                    account.currency.clone()
+                                    account_currency.clone()
                                 }
                             }
                         };
@@ -776,7 +820,7 @@ impl ActivityService {
         let currency = if !activity.currency.is_empty() {
             activity.currency.clone()
         } else {
-            account.currency.clone()
+            account_currency.clone()
         };
 
         // Infer asset kind
@@ -1018,7 +1062,9 @@ impl ActivityServiceTrait for ActivityService {
             .collect();
 
         let update_symbol_mic_cache = if !update_symbols_to_resolve.is_empty() {
-            self.resolve_symbols_batch(update_symbols_to_resolve, "USD").await
+            let base_currency = self.get_base_currency_or_usd();
+            self.resolve_symbols_batch(update_symbols_to_resolve, &base_currency)
+                .await
         } else {
             HashMap::new()
         };
@@ -1150,11 +1196,16 @@ impl ActivityServiceTrait for ActivityService {
         activities: Vec<ActivityImport>,
     ) -> Result<Vec<ActivityImport>> {
         let account: Account = self.account_service.get_account(&account_id)?;
+        let account_currency = if !account.currency.is_empty() {
+            account.currency.clone()
+        } else {
+            self.get_base_currency_or_usd()
+        };
 
         // Batch resolve all unique symbols to get exchange MICs
         let unique_symbols: HashSet<String> = activities.iter().map(|a| a.symbol.clone()).collect();
         let symbol_mic_cache = self
-            .resolve_symbols_batch(unique_symbols, &account.currency)
+            .resolve_symbols_batch(unique_symbols, &account_currency)
             .await;
 
         let mut activities_with_status: Vec<ActivityImport> = Vec::new();
@@ -1172,8 +1223,8 @@ impl ActivityServiceTrait for ActivityService {
             let asset_context_currency = if !activity.currency.is_empty() {
                 activity.currency.clone()
             } else {
-                // Fallback to account currency for context if import data lacks currency
-                account.currency.clone()
+                // Fallback to account/base currency for context if import data lacks currency
+                account_currency.clone()
             };
 
             // Get resolved exchange MIC from cache
@@ -1219,9 +1270,11 @@ impl ActivityServiceTrait for ActivityService {
 
             // Read-only validation without side effects
             // Just check if asset exists (don't create it)
+            let mut asset_currency: Option<String> = None;
             match self.asset_service.get_asset_by_id(&canonical_id) {
                 Ok(asset) => {
                     activity.symbol_name = asset.name;
+                    asset_currency = Some(asset.currency.clone());
                 }
                 Err(_) => {
                     // Asset doesn't exist yet - that's OK for validation
@@ -1231,15 +1284,23 @@ impl ActivityServiceTrait for ActivityService {
                 }
             }
 
+            if activity.currency.is_empty() {
+                activity.currency = self.resolve_activity_currency(
+                    "",
+                    asset_currency.as_deref(),
+                    &account_currency,
+                );
+            }
+
             // Validate currency without registering FX pair
             if activity.currency.is_empty() {
                 is_valid = false;
                 error_message =
                     Some("Activity currency is missing in the import data.".to_string());
-            } else if activity.currency != account.currency {
+            } else if activity.currency != account_currency {
                 // Just check that currencies are valid 3-letter codes
                 // The actual FX pair will be registered during import
-                let from = &account.currency;
+                let from = &account_currency;
                 let to = &activity.currency;
                 if from.len() != 3
                     || !from.chars().all(|c| c.is_alphabetic())
@@ -1590,6 +1651,11 @@ impl ActivityServiceTrait for ActivityService {
         }
 
         let mut result = PrepareActivitiesResult::default();
+        let account_currency = if !account.currency.is_empty() {
+            account.currency.clone()
+        } else {
+            self.get_base_currency_or_usd()
+        };
 
         // 1. Batch resolve symbols → MICs (for securities without exchange_mic)
         let symbols_to_resolve: HashSet<String> = activities
@@ -1607,7 +1673,7 @@ impl ActivityServiceTrait for ActivityService {
             .collect();
 
         let symbol_mic_cache = self
-            .resolve_symbols_batch(symbols_to_resolve, &account.currency)
+            .resolve_symbols_batch(symbols_to_resolve, &account_currency)
             .await;
 
         // 2. Build AssetSpecs for each activity
@@ -1661,21 +1727,21 @@ impl ActivityServiceTrait for ActivityService {
                     .assets
                     .get(asset_id)
                     .map(|asset| asset.currency.clone())
-                    .unwrap_or_else(|| account.currency.clone())
+                    .unwrap_or_else(|| account_currency.clone())
             } else {
-                account.currency.clone()
+                account_currency.clone()
             };
 
             // Activity currency vs account currency
-            if activity_currency != account.currency {
-                fx_pairs.push((activity_currency.clone(), account.currency.clone()));
+            if activity_currency != account_currency {
+                fx_pairs.push((activity_currency.clone(), account_currency.clone()));
             }
 
             // Asset currency vs account currency (when asset currency differs from both)
             if let Some(asset_id) = activity_asset_map.get(idx).and_then(|id| id.as_ref()) {
                 if let Some(asset) = ensure_result.assets.get(asset_id) {
-                    if asset.currency != account.currency && asset.currency != activity_currency {
-                        fx_pairs.push((asset.currency.clone(), account.currency.clone()));
+                    if asset.currency != account_currency && asset.currency != activity_currency {
+                        fx_pairs.push((asset.currency.clone(), account_currency.clone()));
                     }
                 }
             }
@@ -1700,12 +1766,12 @@ impl ActivityServiceTrait for ActivityService {
                     .assets
                     .get(asset_id)
                     .map(|asset| asset.currency.clone())
-                    .unwrap_or_else(|| account.currency.clone())
+                    .unwrap_or_else(|| account_currency.clone())
             } else {
-                account.currency.clone()
+                account_currency.clone()
             };
-            let fx_pair = if activity_currency != account.currency {
-                Some((activity_currency.clone(), account.currency.clone()))
+            let fx_pair = if activity_currency != account_currency {
+                Some((activity_currency.clone(), account_currency.clone()))
             } else {
                 None
             };
@@ -1737,7 +1803,7 @@ impl ActivityServiceTrait for ActivityService {
                             let currency = if !activity.currency.is_empty() {
                                 &activity.currency
                             } else {
-                                &account.currency
+                                &account_currency
                             };
                             self.create_manual_quote_from_activity(
                                 asset_id,
@@ -1757,10 +1823,10 @@ impl ActivityServiceTrait for ActivityService {
                     if let Some(asset) = ensure_result.assets.get(asset_id) {
                         activity.currency = asset.currency.clone();
                     } else {
-                        activity.currency = account.currency.clone();
+                        activity.currency = account_currency.clone();
                     }
                 } else {
-                    activity.currency = account.currency.clone();
+                    activity.currency = account_currency.clone();
                 }
             }
 

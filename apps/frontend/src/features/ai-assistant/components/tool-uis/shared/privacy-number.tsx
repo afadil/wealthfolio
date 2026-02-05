@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { useSettingsContext } from "@/lib/settings-provider";
 
 export interface PrivacyNumberProps {
   value: number;
@@ -12,11 +13,14 @@ const HIDDEN_PLACEHOLDER = "\u2022\u2022\u2022\u2022\u2022";
 
 export function PrivacyNumber({
   value,
-  currency = "USD",
+  currency,
   type = "currency",
   className,
 }: PrivacyNumberProps) {
   const { isBalanceHidden } = useBalancePrivacy();
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
+  const effectiveCurrency = currency ?? baseCurrency;
 
   if (isBalanceHidden) {
     return <span className={cn(className)}>{HIDDEN_PLACEHOLDER}</span>;
@@ -31,7 +35,7 @@ export function PrivacyNumber({
         }).format(value)
       : new Intl.NumberFormat("en-US", {
           style: "currency",
-          currency,
+          currency: effectiveCurrency,
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         }).format(value);

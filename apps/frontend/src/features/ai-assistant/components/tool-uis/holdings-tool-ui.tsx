@@ -20,6 +20,7 @@ import { useMemo, type FC } from "react";
 import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { ResponsiveContainer, Treemap, Tooltip as ChartTooltip } from "recharts";
+import { useSettingsContext } from "@/lib/settings-provider";
 
 // ============================================================================
 // Types
@@ -64,14 +65,14 @@ interface GetHoldingsOutput {
  * Normalizes the result to handle both wrapped and unwrapped formats,
  * as well as snake_case vs camelCase field names.
  */
-function normalizeResult(result: unknown): GetHoldingsOutput | null {
+function normalizeResult(result: unknown, fallbackCurrency: string): GetHoldingsOutput | null {
   if (!result) {
     return null;
   }
 
   if (typeof result === "string") {
     try {
-      return normalizeResult(JSON.parse(result));
+      return normalizeResult(JSON.parse(result), fallbackCurrency);
     } catch {
       return null;
     }
@@ -85,7 +86,7 @@ function normalizeResult(result: unknown): GetHoldingsOutput | null {
 
   // Handle wrapped format: { data: ..., meta: ... }
   if ("data" in candidate && typeof candidate.data === "object") {
-    return normalizeResult(candidate.data);
+    return normalizeResult(candidate.data, fallbackCurrency);
   }
 
   // Extract holdings array
@@ -121,7 +122,7 @@ function normalizeResult(result: unknown): GetHoldingsOutput | null {
           ? Number(entry.dayChangePct ?? entry.day_change_pct)
           : null,
       weight: Number(entry.weight ?? 0),
-      currency: (entry.currency as string | undefined) ?? "USD",
+      currency: (entry.currency as string | undefined) ?? fallbackCurrency,
     }));
 
   return {
@@ -131,7 +132,7 @@ function normalizeResult(result: unknown): GetHoldingsOutput | null {
         (candidate.total_value as number | string | undefined) ??
         0,
     ),
-    currency: (candidate.currency as string | undefined) ?? "USD",
+    currency: (candidate.currency as string | undefined) ?? fallbackCurrency,
     accountScope:
       (candidate.accountScope as string | undefined) ??
       (candidate.account_scope as string | undefined) ??
@@ -320,8 +321,10 @@ export const HoldingsToolUI = makeAssistantToolUI<GetHoldingsArgs, GetHoldingsOu
 type HoldingsContentProps = ToolCallMessagePartProps<GetHoldingsArgs, GetHoldingsOutput>;
 
 function HoldingsContent({ args, result, status }: HoldingsContentProps) {
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
   const { isBalanceHidden } = useBalancePrivacy();
-  const parsed = normalizeResult(result);
+  const parsed = normalizeResult(result, baseCurrency);
 
   // Sort holdings by marketValueBase descending
   const sortedHoldings = useMemo(() => {
@@ -329,7 +332,7 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
     return [...parsed.holdings].sort((a, b) => b.marketValueBase - a.marketValueBase);
   }, [parsed?.holdings]);
 
-  const currency = parsed?.currency ?? "USD";
+  const currency = parsed?.currency ?? baseCurrency;
 
   // Calculate totals for summary
   const { totalValue, totalGain, totalGainPct } = useMemo(() => {

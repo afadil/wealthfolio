@@ -13,6 +13,8 @@ use log::{debug, warn};
 use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::Deserialize;
+
+use crate::SymbolResolver;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::time::Duration;
@@ -22,6 +24,7 @@ use crate::models::{
     AssetProfile, Coverage, InstrumentKind, ProviderInstrument, Quote, QuoteContext, SearchResult,
 };
 use crate::provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
+use crate::resolver::ResolverChain;
 
 const BASE_URL: &str = "https://www.alphavantage.co/query";
 const PROVIDER_ID: &str = "ALPHA_VANTAGE";
@@ -512,6 +515,15 @@ impl AlphaVantageProvider {
             })
     }
 
+    fn resolve_currency(&self, context: &QuoteContext) -> String {
+        let chain = ResolverChain::new();
+        chain
+            .get_currency(&PROVIDER_ID.into(), context)
+            .or_else(|| context.currency_hint.clone())
+            .map(|c| c.to_string())
+            .unwrap_or_else(|| "USD".to_string())
+    }
+
     /// Check for API-level errors in the response.
     fn check_api_error(
         error_message: &Option<String>,
@@ -934,12 +946,8 @@ impl MarketDataProvider for AlphaVantageProvider {
         // Fetch historical quotes and return the most recent one
         let quotes = match instrument {
             ProviderInstrument::EquitySymbol { ref symbol } => {
-                let currency = context
-                    .currency_hint
-                    .as_ref()
-                    .map(|c| c.as_ref())
-                    .unwrap_or("USD");
-                self.fetch_equity_quotes(symbol, currency).await?
+                let currency = self.resolve_currency(context);
+                self.fetch_equity_quotes(symbol, &currency).await?
             }
             ProviderInstrument::FxPair { ref from, ref to } => {
                 self.fetch_fx_quotes(from, to).await?
@@ -966,8 +974,8 @@ impl MarketDataProvider for AlphaVantageProvider {
                 if let Some((base, quote)) = symbol.split_once('-') {
                     self.fetch_crypto_quotes(base, quote).await?
                 } else {
-                    // Default to USD market
-                    self.fetch_crypto_quotes(symbol, "USD").await?
+                    let currency = self.resolve_currency(context);
+                    self.fetch_crypto_quotes(symbol, &currency).await?
                 }
             }
             ProviderInstrument::MetalSymbol { .. } => {
@@ -993,12 +1001,8 @@ impl MarketDataProvider for AlphaVantageProvider {
     ) -> Result<Vec<Quote>, MarketDataError> {
         let quotes = match instrument {
             ProviderInstrument::EquitySymbol { ref symbol } => {
-                let currency = context
-                    .currency_hint
-                    .as_ref()
-                    .map(|c| c.as_ref())
-                    .unwrap_or("USD");
-                self.fetch_equity_quotes(symbol, currency).await?
+                let currency = self.resolve_currency(context);
+                self.fetch_equity_quotes(symbol, &currency).await?
             }
             ProviderInstrument::FxPair { ref from, ref to } => {
                 self.fetch_fx_quotes(from, to).await?
@@ -1025,8 +1029,8 @@ impl MarketDataProvider for AlphaVantageProvider {
                 if let Some((base, quote)) = symbol.split_once('-') {
                     self.fetch_crypto_quotes(base, quote).await?
                 } else {
-                    // Default to USD market
-                    self.fetch_crypto_quotes(symbol, "USD").await?
+                    let currency = self.resolve_currency(context);
+                    self.fetch_crypto_quotes(symbol, &currency).await?
                 }
             }
             ProviderInstrument::MetalSymbol { .. } => {

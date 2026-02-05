@@ -25,6 +25,7 @@ import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { ASSET_KIND_DISPLAY_NAMES, Quote } from "@/lib/types";
 import { cn, formatAmount, formatDate } from "@/lib/utils";
+import { useSettingsContext } from "@/lib/settings-provider";
 import { ScrollArea, Separator } from "@wealthfolio/ui";
 import { ParsedAsset } from "./asset-utils";
 
@@ -53,6 +54,8 @@ export function AssetsTableMobile({
   isUpdatingQuotes,
   isRefetchingQuotes,
 }: AssetsTableMobileProps) {
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDataSources, setSelectedDataSources] = useState<string[]>([]);
@@ -222,7 +225,7 @@ export function AssetsTableMobile({
                       <div className="flex items-center justify-end gap-1 font-semibold">
                         {formatAmount(
                           latestQuotes[asset.id].close,
-                          latestQuotes[asset.id].currency ?? asset.currency ?? "USD",
+                          latestQuotes[asset.id].currency ?? asset.currency ?? baseCurrency,
                         )}
                         {isStaleQuote(latestQuotes[asset.id]) ? (
                           <Tooltip>

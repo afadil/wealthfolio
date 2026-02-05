@@ -210,7 +210,10 @@ export const ActivityTable = ({
           const unitPrice = Number(row.getValue("unitPrice"));
           const amount = row.original.amount;
           const currencyVal = row.getValue("currency");
-          const currency = typeof currencyVal === "string" ? currencyVal : "USD";
+          const currency =
+            typeof currencyVal === "string" && currencyVal
+              ? currencyVal
+              : row.original.accountCurrency || "USD";
           const assetSymbol = String(row.getValue("assetSymbol"));
 
           if (activityType === "FEE") {
@@ -245,7 +248,10 @@ export const ActivityTable = ({
           const activityType = String(row.getValue("activityType"));
           const fee = Number(row.getValue("fee"));
           const currencyVal = row.getValue("currency");
-          const currency = typeof currencyVal === "string" ? currencyVal : "USD";
+          const currency =
+            typeof currencyVal === "string" && currencyVal
+              ? currencyVal
+              : row.original.accountCurrency || "USD";
 
           return (
             <div className="text-right">
@@ -268,7 +274,7 @@ export const ActivityTable = ({
         cell: ({ row }) => {
           const activity = row.original;
           const activityType = activity.activityType;
-          const currency = activity.currency || "USD";
+          const currency = activity.currency || activity.accountCurrency || "USD";
 
           if (activityType === "SPLIT") {
             return <div className="pr-4 text-right">-</div>;

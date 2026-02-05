@@ -85,4 +85,7 @@ pub trait AccountServiceTrait: Send + Sync {
 
     /// Returns active, non-archived accounts (for UI selectors)
     fn get_active_non_archived_accounts(&self) -> Result<Vec<Account>>;
+
+    /// Returns the configured base currency if available.
+    fn get_base_currency(&self) -> Option<String>;
 }

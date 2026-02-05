@@ -31,6 +31,7 @@ import { useMemo, useState, useCallback } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { useSettingsContext } from "@/lib/settings-provider";
 import { createActivity, updateToolResult } from "@/adapters";
 import {
   ActivityType,
@@ -163,14 +164,14 @@ function parseActivityDateToLocal(dateString: string): Date {
 // Normalizer
 // ============================================================================
 
-function normalizeResult(result: unknown): RecordActivityOutput | null {
+function normalizeResult(result: unknown, fallbackCurrency: string): RecordActivityOutput | null {
   if (!result) {
     return null;
   }
 
   if (typeof result === "string") {
     try {
-      return normalizeResult(JSON.parse(result));
+      return normalizeResult(JSON.parse(result), fallbackCurrency);
     } catch {
       return null;
     }
@@ -184,7 +185,7 @@ function normalizeResult(result: unknown): RecordActivityOutput | null {
 
   // Handle wrapped format: { data: ..., meta: ... }
   if ("data" in candidate && typeof candidate.data === "object") {
-    return normalizeResult(candidate.data);
+    return normalizeResult(candidate.data, fallbackCurrency);
   }
 
   // Normalize draft
@@ -207,7 +208,7 @@ function normalizeResult(result: unknown): RecordActivityOutput | null {
           : undefined,
     amount: draftRaw.amount != null ? Number(draftRaw.amount) : undefined,
     fee: draftRaw.fee != null ? Number(draftRaw.fee) : undefined,
-    currency: (draftRaw.currency as string) ?? "USD",
+    currency: (draftRaw.currency as string) ?? fallbackCurrency,
     accountId: (draftRaw.accountId as string) ?? (draftRaw.account_id as string) ?? undefined,
     accountName: (draftRaw.accountName as string) ?? (draftRaw.account_name as string) ?? undefined,
     subtype: (draftRaw.subtype as string) ?? undefined,
@@ -239,7 +240,7 @@ function normalizeResult(result: unknown): RecordActivityOutput | null {
   const availableAccounts: AccountOption[] = accountsRaw.map((acc: Record<string, unknown>) => ({
     id: (acc.id as string) ?? "",
     name: (acc.name as string) ?? "",
-    currency: (acc.currency as string) ?? "USD",
+    currency: (acc.currency as string) ?? fallbackCurrency,
   }));
 
   // Normalize resolved asset
@@ -251,7 +252,7 @@ function normalizeResult(result: unknown): RecordActivityOutput | null {
         assetId: (assetRaw.assetId as string) ?? (assetRaw.asset_id as string) ?? "",
         symbol: (assetRaw.symbol as string) ?? "",
         name: (assetRaw.name as string) ?? "",
-        currency: (assetRaw.currency as string) ?? "USD",
+        currency: (assetRaw.currency as string) ?? fallbackCurrency,
         exchange: (assetRaw.exchange as string) ?? undefined,
         exchangeMic:
           (assetRaw.exchangeMic as string) ?? (assetRaw.exchange_mic as string) ?? undefined,
@@ -444,6 +445,8 @@ function DraftForm({
 }: DraftFormProps) {
   const runtime = useRuntimeContext();
   const threadId = runtime.currentThreadId;
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -485,8 +488,15 @@ function DraftForm({
         ? availableAccounts[0].currency
         : undefined;
 
-    return accountCurrency ?? draft.currency ?? "USD";
-  }, [draft.activityType, draft.accountId, draft.currency, resolvedAsset, availableAccounts]);
+    return accountCurrency ?? draft.currency ?? baseCurrency;
+  }, [
+    draft.activityType,
+    draft.accountId,
+    draft.currency,
+    resolvedAsset,
+    availableAccounts,
+    baseCurrency,
+  ]);
 
   // Initialize form with draft values, preferring resolved values
   const form = useForm<DraftFormValues>({
@@ -702,14 +712,7 @@ function DraftForm({
     } finally {
       setIsSubmitting(false);
     }
-  }, [
-    form,
-    selectedSymbol,
-    selectedExchangeMic,
-    threadId,
-    toolCallId,
-    onSuccess,
-  ]);
+  }, [form, selectedSymbol, selectedExchangeMic, threadId, toolCallId, onSuccess]);
 
   const activityTypeDisplay =
     (ACTIVITY_TYPE_DISPLAY_NAMES as Record<string, string>)[activityType] ?? activityType;
@@ -1138,7 +1141,9 @@ function RecordActivityToolUIContent({
   status,
   toolCallId,
 }: RecordActivityToolUIContentProps) {
-  const parsed = useMemo(() => normalizeResult(result), [result]);
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
+  const parsed = useMemo(() => normalizeResult(result, baseCurrency), [baseCurrency, result]);
   const [successState, setSuccessState] = useState<{
     submitted: boolean;
     createdActivityId?: string;

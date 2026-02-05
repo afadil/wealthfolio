@@ -17,6 +17,7 @@ import { useAlternativeAssetHolding, useAlternativeHoldings } from "@/hooks/use-
 import { useAssetProfileMutations } from "./hooks/use-asset-profile-mutations";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
+import { useSettingsContext } from "@/lib/settings-provider";
 import { Asset, AssetKind, Holding, Quote } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatedToggleGroup, Page, PageContent, PageHeader, SwipableView } from "@wealthfolio/ui";
@@ -81,6 +82,8 @@ interface AssetDetailData {
 type AssetTab = "overview" | "lots" | "history";
 
 export const AssetProfilePage = () => {
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
   const { assetId: encodedAssetId = "" } = useParams<{ assetId: string }>();
   const assetId = decodeURIComponent(encodedAssetId);
   const location = useLocation();
@@ -318,7 +321,7 @@ export const AssetProfilePage = () => {
       attributes: null,
       createdAt: holding?.openDate ? new Date(holding.openDate) : new Date(),
       updatedAt: new Date(),
-      currency: instrument?.currency ?? asset?.currency ?? "USD",
+      currency: instrument?.currency ?? asset?.currency ?? baseCurrency,
       sectors: JSON.stringify(parseJsonField(legacy?.sectors) ?? []),
       url: null,
       marketPrice: quote?.close ?? 0,
@@ -361,7 +364,7 @@ export const AssetProfilePage = () => {
       todaysReturnPercent: quoteData?.todaysReturnPercent ?? null,
       totalReturn: Number(holding.totalGain?.local ?? 0),
       totalReturnPercent: Number(holding.totalGainPct ?? 0),
-      currency: holding.localCurrency ?? holding.instrument?.currency ?? "USD",
+      currency: holding.localCurrency ?? holding.instrument?.currency ?? baseCurrency,
       quote: quoteData?.quote ?? null,
     };
   }, [holding, quote]);
@@ -403,7 +406,7 @@ export const AssetProfilePage = () => {
             <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">
               <AssetHistoryCard
                 assetId={profile.id ?? ""}
-                currency={profile.currency ?? "USD"}
+                currency={profile.currency ?? baseCurrency}
                 marketPrice={profile.marketPrice}
                 totalGainAmount={profile.totalGainAmount}
                 totalGainPercent={profile.totalGainPercent}
@@ -488,7 +491,7 @@ export const AssetProfilePage = () => {
         content: (
           <AssetLotsTable
             lots={holding.lots}
-            currency={profile.currency ?? "USD"}
+            currency={profile.currency ?? baseCurrency}
             marketPrice={profile.marketPrice}
           />
         ),
@@ -501,7 +504,7 @@ export const AssetProfilePage = () => {
       content: isAltAsset ? (
         <ValueHistoryDataGrid
           data={quoteHistory ?? []}
-          currency={profile?.currency ?? "USD"}
+          currency={profile?.currency ?? baseCurrency}
           isLiability={isLiability}
           onSaveQuote={(quote: Quote) => {
             saveQuoteMutation.mutate(quote);
@@ -512,7 +515,7 @@ export const AssetProfilePage = () => {
         <QuoteHistoryDataGrid
           data={quoteHistory ?? []}
           assetId={assetId}
-          currency={profile?.currency ?? "USD"}
+          currency={profile?.currency ?? baseCurrency}
           assetKind={assetProfile?.kind}
           isManualDataSource={isManualPricingMode}
           onSaveQuote={(quote: Quote) => saveQuoteMutation.mutate(quote)}
@@ -603,7 +606,7 @@ export const AssetProfilePage = () => {
           <QuoteHistoryDataGrid
             data={quoteHistory ?? []}
             assetId={assetId}
-            currency={profile?.currency ?? "USD"}
+            currency={profile?.currency ?? baseCurrency}
             assetKind={assetProfile?.kind}
             isManualDataSource={isManualPricingMode}
             onSaveQuote={(quote: Quote) => saveQuoteMutation.mutate(quote)}
@@ -895,7 +898,7 @@ export const AssetProfilePage = () => {
                 <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">
                   <AssetHistoryCard
                     assetId={profile.id ?? ""}
-                    currency={profile.currency ?? "USD"}
+                    currency={profile.currency ?? baseCurrency}
                     marketPrice={profile.marketPrice}
                     totalGainAmount={profile.totalGainAmount}
                     totalGainPercent={profile.totalGainPercent}
@@ -980,7 +983,7 @@ export const AssetProfilePage = () => {
               <TabsContent value="lots" className="pt-6">
                 <AssetLotsTable
                   lots={holding.lots}
-                  currency={profile.currency ?? "USD"}
+                  currency={profile.currency ?? baseCurrency}
                   marketPrice={profile.marketPrice}
                 />
               </TabsContent>
@@ -991,7 +994,7 @@ export const AssetProfilePage = () => {
               {isAltAsset ? (
                 <ValueHistoryDataGrid
                   data={quoteHistory ?? []}
-                  currency={profile?.currency ?? "USD"}
+                  currency={profile?.currency ?? baseCurrency}
                   isLiability={isLiability}
                   onSaveQuote={(quote: Quote) => {
                     saveQuoteMutation.mutate(quote);
@@ -1002,7 +1005,7 @@ export const AssetProfilePage = () => {
                 <QuoteHistoryDataGrid
                   data={quoteHistory ?? []}
                   assetId={assetId}
-                  currency={profile?.currency ?? "USD"}
+                  currency={profile?.currency ?? baseCurrency}
                   assetKind={assetProfile?.kind}
                   isManualDataSource={isManualPricingMode}
                   onSaveQuote={(quote: Quote) => saveQuoteMutation.mutate(quote)}

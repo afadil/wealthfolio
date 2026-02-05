@@ -148,7 +148,10 @@ pub fn build_activity_metadata(activity: &AccountUniversalActivity) -> Option<St
 /// 2. symbol.symbol
 /// 3. $CASH-{currency} (for cash transactions)
 /// 4. $UNKNOWN-{currency} (fallback)
-pub fn resolve_asset_symbol(activity: &AccountUniversalActivity) -> String {
+pub fn resolve_asset_symbol(
+    activity: &AccountUniversalActivity,
+    fallback_currency: Option<&str>,
+) -> String {
     // 1. Option symbol takes priority
     if let Some(ref option_symbol) = activity.option_symbol {
         if let Some(ref ticker) = option_symbol.ticker {
@@ -172,6 +175,8 @@ pub fn resolve_asset_symbol(activity: &AccountUniversalActivity) -> String {
         .currency
         .as_ref()
         .and_then(|c| c.code.clone())
+        .filter(|c| !c.trim().is_empty())
+        .or_else(|| fallback_currency.filter(|c| !c.is_empty()).map(|c| c.to_string()))
         .unwrap_or_else(|| "USD".to_string());
 
     // Check if this is a cash-only transaction (deposit, withdrawal, fee, etc.)

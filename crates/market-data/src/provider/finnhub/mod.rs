@@ -11,6 +11,7 @@
 use std::time::Duration;
 
 use async_trait::async_trait;
+use crate::SymbolResolver;
 use chrono::{DateTime, TimeZone, Utc};
 use reqwest::Client;
 use rust_decimal::Decimal;
@@ -22,6 +23,7 @@ use crate::models::{
     AssetProfile, Coverage, InstrumentKind, ProviderInstrument, Quote, QuoteContext, SearchResult,
 };
 use crate::provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
+use crate::resolver::ResolverChain;
 
 const BASE_URL: &str = "https://finnhub.io/api/v1";
 const PROVIDER_ID: &str = "FINNHUB";
@@ -276,11 +278,12 @@ impl FinnhubProvider {
         }
     }
 
-    /// Get the currency from context or default to USD.
+    /// Get the currency from exchange context or fallback to hint/USD.
     fn get_currency(&self, context: &QuoteContext) -> String {
-        context
-            .currency_hint
-            .as_ref()
+        let chain = ResolverChain::new();
+        chain
+            .get_currency(&PROVIDER_ID.into(), context)
+            .or_else(|| context.currency_hint.clone())
             .map(|c| c.to_string())
             .unwrap_or_else(|| "USD".to_string())
     }

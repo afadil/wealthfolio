@@ -22,20 +22,19 @@ import { SegmentedAllocationBar } from "./components/segmented-allocation-bar";
 
 export const HoldingsInsightsPage = () => {
   const navigate = useNavigate();
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
   const [selectedAccount, setSelectedAccount] = useState<Account | null>({
     id: PORTFOLIO_ACCOUNT_ID,
     name: "All Portfolio",
     accountType: "PORTFOLIO" as unknown as Account["accountType"],
     balance: 0,
-    currency: "USD",
+    currency: baseCurrency,
     isDefault: false,
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
   } as Account);
-
-  const { settings } = useSettingsContext();
-  const baseCurrency = settings?.baseCurrency ?? "USD";
 
   const accountId = selectedAccount?.id ?? PORTFOLIO_ACCOUNT_ID;
   const { holdings, isLoading: holdingsLoading } = useHoldings(accountId);

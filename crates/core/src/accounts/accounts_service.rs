@@ -152,6 +152,15 @@ impl AccountServiceTrait for AccountService {
         self.repository.list(Some(true), Some(false), None)
     }
 
+    fn get_base_currency(&self) -> Option<String> {
+        let base_currency = self.base_currency.read().unwrap().clone();
+        if base_currency.trim().is_empty() {
+            None
+        } else {
+            Some(base_currency)
+        }
+    }
+
     /// Deletes an account by its ID.
     async fn delete_account(&self, account_id: &str) -> Result<()> {
         self.repository.delete(account_id).await?;

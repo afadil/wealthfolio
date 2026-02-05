@@ -11,6 +11,7 @@ use std::sync::RwLock;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use crate::SymbolResolver;
 use chrono::{DateTime, TimeZone, Utc};
 use lazy_static::lazy_static;
 use log::{debug, warn};
@@ -26,6 +27,7 @@ use crate::models::{
     AssetProfile, Coverage, InstrumentKind, ProviderInstrument, Quote, QuoteContext, SearchResult,
 };
 use crate::provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
+use crate::resolver::ResolverChain;
 
 use models::{YahooQuoteSummaryResponse, YahooQuoteSummaryResult};
 
@@ -193,11 +195,12 @@ impl YahooProvider {
     // Quote Fetching
     // ========================================================================
 
-    /// Get the currency from context or default to USD.
+    /// Get the currency from exchange context or fallback to hint/USD.
     fn get_currency(&self, context: &QuoteContext) -> String {
-        context
-            .currency_hint
-            .as_ref()
+        let chain = ResolverChain::new();
+        chain
+            .get_currency(&"YAHOO".into(), context)
+            .or_else(|| context.currency_hint.clone())
             .map(|c| c.to_string())
             .unwrap_or_else(|| "USD".to_string())
     }

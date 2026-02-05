@@ -205,6 +205,10 @@ pub mod test_env {
                 .collect())
         }
 
+        fn get_base_currency(&self) -> Option<String> {
+            Some("USD".to_string())
+        }
+
         async fn create_account(&self, _account: NewAccount) -> CoreResult<Account> {
             unimplemented!("MockAccountService::create_account")
         }

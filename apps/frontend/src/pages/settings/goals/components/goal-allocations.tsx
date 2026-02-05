@@ -3,6 +3,7 @@ import { Input } from "@wealthfolio/ui/components/ui/input";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { Account, Goal, GoalAllocation } from "@/lib/types";
 import { formatAmount } from "@wealthfolio/ui";
+import { useSettingsContext } from "@/lib/settings-provider";
 import React, { useState, useEffect } from "react";
 
 interface GoalsAllocationsProps {
@@ -18,6 +19,8 @@ const GoalsAllocations: React.FC<GoalsAllocationsProps> = ({
   existingAllocations,
   onSubmit,
 }) => {
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
   const [allocations, setAllocations] = useState<GoalAllocation[]>(existingAllocations || []);
   const [totalAllocations, setTotalAllocations] = useState<Record<string, number>>({});
   const [isExceeding, setIsExceeding] = useState<boolean>(false);
@@ -108,7 +111,7 @@ const GoalsAllocations: React.FC<GoalsAllocationsProps> = ({
                   <div className="p-2">
                     <span>{goal.title}</span>
                     <p className="text-muted-foreground text-xs font-light">
-                      {formatAmount(goal.targetAmount, "USD", false)}
+                      {formatAmount(goal.targetAmount, baseCurrency, false)}
                     </p>
                   </div>
                 </td>

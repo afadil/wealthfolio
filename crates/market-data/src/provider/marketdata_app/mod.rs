@@ -18,11 +18,14 @@ use log::warn;
 use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::Deserialize;
+
+use crate::SymbolResolver;
 use std::time::Duration;
 
 use crate::errors::MarketDataError;
 use crate::models::{Coverage, InstrumentKind, ProviderInstrument, Quote, QuoteContext};
 use crate::provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
+use crate::resolver::ResolverChain;
 
 const BASE_URL: &str = "https://api.marketdata.app/v1";
 const PROVIDER_ID: &str = "MARKETDATA_APP";
@@ -140,11 +143,12 @@ impl MarketDataAppProvider {
             })
     }
 
-    /// Get the currency for the quote. Uses the currency hint from context if available.
+    /// Get the currency from exchange context or fallback to hint/USD.
     fn get_currency(context: &QuoteContext) -> String {
-        context
-            .currency_hint
-            .as_ref()
+        let chain = ResolverChain::new();
+        chain
+            .get_currency(&PROVIDER_ID.into(), context)
+            .or_else(|| context.currency_hint.clone())
             .map(|c| c.to_string())
             .unwrap_or_else(|| "USD".to_string())
     }

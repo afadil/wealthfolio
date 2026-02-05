@@ -18,6 +18,7 @@ import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { format, parseISO } from "date-fns";
+import { useSettingsContext } from "@/lib/settings-provider";
 
 // ============================================================================
 // Types
@@ -113,14 +114,17 @@ function formatDate(dateString: string): string {
  * Normalizes the result to handle both wrapped and unwrapped formats,
  * as well as snake_case vs camelCase field names.
  */
-function normalizeResult(result: unknown): SearchActivitiesOutput | null {
+function normalizeResult(
+  result: unknown,
+  fallbackCurrency: string,
+): SearchActivitiesOutput | null {
   if (!result) {
     return null;
   }
 
   if (typeof result === "string") {
     try {
-      return normalizeResult(JSON.parse(result));
+      return normalizeResult(JSON.parse(result), fallbackCurrency);
     } catch {
       return null;
     }
@@ -134,7 +138,7 @@ function normalizeResult(result: unknown): SearchActivitiesOutput | null {
 
   // Handle wrapped format: { data: ..., meta: ... }
   if ("data" in candidate && typeof candidate.data === "object") {
-    return normalizeResult(candidate.data);
+    return normalizeResult(candidate.data, fallbackCurrency);
   }
 
   // Extract activities array
@@ -159,7 +163,7 @@ function normalizeResult(result: unknown): SearchActivitiesOutput | null {
             : null,
       amount: entry.amount != null ? Number(entry.amount) : null,
       fee: entry.fee != null ? Number(entry.fee) : null,
-      currency: (entry.currency as string | undefined) ?? "USD",
+      currency: (entry.currency as string | undefined) ?? fallbackCurrency,
       accountId:
         (entry.accountId as string | undefined) ?? (entry.account_id as string | undefined) ?? "",
       accountName:
@@ -208,8 +212,10 @@ type ActivitiesContentProps = ToolCallMessagePartProps<
 >;
 
 function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
   const { isBalanceHidden } = useBalancePrivacy();
-  const parsed = normalizeResult(result);
+  const parsed = normalizeResult(result, baseCurrency);
 
   // Sort activities by date descending (most recent first)
   const sortedActivities = useMemo(() => {

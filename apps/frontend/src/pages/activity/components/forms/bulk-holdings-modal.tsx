@@ -1,6 +1,7 @@
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { ActivityType, PricingMode } from "@/lib/constants";
 import { Account, ActivityBulkMutationRequest, ActivityCreate } from "@/lib/types";
+import { useSettingsContext } from "@/lib/settings-provider";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Button,
@@ -30,6 +31,8 @@ interface BulkHoldingsModalProps {
 export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModalProps) => {
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const { saveActivitiesMutation } = useActivityMutations();
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
 
   const form = useForm<BulkHoldingsFormValues>({
     resolver: zodResolver(bulkHoldingsFormSchema) as Resolver<BulkHoldingsFormValues>,
@@ -37,7 +40,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
     defaultValues: {
       accountId: "",
       activityDate: new Date(),
-      currency: "USD",
+      currency: baseCurrency,
       comment: "",
       holdings: [
         {
@@ -65,6 +68,9 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
       form.reset();
       setSelectedAccount(null);
     } else {
+      if (!form.getValues("currency")) {
+        form.setValue("currency", baseCurrency, { shouldValidate: false });
+      }
       // When modal opens, focus the account field with proper timing
       // Use a longer delay to ensure modal is fully rendered
       const timeoutId = setTimeout(() => {
@@ -74,7 +80,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
       return () => clearTimeout(timeoutId);
     }
     return; // Explicit return for all code paths
-  }, [open, form]);
+  }, [baseCurrency, form, open]);
 
   // Account change handler
   const handleAccountChange = useCallback(
@@ -84,8 +90,12 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
         shouldValidate: true,
         shouldDirty: true,
       });
+      form.setValue("currency", account?.currency || baseCurrency, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
     },
-    [form],
+    [baseCurrency, form],
   );
 
   const handleSubmit: SubmitHandler<BulkHoldingsFormValues> = useCallback(
@@ -110,7 +120,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
 
       const activityDate =
         data.activityDate instanceof Date ? data.activityDate : new Date(data.activityDate);
-      const currency = data.currency || selectedAccount?.currency || "USD";
+      const currency = data.currency || selectedAccount?.currency || baseCurrency;
 
       const creates: ActivityCreate[] = validHoldings.map((holding) => ({
         accountId: data.accountId,
@@ -149,7 +159,7 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
         // Error handling is managed by the mutation hook toast.
       }
     },
-    [form, onClose, onSuccess, saveActivitiesMutation, selectedAccount],
+    [baseCurrency, form, onClose, onSuccess, saveActivitiesMutation, selectedAccount],
   );
 
   const handleFormError = useCallback((errors: Record<string, any>) => {

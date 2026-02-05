@@ -3,6 +3,7 @@ import { AllocationBreadcrumb } from "@/components/allocation-breadcrumb";
 import { useAccountsSimplePerformance } from "@/hooks/use-accounts-simple-performance";
 import { useDrillDownState } from "@/hooks/use-drill-down-state";
 import { QueryKeys } from "@/lib/query-keys";
+import { useSettingsContext } from "@/lib/settings-provider";
 import type { Account } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -30,6 +31,8 @@ export function DrillableAccountChart({
   isLoading: isLoadingProp,
   onAccountClick,
 }: DrillableAccountChartProps) {
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
   const [activeIndex, setActiveIndex] = useState(0);
   const { path, drillDown, navigateTo, isAtRoot } = useDrillDownState();
 
@@ -57,7 +60,7 @@ export function DrillableAccountChart({
 
         const fxRate = Number(perf.fxRateToBase) || 1;
         const valueBase = valueAcct * fxRate;
-        const currency = perf.baseCurrency || account.currency || "USD";
+        const currency = perf.baseCurrency || account.currency || baseCurrency;
 
         return {
           id: account.id,
@@ -68,7 +71,7 @@ export function DrillableAccountChart({
         };
       })
       .filter((a): a is NonNullable<typeof a> => a !== null);
-  }, [accounts, performanceData]);
+  }, [accounts, performanceData, baseCurrency]);
 
   // Root level: grouped by account group
   const groupedData = useMemo(() => {

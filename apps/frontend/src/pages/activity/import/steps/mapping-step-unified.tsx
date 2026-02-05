@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 
 import { CSVFileViewer } from "../components/csv-file-viewer";
 import { ImportAlert } from "../components/import-alert";
@@ -14,7 +14,7 @@ import { validateTickerSymbol } from "../utils/validation-utils";
 import { getAccounts } from "@/adapters";
 import { ActivityType, IMPORT_REQUIRED_FIELDS, ImportFormat } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
-import type { Account, CsvRowData, ImportMappingData } from "@/lib/types";
+import type { Account, CsvRowData } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper Functions
@@ -122,63 +122,10 @@ export function MappingStepUnified() {
     },
   });
 
-  // Sync local mapping changes to context
-  const syncMappingToContext = useCallback(
-    (updatedMapping: ImportMappingData) => {
-      dispatch(setMapping(updatedMapping));
-    },
-    [dispatch],
-  );
-
-  // Wrapper handlers that sync to context
-  const onColumnMapping = useCallback(
-    (field: ImportFormat, value: string) => {
-      handleColumnMapping(field, value);
-      // Sync after update
-      const updated = {
-        ...localMapping,
-        fieldMappings: { ...localMapping.fieldMappings, [field]: value.trim() },
-      };
-      syncMappingToContext(updated);
-    },
-    [handleColumnMapping, localMapping, syncMappingToContext],
-  );
-
-  const onActivityTypeMapping = useCallback(
-    (csvActivity: string, activityType: ActivityType) => {
-      handleActivityTypeMapping(csvActivity, activityType);
-      // The hook updates internally, we need to sync
-      setTimeout(() => syncMappingToContext(localMapping), 0);
-    },
-    [handleActivityTypeMapping, localMapping, syncMappingToContext],
-  );
-
-  const onSymbolMapping = useCallback(
-    (csvSymbol: string, newSymbol: string) => {
-      handleSymbolMapping(csvSymbol, newSymbol);
-      const updated = {
-        ...localMapping,
-        symbolMappings: { ...localMapping.symbolMappings, [csvSymbol.trim()]: newSymbol.trim() },
-      };
-      syncMappingToContext(updated);
-    },
-    [handleSymbolMapping, localMapping, syncMappingToContext],
-  );
-
-  const onAccountIdMapping = useCallback(
-    (csvAccountId: string, newAccountId: string) => {
-      handleAccountIdMapping(csvAccountId, newAccountId);
-      const updated = {
-        ...localMapping,
-        accountMappings: {
-          ...localMapping.accountMappings,
-          [csvAccountId.trim()]: newAccountId.trim(),
-        },
-      };
-      syncMappingToContext(updated);
-    },
-    [handleAccountIdMapping, localMapping, syncMappingToContext],
-  );
+  // Sync localMapping to context whenever it changes (covers auto-detection, user edits, etc.)
+  useEffect(() => {
+    dispatch(setMapping(localMapping));
+  }, [localMapping, dispatch]);
 
   // Helper to get mapped value from row
   const getMappedValue = useCallback(
@@ -474,10 +421,10 @@ export function MappingStepUnified() {
                 headers={headers}
                 data={dataToMap}
                 accounts={accounts}
-                handleColumnMapping={onColumnMapping}
-                handleActivityTypeMapping={onActivityTypeMapping}
-                handleSymbolMapping={onSymbolMapping}
-                handleAccountIdMapping={onAccountIdMapping}
+                handleColumnMapping={handleColumnMapping}
+                handleActivityTypeMapping={handleActivityTypeMapping}
+                handleSymbolMapping={handleSymbolMapping}
+                handleAccountIdMapping={handleAccountIdMapping}
                 getMappedValue={getMappedValue}
                 invalidSymbols={invalidSymbols}
                 invalidAccounts={invalidAccounts}

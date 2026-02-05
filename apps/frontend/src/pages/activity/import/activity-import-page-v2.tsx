@@ -35,6 +35,7 @@ import { HoldingsConfirmStep } from "./steps/holdings-confirm-step";
 
 // Constants
 import { IMPORT_REQUIRED_FIELDS, ImportFormat, ActivityType } from "@/lib/constants";
+import { validateTickerSymbol } from "./utils/validation-utils";
 
 // Activity types where symbol is optional (can be cash or asset-related)
 const NO_SYMBOL_REQUIRED_ACTIVITY_TYPES = [
@@ -165,13 +166,8 @@ function hasActivityTypeMapping(
  * Check if a symbol is resolved (valid format or has explicit mapping)
  */
 function isSymbolResolved(csvSymbol: string, symbolMappings: Record<string, string>): boolean {
-  // Has explicit mapping
-  if (symbolMappings[csvSymbol]) {
-    return true;
-  }
-  // Valid symbol format (1-10 alphanumeric chars, optionally with dots/hyphens)
-  const isValidFormat = /^[A-Z0-9]{1,10}([.-][A-Z0-9]+){0,2}$/.test(csvSymbol.trim());
-  return isValidFormat;
+  if (symbolMappings[csvSymbol]) return true;
+  return validateTickerSymbol(csvSymbol);
 }
 
 /**
@@ -211,14 +207,12 @@ function useStepValidation(isHoldingsMode: boolean) {
         if (activityTypeColumn) {
           const headerIndex = headers.indexOf(activityTypeColumn);
           if (headerIndex !== -1) {
-            // Get unique activity type values from data
             const uniqueValues = new Set<string>();
             parsedRows.forEach((row) => {
               const value = row[headerIndex]?.trim();
               if (value) uniqueValues.add(value);
             });
 
-            // Check if any values are unmapped
             for (const value of uniqueValues) {
               if (!hasActivityTypeMapping(value, mapping.activityMappings || {})) {
                 return false;
@@ -242,33 +236,26 @@ function useStepValidation(isHoldingsMode: boolean) {
               const symbol = row[symbolHeaderIndex]?.trim();
               if (!symbol) return;
 
-              // Determine if this row's activity type requires a symbol
-              let requiresSymbol = true;
+              // Skip symbol check for cash activity types
               if (activityHeaderIndex !== -1) {
                 const csvActivityType = row[activityHeaderIndex]?.trim();
                 if (csvActivityType) {
-                  // Find the mapped activity type (explicit or smart default)
                   const mappedType = findMappedActivityType(
                     csvActivityType,
                     mapping.activityMappings || {},
                   );
-
                   if (
                     mappedType &&
                     (NO_SYMBOL_REQUIRED_ACTIVITY_TYPES as readonly string[]).includes(mappedType)
                   ) {
-                    requiresSymbol = false;
+                    return;
                   }
                 }
               }
 
-              // Only require symbol resolution for activities that need symbols
-              if (requiresSymbol) {
-                symbolsNeedingResolution.add(symbol);
-              }
+              symbolsNeedingResolution.add(symbol);
             });
 
-            // Check if any non-cash symbols are unresolved
             for (const symbol of symbolsNeedingResolution) {
               if (!isSymbolResolved(symbol, mapping.symbolMappings || {})) {
                 return false;

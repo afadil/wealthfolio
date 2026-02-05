@@ -217,7 +217,7 @@ export function TransferForm({
   assetCurrency,
 }: TransferFormProps) {
   const { data: settings } = useSettings();
-  const baseCurrency = settings?.baseCurrency;
+  const baseCurrency = settings?.baseCurrency ?? "USD";
 
   // Compute initial account and currency for defaultValues
   const initialFromAccountId = defaultValues?.fromAccountId ?? "";
@@ -274,6 +274,13 @@ export function TransferForm({
   const isManualAsset = pricingMode === PricingMode.MANUAL;
   const isCashMode = transferMode === "cash";
 
+  // Get account currency from selected account (internal: fromAccount, external: accountId)
+  const selectedAccount = useMemo(
+    () => accounts.find((a) => a.value === (isExternal ? accountId : fromAccountId)),
+    [accounts, fromAccountId, accountId, isExternal],
+  );
+  const accountCurrency = selectedAccount?.currency;
+
   // Toggle items for transfer mode
   const transferModeItems = [
     { value: "cash" as const, label: "Cash" },
@@ -329,7 +336,8 @@ export function TransferForm({
       : "Transfer";
 
     if (isCashMode && amount && amount > 0) {
-      return `${actionPrefix} ${formatAmount(amount, initialCurrency || "USD", false)}`;
+      const displayCurrency = initialCurrency || accountCurrency || baseCurrency;
+      return `${actionPrefix} ${formatAmount(amount, displayCurrency, false)}`;
     }
 
     if (!isCashMode && assetId && quantity && quantity > 0) {
@@ -338,13 +346,6 @@ export function TransferForm({
 
     return isExternal ? `Add ${actionPrefix}` : "Add Transfer";
   };
-
-  // Get account currency from selected account (internal: fromAccount, external: accountId)
-  const selectedAccount = useMemo(
-    () => accounts.find((a) => a.value === (isExternal ? accountId : fromAccountId)),
-    [accounts, fromAccountId, accountId, isExternal],
-  );
-  const accountCurrency = selectedAccount?.currency;
 
   // Filter destination accounts to exclude source account (for internal transfers)
   const toAccountOptions = accounts.filter((acc) => acc.value !== fromAccountId);

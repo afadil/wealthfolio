@@ -12,6 +12,7 @@ import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { Holding, HOLDING_GROUP_ORDER } from "@/lib/types";
 import { AccountType, AssetKind } from "@/lib/constants";
 import { cn, safeDivide } from "@/lib/utils";
+import { useSettingsContext } from "@/lib/settings-provider";
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -49,6 +50,8 @@ export function HoldingsGroupedTable({
   showConvertedValues,
   isLoading,
 }: HoldingsGroupedTableProps) {
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
   const { isBalanceHidden } = useBalancePrivacy();
   const navigate = useNavigate();
 
@@ -137,7 +140,7 @@ export function HoldingsGroupedTable({
               </div>
               <AmountDisplay
                 value={group.totalValue}
-                currency={group.holdings[0]?.baseCurrency ?? "USD"}
+                currency={group.holdings[0]?.baseCurrency ?? baseCurrency}
                 isHidden={isBalanceHidden}
                 colorFormat={group.name === "Liabilities"}
                 className="font-medium"

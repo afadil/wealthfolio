@@ -90,6 +90,10 @@ mod tests {
         fn get_active_non_archived_accounts(&self) -> Result<Vec<Account>> {
             Ok(self.accounts.lock().unwrap().clone())
         }
+
+        fn get_base_currency(&self) -> Option<String> {
+            Some("USD".to_string())
+        }
     }
 
     // --- Mock AssetService ---

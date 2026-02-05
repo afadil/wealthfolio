@@ -15,6 +15,7 @@ import {
 } from "@wealthfolio/ui";
 import { useMemo } from "react";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { useSettingsContext } from "@/lib/settings-provider";
 
 // ============================================================================
 // Types
@@ -61,14 +62,17 @@ interface GetAssetAllocationOutput {
  * Normalizes the result to handle both wrapped and unwrapped formats,
  * as well as snake_case vs camelCase field names.
  */
-function normalizeResult(result: unknown): GetAssetAllocationOutput | null {
+function normalizeResult(
+  result: unknown,
+  fallbackCurrency: string,
+): GetAssetAllocationOutput | null {
   if (!result) {
     return null;
   }
 
   if (typeof result === "string") {
     try {
-      return normalizeResult(JSON.parse(result));
+      return normalizeResult(JSON.parse(result), fallbackCurrency);
     } catch {
       return null;
     }
@@ -82,7 +86,7 @@ function normalizeResult(result: unknown): GetAssetAllocationOutput | null {
 
   // Handle wrapped format: { data: ..., meta: ... }
   if ("data" in candidate && typeof candidate.data === "object") {
-    return normalizeResult(candidate.data);
+    return normalizeResult(candidate.data, fallbackCurrency);
   }
 
   // Parse allocations array (new format)
@@ -124,12 +128,11 @@ function normalizeResult(result: unknown): GetAssetAllocationOutput | null {
         (candidate.total_value as number | string | undefined) ??
         allocations.reduce((sum, c) => sum + c.value, 0),
     ),
-    currency: (candidate.currency as string | undefined) ?? "USD",
+    currency: (candidate.currency as string | undefined) ?? fallbackCurrency,
     groupBy:
       (candidate.groupBy as string | undefined) ?? (candidate.group_by as string | undefined) ?? "",
     taxonomyId:
-      (candidate.taxonomyId as string | undefined) ??
-      (candidate.taxonomy_id as string | undefined),
+      (candidate.taxonomyId as string | undefined) ?? (candidate.taxonomy_id as string | undefined),
     taxonomyName:
       (candidate.taxonomyName as string | undefined) ??
       (candidate.taxonomy_name as string | undefined),
@@ -161,8 +164,10 @@ type AllocationContentProps = ToolCallMessagePartProps<
 
 function AllocationContent({ args, result, status }: AllocationContentProps) {
   const typedArgs = args as GetAssetAllocationArgs | undefined;
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
   const { isBalanceHidden } = useBalancePrivacy();
-  const parsed = normalizeResult(result);
+  const parsed = normalizeResult(result, baseCurrency);
 
   // Detect drill-down mode (holdings may be empty for a valid category)
   const isDrillDown = parsed?.holdings !== undefined;
@@ -179,7 +184,7 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
     return [...parsed.holdings].sort((a, b) => b.value - a.value);
   }, [parsed?.holdings]);
 
-  const currency = parsed?.currency ?? "USD";
+  const currency = parsed?.currency ?? baseCurrency;
   const totalValue = parsed?.totalValue ?? 0;
 
   const formatter = useMemo(
@@ -274,9 +279,7 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
         <CardHeader className="pb-2">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <CardTitle className="text-sm font-medium">
-                {categoryName ?? "Holdings"}
-              </CardTitle>
+              <CardTitle className="text-sm font-medium">{categoryName ?? "Holdings"}</CardTitle>
               <p className="text-muted-foreground mt-1 text-xs">
                 {holdingsCount} holding{holdingsCount !== 1 ? "s" : ""}
               </p>
@@ -302,11 +305,9 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
               </thead>
               <tbody>
                 {sortedHoldings.map((holding, index) => (
-                  <tr key={`${holding.symbol}-${index}`} className="border-b border-border/50">
+                  <tr key={`${holding.symbol}-${index}`} className="border-border/50 border-b">
                     <td className="py-2 font-medium">{holding.symbol}</td>
-                    <td className="text-muted-foreground truncate py-2">
-                      {holding.name ?? "-"}
-                    </td>
+                    <td className="text-muted-foreground truncate py-2">{holding.name ?? "-"}</td>
                     <td className="py-2 text-right tabular-nums">{formatValue(holding.value)}</td>
                     <td className="text-muted-foreground py-2 text-right tabular-nums">
                       {formatPercent(holding.weight / 100)}
