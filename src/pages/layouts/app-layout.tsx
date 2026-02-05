@@ -29,9 +29,11 @@ const AppLayoutContent = () => {
 
   useNavigationEventListener();
 
-  if (isSettingsLoading) return null;
+  // Only check onboarding when settings are loaded
+  const shouldRedirectToOnboarding =
+    !isSettingsLoading && !settings?.onboardingCompleted && location.pathname !== "/onboarding";
 
-  if (!settings?.onboardingCompleted && location.pathname !== "/onboarding") {
+  if (shouldRedirectToOnboarding) {
     return <Navigate to="/onboarding" />;
   }
 

@@ -1,3 +1,4 @@
+import { PERFORMANCE_CHART_COLORS } from "@/components/performance-chart-colors";
 import {
   ChartConfig,
   ChartContainer,
@@ -6,12 +7,12 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { PERFORMANCE_CHART_COLORS } from "@/components/performance-chart-colors";
 import { ReturnData } from "@/lib/types";
 import { formatPercent } from "@wealthfolio/ui";
 import { differenceInDays, differenceInMonths, format, parseISO } from "date-fns";
+import { ReactNode } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
-import { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
+import { NameType, Payload, ValueType } from "recharts/types/component/DefaultTooltipContent";
 
 interface PerformanceChartMobileProps {
   data: {
@@ -84,15 +85,19 @@ export function PerformanceChartMobile({ data }: PerformanceChartMobileProps) {
     return config;
   }, {} as ChartConfig);
 
-  const tooltipFormatter: (value: ValueType, name: NameType) => [string, string] = (
-    value,
-    name,
-  ) => {
-    const formattedValue = formatPercent(Number(value));
-    return [formattedValue + " - ", name.toString()];
+  const tooltipFormatter = (
+    value: ValueType | undefined,
+    name: NameType | undefined,
+  ): [string, string] => {
+    return [String(value ?? 0), String(name ?? "")];
   };
 
-  const tooltipLabelFormatter = (label: string) => format(parseISO(label), "MMM d, yyyy");
+  const tooltipLabelFormatter = (
+    label: ReactNode,
+    _payload: readonly Payload<ValueType, NameType>[],
+  ): ReactNode => {
+    return String(label ?? "");
+  };
 
   return (
     <div className="h-full w-full">

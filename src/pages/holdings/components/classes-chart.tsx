@@ -15,14 +15,26 @@ function getClassData(holdings: Holding[]) {
 
   const currency = holdings[0]?.baseCurrency || "USD";
 
+  // Group by assetSubclass (sub-asset class), not assetClass
+  // This shows: ETF, Stocks, Bonds, Money Market, etc. across ALL asset classes
   const classes = holdings.reduce(
     (acc, holding) => {
-      const isCash = holding.holdingType === HoldingType.CASH;
-      const assetSubClass = isCash ? "Cash" : holding.instrument?.assetSubclass || "Other";
+      let className: string;
 
-      const current = acc[assetSubClass] || 0;
+      if (holding.holdingType === HoldingType.CASH) {
+        // Cash holdings: check if they have a sub-class, otherwise "Cash"
+        className = holding.instrument?.assetSubclass || "Cash";
+      } else if (holding.instrument?.assetSubclass) {
+        // Use sub-asset class (e.g., "ETF", "Stock", "Bond", "Money Market")
+        className = holding.instrument.assetSubclass;
+      } else {
+        // Fallback to main asset class
+        className = holding.instrument?.assetClass || "Other";
+      }
+
+      const current = acc[className] || 0;
       const value = Number(holding.marketValue?.base) || 0;
-      acc[assetSubClass] = current + value;
+      acc[className] = current + value;
       return acc;
     },
     {} as Record<string, number>,
@@ -30,14 +42,14 @@ function getClassData(holdings: Holding[]) {
 
   return Object.entries(classes)
     .filter(([_, value]) => value > 0)
-    .sort(([, a], [, b]) => b - a)
+    .sort(([, a], [, b]) => b - a) // Sort by value descending
     .map(([name, value]) => ({ name, value, currency }));
 }
 
 interface ClassesChartProps {
-  holdings?: Holding[];
-  isLoading?: boolean;
-  onClassSectionClick?: (className: string) => void;
+  holdings: Holding[];
+  isLoading: boolean;
+  onClassSectionClick: (className: string) => void;
 }
 
 export function ClassesChart({ holdings, isLoading, onClassSectionClick }: ClassesChartProps) {
@@ -96,7 +108,7 @@ export function ClassesChart({ holdings, isLoading, onClassSectionClick }: Class
             endAngle={0}
           />
         ) : (
-          <EmptyPlaceholder description="There is no class data available for your holdings." />
+          <EmptyPlaceholder description="There is no holdings data available." />
         )}
       </CardContent>
     </Card>

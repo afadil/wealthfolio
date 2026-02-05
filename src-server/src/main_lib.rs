@@ -13,19 +13,19 @@ use wealthfolio_core::{
     db::{self, write_actor},
     fx::{FxRepository, FxService, FxServiceTrait},
     goals::{GoalRepository, GoalService, GoalServiceTrait},
+    holdings::{HoldingsService, HoldingsServiceTrait, HoldingsValuationService},
+    income::{IncomeService, IncomeServiceTrait}, // ← Add IncomeServiceTrait
     limits::{
         ContributionLimitRepository, ContributionLimitService, ContributionLimitServiceTrait,
     },
     market_data::{MarketDataRepository, MarketDataService, MarketDataServiceTrait},
-    portfolio::income::{IncomeService, IncomeServiceTrait},
     portfolio::{
-        holdings::{
-            holdings_valuation_service::HoldingsValuationService, HoldingsService,
-            HoldingsServiceTrait,
-        },
+        portfolio_repository::PortfolioRepository,
+        portfolio_service::PortfolioService,
         snapshot::{SnapshotRepository, SnapshotService, SnapshotServiceTrait},
         valuation::{ValuationRepository, ValuationService, ValuationServiceTrait},
     },
+    rebalancing::{RebalancingRepositoryImpl, RebalancingService, RebalancingServiceImpl}, // ← Add RebalancingRepositoryImpl
     secrets::SecretStore,
     settings::{settings_repository::SettingsRepository, SettingsService, SettingsServiceTrait},
 };
@@ -46,6 +46,8 @@ pub struct AppState {
     pub fx_service: Arc<dyn FxServiceTrait + Send + Sync>,
     pub activity_service: Arc<dyn ActivityServiceTrait + Send + Sync>,
     pub asset_service: Arc<dyn AssetServiceTrait + Send + Sync>,
+    pub rebalancing_service: Arc<dyn RebalancingService + Send + Sync>,
+    pub portfolio_service: Arc<PortfolioService>,
     pub addons_root: String,
     pub data_root: String,
     pub db_path: String,
@@ -199,6 +201,19 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             fx_service.clone(),
         ));
 
+    // Initialize RebalancingService
+    let rebalancing_repository =
+        Arc::new(RebalancingRepositoryImpl::new(pool.clone(), writer.clone())); // ← Use RebalancingRepositoryImpl
+    let rebalancing_service: Arc<dyn RebalancingService + Send + Sync> =
+        Arc::new(RebalancingServiceImpl::new(rebalancing_repository));
+
+    // Initialize PortfolioService
+    let portfolio_repository = Arc::new(PortfolioRepository::new(pool.clone(), writer.clone()));
+    let portfolio_service = Arc::new(PortfolioService::new(
+        portfolio_repository,
+        account_service.clone(),
+    ));
+
     // Determine data root directory (parent of DB path)
     let data_root = data_root_path.to_string_lossy().to_string();
 
@@ -226,6 +241,8 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         fx_service: fx_service.clone(),
         activity_service,
         asset_service,
+        rebalancing_service,
+        portfolio_service,
         addons_root: config.addons_root.clone(),
         data_root,
         db_path,

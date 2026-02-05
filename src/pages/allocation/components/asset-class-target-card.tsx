@@ -1,0 +1,268 @@
+import type { AssetClassTarget } from "@/lib/types";
+import { Button, Card, TargetPercentSlider } from "@wealthfolio/ui";
+import { useEffect, useState } from "react";
+import { useProportionalAllocation } from "../hooks";
+import type { AssetClassComposition } from "../hooks/use-current-allocation";
+
+interface AssetClassTargetCardProps {
+  composition: AssetClassComposition;
+  targetPercent: number;
+  allTargets?: AssetClassTarget[];
+  allLockStates?: Map<string, boolean>; // Current lock states (may not be saved yet)
+  onEdit: () => void;
+  onDelete: () => void;
+  onTargetChange: (newPercent: number) => Promise<void>;
+  onProportionalChange?: (targets: AssetClassTarget[]) => Promise<void>;
+  onToggleLock?: () => void; // Add lock toggle handler
+  isLoading?: boolean;
+  accountId?: string;
+  isReadOnly?: boolean;
+  isLocked?: boolean; // Add lock state from parent
+}
+
+export function AssetClassTargetCard({
+  composition,
+  targetPercent,
+  allTargets = [],
+  allLockStates = new Map(),
+  onEdit,
+  onDelete,
+  onTargetChange,
+  onProportionalChange,
+  onToggleLock,
+  isLoading = false,
+  accountId: _accountId = "",
+  isReadOnly = false,
+  isLocked = false, // Get initial lock state from parent
+}: AssetClassTargetCardProps) {
+  const { assetClass, actualPercent } = composition;
+  const [localTarget, setLocalTarget] = useState(targetPercent);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isEditingTarget, setIsEditingTarget] = useState(false);
+  const [editValue, setEditValue] = useState(localTarget.toFixed(1));
+  const [isLockedState, setIsLockedState] = useState(isLocked);
+  const { calculateProportionalTargets } = useProportionalAllocation();
+
+  // Sync local lock state with parent prop (when lock is toggled elsewhere)
+  useEffect(() => {
+    setIsLockedState(isLocked);
+  }, [isLocked]);
+
+  const handleSliderChange = async (newValue: number) => {
+    setLocalTarget(newValue);
+    setEditValue(newValue.toFixed(1));
+
+    // If proportional adjustment enabled and we have all targets
+    if (onProportionalChange && allTargets.length > 0) {
+      // Build set of locked asset classes using CURRENT UI lock states
+      const lockedAssets = new Set<string>();
+
+      // Add current asset class if it's locked (use local UI state)
+      if (isLockedState) {
+        lockedAssets.add(assetClass);
+      }
+
+      // Add other locked asset classes from their saved state OR from allLockStates map
+      // Priority: allLockStates map (if provided) > saved state (from query)
+      allTargets.forEach((t) => {
+        if (t.assetClass !== assetClass) {
+          const currentLockState = allLockStates.has(t.assetClass)
+            ? allLockStates.get(t.assetClass)
+            : t.isLocked;
+          if (currentLockState) {
+            lockedAssets.add(t.assetClass);
+          }
+        }
+      });
+
+      // Calculate proportional targets
+      const proportionalTargets = calculateProportionalTargets(
+        allTargets,
+        assetClass,
+        newValue,
+        lockedAssets, // Pass locked assets to prevent them from being adjusted
+      );
+
+      setIsSaving(true);
+      try {
+        await onProportionalChange(proportionalTargets);
+      } catch (err) {
+        console.error("Failed to update targets proportionally:", err);
+        setLocalTarget(targetPercent);
+        setEditValue(targetPercent.toFixed(1));
+      } finally {
+        setIsSaving(false);
+      }
+    } else {
+      // Fallback: simple update without proportional adjustment
+      setIsSaving(true);
+      try {
+        await onTargetChange(newValue);
+      } catch (err) {
+        console.error("Failed to update target:", err);
+        setLocalTarget(targetPercent);
+        setEditValue(targetPercent.toFixed(1));
+      } finally {
+        setIsSaving(false);
+      }
+    }
+  };
+
+  const handleTargetInputChange = (value: string) => {
+    if (isReadOnly) return;
+    // Allow only numbers and one decimal point
+    const sanitized = value.replace(/[^0-9.]/g, "");
+    // Prevent leading zeros (e.g., "020" → "20")
+    const cleaned = sanitized.replace(/^0+(?=\d)/, "");
+    setEditValue(cleaned || "0");
+  };
+
+  const handleTargetInputBlur = async () => {
+    if (isReadOnly) return;
+    const numValue = parseFloat(editValue) || 0;
+    const clamped = Math.max(0, Math.min(100, numValue)); // Clamp 0-100
+    setLocalTarget(clamped);
+    setEditValue(clamped.toFixed(1));
+    setIsEditingTarget(false);
+    setIsSaving(true);
+    try {
+      await onTargetChange(clamped);
+    } catch (err) {
+      console.error("Failed to update target:", err);
+      setLocalTarget(targetPercent);
+      setEditValue(targetPercent.toFixed(1));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const drift = actualPercent - localTarget;
+  const driftColor =
+    Math.abs(drift) < 2
+      ? "text-success"
+      : drift > 0
+        ? "text-orange-600 dark:text-orange-400"
+        : "text-blue-600 dark:text-blue-400";
+
+  return (
+    <Card className="space-y-4 p-6 transition-shadow hover:shadow-md">
+      {/* Header: Name + Actions */}
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-base font-semibold">{assetClass}</h3>
+        <div className="flex gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onEdit}
+            disabled={isLoading || isSaving || isReadOnly}
+            className="h-7 w-7 p-0"
+          >
+            ✎
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onDelete}
+            disabled={isLoading || isSaving}
+            className="h-7 w-7 p-0"
+          >
+            ✕
+          </Button>
+        </div>
+      </div>
+
+      {/* Target vs Actual - EDITABLE TARGET */}
+      <div className="flex items-center justify-between text-sm">
+        <div>
+          <p className="text-muted-foreground text-xs">Target</p>
+          {isEditingTarget ? (
+            <input
+              type="text"
+              value={editValue}
+              onChange={(e) => handleTargetInputChange(e.target.value)}
+              onBlur={handleTargetInputBlur}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleTargetInputBlur();
+                if (e.key === "Escape") {
+                  setIsEditingTarget(false);
+                  setEditValue(localTarget.toFixed(1));
+                }
+              }}
+              autoFocus
+              disabled={isLockedState}
+              className="border-primary bg-background text-foreground w-16 rounded border px-2 py-1 font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+              placeholder="0"
+            />
+          ) : (
+            <p
+              onClick={() => !isLockedState && setIsEditingTarget(true)}
+              className={`font-semibold transition-colors ${
+                isLockedState
+                  ? "cursor-not-allowed opacity-50"
+                  : "hover:text-primary cursor-pointer"
+              }`}
+            >
+              {localTarget.toFixed(1)}%
+            </p>
+          )}
+        </div>
+        <div>
+          <p className="text-muted-foreground text-xs">Actual</p>
+          <p className="font-semibold">{actualPercent.toFixed(1)}%</p>
+        </div>
+        <div className="text-right">
+          <p className="text-muted-foreground text-xs">Drift</p>
+          <p className={`font-semibold ${driftColor}`}>
+            {drift > 0 ? "+" : ""}
+            {drift.toFixed(1)}%
+          </p>
+        </div>
+      </div>
+
+      {/* Two Bars: Target + Actual (Sector Allocation Style) */}
+      <div className="space-y-3">
+        {/* Target Bar - Overlay Slider */}
+        <div className="flex items-center gap-2">
+          <TargetPercentSlider
+            value={localTarget}
+            onChange={(val) => setLocalTarget(val)}
+            onChangeEnd={(val) => handleSliderChange(val)}
+            label="Target"
+            disabled={isLoading || isSaving || isLockedState}
+            showValue={false}
+            isLocked={isLockedState}
+            onToggleLock={() => {
+              // Don't update local state here - let parent update the prop
+              // This ensures assetClassLockStates Map is updated FIRST
+              if (onToggleLock) {
+                onToggleLock();
+              }
+            }}
+            overlay={true}
+            barColor="bg-chart-2"
+          />
+        </div>
+
+        {/* Actual Bar */}
+        <div className="flex items-center gap-2">
+          <div className="bg-secondary relative flex h-6 flex-1 items-center justify-between overflow-hidden rounded">
+            <div
+              className="bg-success/60 absolute top-0 left-0 h-full rounded transition-all"
+              style={{ width: `${Math.min(actualPercent, 100)}%` }}
+            />
+            {/* Label on left (inside colored portion) */}
+            <div className="text-background absolute top-0 left-0 z-10 flex h-full items-center px-2 text-xs font-medium">
+              <span className="whitespace-nowrap">Actual</span>
+            </div>
+            {/* Percentage on right (inside bar, at end of colored portion) */}
+            <div className="text-foreground absolute top-0 right-0 z-10 flex h-full items-center px-2 text-xs font-medium">
+              <span className="whitespace-nowrap">{actualPercent.toFixed(1)}%</span>
+            </div>
+          </div>
+          {/* Placeholder for lock icon to align bars */}
+          <div className="h-6 w-6 flex-shrink-0" />
+        </div>
+      </div>
+    </Card>
+  );
+}

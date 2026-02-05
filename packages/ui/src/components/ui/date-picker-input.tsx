@@ -66,8 +66,10 @@ function fromDateValue(value: DateValue | null): Date | undefined {
   return undefined;
 }
 
-interface DatePickerInputProps
-  extends Omit<RacDatePickerProps<DateValue>, "value" | "onChange" | "children" | "className" | "granularity"> {
+interface DatePickerInputProps extends Omit<
+  RacDatePickerProps<DateValue>,
+  "value" | "onChange" | "children" | "className" | "granularity"
+> {
   onChange: (date: Date | undefined) => void;
   value?: string | Date;
   disabled?: boolean;

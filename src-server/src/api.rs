@@ -7,7 +7,12 @@ use crate::{
     models::{Account, AccountUpdate, NewAccount},
 };
 use axum::middleware;
-use axum::{routing::get, Json, Router};
+use axum::{
+    extract::Path, // ← Keep only Path, remove State
+    routing::get,
+    Json,
+    Router,
+};
 use tower_http::{
     cors::{Any, CorsLayer},
     request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
@@ -27,6 +32,7 @@ mod limits;
 mod market_data;
 mod performance;
 mod portfolio;
+mod rebalancing;
 mod secrets;
 mod settings;
 mod shared;
@@ -74,6 +80,7 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
         .merge(performance::router())
         .merge(activities::router())
         .merge(goals::router())
+        .merge(rebalancing::router())
         .merge(exchange_rates::router())
         .merge(market_data::router())
         .merge(assets::router())

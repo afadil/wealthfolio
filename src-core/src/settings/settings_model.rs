@@ -13,6 +13,13 @@ pub struct Settings {
     pub auto_update_check_enabled: bool,
     pub menu_bar_visible: bool,
     pub sync_enabled: bool,
+    // Phase 4: Allocation preferences
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allocation_holding_target_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allocation_default_view: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allocation_settings_banner_dismissed: Option<String>,
 }
 
 impl Default for Settings {
@@ -26,6 +33,9 @@ impl Default for Settings {
             auto_update_check_enabled: true,
             menu_bar_visible: true,
             sync_enabled: true,
+            allocation_holding_target_mode: None,
+            allocation_default_view: None,
+            allocation_settings_banner_dismissed: None,
         }
     }
 }
@@ -40,6 +50,10 @@ pub struct SettingsUpdate {
     pub auto_update_check_enabled: Option<bool>,
     pub menu_bar_visible: Option<bool>,
     pub sync_enabled: Option<bool>,
+    // Phase 4: Allocation preferences
+    pub allocation_holding_target_mode: Option<String>,
+    pub allocation_default_view: Option<String>,
+    pub allocation_settings_banner_dismissed: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

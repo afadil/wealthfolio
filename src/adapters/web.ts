@@ -11,6 +11,7 @@ const COMMANDS: CommandMap = {
   create_account: { method: "POST", path: "/accounts" },
   update_account: { method: "PUT", path: "/accounts" },
   delete_account: { method: "DELETE", path: "/accounts" },
+  find_or_create_combined_portfolio: { method: "POST", path: "/accounts/combined" },
   get_settings: { method: "GET", path: "/settings" },
   update_settings: { method: "PUT", path: "/settings" },
   is_auto_update_check_enabled: { method: "GET", path: "/settings/auto-update-enabled" },

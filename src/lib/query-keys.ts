@@ -3,6 +3,10 @@ export const QueryKeys = {
   ACCOUNTS: "accounts",
   ACCOUNTS_SUMMARY: "accounts_summary",
 
+  // Portfolio management keys
+  PORTFOLIOS: "portfolios",
+  PORTFOLIO: "portfolio",
+
   // Activity related keys
   ACTIVITY_DATA: "activity-data",
   ACTIVITIES: "activities",
@@ -17,6 +21,11 @@ export const QueryKeys = {
   // Goals related keys
   GOALS: "goals",
   GOALS_ALLOCATIONS: "goals_allocations",
+
+  // Rebalancing (Allocations) related keys
+  REBALANCING_STRATEGIES: "rebalancing_strategies",
+  ASSET_CLASS_TARGETS: "asset_class_targets",
+  HOLDING_TARGETS: "holding_targets",
 
   // Settings related keys
   SETTINGS: "settings",

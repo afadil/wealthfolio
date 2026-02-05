@@ -32,6 +32,7 @@ import {
   CreditCard,
   DollarSign,
   Download,
+  Edit,
   Eraser,
   ExternalLink,
   Eye,
@@ -57,6 +58,8 @@ import {
   ListFilter,
   Loader,
   Loader2,
+  Lock,
+  LockOpen,
   LucideProps,
   Menu,
   MinusCircle,
@@ -91,6 +94,7 @@ import {
   StretchHorizontal,
   Sun,
   Tag,
+  Target,
   Trash,
   TrendingDown,
   TrendingUp,
@@ -214,7 +218,11 @@ export const Icons = {
   ListFilter: ListFilter,
   Undo: Undo2,
   Fullscreen: Fullscreen,
+  Lock: Lock,
+  LockOpen: LockOpen,
   RectangleEllipsis: RectangleEllipsis,
+  Target: Target,
+  Edit: Edit,
 
   Dashboard: ({ size, ...props }: LucideProps) => (
     <svg

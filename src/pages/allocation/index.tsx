@@ -1,0 +1,1251 @@
+import { getHoldings } from "@/commands/portfolio";
+import { getRebalancingStrategies, saveRebalancingStrategy } from "@/commands/rebalancing";
+import { AccountPortfolioSelector } from "@/components/account-portfolio-selector";
+import { toast } from "@/components/ui/use-toast";
+import { useAccounts } from "@/hooks/use-accounts";
+import { useAllocationSettings } from "@/hooks/useAllocationSettings";
+import { usePortfolios } from "@/hooks/use-portfolios";
+import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { formatCurrencyDisplay } from "@/lib/currency-format";
+import { QueryKeys } from "@/lib/query-keys";
+import { useSettingsContext } from "@/lib/settings-provider";
+import type { Account, AccountType, Holding, Portfolio } from "@/lib/types";
+import { getOrCreateVirtualStrategy } from "@/lib/virtual-portfolio-helper";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { Button, Sheet, SheetContent, SheetHeader, SheetTitle } from "@wealthfolio/ui";
+import { ChevronDown } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { AllocationPieChartView } from "./components/allocation-pie-chart-view";
+import { AssetClassFormDialog } from "./components/asset-class-form-dialog";
+
+import { HoldingTargetRow } from "./components/holding-target-row";
+import { HoldingsAllocationTable } from "./components/holdings-allocation-table";
+import { RebalancingAdvisor } from "./components/rebalancing-advisor";
+import { SaveAsPortfolioModal } from "./components/save-as-portfolio-modal";
+import { SubPieChart } from "./components/sub-pie-chart";
+import { TargetPercentInput } from "./components/target-percent-input";
+import {
+  useAssetClassMutations,
+  useAssetClassTargets,
+  useHoldingTargetMutations,
+  useHoldingTargets,
+  useRebalancingStrategy,
+} from "./hooks";
+import { useStrictModeValidation } from "./hooks/use-strict-mode-validation";
+import {
+  getAvailableAssetClasses,
+  useCurrentAllocation,
+  useHoldingsByAssetClass,
+} from "./hooks/use-current-allocation";
+import { calculateAutoDistribution } from "./lib/auto-distribution";
+
+type TabType = "pie-chart" | "holdings-table" | "rebalancing";
+
+const createPortfolioAccount = (): Account => ({
+  id: PORTFOLIO_ACCOUNT_ID,
+  name: "All Portfolio",
+  accountType: "portfolio" as AccountType,
+  balance: 0,
+  currency: "USD",
+  isDefault: true,
+  isActive: true,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  isCombinedPortfolio: false,
+});
+
+// Helper component for rendering holdings with targets
+function HoldingsTargetList({
+  assetClassId,
+  allHoldings,
+  displayHoldings,
+  assetClassValue,
+  sharedPendingEdits,
+  onSharedPendingChange,
+  isStrictMode,
+}: {
+  assetClassId: string;
+  allHoldings: Holding[]; // All holdings in asset class for auto-distribution
+  displayHoldings: Holding[]; // Holdings to display (filtered by sub-class)
+  assetClassValue: number;
+  sharedPendingEdits: Map<string, number>;
+  onSharedPendingChange: (edits: Map<string, number>) => void;
+  isStrictMode: boolean;
+}) {
+  const navigate = useNavigate();
+  const { data: holdingTargets = [] } = useHoldingTargets(assetClassId);
+  const { deleteTargetMutation, toggleLockMutation } = useHoldingTargetMutations();
+
+  // Only run auto-distribution if user has set at least one target AND we're in preview mode
+  const hasAnyTargets = holdingTargets.length > 0 || sharedPendingEdits.size > 0;
+  const shouldAutoDistribute = hasAnyTargets && !isStrictMode;
+
+  // Calculate distribution across ALL holdings in asset class
+  // In strict mode: show saved targets without auto-distribution
+  // In preview mode: use auto-distribution algorithm
+  const distribution = shouldAutoDistribute
+    ? calculateAutoDistribution(allHoldings, holdingTargets, sharedPendingEdits, assetClassValue)
+    : {
+        holdings: allHoldings
+          .map((holding) => {
+            const assetId = holding.instrument?.id || "";
+            const savedTarget = holdingTargets.find((t) => t.assetId === assetId);
+            const pendingValue = sharedPendingEdits.get(assetId);
+            return {
+              assetId,
+              symbol: holding.instrument?.symbol || "",
+              displayName: holding.instrument?.name || holding.instrument?.symbol || "Unknown",
+              currentValue: holding.marketValue?.base || 0,
+              currentPercent:
+                assetClassValue > 0
+                  ? ((holding.marketValue?.base || 0) / assetClassValue) * 100
+                  : 0,
+              // In strict mode: use pending edit > saved target > 0
+              targetPercent: pendingValue ?? savedTarget?.targetPercentOfClass ?? 0,
+              isUserSet: pendingValue !== undefined || savedTarget !== undefined,
+              isLocked: savedTarget?.isLocked ?? false,
+            };
+          })
+          .sort((a, b) => b.currentValue - a.currentValue),
+        totalUserSet: holdingTargets.reduce((sum, t) => sum + t.targetPercentOfClass, 0),
+        remainder: 100 - holdingTargets.reduce((sum, t) => sum + t.targetPercentOfClass, 0),
+      };
+
+  const handlePendingChange = (assetId: string, percent: number | null) => {
+    const newMap = new Map(sharedPendingEdits);
+    if (percent === null) {
+      newMap.delete(assetId);
+    } else {
+      newMap.set(assetId, percent);
+    }
+    onSharedPendingChange(newMap);
+
+    // Trigger re-calculation of auto-distribution with new pending edits
+    // This ensures that when a user sets one target, others adjust automatically
+    // The parent component will re-render with updated distribution
+  };
+
+  const pendingValue = (assetId: string) => sharedPendingEdits.get(assetId);
+
+  // Filter distribution to only show holdings from this sub-class
+  const displayHoldingIds = new Set(displayHoldings.map((h) => h.instrument?.id));
+  const filteredDistribution = distribution.holdings.filter((h) =>
+    displayHoldingIds.has(h.assetId),
+  );
+
+  return (
+    <>
+      {filteredDistribution.map((holdingData) => {
+        const holding = displayHoldings.find((h) => h.instrument?.id === holdingData.assetId);
+        if (!holding) return null;
+
+        const target = holdingTargets.find((t) => t.assetId === holdingData.assetId);
+        const pending = pendingValue(holdingData.assetId);
+
+        return (
+          <HoldingTargetRow
+            key={holding.id}
+            holding={{
+              id: holding.id,
+              symbol: holdingData.symbol,
+              displayName: holdingData.displayName,
+              currentPercent: holdingData.currentPercent,
+              currentValue: holdingData.currentValue,
+            }}
+            target={target}
+            previewPercent={
+              // Show preview for auto-distributed holdings (not user-set in current session)
+              // This includes holdings with saved targets that aren't locked and have no pending edit
+              holdingData.isUserSet ? undefined : holdingData.targetPercent
+            }
+            pendingPercent={pending}
+            assetClassId={assetClassId}
+            isLocked={holdingData.isLocked ?? false}
+            onPendingChange={(percent) => handlePendingChange(holdingData.assetId, percent)}
+            onToggleLock={() => {
+              if (target) {
+                toggleLockMutation.mutate({
+                  id: target.id,
+                  assetClassId,
+                  holdingName: holdingData.displayName,
+                });
+              }
+            }}
+            onDelete={() => {
+              if (target) {
+                deleteTargetMutation.mutate({ id: target.id, assetClassId });
+              }
+              // Clear pending edit if exists
+              handlePendingChange(holdingData.assetId, null);
+            }}
+            onNavigate={() => {
+              if (holding.instrument?.symbol) {
+                navigate(`/holdings/${holding.instrument.symbol}`);
+              }
+            }}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+export default function AllocationPage() {
+  const { accounts } = useAccounts(false, false);
+  const { data: portfolios = [] } = usePortfolios();
+  const { settings: allocationSettings } = useAllocationSettings();
+  const isStrictMode = allocationSettings.holdingTargetMode === "strict";
+  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([PORTFOLIO_ACCOUNT_ID]);
+  // const [activePortfolioId, setActivePortfolioId] = useState<string | null>(null); // TODO: Will be used for portfolio-specific allocation strategies
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingTarget, setEditingTarget] = useState<string | null>(null);
+  const [viewTab, setViewTab] = useState<TabType>("pie-chart");
+  const [showAssetDetails, setShowAssetDetails] = useState(false);
+  const [selectedAssetClass, setSelectedAssetClass] = useState<string | null>(null);
+  const [assetClassPendingEdits, setAssetClassPendingEdits] = useState<Map<string, number>>(
+    new Map(),
+  );
+
+  const [isSavingAllTargets, setIsSavingAllTargets] = useState(false);
+  const [showHiddenTargets, setShowHiddenTargets] = useState(false);
+  // Removed combinedPortfolio - now using virtual strategies instead
+  const [showSaveAsPortfolioModal, setShowSaveAsPortfolioModal] = useState(false);
+  const lastToastPortfolioId = useRef<string>("");
+  const queryClient = useQueryClient();
+  const { settings } = useSettingsContext(); // ← NEW: Get base currency
+
+  // Derive selectedAccounts from selectedAccountIds
+  const selectedAccounts = useMemo(() => {
+    if (selectedAccountIds.includes(PORTFOLIO_ACCOUNT_ID)) {
+      return [createPortfolioAccount()];
+    }
+    return accounts?.filter((acc) => selectedAccountIds.includes(acc.id)) ?? [];
+  }, [selectedAccountIds, accounts]);
+
+  // Use the first selected account for strategy-based features
+  // In multi-select mode, we create/use a combined portfolio account for strategies
+  const primaryAccount = selectedAccounts[0] ?? null;
+  const baseCurrency = settings?.baseCurrency || "USD"; // ← NEW: Default to USD
+
+  // Check if multiple accounts are selected
+  const isMultiAccountView = selectedAccounts.length > 1;
+
+  // NEW: Virtual strategy state for multi-account selections
+  const [virtualStrategy, setVirtualStrategy] = useState<any>(null);
+
+  // Determine which account ID to use for strategies
+  // - If single account: use that account's ID
+  // - If multi-account: use virtual strategy ID (wait for it to be created)
+  // - If "All Portfolio": use PORTFOLIO_ACCOUNT_ID
+  const selectedAccountId = isMultiAccountView
+    ? (virtualStrategy?.id ?? null) // Multi-account: only use virtual strategy, don't fall back
+    : (primaryAccount?.id ?? PORTFOLIO_ACCOUNT_ID); // Single account: use account ID
+
+  // Removed old combined portfolio logic - now handled by virtual strategies in ensureStrategy effect
+
+  // Track accounts for which we've already created strategies
+  const createdStrategies = useRef<Set<string>>(new Set());
+
+  // Auto-create strategy for account or virtual portfolio
+  useEffect(() => {
+    const ensureStrategy = async () => {
+      // Skip for "All Portfolio" view
+      if (selectedAccountIds.includes(PORTFOLIO_ACCOUNT_ID)) {
+        setVirtualStrategy(null);
+        return;
+      }
+
+      // CASE 1: Multiple accounts selected (not a saved portfolio)
+      if (isMultiAccountView && selectedAccounts.length > 1) {
+        try {
+          const strategy = await getOrCreateVirtualStrategy(selectedAccounts);
+          setVirtualStrategy(strategy);
+          console.log("Using virtual strategy:", strategy);
+          // Invalidate unused strategies queries in case this created a new virtual portfolio
+          queryClient.invalidateQueries({ queryKey: ["unused-virtual-strategies-count"] });
+          queryClient.invalidateQueries({ queryKey: ["unused-virtual-strategies"] });
+        } catch (err) {
+          console.error("Failed to create virtual strategy:", err);
+        }
+        return;
+      }
+
+      // CASE 2: Single account selected
+      setVirtualStrategy(null);
+
+      if (!primaryAccount?.id) {
+        return;
+      }
+
+      const accountId = primaryAccount.id;
+
+      // Skip if we've already created/checked this account
+      if (createdStrategies.current.has(accountId)) {
+        return;
+      }
+
+      try {
+        const strategies = await getRebalancingStrategies();
+        const exists = strategies.some((s) => s.accountId === accountId);
+
+        if (!exists) {
+          console.log("Creating strategy for account:", accountId, primaryAccount.name);
+          await saveRebalancingStrategy({
+            name: `${primaryAccount.name} Allocation Strategy`,
+            accountId: accountId,
+            isActive: true,
+          } as any);
+          // Mark as created to prevent recreation
+          createdStrategies.current.add(accountId);
+          // Invalidate to refetch the new strategy
+          queryClient.invalidateQueries({
+            queryKey: [QueryKeys.REBALANCING_STRATEGIES, accountId],
+          });
+        } else {
+          // Mark as checked even if it already exists
+          createdStrategies.current.add(accountId);
+        }
+      } catch (err) {
+        console.error("Failed to ensure strategy:", err);
+      }
+    };
+
+    ensureStrategy();
+  }, [selectedAccountIds, isMultiAccountView, primaryAccount, queryClient]);
+  // Note: selectedAccounts intentionally omitted - it's derived from selectedAccountIds
+  // Including it causes infinite loop because it's a new array reference each render
+
+  // Auto-match portfolio detection and toast notification
+  useEffect(() => {
+    if (
+      !portfolios ||
+      selectedAccountIds.length === 0 ||
+      selectedAccountIds.includes(PORTFOLIO_ACCOUNT_ID)
+    ) {
+      lastToastPortfolioId.current = "";
+      return;
+    }
+
+    // Check if current selection matches any portfolio (order-independent)
+    const matchedPortfolio = portfolios.find((portfolio: Portfolio) => {
+      const portfolioSet = new Set(portfolio.accountIds);
+      const selectedSet = new Set(selectedAccountIds);
+
+      if (portfolioSet.size !== selectedSet.size) return false;
+
+      for (const id of selectedSet) {
+        if (!portfolioSet.has(id)) return false;
+      }
+
+      return true;
+    });
+
+    // Show toast only once per matched portfolio
+    if (matchedPortfolio) {
+      if (lastToastPortfolioId.current !== matchedPortfolio.id) {
+        toast({
+          title: `✓ Matched Portfolio "${matchedPortfolio.name}"`,
+          description: "Loading allocation targets...",
+          variant: "success",
+        });
+        lastToastPortfolioId.current = matchedPortfolio.id;
+      }
+    } else {
+      lastToastPortfolioId.current = "";
+    }
+  }, [selectedAccountIds, portfolios]);
+
+  // React Query automatically refetches when selectedAccountId changes via queryKey
+  // No need for manual invalidation here
+  const { data: targets = [] } = useAssetClassTargets(selectedAccountId);
+
+  // Fetch all holding targets for validation (aggregate from all asset classes)
+  const allHoldingTargetsQueries = useQueries({
+    queries: targets.map((target) => ({
+      queryKey: [QueryKeys.HOLDING_TARGETS, target.id],
+      queryFn: async () => {
+        const { getHoldingTargets } = await import("@/commands/rebalancing");
+        return getHoldingTargets(target.id);
+      },
+      enabled: !!target.id,
+    })),
+  });
+  const allHoldingTargets = allHoldingTargetsQueries.flatMap((query) => query.data || []);
+
+  // Fetch holdings for all selected accounts and aggregate
+  const accountIds = selectedAccounts.map((acc) => acc.id);
+  const holdingsQueries = useQueries({
+    queries: accountIds.map((accountId) => ({
+      queryKey: [QueryKeys.HOLDINGS, accountId],
+      queryFn: async () => {
+        if (!accountId) return [];
+        return getHoldings(accountId);
+      },
+      enabled: !!accountId,
+    })),
+  });
+
+  // Aggregate holdings from all selected accounts
+  const allHoldings = holdingsQueries.flatMap((query) => query.data || []);
+  const holdings = allHoldings;
+
+  // Get available asset classes from holdings
+  const availableAssetClasses = getAvailableAssetClasses(holdings);
+
+  const { saveTargetMutation, deleteTargetMutation } = useAssetClassMutations();
+  const { saveTargetMutation: saveHoldingTargetMutation } = useHoldingTargetMutations();
+  const { data: strategy } = useRebalancingStrategy(selectedAccountId);
+
+  // NEW: Get current allocation breakdown (Tier 1: by asset class)
+  const { currentAllocation } = useCurrentAllocation(holdings);
+
+  // Calculate composition (target vs actual)
+  const composition = useHoldingsByAssetClass(targets, holdings);
+
+  // Strict mode validation - needs to be after currentAllocation to get total holdings
+  const totalHoldingsInSelectedClass = selectedAssetClass
+    ? currentAllocation.assetClasses
+        .find((ac) => ac.assetClass === selectedAssetClass)
+        ?.subClasses.flatMap((sc) => sc.holdings || []).length || 0
+    : 0;
+
+  const strictValidation = useStrictModeValidation(
+    targets,
+    allHoldingTargets,
+    assetClassPendingEdits,
+    selectedAssetClass,
+    totalHoldingsInSelectedClass,
+  );
+
+  const isMutating = saveTargetMutation.isPending || deleteTargetMutation.isPending;
+
+  const handleOpenForm = (assetClass?: string) => {
+    if (assetClass) {
+      setEditingTarget(assetClass);
+    } else {
+      setEditingTarget(null);
+    }
+    setFormOpen(true);
+  };
+
+  const handleFormSubmit = async (formData: { assetClass: string; targetPercent: number }) => {
+    if (!strategy?.id) {
+      console.error("No strategy ID available");
+      return;
+    }
+
+    // Validate input
+    const validPercent = Math.max(0, Math.min(100, formData.targetPercent));
+
+    const existingTarget = editingTarget
+      ? targets.find((t) => t.assetClass === editingTarget)
+      : null;
+
+    // Calculate current total (excluding the target being edited if editing)
+    const currentTotalInt = Math.round(targets.reduce((sum, t) => sum + t.targetPercent, 0) * 100);
+    const editingAmountInt = Math.round((existingTarget?.targetPercent || 0) * 100);
+    const newAmountInt = Math.round(validPercent * 100);
+    const totalIfSavedInt = currentTotalInt - editingAmountInt + newAmountInt;
+
+    // Check if we're over 100% and need to auto-scale
+    if (totalIfSavedInt > 10000) {
+      // User is creating a new target or increasing existing one beyond 100%
+      // Auto-scale existing targets proportionally
+      const availableSpaceInt = 10000 - newAmountInt;
+      const otherTargetsInt = currentTotalInt - editingAmountInt;
+
+      if (otherTargetsInt > 0) {
+        const scaleFactor = availableSpaceInt / otherTargetsInt;
+
+        // Update all OTHER targets (not including the one being saved) with scaled percentages
+        const targetsToUpdate = targets
+          .filter((t) => {
+            if (editingTarget) {
+              // If editing, exclude the edited target
+              return t.assetClass !== editingTarget;
+            }
+            // If creating new, update all existing targets
+            return true;
+          })
+          .map((t) => ({
+            ...t,
+            targetPercent: Math.max(0, t.targetPercent * scaleFactor),
+          }));
+
+        // Save all scaled targets
+        for (const target of targetsToUpdate) {
+          await saveTargetMutation.mutateAsync({
+            id: target.id,
+            strategyId: strategy.id,
+            assetClass: target.assetClass,
+            targetPercent: target.targetPercent,
+            isLocked: target.isLocked || false,
+          });
+        }
+      }
+    }
+
+    // Save the new/edited target
+    const payload = {
+      ...(existingTarget?.id && { id: existingTarget.id }),
+      strategyId: strategy.id,
+      assetClass: formData.assetClass,
+      targetPercent: validPercent,
+      isLocked: existingTarget?.isLocked || false,
+    };
+
+    console.log("Form submit payload:", payload);
+
+    await saveTargetMutation.mutateAsync(payload);
+
+    // Clear editing state on success
+    setEditingTarget(null);
+    setFormOpen(false);
+
+    // Force refresh of targets to sync card display
+    queryClient.invalidateQueries({
+      queryKey: [QueryKeys.ASSET_CLASS_TARGETS, selectedAccountId],
+    });
+  };
+
+  const handleDelete = async (assetClass: string) => {
+    const targetToDelete = targets.find((t) => t.assetClass === assetClass);
+
+    if (targetToDelete) {
+      // First, delete the target
+      await deleteTargetMutation.mutateAsync(targetToDelete.id);
+
+      // Calculate remaining targets after deletion
+      const remainingTargets = targets.filter((t) => t.assetClass !== assetClass);
+      const remainingTotalInt = Math.round(
+        remainingTargets.reduce((sum, t) => sum + t.targetPercent, 0) * 100,
+      );
+
+      // If remaining targets exist and don't total 100%, scale them proportionally
+      if (remainingTargets.length > 0 && remainingTotalInt > 0 && remainingTotalInt !== 10000) {
+        const scaleFactor = 10000 / remainingTotalInt; // Scale to exactly 100%
+
+        // Update all remaining targets with scaled percentages
+        for (const target of remainingTargets) {
+          const scaledPercent = target.targetPercent * scaleFactor;
+          await saveTargetMutation.mutateAsync({
+            id: target.id,
+            strategyId: strategy?.id!,
+            assetClass: target.assetClass,
+            targetPercent: scaledPercent,
+            isLocked: target.isLocked || false,
+          });
+        }
+      }
+
+      // Force refresh of targets after all updates complete
+      queryClient.invalidateQueries({
+        queryKey: [QueryKeys.ASSET_CLASS_TARGETS, selectedAccountId],
+      });
+    }
+  };
+
+  // Calculate total percentage for validation (used in UI)
+  const totalPercentageValidation = useMemo(() => {
+    if (!selectedAssetClass || assetClassPendingEdits.size === 0) {
+      return { total: 100, isValid: true, error: null };
+    }
+
+    const assetClassData = currentAllocation.assetClasses.find(
+      (ac) => ac.assetClass === selectedAssetClass,
+    );
+    if (!assetClassData) {
+      return { total: 100, isValid: true, error: null };
+    }
+
+    const assetClassTarget = targets.find((t) => t.assetClass === selectedAssetClass);
+    if (!assetClassTarget) {
+      return { total: 100, isValid: true, error: null };
+    }
+
+    // Get all holdings in asset class
+    const allHoldings = assetClassData.subClasses.flatMap((sc) => sc.holdings || []);
+    const assetClassValue = assetClassData.currentValue;
+
+    // Get holding targets for this asset class from cache
+    const holdingTargets =
+      (queryClient.getQueryData([QueryKeys.HOLDING_TARGETS, assetClassTarget.id]) as any[]) || [];
+
+    // Calculate distribution with current pending edits
+    const hasAnyTargets = holdingTargets.length > 0 || assetClassPendingEdits.size > 0;
+    if (!hasAnyTargets) {
+      return { total: 100, isValid: true, error: null };
+    }
+
+    const distribution = calculateAutoDistribution(
+      allHoldings,
+      holdingTargets,
+      assetClassPendingEdits,
+      assetClassValue,
+    );
+
+    // Calculate total percentage
+    const totalPercent = distribution.holdings.reduce((sum, h) => sum + (h.targetPercent || 0), 0);
+
+    const isValid = Math.abs(totalPercent - 100) <= 0.01;
+    const error = isValid
+      ? null
+      : `Total must equal 100%. Current total: ${totalPercent.toFixed(1)}%`;
+
+    return { total: totalPercent, isValid, error };
+  }, [selectedAssetClass, assetClassPendingEdits, currentAllocation, targets, queryClient]);
+
+  // Handle save all targets for selected asset class
+  const handleSaveAllTargets = async () => {
+    if (!selectedAssetClass) return;
+
+    setIsSavingAllTargets(true);
+    try {
+      const assetClassData = currentAllocation.assetClasses.find(
+        (ac) => ac.assetClass === selectedAssetClass,
+      );
+      if (!assetClassData) return;
+
+      // Find the asset class target ID (needed for foreign key)
+      const assetClassTarget = targets.find((t) => t.assetClass === selectedAssetClass);
+      if (!assetClassTarget) {
+        toast({
+          title: "Error",
+          description: `No allocation target found for ${selectedAssetClass}. Please create one first.`,
+          variant: "destructive",
+        });
+        setIsSavingAllTargets(false);
+        return;
+      }
+
+      // Get all holdings in asset class
+      const allHoldings = assetClassData.subClasses.flatMap((sc) => sc.holdings || []);
+      const assetClassValue = assetClassData.currentValue;
+
+      // Get holding targets for this asset class
+      const holdingTargets = (await queryClient.fetchQuery({
+        queryKey: [QueryKeys.HOLDING_TARGETS, assetClassTarget.id],
+      })) as any[];
+
+      // Calculate final distribution
+      const hasAnyTargets = holdingTargets.length > 0 || assetClassPendingEdits.size > 0;
+
+      let distribution;
+      if (isStrictMode) {
+        // In strict mode: no auto-distribution, use exact values from pending edits + saved targets
+        distribution = {
+          holdings: allHoldings
+            .map((holding) => {
+              const assetId = holding.instrument?.id || "";
+              const pendingPercent = assetClassPendingEdits.get(assetId);
+              const savedTarget = holdingTargets.find((ht) => ht.assetId === assetId);
+
+              // Use pending edit if exists, otherwise use saved target, otherwise 0
+              const targetPercent =
+                pendingPercent !== undefined
+                  ? pendingPercent
+                  : savedTarget?.targetPercentOfClass || 0;
+
+              return {
+                assetId,
+                targetPercent,
+                isLocked: savedTarget?.isLocked || false,
+                isUserSet: true, // In strict mode, all values are user-set (no auto-distribution)
+              };
+            })
+            .filter((h) => h.targetPercent > 0), // Only include holdings with targets
+        };
+      } else {
+        // In preview mode: use auto-distribution
+        distribution = hasAnyTargets
+          ? calculateAutoDistribution(
+              allHoldings,
+              holdingTargets,
+              assetClassPendingEdits,
+              assetClassValue,
+            )
+          : { holdings: [] };
+      }
+
+      // Validate total percentage
+      const totalPercent = distribution.holdings.reduce(
+        (sum, h) => sum + (h.targetPercent || 0),
+        0,
+      );
+
+      if (Math.abs(totalPercent - 100) > 0.01) {
+        toast({
+          title: "Invalid Allocation",
+          description: `Total must equal 100%. Current total: ${totalPercent.toFixed(1)}%`,
+          variant: "destructive",
+        });
+        setIsSavingAllTargets(false);
+        return;
+      }
+
+      // Save all holdings with targets
+      const savePromises = distribution.holdings
+        .filter((h) => h.targetPercent !== undefined && h.targetPercent > 0)
+        .map(async (h) => {
+          const existingTarget = holdingTargets.find((t: any) => t.assetId === h.assetId);
+          return saveHoldingTargetMutation.mutateAsync({
+            id: existingTarget?.id,
+            assetClassId: assetClassTarget.id, // Use the asset class target ID, not the name
+            assetId: h.assetId,
+            targetPercentOfClass: h.targetPercent!,
+            isLocked: h.isLocked ?? false,
+          });
+        });
+
+      await Promise.all(savePromises);
+
+      // Clear pending edits
+      setAssetClassPendingEdits(new Map());
+
+      // Show success message
+      const autoCount = distribution.holdings.filter(
+        (h) => !h.isUserSet && h.targetPercent! > 0,
+      ).length;
+      const userCount = distribution.holdings.filter(
+        (h) => h.isUserSet && h.targetPercent! > 0,
+      ).length;
+
+      toast({
+        title: "Success",
+        description: `Saved ${userCount} user-set target${userCount !== 1 ? "s" : ""}${
+          autoCount > 0
+            ? ` and ${autoCount} auto-distributed target${autoCount !== 1 ? "s" : ""}`
+            : ""
+        }`,
+      });
+
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({
+        queryKey: [QueryKeys.HOLDING_TARGETS, assetClassTarget.id],
+      });
+    } catch (error) {
+      console.error("Failed to save all targets:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save targets. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingAllTargets(false);
+    }
+  };
+
+  // Helper: Check if selection has no exact match and has 2+ accounts
+  // Find the exact matching portfolio (if any)
+  const exactMatchingPortfolio = useMemo(() => {
+    if (selectedAccountIds.length < 2 || selectedAccountIds.includes(PORTFOLIO_ACCOUNT_ID)) {
+      return null;
+    }
+
+    const selectedSet = new Set(selectedAccountIds);
+    return (
+      portfolios.find((portfolio: Portfolio) => {
+        const portfolioSet = new Set(portfolio.accountIds);
+        if (portfolioSet.size !== selectedSet.size) return false;
+        for (const id of selectedSet) {
+          if (!portfolioSet.has(id)) return false;
+        }
+        return true;
+      }) || null
+    );
+  }, [selectedAccountIds, portfolios]);
+
+  return (
+    <div className="space-y-6 p-8">
+      {/* Account/Portfolio Selector - Fixed position in top right corner */}
+      <div className="pointer-events-auto fixed top-4 right-2 z-20 hidden md:block lg:right-4">
+        <AccountPortfolioSelector
+          selectedAccountIds={selectedAccountIds}
+          onAccountsChange={setSelectedAccountIds}
+          className="h-9"
+        />
+      </div>
+
+      {/* Account/Portfolio Selector - Mobile */}
+      <div className="mb-4 flex justify-end md:hidden">
+        <AccountPortfolioSelector
+          selectedAccountIds={selectedAccountIds}
+          onAccountsChange={setSelectedAccountIds}
+          className="h-9"
+        />
+      </div>
+
+      {/* Tabs - Navigation Pills style */}
+      <nav className="bg-muted/60 inline-flex items-center rounded-lg p-1">
+        {[
+          { id: "pie-chart", label: "Allocation Overview" },
+          { id: "holdings-table", label: "Holdings Table" },
+          { id: "rebalancing", label: "Rebalancing Suggestions" },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setViewTab(tab.id as TabType)}
+            className={`focus-visible:ring-ring relative flex items-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none ${
+              viewTab === tab.id
+                ? "text-foreground"
+                : "text-muted-foreground hover:text-foreground/80"
+            }`}
+            aria-current={viewTab === tab.id ? "page" : undefined}
+          >
+            {viewTab === tab.id && (
+              <div className="bg-background absolute inset-0 rounded-md shadow-sm" />
+            )}
+            <span className="relative z-10">{tab.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      {/* Banners - Portfolio-related notifications */}
+      <div className="space-y-3">
+        {/* Single Portfolio Banner - Shows either exact match or save option */}
+        {selectedAccountIds.length >= 2 &&
+          !selectedAccountIds.includes(PORTFOLIO_ACCOUNT_ID) &&
+          (exactMatchingPortfolio ? (
+            // Show portfolio composition when exact match found
+            <div className="bg-muted/50 rounded-lg border-l-4 border-l-blue-600 p-4 dark:border-l-blue-400">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 text-blue-600 dark:text-blue-400">
+                  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      fillRule="evenodd"
+                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-foreground text-sm font-medium">
+                    {exactMatchingPortfolio.name}
+                  </p>
+                  <p className="text-muted-foreground mt-1 text-sm">
+                    Includes:{" "}
+                    {selectedAccountIds
+                      .map((id) => accounts?.find((a) => a.id === id)?.name)
+                      .filter(Boolean)
+                      .join(", ")}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            // Show save as portfolio option when no exact match
+            <div className="bg-muted/50 rounded-lg border-l-4 border-l-blue-600 p-4 dark:border-l-blue-400">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-1 items-start gap-3">
+                  <div className="mt-0.5 text-blue-600 dark:text-blue-400">
+                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                      <path
+                        fillRule="evenodd"
+                        d="M4 5a2 2 0 012-2 1 1 0 000 2 1 1 0 100 2H3a1 1 0 00-1 1v6a1 1 0 001 1h14a1 1 0 001-1V9a1 1 0 00-1-1h-3a1 1 0 100-2 1 1 0 000-2 2 2 0 00-2-2H4zm4 0a1 1 0 000 2h2a1 1 0 000-2H8zm6 11a1 1 0 110 2 1 1 0 010-2z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-foreground text-sm font-medium">
+                      Viewing {selectedAccountIds.length} accounts
+                    </p>
+                    <p className="text-muted-foreground mt-1 text-sm">
+                      Save this selection as a portfolio for quick access later.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowSaveAsPortfolioModal(true)}
+                  className="shrink-0"
+                >
+                  Save as Portfolio
+                </Button>
+              </div>
+            </div>
+          ))}
+      </div>
+
+      {/* Tab Content */}
+      <div className="mt-6">
+        {/* Loading indicator for combined portfolio */}
+        {false && (
+          <div className="border-muted bg-muted/30 mb-4 rounded-lg border p-4">
+            <div className="flex items-center gap-3">
+              <div className="border-muted-foreground h-5 w-5 animate-spin rounded-full border-2 border-t-transparent" />
+              <p className="text-muted-foreground text-sm">Setting up combined portfolio view...</p>
+            </div>
+          </div>
+        )}
+
+        {viewTab === "pie-chart" && (
+          <AllocationPieChartView
+            currentAllocation={currentAllocation}
+            targets={targets}
+            onSliceClick={(assetClass: string) => {
+              setSelectedAssetClass(assetClass);
+              setShowAssetDetails(true);
+            }}
+            onUpdateTarget={async (assetClass: string, newPercent: number, isLocked?: boolean) => {
+              const target = targets.find((t) => t.assetClass === assetClass);
+              if (target && strategy?.id) {
+                // Determine if this is a lock toggle (isLocked explicitly passed AND different from current)
+                const isLockChange = isLocked !== undefined && isLocked !== target.isLocked;
+                const isPercentChange = newPercent !== target.targetPercent;
+
+                let customMessage: string | undefined;
+                if (isLockChange && !isPercentChange) {
+                  // Pure lock toggle (no slider movement)
+                  customMessage = `${assetClass} is now ${isLocked ? "locked" : "unlocked"}`;
+                }
+                // For slider/text changes, use default message (undefined)
+
+                await saveTargetMutation.mutateAsync({
+                  id: target.id,
+                  strategyId: strategy.id,
+                  assetClass,
+                  targetPercent: newPercent,
+                  isLocked: isLocked !== undefined ? isLocked : target.isLocked,
+                  toastMessage: customMessage,
+                } as any);
+                queryClient.invalidateQueries({
+                  queryKey: [QueryKeys.ASSET_CLASS_TARGETS, selectedAccountId],
+                });
+              }
+            }}
+            onAddTarget={() => handleOpenForm()}
+            onDeleteTarget={async (assetClass: string) => {
+              await handleDelete(assetClass);
+            }}
+            showHiddenTargets={showHiddenTargets}
+            onToggleHiddenTargets={() => setShowHiddenTargets(!showHiddenTargets)}
+          />
+        )}
+
+        {viewTab === "holdings-table" && (
+          <HoldingsAllocationTable
+            currentAllocation={currentAllocation}
+            assetClassTargets={targets}
+            holdingTargets={allHoldingTargets}
+            onNavigateToOverview={() => setViewTab("pie-chart")}
+          />
+        )}
+
+        {viewTab === "rebalancing" && (
+          <>
+            <RebalancingAdvisor
+              key={selectedAccountId}
+              targets={targets}
+              composition={composition}
+              totalPortfolioValue={currentAllocation.totalValue}
+              isLoading={isMutating}
+              baseCurrency={baseCurrency}
+            />
+          </>
+        )}
+      </div>
+
+      {/* Asset Class Form Dialog - Original Design */}
+      {formOpen && (
+        <AssetClassFormDialog
+          open={formOpen}
+          onOpenChange={() => {
+            setFormOpen(false);
+            setEditingTarget(null);
+          }}
+          onSubmit={handleFormSubmit}
+          existingTargets={targets}
+          editingTarget={
+            editingTarget ? (targets.find((t) => t.assetClass === editingTarget) ?? null) : null
+          }
+          isLoading={isMutating}
+          availableAssetClasses={availableAssetClasses}
+        />
+      )}
+
+      {/* Side Panel for Selected Asset Class */}
+      {showAssetDetails && selectedAssetClass && (
+        <Sheet
+          open={showAssetDetails}
+          onOpenChange={(open) => {
+            setShowAssetDetails(open);
+            if (!open) {
+              // Clear pending edits when closing panel
+              setAssetClassPendingEdits(new Map());
+              setIsSavingAllTargets(false);
+            }
+          }}
+        >
+          <SheetContent
+            className="w-full overflow-y-auto sm:max-w-2xl [&>button]:top-[max(calc(env(safe-area-inset-top,0px)+1rem),2.5rem)]"
+            style={{
+              paddingTop: "max(env(safe-area-inset-top, 0px), 1.5rem)",
+            }}
+          >
+            <SheetHeader>
+              <SheetTitle>{selectedAssetClass} Allocation</SheetTitle>
+            </SheetHeader>
+
+            <div className="space-y-6 py-8">
+              {currentAllocation.assetClasses.find(
+                (ac) => ac.assetClass === selectedAssetClass,
+              ) && (
+                <div className="space-y-4">
+                  {/* Section 1: Target Bar (Grey, Non-Slider) + Editable Target % */}
+                  <div className="bg-muted/30 rounded-lg border p-4">
+                    <div className="mb-4 flex items-center justify-between">
+                      <p className="text-sm font-semibold">Allocation Target</p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          handleOpenForm(selectedAssetClass);
+                        }}
+                        className="h-7 w-7 p-0"
+                      >
+                        ✎
+                      </Button>
+                    </div>
+
+                    {targets.find((t) => t.assetClass === selectedAssetClass) && (
+                      <div className="space-y-3">
+                        {/* Target Bar - with label inside */}
+                        <div className="bg-secondary relative h-6 flex-1 overflow-hidden rounded">
+                          <div
+                            className="bg-chart-2 absolute top-0 left-0 h-full rounded transition-all"
+                            style={{
+                              width: `${Math.min(
+                                targets.find((t) => t.assetClass === selectedAssetClass)
+                                  ?.targetPercent || 0,
+                                100,
+                              )}%`,
+                            }}
+                          />
+                          {/* Label on left (inside colored portion) */}
+                          <div className="text-background absolute top-0 left-0 z-10 flex h-full items-center px-2 text-xs font-medium">
+                            <span className="whitespace-nowrap">Target</span>
+                          </div>
+                          {/* Percentage on right */}
+                          <div className="text-foreground absolute top-0 right-0 z-10 flex h-full items-center px-2 text-xs font-medium">
+                            <span className="whitespace-nowrap">
+                              {(
+                                targets.find((t) => t.assetClass === selectedAssetClass)
+                                  ?.targetPercent || 0
+                              ).toFixed(1)}
+                              %
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Actual Bar - with label inside */}
+                        <div className="bg-secondary relative h-6 flex-1 overflow-hidden rounded">
+                          <div
+                            className="bg-success/60 absolute top-0 left-0 h-full rounded transition-all"
+                            style={{
+                              width: `${Math.min(
+                                currentAllocation.assetClasses.find(
+                                  (ac) => ac.assetClass === selectedAssetClass,
+                                )?.actualPercent || 0,
+                                100,
+                              )}%`,
+                            }}
+                          />
+                          {/* Label on left (inside colored portion) */}
+                          <div className="text-background absolute top-0 left-0 z-10 flex h-full items-center px-2 text-xs font-medium">
+                            <span className="whitespace-nowrap">Actual</span>
+                          </div>
+                          {/* Percentage on right */}
+                          <div className="text-foreground absolute top-0 right-0 z-10 flex h-full items-center px-2 text-xs font-medium">
+                            <span className="whitespace-nowrap">
+                              {currentAllocation.assetClasses
+                                .find((ac) => ac.assetClass === selectedAssetClass)
+                                ?.actualPercent.toFixed(1)}
+                              %
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Hidden editable target input - click edit button to change */}
+                        <div className="hidden">
+                          <TargetPercentInput
+                            value={
+                              targets.find((t) => t.assetClass === selectedAssetClass)
+                                ?.targetPercent || 0
+                            }
+                            onSave={async (newPercent: number) => {
+                              const target = targets.find(
+                                (t) => t.assetClass === selectedAssetClass,
+                              );
+                              if (target && strategy?.id) {
+                                await saveTargetMutation.mutateAsync({
+                                  id: target.id,
+                                  strategyId: strategy.id,
+                                  assetClass: selectedAssetClass,
+                                  targetPercent: newPercent,
+                                  isLocked: target.isLocked || false,
+                                });
+                              }
+                            }}
+                            disabled={isMutating}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Sub-Pie Chart: Visual breakdown of holdings within this asset class */}
+                  <div className="bg-muted/30 rounded-lg border p-4">
+                    <div className="mb-2">
+                      <p className="text-sm font-semibold">Holdings Breakdown</p>
+                    </div>
+                    <SubPieChart
+                      holdings={
+                        currentAllocation.assetClasses
+                          .find((ac) => ac.assetClass === selectedAssetClass)
+                          ?.subClasses.flatMap((sc) => sc.holdings) || []
+                      }
+                      baseCurrency={settings?.baseCurrency || "USD"}
+                    />
+                  </div>
+
+                  {/* Save All Targets Section - Shows when there are pending edits or auto-distribution */}
+                  {assetClassPendingEdits.size > 0 && (
+                    <div className="bg-primary/5 border-primary/20 space-y-3 rounded-lg border p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1 text-sm">
+                          <p className="font-semibold">Unsaved Changes</p>
+                          <p className="text-muted-foreground text-xs">
+                            {assetClassPendingEdits.size} target
+                            {assetClassPendingEdits.size !== 1 ? "s" : ""} modified (across all
+                            sub-classes)
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          <Button
+                            onClick={handleSaveAllTargets}
+                            disabled={
+                              isSavingAllTargets ||
+                              !totalPercentageValidation.isValid ||
+                              !strictValidation.canSave
+                            }
+                            size="sm"
+                            className={
+                              !totalPercentageValidation.isValid || !strictValidation.canSave
+                                ? "opacity-50"
+                                : ""
+                            }
+                          >
+                            {isSavingAllTargets ? "Saving..." : "Save All Targets"}
+                          </Button>
+                          {!totalPercentageValidation.isValid &&
+                            totalPercentageValidation.error && (
+                              <p className="text-xs font-medium text-red-600 dark:text-red-400">
+                                {totalPercentageValidation.error}
+                              </p>
+                            )}
+                          {!strictValidation.isValid && strictValidation.errors.length > 0 && (
+                            <div className="text-xs font-medium text-red-600 dark:text-red-400">
+                              {strictValidation.errors.map((error, i) => (
+                                <p key={i}>• {error}</p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Section 2: Sub-Class Breakdown with Holding Targets */}
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold">Holdings by Type</h4>
+                    {currentAllocation.assetClasses.find(
+                      (ac) => ac.assetClass === selectedAssetClass,
+                    )?.subClasses &&
+                    currentAllocation.assetClasses.find(
+                      (ac) => ac.assetClass === selectedAssetClass,
+                    )?.subClasses.length! > 0 ? (
+                      <div className="space-y-3">
+                        {currentAllocation.assetClasses
+                          .find((ac) => ac.assetClass === selectedAssetClass)
+                          ?.subClasses.map((subClass) => (
+                            <details key={subClass.subClass} className="group">
+                              <summary className="flex cursor-pointer list-none flex-col gap-2">
+                                <div className="flex items-center gap-2">
+                                  <ChevronDown
+                                    size={14}
+                                    className={`text-muted-foreground flex-shrink-0 transition-transform group-open:rotate-180`}
+                                  />
+                                  <p className="flex-1 text-sm font-medium">{subClass.subClass}</p>
+                                  <span className="flex-shrink-0 text-sm font-semibold">
+                                    {formatCurrencyDisplay(subClass.subClassValue)}
+                                  </span>
+                                </div>
+
+                                {/* Progress Bar - INSIDE summary, always visible */}
+                                <div className="bg-muted h-3 overflow-hidden rounded">
+                                  <div
+                                    className="bg-muted-foreground/60 h-full"
+                                    style={{
+                                      width: `${Math.min(subClass.subClassPercent, 100)}%`,
+                                    }}
+                                  />
+                                </div>
+                              </summary>
+
+                              {/* Percentage text and Holdings (only visible when expanded) */}
+                              {(subClass.holdings || []).length > 0 && (
+                                <div className="hidden space-y-2 pt-2 pl-6 group-open:block">
+                                  <span className="text-muted-foreground text-xs">
+                                    {subClass.subClassPercent.toFixed(1)}% of {selectedAssetClass}
+                                  </span>
+                                  <div className="space-y-2">
+                                    <HoldingsTargetList
+                                      assetClassId={
+                                        targets.find((t) => t.assetClass === selectedAssetClass)
+                                          ?.id || ""
+                                      }
+                                      allHoldings={
+                                        currentAllocation.assetClasses
+                                          .find((ac) => ac.assetClass === selectedAssetClass)
+                                          ?.subClasses.flatMap((sc) => sc.holdings || []) || []
+                                      }
+                                      displayHoldings={subClass.holdings || []}
+                                      assetClassValue={
+                                        currentAllocation.assetClasses.find(
+                                          (ac) => ac.assetClass === selectedAssetClass,
+                                        )?.currentValue || 0
+                                      }
+                                      sharedPendingEdits={assetClassPendingEdits}
+                                      onSharedPendingChange={setAssetClassPendingEdits}
+                                      isStrictMode={isStrictMode}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </details>
+                          ))}
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground text-xs">No sub-classes</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
+
+      {/* Save as Portfolio Modal */}
+      <SaveAsPortfolioModal
+        open={showSaveAsPortfolioModal}
+        onOpenChange={setShowSaveAsPortfolioModal}
+        selectedAccountIds={selectedAccountIds}
+      />
+    </div>
+  );
+}

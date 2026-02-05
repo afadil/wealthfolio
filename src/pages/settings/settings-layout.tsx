@@ -24,6 +24,12 @@ const sidebarNavItems = [
     icon: <Icons.CreditCard className="h-5 w-5" />,
   },
   {
+    title: "Portfolios",
+    href: "portfolios",
+    subtitle: "Group accounts into portfolios",
+    icon: <Icons.Group className="h-5 w-5" />,
+  },
+  {
     title: "Limits",
     href: "contribution-limits",
     subtitle: "Contribution limits and rules",
@@ -34,6 +40,12 @@ const sidebarNavItems = [
     href: "goals",
     subtitle: "Plan and track objectives",
     icon: <Icons.Goal className="h-5 w-5" />,
+  },
+  {
+    title: "Allocation",
+    href: "allocation",
+    subtitle: "Allocation and rebalancing preferences",
+    icon: <Icons.PieChart className="h-5 w-5" />,
   },
   {
     title: "Securities",

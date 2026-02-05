@@ -9,6 +9,7 @@ pub mod market_data;
 pub mod platform;
 pub mod portfolio;
 pub mod providers_settings;
+pub mod rebalancing;
 pub mod secrets;
 pub mod settings;
 pub mod utilities;

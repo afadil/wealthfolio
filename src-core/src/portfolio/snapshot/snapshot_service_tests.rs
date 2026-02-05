@@ -758,6 +758,8 @@ mod tests {
             created_at: Utc::now().naive_utc(),
             updated_at: Utc::now().naive_utc(),
             platform_id: None,
+            is_combined_portfolio: false,
+            component_account_ids: None,
         }
     }
 

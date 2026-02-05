@@ -118,7 +118,7 @@ export const DonutChart: React.FC<DonutChartProps> = ({
           {displayTooltip && (
             <ChartTooltip
               cursor={{ fill: "var(--muted)", opacity: 0.3 }}
-              content={<ChartTooltipContent formatter={tooltipFormatter} hideLabel hideIndicator />}
+              content={<ChartTooltipContent formatter={tooltipFormatter as any} hideLabel hideIndicator />}
               position={{ y: 0 }}
             />
           )}

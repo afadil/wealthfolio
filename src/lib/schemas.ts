@@ -1,14 +1,14 @@
 import * as z from "zod";
-import { ActivityType, activityTypeSchema, accountTypeSchema } from "./constants";
-import { tryParseDate } from "./utils";
 import {
   isCashActivity,
-  isIncomeActivity,
   isCashTransfer,
-  isTradeActivity,
   isFeeActivity,
+  isIncomeActivity,
   isSplitActivity,
+  isTradeActivity,
 } from "./activity-utils";
+import { accountTypeSchema, ActivityType, activityTypeSchema } from "./constants";
+import { tryParseDate } from "./utils";
 
 export const importMappingSchema = z.object({
   accountId: z.string(),
@@ -48,6 +48,26 @@ export const newGoalSchema = z.object({
   yearlyContribution: z.number().optional(),
   deadline: z.date().optional(),
   isAchieved: z.boolean().optional(),
+});
+
+export const newPortfolioSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z
+    .string()
+    .min(2, {
+      message: "Name must be at least 2 characters.",
+    })
+    .max(100, {
+      message: "Name must not be longer than 100 characters.",
+    }),
+  accountIds: z
+    .array(z.string())
+    .min(2, {
+      message: "Portfolio must contain at least 2 accounts.",
+    })
+    .refine((ids) => new Set(ids).size === ids.length, {
+      message: "Duplicate accounts are not allowed.",
+    }),
 });
 
 export const importActivitySchema = z

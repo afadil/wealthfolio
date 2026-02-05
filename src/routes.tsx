@@ -8,6 +8,7 @@ import SettingsLayout from "@/pages/settings/settings-layout";
 import ActivityManagerPage from "@/pages/activity/activity-manager-page";
 import ActivityPage from "@/pages/activity/activity-page";
 import ActivityImportPage from "@/pages/activity/import/activity-import-page";
+import AllocationPage from "@/pages/allocation";
 import AssetsPage from "@/pages/asset/assets-page";
 import DashboardPage from "@/pages/dashboard/dashboard-page";
 import HoldingsPage from "@/pages/holdings/holdings-page";
@@ -15,7 +16,9 @@ import IncomePage from "@/pages/income/income-page";
 import PortfolioInsightsPage from "@/pages/insights/portfolio-insights";
 import PerformancePage from "@/pages/performance/performance-page";
 import SettingsAccountsPage from "@/pages/settings/accounts/accounts-page";
+import SettingsAllocationPage from "@/pages/settings/allocation/allocation-page";
 import SettingsAppearancePage from "@/pages/settings/appearance/appearance-page";
+import SettingsPortfoliosPage from "@/pages/settings/portfolios/portfolios-page";
 import AccountPage from "./pages/account/account-page";
 import AssetProfilePage from "./pages/asset/asset-profile-page";
 import OnboardingPage from "./pages/onboarding/onboarding-page";
@@ -81,6 +84,9 @@ export function AppRoutes() {
           <Route path="income" element={<IncomePage />} />
           <Route path="performance" element={<PerformancePage />} />
           <Route path="insights" element={<PortfolioInsightsPage />} />
+          <Route path="allocation" element={<AllocationPage />} />
+          <Route path="allocations" element={<AllocationPage />} />
+          <Route path="allocations/:accountId?" element={<AllocationPage />} />
           {/* Dynamic addon routes */}
           {dynamicRoutes.map(({ path, component: Component }) => (
             <Route
@@ -99,8 +105,10 @@ export function AppRoutes() {
             <Route index element={<GeneralSettingsPage />} />
             <Route path="general" element={<GeneralSettingsPage />} />
             <Route path="accounts" element={<SettingsAccountsPage />} />
+            <Route path="portfolios" element={<SettingsPortfoliosPage />} />
             <Route path="goals" element={<SettingsGoalsPage />} />
             <Route path="appearance" element={<SettingsAppearancePage />} />
+            <Route path="allocation" element={<SettingsAllocationPage />} />
             <Route path="about" element={<AboutSettingsPage />} />
             <Route path="exports" element={<ExportSettingsPage />} />
             <Route path="contribution-limits" element={<ContributionLimitPage />} />

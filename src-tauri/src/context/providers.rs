@@ -13,7 +13,10 @@ use wealthfolio_core::{
         holdings::{HoldingsService, HoldingsValuationService},
         income::IncomeService,
         performance::PerformanceService,
+        portfolio_repository::PortfolioRepository,
+        portfolio_service::PortfolioService,
     },
+    rebalancing::{RebalancingRepositoryImpl, RebalancingServiceImpl},
     settings::{settings_repository::SettingsRepository, SettingsService, SettingsServiceTrait},
     snapshot::{SnapshotRepository, SnapshotService},
     valuation::{ValuationRepository, ValuationService},
@@ -46,6 +49,10 @@ pub async fn initialize_context(
     let fx_repository = Arc::new(FxRepository::new(pool.clone(), writer.clone()));
     let snapshot_repository = Arc::new(SnapshotRepository::new(pool.clone(), writer.clone()));
     let valuation_repository = Arc::new(ValuationRepository::new(pool.clone(), writer.clone()));
+    let rebalancing_repository =
+        Arc::new(RebalancingRepositoryImpl::new(pool.clone(), writer.clone()));
+    let portfolio_repository = Arc::new(PortfolioRepository::new(pool.clone(), writer.clone()));
+
     // Instantiate Transaction Executor using the Arc<DbPool> directly
     let transaction_executor = pool.clone();
 
@@ -95,6 +102,8 @@ pub async fn initialize_context(
         activity_repository.clone(),
     ));
 
+    let rebalancing_service = Arc::new(RebalancingServiceImpl::new(rebalancing_repository));
+
     let income_service = Arc::new(IncomeService::new(
         fx_service.clone(),
         activity_repository.clone(),
@@ -134,6 +143,11 @@ pub async fn initialize_context(
         holdings_valuation_service.clone(),
     ));
 
+    let portfolio_service = Arc::new(PortfolioService::new(
+        portfolio_repository.clone(),
+        account_service.clone(),
+    ));
+
     Ok(ServiceContext {
         base_currency,
         instance_id,
@@ -150,5 +164,7 @@ pub async fn initialize_context(
         snapshot_service,
         holdings_service,
         valuation_service,
+        rebalancing_service,
+        portfolio_service,
     })
 }

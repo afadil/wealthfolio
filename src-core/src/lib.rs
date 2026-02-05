@@ -11,6 +11,7 @@ pub mod goals;
 pub mod limits;
 pub mod market_data;
 pub mod portfolio;
+pub mod rebalancing;
 pub mod schema;
 pub mod secrets;
 pub mod settings;

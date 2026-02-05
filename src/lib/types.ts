@@ -26,6 +26,28 @@ export interface Account {
   createdAt: Date;
   updatedAt: Date;
   platformId?: string; // Optional
+  isCombinedPortfolio: boolean;
+  componentAccountIds?: string; // JSON array of account IDs
+}
+
+export interface Portfolio {
+  id: string;
+  name: string;
+  accountIds: string[]; // Array of account IDs
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface NewPortfolio {
+  id?: string;
+  name: string;
+  accountIds: string[]; // Must contain at least 2 accounts
+}
+
+export interface UpdatePortfolio {
+  id: string;
+  name?: string;
+  accountIds?: string[];
 }
 
 export interface Activity {
@@ -346,6 +368,9 @@ export interface Settings {
   autoUpdateCheckEnabled: boolean;
   menuBarVisible: boolean;
   syncEnabled: boolean;
+  allocationHoldingTargetMode?: "preview" | "strict";
+  allocationDefaultView?: "overview" | "holdings-table";
+  allocationSettingsBannerDismissed?: "true" | "false";
 }
 
 export interface SettingsContextType {
@@ -561,3 +586,41 @@ export interface UpdateInfo {
   changelogUrl?: string;
   screenshots?: string[];
 }
+
+// ============================================================================
+// Rebalancing Types
+// ============================================================================
+
+export interface RebalancingStrategy {
+  id: string;
+  name: string;
+  accountId: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssetClassTarget {
+  id: string;
+  strategyId: string;
+  assetClass: string;
+  targetPercent: number;
+  isLocked: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HoldingTarget {
+  id: string;
+  assetClassId: string;
+  assetId: string;
+  targetPercentOfClass: number;
+  isLocked: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// New types for creating entities (without id and timestamps)
+export type NewRebalancingStrategy = Omit<RebalancingStrategy, "id" | "createdAt" | "updatedAt">;
+export type NewAssetClassTarget = Omit<AssetClassTarget, "id" | "createdAt" | "updatedAt">;
+export type NewHoldingTarget = Omit<HoldingTarget, "id" | "createdAt" | "updatedAt">;

@@ -55,6 +55,7 @@ function createPortfolioAccount(baseCurrency: string): UIAccount {
     balance: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
+    isCombinedPortfolio: false,
   };
 }
 

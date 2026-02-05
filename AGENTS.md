@@ -184,6 +184,14 @@ Docs entry points:
 - `docs/addons/addon-architecture.md`:1 — Design and patterns
 - `docs/activities/activity-types.md`:1 — Activity schemas for import/creation
 
+## Feature-Specific Agent Guides
+
+For detailed feature-specific architecture, patterns, and workflows:
+
+- **Allocations**: `docs/features/allocations/allocation-agents.md` — Portfolio
+  & allocation feature architecture, database schema, sprint workflow, and
+  commit conventions
+
 ## Frontend Rules (Cursor)
 
 - Scope: applies to `src/**`, `.tsx`, `.ts` files; complements repo conventions.
