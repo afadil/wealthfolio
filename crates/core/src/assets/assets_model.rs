@@ -454,7 +454,7 @@ impl NewAsset {
             && self
                 .exchange_mic
                 .as_ref()
-                .map_or(true, |mic| mic.trim().is_empty())
+                .is_none_or(|mic| mic.trim().is_empty())
         {
             return Err(Error::Validation(ValidationError::InvalidInput(
                 "Securities with MARKET pricing require an exchange MIC code (e.g., XNAS, XNYS)"

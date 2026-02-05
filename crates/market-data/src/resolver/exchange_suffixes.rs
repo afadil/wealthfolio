@@ -607,19 +607,19 @@ pub fn yahoo_suffix_to_mic(suffix: &str) -> Option<&'static str> {
 /// The canonical ticker with exchange suffix removed if applicable.
 pub fn strip_yahoo_suffix(symbol: &str) -> &str {
     // Handle special suffixes first
-    if symbol.ends_with("=X") {
+    if let Some(stripped) = symbol.strip_suffix("=X") {
         // FX pairs like EURUSD=X
-        return &symbol[..symbol.len() - 2];
+        return stripped;
     }
-    if symbol.ends_with("=F") {
+    if let Some(stripped) = symbol.strip_suffix("=F") {
         // Futures like GC=F
-        return &symbol[..symbol.len() - 2];
+        return stripped;
     }
 
     // Only strip if suffix is in our known exchange whitelist
     for suffix in YAHOO_EXCHANGE_SUFFIXES {
-        if symbol.ends_with(suffix) {
-            return &symbol[..symbol.len() - suffix.len()];
+        if let Some(stripped) = symbol.strip_suffix(suffix) {
+            return stripped;
         }
     }
 

@@ -318,7 +318,7 @@ impl EtfProfileResponse {
             || self
                 .information
                 .as_ref()
-                .map_or(false, |i| i.contains("demo"))
+                .is_some_and(|i| i.contains("demo"))
             || self.sectors.is_empty()
     }
 
@@ -402,7 +402,7 @@ impl CompanyOverviewResponse {
             || self
                 .information
                 .as_ref()
-                .map_or(false, |i| i.contains("demo"))
+                .is_some_and(|i| i.contains("demo"))
     }
 
     /// Convert to AssetProfile

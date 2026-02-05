@@ -177,6 +177,13 @@ export function calculateCashActivityAmount(
   return safeQuantity;
 }
 
+/** Convert decimal-like schema values (string | number | null | undefined) to number | undefined */
+function toNum(value: string | number | null | undefined): number | undefined {
+  if (value === null || value === undefined) return undefined;
+  const n = typeof value === "string" ? Number(value) : value;
+  return isNaN(n) ? undefined : n;
+}
+
 // Define types for the calculation functions
 type SymbolCalculator = (
   activity: Partial<ActivityImport>,
@@ -198,104 +205,157 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
     calculateSymbol: (activity) => activity.symbol, // Keep original symbol
     calculateAmount: (activity) => {
       // Calculate amount = quantity * price if both positive, using absolute values
-      if (
-        activity.quantity &&
-        Math.abs(activity.quantity) > 0 &&
-        activity.unitPrice &&
-        Math.abs(activity.unitPrice) > 0
-      ) {
-        return Math.abs(activity.quantity) * Math.abs(activity.unitPrice);
+      const qty = toNum(activity.quantity);
+      const price = toNum(activity.unitPrice);
+      if (qty && Math.abs(qty) > 0 && price && Math.abs(price) > 0) {
+        return Math.abs(qty) * Math.abs(price);
       }
-      return activity.amount ? Math.abs(activity.amount) : activity.amount; // Fallback to provided amount with absolute value
+      const amt = toNum(activity.amount);
+      return amt ? Math.abs(amt) : undefined; // Fallback to provided amount with absolute value
     },
-    calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0), // Use absolute value of provided fee or 0
+    calculateFee: (activity) => {
+      const f = toNum(activity.fee);
+      return f ? Math.abs(f) : 0;
+    },
   },
   [ActivityType.SELL]: {
     // Similar logic to BUY
     calculateSymbol: (activity) => activity.symbol,
     calculateAmount: (activity) => {
-      if (
-        activity.quantity &&
-        Math.abs(activity.quantity) > 0 &&
-        activity.unitPrice &&
-        Math.abs(activity.unitPrice) > 0
-      ) {
-        return Math.abs(activity.quantity) * Math.abs(activity.unitPrice);
+      const qty = toNum(activity.quantity);
+      const price = toNum(activity.unitPrice);
+      if (qty && Math.abs(qty) > 0 && price && Math.abs(price) > 0) {
+        return Math.abs(qty) * Math.abs(price);
       }
-      return activity.amount ? Math.abs(activity.amount) : activity.amount;
+      const amt = toNum(activity.amount);
+      return amt ? Math.abs(amt) : undefined;
     },
-    calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
+    calculateFee: (activity) => {
+      const f = toNum(activity.fee);
+      return f ? Math.abs(f) : 0;
+    },
   },
   [ActivityType.DEPOSIT]: {
     calculateSymbol: (activity, accountCurrency) =>
       `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
-    calculateAmount: (activity) =>
-      activity.amount
-        ? Math.abs(activity.amount)
-        : Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice)),
-    calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
+    calculateAmount: (activity) => {
+      const amt = toNum(activity.amount);
+      return amt
+        ? Math.abs(amt)
+        : Math.abs(
+            calculateCashActivityAmount(toNum(activity.quantity), toNum(activity.unitPrice)),
+          );
+    },
+    calculateFee: (activity) => {
+      const f = toNum(activity.fee);
+      return f ? Math.abs(f) : 0;
+    },
   },
   [ActivityType.WITHDRAWAL]: {
     calculateSymbol: (activity, accountCurrency) =>
       `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
-    calculateAmount: (activity) =>
-      activity.amount
-        ? Math.abs(activity.amount)
-        : Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice)),
-    calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
+    calculateAmount: (activity) => {
+      const amt = toNum(activity.amount);
+      return amt
+        ? Math.abs(amt)
+        : Math.abs(
+            calculateCashActivityAmount(toNum(activity.quantity), toNum(activity.unitPrice)),
+          );
+    },
+    calculateFee: (activity) => {
+      const f = toNum(activity.fee);
+      return f ? Math.abs(f) : 0;
+    },
   },
   [ActivityType.INTEREST]: {
     calculateSymbol: (activity, accountCurrency) =>
       `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
-    calculateAmount: (activity) =>
-      activity.amount
-        ? Math.abs(activity.amount)
-        : Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice)),
-    calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
+    calculateAmount: (activity) => {
+      const amt = toNum(activity.amount);
+      return amt
+        ? Math.abs(amt)
+        : Math.abs(
+            calculateCashActivityAmount(toNum(activity.quantity), toNum(activity.unitPrice)),
+          );
+    },
+    calculateFee: (activity) => {
+      const f = toNum(activity.fee);
+      return f ? Math.abs(f) : 0;
+    },
   },
   [ActivityType.DIVIDEND]: {
     calculateSymbol: (activity) => activity.symbol, // Usually associated with a stock
-    calculateAmount: (activity) =>
-      activity.amount
-        ? Math.abs(activity.amount)
-        : Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice)),
-    calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
+    calculateAmount: (activity) => {
+      const amt = toNum(activity.amount);
+      return amt
+        ? Math.abs(amt)
+        : Math.abs(
+            calculateCashActivityAmount(toNum(activity.quantity), toNum(activity.unitPrice)),
+          );
+    },
+    calculateFee: (activity) => {
+      const f = toNum(activity.fee);
+      return f ? Math.abs(f) : 0;
+    },
   },
   [ActivityType.FEE]: {
     calculateSymbol: (activity, accountCurrency) =>
       `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
     calculateAmount: (activity) => {
       // For FEE activities, amount should typically be 0 unless explicitly provided
-      return activity.amount ? Math.abs(activity.amount) : 0;
+      const amt = toNum(activity.amount);
+      return amt ? Math.abs(amt) : 0;
     },
     calculateFee: (activity) => {
       // For FEE activities, prefer fee field, then amount as fallback, then calculated amount
-      if (activity.fee && Math.abs(activity.fee) > 0) {
-        return Math.abs(activity.fee);
+      const f = toNum(activity.fee);
+      if (f && Math.abs(f) > 0) {
+        return Math.abs(f);
       }
-      if (activity.amount && Math.abs(activity.amount) > 0) {
-        return Math.abs(activity.amount);
+      const amt = toNum(activity.amount);
+      if (amt && Math.abs(amt) > 0) {
+        return Math.abs(amt);
       }
-      return Math.abs(calculateCashActivityAmount(activity.quantity, activity.unitPrice));
+      return Math.abs(
+        calculateCashActivityAmount(toNum(activity.quantity), toNum(activity.unitPrice)),
+      );
     },
   },
   [ActivityType.TAX]: {
     calculateSymbol: (activity, accountCurrency) =>
       `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
-    calculateAmount: (activity) => (activity.amount ? Math.abs(activity.amount) : 0), // Amount is mandatory for cash activities
-    calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
+    calculateAmount: (activity) => {
+      const amt = toNum(activity.amount);
+      return amt ? Math.abs(amt) : 0;
+    },
+    calculateFee: (activity) => {
+      const f = toNum(activity.fee);
+      return f ? Math.abs(f) : 0;
+    },
   },
   [ActivityType.TRANSFER_IN]: {
     calculateSymbol: (activity, accountCurrency) =>
       activity.symbol || `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
-    calculateAmount: (activity) => (activity.amount ? Math.abs(activity.amount) : 0), // Amount is mandatory for cash activities
-    calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
+    calculateAmount: (activity) => {
+      const amt = toNum(activity.amount);
+      return amt ? Math.abs(amt) : 0;
+    },
+    calculateFee: (activity) => {
+      const f = toNum(activity.fee);
+      return f ? Math.abs(f) : 0;
+    },
   },
   [ActivityType.TRANSFER_OUT]: {
     calculateSymbol: (activity, accountCurrency) =>
       activity.symbol || `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
-    calculateAmount: (activity) => (activity.amount ? Math.abs(activity.amount) : 0), // Amount is mandatory for cash activities
-    calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
+    calculateAmount: (activity) => {
+      const amt = toNum(activity.amount);
+      return amt ? Math.abs(amt) : 0;
+    },
+    calculateFee: (activity) => {
+      const f = toNum(activity.fee);
+      return f ? Math.abs(f) : 0;
+    },
   },
   [ActivityType.SPLIT]: {
     calculateSymbol: (activity) => activity.symbol,
@@ -308,8 +368,14 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
 // Default logic if type-specific logic isn't found
 const defaultLogic: ActivityLogicConfig = {
   calculateSymbol: (activity) => activity.symbol,
-  calculateAmount: (activity) => (activity.amount ? Math.abs(activity.amount) : activity.amount),
-  calculateFee: (activity) => (activity.fee ? Math.abs(activity.fee) : 0),
+  calculateAmount: (activity) => {
+    const amt = toNum(activity.amount);
+    return amt ? Math.abs(amt) : undefined;
+  },
+  calculateFee: (activity) => {
+    const f = toNum(activity.fee);
+    return f ? Math.abs(f) : 0;
+  },
 };
 
 // Helper function to transform a CSV row into an Activity object

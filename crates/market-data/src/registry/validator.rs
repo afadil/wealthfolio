@@ -345,10 +345,8 @@ impl QuoteValidator {
         }
 
         // Soft validations (warn but accept)
-        if self.config.warn_on_zero_volume {
-            if quote.volume == Some(Decimal::ZERO) {
-                return ValidationResult::soft_warn("Zero volume (market may be closed)");
-            }
+        if self.config.warn_on_zero_volume && quote.volume == Some(Decimal::ZERO) {
+            return ValidationResult::soft_warn("Zero volume (market may be closed)");
         }
 
         ValidationResult::ok()

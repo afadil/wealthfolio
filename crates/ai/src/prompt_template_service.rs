@@ -135,7 +135,7 @@ pub fn build_run_config_from_context(
         template_version: "1.0.0".to_string(),
         locale: locale.map(|s| s.to_string()),
         detail_level: detail_level
-            .map(|s| DetailLevel::from_str_or_default(s))
+            .map(DetailLevel::from_str_or_default)
             .unwrap_or_default(),
     }
 }

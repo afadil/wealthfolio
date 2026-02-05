@@ -216,7 +216,7 @@ impl YahooProvider {
     ) -> Result<Quote, MarketDataError> {
         // Validate timestamp
         let timestamp: DateTime<Utc> = Utc
-            .timestamp_opt(yahoo_quote.timestamp as i64, 0)
+            .timestamp_opt(yahoo_quote.timestamp, 0)
             .single()
             .ok_or_else(|| MarketDataError::ValidationFailed {
                 message: format!("Invalid timestamp: {}", yahoo_quote.timestamp),

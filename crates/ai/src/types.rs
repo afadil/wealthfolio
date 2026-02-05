@@ -842,6 +842,7 @@ pub struct ChatModelConfig {
 /// Request to send a chat message.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub struct SendMessageRequest {
     /// Thread ID (creates new thread if not provided).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -883,18 +884,6 @@ impl SendMessageRequest {
     }
 }
 
-impl Default for SendMessageRequest {
-    fn default() -> Self {
-        Self {
-            thread_id: None,
-            content: String::new(),
-            config: None,
-            provider_id: None,
-            model_id: None,
-            allowed_tools: None,
-        }
-    }
-}
 
 // ============================================================================
 // Simple Chat Message (for rig-core compatibility)

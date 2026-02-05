@@ -650,7 +650,7 @@ where
 
         // 7. Sort results: existing first, then by exchange relevance (if currency), then by score
         let preferred_exchanges = account_currency
-            .map(|c| exchanges_for_currency(c))
+            .map(exchanges_for_currency)
             .unwrap_or_default();
 
         merged.sort_by(|a, b| {
@@ -1075,7 +1075,7 @@ where
             let get_field =
                 |idx: usize| record.get(idx).map(|s| s.trim()).filter(|s| !s.is_empty());
             let parse_decimal = |idx: Option<usize>| -> Option<Decimal> {
-                idx.and_then(|i| get_field(i))
+                idx.and_then(&get_field)
                     .and_then(|s| Decimal::from_str(&s.replace(',', "")).ok())
             };
 

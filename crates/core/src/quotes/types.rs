@@ -156,11 +156,6 @@ impl Day {
         self.0
     }
 
-    /// Formats the day as "YYYY-MM-DD".
-    pub fn to_string(&self) -> String {
-        self.0.format("%Y-%m-%d").to_string()
-    }
-
     /// Parses a day from "YYYY-MM-DD" format.
     pub fn parse(s: &str) -> Option<Self> {
         NaiveDate::parse_from_str(s, "%Y-%m-%d").ok().map(Self)
@@ -203,7 +198,9 @@ impl From<Day> for NaiveDate {
 /// Invariant: Manual quotes are never overwritten by provider sync.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "provider")]
+#[derive(Default)]
 pub enum QuoteSource {
+    #[default]
     Manual,
     Provider(ProviderId),
 }
@@ -247,11 +244,6 @@ impl QuoteSource {
     }
 }
 
-impl Default for QuoteSource {
-    fn default() -> Self {
-        QuoteSource::Manual
-    }
-}
 
 impl fmt::Display for QuoteSource {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

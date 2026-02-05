@@ -22,7 +22,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { getHoldingsByAllocation } from "@/adapters";
 import { TickerAvatar } from "@/components/ticker-avatar";
-import type { TaxonomyAllocation, HoldingSummary, AllocationHoldings } from "@/lib/types";
+import type { TaxonomyAllocation, HoldingSummary } from "@/lib/types";
 import { QueryKeys } from "@/lib/query-keys";
 import { CompactAllocationStrip } from "./compact-allocation-strip";
 

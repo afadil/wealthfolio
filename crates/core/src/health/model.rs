@@ -22,7 +22,9 @@ use std::hash::Hash;
 /// This ordering is used to determine the overall health status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[derive(Default)]
 pub enum Severity {
+    #[default]
     Info,
     Warning,
     Error,
@@ -41,11 +43,6 @@ impl Severity {
     }
 }
 
-impl Default for Severity {
-    fn default() -> Self {
-        Severity::Info
-    }
-}
 
 impl std::fmt::Display for Severity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

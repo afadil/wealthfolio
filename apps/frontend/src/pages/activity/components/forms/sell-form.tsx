@@ -129,7 +129,6 @@ export function SellForm({
   const accountId = watch("accountId");
   const assetId = watch("assetId");
   const quantity = watch("quantity");
-  const unitPrice = watch("unitPrice");
   const pricingMode = watch("pricingMode");
   const isManualAsset = pricingMode === PricingMode.MANUAL;
 

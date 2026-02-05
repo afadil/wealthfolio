@@ -85,11 +85,11 @@ pub fn get_migration_status(
             .get_asset_assignments(&asset.id)
             .unwrap_or_default();
 
-        let has_gics_assignment = gics_taxonomy.as_ref().map_or(false, |t| {
+        let has_gics_assignment = gics_taxonomy.as_ref().is_some_and(|t| {
             assignments.iter().any(|a| a.taxonomy_id == t.taxonomy.id)
         });
 
-        let has_regions_assignment = regions_taxonomy.as_ref().map_or(false, |t| {
+        let has_regions_assignment = regions_taxonomy.as_ref().is_some_and(|t| {
             assignments.iter().any(|a| a.taxonomy_id == t.taxonomy.id)
         });
 

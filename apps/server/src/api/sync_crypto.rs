@@ -83,7 +83,7 @@ async fn derive_dek(
     Json(body): Json<DeriveDekRequest>,
 ) -> ApiResult<Json<StringResponse>> {
     let value =
-        crypto::derive_dek(&body.root_key, body.version).map_err(|e| ApiError::BadRequest(e))?;
+        crypto::derive_dek(&body.root_key, body.version).map_err(ApiError::BadRequest)?;
     Ok(Json(StringResponse { value }))
 }
 
@@ -99,7 +99,7 @@ async fn compute_shared_secret(
     Json(body): Json<ComputeSharedSecretRequest>,
 ) -> ApiResult<Json<StringResponse>> {
     let value = crypto::compute_shared_secret(&body.our_secret, &body.their_public)
-        .map_err(|e| ApiError::BadRequest(e))?;
+        .map_err(ApiError::BadRequest)?;
     Ok(Json(StringResponse { value }))
 }
 
@@ -108,7 +108,7 @@ async fn derive_session_key(
     Json(body): Json<DeriveSessionKeyRequest>,
 ) -> ApiResult<Json<StringResponse>> {
     let value = crypto::derive_session_key(&body.shared_secret, &body.context)
-        .map_err(|e| ApiError::BadRequest(e))?;
+        .map_err(ApiError::BadRequest)?;
     Ok(Json(StringResponse { value }))
 }
 
@@ -116,7 +116,7 @@ async fn encrypt(
     State(_state): State<Arc<AppState>>,
     Json(body): Json<EncryptRequest>,
 ) -> ApiResult<Json<StringResponse>> {
-    let value = crypto::encrypt(&body.key, &body.plaintext).map_err(|e| ApiError::BadRequest(e))?;
+    let value = crypto::encrypt(&body.key, &body.plaintext).map_err(ApiError::BadRequest)?;
     Ok(Json(StringResponse { value }))
 }
 
@@ -125,7 +125,7 @@ async fn decrypt(
     Json(body): Json<DecryptRequest>,
 ) -> ApiResult<Json<StringResponse>> {
     let value =
-        crypto::decrypt(&body.key, &body.ciphertext).map_err(|e| ApiError::BadRequest(e))?;
+        crypto::decrypt(&body.key, &body.ciphertext).map_err(ApiError::BadRequest)?;
     Ok(Json(StringResponse { value }))
 }
 
@@ -148,7 +148,7 @@ async fn compute_sas(
     State(_state): State<Arc<AppState>>,
     Json(body): Json<ComputeSasRequest>,
 ) -> ApiResult<Json<StringResponse>> {
-    let value = crypto::compute_sas(&body.shared_secret).map_err(|e| ApiError::BadRequest(e))?;
+    let value = crypto::compute_sas(&body.shared_secret).map_err(ApiError::BadRequest)?;
     Ok(Json(StringResponse { value }))
 }
 

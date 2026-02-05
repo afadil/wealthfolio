@@ -125,10 +125,6 @@ export function BuyForm({
 
   const { watch } = form;
   const accountId = watch("accountId");
-  const quantity = watch("quantity");
-  const unitPrice = watch("unitPrice");
-  const fee = watch("fee");
-  const currency = watch("currency");
   const pricingMode = watch("pricingMode");
   const isManualAsset = pricingMode === PricingMode.MANUAL;
 

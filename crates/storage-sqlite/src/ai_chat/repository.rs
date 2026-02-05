@@ -539,7 +539,7 @@ fn db_to_message(db: &AiMessageDB) -> ChatRepositoryResult<ChatMessage> {
     let role = db
         .role
         .parse::<ChatMessageRole>()
-        .map_err(|e| AiError::InvalidInput(e))?;
+        .map_err(AiError::InvalidInput)?;
 
     Ok(ChatMessage {
         id: db.id.clone(),

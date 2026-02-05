@@ -62,10 +62,7 @@ const toNumber = (value: string | number | null | undefined): number | undefined
 };
 
 // Helper function to safely format numbers, handling NaN/null/undefined values
-const safeFormatAmount = (
-  value: string | number | null | undefined,
-  currency: string,
-): string => {
+const safeFormatAmount = (value: string | number | null | undefined, currency: string): string => {
   const parsed = toNumber(value);
   if (parsed === undefined) {
     return "-";
@@ -464,7 +461,7 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       ),
       cell: ({ row }) => {
         const activityType = row.getValue("activityType");
-        const unitPrice = row.getValue("unitPrice");
+        const unitPrice = row.getValue("unitPrice") as string | number | null | undefined;
         const currency = row.getValue("currency") || "USD";
         const hasError = hasFieldError(row.original, "unitPrice");
         const errorMessages = getFieldErrorMessage(row.original, "unitPrice");
@@ -491,7 +488,7 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       ),
       cell: ({ row }) => {
         const activityType = row.getValue("activityType");
-        const amount = row.getValue("amount");
+        const amount = row.getValue("amount") as string | number | null | undefined;
         const currency = row.getValue("currency") || "USD";
 
         // Check if amount field has errors directly
@@ -519,7 +516,7 @@ function getColumns(accounts: Account[]): ColumnDef<ActivityImport>[] {
       ),
       cell: ({ row }) => {
         const activityType = row.getValue("activityType");
-        const fee = row.getValue("fee");
+        const fee = row.getValue("fee") as string | number | null | undefined;
         const currency = row.getValue("currency") || "USD";
         const hasError = hasFieldError(row.original, "fee");
         const errorMessages = getFieldErrorMessage(row.original, "fee");

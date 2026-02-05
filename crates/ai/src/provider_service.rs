@@ -412,7 +412,7 @@ impl AiProviderServiceTrait for AiProviderService {
         let base_url = config
             .base_url
             .as_deref()
-            .unwrap_or_else(|| match provider_id {
+            .unwrap_or(match provider_id {
                 "anthropic" => "https://api.anthropic.com",
                 "openai" => "https://api.openai.com",
                 "groq" => "https://api.groq.com/openai",

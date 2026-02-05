@@ -52,7 +52,7 @@ impl QuoteStore for MarketDataRepository {
                 diesel::replace_into(quotes_dsl::quotes)
                     .values(&db_row)
                     .execute(conn)
-                    .map_err(|e| StorageError::QueryFailed(e))?;
+                    .map_err(StorageError::QueryFailed)?;
                 Ok(())
             })
             .await?;
@@ -66,7 +66,7 @@ impl QuoteStore for MarketDataRepository {
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
                 diesel::delete(quotes_dsl::quotes.filter(quotes_dsl::id.eq(id_to_delete)))
                     .execute(conn)
-                    .map_err(|e| StorageError::QueryFailed(e))?;
+                    .map_err(StorageError::QueryFailed)?;
                 Ok(())
             })
             .await
@@ -86,7 +86,7 @@ impl QuoteStore for MarketDataRepository {
                     total_upserted += diesel::replace_into(quotes_dsl::quotes)
                         .values(chunk)
                         .execute(conn)
-                        .map_err(|e| StorageError::QueryFailed(e))?;
+                        .map_err(StorageError::QueryFailed)?;
                 }
                 Ok(total_upserted)
             })
@@ -102,7 +102,7 @@ impl QuoteStore for MarketDataRepository {
                     quotes_dsl::quotes.filter(quotes_dsl::asset_id.eq(asset_id_str)),
                 )
                 .execute(conn)
-                .map_err(|e| StorageError::QueryFailed(e))?;
+                .map_err(StorageError::QueryFailed)?;
                 Ok(count)
             })
             .await

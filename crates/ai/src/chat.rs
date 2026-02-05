@@ -868,20 +868,18 @@ impl ThinkTagParser {
                 } else {
                     break;
                 }
+            } else if let Some(start_idx) = self.buffer.find("<think>") {
+                text_out.push_str(&self.buffer[..start_idx]);
+                self.buffer = self.buffer[start_idx + 7..].to_string();
+                self.in_think_block = true;
+            } else if self.buffer.len() > 7 && !self.buffer.ends_with('<') {
+                // Safe to emit most of the buffer as text
+                let safe_len = self.buffer.len().saturating_sub(7);
+                text_out.push_str(&self.buffer[..safe_len]);
+                self.buffer = self.buffer[safe_len..].to_string();
+                break;
             } else {
-                if let Some(start_idx) = self.buffer.find("<think>") {
-                    text_out.push_str(&self.buffer[..start_idx]);
-                    self.buffer = self.buffer[start_idx + 7..].to_string();
-                    self.in_think_block = true;
-                } else if self.buffer.len() > 7 && !self.buffer.ends_with('<') {
-                    // Safe to emit most of the buffer as text
-                    let safe_len = self.buffer.len().saturating_sub(7);
-                    text_out.push_str(&self.buffer[..safe_len]);
-                    self.buffer = self.buffer[safe_len..].to_string();
-                    break;
-                } else {
-                    break;
-                }
+                break;
             }
         }
 

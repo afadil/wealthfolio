@@ -371,7 +371,7 @@ where
                 .push(asset.id.clone());
         }
         for (provider, ids) in &assets_by_provider {
-            if let Ok(bounds) = self.quote_store.get_quote_bounds_for_assets(&ids, provider) {
+            if let Ok(bounds) = self.quote_store.get_quote_bounds_for_assets(ids, provider) {
                 quote_bounds.extend(bounds);
             }
         }
@@ -975,7 +975,7 @@ where
                 .push(asset.id.clone());
         }
         for (provider, ids) in &assets_by_provider {
-            if let Ok(bounds) = self.quote_store.get_quote_bounds_for_assets(&ids, provider) {
+            if let Ok(bounds) = self.quote_store.get_quote_bounds_for_assets(ids, provider) {
                 quote_bounds.extend(bounds);
             }
         }
