@@ -28,6 +28,33 @@ export const isIncomeActivity = (activityType: string): boolean => {
 };
 
 /**
+ * Recognizes cash symbol patterns from brokers/exports (e.g. $CASH-CAD, CASH:USD).
+ */
+export const isCashSymbol = (symbol?: string): boolean => {
+  if (!symbol?.trim()) return false;
+  return /^\$?CASH[-_:][A-Z]{3}$/i.test(symbol.trim());
+};
+
+const SYMBOL_NEVER_NEEDED = new Set<string>([
+  ActivityType.DEPOSIT,
+  ActivityType.WITHDRAWAL,
+  ActivityType.INTEREST,
+  ActivityType.TAX,
+  ActivityType.FEE,
+  ActivityType.CREDIT,
+]);
+
+/**
+ * Whether a symbol is required for this activity+symbol combination.
+ * Pure cash types → never. Cash symbols (e.g. $CASH-CAD) → never. Otherwise → yes.
+ */
+export const isSymbolRequired = (activityType: string, symbol?: string): boolean => {
+  if (SYMBOL_NEVER_NEEDED.has(activityType)) return false;
+  if (isCashSymbol(symbol)) return false;
+  return true;
+};
+
+/**
  * Determines if an activity is a cash transfer based on its type and symbol
  * @param activityType The activity type to check
  * @param assetSymbol The asset symbol to check
@@ -38,18 +65,12 @@ export const isCashTransfer = (activityType: string, assetSymbol: string): boole
     return false;
   }
   // Recognize cash transfers by symbol:
-  // - Legacy format: $CASH-{currency} (e.g., $CASH-USD)
-  // - New format: CASH:{currency} (e.g., CASH:USD)
+  // - CASH:{currency} (e.g., CASH:USD)
   // - Display value: "CASH" (set by applyCashDefaults)
   const upperSymbol = assetSymbol.toUpperCase();
 
   if (upperSymbol === "CASH") {
     return true;
-  }
-
-  if (upperSymbol.startsWith("$CASH-")) {
-    const currency = upperSymbol.slice("$CASH-".length);
-    return /^[A-Z]{3}$/.test(currency);
   }
 
   if (upperSymbol.startsWith("CASH:")) {

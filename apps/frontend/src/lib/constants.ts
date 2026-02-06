@@ -494,6 +494,7 @@ export const CASH_ACTIVITY_TYPES = [
   ActivityType.TRANSFER_OUT,
   ActivityType.TAX,
   ActivityType.FEE,
+  ActivityType.CREDIT,
 ] as const;
 
 export const INCOME_ACTIVITY_TYPES = [ActivityType.DIVIDEND, ActivityType.INTEREST] as const;

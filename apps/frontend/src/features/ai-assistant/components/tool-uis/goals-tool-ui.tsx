@@ -13,6 +13,7 @@ import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { useSettingsContext } from "@/lib/settings-provider";
 
 // ============================================================================
 // Types
@@ -333,22 +334,24 @@ function ErrorState({ message }: { message?: string }) {
 type GoalsToolUIContentProps = ToolCallMessagePartProps<GetGoalsArgs, GetGoalsResult>;
 
 function GoalsToolUIContent({ result, status }: GoalsToolUIContentProps) {
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
   const { isBalanceHidden } = useBalancePrivacy();
   const parsed = useMemo(() => normalizeResult(result), [result]);
 
   const isLoading = status?.type === "running";
   const isIncomplete = status?.type === "incomplete";
 
-  // Currency formatter - default to USD as goals typically use base currency
+  // Currency formatter - default to base currency
   const formatter = useMemo(
     () =>
       new Intl.NumberFormat(undefined, {
         style: "currency",
-        currency: "USD",
+        currency: baseCurrency,
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
       }),
-    [],
+    [baseCurrency],
   );
 
   // Show loading skeleton while running

@@ -82,4 +82,8 @@ pub trait FxServiceTrait: Send + Sync {
         from_currency: &str,
         to_currency: &str,
     ) -> Result<()>;
+
+    /// Registers multiple FX pairs in batch.
+    /// Pairs are (from_currency, to_currency).
+    async fn ensure_fx_pairs(&self, pairs: Vec<(String, String)>) -> Result<()>;
 }

@@ -45,6 +45,7 @@ import { useAccounts } from "@/hooks/use-accounts";
 import { useValuationHistory } from "@/hooks/use-valuation-history";
 import { AccountType } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
+import { useSettingsContext } from "@/lib/settings-provider";
 import {
   Account,
   AccountValuation,
@@ -101,6 +102,8 @@ const formatDate = (dateStr: string): string => {
 const INITIAL_INTERVAL_CODE: TimePeriod = "3M";
 
 const AccountPage = () => {
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
   const { id = "" } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
@@ -540,14 +543,14 @@ const AccountPage = () => {
                           <p className="pt-3 text-xl font-bold">
                             <PrivacyAmount
                               value={currentValuation?.totalValue ?? 0}
-                              currency={account?.currency ?? "USD"}
+                              currency={account?.currency ?? baseCurrency}
                             />
                           </p>
                           <div className="flex items-center gap-2 text-sm">
                             <GainAmount
                               className="text-sm font-light"
                               value={frontendGainLossAmount}
-                              currency={account?.currency ?? "USD"}
+                              currency={account?.currency ?? baseCurrency}
                               displayCurrency={false}
                             />
                             <GainPercent

@@ -65,6 +65,10 @@ mod tests {
             unimplemented!("Not needed for tests")
         }
 
+        async fn create_batch(&self, _new_assets: Vec<NewAsset>) -> Result<Vec<Asset>> {
+            unimplemented!("Not needed for tests")
+        }
+
         async fn update_profile(
             &self,
             _asset_id: &str,
@@ -104,6 +108,14 @@ mod tests {
         }
 
         async fn cleanup_legacy_metadata(&self, _asset_id: &str) -> Result<()> {
+            Ok(())
+        }
+
+        async fn deactivate(&self, _asset_id: &str) -> Result<()> {
+            Ok(())
+        }
+
+        async fn copy_user_metadata(&self, _source_id: &str, _target_id: &str) -> Result<()> {
             Ok(())
         }
     }
@@ -264,6 +276,10 @@ mod tests {
             Err(crate::errors::Error::Unexpected(
                 "MockFxService::register_currency_pair_manual not implemented".to_string(),
             ))
+        }
+
+        async fn ensure_fx_pairs(&self, _pairs: Vec<(String, String)>) -> Result<()> {
+            Ok(())
         }
     }
 
@@ -2428,7 +2444,7 @@ mod tests {
         Activity {
             id: id.to_string(),
             account_id: "acc_1".to_string(),
-            asset_id: Some(format!("$CASH-{}", currency)),
+            asset_id: Some(format!("CASH:{}", currency)),
             activity_type: activity_type.as_str().to_string(),
             activity_type_override: None,
             source_type: None,

@@ -21,6 +21,7 @@ import {
 import type { ImportMappingData, SymbolSearchResult } from "@/lib/types";
 import TickerSearchInput from "@/components/ticker-search";
 import { initializeColumnMapping } from "../hooks/use-import-mapping";
+import { findMappedActivityType } from "../utils/activity-type-mapping";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -65,36 +66,13 @@ const TARGET_FIELDS: { value: ImportFormat; label: string; required: boolean }[]
 
 const SKIP_FIELD_VALUE = "__skip__";
 
-// Smart defaults for activity type mapping
-const ACTIVITY_TYPE_SMART_DEFAULTS: Record<string, string> = {
-  BUY: ActivityType.BUY,
-  PURCHASE: ActivityType.BUY,
-  BOUGHT: ActivityType.BUY,
-  SELL: ActivityType.SELL,
-  SOLD: ActivityType.SELL,
-  DIVIDEND: ActivityType.DIVIDEND,
-  DIV: ActivityType.DIVIDEND,
-  DEPOSIT: ActivityType.DEPOSIT,
-  WITHDRAWAL: ActivityType.WITHDRAWAL,
-  WITHDRAW: ActivityType.WITHDRAWAL,
-  FEE: ActivityType.FEE,
-  TAX: ActivityType.TAX,
-  TRANSFER_IN: ActivityType.TRANSFER_IN,
-  TRANSFER: ActivityType.TRANSFER_IN,
-  TRANSFER_OUT: ActivityType.TRANSFER_OUT,
-  INTEREST: ActivityType.INTEREST,
-  INT: ActivityType.INTEREST,
-  SPLIT: ActivityType.SPLIT,
-  CREDIT: ActivityType.CREDIT,
-  ADJUSTMENT: ActivityType.ADJUSTMENT,
-};
-
 // Activity types where symbol is optional (can be cash or asset-related)
 const NO_SYMBOL_REQUIRED_ACTIVITY_TYPES = [
   ActivityType.DEPOSIT,
   ActivityType.WITHDRAWAL,
   ActivityType.FEE,
   ActivityType.TAX,
+  ActivityType.CREDIT,
   ActivityType.INTEREST, // Can be cash interest or bond/asset interest
   ActivityType.TRANSFER_IN, // Can be cash or share transfer
   ActivityType.TRANSFER_OUT,
@@ -103,39 +81,6 @@ const NO_SYMBOL_REQUIRED_ACTIVITY_TYPES = [
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper Functions
 // ─────────────────────────────────────────────────────────────────────────────
-
-function getSmartDefault(csvValue: string): string | null {
-  const normalized = csvValue.trim().toUpperCase();
-
-  // Direct match
-  if (ACTIVITY_TYPE_SMART_DEFAULTS[normalized]) {
-    return ACTIVITY_TYPE_SMART_DEFAULTS[normalized];
-  }
-
-  // Partial match (e.g., "BUY - MARKET" starts with "BUY")
-  for (const [key, value] of Object.entries(ACTIVITY_TYPE_SMART_DEFAULTS)) {
-    if (normalized.startsWith(key) || normalized.includes(key)) {
-      return value;
-    }
-  }
-
-  return null;
-}
-
-function findMappedActivityType(
-  csvValue: string,
-  activityMappings: Record<string, string[]>,
-): string | null {
-  const normalized = csvValue.trim().toUpperCase();
-
-  for (const [activityType, csvValues] of Object.entries(activityMappings)) {
-    if (csvValues?.some((v) => normalized.startsWith(v.trim().toUpperCase()))) {
-      return activityType;
-    }
-  }
-
-  return null;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components
@@ -519,13 +464,7 @@ export function MappingStepV2() {
 
     return Array.from(valueCounts.entries())
       .map(([csvValue, count]) => {
-        // Check if already mapped
-        let mappedType = findMappedActivityType(csvValue, localMapping.activityMappings);
-
-        // If not mapped, try smart defaults
-        if (!mappedType) {
-          mappedType = getSmartDefault(csvValue);
-        }
+        const mappedType = findMappedActivityType(csvValue, localMapping.activityMappings);
 
         return {
           csvValue,
@@ -572,9 +511,10 @@ export function MappingStepV2() {
       if (activityHeaderIndex !== -1) {
         const csvActivityType = row[activityHeaderIndex]?.trim();
         if (csvActivityType) {
-          const mappedType = findMappedActivityType(csvActivityType, localMapping.activityMappings);
-          // Use the smart default if no explicit mapping
-          const effectiveType = mappedType || getSmartDefault(csvActivityType);
+          const effectiveType = findMappedActivityType(
+            csvActivityType,
+            localMapping.activityMappings,
+          );
           const isNoSymbolRequired =
             effectiveType &&
             (NO_SYMBOL_REQUIRED_ACTIVITY_TYPES as readonly string[]).includes(effectiveType);

@@ -1,11 +1,14 @@
 use log::{debug, error, info, warn};
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::quotes::QuoteServiceTrait;
 use crate::taxonomies::{NewAssetTaxonomyAssignment, TaxonomyServiceTrait};
 
-use super::assets_model::{Asset, AssetKind, NewAsset, PricingMode, UpdateAssetProfile};
+use super::assets_model::{
+    Asset, AssetKind, AssetSpec, EnsureAssetsResult, NewAsset, PricingMode, UpdateAssetProfile,
+};
 use super::canonical_asset_id;
 use super::assets_traits::{AssetRepositoryTrait, AssetServiceTrait};
 use super::auto_classification::{AutoClassificationService, ClassificationInput};
@@ -29,7 +32,6 @@ fn infer_asset_kind(asset_id: &str) -> AssetKind {
 
     // Legacy system-defined prefixes (deterministic patterns)
     match asset_id {
-        s if s.starts_with("$CASH-") => AssetKind::Cash,
         s if s.starts_with("$UNKNOWN-") => AssetKind::Security,
         // Alternative asset prefixes (user-created convention)
         s if s.starts_with("PROP-") => AssetKind::Property,
@@ -161,6 +163,99 @@ impl AssetService {
 
         Ok(asset)
     }
+
+    /// Builds a NewAsset from an AssetSpec without any I/O.
+    fn new_asset_from_spec(&self, spec: &AssetSpec) -> NewAsset {
+        let pricing_mode = spec.pricing_mode.clone().unwrap_or_else(|| match &spec.kind {
+            AssetKind::Cash => PricingMode::None,
+            AssetKind::Crypto | AssetKind::Security => PricingMode::Market,
+            _ => PricingMode::Manual,
+        });
+        let preferred_provider = match pricing_mode {
+            PricingMode::Market => Some("YAHOO".to_string()),
+            PricingMode::Manual => Some("MANUAL".to_string()),
+            PricingMode::None | PricingMode::Derived => None,
+        };
+
+        if spec.kind == AssetKind::Cash {
+            NewAsset::new_cash_asset(&spec.currency)
+        } else {
+            NewAsset {
+                id: Some(spec.id.clone()),
+                kind: spec.kind.clone(),
+                name: spec.name.clone(),
+                symbol: spec.symbol.clone(),
+                exchange_mic: spec.exchange_mic.clone(),
+                currency: spec.currency.clone(),
+                pricing_mode,
+                preferred_provider,
+                is_active: true,
+                ..Default::default()
+            }
+        }
+    }
+
+    /// Assigns taxonomy categories for a cash asset (best-effort).
+    async fn assign_cash_taxonomy(&self, asset_id: &str) {
+        if let Some(ref taxonomy_service) = self.taxonomy_service {
+            let asset_class_assignment = NewAssetTaxonomyAssignment {
+                id: None,
+                asset_id: asset_id.to_string(),
+                taxonomy_id: "asset_classes".to_string(),
+                category_id: "CASH_BANK_DEPOSITS".to_string(),
+                weight: 10000,
+                source: "AUTO".to_string(),
+            };
+            if let Err(e) = taxonomy_service
+                .assign_asset_to_category(asset_class_assignment)
+                .await
+            {
+                warn!("Failed to assign asset class for cash {}: {}", asset_id, e);
+            }
+
+            let instrument_type_assignment = NewAssetTaxonomyAssignment {
+                id: None,
+                asset_id: asset_id.to_string(),
+                taxonomy_id: "instrument_type".to_string(),
+                category_id: "CASH".to_string(),
+                weight: 10000,
+                source: "AUTO".to_string(),
+            };
+            if let Err(e) = taxonomy_service
+                .assign_asset_to_category(instrument_type_assignment)
+                .await
+            {
+                warn!(
+                    "Failed to assign instrument type for cash {}: {}",
+                    asset_id, e
+                );
+            }
+        }
+    }
+}
+
+/// Helper: find UNKNOWN variant of a resolved asset ID.
+/// e.g., "SEC:AAPL:XNAS" → Some("SEC:AAPL:UNKNOWN")
+/// Returns None if the asset is not a security or already has UNKNOWN qualifier.
+fn find_unknown_variant(asset_id: &str) -> Option<String> {
+    let parsed = super::parse_canonical_asset_id(asset_id)?;
+
+    // Only securities can have UNKNOWN variants
+    if parsed.kind != Some(AssetKind::Security) {
+        return None;
+    }
+
+    // Skip if already UNKNOWN or empty qualifier
+    if parsed.qualifier.is_empty() || parsed.qualifier == "UNKNOWN" {
+        return None;
+    }
+
+    Some(canonical_asset_id(
+        &AssetKind::Security,
+        &parsed.symbol,
+        Some("UNKNOWN"),
+        &parsed.qualifier,
+    ))
 }
 
 // Implement the service trait
@@ -316,7 +411,6 @@ impl AssetServiceTrait for AssetService {
         if kind == AssetKind::Cash {
             let cash_currency = super::parse_canonical_asset_id(asset_id)
                 .map(|parsed| parsed.symbol)
-                .or_else(|| asset_id.strip_prefix("$CASH-").map(|s| s.to_string()))
                 .filter(|c| !c.is_empty())
                 .or_else(|| context_currency.clone().filter(|c| !c.is_empty()))
                 .unwrap_or_else(|| asset_id.to_string());
@@ -703,5 +797,180 @@ impl AssetServiceTrait for AssetService {
         self.asset_repository
             .cleanup_legacy_metadata(asset_id)
             .await
+    }
+
+    async fn merge_unknown_asset(
+        &self,
+        resolved_asset_id: &str,
+        unknown_asset_id: &str,
+        activity_repository: &dyn crate::activities::ActivityRepositoryTrait,
+    ) -> Result<u32> {
+        info!(
+            "Merging UNKNOWN asset {} into resolved asset {}",
+            unknown_asset_id, resolved_asset_id
+        );
+
+        let (account_ids, currencies) = match activity_repository
+            .get_activity_accounts_and_currencies_by_asset_id(unknown_asset_id)
+            .await
+        {
+            Ok(data) => data,
+            Err(e) => {
+                warn!(
+                    "Failed to load account_ids/currencies for UNKNOWN asset {}: {}",
+                    unknown_asset_id, e
+                );
+                (Vec::new(), Vec::new())
+            }
+        };
+
+        // 1. Copy user metadata (notes) from UNKNOWN to resolved
+        if let Err(e) = self
+            .asset_repository
+            .copy_user_metadata(unknown_asset_id, resolved_asset_id)
+            .await
+        {
+            warn!(
+                "Failed to copy user metadata from {} to {}: {}",
+                unknown_asset_id, resolved_asset_id, e
+            );
+        }
+
+        // 2. Reassign all activities from UNKNOWN to resolved
+        let activities_migrated = activity_repository
+            .reassign_asset(unknown_asset_id, resolved_asset_id)
+            .await?;
+
+        // 3. Deactivate the UNKNOWN asset
+        if let Err(e) = self.asset_repository.deactivate(unknown_asset_id).await {
+            warn!(
+                "Failed to deactivate UNKNOWN asset {}: {}",
+                unknown_asset_id, e
+            );
+        }
+
+        // 4. Emit assets_merged domain event
+        self.event_sink.emit(DomainEvent::assets_merged(
+            unknown_asset_id.to_string(),
+            resolved_asset_id.to_string(),
+            activities_migrated,
+        ));
+
+        // 5. Emit activities_changed to trigger recalculation for affected accounts
+        if activities_migrated > 0 {
+            let asset_ids = vec![
+                unknown_asset_id.to_string(),
+                resolved_asset_id.to_string(),
+            ];
+            self.event_sink.emit(DomainEvent::activities_changed(
+                account_ids,
+                asset_ids,
+                currencies,
+            ));
+        }
+
+        info!(
+            "Merged UNKNOWN asset {} into {}: {} activities migrated",
+            unknown_asset_id, resolved_asset_id, activities_migrated
+        );
+
+        Ok(activities_migrated)
+    }
+
+    async fn ensure_assets(
+        &self,
+        specs: Vec<AssetSpec>,
+        activity_repository: &dyn crate::activities::ActivityRepositoryTrait,
+    ) -> Result<EnsureAssetsResult> {
+        if specs.is_empty() {
+            return Ok(EnsureAssetsResult::default());
+        }
+
+        // Deduplicate specs by ID
+        let unique_specs: Vec<AssetSpec> = specs
+            .into_iter()
+            .fold(HashMap::new(), |mut map, spec| {
+                map.entry(spec.id.clone()).or_insert(spec);
+                map
+            })
+            .into_values()
+            .collect();
+
+        let ids: Vec<String> = unique_specs.iter().map(|s| s.id.clone()).collect();
+
+        // 1. Pre-read existing asset IDs (for merge detection + created_ids tracking)
+        let existing_ids: HashSet<String> = self
+            .asset_repository
+            .list_by_asset_ids(&ids)?
+            .into_iter()
+            .map(|a| a.id)
+            .collect();
+
+        // 2. Check for UNKNOWN merge candidates among missing specs
+        let mut merge_candidates: Vec<(String, String)> = Vec::new();
+        for spec in &unique_specs {
+            if existing_ids.contains(&spec.id) {
+                continue;
+            }
+            if let Some(unknown_id) = find_unknown_variant(&spec.id) {
+                if self.asset_repository.get_by_id(&unknown_id).is_ok() {
+                    merge_candidates.push((spec.id.clone(), unknown_id));
+                }
+            }
+        }
+
+        // 3. Batch upsert all specs (INSERT OR IGNORE) in a single transaction
+        let new_assets: Vec<NewAsset> = unique_specs
+            .iter()
+            .map(|spec| self.new_asset_from_spec(spec))
+            .collect();
+
+        self.asset_repository.create_batch(new_assets).await?;
+
+        // Newly created = all spec IDs minus pre-existing
+        let created_ids: Vec<String> = ids
+            .iter()
+            .filter(|id| !existing_ids.contains(*id))
+            .cloned()
+            .collect();
+
+        // Assign taxonomy for newly created cash assets (best-effort)
+        for spec in &unique_specs {
+            if spec.kind == AssetKind::Cash && !existing_ids.contains(&spec.id) {
+                self.assign_cash_taxonomy(&spec.id).await;
+            }
+        }
+
+        // 4. Execute merges
+        for (resolved_id, unknown_id) in &merge_candidates {
+            if let Err(e) = self
+                .merge_unknown_asset(resolved_id, unknown_id, activity_repository)
+                .await
+            {
+                warn!(
+                    "Failed to merge UNKNOWN asset {} into {}: {}",
+                    unknown_id, resolved_id, e
+                );
+            }
+        }
+
+        // 5. Emit batch event for created assets
+        if !created_ids.is_empty() {
+            self.event_sink
+                .emit(DomainEvent::assets_created(created_ids.clone()));
+        }
+
+        // 6. Fetch all requested assets
+        let all_assets = self.asset_repository.list_by_asset_ids(&ids)?;
+        let assets_map: HashMap<String, Asset> = all_assets
+            .into_iter()
+            .map(|a| (a.id.clone(), a))
+            .collect();
+
+        Ok(EnsureAssetsResult {
+            assets: assets_map,
+            created_ids,
+            merge_candidates,
+        })
     }
 }

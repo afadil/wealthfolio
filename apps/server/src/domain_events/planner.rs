@@ -102,8 +102,10 @@ pub fn plan_portfolio_job(
                     account_ids.insert(account_id.clone());
                 }
             }
-            // AssetsCreated and TrackingModeChanged don't trigger portfolio recalc directly
-            DomainEvent::AssetsCreated { .. } | DomainEvent::TrackingModeChanged { .. } => {}
+            // AssetsCreated, AssetsMerged, and TrackingModeChanged don't trigger portfolio recalc directly
+            DomainEvent::AssetsCreated { .. }
+            | DomainEvent::AssetsMerged { .. }
+            | DomainEvent::TrackingModeChanged { .. } => {}
         }
     }
 

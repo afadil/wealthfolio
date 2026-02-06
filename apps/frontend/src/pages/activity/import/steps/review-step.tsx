@@ -618,8 +618,7 @@ export function ReviewStep() {
                   accountId: accountId, // Use the selected account from state
                   activityType: draft.activityType as ActivityImport["activityType"],
                   date: draft.activityDate || "",
-                  symbol:
-                    draft.symbol || "$CASH-" + (draft.currency || parseConfig.defaultCurrency),
+                  symbol: draft.symbol || "",
                   quantity: draft.quantity,
                   unitPrice: draft.unitPrice,
                   amount: draft.amount,
@@ -635,15 +634,14 @@ export function ReviewStep() {
             ) as ActivityImport[];
 
           logger.info(
-            `Backend validation: sending ${activitiesToValidate.length} activities to check_activities_import (dryRun=true)`,
+            `Backend validation: sending ${activitiesToValidate.length} activities to check_activities_import`,
           );
 
           if (activitiesToValidate.length > 0) {
-            // Call backend with dryRun=true for read-only validation
+            // Call backend for read-only validation
             const validated = await checkActivitiesImport({
               accountId,
               activities: activitiesToValidate,
-              dryRun: true,
             });
 
             logger.info(`Backend validation returned ${validated.length} results`);

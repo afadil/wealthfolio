@@ -29,6 +29,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/compone
 import { ASSET_KIND_DISPLAY_NAMES } from "@/lib/types";
 import { Quote } from "@/lib/types";
 import { formatAmount, formatDate } from "@/lib/utils";
+import { useSettingsContext } from "@/lib/settings-provider";
 import { ParsedAsset } from "./asset-utils";
 
 interface AssetsTableProps {
@@ -75,6 +76,8 @@ export function AssetsTable({
   isUpdatingQuotes,
   isRefetchingQuotes,
 }: AssetsTableProps) {
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
   const navigate = useNavigate();
 
   const columns: ColumnDef<ParsedAsset>[] = useMemo(
@@ -215,7 +218,7 @@ export function AssetsTable({
                   </Tooltip>
                 ) : null}
                 <span className="font-semibold tabular-nums">
-                  {formatAmount(quote.close, quote.currency ?? asset.currency ?? "USD")}
+                  {formatAmount(quote.close, quote.currency ?? asset.currency ?? baseCurrency)}
                 </span>
               </div>
               <div className="text-muted-foreground text-[11px]">{formatDate(quote.timestamp)}</div>

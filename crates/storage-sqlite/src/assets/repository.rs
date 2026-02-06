@@ -119,6 +119,38 @@ impl AssetRepositoryTrait for AssetRepository {
             .await
     }
 
+    async fn create_batch(&self, new_assets: Vec<NewAsset>) -> Result<Vec<Asset>> {
+        if new_assets.is_empty() {
+            return Ok(Vec::new());
+        }
+        for asset in &new_assets {
+            asset.validate()?;
+        }
+        let assets_db: Vec<AssetDB> = new_assets.into_iter().map(|a| a.into()).collect();
+
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<Vec<Asset>> {
+                // INSERT OR IGNORE: skip assets that already exist
+                for asset_db in &assets_db {
+                    diesel::insert_into(assets::table)
+                        .values(asset_db)
+                        .on_conflict(assets::id)
+                        .do_nothing()
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
+                }
+
+                // Re-read all to return the full set
+                let ids: Vec<String> = assets_db.into_iter().map(|a| a.id).collect();
+                let results = assets::table
+                    .filter(assets::id.eq_any(&ids))
+                    .load::<AssetDB>(conn)
+                    .map_err(StorageError::from)?;
+                Ok(results.into_iter().map(|r| r.into()).collect())
+            })
+            .await
+    }
+
     /// Updates an existing asset in the database
     async fn update_profile(&self, asset_id: &str, payload: UpdateAssetProfile) -> Result<Asset> {
         payload.validate()?;
@@ -294,6 +326,46 @@ impl AssetRepositoryTrait for AssetRepository {
                     .set(assets::metadata.eq(new_metadata))
                     .execute(conn)
                     .map_err(StorageError::from)?;
+
+                Ok(())
+            })
+            .await
+    }
+
+    async fn deactivate(&self, asset_id: &str) -> Result<()> {
+        let asset_id_owned = asset_id.to_string();
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                diesel::update(assets::table.filter(assets::id.eq(&asset_id_owned)))
+                    .set(assets::is_active.eq(0))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                Ok(())
+            })
+            .await
+    }
+
+    async fn copy_user_metadata(&self, source_id: &str, target_id: &str) -> Result<()> {
+        let source_id_owned = source_id.to_string();
+        let target_id_owned = target_id.to_string();
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                // Get source asset
+                let source: AssetDB = assets::table
+                    .filter(assets::id.eq(&source_id_owned))
+                    .first(conn)
+                    .map_err(StorageError::from)?;
+
+                // Only copy notes (user-editable field) if source has content
+                // Don't overwrite target's notes if source is empty
+                if let Some(ref notes) = source.notes {
+                    if !notes.trim().is_empty() {
+                        diesel::update(assets::table.filter(assets::id.eq(&target_id_owned)))
+                            .set(assets::notes.eq(notes))
+                            .execute(conn)
+                            .map_err(StorageError::from)?;
+                    }
+                }
 
                 Ok(())
             })

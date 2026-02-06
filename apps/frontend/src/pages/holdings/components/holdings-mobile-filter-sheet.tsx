@@ -15,6 +15,7 @@ import {
 } from "@/lib/constants";
 import { Account, HoldingCategoryFilterId } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useSettingsContext } from "@/lib/settings-provider";
 import { AnimatedToggleGroup, ScrollArea, Separator } from "@wealthfolio/ui";
 
 interface HoldingsMobileFilterSheetProps {
@@ -50,6 +51,9 @@ export const HoldingsMobileFilterSheet = ({
   categoryFilter = "investments",
   setCategoryFilter,
 }: HoldingsMobileFilterSheetProps) => {
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="flex h-[85vh] flex-col rounded-t-xl">
@@ -143,15 +147,15 @@ export const HoldingsMobileFilterSheet = ({
                         : "hover:bg-muted/50",
                     )}
                     onClick={() => {
-                      onAccountChange({
-                        id: PORTFOLIO_ACCOUNT_ID,
-                        name: "All Portfolio",
-                        accountType: "PORTFOLIO" as unknown as Account["accountType"],
-                        balance: 0,
-                        currency: "USD",
-                        isDefault: false,
-                        isActive: true,
-                        createdAt: new Date(),
+                        onAccountChange({
+                          id: PORTFOLIO_ACCOUNT_ID,
+                          name: "All Portfolio",
+                          accountType: "PORTFOLIO" as unknown as Account["accountType"],
+                          balance: 0,
+                          currency: baseCurrency,
+                          isDefault: false,
+                          isActive: true,
+                          createdAt: new Date(),
                         updatedAt: new Date(),
                       } as Account);
                       onOpenChange(false);

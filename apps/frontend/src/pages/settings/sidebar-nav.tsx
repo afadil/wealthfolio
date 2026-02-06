@@ -16,17 +16,14 @@ export function SidebarNav({ className, items, ...props }: SidebarNavProps) {
   const location = useLocation();
 
   return (
-    <nav
-      className={cn("flex space-x-2 lg:flex-col lg:space-x-0 lg:space-y-0.5", className)}
-      {...props}
-    >
+    <nav className={cn("flex flex-col space-y-1", className)} {...props}>
       {items.map((item) => (
         <NavLink
           key={item.href}
           to={item.href}
           className={cn(
-            buttonVariants({ variant: "ghost", size: "sm" }),
-            "justify-start rounded-md px-2.5 py-1 text-[13px] [&_svg]:size-4",
+            buttonVariants({ variant: "ghost" }),
+            "h-9 justify-start rounded-md px-2 [&_svg]:size-4",
             location.pathname.includes(item.href) ? "bg-muted hover:bg-muted" : "hover:bg-muted/50",
           )}
         >

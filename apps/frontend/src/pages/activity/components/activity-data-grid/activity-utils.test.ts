@@ -193,7 +193,7 @@ describe("activity-utils", () => {
     const assetCurrencyLookup = new Map([
       ["AAPL", "USD"],
       ["VOD.L", "GBP"],
-      ["$CASH-EUR", "EUR"],
+      ["CASH:EUR", "EUR"],
     ]);
 
     it("should return transaction currency if set", () => {
@@ -220,8 +220,8 @@ describe("activity-utils", () => {
       const resolver = createCurrencyResolver(assetCurrencyLookup, "USD");
       const tx = createMockTransaction({
         currency: "",
-        assetId: "$CASH-EUR",
-        assetSymbol: "$CASH-EUR",
+        assetId: "CASH:EUR",
+        assetSymbol: "CASH:EUR",
         accountCurrency: "",
       });
 

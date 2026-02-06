@@ -69,8 +69,8 @@ pub use asset_id::{
 };
 pub use assets_constants::*;
 pub use assets_model::{
-    Asset, AssetKind, AssetMetadata, Country, InstrumentId, NewAsset, OptionSpec, PricingMode,
-    ProviderProfile, Sector, UpdateAssetProfile,
+    Asset, AssetKind, AssetMetadata, AssetSpec, Country, EnsureAssetsResult, InstrumentId,
+    NewAsset, OptionSpec, PricingMode, ProviderProfile, Sector, UpdateAssetProfile,
 };
 pub use assets_service::AssetService;
 pub use assets_traits::{AssetRepositoryTrait, AssetServiceTrait};

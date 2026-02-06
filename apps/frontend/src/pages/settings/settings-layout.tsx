@@ -194,7 +194,7 @@ export default function SettingsLayout() {
               <div className="space-y-6">
                 {settingsSections.map((section) => (
                   <div key={section.title} className="space-y-2">
-                    <div className="text-muted-foreground pl-2.5 text-[11px] font-semibold uppercase tracking-widest">
+                    <div className="text-muted-foreground pl-2 text-sm font-light uppercase tracking-widest">
                       {section.title}
                     </div>
                     <SidebarNav items={section.items} />

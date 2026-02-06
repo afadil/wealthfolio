@@ -27,6 +27,7 @@ use super::alternative_assets_traits::{
 };
 use super::{generate_asset_id, AssetKind, AssetRepositoryTrait, NewAsset, PricingMode};
 use crate::errors::{Error, Result, ValidationError};
+use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::quotes::{DataSource, Quote, QuoteServiceTrait};
 
 /// Service for managing alternative assets.
@@ -39,6 +40,7 @@ pub struct AlternativeAssetService {
     alternative_asset_repository: Arc<dyn AlternativeAssetRepositoryTrait>,
     asset_repository: Arc<dyn AssetRepositoryTrait>,
     quote_service: Arc<dyn QuoteServiceTrait>,
+    event_sink: Arc<dyn DomainEventSink>,
 }
 
 impl AlternativeAssetService {
@@ -52,7 +54,14 @@ impl AlternativeAssetService {
             alternative_asset_repository,
             asset_repository,
             quote_service,
+            event_sink: Arc::new(NoOpDomainEventSink),
         }
+    }
+
+    /// Sets the domain event sink for this service.
+    pub fn with_event_sink(mut self, event_sink: Arc<dyn DomainEventSink>) -> Self {
+        self.event_sink = event_sink;
+        self
     }
 
     /// Validates that the request is for an alternative asset kind.
@@ -62,6 +71,7 @@ impl AlternativeAssetService {
             | AssetKind::Vehicle
             | AssetKind::Collectible
             | AssetKind::PhysicalPrecious
+            | AssetKind::PrivateEquity
             | AssetKind::Liability
             | AssetKind::Other => Ok(()),
             _ => Err(Error::Validation(ValidationError::InvalidInput(format!(
@@ -232,6 +242,10 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
 
         let asset = self.asset_repository.create(new_asset).await?;
         debug!("Created asset: {}", asset.id);
+
+        // Emit asset created event
+        self.event_sink
+            .emit(DomainEvent::assets_created(vec![asset.id.clone()]));
 
         // 4. Create purchase/origination quote if both price and date are provided
         // This gives us historical data for charts showing value progression

@@ -90,6 +90,10 @@ mod tests {
         fn get_active_non_archived_accounts(&self) -> Result<Vec<Account>> {
             Ok(self.accounts.lock().unwrap().clone())
         }
+
+        fn get_base_currency(&self) -> Option<String> {
+            Some("USD".to_string())
+        }
     }
 
     // --- Mock AssetService ---
@@ -192,6 +196,33 @@ mod tests {
 
         async fn cleanup_legacy_metadata(&self, _asset_id: &str) -> Result<()> {
             Ok(())
+        }
+
+        async fn merge_unknown_asset(
+            &self,
+            _resolved_asset_id: &str,
+            _unknown_asset_id: &str,
+            _activity_repository: &dyn crate::activities::ActivityRepositoryTrait,
+        ) -> Result<u32> {
+            Ok(0)
+        }
+
+        async fn ensure_assets(
+            &self,
+            specs: Vec<crate::assets::AssetSpec>,
+            _activity_repository: &dyn crate::activities::ActivityRepositoryTrait,
+        ) -> Result<crate::assets::EnsureAssetsResult> {
+            let mut result = crate::assets::EnsureAssetsResult::default();
+            let assets = self.assets.lock().unwrap();
+
+            // Look up existing assets by spec ID
+            for spec in specs {
+                if let Some(asset) = assets.iter().find(|a| a.id == spec.id) {
+                    result.assets.insert(spec.id, asset.clone());
+                }
+            }
+
+            Ok(result)
         }
     }
 
@@ -301,6 +332,14 @@ mod tests {
             _to_currency: &str,
         ) -> Result<()> {
             unimplemented!()
+        }
+
+        async fn ensure_fx_pairs(&self, pairs: Vec<(String, String)>) -> Result<()> {
+            let mut registered = self.registered_pairs.lock().unwrap();
+            for (from, to) in pairs {
+                registered.insert((from, to));
+            }
+            Ok(())
         }
     }
 
@@ -688,6 +727,17 @@ mod tests {
             _activities: Vec<crate::activities::ActivityUpsert>,
         ) -> Result<crate::activities::BulkUpsertResult> {
             unimplemented!()
+        }
+
+        async fn reassign_asset(&self, _old_asset_id: &str, _new_asset_id: &str) -> Result<u32> {
+            Ok(0)
+        }
+
+        async fn get_activity_accounts_and_currencies_by_asset_id(
+            &self,
+            _asset_id: &str,
+        ) -> Result<(Vec<String>, Vec<String>)> {
+            Ok((Vec::new(), Vec::new()))
         }
     }
 
@@ -1366,8 +1416,8 @@ mod tests {
         let account = create_test_account("acc-1", "USD");
         account_service.add_account(account);
 
-        // Add crypto asset with pattern-based ID
-        let asset = create_test_asset("CRYPTO:BTC-USD:USD", "USD");
+        // Add crypto asset with normalized ID (BTC-USD -> BTC with USD quote currency)
+        let asset = create_test_asset("CRYPTO:BTC:USD", "USD");
         asset_service.add_asset(asset);
 
         let quote_service = Arc::new(MockQuoteService);
@@ -1405,7 +1455,7 @@ mod tests {
         };
 
         let result = activity_service.create_activity(new_activity).await;
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
 
         let created = result.unwrap();
         assert!(

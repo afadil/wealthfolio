@@ -87,6 +87,18 @@ pub trait ActivityRepositoryTrait: Send + Sync {
     /// Returns statistics about the operation.
     async fn bulk_upsert(&self, activities: Vec<super::ActivityUpsert>)
         -> Result<super::BulkUpsertResult>;
+
+    /// Reassigns all activities from one asset to another.
+    /// Used when merging UNKNOWN assets into resolved ones.
+    /// Returns the number of activities updated.
+    async fn reassign_asset(&self, old_asset_id: &str, new_asset_id: &str) -> Result<u32>;
+
+    /// Returns distinct account_ids and currencies for activities with the given asset_id.
+    /// Used to plan recalculations after asset merges.
+    async fn get_activity_accounts_and_currencies_by_asset_id(
+        &self,
+        asset_id: &str,
+    ) -> Result<(Vec<String>, Vec<String>)>;
 }
 
 /// Trait defining the contract for Activity service operations.
@@ -126,7 +138,6 @@ pub trait ActivityServiceTrait: Send + Sync {
         &self,
         account_id: String,
         activities: Vec<ActivityImport>,
-        dry_run: bool,
     ) -> Result<Vec<ActivityImport>>;
     async fn import_activities(
         &self,
@@ -160,4 +171,21 @@ pub trait ActivityServiceTrait: Send + Sync {
         &self,
         activities: Vec<super::ActivityUpsert>,
     ) -> Result<super::BulkUpsertResult>;
+
+    /// Prepares activities for persistence.
+    /// This is the unified entry point for all activity preparation logic.
+    ///
+    /// Steps:
+    /// 1. Batch resolve symbols → exchange MICs
+    /// 2. Compute canonical asset IDs
+    /// 3. Ensure all assets exist (batch)
+    /// 4. Register FX pairs (batch)
+    /// 5. Validate each activity
+    ///
+    /// All entry points (forms, CSV import, broker sync) should use this.
+    async fn prepare_activities(
+        &self,
+        activities: Vec<NewActivity>,
+        account: &crate::accounts::Account,
+    ) -> Result<PrepareActivitiesResult>;
 }

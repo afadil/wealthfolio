@@ -1135,7 +1135,7 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
             .iter()
             .filter_map(|a| {
                 let symbol = a.symbol.as_ref()?;
-                if symbol.starts_with("$CASH-") {
+                if symbol.starts_with("CASH:") {
                     return None;
                 }
                 if let Some(ref t) = a.activity_type {
@@ -1164,7 +1164,7 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
         // Update activities with resolved MICs
         for draft in &mut activities {
             if let Some(ref symbol) = draft.symbol {
-                if symbol.starts_with("$CASH-") {
+                if symbol.starts_with("CASH:") {
                     continue;
                 }
                 if let Some(ref t) = draft.activity_type {

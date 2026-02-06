@@ -1,6 +1,7 @@
 //! Asset domain models.
 
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::NaiveDateTime;
@@ -23,7 +24,7 @@ pub enum AssetKind {
     #[default]
     Security, // Stocks, ETFs, bonds, funds
     Crypto,           // Cryptocurrencies
-    Cash,             // Holdable cash position ($CASH-USD)
+    Cash,             // Holdable cash position (CASH:USD)
     FxRate,           // Currency exchange rate (not holdable)
     Option,           // Options contracts
     Commodity,        // Physical commodities (ETFs/futures)
@@ -612,4 +613,35 @@ impl UpdateAssetProfile {
         }
         Ok(())
     }
+}
+
+/// Specification for ensuring an asset exists.
+/// Used by `ensure_assets()` to batch-create missing assets.
+#[derive(Debug, Clone)]
+pub struct AssetSpec {
+    /// Canonical asset ID (e.g., "SEC:AAPL:XNAS")
+    pub id: String,
+    /// The symbol/ticker
+    pub symbol: String,
+    /// Exchange MIC code for securities
+    pub exchange_mic: Option<String>,
+    /// Currency for the asset
+    pub currency: String,
+    /// Asset kind (Security, Crypto, etc.)
+    pub kind: AssetKind,
+    /// Optional pricing mode override
+    pub pricing_mode: Option<PricingMode>,
+    /// User-provided name
+    pub name: Option<String>,
+}
+
+/// Result of ensuring assets exist via `ensure_assets()`.
+#[derive(Debug, Default)]
+pub struct EnsureAssetsResult {
+    /// All assets (existing + created), keyed by asset ID
+    pub assets: HashMap<String, Asset>,
+    /// IDs of newly created assets
+    pub created_ids: Vec<String>,
+    /// Merge candidates: (resolved_id, unknown_id) pairs where UNKNOWN was merged into resolved
+    pub merge_candidates: Vec<(String, String)>,
 }

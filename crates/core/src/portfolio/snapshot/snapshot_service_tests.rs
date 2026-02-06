@@ -141,6 +141,10 @@ mod tests {
         ) -> AppResult<()> {
             Ok(())
         }
+
+        async fn ensure_fx_pairs(&self, _pairs: Vec<(String, String)>) -> AppResult<()> {
+            Ok(())
+        }
     }
 
     #[derive(Clone, Debug)]
@@ -205,6 +209,10 @@ mod tests {
             unimplemented!("create not implemented for MockAssetRepository")
         }
 
+        async fn create_batch(&self, _new_assets: Vec<NewAsset>) -> AppResult<Vec<Asset>> {
+            unimplemented!("create_batch not implemented for MockAssetRepository")
+        }
+
         async fn update_profile(
             &self,
             _asset_id: &str,
@@ -250,6 +258,14 @@ mod tests {
         }
 
         async fn cleanup_legacy_metadata(&self, _asset_id: &str) -> AppResult<()> {
+            Ok(())
+        }
+
+        async fn deactivate(&self, _asset_id: &str) -> AppResult<()> {
+            Ok(())
+        }
+
+        async fn copy_user_metadata(&self, _source_id: &str, _target_id: &str) -> AppResult<()> {
             Ok(())
         }
     }
@@ -436,6 +452,17 @@ mod tests {
         ) -> AppResult<crate::activities::BulkUpsertResult> {
             unimplemented!()
         }
+
+        async fn reassign_asset(&self, _old_asset_id: &str, _new_asset_id: &str) -> AppResult<u32> {
+            Ok(0)
+        }
+
+        async fn get_activity_accounts_and_currencies_by_asset_id(
+            &self,
+            _asset_id: &str,
+        ) -> AppResult<(Vec<String>, Vec<String>)> {
+            Ok((Vec::new(), Vec::new()))
+        }
     }
 
     #[derive(Clone, Debug)]
@@ -572,6 +599,17 @@ mod tests {
             _activities: Vec<crate::activities::ActivityUpsert>,
         ) -> AppResult<crate::activities::BulkUpsertResult> {
             unimplemented!()
+        }
+
+        async fn reassign_asset(&self, _old_asset_id: &str, _new_asset_id: &str) -> AppResult<u32> {
+            Ok(0)
+        }
+
+        async fn get_activity_accounts_and_currencies_by_asset_id(
+            &self,
+            _asset_id: &str,
+        ) -> AppResult<(Vec<String>, Vec<String>)> {
+            Ok((Vec::new(), Vec::new()))
         }
     }
 
@@ -1282,7 +1320,7 @@ mod tests {
         let act1 = create_test_activity(
             "act1",
             &acc.id,
-            Some("$CASH-CAD"),
+            Some("CASH:CAD"),
             "DEPOSIT",
             d1,
             None,
@@ -1293,7 +1331,7 @@ mod tests {
         let act2 = create_test_activity(
             "act2",
             &acc.id,
-            Some("$CASH-CAD"),
+            Some("CASH:CAD"),
             "DEPOSIT",
             d2,
             None,
@@ -1335,7 +1373,7 @@ mod tests {
         let act = create_test_activity(
             "act1",
             &acc.id,
-            Some("$CASH-CAD"),
+            Some("CASH:CAD"),
             "DEPOSIT",
             activity_date,
             None,
@@ -1384,7 +1422,7 @@ mod tests {
         let dep1 = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-CAD"),
+            Some("CASH:CAD"),
             "DEPOSIT",
             d1,
             None,
@@ -1395,7 +1433,7 @@ mod tests {
         let dividend = create_test_activity(
             "div1",
             &acc.id,
-            Some("$CASH-CAD"),
+            Some("CASH:CAD"),
             "DIVIDEND",
             d2,
             None,
@@ -1406,7 +1444,7 @@ mod tests {
         let dep2 = create_test_activity(
             "dep2",
             &acc.id,
-            Some("$CASH-CAD"),
+            Some("CASH:CAD"),
             "DEPOSIT",
             d2,
             None,
@@ -1478,7 +1516,7 @@ mod tests {
         let deposit = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -1552,7 +1590,7 @@ mod tests {
         let deposit = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -1643,7 +1681,7 @@ mod tests {
         let deposit = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -1655,7 +1693,7 @@ mod tests {
         let withdrawal = create_test_activity(
             "wd1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "WITHDRAWAL",
             d2,
             None,
@@ -1712,7 +1750,7 @@ mod tests {
         let deposit = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -1776,7 +1814,7 @@ mod tests {
         let deposit = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -1788,7 +1826,7 @@ mod tests {
         let interest = create_test_activity(
             "int1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "INTEREST",
             d2,
             None,
@@ -1842,7 +1880,7 @@ mod tests {
         let deposit = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -1854,7 +1892,7 @@ mod tests {
         let fee = create_test_activity(
             "fee1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "FEE",
             d2,
             None,
@@ -1906,7 +1944,7 @@ mod tests {
         let deposit = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -1918,7 +1956,7 @@ mod tests {
         let tax = create_test_activity(
             "tax1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "TAX",
             d2,
             None,
@@ -1974,7 +2012,7 @@ mod tests {
         let deposit = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -1987,7 +2025,7 @@ mod tests {
         let mut credit_bonus = create_test_activity(
             "credit1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "CREDIT",
             d2,
             None,
@@ -2045,7 +2083,7 @@ mod tests {
         let deposit = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -2058,7 +2096,7 @@ mod tests {
         let mut credit_rebate = create_test_activity(
             "credit1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "CREDIT",
             d2,
             None,
@@ -2116,7 +2154,7 @@ mod tests {
         let deposit = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -2129,7 +2167,7 @@ mod tests {
         let credit = create_test_activity(
             "credit1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "CREDIT",
             d2,
             None,
@@ -2303,7 +2341,7 @@ mod tests {
         let deposit = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -2388,7 +2426,7 @@ mod tests {
         let deposit = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-CAD"),
+            Some("CASH:CAD"),
             "DEPOSIT",
             d1,
             None,
@@ -2463,7 +2501,7 @@ mod tests {
         let dep1 = create_test_activity(
             "dep1",
             &acc1.id,
-            Some("$CASH-CAD"),
+            Some("CASH:CAD"),
             "DEPOSIT",
             d1,
             None,
@@ -2475,7 +2513,7 @@ mod tests {
         let dep2 = create_test_activity(
             "dep2",
             &acc2.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -2541,7 +2579,7 @@ mod tests {
         let dep1 = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -2553,7 +2591,7 @@ mod tests {
         let dep2 = create_test_activity(
             "dep2",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d2,
             None,
@@ -2565,7 +2603,7 @@ mod tests {
         let dep3 = create_test_activity(
             "dep3",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d3,
             None,
@@ -2621,7 +2659,7 @@ mod tests {
         let dep1 = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -2633,7 +2671,7 @@ mod tests {
         let dep2 = create_test_activity(
             "dep2",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d2,
             None,
@@ -2702,7 +2740,7 @@ mod tests {
         let dep1 = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -2714,7 +2752,7 @@ mod tests {
         let dep2 = create_test_activity(
             "dep2",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d2,
             None,
@@ -2765,7 +2803,7 @@ mod tests {
         let dep1 = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -2847,7 +2885,7 @@ mod tests {
         let dep = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -2871,7 +2909,7 @@ mod tests {
         let fee = create_test_activity(
             "fee1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "FEE",
             d1,
             None,
@@ -2920,7 +2958,7 @@ mod tests {
         let dep1 = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -2932,7 +2970,7 @@ mod tests {
         let dep2 = create_test_activity(
             "dep2",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d2,
             None,
@@ -3004,7 +3042,7 @@ mod tests {
         let dep_cad = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-CAD"),
+            Some("CASH:CAD"),
             "DEPOSIT",
             d1,
             None,
@@ -3017,7 +3055,7 @@ mod tests {
         let dep_usd = create_test_activity(
             "dep2",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -3074,7 +3112,7 @@ mod tests {
         let deposit = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -3138,7 +3176,7 @@ mod tests {
         let deposit = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -3224,7 +3262,7 @@ mod tests {
         let dep1 = create_test_activity(
             "dep1",
             &acc1.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -3236,7 +3274,7 @@ mod tests {
         let dep2 = create_test_activity(
             "dep2",
             &acc2.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,
@@ -3289,7 +3327,7 @@ mod tests {
         let deposit = create_test_activity(
             "dep1",
             &acc.id,
-            Some("$CASH-USD"),
+            Some("CASH:USD"),
             "DEPOSIT",
             d1,
             None,

@@ -143,8 +143,12 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     db::run_migrations(&pool)?;
     let writer = write_actor::spawn_writer((*pool).clone());
 
+    // Domain event sink - two-phase initialization to handle circular dependencies
+    // Phase 1: Create the sink (can receive events immediately, buffers until worker starts)
+    let domain_event_sink = Arc::new(WebDomainEventSink::new());
+
     let fx_repo = Arc::new(FxRepository::new(pool.clone(), writer.clone()));
-    let fx_service = Arc::new(FxService::new(fx_repo));
+    let fx_service = Arc::new(FxService::new(fx_repo).with_event_sink(domain_event_sink.clone()));
     fx_service.initialize()?;
 
     let settings_repo = Arc::new(SettingsRepository::new(pool.clone(), writer.clone()));
@@ -154,10 +158,6 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     ));
     let settings = settings_service.get_settings()?;
     let base_currency = Arc::new(RwLock::new(settings.base_currency));
-
-    // Domain event sink - two-phase initialization to handle circular dependencies
-    // Phase 1: Create the sink (can receive events immediately, buffers until worker starts)
-    let domain_event_sink = Arc::new(WebDomainEventSink::new());
 
     let account_repo = Arc::new(AccountRepository::new(pool.clone(), writer.clone()));
     let account_service = Arc::new(AccountService::new(
@@ -302,13 +302,15 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             alternative_asset_repository.clone(),
             asset_repository.clone(),
             quote_service.clone(),
-        ));
+        )
+        .with_event_sink(domain_event_sink.clone()));
 
     // Connect sync service for broker data synchronization
     let platform_repository = Arc::new(PlatformRepository::new(pool.clone(), writer.clone()));
     let connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync> = Arc::new(
         BrokerSyncService::new(
             account_service.clone(),
+            asset_service.clone(),
             platform_repository,
             pool.clone(),
             writer.clone(),

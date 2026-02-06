@@ -3,6 +3,7 @@ import { GoalOperations } from "./goal-operations";
 import type { Goal } from "@/lib/types";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { formatAmount } from "@wealthfolio/ui";
+import { useSettingsContext } from "@/lib/settings-provider";
 
 export interface GoalItemProps {
   goal: Goal;
@@ -11,6 +12,9 @@ export interface GoalItemProps {
 }
 
 export function GoalItem({ goal, onEdit, onDelete }: GoalItemProps) {
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
+
   return (
     <div className="flex items-center justify-between p-4">
       <div className="grid gap-1">
@@ -26,7 +30,7 @@ export function GoalItem({ goal, onEdit, onDelete }: GoalItemProps) {
           ) : (
             <Icons.Goal className="text-success mr-1 h-5" />
           )}
-          <span className="text-md">{formatAmount(goal.targetAmount, "USD", false)}</span>
+          <span className="text-md">{formatAmount(goal.targetAmount, baseCurrency, false)}</span>
         </div>
 
         <GoalOperations goal={goal} onEdit={onEdit} onDelete={onDelete} />

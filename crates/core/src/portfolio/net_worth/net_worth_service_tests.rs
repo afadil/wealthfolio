@@ -95,6 +95,10 @@ impl AssetRepositoryTrait for MockAssetRepository {
         unimplemented!()
     }
 
+    async fn create_batch(&self, _new_assets: Vec<NewAsset>) -> Result<Vec<Asset>> {
+        unimplemented!()
+    }
+
     async fn update_profile(&self, _asset_id: &str, _payload: UpdateAssetProfile) -> Result<Asset> {
         unimplemented!()
     }
@@ -135,6 +139,14 @@ impl AssetRepositoryTrait for MockAssetRepository {
     }
 
     async fn cleanup_legacy_metadata(&self, _asset_id: &str) -> Result<()> {
+        Ok(())
+    }
+
+    async fn deactivate(&self, _asset_id: &str) -> Result<()> {
+        Ok(())
+    }
+
+    async fn copy_user_metadata(&self, _source_id: &str, _target_id: &str) -> Result<()> {
         Ok(())
     }
 }
@@ -654,6 +666,10 @@ impl FxServiceTrait for MockFxService {
         _from_currency: &str,
         _to_currency: &str,
     ) -> Result<()> {
+        Ok(())
+    }
+
+    async fn ensure_fx_pairs(&self, _pairs: Vec<(String, String)>) -> Result<()> {
         Ok(())
     }
 }

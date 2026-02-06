@@ -8,6 +8,7 @@ import { isAfter, parseISO, subMonths } from "date-fns";
 import { useMemo, useState } from "react";
 
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { useSettingsContext } from "@/lib/settings-provider";
 
 interface ValuationArgs {
   accountId?: string;
@@ -37,14 +38,14 @@ const getInitialDateRange = (): DateRange => ({
 /**
  * Normalize backend result to consistent shape, handling both camelCase and snake_case.
  */
-const normalizeResult = (result: unknown): ValuationResult | null => {
+const normalizeResult = (result: unknown, fallbackCurrency: string): ValuationResult | null => {
   if (!result) {
     return null;
   }
 
   if (typeof result === "string") {
     try {
-      return normalizeResult(JSON.parse(result));
+      return normalizeResult(JSON.parse(result), fallbackCurrency);
     } catch {
       return null;
     }
@@ -60,7 +61,7 @@ const normalizeResult = (result: unknown): ValuationResult | null => {
     (candidate.baseCurrency as string | undefined) ??
     (candidate.base_currency as string | undefined) ??
     (candidate.currency as string | undefined) ??
-    "USD";
+    fallbackCurrency;
 
   const valuations: ValuationPoint[] = valuationsRaw
     .map((entry) => entry as Record<string, unknown>)
@@ -114,10 +115,12 @@ export const ValuationToolUI = makeAssistantToolUI<ValuationArgs, ValuationResul
 type ValuationContentProps = ToolCallMessagePartProps<ValuationArgs, ValuationResult>;
 
 function ValuationContent({ args, result, status }: ValuationContentProps) {
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
   const [period, setPeriod] = useState<TimePeriod>("3M");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(getInitialDateRange());
 
-  const parsed = normalizeResult(result);
+  const parsed = normalizeResult(result, baseCurrency);
 
   const chartData = useMemo(() => {
     if (!parsed?.valuations) return [];

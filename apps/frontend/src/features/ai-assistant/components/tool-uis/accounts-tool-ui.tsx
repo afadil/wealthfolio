@@ -2,6 +2,7 @@ import type { ToolCallMessagePartProps } from "@assistant-ui/react";
 import { makeAssistantToolUI } from "@assistant-ui/react";
 import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton } from "@wealthfolio/ui";
 import { useMemo } from "react";
+import { useSettingsContext } from "@/lib/settings-provider";
 
 // ============================================================================
 // Types
@@ -44,7 +45,7 @@ function safeString(value: unknown, fallback: string): string {
  * Normalizes the result to handle both wrapped and unwrapped formats.
  * The backend may return data in different shapes depending on the context.
  */
-function normalizeResult(result: unknown): GetAccountsResult | null {
+function normalizeResult(result: unknown, fallbackCurrency: string): GetAccountsResult | null {
   if (!result) {
     return null;
   }
@@ -52,7 +53,7 @@ function normalizeResult(result: unknown): GetAccountsResult | null {
   // Handle string (JSON) format
   if (typeof result === "string") {
     try {
-      return normalizeResult(JSON.parse(result));
+      return normalizeResult(JSON.parse(result), fallbackCurrency);
     } catch {
       return null;
     }
@@ -68,13 +69,13 @@ function normalizeResult(result: unknown): GetAccountsResult | null {
   if ("data" in candidate && typeof candidate.data === "object" && candidate.data !== null) {
     const data = candidate.data as Record<string, unknown>;
     if (Array.isArray(data.accounts)) {
-      return normalizeAccountsResult(data);
+      return normalizeAccountsResult(data, fallbackCurrency);
     }
   }
 
   // Handle direct format: { accounts: [...], count: ... }
   if (Array.isArray(candidate.accounts)) {
-    return normalizeAccountsResult(candidate);
+    return normalizeAccountsResult(candidate, fallbackCurrency);
   }
 
   return null;
@@ -83,7 +84,10 @@ function normalizeResult(result: unknown): GetAccountsResult | null {
 /**
  * Normalizes a candidate object with accounts array to GetAccountsResult.
  */
-function normalizeAccountsResult(candidate: Record<string, unknown>): GetAccountsResult {
+function normalizeAccountsResult(
+  candidate: Record<string, unknown>,
+  fallbackCurrency: string,
+): GetAccountsResult {
   const accountsRaw = candidate.accounts as unknown[];
 
   const accounts: AccountDto[] = accountsRaw
@@ -92,7 +96,7 @@ function normalizeAccountsResult(candidate: Record<string, unknown>): GetAccount
       id: safeString(item.id ?? item.Id, ""),
       name: safeString(item.name ?? item.Name, "Unknown"),
       accountType: safeString(item.accountType ?? item.account_type ?? item.AccountType, "Unknown"),
-      currency: safeString(item.currency ?? item.Currency, "USD"),
+      currency: safeString(item.currency ?? item.Currency, fallbackCurrency),
       isActive: Boolean(item.isActive ?? item.is_active ?? item.IsActive ?? true),
     }));
 
@@ -194,7 +198,9 @@ function ErrorState({ message }: { message?: string }) {
 type AccountsToolUIContentProps = ToolCallMessagePartProps<GetAccountsArgs, GetAccountsResult>;
 
 function AccountsToolUIContent({ result, status }: AccountsToolUIContentProps) {
-  const parsed = useMemo(() => normalizeResult(result), [result]);
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
+  const parsed = useMemo(() => normalizeResult(result, baseCurrency), [baseCurrency, result]);
 
   // Group accounts by currency for the summary - must be before early returns
   const currencySummary = useMemo(() => {

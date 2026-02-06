@@ -8,10 +8,9 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-  Icons,
   type SymbolSearchResult,
 } from "@wealthfolio/ui";
-import { cn } from "@/lib/utils";
+
 import {
   ActivityType,
   ActivityTypeNames,
@@ -81,70 +80,30 @@ const STATUS_CONFIG: Record<DraftActivityStatus, StatusConfig> = {
 // Cell Components
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface StatusCellProps {
-  status: DraftActivityStatus;
-  skipReason?: string;
-  duplicateOfId?: string;
-  errors?: Record<string, string[]>;
+function getStatusTitle(
+  status: DraftActivityStatus,
+  skipReason?: string,
+  duplicateOfId?: string,
+  errors?: Record<string, string[]>,
+): string | undefined {
+  if (status === "valid") return undefined;
+  if (status === "skipped" && skipReason) return skipReason;
+  if (status === "duplicate" && duplicateOfId) return `Duplicate of: ${duplicateOfId}`;
+  if (errors) {
+    return Object.entries(errors)
+      .flatMap(([field, msgs]) => msgs.map((msg) => `${field}: ${msg}`))
+      .join("\n");
+  }
+  return STATUS_CONFIG[status].label;
 }
 
-function StatusCell({ status, skipReason, duplicateOfId, errors }: StatusCellProps) {
-  const config = STATUS_CONFIG[status];
-
-  const tooltipContent = useMemo(() => {
-    if (status === "skipped" && skipReason) {
-      return skipReason;
-    }
-    if (status === "duplicate" && duplicateOfId) {
-      return `Duplicate of activity: ${duplicateOfId}`;
-    }
-    if (status === "error" && errors) {
-      const errorMessages = Object.values(errors).flat();
-      if (errorMessages.length > 0) {
-        return errorMessages.join(", ");
-      }
-    }
-    return config.label;
-  }, [status, skipReason, duplicateOfId, errors, config.label]);
-
-  // Render appropriate icon based on status
-  const StatusIcon = useMemo(() => {
-    switch (status) {
-      case "valid":
-        return <Icons.CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />;
-      case "warning":
-        return <Icons.AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />;
-      case "error":
-        return <Icons.XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />;
-      case "skipped":
-        return <Icons.MinusCircle className="text-muted-foreground h-4 w-4" />;
-      case "duplicate":
-        return <Icons.Copy className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
-      default:
-        return null;
-    }
-  }, [status]);
-
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div
-            className={cn(
-              "flex h-full w-full items-center justify-center rounded",
-              config.bgClassName,
-            )}
-          >
-            {StatusIcon}
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="right" className="max-w-xs">
-          <p>{tooltipContent}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
-}
+const STATUS_DOT_COLOR: Record<DraftActivityStatus, string> = {
+  valid: "",
+  error: "bg-red-500",
+  warning: "bg-yellow-500",
+  duplicate: "bg-blue-500",
+  skipped: "bg-gray-400",
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Column Definitions
@@ -227,18 +186,39 @@ function useImportReviewColumns({
       // 2. Status indicator (row number + validation status)
       {
         id: "status",
-        header: "#",
-        cell: ({ row }) => (
-          <div className="flex items-center gap-1.5">
-            <span className="text-muted-foreground w-5 text-xs">{row.original.rowIndex + 1}</span>
-            <StatusCell
-              status={row.original.status}
-              skipReason={row.original.skipReason}
-              duplicateOfId={row.original.duplicateOfId}
-              errors={row.original.errors}
-            />
-          </div>
-        ),
+        header: () => "#",
+        cell: ({ row }) => {
+          const { status, skipReason, duplicateOfId, errors, rowIndex } = row.original;
+          const title = getStatusTitle(status, skipReason, duplicateOfId, errors);
+          const dotColor = STATUS_DOT_COLOR[status];
+          const dot = dotColor ? (
+            <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${dotColor}`} />
+          ) : null;
+          return (
+            <div className="flex items-center gap-1.5">
+              <span className="text-muted-foreground w-5 text-xs">{rowIndex + 1}</span>
+              {dot && title ? (
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>{dot}</TooltipTrigger>
+                    <TooltipContent
+                      side="right"
+                      className={
+                        status === "error"
+                          ? "bg-destructive text-destructive-foreground border-destructive max-w-xs whitespace-pre-wrap text-xs"
+                          : "max-w-xs whitespace-pre-wrap text-xs"
+                      }
+                    >
+                      {title}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                dot
+              )}
+            </div>
+          );
+        },
         size: 70,
         minSize: 70,
         maxSize: 70,
@@ -491,6 +471,23 @@ export function ImportReviewGrid({
   // Close context menu
   const handleContextMenuOpenChange = useCallback((open: boolean) => {
     setContextMenu((prev) => ({ ...prev, open }));
+  }, []);
+
+  // Handle horizontal scroll with mouse wheel (Shift + wheel or just wheel)
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    const target = e.currentTarget.querySelector('[data-slot="grid"]') as HTMLElement;
+    if (!target) return;
+
+    // If user is scrolling horizontally with trackpad (deltaX), let it happen naturally
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+      return;
+    }
+
+    // Convert vertical scroll to horizontal when Shift is pressed
+    if (e.shiftKey && e.deltaY !== 0) {
+      e.preventDefault();
+      target.scrollLeft += e.deltaY;
+    }
   }, []);
 
   // Bulk action handlers
@@ -767,7 +764,7 @@ export function ImportReviewGrid({
       />
 
       {/* Data grid with context menu support */}
-      <div className="min-h-0 flex-1 overflow-hidden" onContextMenu={handleContextMenu}>
+      <div className="min-h-0 flex-1" onContextMenu={handleContextMenu} onWheel={handleWheel}>
         <DataGrid {...dataGrid} stretchColumns height="calc(100vh - 360px)" className="text-sm" />
       </div>
 

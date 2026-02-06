@@ -138,9 +138,9 @@ const RANDOM_ID_LENGTH: usize = 8;
 const ALPHABET: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
 /// Regex pattern for validating alternative asset IDs
-/// Format: ^(PROP|VEH|COLL|PREC|LIAB|ALT):[a-zA-Z0-9]{8}$
+/// Format: ^(PROP|VEH|COLL|PREC|LIAB|ALT|PEQ):[a-zA-Z0-9]{8}$
 static ALTERNATIVE_ASSET_ID_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^(PROP|VEH|COLL|PREC|LIAB|ALT):[a-zA-Z0-9]{8}$").unwrap());
+    LazyLock::new(|| Regex::new(r"^(PROP|VEH|COLL|PREC|LIAB|ALT|PEQ):[a-zA-Z0-9]{8}$").unwrap());
 
 // ============================================================================
 // PARSED ASSET ID
@@ -297,6 +297,7 @@ pub fn canonical_asset_id(
         AssetKind::Security => {
             let mic = exchange_mic
                 .map(|m| m.trim().to_uppercase())
+                .filter(|m| !m.is_empty())
                 .unwrap_or_else(|| "UNKNOWN".to_string());
             format!("{}:{}:{}", SECURITY_PREFIX, sym, mic)
         }
@@ -304,6 +305,7 @@ pub fn canonical_asset_id(
         AssetKind::Option => {
             let mic = exchange_mic
                 .map(|m| m.trim().to_uppercase())
+                .filter(|m| !m.is_empty())
                 .unwrap_or_else(|| "UNKNOWN".to_string());
             format!("{}:{}:{}", OPTION_PREFIX, sym, mic)
         }
@@ -723,7 +725,7 @@ pub fn try_generate_asset_id(kind: &AssetKind) -> Option<String> {
 
 /// Validates whether a string is a valid alternative asset ID.
 ///
-/// A valid ID must match the pattern: `^(PROP|VEH|COLL|PREC|LIAB|ALT):[a-zA-Z0-9]{8}$`
+/// A valid ID must match the pattern: `^(PROP|VEH|COLL|PREC|LIAB|ALT|PEQ):[a-zA-Z0-9]{8}$`
 ///
 /// # Arguments
 ///
@@ -1453,12 +1455,12 @@ mod tests {
         // Empty exchange MIC falls back to UNKNOWN
         assert_eq!(
             canonical_asset_id(&AssetKind::Security, "AAPL", Some(""), "USD"),
-            "SEC:AAPL:"
+            "SEC:AAPL:UNKNOWN"
         );
-        // Whitespace-only exchange MIC is trimmed to empty (not UNKNOWN)
+        // Whitespace-only exchange MIC is trimmed to empty, falls back to UNKNOWN
         assert_eq!(
             canonical_asset_id(&AssetKind::Security, "AAPL", Some("   "), "USD"),
-            "SEC:AAPL:"
+            "SEC:AAPL:UNKNOWN"
         );
         // None exchange falls back to UNKNOWN
         assert_eq!(

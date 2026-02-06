@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 
-type AlertVariant = "warning" | "success" | "destructive";
+type AlertVariant = "warning" | "success" | "destructive" | "info";
 type AlertSize = "sm" | "lg" | "xl";
 
 interface ImportAlertProps {
@@ -41,6 +41,9 @@ export function ImportAlert({
       case "destructive":
         Icon = Icons.AlertCircle;
         break;
+      case "info":
+        Icon = Icons.Info;
+        break;
     }
   }
 
@@ -71,6 +74,15 @@ export function ImportAlert({
       bg: "bg-destructive/10",
       title: "text-destructive",
       description: "text-foreground/90",
+      glow: "",
+    },
+    info: {
+      iconBg: "bg-primary/15",
+      iconColor: "text-primary",
+      borderColor: "border-primary/10",
+      bg: "bg-primary/5",
+      title: "text-foreground",
+      description: "text-muted-foreground",
       glow: "",
     },
   };

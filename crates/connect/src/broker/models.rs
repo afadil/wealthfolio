@@ -580,8 +580,9 @@ pub struct SyncResult {
 }
 
 impl BrokerAccount {
-    /// Get the currency, preferring the direct currency field, then balance currency, defaulting to USD
-    pub fn get_currency(&self) -> String {
+    /// Get the currency, preferring the direct currency field, then balance currency,
+    /// then base currency if provided, defaulting to USD.
+    pub fn get_currency(&self, base_currency: Option<&str>) -> String {
         // First try the direct currency field (new API)
         if let Some(ref currency) = self.currency {
             if !currency.is_empty() {
@@ -592,6 +593,7 @@ impl BrokerAccount {
         self.balance
             .as_ref()
             .and_then(|b| b.currency.clone())
+            .or_else(|| base_currency.filter(|c| !c.is_empty()).map(|c| c.to_string()))
             .unwrap_or_else(|| "USD".to_string())
     }
 

@@ -34,42 +34,9 @@ import { HoldingsReviewStep } from "./steps/holdings-review-step";
 import { HoldingsConfirmStep } from "./steps/holdings-confirm-step";
 
 // Constants
-import { IMPORT_REQUIRED_FIELDS, ImportFormat, ActivityType } from "@/lib/constants";
-
-// Activity types where symbol is optional (can be cash or asset-related)
-const NO_SYMBOL_REQUIRED_ACTIVITY_TYPES = [
-  ActivityType.DEPOSIT,
-  ActivityType.WITHDRAWAL,
-  ActivityType.FEE,
-  ActivityType.TAX,
-  ActivityType.INTEREST, // Can be cash interest or bond/asset interest
-  ActivityType.TRANSFER_IN, // Can be cash or share transfer
-  ActivityType.TRANSFER_OUT,
-] as const;
-
-// Smart defaults for activity type mapping (duplicated from mapping-step-v2 for validation)
-const ACTIVITY_TYPE_SMART_DEFAULTS: Record<string, string> = {
-  BUY: ActivityType.BUY,
-  PURCHASE: ActivityType.BUY,
-  BOUGHT: ActivityType.BUY,
-  SELL: ActivityType.SELL,
-  SOLD: ActivityType.SELL,
-  DIVIDEND: ActivityType.DIVIDEND,
-  DIV: ActivityType.DIVIDEND,
-  DEPOSIT: ActivityType.DEPOSIT,
-  WITHDRAWAL: ActivityType.WITHDRAWAL,
-  WITHDRAW: ActivityType.WITHDRAWAL,
-  FEE: ActivityType.FEE,
-  TAX: ActivityType.TAX,
-  TRANSFER_IN: ActivityType.TRANSFER_IN,
-  TRANSFER: ActivityType.TRANSFER_IN,
-  TRANSFER_OUT: ActivityType.TRANSFER_OUT,
-  INTEREST: ActivityType.INTEREST,
-  INT: ActivityType.INTEREST,
-  SPLIT: ActivityType.SPLIT,
-  CREDIT: ActivityType.CREDIT,
-  ADJUSTMENT: ActivityType.ADJUSTMENT,
-};
+import { IMPORT_REQUIRED_FIELDS, ImportFormat } from "@/lib/constants";
+import { isSymbolRequired } from "@/lib/activity-utils";
+import { validateTickerSymbol, findMappedActivityType } from "./utils/validation-utils";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Step Configuration
@@ -79,8 +46,7 @@ const STEPS: WizardStep[] = [
   { id: "upload", label: "Upload" },
   { id: "mapping", label: "Mapping" },
   { id: "review", label: "Review" },
-  { id: "confirm", label: "Confirm" },
-  { id: "result", label: "Result" },
+  { id: "confirm", label: "Import" },
 ];
 
 const STEP_COMPONENTS: Record<ImportStep, React.ComponentType> = {
@@ -104,8 +70,7 @@ const HOLDINGS_STEPS: WizardStep[] = [
   { id: "upload", label: "Upload" },
   { id: "mapping", label: "Mapping" },
   { id: "review", label: "Review" },
-  { id: "confirm", label: "Confirm" },
-  { id: "result", label: "Result" },
+  { id: "confirm", label: "Import" },
 ];
 
 // Holdings import required fields
@@ -114,65 +79,6 @@ const HOLDINGS_REQUIRED_FIELDS: HoldingsFormat[] = [
   HoldingsFormat.SYMBOL,
   HoldingsFormat.QUANTITY,
 ];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Validation Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Find the mapped activity type for a CSV value (explicit mapping or smart default)
- * Returns null if no mapping found
- */
-function findMappedActivityType(
-  csvValue: string,
-  activityMappings: Record<string, string[]>,
-): string | null {
-  const normalized = csvValue.trim().toUpperCase();
-
-  // Check explicit mappings first
-  for (const [activityType, csvValues] of Object.entries(activityMappings)) {
-    if (csvValues?.some((v) => normalized.startsWith(v.trim().toUpperCase()))) {
-      return activityType;
-    }
-  }
-
-  // Check smart defaults - exact match
-  if (ACTIVITY_TYPE_SMART_DEFAULTS[normalized]) {
-    return ACTIVITY_TYPE_SMART_DEFAULTS[normalized];
-  }
-
-  // Check smart defaults - partial match
-  for (const [key, value] of Object.entries(ACTIVITY_TYPE_SMART_DEFAULTS)) {
-    if (normalized.startsWith(key) || normalized.includes(key)) {
-      return value;
-    }
-  }
-
-  return null;
-}
-
-/**
- * Check if an activity type value has a mapping (explicit or smart default)
- */
-function hasActivityTypeMapping(
-  csvValue: string,
-  activityMappings: Record<string, string[]>,
-): boolean {
-  return findMappedActivityType(csvValue, activityMappings) !== null;
-}
-
-/**
- * Check if a symbol is resolved (valid format or has explicit mapping)
- */
-function isSymbolResolved(csvSymbol: string, symbolMappings: Record<string, string>): boolean {
-  // Has explicit mapping
-  if (symbolMappings[csvSymbol]) {
-    return true;
-  }
-  // Valid symbol format (1-10 alphanumeric chars, optionally with dots/hyphens)
-  const isValidFormat = /^[A-Z0-9]{1,10}([.-][A-Z0-9]+){0,2}$/.test(csvSymbol.trim());
-  return isValidFormat;
-}
 
 /**
  * Check if a step can proceed to the next step (for activity import)
@@ -211,16 +117,14 @@ function useStepValidation(isHoldingsMode: boolean) {
         if (activityTypeColumn) {
           const headerIndex = headers.indexOf(activityTypeColumn);
           if (headerIndex !== -1) {
-            // Get unique activity type values from data
             const uniqueValues = new Set<string>();
             parsedRows.forEach((row) => {
               const value = row[headerIndex]?.trim();
               if (value) uniqueValues.add(value);
             });
 
-            // Check if any values are unmapped
             for (const value of uniqueValues) {
-              if (!hasActivityTypeMapping(value, mapping.activityMappings || {})) {
+              if (!findMappedActivityType(value, mapping.activityMappings || {})) {
                 return false;
               }
             }
@@ -235,42 +139,29 @@ function useStepValidation(isHoldingsMode: boolean) {
           const activityHeaderIndex = activityTypeCol ? headers.indexOf(activityTypeCol) : -1;
 
           if (symbolHeaderIndex !== -1) {
-            // Get unique symbol values from activities that require symbols
             const symbolsNeedingResolution = new Set<string>();
 
             parsedRows.forEach((row) => {
               const symbol = row[symbolHeaderIndex]?.trim();
               if (!symbol) return;
 
-              // Determine if this row's activity type requires a symbol
-              let requiresSymbol = true;
+              // Skip symbols that don't need mapping
               if (activityHeaderIndex !== -1) {
                 const csvActivityType = row[activityHeaderIndex]?.trim();
                 if (csvActivityType) {
-                  // Find the mapped activity type (explicit or smart default)
                   const mappedType = findMappedActivityType(
                     csvActivityType,
                     mapping.activityMappings || {},
                   );
-
-                  if (
-                    mappedType &&
-                    (NO_SYMBOL_REQUIRED_ACTIVITY_TYPES as readonly string[]).includes(mappedType)
-                  ) {
-                    requiresSymbol = false;
-                  }
+                  if (mappedType && !isSymbolRequired(mappedType, symbol)) return;
                 }
               }
 
-              // Only require symbol resolution for activities that need symbols
-              if (requiresSymbol) {
-                symbolsNeedingResolution.add(symbol);
-              }
+              symbolsNeedingResolution.add(symbol);
             });
 
-            // Check if any non-cash symbols are unresolved
             for (const symbol of symbolsNeedingResolution) {
-              if (!isSymbolResolved(symbol, mapping.symbolMappings || {})) {
+              if (!mapping.symbolMappings?.[symbol] && !validateTickerSymbol(symbol)) {
                 return false;
               }
             }
@@ -437,10 +328,12 @@ function ImportWizardContent() {
         <ErrorBoundary>
           <div className="px-2 pb-6 pt-2 sm:px-4 sm:pt-4 md:px-6 md:pt-6">
             <Card className="w-full">
-              {/* Step indicator */}
-              <CardHeader className="border-b px-3 py-3 sm:px-6 sm:py-4">
-                <WizardStepIndicator steps={steps} currentStep={state.step} />
-              </CardHeader>
+              {/* Step indicator — hidden on result step */}
+              {state.step !== "result" && (
+                <CardHeader className="border-b px-3 py-3 sm:px-6 sm:py-4">
+                  <WizardStepIndicator steps={steps} currentStep={state.step} />
+                </CardHeader>
+              )}
 
               {/* Step content */}
               <CardContent className="overflow-hidden p-0">

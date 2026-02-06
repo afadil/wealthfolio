@@ -117,6 +117,10 @@ mod tests {
             unimplemented!()
         }
 
+        async fn ensure_fx_pairs(&self, _pairs: Vec<(String, String)>) -> Result<()> {
+            Ok(())
+        }
+
         fn get_latest_exchange_rate(
             &self,
             from_currency: &str,
@@ -882,7 +886,7 @@ mod tests {
         let mut holdings = vec![create_holding(
             "h_cash_cad",
             HoldingType::Cash,
-            "$CASH-CAD",
+            "CASH:CAD",
             dec!(1000.0),
             "CAD",
             "CAD",
@@ -984,7 +988,7 @@ mod tests {
         let mut holdings = vec![create_holding(
             "h_cash_usd",
             HoldingType::Cash,
-            "$CASH-USD",
+            "CASH:USD",
             dec!(500.0),
             "USD",
             "CAD",
@@ -1111,7 +1115,7 @@ mod tests {
             create_holding(
                 "h_cash_cad",
                 HoldingType::Cash,
-                "$CASH-CAD",
+                "CASH:CAD",
                 dec!(1000.0),
                 "CAD",
                 "CAD",
@@ -1121,7 +1125,7 @@ mod tests {
             create_holding(
                 "h_cash_usd",
                 HoldingType::Cash,
-                "$CASH-USD",
+                "CASH:USD",
                 dec!(500.0),
                 "USD",
                 "CAD",
@@ -1435,7 +1439,7 @@ mod tests {
             create_holding(
                 "h_cash_usd",
                 HoldingType::Cash,
-                "$CASH-USD",
+                "CASH:USD",
                 dec!(500.0),
                 "USD",
                 "CAD",

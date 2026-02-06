@@ -41,19 +41,22 @@ import { ClassificationSheet } from "@/components/classification/classification-
 import { useUpdatePortfolioMutation } from "@/hooks/use-calculate-portfolio";
 import { useQueryClient } from "@tanstack/react-query";
 import { QueryKeys } from "@/lib/query-keys";
+import { useSettingsContext } from "@/lib/settings-provider";
 
 export const HoldingsPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const currentTab = searchParams.get("tab") ?? "investments";
   const queryClient = useQueryClient();
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
 
   const [selectedAccount, setSelectedAccount] = useState<Account | null>({
     id: PORTFOLIO_ACCOUNT_ID,
     name: "All Portfolio",
     accountType: "PORTFOLIO" as unknown as Account["accountType"],
     balance: 0,
-    currency: "USD",
+    currency: baseCurrency,
     isDefault: false,
     isActive: true,
     createdAt: new Date(),
@@ -645,7 +648,7 @@ export const HoldingsPage = () => {
         assetName={updateValueAsset?.name ?? ""}
         currentValue={updateValueAsset?.marketValue ?? "0"}
         lastUpdatedDate={updateValueAsset?.valuationDate?.split("T")[0] ?? ""}
-        currency={updateValueAsset?.currency ?? "USD"}
+        currency={updateValueAsset?.currency ?? baseCurrency}
       />
 
       {/* Classification Sheet */}
