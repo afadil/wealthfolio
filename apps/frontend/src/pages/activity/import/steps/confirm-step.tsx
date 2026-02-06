@@ -97,14 +97,14 @@ function draftToActivityImport(draft: DraftActivity): ActivityImport {
     currency: draft.currency,
     activityType: draft.activityType as ActivityImport["activityType"],
     date: draft.activityDate,
-    symbol: draft.symbol ?? "$CASH-" + draft.currency,
+    symbol: draft.symbol ?? "",
     amount: draft.amount,
     quantity: draft.quantity,
     unitPrice: draft.unitPrice,
     fee: draft.fee,
     fxRate: draft.fxRate,
     subtype: draft.subtype,
-    exchangeMic: undefined,
+    exchangeMic: draft.exchangeMic,
     errors: draft.errors,
     isValid: draft.status === "valid" || draft.status === "warning",
     lineNumber: draft.rowIndex + 1,
@@ -237,7 +237,7 @@ export function ConfirmStep() {
 
   return (
     <div className="space-y-6">
-      {/* Summary alert */}
+      {/* Header */}
       {summary.toImport === 0 ? (
         <ImportAlert
           variant="warning"
@@ -251,19 +251,15 @@ export function ConfirmStep() {
           description={`${summary.warnings} activities have warnings but will still be imported.`}
         />
       ) : (
-        <ImportAlert
-          variant="success"
-          title={`${summary.toImport} activities ready to import`}
-          description="All selected activities have passed validation and are ready to be imported."
-        />
+        <div>
+          <p className="text-muted-foreground">
+            Review the summary below, then click Import to proceed.
+          </p>
+        </div>
       )}
 
       {/* Summary section */}
       <div className="space-y-6">
-        <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
-          Import Summary
-        </h4>
-
         {/* Stats row */}
         <div className="grid grid-cols-3 gap-4">
           {/* Total Rows */}
@@ -278,15 +274,13 @@ export function ConfirmStep() {
           </div>
 
           {/* To Import - highlighted */}
-          <div className="bg-muted/50 flex items-center gap-3 rounded-xl border-2 border-green-500/50 p-4 dark:border-green-500/30">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-green-500">
-              <Icons.Check className="h-5 w-5 text-white" />
+          <div className="bg-muted/50 border-primary/30 flex items-center gap-3 rounded-xl border-2 p-4">
+            <div className="bg-primary flex h-11 w-11 shrink-0 items-center justify-center rounded-lg">
+              <Icons.Import className="text-primary-foreground h-5 w-5" />
             </div>
             <div>
-              <div className="text-sm text-green-600 dark:text-green-400">To Import</div>
-              <div className="text-2xl font-semibold text-green-600 dark:text-green-400">
-                {summary.toImport}
-              </div>
+              <div className="text-primary text-sm">To Import</div>
+              <div className="text-primary text-2xl font-semibold">{summary.toImport}</div>
             </div>
           </div>
 
@@ -367,14 +361,18 @@ export function ConfirmStep() {
       />
 
       {/* Action buttons */}
-      <div className="flex justify-between gap-3 pt-4">
+      <div className="flex justify-between gap-3 border-t pt-6">
         <Button variant="outline" onClick={handleBack} disabled={isProcessing}>
           <Icons.ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
 
         <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
-          <Button onClick={handleImport} disabled={summary.toImport === 0 || isProcessing}>
+          <Button
+            size="lg"
+            onClick={handleImport}
+            disabled={summary.toImport === 0 || isProcessing}
+          >
             {isProcessing ? (
               <>
                 <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
@@ -382,7 +380,7 @@ export function ConfirmStep() {
               </>
             ) : (
               <>
-                <Icons.Check className="mr-2 h-4 w-4" />
+                <Icons.Import className="mr-2 h-4 w-4" />
                 Import {summary.toImport} {summary.toImport === 1 ? "Activity" : "Activities"}
               </>
             )}

@@ -4,6 +4,7 @@ import { useMemo } from "react";
 
 import { CardContent } from "@wealthfolio/ui/components/ui/card";
 import { validateTickerSymbol } from "../utils/validation-utils";
+import { findMappedActivityType } from "../utils/activity-type-mapping";
 import { CSVFileViewer } from "./csv-file-viewer";
 import { MappingTable } from "./mapping-table";
 
@@ -61,7 +62,7 @@ export function CsvMappingEditor(props: CsvMappingEditorProps) {
         csvType: type,
         row: data.row,
         count: data.count,
-        appType: findAppTypeForCsvType(type, props.mapping.activityMappings),
+        appType: findMappedActivityType(type, props.mapping.activityMappings),
       })),
       totalRows: total,
     };
@@ -185,25 +186,6 @@ export function CsvMappingEditor(props: CsvMappingEditorProps) {
       return parseInt(a.lineNumber) - parseInt(b.lineNumber);
     });
   }, [distinctActivityTypes, distinctSymbolRows, distinctAccountRows]);
-
-  function findAppTypeForCsvType(
-    csvType: string,
-    mappings: Partial<Record<ActivityType, string[]>>,
-  ): ActivityType | null {
-    const normalizedCsvType = csvType.trim().toUpperCase();
-
-    for (const [appType, csvTypes] of Object.entries(mappings)) {
-      if (
-        csvTypes?.some((mappedType) => {
-          const normalizedMappedType = mappedType.trim().toUpperCase();
-          return normalizedCsvType.startsWith(normalizedMappedType);
-        })
-      ) {
-        return appType as ActivityType;
-      }
-    }
-    return null;
-  }
 
   // Convert CsvRowData to CSVLine format for CSVFileViewer
   const csvData = useMemo(() => {

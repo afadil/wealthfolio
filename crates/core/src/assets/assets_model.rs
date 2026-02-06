@@ -24,7 +24,7 @@ pub enum AssetKind {
     #[default]
     Security, // Stocks, ETFs, bonds, funds
     Crypto,           // Cryptocurrencies
-    Cash,             // Holdable cash position ($CASH-USD)
+    Cash,             // Holdable cash position (CASH:USD)
     FxRate,           // Currency exchange rate (not holdable)
     Option,           // Options contracts
     Commodity,        // Physical commodities (ETFs/futures)

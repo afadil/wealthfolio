@@ -167,7 +167,7 @@ describe("validation-utils", () => {
         {
           lineNumber: "1",
           date: "2024-01-01T00:00:00.000Z",
-          symbol: "$CASH-USD",
+          symbol: "CASH:USD",
           activityType: "DEPOSIT",
           quantity: "1",
           unitPrice: "1",
@@ -243,7 +243,7 @@ describe("validation-utils", () => {
         {
           lineNumber: "1",
           date: "2024-01-01T00:00:00.000Z",
-          symbol: "$CASH-USD",
+          symbol: "CASH:USD",
           activityType: "TRANSFER_IN",
           quantity: "1",
           unitPrice: "1",
@@ -260,6 +260,29 @@ describe("validation-utils", () => {
 
       expect(activity.amount).toBe(500.0); // converted to positive
       expect(activity.fee).toBe(0);
+    });
+
+    it("should fail non-cash activities without a symbol", () => {
+      const testData = [
+        {
+          lineNumber: "1",
+          date: "2024-01-01T00:00:00.000Z",
+          symbol: "",
+          activityType: "BUY",
+          quantity: "1",
+          unitPrice: "100",
+          amount: "100",
+          fee: "0",
+          currency: "USD",
+        },
+      ];
+
+      const result = validateActivityImport(testData, testMapping, "test-account", "USD");
+
+      expect(result.activities).toHaveLength(1);
+      const activity = result.activities[0];
+      expect(activity.isValid).toBe(false);
+      expect(activity.errors?.symbol).toContain("Symbol is required for non-cash activities");
     });
 
     it("should handle CSV values with currency symbols like real broker exports", () => {
@@ -312,7 +335,7 @@ describe("validation-utils", () => {
         {
           lineNumber: "1",
           date: "2024-01-01T00:00:00.000Z",
-          symbol: "$CASH-USD",
+          symbol: "CASH:USD",
           activityType: "FEE",
           quantity: "",
           unitPrice: "",
@@ -338,7 +361,7 @@ describe("validation-utils", () => {
         {
           lineNumber: "1",
           date: "2024-01-01T00:00:00.000Z",
-          symbol: "$CASH-USD",
+          symbol: "CASH:USD",
           activityType: "FEE",
           quantity: "",
           unitPrice: "",

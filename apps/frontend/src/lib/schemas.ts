@@ -126,10 +126,14 @@ export const importActivitySchema = z
       .optional(),
     symbol: z
       .string()
-      .min(1, { message: "Symbol is required" })
-      .refine((val) => /^(\$CASH-[A-Z]{3}|[A-Z0-9]{1,10}([.-][A-Z0-9]+){0,2})$/.test(val.trim()), {
-        message: "Invalid symbol format",
-      }),
+      .optional()
+      .refine(
+        (val) => {
+          if (!val || val.trim() === "") return true;
+          return /^(CASH:[A-Z]{3}|[A-Z0-9]{1,10}([.-][A-Z0-9]+){0,2})$/.test(val.trim());
+        },
+        { message: "Invalid symbol format" },
+      ),
     amount: decimalLikeSchema.nullable().optional(),
     quantity: decimalLikeSchema.nullable().optional(),
     unitPrice: decimalLikeSchema.nullable().optional(),
@@ -184,6 +188,19 @@ export const importActivitySchema = z
     {
       message: "FX rate must be a positive number.",
       path: ["fxRate"],
+    },
+  )
+  .refine(
+    (data) => {
+      if (isCashActivity(data.activityType as string)) {
+        return true;
+      }
+
+      return !!data.symbol?.trim();
+    },
+    {
+      message: "Symbol is required for non-cash activities",
+      path: ["symbol"],
     },
   )
   .refine(

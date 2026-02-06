@@ -95,6 +95,10 @@ impl AssetRepositoryTrait for MockAssetRepository {
         unimplemented!()
     }
 
+    async fn create_batch(&self, _new_assets: Vec<NewAsset>) -> Result<Vec<Asset>> {
+        unimplemented!()
+    }
+
     async fn update_profile(&self, _asset_id: &str, _payload: UpdateAssetProfile) -> Result<Asset> {
         unimplemented!()
     }

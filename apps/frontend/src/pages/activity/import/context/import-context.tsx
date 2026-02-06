@@ -43,6 +43,10 @@ export interface DraftActivity {
   /** Whether this is an external transfer (for TRANSFER_IN/TRANSFER_OUT) */
   isExternal?: boolean;
 
+  // Enriched by backend check
+  exchangeMic?: string;
+  symbolName?: string;
+
   // Validation state
   status: DraftActivityStatus;
   errors: Record<string, string[]>;

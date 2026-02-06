@@ -12,12 +12,15 @@ import { logger } from "@/adapters";
 import { SUBTYPES_BY_ACTIVITY_TYPE, SUBTYPE_DISPLAY_NAMES } from "@/lib/constants";
 
 // Ticker symbol validation regex
-const tickerRegex = /^(\$CASH-[A-Z]{3}|[A-Z0-9]{1,10}([.-][A-Z0-9]+){0,2})$/;
+const tickerRegex = /^(CASH:[A-Z]{3}|[A-Z0-9]{1,10}([.-][A-Z0-9]+){0,2})$/;
 
 // Helper to validate ticker symbol format
 export function validateTickerSymbol(symbol: string): boolean {
   return tickerRegex.test(symbol.trim());
 }
+
+// Re-export shared activity type mapping utilities
+export { ACTIVITY_TYPE_SMART_DEFAULTS, findMappedActivityType } from "./activity-type-mapping";
 
 // Build reverse lookup from display names to subtype codes
 const DISPLAY_NAME_TO_SUBTYPE: Record<string, string> = {};
@@ -236,8 +239,7 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
     },
   },
   [ActivityType.DEPOSIT]: {
-    calculateSymbol: (activity, accountCurrency) =>
-      `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
+    calculateSymbol: () => "",
     calculateAmount: (activity) => {
       const amt = toNum(activity.amount);
       return amt
@@ -252,8 +254,7 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
     },
   },
   [ActivityType.WITHDRAWAL]: {
-    calculateSymbol: (activity, accountCurrency) =>
-      `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
+    calculateSymbol: () => "",
     calculateAmount: (activity) => {
       const amt = toNum(activity.amount);
       return amt
@@ -268,8 +269,7 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
     },
   },
   [ActivityType.INTEREST]: {
-    calculateSymbol: (activity, accountCurrency) =>
-      `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
+    calculateSymbol: (a) => a.symbol || "",
     calculateAmount: (activity) => {
       const amt = toNum(activity.amount);
       return amt
@@ -299,8 +299,7 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
     },
   },
   [ActivityType.FEE]: {
-    calculateSymbol: (activity, accountCurrency) =>
-      `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
+    calculateSymbol: () => "",
     calculateAmount: (activity) => {
       // For FEE activities, amount should typically be 0 unless explicitly provided
       const amt = toNum(activity.amount);
@@ -322,8 +321,7 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
     },
   },
   [ActivityType.TAX]: {
-    calculateSymbol: (activity, accountCurrency) =>
-      `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
+    calculateSymbol: () => "",
     calculateAmount: (activity) => {
       const amt = toNum(activity.amount);
       return amt ? Math.abs(amt) : 0;
@@ -334,8 +332,7 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
     },
   },
   [ActivityType.TRANSFER_IN]: {
-    calculateSymbol: (activity, accountCurrency) =>
-      activity.symbol || `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
+    calculateSymbol: (a) => a.symbol || "",
     calculateAmount: (activity) => {
       const amt = toNum(activity.amount);
       return amt ? Math.abs(amt) : 0;
@@ -346,8 +343,7 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
     },
   },
   [ActivityType.TRANSFER_OUT]: {
-    calculateSymbol: (activity, accountCurrency) =>
-      activity.symbol || `$CASH-${(activity.currency || accountCurrency).toUpperCase()}`,
+    calculateSymbol: (a) => a.symbol || "",
     calculateAmount: (activity) => {
       const amt = toNum(activity.amount);
       return amt ? Math.abs(amt) : 0;
@@ -362,7 +358,21 @@ const activityLogicMap: Partial<Record<ActivityType, ActivityLogicConfig>> = {
     calculateAmount: () => 0, // SPLIT has no cash impact according to docs
     calculateFee: () => 0, // SPLIT typically has no fee
   },
-  // ... Add configurations for other ActivityTypes (TAX, TRANSFER_IN, TRANSFER_OUT, etc.)
+  [ActivityType.CREDIT]: {
+    calculateSymbol: () => "",
+    calculateAmount: (activity) => {
+      const amt = toNum(activity.amount);
+      return amt
+        ? Math.abs(amt)
+        : Math.abs(
+            calculateCashActivityAmount(toNum(activity.quantity), toNum(activity.unitPrice)),
+          );
+    },
+    calculateFee: (activity) => {
+      const f = toNum(activity.fee);
+      return f ? Math.abs(f) : 0;
+    },
+  },
 };
 
 // Default logic if type-specific logic isn't found

@@ -21,6 +21,10 @@ Key directories:
 - Type check: `pnpm type-check`
 - Lint: `pnpm lint`
 
+## Git
+
+- Never add `Co-Authored-By` lines to commit messages.
+
 ## Plan Mode
 
 - Make the plan extremely concise. Sacrifice grammar for the sake of concision.

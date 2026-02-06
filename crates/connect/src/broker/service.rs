@@ -23,7 +23,7 @@ use wealthfolio_core::activities::{self, compute_idempotency_key, AssetInput, Ne
 use wealthfolio_core::assets::{canonical_asset_id, AssetKind, AssetServiceTrait, NewAsset};
 use wealthfolio_core::errors::Result;
 use wealthfolio_core::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
-use wealthfolio_core::fx::currency::{get_normalization_rule, normalize_amount};
+use wealthfolio_core::fx::currency::{get_normalization_rule, normalize_amount, resolve_currency};
 use wealthfolio_core::portfolio::snapshot::{
     AccountStateSnapshot, Position, SnapshotRepositoryTrait, SnapshotServiceTrait, SnapshotSource,
 };
@@ -363,7 +363,6 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 activity_type.as_str(),
                 activities::ACTIVITY_TYPE_DEPOSIT
                     | activities::ACTIVITY_TYPE_WITHDRAWAL
-                    | activities::ACTIVITY_TYPE_DIVIDEND
                     | activities::ACTIVITY_TYPE_INTEREST
                     | activities::ACTIVITY_TYPE_FEE
                     | activities::ACTIVITY_TYPE_TAX
@@ -394,11 +393,12 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 .and_then(|c| c.code.clone())
                 .filter(|c| !c.trim().is_empty());
 
-            let currency_code = activity_currency
-                .or_else(|| symbol_currency.clone())
-                .or_else(|| account_currency.clone())
-                .or_else(|| base_currency.clone())
-                .unwrap_or_else(|| "USD".to_string());
+            let currency_code = resolve_currency(&[
+                activity_currency.as_deref().unwrap_or(""),
+                symbol_currency.as_deref().unwrap_or(""),
+                account_currency.as_deref().unwrap_or(""),
+                base_currency.as_deref().unwrap_or(""),
+            ]);
 
             // Determine the display symbol based on asset type
             // For crypto: we want the base symbol (e.g., "SOL" not "SOL-USD")

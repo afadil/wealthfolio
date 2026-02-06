@@ -65,6 +65,10 @@ mod tests {
             unimplemented!("Not needed for tests")
         }
 
+        async fn create_batch(&self, _new_assets: Vec<NewAsset>) -> Result<Vec<Asset>> {
+            unimplemented!("Not needed for tests")
+        }
+
         async fn update_profile(
             &self,
             _asset_id: &str,
@@ -2440,7 +2444,7 @@ mod tests {
         Activity {
             id: id.to_string(),
             account_id: "acc_1".to_string(),
-            asset_id: Some(format!("$CASH-{}", currency)),
+            asset_id: Some(format!("CASH:{}", currency)),
             activity_type: activity_type.as_str().to_string(),
             activity_type_override: None,
             source_type: None,

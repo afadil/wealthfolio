@@ -69,7 +69,7 @@ export function valuesAreEqual(field: string, prevValue: unknown, nextValue: unk
  * For cash activities, returns undefined - backend will generate CASH:{currency}.
  * For market activities, returns the existing assetId if present.
  *
- * NOTE: This function no longer generates $CASH-{currency} IDs.
+ * NOTE: This function no longer generates CASH:{currency} IDs.
  * The backend is now the sole generator of canonical asset IDs.
  */
 export function resolveAssetIdForTransaction(
@@ -298,14 +298,8 @@ export function createCurrencyResolver(
     // 1. Try to get currency from the asset
     const assetKey = (transaction.assetId ?? transaction.assetSymbol ?? "").trim().toUpperCase();
 
-    // Support both old format ($CASH-CAD) and new format (CASH:CAD)
     let cashCurrency: string | undefined;
-    if (assetKey.startsWith("$CASH-")) {
-      const currency = assetKey.slice("$CASH-".length);
-      if (/^[A-Z]{3}$/.test(currency)) {
-        cashCurrency = currency;
-      }
-    } else if (assetKey.startsWith("CASH:")) {
+    if (assetKey.startsWith("CASH:")) {
       const currency = assetKey.slice("CASH:".length);
       if (/^[A-Z]{3}$/.test(currency)) {
         cashCurrency = currency;

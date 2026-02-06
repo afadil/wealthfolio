@@ -12,9 +12,12 @@ use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
 use crate::activities::csv_parser::{self, ParseConfig, ParsedCsvResult};
 use crate::activities::{ActivityRepositoryTrait, ActivityServiceTrait};
-use crate::assets::{canonical_asset_id, parse_crypto_pair_symbol, AssetKind, AssetServiceTrait};
+use crate::assets::{
+    canonical_asset_id, parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix, AssetKind,
+    AssetServiceTrait,
+};
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
-use crate::fx::currency::{get_normalization_rule, normalize_amount};
+use crate::fx::currency::{get_normalization_rule, normalize_amount, resolve_currency};
 use crate::fx::FxServiceTrait;
 use crate::quotes::{DataSource, Quote, QuoteServiceTrait};
 use crate::sync::{
@@ -84,10 +87,9 @@ impl ActivityService {
     }
 
     fn get_base_currency_or_usd(&self) -> String {
-        self.account_service
-            .get_base_currency()
-            .filter(|c| !c.trim().is_empty())
-            .unwrap_or_else(|| "USD".to_string())
+        resolve_currency(&[
+            self.account_service.get_base_currency().as_deref().unwrap_or(""),
+        ])
     }
 
     fn resolve_activity_currency(
@@ -96,16 +98,12 @@ impl ActivityService {
         asset_currency: Option<&str>,
         account_currency: &str,
     ) -> String {
-        if !activity_currency.is_empty() {
-            return activity_currency.to_string();
-        }
-        if let Some(asset_currency) = asset_currency.filter(|c| !c.is_empty()) {
-            return asset_currency.to_string();
-        }
-        if !account_currency.is_empty() {
-            return account_currency.to_string();
-        }
-        self.get_base_currency_or_usd()
+        resolve_currency(&[
+            activity_currency,
+            asset_currency.unwrap_or(""),
+            account_currency,
+            self.account_service.get_base_currency().as_deref().unwrap_or(""),
+        ])
     }
 
     /// Resolves symbols to exchange MICs in batch.
@@ -133,6 +131,10 @@ impl ActivityService {
         let mut missing_symbols: Vec<String> = Vec::new();
 
         for symbol in &symbols {
+            if symbol.trim().is_empty() {
+                cache.insert(symbol.clone(), None);
+                continue;
+            }
             if let Some(exchange_mic) = existing_map.get(&symbol.to_lowercase()) {
                 // Found in existing assets
                 cache.insert(symbol.clone(), exchange_mic.clone());
@@ -353,20 +355,10 @@ impl ActivityService {
 
     async fn prepare_new_activity(&self, mut activity: NewActivity) -> Result<NewActivity> {
         let account: Account = self.account_service.get_account(&activity.account_id)?;
-        let account_currency = if !account.currency.is_empty() {
-            account.currency.clone()
-        } else {
-            self.get_base_currency_or_usd()
-        };
+        let base_ccy = self.account_service.get_base_currency().unwrap_or_default();
+        let account_currency = resolve_currency(&[&account.currency, &base_ccy]);
 
-        // Determine currency (needed for asset ID generation)
-        let currency = if !activity.currency.is_empty() {
-            activity.currency.clone()
-        } else if !account_currency.is_empty() {
-            account_currency.clone()
-        } else {
-            self.get_base_currency_or_usd()
-        };
+        let currency = resolve_currency(&[&activity.currency, &account_currency, &base_ccy]);
 
         // Extract asset fields from nested `asset` object
         let symbol = activity.get_symbol().map(|s| s.to_string());
@@ -538,18 +530,9 @@ impl ActivityService {
         mut activity: ActivityUpdate,
     ) -> Result<ActivityUpdate> {
         let account: Account = self.account_service.get_account(&activity.account_id)?;
-        let account_currency = if !account.currency.is_empty() {
-            account.currency.clone()
-        } else {
-            self.get_base_currency_or_usd()
-        };
-
-        // Determine currency (needed for asset ID generation)
-        let currency = if !activity.currency.is_empty() {
-            activity.currency.clone()
-        } else {
-            account_currency.clone()
-        };
+        let base_ccy = self.account_service.get_base_currency().unwrap_or_default();
+        let account_currency = resolve_currency(&[&account.currency, &base_ccy]);
+        let currency = resolve_currency(&[&activity.currency, &account_currency]);
 
         // Extract asset fields using helper methods (supports both nested `asset` and legacy flat fields)
         let symbol = activity.get_symbol().map(|s| s.to_string());
@@ -728,11 +711,8 @@ impl ActivityService {
         use crate::assets::{
             canonical_asset_id, parse_canonical_asset_id, parse_crypto_pair_symbol, AssetSpec,
         };
-        let account_currency = if !account.currency.is_empty() {
-            account.currency.clone()
-        } else {
-            self.get_base_currency_or_usd()
-        };
+        let base_ccy = self.account_service.get_base_currency().unwrap_or_default();
+        let account_currency = resolve_currency(&[&account.currency, &base_ccy]);
 
         let symbol = match activity.get_symbol() {
             Some(s) if !s.is_empty() => s.to_string(),
@@ -810,11 +790,15 @@ impl ActivityService {
             }
         };
 
-        // Get exchange MIC: prefer explicit value, then check cache
+        // Strip Yahoo suffix from symbol (e.g. GOOG.TO → GOOG + XTSE)
+        let (base_symbol, suffix_mic) = parse_symbol_with_exchange_suffix(&symbol);
+
+        // Get exchange MIC: prefer explicit value, then cache, then suffix-derived
         let exchange_mic = activity
             .get_exchange_mic()
             .map(|s| s.to_string())
-            .or_else(|| symbol_mic_cache.get(&symbol).cloned().flatten());
+            .or_else(|| symbol_mic_cache.get(&symbol).cloned().flatten())
+            .or_else(|| suffix_mic.map(|s| s.to_string()));
 
         // Determine currency
         let currency = if !activity.currency.is_empty() {
@@ -823,20 +807,20 @@ impl ActivityService {
             account_currency.clone()
         };
 
-        // Infer asset kind
-        let kind = self.infer_asset_kind(&symbol, exchange_mic.as_deref(), activity.get_asset_kind());
+        // Infer asset kind using base symbol
+        let kind = self.infer_asset_kind(base_symbol, exchange_mic.as_deref(), activity.get_asset_kind());
 
         // For crypto, use the quote currency from the pair if available
         let asset_currency = if kind == crate::assets::AssetKind::Crypto {
-            parse_crypto_pair_symbol(&symbol)
+            parse_crypto_pair_symbol(base_symbol)
                 .map(|(_, quote)| quote)
                 .unwrap_or_else(|| currency.clone())
         } else {
             currency.clone()
         };
 
-        // Generate canonical asset ID
-        let canonical_id = canonical_asset_id(&kind, &symbol, exchange_mic.as_deref(), &asset_currency);
+        // Generate canonical asset ID using base symbol (without exchange suffix)
+        let canonical_id = canonical_asset_id(&kind, base_symbol, exchange_mic.as_deref(), &asset_currency);
 
         // Parse pricing mode if provided
         let pricing_mode = activity.get_pricing_mode().and_then(|s| {
@@ -851,13 +835,42 @@ impl ActivityService {
 
         Ok(Some(AssetSpec {
             id: canonical_id,
-            symbol,
+            symbol: base_symbol.to_string(),
             exchange_mic,
             currency: asset_currency,
             kind,
             pricing_mode,
             name: activity.get_asset_name().map(|s| s.to_string()),
         }))
+    }
+
+    /// Validates currency codes on an activity, marking invalid if malformed.
+    fn validate_currency(&self, activity: &mut ActivityImport, account_currency: &str) {
+        if activity.currency.is_empty() {
+            activity.is_valid = false;
+            let mut errors = activity.errors.take().unwrap_or_default();
+            errors
+                .entry("currency".to_string())
+                .or_default()
+                .push("Activity currency is missing in the import data.".to_string());
+            activity.errors = Some(errors);
+        } else if activity.currency != account_currency {
+            let from = account_currency;
+            let to = &activity.currency;
+            if from.len() != 3
+                || !from.chars().all(|c| c.is_alphabetic())
+                || to.len() != 3
+                || !to.chars().all(|c| c.is_alphabetic())
+            {
+                activity.is_valid = false;
+                let mut errors = activity.errors.take().unwrap_or_default();
+                errors
+                    .entry("currency".to_string())
+                    .or_default()
+                    .push(format!("Invalid currency code: {} or {}", from, to));
+                activity.errors = Some(errors);
+            }
+        }
     }
 }
 
@@ -1052,7 +1065,7 @@ impl ActivityServiceTrait for ActivityService {
             .filter_map(|a| {
                 let symbol = a.get_symbol();
                 let has_mic = a.get_exchange_mic().is_some();
-                let is_cash = symbol.map(|s| s.starts_with("$CASH-")).unwrap_or(false);
+                let is_cash = symbol.map(|s| s.starts_with("CASH:")).unwrap_or(false);
                 if symbol.is_some() && !has_mic && !is_cash {
                     symbol.map(|s| s.to_string())
                 } else {
@@ -1190,20 +1203,31 @@ impl ActivityServiceTrait for ActivityService {
     /// Verifies the activities import from CSV file (read-only validation).
     /// This performs read-only validation without creating assets or registering FX pairs.
     /// Asset creation happens in import_activities when the user confirms the import.
+    ///
+    /// Symbol resolution is activity-type-driven:
+    /// - Cash activity types (DEPOSIT, WITHDRAWAL, etc.) skip symbol resolution entirely
+    /// - Non-cash types require a valid symbol: searched in local assets, then market data
+    /// - Resolved exchange_mic + base symbol are stored on the activity for the import step
     async fn check_activities_import(
         &self,
         account_id: String,
         activities: Vec<ActivityImport>,
     ) -> Result<Vec<ActivityImport>> {
         let account: Account = self.account_service.get_account(&account_id)?;
-        let account_currency = if !account.currency.is_empty() {
-            account.currency.clone()
-        } else {
-            self.get_base_currency_or_usd()
-        };
+        let base_ccy = self.account_service.get_base_currency().unwrap_or_default();
+        let account_currency = resolve_currency(&[&account.currency, &base_ccy]);
 
-        // Batch resolve all unique symbols to get exchange MICs
-        let unique_symbols: HashSet<String> = activities.iter().map(|a| a.symbol.clone()).collect();
+        // Only resolve symbols for non-cash activity types that don't already have exchange_mic
+        let unique_symbols: HashSet<String> = activities
+            .iter()
+            .filter(|a| {
+                !is_cash_activity(&a.activity_type)
+                    && !a.symbol.trim().is_empty()
+                    && a.exchange_mic.is_none()
+            })
+            .map(|a| a.symbol.clone())
+            .collect();
+
         let symbol_mic_cache = self
             .resolve_symbols_batch(unique_symbols, &account_currency)
             .await;
@@ -1219,36 +1243,55 @@ impl ActivityServiceTrait for ActivityService {
                 activity.account_id = Some(account_id.clone());
             }
 
-            // Determine context currency for potential asset creation during check
-            let asset_context_currency = if !activity.currency.is_empty() {
-                activity.currency.clone()
-            } else {
-                // Fallback to account/base currency for context if import data lacks currency
-                account_currency.clone()
-            };
+            // Cash activity types skip symbol resolution entirely
+            if is_cash_activity(&activity.activity_type) {
+                // Resolve currency, then mark valid
+                if activity.currency.is_empty() {
+                    activity.currency = account_currency.clone();
+                }
+                activity.is_valid = true;
+                self.validate_currency(&mut activity, &account_currency);
+                activities_with_status.push(activity);
+                continue;
+            }
 
-            // Get resolved exchange MIC from cache
-            let exchange_mic = symbol_mic_cache.get(&activity.symbol).cloned().flatten();
-
-            // Store resolved exchange_mic in activity for use during import
-            activity.exchange_mic = exchange_mic.clone();
-
-            // Generate canonical asset ID using resolved exchange MIC
-            let inferred_kind = self.infer_asset_kind(&activity.symbol, None, None);
-
-            // Check if this is a security that couldn't be resolved
-            // Cash symbols ($CASH-XXX) and cash activities don't need exchange MIC
-            let is_cash_symbol = activity.symbol.starts_with("$CASH-");
-            let is_cash_type = is_cash_activity(&activity.activity_type);
-            let needs_exchange_mic =
-                inferred_kind == AssetKind::Security && !is_cash_symbol && !is_cash_type;
-
-            // Early validation: if we need exchange MIC but couldn't resolve it, mark as invalid
-            if needs_exchange_mic && exchange_mic.is_none() {
+            // Non-cash: symbol is required
+            let symbol = activity.symbol.trim().to_string();
+            if symbol.is_empty() || symbol == "----" {
                 activity.is_valid = false;
                 let mut errors = std::collections::HashMap::new();
                 errors.insert(
-                    activity.symbol.clone(),
+                    "symbol".to_string(),
+                    vec![format!(
+                        "Symbol is required for {} activities.",
+                        &activity.activity_type
+                    )],
+                );
+                activity.errors = Some(errors);
+                activities_with_status.push(activity);
+                continue;
+            }
+
+            // Get exchange_mic: prefer already-set value (from prior check), then cache
+            let exchange_mic = activity
+                .exchange_mic
+                .clone()
+                .or_else(|| symbol_mic_cache.get(&activity.symbol).cloned().flatten());
+
+            // Strip Yahoo suffix to get base symbol (e.g. GOOG.TO → GOOG)
+            let (base_symbol, suffix_mic) = parse_symbol_with_exchange_suffix(&symbol);
+            let resolved_mic = exchange_mic.or_else(|| suffix_mic.map(|s| s.to_string()));
+
+            // Infer asset kind using base symbol and resolved MIC
+            let inferred_kind =
+                self.infer_asset_kind(base_symbol, resolved_mic.as_deref(), None);
+
+            // Securities must have a resolved exchange MIC
+            if inferred_kind == AssetKind::Security && resolved_mic.is_none() {
+                activity.is_valid = false;
+                let mut errors = std::collections::HashMap::new();
+                errors.insert(
+                    "symbol".to_string(),
                     vec![format!(
                         "Could not find '{}' in market data. Please search for the correct ticker symbol.",
                         &activity.symbol
@@ -1259,17 +1302,26 @@ impl ActivityServiceTrait for ActivityService {
                 continue;
             }
 
+            // Store resolved data back on activity for import step
+            activity.exchange_mic = resolved_mic.clone();
+            activity.symbol = base_symbol.to_string();
+
+            // Determine currency context
+            let asset_context_currency = if !activity.currency.is_empty() {
+                activity.currency.clone()
+            } else {
+                account_currency.clone()
+            };
+
+            // Build canonical ID with base symbol
             let canonical_id = canonical_asset_id(
                 &inferred_kind,
-                &activity.symbol,
-                exchange_mic.as_deref(),
+                base_symbol,
+                resolved_mic.as_deref(),
                 &asset_context_currency,
             );
 
-            let (mut is_valid, mut error_message) = (true, None);
-
-            // Read-only validation without side effects
-            // Just check if asset exists (don't create it)
+            // Read-only: check if asset exists for name/currency enrichment
             let mut asset_currency: Option<String> = None;
             match self.asset_service.get_asset_by_id(&canonical_id) {
                 Ok(asset) => {
@@ -1277,10 +1329,7 @@ impl ActivityServiceTrait for ActivityService {
                     asset_currency = Some(asset.currency.clone());
                 }
                 Err(_) => {
-                    // Asset doesn't exist yet - that's OK for validation
-                    // It will be created during actual import
-                    // Use the symbol as a placeholder name
-                    activity.symbol_name = Some(activity.symbol.clone());
+                    activity.symbol_name = Some(base_symbol.to_string());
                 }
             }
 
@@ -1292,33 +1341,8 @@ impl ActivityServiceTrait for ActivityService {
                 );
             }
 
-            // Validate currency without registering FX pair
-            if activity.currency.is_empty() {
-                is_valid = false;
-                error_message =
-                    Some("Activity currency is missing in the import data.".to_string());
-            } else if activity.currency != account_currency {
-                // Just check that currencies are valid 3-letter codes
-                // The actual FX pair will be registered during import
-                let from = &account_currency;
-                let to = &activity.currency;
-                if from.len() != 3
-                    || !from.chars().all(|c| c.is_alphabetic())
-                    || to.len() != 3
-                    || !to.chars().all(|c| c.is_alphabetic())
-                {
-                    is_valid = false;
-                    error_message = Some(format!("Invalid currency code: {} or {}", from, to));
-                }
-            }
-
-            activity.is_valid = is_valid;
-            if let Some(error_msg) = error_message {
-                let mut errors = std::collections::HashMap::new();
-                errors.insert(activity.symbol.clone(), vec![error_msg]);
-                activity.errors = Some(errors);
-            }
-
+            activity.is_valid = true;
+            self.validate_currency(&mut activity, &account_currency);
             activities_with_status.push(activity);
         }
 
@@ -1651,11 +1675,8 @@ impl ActivityServiceTrait for ActivityService {
         }
 
         let mut result = PrepareActivitiesResult::default();
-        let account_currency = if !account.currency.is_empty() {
-            account.currency.clone()
-        } else {
-            self.get_base_currency_or_usd()
-        };
+        let base_ccy = self.account_service.get_base_currency().unwrap_or_default();
+        let account_currency = resolve_currency(&[&account.currency, &base_ccy]);
 
         // 1. Batch resolve symbols → MICs (for securities without exchange_mic)
         let symbols_to_resolve: HashSet<String> = activities
@@ -1663,7 +1684,7 @@ impl ActivityServiceTrait for ActivityService {
             .filter_map(|a| {
                 let symbol = a.get_symbol()?;
                 let has_mic = a.get_exchange_mic().is_some();
-                let is_cash = symbol.starts_with("$CASH-");
+                let is_cash = symbol.starts_with("CASH:");
                 if !has_mic && !is_cash {
                     Some(symbol.to_string())
                 } else {
@@ -1687,8 +1708,26 @@ impl ActivityServiceTrait for ActivityService {
                     asset_specs.push(spec);
                 }
                 Ok(None) => {
-                    // Cash activity or no asset needed
-                    activity_asset_map.push(None);
+                    if is_cash_activity(&activity.activity_type) {
+                        let ccy = if !activity.currency.is_empty() {
+                            activity.currency.to_uppercase()
+                        } else {
+                            account_currency.to_uppercase()
+                        };
+                        let cash_id = canonical_asset_id(&AssetKind::Cash, &ccy, None, &ccy);
+                        asset_specs.push(AssetSpec {
+                            id: cash_id.clone(),
+                            symbol: ccy.clone(),
+                            exchange_mic: None,
+                            currency: ccy,
+                            kind: AssetKind::Cash,
+                            pricing_mode: None,
+                            name: None,
+                        });
+                        activity_asset_map.push(Some(cash_id));
+                    } else {
+                        activity_asset_map.push(None);
+                    }
                 }
                 Err(e) => {
                     result.errors.push((idx, e.to_string()));

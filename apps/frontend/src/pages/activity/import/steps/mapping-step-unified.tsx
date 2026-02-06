@@ -9,77 +9,13 @@ import { ImportAlert } from "../components/import-alert";
 import { MappingTable } from "../components/mapping-table";
 import { setMapping, useImportContext } from "../context";
 import { useImportMapping } from "../hooks/use-import-mapping";
-import { validateTickerSymbol } from "../utils/validation-utils";
+import { validateTickerSymbol, findMappedActivityType } from "../utils/validation-utils";
 
 import { getAccounts } from "@/adapters";
-import { ActivityType, IMPORT_REQUIRED_FIELDS, ImportFormat } from "@/lib/constants";
+import { isSymbolRequired } from "@/lib/activity-utils";
+import { IMPORT_REQUIRED_FIELDS, ImportFormat } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, CsvRowData } from "@/lib/types";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper Functions
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Smart defaults for activity type mapping
-const ACTIVITY_TYPE_SMART_DEFAULTS: Record<string, ActivityType> = {
-  BUY: ActivityType.BUY,
-  PURCHASE: ActivityType.BUY,
-  BOUGHT: ActivityType.BUY,
-  SELL: ActivityType.SELL,
-  SOLD: ActivityType.SELL,
-  DIVIDEND: ActivityType.DIVIDEND,
-  DIV: ActivityType.DIVIDEND,
-  DEPOSIT: ActivityType.DEPOSIT,
-  WITHDRAWAL: ActivityType.WITHDRAWAL,
-  WITHDRAW: ActivityType.WITHDRAWAL,
-  FEE: ActivityType.FEE,
-  TAX: ActivityType.TAX,
-  TRANSFER_IN: ActivityType.TRANSFER_IN,
-  TRANSFER: ActivityType.TRANSFER_IN,
-  TRANSFER_OUT: ActivityType.TRANSFER_OUT,
-  INTEREST: ActivityType.INTEREST,
-  INT: ActivityType.INTEREST,
-  SPLIT: ActivityType.SPLIT,
-  CREDIT: ActivityType.CREDIT,
-  ADJUSTMENT: ActivityType.ADJUSTMENT,
-};
-
-function findAppTypeForCsvType(
-  csvType: string,
-  mappings: Record<string, string[]>,
-): ActivityType | null {
-  const normalizedCsvType = csvType.trim().toUpperCase();
-
-  // Check explicit mappings first
-  for (const [appType, csvTypes] of Object.entries(mappings)) {
-    if (
-      csvTypes?.some((mappedType) => {
-        const normalizedMappedType = mappedType.trim().toUpperCase();
-        return normalizedCsvType.startsWith(normalizedMappedType);
-      })
-    ) {
-      return appType as ActivityType;
-    }
-  }
-
-  // Check smart defaults - exact match
-  if (ACTIVITY_TYPE_SMART_DEFAULTS[normalizedCsvType]) {
-    return ACTIVITY_TYPE_SMART_DEFAULTS[normalizedCsvType];
-  }
-
-  // Check smart defaults - partial match
-  for (const [key, value] of Object.entries(ACTIVITY_TYPE_SMART_DEFAULTS)) {
-    if (normalizedCsvType.startsWith(key) || normalizedCsvType.includes(key)) {
-      return value;
-    }
-  }
-
-  return null;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Component
-// ─────────────────────────────────────────────────────────────────────────────
 
 export function MappingStepUnified() {
   const { state, dispatch } = useImportContext();
@@ -149,16 +85,31 @@ export function MappingStepUnified() {
   ).length;
   const totalFields = Object.values(ImportFormat).length;
 
-  // Symbols validation
-  const distinctSymbols = useMemo(() => {
-    return Array.from(new Set(data.map((row) => getMappedValue(row, ImportFormat.SYMBOL)))).filter(
-      Boolean,
-    );
-  }, [data, getMappedValue]);
+  // Symbols validation — skip rows where symbol is not required
+  const { distinctSymbols, invalidSymbols } = useMemo(() => {
+    const needed = new Set<string>();
+    const invalid = new Set<string>();
 
-  const invalidSymbols = useMemo(() => {
-    return distinctSymbols.filter((symbol) => !validateTickerSymbol(symbol));
-  }, [distinctSymbols]);
+    data.forEach((row) => {
+      const symbol = getMappedValue(row, ImportFormat.SYMBOL)?.trim();
+      if (!symbol) return;
+
+      const csvType = getMappedValue(row, ImportFormat.ACTIVITY_TYPE)?.trim();
+      const appType = csvType
+        ? findMappedActivityType(csvType, localMapping.activityMappings || {})
+        : null;
+
+      if (appType && !isSymbolRequired(appType, symbol)) return;
+
+      needed.add(symbol);
+      if (!validateTickerSymbol(symbol)) invalid.add(symbol);
+    });
+
+    return {
+      distinctSymbols: Array.from(needed),
+      invalidSymbols: Array.from(invalid),
+    };
+  }, [data, getMappedValue, localMapping.activityMappings]);
 
   // Account ID mappings
   const distinctAccountIds = useMemo(() => {
@@ -196,7 +147,7 @@ export function MappingStepUnified() {
         csvType: type,
         row: d.row,
         count: d.count,
-        appType: findAppTypeForCsvType(type, localMapping.activityMappings || {}),
+        appType: findMappedActivityType(type, localMapping.activityMappings || {}),
       })),
       totalRows: total,
     };
@@ -213,21 +164,35 @@ export function MappingStepUnified() {
   }, [localMapping.fieldMappings, invalidAccounts]);
 
   const symbolsToMapCount = useMemo(() => {
-    return invalidSymbols.filter((symbol) => {
-      const normalizedSymbol = symbol.trim();
-      return !Object.keys(localMapping.symbolMappings || {}).some(
-        (mappedSymbol) => mappedSymbol.trim() === normalizedSymbol,
-      );
-    }).length;
-  }, [invalidSymbols, localMapping.symbolMappings]);
+    const unresolved = new Set<string>();
+    data.forEach((row) => {
+      const symbol = getMappedValue(row, ImportFormat.SYMBOL)?.trim();
+      if (!symbol) return;
 
-  // Data to display in mapping table (prioritize rows needing mapping)
+      const csvType = getMappedValue(row, ImportFormat.ACTIVITY_TYPE)?.trim();
+      const appType = csvType
+        ? findMappedActivityType(csvType, localMapping.activityMappings || {})
+        : null;
+
+      if (appType && !isSymbolRequired(appType, symbol)) return;
+      if (validateTickerSymbol(symbol) || localMapping.symbolMappings?.[symbol]) return;
+      unresolved.add(symbol);
+    });
+    return unresolved.size;
+  }, [data, getMappedValue, localMapping.symbolMappings, localMapping.activityMappings]);
+
+  // Data to display in mapping table (prioritize rows needing mapping, exclude cash-only symbols)
+  const nonCashSymbolSet = useMemo(() => new Set(distinctSymbols), [distinctSymbols]);
+
   const { distinctSymbolRows } = useMemo(() => {
     const symbolMap = new Map<string, { row: CsvRowData; count: number }>();
 
     data.forEach((row) => {
       const symbol = getMappedValue(row, ImportFormat.SYMBOL);
       if (!symbol) return;
+
+      // Skip symbols that only appear on cash activity rows
+      if (!nonCashSymbolSet.has(symbol.trim())) return;
 
       if (!symbolMap.has(symbol)) {
         symbolMap.set(symbol, { row, count: 1 });
@@ -246,7 +211,7 @@ export function MappingStepUnified() {
         mappedSymbol: localMapping.symbolMappings?.[symbol],
       })),
     };
-  }, [data, getMappedValue, invalidSymbols, localMapping.symbolMappings]);
+  }, [data, getMappedValue, invalidSymbols, localMapping.symbolMappings, nonCashSymbolSet]);
 
   const { distinctAccountRows } = useMemo(() => {
     const accountMap = new Map<string, { row: CsvRowData; count: number }>();

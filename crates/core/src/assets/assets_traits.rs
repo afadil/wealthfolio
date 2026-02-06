@@ -73,6 +73,8 @@ pub trait AssetServiceTrait: Send + Sync {
 #[async_trait::async_trait]
 pub trait AssetRepositoryTrait: Send + Sync {
     async fn create(&self, new_asset: NewAsset) -> Result<Asset>;
+    /// Creates multiple assets in a single transaction. All-or-nothing.
+    async fn create_batch(&self, new_assets: Vec<NewAsset>) -> Result<Vec<Asset>>;
     async fn update_profile(&self, asset_id: &str, payload: UpdateAssetProfile) -> Result<Asset>;
     async fn update_pricing_mode(&self, asset_id: &str, pricing_mode: &str) -> Result<Asset>;
     fn get_by_id(&self, asset_id: &str) -> Result<Asset>;

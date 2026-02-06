@@ -1,9 +1,6 @@
 /// Total account ID
 pub const PORTFOLIO_TOTAL_ACCOUNT_ID: &str = "TOTAL";
 
-/// Cash asset ID prefix
-pub const CASH_ASSET_PREFIX: &str = "$CASH";
-
 /// Decimal precision for valuation calculations
 pub const DECIMAL_PRECISION: u32 = 6;
 

@@ -119,6 +119,38 @@ impl AssetRepositoryTrait for AssetRepository {
             .await
     }
 
+    async fn create_batch(&self, new_assets: Vec<NewAsset>) -> Result<Vec<Asset>> {
+        if new_assets.is_empty() {
+            return Ok(Vec::new());
+        }
+        for asset in &new_assets {
+            asset.validate()?;
+        }
+        let assets_db: Vec<AssetDB> = new_assets.into_iter().map(|a| a.into()).collect();
+
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<Vec<Asset>> {
+                // INSERT OR IGNORE: skip assets that already exist
+                for asset_db in &assets_db {
+                    diesel::insert_into(assets::table)
+                        .values(asset_db)
+                        .on_conflict(assets::id)
+                        .do_nothing()
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
+                }
+
+                // Re-read all to return the full set
+                let ids: Vec<String> = assets_db.into_iter().map(|a| a.id).collect();
+                let results = assets::table
+                    .filter(assets::id.eq_any(&ids))
+                    .load::<AssetDB>(conn)
+                    .map_err(StorageError::from)?;
+                Ok(results.into_iter().map(|r| r.into()).collect())
+            })
+            .await
+    }
+
     /// Updates an existing asset in the database
     async fn update_profile(&self, asset_id: &str, payload: UpdateAssetProfile) -> Result<Asset> {
         payload.validate()?;

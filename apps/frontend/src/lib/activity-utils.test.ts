@@ -14,6 +14,7 @@ describe("Activity Utilities", () => {
       expect(isCashActivity(ActivityType.WITHDRAWAL)).toBe(true);
       expect(isCashActivity(ActivityType.FEE)).toBe(true);
       expect(isCashActivity(ActivityType.INTEREST)).toBe(true);
+      expect(isCashActivity(ActivityType.CREDIT)).toBe(true);
 
       expect(isCashActivity(ActivityType.BUY)).toBe(false);
       expect(isCashActivity(ActivityType.SELL)).toBe(false);
@@ -35,14 +36,14 @@ describe("Activity Utilities", () => {
 
   describe("isCashTransfer", () => {
     it("should identify cash transfers correctly", () => {
-      expect(isCashTransfer(ActivityType.TRANSFER_IN, "$CASH-USD")).toBe(true);
-      expect(isCashTransfer(ActivityType.TRANSFER_OUT, "$CASH-EUR")).toBe(true);
+      expect(isCashTransfer(ActivityType.TRANSFER_IN, "CASH:USD")).toBe(true);
+      expect(isCashTransfer(ActivityType.TRANSFER_OUT, "CASH:EUR")).toBe(true);
       expect(isCashTransfer(ActivityType.TRANSFER_IN, "CASH:USD")).toBe(true);
 
       expect(isCashTransfer(ActivityType.TRANSFER_IN, "AAPL")).toBe(false);
       expect(isCashTransfer(ActivityType.TRANSFER_IN, "CASH:XTSE")).toBe(false);
       expect(isCashTransfer(ActivityType.TRANSFER_IN, "CASH.TO")).toBe(false);
-      expect(isCashTransfer(ActivityType.DEPOSIT, "$CASH-USD")).toBe(false);
+      expect(isCashTransfer(ActivityType.DEPOSIT, "CASH:USD")).toBe(false);
     });
   });
 
@@ -156,7 +157,7 @@ describe("Activity Utilities", () => {
     it("should calculate cash transfer activity value correctly", () => {
       const transferIn = createActivity({
         activityType: ActivityType.TRANSFER_IN,
-        assetSymbol: "$CASH-USD",
+        assetSymbol: "CASH:USD",
         amount: "1000",
         fee: "10",
       });
@@ -165,7 +166,7 @@ describe("Activity Utilities", () => {
 
       const transferOut = createActivity({
         activityType: ActivityType.TRANSFER_OUT,
-        assetSymbol: "$CASH-USD",
+        assetSymbol: "CASH:USD",
         amount: "1000",
         fee: "10",
       });

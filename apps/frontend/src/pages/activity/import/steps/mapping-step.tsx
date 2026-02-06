@@ -1,8 +1,9 @@
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { CsvMappingEditor } from "../components/mapping-editor";
-import { ImportFormat, ActivityType, ImportMappingData, CsvRowData, Account } from "@/lib/types";
+import { ImportFormat, ImportMappingData, CsvRowData, Account } from "@/lib/types";
 import { useMemo } from "react";
 import { validateTickerSymbol } from "../utils/validation-utils";
+import { findMappedActivityType } from "../utils/activity-type-mapping";
 import { useImportMapping } from "../hooks/use-import-mapping";
 import { IMPORT_REQUIRED_FIELDS } from "@/lib/constants";
 import { ImportAlert } from "../components/import-alert";
@@ -127,29 +128,10 @@ export const MappingStep = ({
         csvType: type,
         row: data.row,
         count: data.count,
-        appType: findAppTypeForCsvType(type, mapping.activityMappings),
+        appType: findMappedActivityType(type, mapping.activityMappings),
       })),
     };
   }, [data, mapping.activityMappings, mapping.fieldMappings]);
-
-  function findAppTypeForCsvType(
-    csvType: string,
-    mappings: Partial<Record<ActivityType, string[]>>,
-  ): ActivityType | null {
-    const normalizedCsvType = csvType.trim().toUpperCase();
-
-    for (const [appType, csvTypes] of Object.entries(mappings)) {
-      if (
-        csvTypes?.some((mappedType) => {
-          const normalizedMappedType = mappedType.trim().toUpperCase();
-          return normalizedCsvType.startsWith(normalizedMappedType);
-        })
-      ) {
-        return appType as ActivityType;
-      }
-    }
-    return null;
-  }
 
   // Count unmapped activities
   const activitiesToMapCount = useMemo(() => {

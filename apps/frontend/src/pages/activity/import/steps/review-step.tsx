@@ -618,8 +618,7 @@ export function ReviewStep() {
                   accountId: accountId, // Use the selected account from state
                   activityType: draft.activityType as ActivityImport["activityType"],
                   date: draft.activityDate || "",
-                  symbol:
-                    draft.symbol || "$CASH-" + (draft.currency || parseConfig.defaultCurrency),
+                  symbol: draft.symbol || "",
                   quantity: draft.quantity,
                   unitPrice: draft.unitPrice,
                   amount: draft.amount,

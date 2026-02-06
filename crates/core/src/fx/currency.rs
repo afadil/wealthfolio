@@ -105,3 +105,13 @@ pub fn denormalization_multiplier(currency: &str) -> Decimal {
         Decimal::ONE
     }
 }
+
+/// Resolves currency from a priority list of candidates.
+/// Returns the first non-empty candidate, or "USD" as the ultimate fallback.
+pub fn resolve_currency(candidates: &[&str]) -> String {
+    candidates
+        .iter()
+        .find(|c| !c.trim().is_empty())
+        .map(|c| c.to_string())
+        .unwrap_or_else(|| "USD".to_string())
+}

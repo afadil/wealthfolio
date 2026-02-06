@@ -180,7 +180,7 @@ export function useActivityMutations(
 
   const saveActivitiesMutation = useMutation({
     mutationFn: async (request: ActivityBulkMutationRequest) => {
-      // NOTE: No longer normalizing cash activities to $CASH-{currency} here.
+      // NOTE: No longer normalizing cash activities to CASH:{currency} here.
       // Backend is now responsible for generating canonical asset IDs:
       // - For cash activities: backend generates CASH:{currency}
       // - For market activities: backend generates SEC:{symbol}:{mic} from symbol + exchangeMic

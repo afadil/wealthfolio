@@ -11,6 +11,7 @@ import {
   ImportRequiredField,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { isSymbolRequired } from "@/lib/activity-utils";
 import {
   Badge,
   SearchableSelect,
@@ -22,6 +23,7 @@ import {
   SelectValue,
 } from "@wealthfolio/ui";
 import { useState } from "react";
+import { findMappedActivityType } from "../utils/activity-type-mapping";
 
 const SKIP_FIELD_VALUE = "__skip__";
 
@@ -96,63 +98,6 @@ export function MappingHeaderCell({
       )}
     </div>
   );
-}
-
-// Smart defaults for activity type mapping
-const ACTIVITY_TYPE_SMART_DEFAULTS: Record<string, ActivityType> = {
-  BUY: ActivityType.BUY,
-  PURCHASE: ActivityType.BUY,
-  BOUGHT: ActivityType.BUY,
-  SELL: ActivityType.SELL,
-  SOLD: ActivityType.SELL,
-  DIVIDEND: ActivityType.DIVIDEND,
-  DIV: ActivityType.DIVIDEND,
-  DEPOSIT: ActivityType.DEPOSIT,
-  WITHDRAWAL: ActivityType.WITHDRAWAL,
-  WITHDRAW: ActivityType.WITHDRAWAL,
-  FEE: ActivityType.FEE,
-  TAX: ActivityType.TAX,
-  TRANSFER_IN: ActivityType.TRANSFER_IN,
-  TRANSFER: ActivityType.TRANSFER_IN,
-  TRANSFER_OUT: ActivityType.TRANSFER_OUT,
-  INTEREST: ActivityType.INTEREST,
-  INT: ActivityType.INTEREST,
-  SPLIT: ActivityType.SPLIT,
-  CREDIT: ActivityType.CREDIT,
-  ADJUSTMENT: ActivityType.ADJUSTMENT,
-};
-
-function findAppTypeForCsvType(
-  csvType: string,
-  mappings: Record<string, string[]>,
-): ActivityType | null {
-  const normalizedCsvType = csvType.trim().toUpperCase();
-
-  // Check explicit mappings first
-  for (const [appType, csvTypes] of Object.entries(mappings)) {
-    if (
-      csvTypes?.some((mappedType) => {
-        const normalizedMappedType = mappedType.trim().toUpperCase();
-        return normalizedCsvType.startsWith(normalizedMappedType);
-      })
-    ) {
-      return appType as ActivityType;
-    }
-  }
-
-  // Check smart defaults - exact match
-  if (ACTIVITY_TYPE_SMART_DEFAULTS[normalizedCsvType]) {
-    return ACTIVITY_TYPE_SMART_DEFAULTS[normalizedCsvType];
-  }
-
-  // Check smart defaults - partial match
-  for (const [key, value] of Object.entries(ACTIVITY_TYPE_SMART_DEFAULTS)) {
-    if (normalizedCsvType.startsWith(key) || normalizedCsvType.includes(key)) {
-      return value;
-    }
-  }
-
-  return null;
 }
 
 interface ActivityTypeDisplayCellProps {
@@ -389,7 +334,7 @@ export function MappingCell({
 
   // Special fields with custom renderers
   if (field === ImportFormat.ACTIVITY_TYPE) {
-    const appType = findAppTypeForCsvType(value, mapping.activityMappings);
+    const appType = findMappedActivityType(value, mapping.activityMappings);
     return (
       <ActivityTypeDisplayCell
         csvType={value}
@@ -400,6 +345,13 @@ export function MappingCell({
   }
 
   if (field === ImportFormat.SYMBOL) {
+    // Skip symbol display when not required (pure cash types, cash symbols)
+    const csvType = getMappedValue(row, ImportFormat.ACTIVITY_TYPE)?.trim();
+    const appType = csvType ? findMappedActivityType(csvType, mapping.activityMappings) : null;
+    if (appType && !isSymbolRequired(appType, value)) {
+      return <span className="text-muted-foreground text-xs">-</span>;
+    }
+
     const isInvalid = invalidSymbols.includes(value || ""); // handle empty string case for invalidSymbols check
     const mappedSymbol = mapping.symbolMappings[value];
     return (

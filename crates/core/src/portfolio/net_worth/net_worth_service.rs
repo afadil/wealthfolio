@@ -383,7 +383,7 @@ impl NetWorthServiceTrait for NetWorthService {
                 };
 
                 valuations.push(ValuationInfo {
-                    asset_id: format!("$CASH-{}", currency),
+                    asset_id: format!("CASH:{}", currency),
                     name: Some(format!("Cash ({})", currency)),
                     market_value_base: cash_base.round_dp(DECIMAL_PRECISION),
                     valuation_date: snapshot.snapshot_date,

@@ -664,7 +664,7 @@ impl MarketDataProvider for YahooProvider {
         );
 
         // Skip cash symbols
-        if symbol.starts_with("$CASH-") {
+        if symbol.starts_with("CASH:") {
             return Ok(vec![]);
         }
 
