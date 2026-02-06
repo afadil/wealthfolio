@@ -21,40 +21,6 @@ pub enum ValidationSeverity {
     Soft,
 }
 
-/// Result of quote validation.
-#[derive(Clone, Debug)]
-pub struct ValidationResult {
-    pub valid: bool,
-    pub severity: Option<ValidationSeverity>,
-    pub message: Option<String>,
-}
-
-impl ValidationResult {
-    pub fn ok() -> Self {
-        Self {
-            valid: true,
-            severity: None,
-            message: None,
-        }
-    }
-
-    pub fn hard_fail(message: impl Into<String>) -> Self {
-        Self {
-            valid: false,
-            severity: Some(ValidationSeverity::Hard),
-            message: Some(message.into()),
-        }
-    }
-
-    pub fn soft_warn(message: impl Into<String>) -> Self {
-        Self {
-            valid: true, // Still accepted
-            severity: Some(ValidationSeverity::Soft),
-            message: Some(message.into()),
-        }
-    }
-}
-
 /// Validation result details.
 #[derive(Clone, Debug)]
 pub struct ValidationIssue {
@@ -314,42 +280,6 @@ impl QuoteValidator {
                 });
             }
         }
-    }
-
-    /// Validate a quote with severity levels.
-    pub fn validate_with_severity(
-        &self,
-        quote: &Quote,
-        _context: &InstrumentId,
-    ) -> ValidationResult {
-        // Hard validations (reject quote)
-        if self.config.reject_negative_prices && quote.close < Decimal::ZERO {
-            return ValidationResult::hard_fail("Negative close price");
-        }
-
-        if let Some(max) = self.config.max_price {
-            if quote.close > max {
-                return ValidationResult::hard_fail(format!(
-                    "Price {} exceeds sanity limit {}",
-                    quote.close, max
-                ));
-            }
-        }
-
-        if self.config.reject_invalid_ohlc {
-            if let (Some(high), Some(low)) = (quote.high, quote.low) {
-                if high < low {
-                    return ValidationResult::hard_fail("High < Low in OHLC");
-                }
-            }
-        }
-
-        // Soft validations (warn but accept)
-        if self.config.warn_on_zero_volume && quote.volume == Some(Decimal::ZERO) {
-            return ValidationResult::soft_warn("Zero volume (market may be closed)");
-        }
-
-        ValidationResult::ok()
     }
 }
 

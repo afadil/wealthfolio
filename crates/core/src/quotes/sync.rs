@@ -153,6 +153,8 @@ pub enum AssetSkipReason {
     NotFound,
     /// Sync already in progress for this asset (US-012).
     SyncInProgress,
+    /// Too many consecutive sync failures (exceeds MAX_SYNC_ERRORS).
+    TooManyErrors,
 }
 
 impl std::fmt::Display for AssetSkipReason {
@@ -164,6 +166,7 @@ impl std::fmt::Display for AssetSkipReason {
             AssetSkipReason::ClosedPosition => write!(f, "Closed position"),
             AssetSkipReason::NotFound => write!(f, "Asset not found"),
             AssetSkipReason::SyncInProgress => write!(f, "Sync already in progress"),
+            AssetSkipReason::TooManyErrors => write!(f, "Too many consecutive sync failures"),
         }
     }
 }
@@ -730,10 +733,22 @@ where
             .map(|a| a.id.clone())
             .collect();
 
-        // Filter states to only include syncable assets
+        // Filter states to only include syncable assets and skip assets with too many errors
         let states: Vec<_> = states
             .into_iter()
-            .filter(|s| syncable_asset_ids.contains(&s.asset_id))
+            .filter(|s| {
+                if !syncable_asset_ids.contains(&s.asset_id) {
+                    return false;
+                }
+                if s.error_count >= MAX_SYNC_ERRORS {
+                    debug!(
+                        "Skipping {} - too many consecutive errors ({})",
+                        s.asset_id, s.error_count
+                    );
+                    return false;
+                }
+                true
+            })
             .collect();
 
         // Compute activity bounds on-the-fly from activities table
@@ -988,6 +1003,20 @@ where
                 .get_by_asset_id(&asset.id)
                 .ok()
                 .flatten();
+
+            // Skip assets with too many consecutive errors (unless full resync)
+            if !matches!(mode, SyncMode::BackfillHistory { .. }) {
+                if let Some(ref s) = state {
+                    if s.error_count >= MAX_SYNC_ERRORS {
+                        debug!(
+                            "Skipping {} - too many consecutive errors ({})",
+                            asset.id, s.error_count
+                        );
+                        result.add_skipped(asset.id.clone(), AssetSkipReason::TooManyErrors);
+                        continue;
+                    }
+                }
+            }
 
             // Build SyncPlanningInputs from computed bounds
             let (activity_min, activity_max) = activity_bounds

@@ -46,3 +46,8 @@ pub const MIN_HISTORICAL_TRADING_DAYS: i64 = 20;
 /// This ensures that if a provider corrects historical data (e.g., stock splits,
 /// dividend adjustments), we'll pick up those corrections on subsequent syncs.
 pub const OVERLAP_DAYS: i64 = 5;
+
+/// Maximum consecutive sync failures before an asset is skipped.
+/// After this threshold, the asset won't be synced until the user manually
+/// triggers a resync or the error count is reset.
+pub const MAX_SYNC_ERRORS: i32 = 10;

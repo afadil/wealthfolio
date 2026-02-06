@@ -16,4 +16,4 @@ pub use circuit_breaker::{CircuitBreaker, CircuitState};
 pub use rate_limiter::{RateLimitConfig, RateLimiter};
 pub use provider_registry::ProviderRegistry;
 pub use skip_reason::{FetchDiagnostics, ProviderAttempt, SkipReason};
-pub use validator::{QuoteValidator, ValidationResult, ValidationSeverity};
+pub use validator::{QuoteValidator, ValidationSeverity};
