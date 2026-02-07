@@ -260,6 +260,10 @@ mod tests {
         async fn copy_user_metadata(&self, _source_id: &str, _target_id: &str) -> AppResult<()> {
             Ok(())
         }
+
+        async fn deactivate_orphaned_investments(&self) -> AppResult<Vec<String>> {
+            Ok(vec![])
+        }
     }
 
     #[derive(Clone, Debug)]

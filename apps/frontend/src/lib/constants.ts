@@ -214,15 +214,12 @@ export const TRADING_ACTIVITY_TYPES = [
   ActivityType.SPLIT,
 ] as const;
 
-export const CASH_ACTIVITY_TYPES = [
-  ActivityType.DEPOSIT,
-  ActivityType.WITHDRAWAL,
-  ActivityType.INTEREST,
-  ActivityType.TRANSFER_IN,
-  ActivityType.TRANSFER_OUT,
-  ActivityType.TAX,
-  ActivityType.FEE,
-  ActivityType.CREDIT,
+export const SYMBOL_REQUIRED_TYPES = [
+  ActivityType.BUY,
+  ActivityType.SELL,
+  ActivityType.SPLIT,
+  ActivityType.DIVIDEND,
+  ActivityType.ADJUSTMENT,
 ] as const;
 
 export const INCOME_ACTIVITY_TYPES = [ActivityType.DIVIDEND, ActivityType.INTEREST] as const;

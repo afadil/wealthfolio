@@ -160,12 +160,6 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let base_currency = Arc::new(RwLock::new(settings.base_currency));
 
     let account_repo = Arc::new(AccountRepository::new(pool.clone(), writer.clone()));
-    let account_service = Arc::new(AccountService::new(
-        account_repo.clone(),
-        fx_service.clone(),
-        base_currency.clone(),
-        domain_event_sink.clone(),
-    ));
 
     // Additional repositories/services for web API
     let asset_repository = Arc::new(AssetRepository::new(pool.clone(), writer.clone()));
@@ -174,6 +168,15 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let snapshot_repository = Arc::new(SnapshotRepository::new(pool.clone(), writer.clone()));
     let quote_sync_state_repository =
         Arc::new(QuoteSyncStateRepository::new(pool.clone(), writer.clone()));
+
+    let account_service = Arc::new(AccountService::new(
+        account_repo.clone(),
+        fx_service.clone(),
+        base_currency.clone(),
+        domain_event_sink.clone(),
+        asset_repository.clone(),
+        quote_sync_state_repository.clone(),
+    ));
     let quote_service: Arc<dyn QuoteServiceTrait + Send + Sync> = Arc::new(
         QuoteService::new(
             market_data_repository.clone(),      // QuoteStore

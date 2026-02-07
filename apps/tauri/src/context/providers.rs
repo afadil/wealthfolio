@@ -136,6 +136,8 @@ pub async fn initialize_context(
         fx_service.clone(),
         base_currency.clone(),
         domain_event_sink.clone(),
+        asset_repository.clone(),
+        quote_sync_state_repository.clone(),
     ));
 
     // Import run repository for tracking CSV imports

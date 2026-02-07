@@ -32,6 +32,7 @@ export interface ProgressIndicatorProps {
   title?: string;
   description?: string;
   message?: string;
+  className?: string;
 }
 
 export function ProgressIndicator({
@@ -40,6 +41,7 @@ export function ProgressIndicator({
   title = "Processing",
   description = "Please wait while we process your request. This may take a few moments.",
   message = "Processing...",
+  className,
 }: ProgressIndicatorProps) {
   const [elapsedTime, setElapsedTime] = useState(0);
 
@@ -69,7 +71,7 @@ export function ProgressIndicator({
   // The progress content
   const progressContent = (
     <div className="mx-auto w-full max-w-md">
-      <div className="bg-card text-card-foreground rounded-lg border p-6 shadow-md">
+      <div className={cn("bg-card text-card-foreground rounded-lg border p-6 shadow-md", className)}>
         <div className="flex flex-col items-center space-y-4 text-center">
           <motion.div
             className="bg-primary/10 rounded-full p-4"

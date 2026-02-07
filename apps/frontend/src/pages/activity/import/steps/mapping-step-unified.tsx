@@ -12,7 +12,7 @@ import { useImportMapping } from "../hooks/use-import-mapping";
 import { validateTickerSymbol, findMappedActivityType } from "../utils/validation-utils";
 
 import { getAccounts } from "@/adapters";
-import { isSymbolRequired } from "@/lib/activity-utils";
+import { isCashSymbol, isSymbolRequired } from "@/lib/activity-utils";
 import { IMPORT_REQUIRED_FIELDS, ImportFormat } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, CsvRowData } from "@/lib/types";
@@ -99,7 +99,7 @@ export function MappingStepUnified() {
         ? findMappedActivityType(csvType, localMapping.activityMappings || {})
         : null;
 
-      if (appType && !isSymbolRequired(appType, symbol)) return;
+      if (appType && (!isSymbolRequired(appType) || isCashSymbol(symbol))) return;
 
       needed.add(symbol);
       if (!validateTickerSymbol(symbol)) invalid.add(symbol);
@@ -174,7 +174,7 @@ export function MappingStepUnified() {
         ? findMappedActivityType(csvType, localMapping.activityMappings || {})
         : null;
 
-      if (appType && !isSymbolRequired(appType, symbol)) return;
+      if (appType && (!isSymbolRequired(appType) || isCashSymbol(symbol))) return;
       if (validateTickerSymbol(symbol) || localMapping.symbolMappings?.[symbol]) return;
       unresolved.add(symbol);
     });

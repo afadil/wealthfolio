@@ -409,4 +409,32 @@ impl AssetRepositoryTrait for AssetRepository {
             })
             .await
     }
+
+    async fn deactivate_orphaned_investments(&self) -> Result<Vec<String>> {
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<Vec<String>> {
+                // Find active INVESTMENT assets with zero activities
+                let orphan_ids: Vec<String> = assets::table
+                    .select(assets::id)
+                    .filter(assets::kind.eq("INVESTMENT"))
+                    .filter(assets::is_active.eq(1))
+                    .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
+                        "id NOT IN (SELECT DISTINCT asset_id FROM activities WHERE asset_id IS NOT NULL)",
+                    ))
+                    .load::<String>(conn)
+                    .map_err(StorageError::from)?;
+
+                if !orphan_ids.is_empty() {
+                    diesel::update(
+                        assets::table.filter(assets::id.eq_any(&orphan_ids)),
+                    )
+                    .set(assets::is_active.eq(0))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                }
+
+                Ok(orphan_ids)
+            })
+            .await
+    }
 }

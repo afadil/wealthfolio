@@ -101,4 +101,8 @@ pub trait AssetRepositoryTrait: Send + Sync {
     /// Copies user-editable fields from source asset to target asset.
     /// Used during UNKNOWN asset merge to preserve user customizations.
     async fn copy_user_metadata(&self, source_id: &str, target_id: &str) -> Result<()>;
+
+    /// Finds INVESTMENT assets with no remaining activities and deactivates them.
+    /// Returns the IDs of deactivated assets.
+    async fn deactivate_orphaned_investments(&self) -> Result<Vec<String>>;
 }

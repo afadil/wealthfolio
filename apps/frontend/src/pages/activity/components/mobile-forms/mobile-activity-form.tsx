@@ -10,7 +10,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@wealthfolio/ui/components/ui/sheet";
-import { CASH_ACTIVITY_TYPES, QuoteMode } from "@/lib/constants";
+import { QuoteMode } from "@/lib/constants";
+import { isSymbolRequired } from "@/lib/activity-utils";
 import type { ActivityDetails } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
@@ -101,7 +102,7 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
       // For cash activities (DEPOSIT, WITHDRAWAL, INTEREST, FEE, TAX, TRANSFER_IN, TRANSFER_OUT):
       // Don't send assetId - backend will generate CASH:{currency} from account currency
       // Just ensure currency is set for the backend to use
-      if ((CASH_ACTIVITY_TYPES as readonly string[]).includes(submitData.activityType)) {
+      if (!isSymbolRequired(submitData.activityType)) {
         // Clear assetId - let backend generate it
         if ("assetId" in submitData) {
           delete (submitData as Record<string, unknown>).assetId;

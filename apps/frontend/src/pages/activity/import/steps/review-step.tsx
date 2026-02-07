@@ -1,6 +1,7 @@
 import { useMemo, useState, useCallback, useEffect } from "react";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { ProgressIndicator } from "@wealthfolio/ui/components/ui/progress-indicator";
 import {
   useImportContext,
   setDraftActivities,
@@ -896,10 +897,10 @@ export function ReviewStep() {
   if ((draftActivities.length === 0 && parsedRows.length > 0) || isValidating) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <Icons.Spinner className="text-primary h-8 w-8 animate-spin" />
-        <p className="text-muted-foreground mt-4">
-          {isValidating ? "Validating activities..." : "Processing activities..."}
-        </p>
+        <ProgressIndicator
+          message={isValidating ? "Validating activities..." : "Processing activities..."}
+          className="border-none shadow-none"
+        />
       </div>
     );
   }

@@ -6,7 +6,8 @@ use std::sync::Arc;
 
 use crate::accounts::{Account, AccountServiceTrait};
 use crate::activities::activities_constants::{
-    is_cash_activity, ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT,
+    classify_import_activity, is_garbage_symbol, requires_symbol, ImportSymbolDisposition,
+    ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT,
 };
 use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
@@ -413,11 +414,11 @@ impl ActivityService {
         } else if let Some(asset_id) = activity.get_symbol_id().filter(|s| !s.is_empty()) {
             // Existing asset_id provided (UUID from frontend)
             Some(asset_id.to_string())
-        } else if is_cash_activity(&activity.activity_type) {
-            None // Cash activities have no asset
+        } else if !requires_symbol(&activity.activity_type) {
+            None // Symbol-optional types have no asset when symbol is absent
         } else {
             return Err(ActivityError::InvalidData(
-                "Non-cash activities require either asset_id or symbol".to_string(),
+                "Symbol-required activities need either asset_id or symbol".to_string(),
             )
             .into());
         };
@@ -612,11 +613,11 @@ impl ActivityService {
             }
         } else if let Some(asset_id) = activity.get_symbol_id().filter(|s| !s.is_empty()) {
             Some(asset_id.to_string())
-        } else if is_cash_activity(&activity.activity_type) {
+        } else if !requires_symbol(&activity.activity_type) {
             None
         } else {
             return Err(ActivityError::InvalidData(
-                "Non-cash activities require either asset_id or symbol".to_string(),
+                "Symbol-required activities need either asset_id or symbol".to_string(),
             )
             .into());
         };
@@ -742,13 +743,7 @@ impl ActivityService {
         account: &Account,
         symbol_mic_cache: &HashMap<String, Option<String>>,
     ) -> Result<Option<crate::assets::AssetSpec>> {
-        use crate::activities::activities_constants::is_cash_activity;
         use crate::assets::{parse_crypto_pair_symbol, AssetSpec};
-
-        // Cash activities never need an asset, regardless of symbol
-        if is_cash_activity(&activity.activity_type) {
-            return Ok(None);
-        }
 
         let base_ccy = self.account_service.get_base_currency().unwrap_or_default();
         let account_currency = resolve_currency(&[&account.currency, &base_ccy]);
@@ -787,12 +782,12 @@ impl ActivityService {
                         }));
                     }
                 }
-                // Check if this is a cash activity (doesn't need asset)
-                if is_cash_activity(&activity.activity_type) {
+                // Symbol-optional types with no symbol → no asset needed
+                if !requires_symbol(&activity.activity_type) {
                     return Ok(None);
                 }
                 return Err(ActivityError::InvalidData(
-                    "Non-cash activity requires symbol or asset_id".to_string(),
+                    "Symbol-required activity needs symbol or asset_id".to_string(),
                 )
                 .into());
             }
@@ -1228,8 +1223,8 @@ impl ActivityServiceTrait for ActivityService {
     /// Asset creation happens in import_activities when the user confirms the import.
     ///
     /// Symbol resolution is activity-type-driven:
-    /// - Cash activity types (DEPOSIT, WITHDRAWAL, etc.) skip symbol resolution entirely
-    /// - Non-cash types require a valid symbol: searched in local assets, then market data
+    /// - Symbol-optional types with empty/cash symbols skip resolution (pure cash)
+    /// - Symbol-required types need a valid symbol: searched in local assets, then market data
     /// - Resolved exchange_mic + base symbol are stored on the activity for the import step
     async fn check_activities_import(
         &self,
@@ -1240,12 +1235,21 @@ impl ActivityServiceTrait for ActivityService {
         let base_ccy = self.account_service.get_base_currency().unwrap_or_default();
         let account_currency = resolve_currency(&[&account.currency, &base_ccy]);
 
-        // Only resolve symbols for non-cash activity types that don't already have exchange_mic
+        // Resolve symbols that will actually be used (only ResolveAsset disposition)
         let unique_symbols: HashSet<String> = activities
             .iter()
             .filter(|a| {
-                !is_cash_activity(&a.activity_type)
-                    && !a.symbol.trim().is_empty()
+                let sym = a.symbol.trim();
+                !sym.is_empty()
+                    && matches!(
+                        classify_import_activity(
+                            &a.activity_type,
+                            sym,
+                            a.quantity,
+                            a.unit_price,
+                        ),
+                        ImportSymbolDisposition::ResolveAsset
+                    )
                     && a.exchange_mic.is_none()
             })
             .map(|a| a.symbol.clone())
@@ -1267,48 +1271,65 @@ impl ActivityServiceTrait for ActivityService {
             }
 
             let symbol = activity.symbol.trim().to_string();
-            let is_cash = is_cash_activity(&activity.activity_type);
 
-            // Reject garbage symbols on ANY activity type (cash or not)
-            let is_garbage = !symbol.is_empty()
-                && (symbol.chars().all(|c| c == '-') || symbol.starts_with('$'));
-            if is_garbage {
-                activity.is_valid = false;
-                let mut errors = std::collections::HashMap::new();
-                errors.insert(
-                    "symbol".to_string(),
-                    vec![format!("Invalid symbol '{}'. Please correct or remove it.", &symbol)],
-                );
-                activity.errors = Some(errors);
-                activities_with_status.push(activity);
-                continue;
-            }
-
-            // Cash activities don't need a symbol — resolve currency and move on
-            if is_cash && symbol.is_empty() {
-                if activity.currency.is_empty() {
-                    activity.currency = account_currency.clone();
+            // Classify the activity based on type, symbol, quantity, and price
+            match classify_import_activity(
+                &activity.activity_type,
+                &symbol,
+                activity.quantity,
+                activity.unit_price,
+            ) {
+                ImportSymbolDisposition::CashMovement => {
+                    activity.symbol = String::new();
+                    if activity.currency.is_empty() {
+                        activity.currency = account_currency.clone();
+                    }
+                    activity.is_valid = true;
+                    self.validate_currency(&mut activity, &account_currency);
+                    activities_with_status.push(activity);
+                    continue;
                 }
-                activity.is_valid = true;
-                self.validate_currency(&mut activity, &account_currency);
-                activities_with_status.push(activity);
-                continue;
-            }
-
-            // Non-cash: symbol is required
-            if symbol.is_empty() {
-                activity.is_valid = false;
-                let mut errors = std::collections::HashMap::new();
-                errors.insert(
-                    "symbol".to_string(),
-                    vec![format!(
-                        "Symbol is required for {} activities.",
-                        &activity.activity_type
-                    )],
-                );
-                activity.errors = Some(errors);
-                activities_with_status.push(activity);
-                continue;
+                ImportSymbolDisposition::NeedsReview(msg) => {
+                    activity.is_valid = false;
+                    let mut errors = std::collections::HashMap::new();
+                    errors.insert("symbol".to_string(), vec![msg]);
+                    activity.errors = Some(errors);
+                    activities_with_status.push(activity);
+                    continue;
+                }
+                ImportSymbolDisposition::ResolveAsset => {
+                    // Symbol-required types with empty symbol → error
+                    if symbol.is_empty() {
+                        activity.is_valid = false;
+                        let mut errors = std::collections::HashMap::new();
+                        errors.insert(
+                            "symbol".to_string(),
+                            vec![format!(
+                                "Symbol is required for {} activities.",
+                                &activity.activity_type
+                            )],
+                        );
+                        activity.errors = Some(errors);
+                        activities_with_status.push(activity);
+                        continue;
+                    }
+                    // Garbage symbols on symbol-required types → error
+                    if is_garbage_symbol(&symbol) {
+                        activity.is_valid = false;
+                        let mut errors = std::collections::HashMap::new();
+                        errors.insert(
+                            "symbol".to_string(),
+                            vec![format!(
+                                "Invalid symbol '{}'. Please correct or remove it.",
+                                &symbol
+                            )],
+                        );
+                        activity.errors = Some(errors);
+                        activities_with_status.push(activity);
+                        continue;
+                    }
+                    // Fall through to symbol resolution below
+                }
             }
 
             // Get exchange_mic: prefer already-set value (from prior check), then cache

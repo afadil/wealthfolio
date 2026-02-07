@@ -27,15 +27,6 @@ export type PickerActivityType =
   | "INTEREST"
   | "TAX";
 
-// Pure cash activities that need account currency
-export const PURE_CASH_ACTIVITY_TYPES = [
-  "DEPOSIT",
-  "WITHDRAWAL",
-  "FEE",
-  "INTEREST",
-  "TAX",
-] as const;
-
 // Form values union type
 export type ActivityFormValues =
   | BuyFormValues
