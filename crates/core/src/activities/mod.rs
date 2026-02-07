@@ -21,9 +21,9 @@ pub use activities_model::{
     parse_decimal_string_tolerant, Activity, ActivityBulkIdentifierMapping,
     ActivityBulkMutationError, ActivityBulkMutationRequest, ActivityBulkMutationResult,
     ActivityDetails, ActivityImport, ActivitySearchResponse, ActivitySearchResponseMeta,
-    ActivityStatus, ActivityType, ActivityUpdate, ActivityUpsert, AssetInput, BulkUpsertResult,
+    ActivityStatus, ActivityType, ActivityUpdate, ActivityUpsert, BulkUpsertResult,
     ImportActivitiesResult, ImportActivitiesSummary, ImportMapping, ImportMappingData, IncomeData,
-    NewActivity, Sort,
+    NewActivity, Sort, SymbolInput,
 };
 pub use activities_service::ActivityService;
 pub use activities_traits::{ActivityRepositoryTrait, ActivityServiceTrait};

@@ -429,7 +429,7 @@ export function buildSavePayload(
         // Backend will generate the canonical ID
         const symbol = (transaction.assetSymbol || "").trim().toUpperCase();
         if (symbol) {
-          createPayload.asset = {
+          createPayload.symbol = {
             symbol,
             exchangeMic: transaction.exchangeMic,
             kind: transaction.pendingAssetKind,
@@ -452,7 +452,7 @@ export function buildSavePayload(
 
         if (symbolChanged && currentSymbol) {
           // Symbol changed: send symbol + exchangeMic for backend to generate new canonical ID
-          updatePayload.asset = {
+          updatePayload.symbol = {
             symbol: currentSymbol,
             exchangeMic: transaction.exchangeMic,
             kind: transaction.pendingAssetKind,
@@ -461,7 +461,7 @@ export function buildSavePayload(
           };
         } else if (transaction._originalAssetId) {
           // Symbol unchanged: send existing asset ID with quoteMode to allow mode updates
-          updatePayload.asset = {
+          updatePayload.symbol = {
             id: transaction._originalAssetId,
             quoteMode: transaction.assetQuoteMode,
           };

@@ -64,13 +64,13 @@ export function useActivityMutations(
         amount: toDecimalPayload(amount),
         fee: toDecimalPayload(fee),
         fxRate: toDecimalPayload(fxRate),
-        // Use nested asset object (preferred over flat fields)
-        asset: {
+        // Use nested symbol object
+        symbol: {
           symbol: assetId,
           exchangeMic,
           kind: assetKind || assetMetadata?.kind,
           name: assetMetadata?.name,
-          quoteMode: quoteMode as ActivityCreate["asset"] extends { quoteMode?: infer P }
+          quoteMode: quoteMode as ActivityCreate["symbol"] extends { quoteMode?: infer P }
             ? P
             : never,
         },
@@ -110,14 +110,14 @@ export function useActivityMutations(
         amount: toDecimalPayload(amount),
         fee: toDecimalPayload(fee),
         fxRate: toDecimalPayload(fxRate),
-        // Use nested asset object (preferred over flat fields)
-        asset: {
+        // Use nested symbol object
+        symbol: {
           id: assetId, // For updates, assetId may be the canonical ID
           symbol: assetId,
           exchangeMic,
           kind: assetKind || assetMetadata?.kind,
           name: assetMetadata?.name,
-          quoteMode: quoteMode as ActivityUpdate["asset"] extends { quoteMode?: infer P }
+          quoteMode: quoteMode as ActivityUpdate["symbol"] extends { quoteMode?: infer P }
             ? P
             : never,
         },
@@ -162,8 +162,8 @@ export function useActivityMutations(
       fxRate: restOfActivityData.fxRate ?? undefined,
       activityDate: date,
       comment: "Duplicated",
-      // Use nested asset object
-      asset: {
+      // Use nested symbol object
+      symbol: {
         symbol: assetSymbol,
         exchangeMic,
         quoteMode: assetQuoteMode,

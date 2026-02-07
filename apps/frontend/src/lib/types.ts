@@ -209,10 +209,10 @@ export interface ActivitySearchResponse {
  * IMPORTANT: assetId is NOT allowed for creates - backend generates canonical IDs
  */
 /**
- * Asset input for creating/updating activities.
- * Groups all asset-related fields into a single nested object.
+ * Symbol input for creating/updating activities.
+ * Groups all symbol-related fields into a single nested object.
  */
-export interface AssetInput {
+export interface SymbolInput {
   id?: string; // Only for updates (backend generates ID for creates)
   symbol?: string; // e.g., "AAPL" or undefined for cash
   exchangeMic?: string; // e.g., "XNAS" or undefined
@@ -229,13 +229,7 @@ export interface ActivityCreate {
   activityDate: string | Date;
   /** Optional grouping key (links paired transfer legs). */
   sourceGroupId?: string;
-  // Nested asset input (preferred)
-  asset?: AssetInput;
-  // Legacy flat fields (deprecated - use asset object instead)
-  symbol?: string;
-  exchangeMic?: string;
-  assetKind?: string;
-  quoteMode?: QuoteMode;
+  symbol?: SymbolInput;
   quantity?: string | number | null;
   unitPrice?: string | number | null;
   amount?: string | number | null;
@@ -248,10 +242,6 @@ export interface ActivityCreate {
 
 /**
  * Payload for updating an EXISTING activity.
- *
- * Asset identification:
- * - Use nested asset object (preferred)
- * - Or use legacy flat fields (assetId, symbol, exchangeMic)
  */
 export interface ActivityUpdate {
   id: string;
@@ -261,14 +251,7 @@ export interface ActivityUpdate {
   activityDate: string | Date;
   /** Optional grouping key (links paired transfer legs). */
   sourceGroupId?: string;
-  // Nested asset input (preferred)
-  asset?: AssetInput;
-  // Legacy flat fields (deprecated - use asset object instead)
-  assetId?: string;
-  symbol?: string;
-  exchangeMic?: string;
-  assetKind?: string;
-  quoteMode?: QuoteMode;
+  symbol?: SymbolInput;
   quantity?: string | number | null;
   unitPrice?: string | number | null;
   amount?: string | number | null;

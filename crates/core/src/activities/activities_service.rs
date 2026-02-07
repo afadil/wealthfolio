@@ -333,10 +333,10 @@ impl ActivityService {
         let currency = resolve_currency(&[&activity.currency, &account_currency, &base_ccy]);
 
         // Extract asset fields from nested `asset` object
-        let symbol = activity.get_symbol().map(|s| s.to_string());
+        let symbol = activity.get_symbol_code().map(|s| s.to_string());
         let exchange_mic = activity.get_exchange_mic().map(|s| s.to_string());
-        let asset_kind_hint = activity.get_asset_kind().map(|s| s.to_string());
-        let asset_name = activity.get_asset_name().map(|s| s.to_string());
+        let asset_kind_hint = activity.get_kind_hint().map(|s| s.to_string());
+        let asset_name = activity.get_name().map(|s| s.to_string());
         let quote_mode = activity.get_quote_mode().map(|s| s.to_string());
 
         let inferred = symbol.as_deref().map(|s| {
@@ -410,7 +410,7 @@ impl ActivityService {
             } else {
                 None
             }
-        } else if let Some(asset_id) = activity.get_asset_id().filter(|s| !s.is_empty()) {
+        } else if let Some(asset_id) = activity.get_symbol_id().filter(|s| !s.is_empty()) {
             // Existing asset_id provided (UUID from frontend)
             Some(asset_id.to_string())
         } else if is_cash_activity(&activity.activity_type) {
@@ -424,10 +424,10 @@ impl ActivityService {
 
         // Update activity's asset with resolved asset_id
         if let Some(ref resolved_id) = resolved_asset_id {
-            match activity.asset.as_mut() {
+            match activity.symbol.as_mut() {
                 Some(asset) => asset.id = Some(resolved_id.clone()),
                 None => {
-                    activity.asset = Some(AssetInput {
+                    activity.symbol = Some(SymbolInput {
                         id: Some(resolved_id.clone()),
                         ..Default::default()
                     });
@@ -548,10 +548,10 @@ impl ActivityService {
         let currency = resolve_currency(&[&activity.currency, &account_currency]);
 
         // Extract asset fields
-        let symbol = activity.get_symbol().map(|s| s.to_string());
+        let symbol = activity.get_symbol_code().map(|s| s.to_string());
         let exchange_mic = activity.get_exchange_mic().map(|s| s.to_string());
-        let asset_kind_hint = activity.get_asset_kind().map(|s| s.to_string());
-        let asset_name = activity.get_asset_name().map(|s| s.to_string());
+        let asset_kind_hint = activity.get_kind_hint().map(|s| s.to_string());
+        let asset_name = activity.get_name().map(|s| s.to_string());
         let quote_mode = activity.get_quote_mode().map(|s| s.to_string());
 
         let inferred = symbol.as_deref().map(|s| {
@@ -610,7 +610,7 @@ impl ActivityService {
             } else {
                 None
             }
-        } else if let Some(asset_id) = activity.get_asset_id().filter(|s| !s.is_empty()) {
+        } else if let Some(asset_id) = activity.get_symbol_id().filter(|s| !s.is_empty()) {
             Some(asset_id.to_string())
         } else if is_cash_activity(&activity.activity_type) {
             None
@@ -623,10 +623,10 @@ impl ActivityService {
 
         // Update activity's asset with resolved asset_id
         if let Some(ref resolved_id) = resolved_asset_id {
-            match activity.asset.as_mut() {
+            match activity.symbol.as_mut() {
                 Some(asset) => asset.id = Some(resolved_id.clone()),
                 None => {
-                    activity.asset = Some(AssetInput {
+                    activity.symbol = Some(SymbolInput {
                         id: Some(resolved_id.clone()),
                         ..Default::default()
                     });
@@ -753,11 +753,11 @@ impl ActivityService {
         let base_ccy = self.account_service.get_base_currency().unwrap_or_default();
         let account_currency = resolve_currency(&[&account.currency, &base_ccy]);
 
-        let symbol = match activity.get_symbol() {
+        let symbol = match activity.get_symbol_code() {
             Some(s) if !s.is_empty() => s.to_string(),
             _ => {
                 // No symbol provided - check if we have an asset_id directly (UUID)
-                if let Some(asset_id) = activity.get_asset_id() {
+                if let Some(asset_id) = activity.get_symbol_id() {
                     if !asset_id.is_empty() {
                         // asset_id is a UUID; look up the existing asset to build spec
                         let currency = if !activity.currency.is_empty() {
@@ -783,7 +783,7 @@ impl ActivityService {
                             quote_ccy: currency,
                             kind: AssetKind::Investment,
                             quote_mode,
-                            name: activity.get_asset_name().map(|s| s.to_string()),
+                            name: activity.get_name().map(|s| s.to_string()),
                         }));
                     }
                 }
@@ -817,7 +817,7 @@ impl ActivityService {
 
         // Infer asset kind and instrument type using base symbol
         let (kind, instrument_type) =
-            self.infer_asset_kind(base_symbol, exchange_mic.as_deref(), activity.get_asset_kind());
+            self.infer_asset_kind(base_symbol, exchange_mic.as_deref(), activity.get_kind_hint());
 
         // For crypto, use the quote currency from the pair if available
         let is_crypto = instrument_type.as_ref() == Some(&InstrumentType::Crypto);
@@ -863,7 +863,7 @@ impl ActivityService {
             quote_ccy: asset_currency,
             kind,
             quote_mode,
-            name: activity.get_asset_name().map(|s| s.to_string()),
+            name: activity.get_name().map(|s| s.to_string()),
         }))
     }
 
@@ -1086,7 +1086,7 @@ impl ActivityServiceTrait for ActivityService {
             .updates
             .iter()
             .filter_map(|a| {
-                let symbol = a.get_symbol();
+                let symbol = a.get_symbol_code();
                 let has_mic = a.get_exchange_mic().is_some();
                 let is_cash = symbol.map(|s| s.starts_with("CASH:")).unwrap_or(false);
                 if symbol.is_some() && !has_mic && !is_cash {
@@ -1107,11 +1107,11 @@ impl ActivityServiceTrait for ActivityService {
 
         // Update updates with resolved exchange_mic
         for activity in &mut request.updates {
-            if let Some(symbol) = activity.get_symbol() {
+            if let Some(symbol) = activity.get_symbol_code() {
                 let has_mic = activity.get_exchange_mic().is_some();
                 if !has_mic {
                     if let Some(mic) = update_symbol_mic_cache.get(symbol).cloned().flatten() {
-                        if let Some(ref mut asset) = activity.asset {
+                        if let Some(ref mut asset) = activity.symbol {
                             asset.exchange_mic = Some(mic);
                         }
                     }
@@ -1535,7 +1535,7 @@ impl ActivityServiceTrait for ActivityService {
         // Collect unique asset_ids and currencies before consuming activities
         let asset_ids: Vec<String> = activities_to_insert
             .iter()
-            .filter_map(|a| a.get_asset_id().map(|s| s.to_string()))
+            .filter_map(|a| a.get_symbol_id().map(|s| s.to_string()))
             .collect::<HashSet<_>>()
             .into_iter()
             .collect();
@@ -1714,7 +1714,7 @@ impl ActivityServiceTrait for ActivityService {
         let symbols_to_resolve: HashSet<String> = activities
             .iter()
             .filter_map(|a| {
-                let symbol = a.get_symbol()?;
+                let symbol = a.get_symbol_code()?;
                 let has_mic = a.get_exchange_mic().is_some();
                 let is_cash = symbol.starts_with("CASH:");
                 if !has_mic && !is_cash {
@@ -1869,10 +1869,10 @@ impl ActivityServiceTrait for ActivityService {
 
             // Update activity's asset with resolved asset_id
             if let Some(ref asset_id) = resolved_asset_id {
-                match activity.asset.as_mut() {
+                match activity.symbol.as_mut() {
                     Some(asset) => asset.id = Some(asset_id.clone()),
                     None => {
-                        activity.asset = Some(AssetInput {
+                        activity.symbol = Some(SymbolInput {
                             id: Some(asset_id.clone()),
                             ..Default::default()
                         });

@@ -167,7 +167,7 @@ impl Activity {
 /// Consolidates all asset-related fields into a single nested object.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct AssetInput {
+pub struct SymbolInput {
     /// Asset ID - optional, for backward compatibility with existing assets
     pub id: Option<String>,
     /// Symbol (e.g., "AAPL", "BTC") - used to generate canonical asset ID
@@ -189,9 +189,10 @@ pub struct NewActivity {
     pub id: Option<String>,
     pub account_id: String,
 
-    /// Asset input - consolidates id, symbol, exchangeMic, kind, name, quoteMode
+    /// Symbol input - consolidates id, symbol, exchangeMic, kind, name, quoteMode
     /// Optional for cash activities which don't require an asset
-    pub asset: Option<AssetInput>,
+    #[serde(alias = "asset")]
+    pub symbol: Option<SymbolInput>,
 
     pub activity_type: String,
     pub subtype: Option<String>, // Semantic variation (DRIP, STAKING_REWARD, etc.)
@@ -258,30 +259,30 @@ impl NewActivity {
         Ok(())
     }
 
-    // Helper methods to extract asset fields from nested `asset`
+    // Helper methods to extract fields from nested `symbol`
 
-    pub fn get_asset_id(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.id.as_deref())
+    pub fn get_symbol_id(&self) -> Option<&str> {
+        self.symbol.as_ref().and_then(|a| a.id.as_deref())
     }
 
-    pub fn get_symbol(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.symbol.as_deref())
+    pub fn get_symbol_code(&self) -> Option<&str> {
+        self.symbol.as_ref().and_then(|a| a.symbol.as_deref())
     }
 
     pub fn get_exchange_mic(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.exchange_mic.as_deref())
+        self.symbol.as_ref().and_then(|a| a.exchange_mic.as_deref())
     }
 
-    pub fn get_asset_kind(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.kind.as_deref())
+    pub fn get_kind_hint(&self) -> Option<&str> {
+        self.symbol.as_ref().and_then(|a| a.kind.as_deref())
     }
 
-    pub fn get_asset_name(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.name.as_deref())
+    pub fn get_name(&self) -> Option<&str> {
+        self.symbol.as_ref().and_then(|a| a.name.as_deref())
     }
 
     pub fn get_quote_mode(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.quote_mode.as_deref())
+        self.symbol.as_ref().and_then(|a| a.quote_mode.as_deref())
     }
 }
 
@@ -292,9 +293,10 @@ pub struct ActivityUpdate {
     pub id: String,
     pub account_id: String,
 
-    /// Asset input - consolidates id, symbol, exchangeMic, kind, name, quoteMode
+    /// Symbol input - consolidates id, symbol, exchangeMic, kind, name, quoteMode
     /// Optional for cash activities which don't require an asset
-    pub asset: Option<AssetInput>,
+    #[serde(alias = "asset")]
+    pub symbol: Option<SymbolInput>,
 
     pub activity_type: String,
     pub subtype: Option<String>, // Semantic variation (DRIP, STAKING_REWARD, etc.)
@@ -354,30 +356,30 @@ impl ActivityUpdate {
         Ok(())
     }
 
-    // Helper methods to extract asset fields from nested `asset`
+    // Helper methods to extract fields from nested `symbol`
 
-    pub fn get_asset_id(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.id.as_deref())
+    pub fn get_symbol_id(&self) -> Option<&str> {
+        self.symbol.as_ref().and_then(|a| a.id.as_deref())
     }
 
-    pub fn get_symbol(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.symbol.as_deref())
+    pub fn get_symbol_code(&self) -> Option<&str> {
+        self.symbol.as_ref().and_then(|a| a.symbol.as_deref())
     }
 
     pub fn get_exchange_mic(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.exchange_mic.as_deref())
+        self.symbol.as_ref().and_then(|a| a.exchange_mic.as_deref())
     }
 
-    pub fn get_asset_kind(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.kind.as_deref())
+    pub fn get_kind_hint(&self) -> Option<&str> {
+        self.symbol.as_ref().and_then(|a| a.kind.as_deref())
     }
 
-    pub fn get_asset_name(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.name.as_deref())
+    pub fn get_name(&self) -> Option<&str> {
+        self.symbol.as_ref().and_then(|a| a.name.as_deref())
     }
 
     pub fn get_quote_mode(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.quote_mode.as_deref())
+        self.symbol.as_ref().and_then(|a| a.quote_mode.as_deref())
     }
 }
 
@@ -1022,10 +1024,10 @@ pub struct PrepareActivitiesResult {
 
 impl From<ActivityImport> for NewActivity {
     fn from(import: ActivityImport) -> Self {
-        let asset = if import.symbol.is_empty() {
+        let symbol = if import.symbol.is_empty() {
             None
         } else {
-            Some(AssetInput {
+            Some(SymbolInput {
                 id: None,
                 symbol: Some(import.symbol),
                 exchange_mic: import.exchange_mic,
@@ -1044,7 +1046,7 @@ impl From<ActivityImport> for NewActivity {
         NewActivity {
             id: import.id,
             account_id: import.account_id.unwrap_or_default(),
-            asset,
+            symbol,
             activity_type: import.activity_type,
             subtype: import.subtype,
             activity_date: import.date,

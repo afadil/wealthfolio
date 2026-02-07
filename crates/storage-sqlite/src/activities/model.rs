@@ -451,7 +451,7 @@ impl From<NewActivity> for ActivityDB {
             .to_string();
 
         // Extract asset_id before consuming domain fields
-        let asset_id = domain.get_asset_id().map(|s| s.to_string());
+        let asset_id = domain.get_symbol_id().map(|s| s.to_string());
 
         Self {
             id: domain.id.unwrap_or_default(),
@@ -539,7 +539,7 @@ impl From<ActivityUpdate> for ActivityDB {
             .to_string();
 
         // Extract asset_id before consuming domain fields
-        let asset_id = domain.get_asset_id().map(|s| s.to_string());
+        let asset_id = domain.get_symbol_id().map(|s| s.to_string());
 
         Self {
             id: domain.id,

@@ -589,7 +589,7 @@ mod tests {
         async fn create_activity(&self, new_activity: NewActivity) -> Result<Activity> {
             use crate::activities::ActivityStatus;
             // Extract asset_id before consuming other fields
-            let asset_id = new_activity.get_asset_id().map(|s| s.to_string());
+            let asset_id = new_activity.get_symbol_id().map(|s| s.to_string());
             let activity = Activity {
                 id: new_activity.id.unwrap_or_else(|| "test-id".to_string()),
                 account_id: new_activity.account_id,
@@ -812,7 +812,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 id: Some("NESN".to_string()),
                 ..Default::default()
             }),
@@ -883,7 +883,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 id: Some("NESN".to_string()),
                 ..Default::default()
             }),
@@ -955,7 +955,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 id: Some("AAPL".to_string()),
                 ..Default::default()
             }),
@@ -1029,7 +1029,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 symbol: Some("AAPL".to_string()),
                 exchange_mic: Some("XNAS".to_string()),
                 ..Default::default()
@@ -1095,7 +1095,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 symbol: Some("TSLA".to_string()),
                 ..Default::default()
             }),
@@ -1161,7 +1161,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 id: Some("IGNORED".to_string()), // Should be ignored when symbol is provided
                 symbol: Some("AAPL".to_string()),
                 exchange_mic: Some("XNAS".to_string()),
@@ -1219,7 +1219,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: None,
+            symbol: None,
             activity_type: "DEPOSIT".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -1271,7 +1271,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: None,
+            symbol: None,
             activity_type: "WITHDRAWAL".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -1323,7 +1323,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: None, // No asset info
+            symbol: None, // No asset info
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -1382,7 +1382,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 symbol: Some("BTC".to_string()),
                 ..Default::default()
             }),
@@ -1448,7 +1448,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 symbol: Some("BTC-USD".to_string()),
                 ..Default::default()
             }),
@@ -1515,7 +1515,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 symbol: Some("BTC".to_string()),
                 exchange_mic: Some("XNAS".to_string()),
                 kind: Some("SECURITY".to_string()), // Explicit hint
@@ -1583,7 +1583,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 symbol: Some("ETH".to_string()),
                 exchange_mic: Some("XTSE".to_string()), // Has exchange = security
                 ..Default::default()
@@ -1651,7 +1651,7 @@ mod tests {
             let new_activity = NewActivity {
                 id: Some(format!("activity-{}", activity_type)),
                 account_id: "acc-1".to_string(),
-                asset: None,
+                symbol: None,
                 activity_type: activity_type.to_string(),
                 subtype: None,
                 activity_date: "2024-01-15".to_string(),
@@ -1718,7 +1718,7 @@ mod tests {
             creates: vec![NewActivity {
                 id: Some("activity-1".to_string()),
                 account_id: "acc-1".to_string(),
-                asset: Some(AssetInput {
+                symbol: Some(SymbolInput {
                     id: Some("NESN".to_string()),
                     ..Default::default()
                 }),
@@ -1799,7 +1799,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 id: Some("SEC:AZN:XLON".to_string()),
                 ..Default::default()
             }),
@@ -1887,7 +1887,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 id: Some("SEC:VOD:XLON".to_string()),
                 ..Default::default()
             }),
@@ -1948,7 +1948,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 id: Some("SEC:NPN:XJSE".to_string()),
                 ..Default::default()
             }),
@@ -2009,7 +2009,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 id: Some("SEC:LLOY:XLON".to_string()),
                 ..Default::default()
             }),

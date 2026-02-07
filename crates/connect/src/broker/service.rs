@@ -19,7 +19,7 @@ use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 use std::collections::HashSet;
 use wealthfolio_core::accounts::{Account, AccountServiceTrait, NewAccount, TrackingMode};
-use wealthfolio_core::activities::{self, compute_idempotency_key, AssetInput, NewActivity};
+use wealthfolio_core::activities::{self, compute_idempotency_key, NewActivity, SymbolInput};
 use wealthfolio_core::assets::{AssetKind, AssetServiceTrait};
 use wealthfolio_core::errors::Result;
 use wealthfolio_core::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
@@ -584,7 +584,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 id: Some(activity_id),
                 account_id: account_id.clone(),
                 // Broker sync provides asset_id directly (already resolved by mapping)
-                asset: asset_id.as_ref().map(|id| AssetInput {
+                symbol: asset_id.as_ref().map(|id| SymbolInput {
                     id: Some(id.clone()),
                     symbol: None, // Broker sync uses resolved asset_id directly
                     exchange_mic: None,

@@ -672,8 +672,8 @@ function DraftForm({
         accountId: formValues.accountId,
         activityType: formValues.activityType,
         activityDate: formValues.activityDate.toISOString(),
-        // Nest asset fields in asset object (required by backend)
-        asset: selectedSymbol
+        // Nest symbol fields in symbol object (required by backend)
+        symbol: selectedSymbol
           ? {
               symbol: selectedSymbol,
               exchangeMic: selectedExchangeMic,

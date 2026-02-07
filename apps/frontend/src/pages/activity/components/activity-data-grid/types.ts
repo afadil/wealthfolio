@@ -133,9 +133,9 @@ interface ActivityBasePayload {
 }
 
 /**
- * Asset input for activity payloads - matches backend's AssetInput struct
+ * Symbol input for activity payloads - matches backend's SymbolInput struct
  */
-export interface AssetInput {
+export interface SymbolInput {
   /** Asset ID - optional, for backward compatibility with existing assets */
   id?: string;
   /** Symbol (e.g., "AAPL", "BTC") - used to generate canonical asset ID */
@@ -153,27 +153,27 @@ export interface AssetInput {
 /**
  * Payload for creating a NEW activity
  *
- * Asset identification:
- * - Send asset.symbol + asset.exchangeMic, backend generates the canonical ID
- * - For CASH activities: don't send asset, backend generates CASH:{currency}
+ * Symbol identification:
+ * - Send symbol.symbol + symbol.exchangeMic, backend generates the canonical ID
+ * - For CASH activities: don't send symbol, backend generates CASH:{currency}
  *
- * IMPORTANT: asset.id is NOT allowed for creates - backend generates canonical IDs
+ * IMPORTANT: symbol.id is NOT allowed for creates - backend generates canonical IDs
  */
 export interface ActivityCreatePayload extends ActivityBasePayload {
-  /** Asset input - consolidates id, symbol, exchangeMic, kind, name, quoteMode */
-  asset?: AssetInput;
+  /** Symbol input - consolidates id, symbol, exchangeMic, kind, name, quoteMode */
+  symbol?: SymbolInput;
 }
 
 /**
  * Payload for updating an EXISTING activity
  *
- * Asset identification:
- * - Send asset.id for existing assets (backward compatibility)
- * - Or send asset.symbol + asset.exchangeMic to re-resolve the asset
+ * Symbol identification:
+ * - Send symbol.id for existing assets (backward compatibility)
+ * - Or send symbol.symbol + symbol.exchangeMic to re-resolve the asset
  */
 export interface ActivityUpdatePayload extends ActivityBasePayload {
-  /** Asset input - consolidates id, symbol, exchangeMic, kind, name, quoteMode */
-  asset?: AssetInput;
+  /** Symbol input - consolidates id, symbol, exchangeMic, kind, name, quoteMode */
+  symbol?: SymbolInput;
 }
 
 /**

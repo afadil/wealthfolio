@@ -265,7 +265,7 @@ mod tests {
         NewActivity {
             id: None,
             account_id: "account-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 id: Some("AAPL".to_string()),
                 ..Default::default()
             }),
@@ -360,7 +360,7 @@ mod tests {
     #[test]
     fn test_new_activity_allows_null_asset_id() {
         let mut activity = create_test_new_activity();
-        activity.asset = None;
+        activity.symbol = None;
         activity.activity_type = "DEPOSIT".to_string();
 
         let result = activity.validate();
@@ -375,7 +375,7 @@ mod tests {
         ActivityUpdate {
             id: "activity-1".to_string(),
             account_id: "account-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 id: Some("AAPL".to_string()),
                 ..Default::default()
             }),
@@ -434,7 +434,7 @@ mod tests {
     #[test]
     fn test_activity_update_allows_null_asset_id() {
         let mut update = create_test_activity_update();
-        update.asset = None;
+        update.symbol = None;
         update.activity_type = "DEPOSIT".to_string();
 
         let result = update.validate();
