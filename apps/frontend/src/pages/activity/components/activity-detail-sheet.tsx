@@ -229,12 +229,12 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
                 }
               />
             )}
-            {activity.assetPricingMode && (
+            {activity.assetQuoteMode && (
               <DetailRow
-                label="Pricing Mode"
+                label="Quote Mode"
                 value={
                   <Badge variant="secondary" className="text-xs">
-                    {activity.assetPricingMode}
+                    {activity.assetQuoteMode}
                   </Badge>
                 }
               />

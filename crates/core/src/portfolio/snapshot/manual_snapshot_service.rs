@@ -3,8 +3,9 @@ use std::sync::Arc;
 
 use chrono::{NaiveDate, Utc};
 use rust_decimal::Decimal;
+use uuid::Uuid;
 
-use crate::assets::{security_id_from_symbol_with_mic, AssetServiceTrait};
+use crate::assets::AssetServiceTrait;
 use crate::errors::Result;
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::fx::FxServiceTrait;
@@ -78,11 +79,7 @@ impl ManualSnapshotService {
 
             let asset_id = match holding.asset_id.as_deref() {
                 Some(id) if !id.is_empty() => id.to_string(),
-                _ => security_id_from_symbol_with_mic(
-                    &holding.symbol,
-                    holding.exchange_mic.as_deref(),
-                    &holding.currency,
-                ),
+                _ => Uuid::new_v4().to_string(),
             };
 
             let asset = self
@@ -98,9 +95,9 @@ impl ManualSnapshotService {
                     .await?;
             }
 
-            if asset.currency != request.account_currency && asset.currency != holding.currency {
+            if asset.quote_ccy != request.account_currency && asset.quote_ccy != holding.currency {
                 self.fx_service
-                    .register_currency_pair(&asset.currency, &request.account_currency)
+                    .register_currency_pair(&asset.quote_ccy, &request.account_currency)
                     .await?;
             }
 
@@ -128,10 +125,6 @@ impl ManualSnapshotService {
             if cash.amount.is_zero() {
                 continue;
             }
-
-            self.asset_service
-                .ensure_cash_asset(&cash.currency)
-                .await?;
 
             if cash.currency != request.account_currency {
                 self.fx_service

@@ -84,22 +84,20 @@ export function AssetsTable({
     () => [
       {
         id: "symbol",
-        accessorKey: "symbol",
+        accessorFn: (row) => row.displayCode ?? "",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Security" />,
         size: 220,
         maxSize: 260,
         cell: ({ row }) => {
           const asset = row.original;
-          const displaySymbol = asset.symbol.startsWith("$CASH")
-            ? asset.symbol.split("-")[0]
-            : asset.symbol;
+          const displaySymbol = asset.displayCode ?? asset.name ?? "Unknown";
           return (
             <button
               type="button"
               onClick={() => navigate(`/holdings/${encodeURIComponent(asset.id)}`)}
               className="hover:bg-muted/60 focus-visible:ring-ring group flex w-full items-center gap-2.5 rounded-md py-1 text-left transition"
             >
-              <TickerAvatar symbol={asset.symbol} className="h-8 w-8 shrink-0" />
+              <TickerAvatar symbol={asset.displayCode ?? ""} className="h-8 w-8 shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="group-hover:text-primary font-semibold leading-tight transition-colors">
                   {displaySymbol}
@@ -118,7 +116,7 @@ export function AssetsTable({
         size: 120,
         cell: ({ row }) => {
           const asset = row.original;
-          const isManual = asset.pricingMode === "MANUAL";
+          const isManual = asset.quoteMode === "MANUAL";
           return (
             <div className="space-y-0.5">
               <div className="flex items-center gap-1.5 text-sm">
@@ -128,7 +126,7 @@ export function AssetsTable({
                     <span className="text-muted-foreground/50">·</span>
                   </>
                 ) : null}
-                <span className="text-muted-foreground">{asset.currency}</span>
+                <span className="text-muted-foreground">{asset.quoteCcy}</span>
               </div>
               {isManual ? (
                 <div>
@@ -142,7 +140,7 @@ export function AssetsTable({
         },
       },
       {
-        accessorKey: "currency",
+        accessorKey: "quoteCcy",
         header: () => null,
         cell: () => null,
         enableHiding: false,
@@ -154,7 +152,7 @@ export function AssetsTable({
         enableHiding: false,
       },
       {
-        accessorKey: "pricingMode",
+        accessorKey: "quoteMode",
         header: () => null,
         cell: () => null,
         enableHiding: false,
@@ -218,7 +216,7 @@ export function AssetsTable({
                   </Tooltip>
                 ) : null}
                 <span className="font-semibold tabular-nums">
-                  {formatAmount(quote.close, quote.currency ?? asset.currency ?? baseCurrency)}
+                  {formatAmount(quote.close, quote.currency ?? asset.quoteCcy ?? baseCurrency)}
                 </span>
               </div>
               <div className="text-muted-foreground text-[11px]">{formatDate(quote.timestamp)}</div>
@@ -286,9 +284,9 @@ export function AssetsTable({
     ],
   );
 
-  // Build filter options from assets (pricingMode)
-  const pricingModeOptions = useMemo(() => {
-    const modes = new Set(assets.map((asset) => asset.pricingMode).filter(Boolean));
+  // Build filter options from assets (quoteMode)
+  const quoteModeOptions = useMemo(() => {
+    const modes = new Set(assets.map((asset) => asset.quoteMode).filter(Boolean));
     return Array.from(modes).map((mode) => ({
       label: mode === "MARKET" ? "Auto" : mode,
       value: mode,
@@ -312,9 +310,9 @@ export function AssetsTable({
         options: kindOptions,
       },
       {
-        id: "pricingMode",
+        id: "quoteMode",
         title: "Mode",
-        options: pricingModeOptions,
+        options: quoteModeOptions,
       },
       {
         id: "isStale",
@@ -322,7 +320,7 @@ export function AssetsTable({
         options: PRICE_STALE_OPTIONS,
       },
     ],
-    [kindOptions, pricingModeOptions],
+    [kindOptions, quoteModeOptions],
   );
 
   // Add computed field for stale status to enable filtering
@@ -396,10 +394,10 @@ export function AssetsTable({
       searchBy="symbol"
       filters={filters}
       defaultColumnVisibility={{
-        currency: false,
+        quoteCcy: false,
         isStale: false,
         assetSubClass: false,
-        pricingMode: false,
+        quoteMode: false,
         kind: false,
       }}
       defaultSorting={[{ id: "symbol", desc: false }]}

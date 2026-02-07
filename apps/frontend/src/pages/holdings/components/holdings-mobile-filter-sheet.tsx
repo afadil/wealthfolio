@@ -9,7 +9,7 @@ import {
   SheetTitle,
 } from "@wealthfolio/ui/components/ui/sheet";
 import {
-  ASSET_SUBCLASS_TYPES,
+  INSTRUMENT_TYPE_OPTIONS,
   HOLDING_CATEGORY_FILTERS,
   PORTFOLIO_ACCOUNT_ID,
 } from "@/lib/constants";
@@ -147,15 +147,15 @@ export const HoldingsMobileFilterSheet = ({
                         : "hover:bg-muted/50",
                     )}
                     onClick={() => {
-                        onAccountChange({
-                          id: PORTFOLIO_ACCOUNT_ID,
-                          name: "All Portfolio",
-                          accountType: "PORTFOLIO" as unknown as Account["accountType"],
-                          balance: 0,
-                          currency: baseCurrency,
-                          isDefault: false,
-                          isActive: true,
-                          createdAt: new Date(),
+                      onAccountChange({
+                        id: PORTFOLIO_ACCOUNT_ID,
+                        name: "All Portfolio",
+                        accountType: "PORTFOLIO" as unknown as Account["accountType"],
+                        balance: 0,
+                        currency: baseCurrency,
+                        isDefault: false,
+                        isActive: true,
+                        createdAt: new Date(),
                         updatedAt: new Date(),
                       } as Account);
                       onOpenChange(false);
@@ -215,7 +215,7 @@ export const HoldingsMobileFilterSheet = ({
                   <span>All Types</span>
                   {selectedTypes.length === 0 && <Icons.Check className="text-primary h-4 w-4" />}
                 </div>
-                {ASSET_SUBCLASS_TYPES.map((type) => (
+                {INSTRUMENT_TYPE_OPTIONS.map((type) => (
                   <div
                     key={type.value}
                     className={cn(

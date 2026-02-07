@@ -85,7 +85,7 @@ export const COMMANDS: CommandMap = {
   delete_asset: { method: "DELETE", path: "/assets" },
   get_asset_profile: { method: "GET", path: "/assets/profile" },
   update_asset_profile: { method: "PUT", path: "/assets/profile" },
-  update_pricing_mode: { method: "PUT", path: "/assets/pricing-mode" },
+  update_quote_mode: { method: "PUT", path: "/assets/pricing-mode" },
   // Market data
   search_symbol: { method: "GET", path: "/market-data/search" },
   get_quote_history: { method: "GET", path: "/market-data/quotes/history" },
@@ -559,10 +559,10 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       body = JSON.stringify(bodyPayload);
       break;
     }
-    case "update_pricing_mode": {
-      const { id, pricingMode } = payload as { id: string; pricingMode: string };
+    case "update_quote_mode": {
+      const { id, quoteMode } = payload as { id: string; quoteMode: string };
       url += `/${encodeURIComponent(id)}`;
-      body = JSON.stringify({ pricing_mode: pricingMode });
+      body = JSON.stringify({ quoteMode });
       break;
     }
     case "search_symbol": {

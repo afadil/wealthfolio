@@ -123,7 +123,7 @@ export function createDraftTransaction(
     accountCurrency: defaultAccount?.currency ?? fallbackCurrency,
     assetSymbol: "",
     assetName: "",
-    assetPricingMode: undefined,
+    assetQuoteMode: undefined,
     subRows: undefined,
     isNew: true,
   };
@@ -434,7 +434,7 @@ export function buildSavePayload(
             exchangeMic: transaction.exchangeMic,
             kind: transaction.pendingAssetKind,
             name: transaction.pendingAssetName,
-            pricingMode: transaction.assetPricingMode,
+            quoteMode: transaction.assetQuoteMode,
           };
         }
       }
@@ -457,13 +457,13 @@ export function buildSavePayload(
             exchangeMic: transaction.exchangeMic,
             kind: transaction.pendingAssetKind,
             name: transaction.pendingAssetName,
-            pricingMode: transaction.assetPricingMode,
+            quoteMode: transaction.assetQuoteMode,
           };
         } else if (transaction._originalAssetId) {
-          // Symbol unchanged: send existing asset ID with pricingMode to allow mode updates
+          // Symbol unchanged: send existing asset ID with quoteMode to allow mode updates
           updatePayload.asset = {
             id: transaction._originalAssetId,
-            pricingMode: transaction.assetPricingMode,
+            quoteMode: transaction.assetQuoteMode,
           };
         }
       }

@@ -18,7 +18,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/compone
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { Holding } from "@/lib/types";
-import { AssetKind } from "@/lib/constants";
 import { AmountDisplay, QuantityDisplay } from "@wealthfolio/ui";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -185,10 +184,7 @@ const getColumns = (
     cell: ({ row }) => {
       const navigate = useNavigate();
       const holding = row.original;
-      const isCash = holding.assetKind === AssetKind.CASH;
       const symbol = holding.instrument?.symbol ?? holding.id;
-      const displaySymbol = isCash ? "Cash" : symbol;
-      const avatarSymbol = isCash ? "$CASH" : symbol;
 
       const handleNavigate = () => {
         // Use instrument.id (asset ID) for navigation, not symbol (which may be stripped)
@@ -196,24 +192,20 @@ const getColumns = (
         navigate(`/holdings/${encodeURIComponent(navSymbol)}`, { state: { holding } });
       };
 
-      const isManual = holding.instrument?.pricingMode === "MANUAL";
+      const isManual = holding.instrument?.quoteMode === "MANUAL";
       const content = (
         <div className="flex items-center">
-          <TickerAvatar symbol={avatarSymbol} className="mr-2 h-8 w-8" />
+          <TickerAvatar symbol={symbol} className="mr-2 h-8 w-8" />
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
-              <span className="font-medium">{displaySymbol}</span>
+              <span className="font-medium">{symbol}</span>
               {isManual && (
                 <Badge variant="secondary" className="h-4 px-1 py-0 text-[10px]">
                   Manual
                 </Badge>
               )}
             </div>
-            {isCash ? (
-              <span className="text-muted-foreground line-clamp-1 text-xs">
-                {holding.localCurrency}
-              </span>
-            ) : holding.instrument?.name ? (
+            {holding.instrument?.name ? (
               <span className="text-muted-foreground line-clamp-1 text-xs">
                 {holding.instrument.name}
               </span>
@@ -221,10 +213,6 @@ const getColumns = (
           </div>
         </div>
       );
-
-      if (isCash) {
-        return <div className="flex items-center p-2">{content}</div>;
-      }
 
       return (
         <div className="-m-1 cursor-pointer p-1" onClick={handleNavigate}>

@@ -103,11 +103,14 @@ function normalizeResult(result: unknown): GetIncomeOutput | null {
     (candidate.top_assets as TopAssetDto[] | undefined) ??
     [];
 
-  const topAssets = topAssetsRaw.map((asset) => ({
-    symbol: asset.symbol ?? "",
-    name: asset.name ?? "",
-    income: asset.income ?? 0,
-  }));
+  const topAssets = topAssetsRaw.map((asset) => {
+    const raw = asset as unknown as Record<string, unknown>;
+    return {
+      symbol: (raw.display_code as string) ?? (raw.displayCode as string) ?? asset.symbol ?? "",
+      name: asset.name ?? "",
+      income: asset.income ?? 0,
+    };
+  });
 
   const period = (candidate.period as string | undefined) ?? "YTD";
 

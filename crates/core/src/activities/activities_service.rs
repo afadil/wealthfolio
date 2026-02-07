@@ -13,8 +13,8 @@ use crate::activities::activities_model::*;
 use crate::activities::csv_parser::{self, ParseConfig, ParsedCsvResult};
 use crate::activities::{ActivityRepositoryTrait, ActivityServiceTrait};
 use crate::assets::{
-    canonical_asset_id, parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix, AssetKind,
-    AssetServiceTrait,
+    parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix, AssetKind, AssetServiceTrait,
+    InstrumentType, QuoteMode,
 };
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::fx::currency::{get_normalization_rule, normalize_amount, resolve_currency};
@@ -124,7 +124,10 @@ impl ActivityService {
         let existing_assets = self.asset_service.get_assets().unwrap_or_default();
         let existing_map: HashMap<String, Option<String>> = existing_assets
             .into_iter()
-            .map(|a| (a.symbol.to_lowercase(), a.exchange_mic))
+            .filter_map(|a| {
+                let symbol = a.display_code.or(a.instrument_symbol)?;
+                Some((symbol.to_lowercase(), a.instrument_exchange_mic))
+            })
             .collect();
 
         // 2. Check each symbol against existing assets first
@@ -159,7 +162,7 @@ impl ActivityService {
         cache
     }
 
-    /// Creates a manual quote from activity data when pricing_mode is MANUAL.
+    /// Creates a manual quote from activity data when quote_mode is MANUAL.
     /// This ensures the asset has a price point on the activity date.
     async fn create_manual_quote_from_activity(
         &self,
@@ -227,116 +230,42 @@ impl ActivityService {
 }
 
 impl ActivityService {
-    /// Resolves the asset_id for an activity.
-    ///
-    /// Priority:
-    /// 1. If asset_id is provided, use it (backward compatibility, editing existing activities)
-    /// 2. If symbol + exchange_mic are provided, generate canonical ID using canonical_asset_id()
-    /// 3. For cash activities without symbol, generate CASH:{currency}
-    /// 4. For non-cash activities without symbol, return error
-    fn resolve_asset_id(
-        &self,
-        asset_id: Option<&str>,
-        symbol: Option<&str>,
-        exchange_mic: Option<&str>,
-        asset_kind_hint: Option<&str>,
-        activity_type: &str,
-        currency: &str,
-    ) -> Result<Option<String>> {
-        // 1. If asset_id is explicitly provided, use it (backward compatibility for updates)
-        if let Some(id) = asset_id {
-            if !id.is_empty() {
-                // Normalize legacy crypto IDs where the base symbol includes the quote currency,
-                // e.g. "CRYPTO:BTC-CAD:CAD" -> "CRYPTO:BTC:CAD".
-                if id.starts_with("CRYPTO:") {
-                    if let Some(parsed) = crate::assets::parse_canonical_asset_id(id) {
-                        if parsed.kind == Some(crate::assets::AssetKind::Crypto) {
-                            if let Some((base, quote)) =
-                                crate::assets::parse_crypto_pair_symbol(&parsed.symbol)
-                            {
-                                if !base.trim().is_empty() {
-                                    return Ok(Some(crate::assets::canonical_asset_id(
-                                        &crate::assets::AssetKind::Crypto,
-                                        &base,
-                                        None,
-                                        &quote,
-                                    )));
-                                }
-                            }
-                        }
-                    }
-                }
-                return Ok(Some(id.to_string()));
-            }
-        }
-
-        // 2. If symbol is provided, generate canonical asset_id
-        if let Some(sym) = symbol {
-            if !sym.is_empty() {
-                let kind = self.infer_asset_kind(sym, exchange_mic, asset_kind_hint);
-                let generated_id = canonical_asset_id(&kind, sym, exchange_mic, currency);
-                return Ok(Some(generated_id));
-            }
-        }
-
-        // 3. For cash activities without symbol, generate CASH:{currency}
-        if is_cash_activity(activity_type) {
-            // Generate canonical CASH asset ID for cash activities
-            let cash_id = canonical_asset_id(&AssetKind::Cash, currency, None, currency);
-            return Ok(Some(cash_id));
-        }
-
-        // 4. For non-cash activities (BUY, SELL, DIVIDEND, etc.), we need either asset_id or symbol
-        Err(ActivityError::InvalidData(
-            "Non-cash activities require either asset_id or symbol to be provided".to_string(),
-        )
-        .into())
-    }
-
-    /// Infers the asset kind from symbol, exchange, and hints.
+    /// Infers the asset kind and instrument type from symbol, exchange, and hints.
+    /// Returns (AssetKind, Option<InstrumentType>).
     fn infer_asset_kind(
         &self,
         symbol: &str,
         exchange_mic: Option<&str>,
         asset_kind_hint: Option<&str>,
-    ) -> AssetKind {
+    ) -> (AssetKind, Option<InstrumentType>) {
         // 1. If explicit hint is provided, use it
         if let Some(hint) = asset_kind_hint {
             match hint.to_uppercase().as_str() {
-                "SECURITY" => return AssetKind::Security,
-                "CRYPTO" => return AssetKind::Crypto,
-                "CASH" => return AssetKind::Cash,
-                "FX_RATE" | "FX" => return AssetKind::FxRate,
-                "OPTION" | "OPT" => return AssetKind::Option,
-                "COMMODITY" | "CMDTY" => return AssetKind::Commodity,
-                "PROPERTY" | "PROP" => return AssetKind::Property,
-                "VEHICLE" | "VEH" => return AssetKind::Vehicle,
-                "COLLECTIBLE" | "COLL" => return AssetKind::Collectible,
-                "PHYSICAL_PRECIOUS" | "PREC" => return AssetKind::PhysicalPrecious,
-                "PRIVATE_EQUITY" | "PEQ" => return AssetKind::PrivateEquity,
-                "LIABILITY" | "LIAB" => return AssetKind::Liability,
-                "OTHER" | "ALT" => return AssetKind::Other,
+                "SECURITY" | "INVESTMENT" | "EQUITY" => {
+                    return (AssetKind::Investment, Some(InstrumentType::Equity))
+                }
+                "CRYPTO" => return (AssetKind::Investment, Some(InstrumentType::Crypto)),
+                "FX_RATE" | "FX" => return (AssetKind::Fx, Some(InstrumentType::Fx)),
+                "OPTION" | "OPT" => {
+                    return (AssetKind::Investment, Some(InstrumentType::Option))
+                }
+                "COMMODITY" | "CMDTY" | "METAL" => {
+                    return (AssetKind::Investment, Some(InstrumentType::Metal))
+                }
+                "PROPERTY" | "PROP" => return (AssetKind::Property, None),
+                "VEHICLE" | "VEH" => return (AssetKind::Vehicle, None),
+                "COLLECTIBLE" | "COLL" => return (AssetKind::Collectible, None),
+                "PRECIOUS_METAL" | "PREC" => return (AssetKind::PreciousMetal, None),
+                "PRIVATE_EQUITY" | "PEQ" => return (AssetKind::PrivateEquity, None),
+                "LIABILITY" | "LIAB" => return (AssetKind::Liability, None),
+                "OTHER" | "ALT" => return (AssetKind::Other, None),
                 _ => {} // Fall through to inference
             }
         }
 
-        // 2. If exchange MIC is provided, it's a security
-        if exchange_mic.is_some() {
-            return AssetKind::Security;
-        }
-
-        // 3. Common crypto symbols heuristic
+        // 2. Crypto pair pattern (e.g., BTC-USD, ETH-CAD) — checked before
+        //    exchange_mic because brokers may attach their MIC to crypto pairs
         let upper_symbol = symbol.to_uppercase();
-        let common_crypto = [
-            "BTC", "ETH", "XRP", "LTC", "BCH", "ADA", "DOT", "LINK", "XLM", "DOGE", "UNI", "SOL",
-            "AVAX", "MATIC", "ATOM", "ALGO", "VET", "FIL", "TRX", "ETC", "XMR", "AAVE", "MKR",
-            "COMP", "SNX", "YFI", "SUSHI", "CRV",
-        ];
-        if common_crypto.contains(&upper_symbol.as_str()) {
-            return AssetKind::Crypto;
-        }
-
-        // 4. If symbol looks like a crypto pair (e.g., BTC-USD, BTC-USDT), likely crypto
         if let Some((_base, quote)) = upper_symbol.rsplit_once('-') {
             let quote = quote.trim();
             let crypto_quotes = [
@@ -345,12 +274,55 @@ impl ActivityService {
                 "ZAR", "BTC", "ETH", "USDT", "USDC", "DAI", "BUSD", "USDP", "TUSD", "FDUSD",
             ];
             if crypto_quotes.contains(&quote) {
-                return AssetKind::Crypto;
+                return (AssetKind::Investment, Some(InstrumentType::Crypto));
             }
         }
 
-        // 5. Default to Security (most common case)
-        AssetKind::Security
+        // 3. If exchange MIC is provided, it's an equity
+        if exchange_mic.is_some() {
+            return (AssetKind::Investment, Some(InstrumentType::Equity));
+        }
+
+        // 4. Common crypto symbols heuristic (no MIC, bare symbol like BTC, ETH)
+        let common_crypto = [
+            "BTC", "ETH", "XRP", "LTC", "BCH", "ADA", "DOT", "LINK", "XLM", "DOGE", "UNI",
+            "SOL", "AVAX", "MATIC", "ATOM", "ALGO", "VET", "FIL", "TRX", "ETC", "XMR", "AAVE",
+            "MKR", "COMP", "SNX", "YFI", "SUSHI", "CRV",
+        ];
+        if common_crypto.contains(&upper_symbol.as_str()) {
+            return (AssetKind::Investment, Some(InstrumentType::Crypto));
+        }
+
+        // 5. Default to equity (most common case)
+        (AssetKind::Investment, Some(InstrumentType::Equity))
+    }
+
+    /// Finds an existing asset by instrument fields, searching all assets.
+    fn find_existing_asset_id(
+        &self,
+        symbol: &str,
+        exchange_mic: Option<&str>,
+        instrument_type: Option<&InstrumentType>,
+    ) -> Option<String> {
+        let assets = self.asset_service.get_assets().unwrap_or_default();
+        let upper_symbol = symbol.to_uppercase();
+        for asset in &assets {
+            if let (Some(ref a_symbol), Some(ref a_type)) =
+                (&asset.instrument_symbol, &asset.instrument_type)
+            {
+                let type_matches = instrument_type.map_or(true, |t| t == a_type);
+                let symbol_matches = a_symbol.to_uppercase() == upper_symbol;
+                let mic_matches = match (exchange_mic, &asset.instrument_exchange_mic) {
+                    (Some(mic), Some(a_mic)) => mic.eq_ignore_ascii_case(a_mic),
+                    (None, None) => true,
+                    _ => false,
+                };
+                if type_matches && symbol_matches && mic_matches {
+                    return Some(asset.id.clone());
+                }
+            }
+        }
+        None
     }
 
     async fn prepare_new_activity(&self, mut activity: NewActivity) -> Result<NewActivity> {
@@ -363,27 +335,18 @@ impl ActivityService {
         // Extract asset fields from nested `asset` object
         let symbol = activity.get_symbol().map(|s| s.to_string());
         let exchange_mic = activity.get_exchange_mic().map(|s| s.to_string());
-        let asset_kind = activity.get_asset_kind().map(|s| s.to_string());
+        let asset_kind_hint = activity.get_asset_kind().map(|s| s.to_string());
         let asset_name = activity.get_asset_name().map(|s| s.to_string());
-        let pricing_mode = activity.get_pricing_mode().map(|s| s.to_string());
+        let quote_mode = activity.get_quote_mode().map(|s| s.to_string());
 
-        // Build asset metadata from extracted fields
-        let asset_metadata = if asset_name.is_some() || exchange_mic.is_some() {
-            Some(crate::assets::AssetMetadata {
-                name: asset_name.clone(),
-                kind: None,
-                exchange_mic: exchange_mic.clone(),
-            })
-        } else {
-            None
-        };
-
-        let inferred_kind = symbol
-            .as_deref()
-            .map(|s| self.infer_asset_kind(s, exchange_mic.as_deref(), asset_kind.as_deref()));
+        let inferred = symbol.as_deref().map(|s| {
+            self.infer_asset_kind(s, exchange_mic.as_deref(), asset_kind_hint.as_deref())
+        });
+        let inferred_instrument_type = inferred.as_ref().and_then(|(_, it)| it.clone());
 
         // Use asset currency for crypto pairs (e.g., BTC-USD -> USD) instead of activity currency.
-        let asset_currency = if inferred_kind == Some(AssetKind::Crypto) {
+        let is_crypto = inferred_instrument_type.as_ref() == Some(&InstrumentType::Crypto);
+        let asset_currency = if is_crypto {
             symbol
                 .as_deref()
                 .and_then(parse_crypto_pair_symbol)
@@ -393,26 +356,71 @@ impl ActivityService {
             currency.clone()
         };
 
-        // For NEW activities: prioritize symbol over asset_id to ensure canonical ID generation.
-        // This prevents clients from accidentally sending raw symbols (e.g., "AAPL") as asset_id.
-        // If symbol is provided, ignore asset_id and generate canonical ID.
-        let effective_asset_id = if symbol.as_ref().is_some_and(|s| !s.is_empty()) {
-            // Symbol is provided, ignore any asset_id and let resolve_asset_id generate canonical ID
-            None
-        } else {
-            // No symbol provided, fall back to asset.id (for edge cases like editing existing activities)
-            activity.get_asset_id().map(|s| s.to_string())
-        };
+        // Resolve asset_id:
+        // 1. If symbol is provided, search existing assets or prepare for creation
+        // 2. If only asset.id is provided (UUID), use it directly
+        // 3. Cash activities: no asset
+        let resolved_asset_id = if let Some(ref sym) = symbol {
+            if !sym.is_empty() {
+                // Strip Yahoo suffix (e.g. GOOG.TO → GOOG + XTSE)
+                let (base_symbol, suffix_mic) = parse_symbol_with_exchange_suffix(sym);
+                let effective_mic = exchange_mic
+                    .clone()
+                    .or_else(|| suffix_mic.map(|s| s.to_string()));
 
-        // Resolve asset_id using canonical_asset_id() if symbol is provided
-        let resolved_asset_id = self.resolve_asset_id(
-            effective_asset_id.as_deref(),
-            symbol.as_deref(),
-            exchange_mic.as_deref(),
-            asset_kind.as_deref(),
-            &activity.activity_type,
-            &asset_currency,
-        )?;
+                // For crypto pairs (e.g. BTC-USD), normalize to base symbol (BTC)
+                let normalized_symbol = if is_crypto {
+                    parse_crypto_pair_symbol(base_symbol)
+                        .map(|(base, _)| base)
+                        .unwrap_or_else(|| base_symbol.to_string())
+                } else {
+                    base_symbol.to_string()
+                };
+
+                // Look up existing asset by instrument fields
+                let existing_id = self.find_existing_asset_id(
+                    &normalized_symbol,
+                    effective_mic.as_deref(),
+                    inferred_instrument_type.as_ref(),
+                );
+
+                if let Some(id) = existing_id {
+                    Some(id)
+                } else {
+                    // Create new asset with generated UUID
+                    let new_id = Uuid::new_v4().to_string();
+                    let metadata = crate::assets::AssetMetadata {
+                        name: asset_name.clone(),
+                        kind: inferred.as_ref().map(|(k, _)| k.clone()),
+                        instrument_exchange_mic: effective_mic.clone(),
+                        instrument_symbol: Some(normalized_symbol.clone()),
+                        instrument_type: inferred_instrument_type.clone(),
+                        display_code: Some(normalized_symbol.clone()),
+                    };
+                    self.asset_service
+                        .get_or_create_minimal_asset(
+                            &new_id,
+                            Some(asset_currency.clone()),
+                            Some(metadata),
+                            quote_mode.clone(),
+                        )
+                        .await?;
+                    Some(new_id)
+                }
+            } else {
+                None
+            }
+        } else if let Some(asset_id) = activity.get_asset_id().filter(|s| !s.is_empty()) {
+            // Existing asset_id provided (UUID from frontend)
+            Some(asset_id.to_string())
+        } else if is_cash_activity(&activity.activity_type) {
+            None // Cash activities have no asset
+        } else {
+            return Err(ActivityError::InvalidData(
+                "Non-cash activities require either asset_id or symbol".to_string(),
+            )
+            .into());
+        };
 
         // Update activity's asset with resolved asset_id
         if let Some(ref resolved_id) = resolved_asset_id {
@@ -429,28 +437,39 @@ impl ActivityService {
 
         // Process asset if asset_id is resolved
         if let Some(ref asset_id) = resolved_asset_id {
-            // Pass pricing_mode to asset creation so custom/manual assets get the right mode
-                let asset = self
-                    .asset_service
-                    .get_or_create_minimal_asset(
-                        asset_id,
-                        Some(asset_currency.clone()),
-                        asset_metadata,
-                        pricing_mode.clone(),
-                    )
-                    .await?;
+            let metadata = crate::assets::AssetMetadata {
+                name: asset_name.clone(),
+                kind: inferred.as_ref().map(|(k, _)| k.clone()),
+                instrument_exchange_mic: exchange_mic.clone(),
+                instrument_symbol: symbol.as_deref().map(|s| {
+                    parse_symbol_with_exchange_suffix(s).0.to_string()
+                }),
+                instrument_type: inferred_instrument_type.clone(),
+                display_code: symbol.as_deref().map(|s| {
+                    parse_symbol_with_exchange_suffix(s).0.to_string()
+                }),
+            };
+            let asset = self
+                .asset_service
+                .get_or_create_minimal_asset(
+                    asset_id,
+                    Some(asset_currency.clone()),
+                    Some(metadata),
+                    quote_mode.clone(),
+                )
+                .await?;
 
-            // Update asset pricing mode if specified (for existing assets that need mode change)
-            if let Some(ref mode) = pricing_mode {
+            // Update asset quote mode if specified (for existing assets that need mode change)
+            if let Some(ref mode) = quote_mode {
                 let requested_mode = mode.to_uppercase();
-                let current_mode = asset.pricing_mode.as_db_str();
+                let current_mode = asset.quote_mode.as_db_str();
                 if requested_mode != current_mode {
                     self.asset_service
-                        .update_pricing_mode(&asset.id, &requested_mode)
+                        .update_quote_mode(&asset.id, &requested_mode)
                         .await?;
                 }
 
-                // Create manual quote for MANUAL pricing mode assets
+                // Create manual quote for MANUAL mode assets
                 if requested_mode == "MANUAL" {
                     if let Some(unit_price) = activity.unit_price {
                         self.create_manual_quote_from_activity(
@@ -465,11 +484,10 @@ impl ActivityService {
             }
 
             if activity.currency.is_empty() {
-                activity.currency = asset.currency.clone();
+                activity.currency = asset.quote_ccy.clone();
             }
 
             // Register FX pair for activity currency if different from account currency
-            // Creates FX:activity_currency:account_currency for converting foreign values to account currency
             if activity.currency != account_currency {
                 self.fx_service
                     .register_currency_pair(activity.currency.as_str(), account_currency.as_str())
@@ -477,11 +495,9 @@ impl ActivityService {
             }
 
             // Register FX pair for asset currency if different from account currency
-            // This is needed when the asset's native currency differs from the activity currency
-            // (e.g., asset is EUR but activity was recorded in account's USD)
-            if asset.currency != account_currency && asset.currency != activity.currency {
+            if asset.quote_ccy != account_currency && asset.quote_ccy != activity.currency {
                 self.fx_service
-                    .register_currency_pair(asset.currency.as_str(), account_currency.as_str())
+                    .register_currency_pair(asset.quote_ccy.as_str(), account_currency.as_str())
                     .await?;
             }
         } else {
@@ -499,7 +515,6 @@ impl ActivityService {
         }
 
         // Normalize minor currency units (e.g., GBp -> GBP) and convert amounts
-        // This ensures activities are stored with major currency and properly scaled amounts
         if get_normalization_rule(&activity.currency).is_some() {
             if let Some(unit_price) = activity.unit_price {
                 let (normalized_price, _) = normalize_amount(unit_price, &activity.currency);
@@ -513,10 +528,8 @@ impl ActivityService {
                 let (normalized_fee, normalized_currency) =
                     normalize_amount(fee, &activity.currency);
                 activity.fee = Some(normalized_fee);
-                // Update currency to major unit (e.g., GBp -> GBP)
                 activity.currency = normalized_currency.to_string();
             } else {
-                // Still need to normalize currency even if no fee
                 let (_, normalized_currency) = normalize_amount(Decimal::ZERO, &activity.currency);
                 activity.currency = normalized_currency.to_string();
             }
@@ -534,30 +547,21 @@ impl ActivityService {
         let account_currency = resolve_currency(&[&account.currency, &base_ccy]);
         let currency = resolve_currency(&[&activity.currency, &account_currency]);
 
-        // Extract asset fields using helper methods (supports both nested `asset` and legacy flat fields)
+        // Extract asset fields
         let symbol = activity.get_symbol().map(|s| s.to_string());
         let exchange_mic = activity.get_exchange_mic().map(|s| s.to_string());
-        let asset_kind = activity.get_asset_kind().map(|s| s.to_string());
+        let asset_kind_hint = activity.get_asset_kind().map(|s| s.to_string());
         let asset_name = activity.get_asset_name().map(|s| s.to_string());
-        let pricing_mode = activity.get_pricing_mode().map(|s| s.to_string());
+        let quote_mode = activity.get_quote_mode().map(|s| s.to_string());
 
-        // Build asset metadata from extracted fields
-        let asset_metadata = if asset_name.is_some() || exchange_mic.is_some() {
-            Some(crate::assets::AssetMetadata {
-                name: asset_name.clone(),
-                kind: None,
-                exchange_mic: exchange_mic.clone(),
-            })
-        } else {
-            None
-        };
+        let inferred = symbol.as_deref().map(|s| {
+            self.infer_asset_kind(s, exchange_mic.as_deref(), asset_kind_hint.as_deref())
+        });
+        let inferred_instrument_type = inferred.as_ref().and_then(|(_, it)| it.clone());
 
-        let inferred_kind = symbol
-            .as_deref()
-            .map(|s| self.infer_asset_kind(s, exchange_mic.as_deref(), asset_kind.as_deref()));
-
-        // Use asset currency for crypto pairs (e.g., BTC-USD -> USD) instead of activity currency.
-        let asset_currency = if inferred_kind == Some(AssetKind::Crypto) {
+        // Use asset currency for crypto pairs
+        let is_crypto = inferred_instrument_type.as_ref() == Some(&InstrumentType::Crypto);
+        let asset_currency = if is_crypto {
             symbol
                 .as_deref()
                 .and_then(parse_crypto_pair_symbol)
@@ -567,27 +571,55 @@ impl ActivityService {
             currency.clone()
         };
 
-        // For UPDATES: prioritize symbol over asset_id to ensure canonical ID generation.
-        // This prevents clients from accidentally sending raw symbols (e.g., "BTC") as asset_id,
-        // which would bypass canonical ID generation and cause asset kind inference failures.
-        // If symbol is provided, ignore asset_id and generate canonical ID from symbol.
-        let effective_asset_id = if symbol.as_ref().is_some_and(|s| !s.is_empty()) {
-            // Symbol is provided, ignore any asset_id and let resolve_asset_id generate canonical ID
+        // Resolve asset_id (same logic as prepare_new_activity)
+        let resolved_asset_id = if let Some(ref sym) = symbol {
+            if !sym.is_empty() {
+                let (base_symbol, suffix_mic) = parse_symbol_with_exchange_suffix(sym);
+                let effective_mic = exchange_mic
+                    .clone()
+                    .or_else(|| suffix_mic.map(|s| s.to_string()));
+
+                let existing_id = self.find_existing_asset_id(
+                    base_symbol,
+                    effective_mic.as_deref(),
+                    inferred_instrument_type.as_ref(),
+                );
+
+                if let Some(id) = existing_id {
+                    Some(id)
+                } else {
+                    let new_id = Uuid::new_v4().to_string();
+                    let metadata = crate::assets::AssetMetadata {
+                        name: asset_name.clone(),
+                        kind: inferred.as_ref().map(|(k, _)| k.clone()),
+                        instrument_exchange_mic: effective_mic.clone(),
+                        instrument_symbol: Some(base_symbol.to_string()),
+                        instrument_type: inferred_instrument_type.clone(),
+                        display_code: Some(base_symbol.to_string()),
+                    };
+                    self.asset_service
+                        .get_or_create_minimal_asset(
+                            &new_id,
+                            Some(asset_currency.clone()),
+                            Some(metadata),
+                            quote_mode.clone(),
+                        )
+                        .await?;
+                    Some(new_id)
+                }
+            } else {
+                None
+            }
+        } else if let Some(asset_id) = activity.get_asset_id().filter(|s| !s.is_empty()) {
+            Some(asset_id.to_string())
+        } else if is_cash_activity(&activity.activity_type) {
             None
         } else {
-            // No symbol provided, fall back to asset.id (for edge cases)
-            activity.get_asset_id().map(|s| s.to_string())
+            return Err(ActivityError::InvalidData(
+                "Non-cash activities require either asset_id or symbol".to_string(),
+            )
+            .into());
         };
-
-        // Resolve asset_id using canonical_asset_id() if symbol is provided
-        let resolved_asset_id = self.resolve_asset_id(
-            effective_asset_id.as_deref(),
-            symbol.as_deref(),
-            exchange_mic.as_deref(),
-            asset_kind.as_deref(),
-            &activity.activity_type,
-            &asset_currency,
-        )?;
 
         // Update activity's asset with resolved asset_id
         if let Some(ref resolved_id) = resolved_asset_id {
@@ -604,28 +636,38 @@ impl ActivityService {
 
         // Process asset if asset_id is resolved
         if let Some(ref asset_id) = resolved_asset_id {
-            // Pass pricing_mode for asset creation/update
+            let metadata = crate::assets::AssetMetadata {
+                name: asset_name.clone(),
+                kind: inferred.as_ref().map(|(k, _)| k.clone()),
+                instrument_exchange_mic: exchange_mic.clone(),
+                instrument_symbol: symbol.as_deref().map(|s| {
+                    parse_symbol_with_exchange_suffix(s).0.to_string()
+                }),
+                instrument_type: inferred_instrument_type.clone(),
+                display_code: symbol.as_deref().map(|s| {
+                    parse_symbol_with_exchange_suffix(s).0.to_string()
+                }),
+            };
             let asset = self
                 .asset_service
                 .get_or_create_minimal_asset(
                     asset_id,
                     Some(asset_currency.clone()),
-                    asset_metadata,
-                    pricing_mode.clone(),
+                    Some(metadata),
+                    quote_mode.clone(),
                 )
                 .await?;
 
-            // Update asset pricing mode if specified (for existing assets that need mode change)
-            if let Some(ref mode) = pricing_mode {
+            // Update asset quote mode if specified
+            if let Some(ref mode) = quote_mode {
                 let requested_mode = mode.to_uppercase();
-                let current_mode = asset.pricing_mode.as_db_str();
+                let current_mode = asset.quote_mode.as_db_str();
                 if requested_mode != current_mode {
                     self.asset_service
-                        .update_pricing_mode(&asset.id, &requested_mode)
+                        .update_quote_mode(&asset.id, &requested_mode)
                         .await?;
                 }
 
-                // Create manual quote for MANUAL pricing mode assets
                 if requested_mode == "MANUAL" {
                     if let Some(Some(unit_price)) = activity.unit_price {
                         self.create_manual_quote_from_activity(
@@ -640,27 +682,21 @@ impl ActivityService {
             }
 
             if activity.currency.is_empty() {
-                activity.currency = asset.currency.clone();
+                activity.currency = asset.quote_ccy.clone();
             }
 
-            // Register FX pair for activity currency if different from account currency
-            // Creates FX:activity_currency:account_currency for converting foreign values to account currency
             if activity.currency != account_currency {
                 self.fx_service
                     .register_currency_pair(activity.currency.as_str(), account_currency.as_str())
                     .await?;
             }
 
-            // Register FX pair for asset currency if different from account currency
-            // This is needed when the asset's native currency differs from the activity currency
-            // (e.g., asset is EUR but activity was recorded in account's USD)
-            if asset.currency != account_currency && asset.currency != activity.currency {
+            if asset.quote_ccy != account_currency && asset.quote_ccy != activity.currency {
                 self.fx_service
-                    .register_currency_pair(asset.currency.as_str(), account_currency.as_str())
+                    .register_currency_pair(asset.quote_ccy.as_str(), account_currency.as_str())
                     .await?;
             }
         } else {
-            // For pure cash movements without asset, just register FX if needed
             if activity.currency.is_empty() {
                 activity.currency =
                     self.resolve_activity_currency("", None, &account_currency);
@@ -673,8 +709,7 @@ impl ActivityService {
             }
         }
 
-        // Normalize minor currency units (e.g., GBp -> GBP) and convert amounts
-        // This ensures activities are stored with major currency and properly scaled amounts
+        // Normalize minor currency units
         if get_normalization_rule(&activity.currency).is_some() {
             if let Some(Some(unit_price)) = activity.unit_price {
                 let (normalized_price, _) = normalize_amount(unit_price, &activity.currency);
@@ -708,73 +743,46 @@ impl ActivityService {
         symbol_mic_cache: &HashMap<String, Option<String>>,
     ) -> Result<Option<crate::assets::AssetSpec>> {
         use crate::activities::activities_constants::is_cash_activity;
-        use crate::assets::{
-            canonical_asset_id, parse_canonical_asset_id, parse_crypto_pair_symbol, AssetSpec,
-        };
+        use crate::assets::{parse_crypto_pair_symbol, AssetSpec};
+
+        // Cash activities never need an asset, regardless of symbol
+        if is_cash_activity(&activity.activity_type) {
+            return Ok(None);
+        }
+
         let base_ccy = self.account_service.get_base_currency().unwrap_or_default();
         let account_currency = resolve_currency(&[&account.currency, &base_ccy]);
 
         let symbol = match activity.get_symbol() {
             Some(s) if !s.is_empty() => s.to_string(),
             _ => {
-                // No symbol provided - check if we have an asset_id directly
+                // No symbol provided - check if we have an asset_id directly (UUID)
                 if let Some(asset_id) = activity.get_asset_id() {
                     if !asset_id.is_empty() {
-                        let parsed = parse_canonical_asset_id(asset_id).ok_or_else(|| {
-                            ActivityError::InvalidData("Invalid asset_id format".to_string())
-                        })?;
-
-                        let kind =
-                            parsed.kind.unwrap_or(crate::assets::AssetKind::Security);
-
-                        let exchange_mic = match kind {
-                            crate::assets::AssetKind::Security
-                            | crate::assets::AssetKind::Option => {
-                                if parsed.qualifier.is_empty() {
-                                    None
-                                } else {
-                                    Some(parsed.qualifier.clone())
-                                }
-                            }
-                            _ => None,
+                        // asset_id is a UUID; look up the existing asset to build spec
+                        let currency = if !activity.currency.is_empty() {
+                            activity.currency.clone()
+                        } else {
+                            account_currency.clone()
                         };
 
-                        let currency = match kind {
-                            crate::assets::AssetKind::Cash => parsed.symbol.clone(),
-                            crate::assets::AssetKind::Crypto
-                            | crate::assets::AssetKind::FxRate => {
-                                if !parsed.qualifier.is_empty() {
-                                    parsed.qualifier.clone()
-                                } else if !activity.currency.is_empty() {
-                                    activity.currency.clone()
-                                } else {
-                                    account_currency.clone()
-                                }
+                        let quote_mode = activity.get_quote_mode().and_then(|s| {
+                            match s.to_uppercase().as_str() {
+                                "MARKET" => Some(QuoteMode::Market),
+                                "MANUAL" => Some(QuoteMode::Manual),
+                                _ => None,
                             }
-                            _ => {
-                                if !activity.currency.is_empty() {
-                                    activity.currency.clone()
-                                } else {
-                                    account_currency.clone()
-                                }
-                            }
-                        };
+                        });
 
                         return Ok(Some(AssetSpec {
-                            id: asset_id.to_string(),
-                            symbol: parsed.symbol,
-                            exchange_mic,
-                            currency,
-                            kind,
-                            pricing_mode: activity.get_pricing_mode().and_then(|s| {
-                                match s.to_uppercase().as_str() {
-                                    "MARKET" => Some(crate::assets::PricingMode::Market),
-                                    "MANUAL" => Some(crate::assets::PricingMode::Manual),
-                                    "DERIVED" => Some(crate::assets::PricingMode::Derived),
-                                    "NONE" => Some(crate::assets::PricingMode::None),
-                                    _ => None,
-                                }
-                            }),
+                            id: Some(asset_id.to_string()),
+                            display_code: None,
+                            instrument_symbol: None,
+                            instrument_exchange_mic: None,
+                            instrument_type: None,
+                            quote_ccy: currency,
+                            kind: AssetKind::Investment,
+                            quote_mode,
                             name: activity.get_asset_name().map(|s| s.to_string()),
                         }));
                     }
@@ -807,11 +815,13 @@ impl ActivityService {
             account_currency.clone()
         };
 
-        // Infer asset kind using base symbol
-        let kind = self.infer_asset_kind(base_symbol, exchange_mic.as_deref(), activity.get_asset_kind());
+        // Infer asset kind and instrument type using base symbol
+        let (kind, instrument_type) =
+            self.infer_asset_kind(base_symbol, exchange_mic.as_deref(), activity.get_asset_kind());
 
         // For crypto, use the quote currency from the pair if available
-        let asset_currency = if kind == crate::assets::AssetKind::Crypto {
+        let is_crypto = instrument_type.as_ref() == Some(&InstrumentType::Crypto);
+        let asset_currency = if is_crypto {
             parse_crypto_pair_symbol(base_symbol)
                 .map(|(_, quote)| quote)
                 .unwrap_or_else(|| currency.clone())
@@ -819,27 +829,40 @@ impl ActivityService {
             currency.clone()
         };
 
-        // Generate canonical asset ID using base symbol (without exchange suffix)
-        let canonical_id = canonical_asset_id(&kind, base_symbol, exchange_mic.as_deref(), &asset_currency);
+        // For crypto pairs (e.g. BTC-USD), normalize to base symbol (BTC)
+        let normalized_symbol = if is_crypto {
+            parse_crypto_pair_symbol(base_symbol)
+                .map(|(base, _)| base)
+                .unwrap_or_else(|| base_symbol.to_string())
+        } else {
+            base_symbol.to_string()
+        };
 
-        // Parse pricing mode if provided
-        let pricing_mode = activity.get_pricing_mode().and_then(|s| {
+        // Look up existing asset by instrument fields to get its UUID
+        let existing_id = self.find_existing_asset_id(
+            &normalized_symbol,
+            exchange_mic.as_deref(),
+            instrument_type.as_ref(),
+        );
+
+        // Parse quote mode if provided
+        let quote_mode = activity.get_quote_mode().and_then(|s| {
             match s.to_uppercase().as_str() {
-                "MARKET" => Some(crate::assets::PricingMode::Market),
-                "MANUAL" => Some(crate::assets::PricingMode::Manual),
-                "DERIVED" => Some(crate::assets::PricingMode::Derived),
-                "NONE" => Some(crate::assets::PricingMode::None),
+                "MARKET" => Some(QuoteMode::Market),
+                "MANUAL" => Some(QuoteMode::Manual),
                 _ => None,
             }
         });
 
         Ok(Some(AssetSpec {
-            id: canonical_id,
-            symbol: base_symbol.to_string(),
-            exchange_mic,
-            currency: asset_currency,
+            id: existing_id,
+            display_code: Some(normalized_symbol.clone()),
+            instrument_symbol: Some(normalized_symbol.clone()),
+            instrument_exchange_mic: exchange_mic,
+            instrument_type,
+            quote_ccy: asset_currency,
             kind,
-            pricing_mode,
+            quote_mode,
             name: activity.get_asset_name().map(|s| s.to_string()),
         }))
     }
@@ -1243,9 +1266,26 @@ impl ActivityServiceTrait for ActivityService {
                 activity.account_id = Some(account_id.clone());
             }
 
-            // Cash activity types skip symbol resolution entirely
-            if is_cash_activity(&activity.activity_type) {
-                // Resolve currency, then mark valid
+            let symbol = activity.symbol.trim().to_string();
+            let is_cash = is_cash_activity(&activity.activity_type);
+
+            // Reject garbage symbols on ANY activity type (cash or not)
+            let is_garbage = !symbol.is_empty()
+                && (symbol.chars().all(|c| c == '-') || symbol.starts_with('$'));
+            if is_garbage {
+                activity.is_valid = false;
+                let mut errors = std::collections::HashMap::new();
+                errors.insert(
+                    "symbol".to_string(),
+                    vec![format!("Invalid symbol '{}'. Please correct or remove it.", &symbol)],
+                );
+                activity.errors = Some(errors);
+                activities_with_status.push(activity);
+                continue;
+            }
+
+            // Cash activities don't need a symbol — resolve currency and move on
+            if is_cash && symbol.is_empty() {
                 if activity.currency.is_empty() {
                     activity.currency = account_currency.clone();
                 }
@@ -1256,8 +1296,7 @@ impl ActivityServiceTrait for ActivityService {
             }
 
             // Non-cash: symbol is required
-            let symbol = activity.symbol.trim().to_string();
-            if symbol.is_empty() || symbol == "----" {
+            if symbol.is_empty() {
                 activity.is_valid = false;
                 let mut errors = std::collections::HashMap::new();
                 errors.insert(
@@ -1282,12 +1321,14 @@ impl ActivityServiceTrait for ActivityService {
             let (base_symbol, suffix_mic) = parse_symbol_with_exchange_suffix(&symbol);
             let resolved_mic = exchange_mic.or_else(|| suffix_mic.map(|s| s.to_string()));
 
-            // Infer asset kind using base symbol and resolved MIC
-            let inferred_kind =
+            // Infer asset kind and instrument type using base symbol and resolved MIC
+            let (inferred_kind, inferred_instrument_type) =
                 self.infer_asset_kind(base_symbol, resolved_mic.as_deref(), None);
 
-            // Securities must have a resolved exchange MIC
-            if inferred_kind == AssetKind::Security && resolved_mic.is_none() {
+            // Equities (Investment + Equity instrument) must have a resolved exchange MIC
+            let is_equity = inferred_kind == AssetKind::Investment
+                && inferred_instrument_type.as_ref() == Some(&InstrumentType::Equity);
+            if is_equity && resolved_mic.is_none() {
                 activity.is_valid = false;
                 let mut errors = std::collections::HashMap::new();
                 errors.insert(
@@ -1306,31 +1347,22 @@ impl ActivityServiceTrait for ActivityService {
             activity.exchange_mic = resolved_mic.clone();
             activity.symbol = base_symbol.to_string();
 
-            // Determine currency context
-            let asset_context_currency = if !activity.currency.is_empty() {
-                activity.currency.clone()
-            } else {
-                account_currency.clone()
-            };
-
-            // Build canonical ID with base symbol
-            let canonical_id = canonical_asset_id(
-                &inferred_kind,
-                base_symbol,
-                resolved_mic.as_deref(),
-                &asset_context_currency,
-            );
-
             // Read-only: check if asset exists for name/currency enrichment
             let mut asset_currency: Option<String> = None;
-            match self.asset_service.get_asset_by_id(&canonical_id) {
-                Ok(asset) => {
+            let existing_id = self.find_existing_asset_id(
+                base_symbol,
+                resolved_mic.as_deref(),
+                inferred_instrument_type.as_ref(),
+            );
+            if let Some(ref id) = existing_id {
+                if let Ok(asset) = self.asset_service.get_asset_by_id(id) {
                     activity.symbol_name = asset.name;
-                    asset_currency = Some(asset.currency.clone());
-                }
-                Err(_) => {
+                    asset_currency = Some(asset.quote_ccy.clone());
+                } else {
                     activity.symbol_name = Some(base_symbol.to_string());
                 }
+            } else {
+                activity.symbol_name = Some(base_symbol.to_string());
             }
 
             if activity.currency.is_empty() {
@@ -1704,30 +1736,14 @@ impl ActivityServiceTrait for ActivityService {
         for (idx, activity) in activities.iter().enumerate() {
             match self.build_asset_spec(activity, account, &symbol_mic_cache) {
                 Ok(Some(spec)) => {
-                    activity_asset_map.push(Some(spec.id.clone()));
+                    // Use spec.id if available, or instrument_key for mapping
+                    let map_key = spec.id.clone().or_else(|| spec.instrument_key());
+                    activity_asset_map.push(map_key);
                     asset_specs.push(spec);
                 }
                 Ok(None) => {
-                    if is_cash_activity(&activity.activity_type) {
-                        let ccy = if !activity.currency.is_empty() {
-                            activity.currency.to_uppercase()
-                        } else {
-                            account_currency.to_uppercase()
-                        };
-                        let cash_id = canonical_asset_id(&AssetKind::Cash, &ccy, None, &ccy);
-                        asset_specs.push(AssetSpec {
-                            id: cash_id.clone(),
-                            symbol: ccy.clone(),
-                            exchange_mic: None,
-                            currency: ccy,
-                            kind: AssetKind::Cash,
-                            pricing_mode: None,
-                            name: None,
-                        });
-                        activity_asset_map.push(Some(cash_id));
-                    } else {
-                        activity_asset_map.push(None);
-                    }
+                    // Cash activities have no asset
+                    activity_asset_map.push(None);
                 }
                 Err(e) => {
                     result.errors.push((idx, e.to_string()));
@@ -1740,7 +1756,10 @@ impl ActivityServiceTrait for ActivityService {
         let unique_specs: Vec<AssetSpec> = asset_specs
             .into_iter()
             .fold(HashMap::new(), |mut map, spec| {
-                map.entry(spec.id.clone()).or_insert(spec);
+                let key = spec.id.clone().unwrap_or_else(|| {
+                    spec.instrument_key().unwrap_or_default()
+                });
+                map.entry(key).or_insert(spec);
                 map
             })
             .into_values()
@@ -1752,6 +1771,33 @@ impl ActivityServiceTrait for ActivityService {
             .await?;
 
         result.assets_created = ensure_result.created_ids.len() as u32;
+
+        // Build reverse lookup: instrument_key → asset_id for resolving activity_asset_map entries
+        let mut key_to_asset_id: HashMap<String, String> = HashMap::new();
+        for asset in ensure_result.assets.values() {
+            if let Some(ref key) = asset.instrument_key {
+                key_to_asset_id.insert(key.clone(), asset.id.clone());
+            }
+        }
+
+        // Resolve activity_asset_map entries: replace instrument_key refs with actual asset IDs
+        for entry in &mut activity_asset_map {
+            if let Some(ref map_key) = entry {
+                // If the map_key is not a direct asset ID in ensure_result, try instrument_key lookup
+                if !ensure_result.assets.contains_key(map_key) {
+                    if let Some(asset_id) = key_to_asset_id.get(map_key) {
+                        *entry = Some(asset_id.clone());
+                    } else {
+                        // Unresolved instrument_key — clear to avoid FK violation
+                        warn!(
+                            "Could not resolve asset for key '{}'; activity will have no linked asset",
+                            map_key
+                        );
+                        *entry = None;
+                    }
+                }
+            }
+        }
 
         // 4. Collect FX pairs and call ensure_fx_pairs()
         // Include both activity currency and asset currency pairs
@@ -1765,7 +1811,7 @@ impl ActivityServiceTrait for ActivityService {
                 ensure_result
                     .assets
                     .get(asset_id)
-                    .map(|asset| asset.currency.clone())
+                    .map(|asset| asset.quote_ccy.clone())
                     .unwrap_or_else(|| account_currency.clone())
             } else {
                 account_currency.clone()
@@ -1779,8 +1825,8 @@ impl ActivityServiceTrait for ActivityService {
             // Asset currency vs account currency (when asset currency differs from both)
             if let Some(asset_id) = activity_asset_map.get(idx).and_then(|id| id.as_ref()) {
                 if let Some(asset) = ensure_result.assets.get(asset_id) {
-                    if asset.currency != account_currency && asset.currency != activity_currency {
-                        fx_pairs.push((asset.currency.clone(), account_currency.clone()));
+                    if asset.quote_ccy != account_currency && asset.quote_ccy != activity_currency {
+                        fx_pairs.push((asset.quote_ccy.clone(), account_currency.clone()));
                     }
                 }
             }
@@ -1804,7 +1850,7 @@ impl ActivityServiceTrait for ActivityService {
                 ensure_result
                     .assets
                     .get(asset_id)
-                    .map(|asset| asset.currency.clone())
+                    .map(|asset| asset.quote_ccy.clone())
                     .unwrap_or_else(|| account_currency.clone())
             } else {
                 account_currency.clone()
@@ -1834,10 +1880,10 @@ impl ActivityServiceTrait for ActivityService {
                 }
             }
 
-            // 6. Handle manual quotes for MANUAL pricing mode assets
+            // 6. Handle manual quotes for MANUAL quote mode assets
             if let Some(ref asset_id) = resolved_asset_id {
                 if let Some(asset) = ensure_result.assets.get(asset_id) {
-                    if asset.pricing_mode == crate::assets::PricingMode::Manual {
+                    if asset.quote_mode == QuoteMode::Manual {
                         if let Some(unit_price) = activity.unit_price {
                             let currency = if !activity.currency.is_empty() {
                                 &activity.currency
@@ -1860,7 +1906,7 @@ impl ActivityServiceTrait for ActivityService {
             if activity.currency.is_empty() {
                 if let Some(asset_id) = resolved_asset_id.as_ref() {
                     if let Some(asset) = ensure_result.assets.get(asset_id) {
-                        activity.currency = asset.currency.clone();
+                        activity.currency = asset.quote_ccy.clone();
                     } else {
                         activity.currency = account_currency.clone();
                     }

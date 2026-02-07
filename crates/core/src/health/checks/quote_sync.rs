@@ -5,7 +5,7 @@
 use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
 
-use crate::assets::{AssetServiceTrait, PricingMode};
+use crate::assets::{AssetServiceTrait, QuoteMode};
 use crate::errors::Result;
 use crate::health::model::{
     AffectedItem, FixAction, HealthCategory, HealthIssue, NavigateAction, Severity,
@@ -67,24 +67,24 @@ pub fn gather_quote_sync_errors(
         Err(_) => return Vec::new(),
     };
 
-    // Build a map of asset_id -> (symbol, pricing_mode)
-    let asset_map: HashMap<String, (String, PricingMode)> = all_assets
+    // Build a map of asset_id -> (symbol, quote_mode)
+    let asset_map: HashMap<String, (String, QuoteMode)> = all_assets
         .into_iter()
         .filter(|a| asset_ids_set.contains(&a.id))
-        .map(|a| (a.id.clone(), (a.symbol.clone(), a.pricing_mode)))
+        .map(|a| (a.id.clone(), (a.display_code.clone().unwrap_or_default(), a.quote_mode)))
         .collect();
 
     // Convert to QuoteSyncErrorInfo, filtering out manual pricing assets
     sync_states_with_errors
         .into_iter()
         .filter_map(|s| {
-            let (symbol, pricing_mode) = asset_map
+            let (symbol, quote_mode) = asset_map
                 .get(&s.asset_id)
                 .cloned()
-                .unwrap_or_else(|| (s.asset_id.clone(), PricingMode::Market));
+                .unwrap_or_else(|| (s.asset_id.clone(), QuoteMode::Market));
 
             // Skip assets with manual pricing - they don't need quote syncing
-            if pricing_mode == PricingMode::Manual {
+            if quote_mode == QuoteMode::Manual {
                 return None;
             }
 

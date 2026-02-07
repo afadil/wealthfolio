@@ -31,9 +31,9 @@ import {
 import { CurrencyInput } from "@wealthfolio/ui";
 import type { SymbolSearchResult } from "@/lib/types";
 
-// Simplified asset types for the form
+// Simplified asset types for the form (values are InstrumentType)
 const ASSET_TYPE_OPTIONS = [
-  { value: "SECURITY", label: "Security (Stock, ETF, Bond)" },
+  { value: "EQUITY", label: "Security (Stock, ETF, Bond)" },
   { value: "CRYPTO", label: "Cryptocurrency" },
   { value: "OTHER", label: "Other" },
 ] as const;
@@ -45,7 +45,7 @@ const customAssetSchema = z.object({
     .max(20, "Symbol must be 20 characters or less")
     .transform((val) => val.toUpperCase().trim()),
   name: z.string().min(1, "Name is required").max(100, "Name must be 100 characters or less"),
-  assetType: z.enum(["SECURITY", "CRYPTO", "OTHER"]),
+  assetType: z.enum(["EQUITY", "CRYPTO", "OTHER"]),
   currency: z.string().min(1, "Currency is required"),
 });
 
@@ -76,7 +76,7 @@ export function CreateCustomAssetDialog({
     defaultValues: {
       symbol: defaultSymbol.toUpperCase(),
       name: "",
-      assetType: "SECURITY",
+      assetType: "EQUITY",
       currency,
     },
   });
@@ -87,7 +87,7 @@ export function CreateCustomAssetDialog({
       form.reset({
         symbol: defaultSymbol.toUpperCase(),
         name: "",
-        assetType: "SECURITY",
+        assetType: "EQUITY",
         currency,
       });
     }
@@ -108,8 +108,8 @@ export function CreateCustomAssetDialog({
       score: 0,
       // Include currency so SymbolSearch can set it in the form
       currency: values.currency,
-      // Include asset kind for custom assets (SECURITY, CRYPTO, OTHER)
-      assetKind: values.assetType,
+      // Include asset kind for custom assets (INVESTMENT, OTHER)
+      assetKind: values.assetType === "OTHER" ? "OTHER" : "INVESTMENT",
       // We don't set exchangeMic - this will result in SEC:SYMBOL:UNKNOWN for the asset ID
     };
 

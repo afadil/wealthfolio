@@ -14,7 +14,7 @@ mod tests {
         Sort as ActivitySort,
     };
     use crate::assets::{
-        Asset, AssetKind, AssetRepositoryTrait, NewAsset, PricingMode, UpdateAssetProfile,
+        Asset, AssetKind, AssetRepositoryTrait, NewAsset, QuoteMode, UpdateAssetProfile,
     };
     use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
     use crate::errors::{Error, Result as AppResult};
@@ -161,20 +161,14 @@ mod tests {
                 "AAPL".to_string(),
                 Asset {
                     id: "AAPL".to_string(),
-                    kind: AssetKind::Security,
+                    kind: AssetKind::Investment,
                     name: Some("Apple Inc.".to_string()),
-                    symbol: "AAPL".to_string(),
-                    exchange_mic: None,
-                    exchange_name: None,
-                    currency: "USD".to_string(), // USD listing
-                    pricing_mode: PricingMode::Market,
-                    preferred_provider: None,
-                    provider_overrides: None,
-                    notes: None,
-                    metadata: None,
-                    is_active: true,
+                    display_code: Some("AAPL".to_string()),
+                    quote_ccy: "USD".to_string(), // USD listing
+                    quote_mode: QuoteMode::Market,
                     created_at: chrono::Utc::now().naive_utc(),
                     updated_at: chrono::Utc::now().naive_utc(),
+                    ..Default::default()
                 },
             );
 
@@ -182,20 +176,14 @@ mod tests {
                 "SHOP".to_string(),
                 Asset {
                     id: "SHOP".to_string(),
-                    kind: AssetKind::Security,
+                    kind: AssetKind::Investment,
                     name: Some("Shopify Inc.".to_string()),
-                    symbol: "SHOP".to_string(),
-                    exchange_mic: None,
-                    exchange_name: None,
-                    currency: "CAD".to_string(), // CAD listing
-                    pricing_mode: PricingMode::Market,
-                    preferred_provider: None,
-                    provider_overrides: None,
-                    notes: None,
-                    metadata: None,
-                    is_active: true,
+                    display_code: Some("SHOP".to_string()),
+                    quote_ccy: "CAD".to_string(), // CAD listing
+                    quote_mode: QuoteMode::Market,
                     created_at: chrono::Utc::now().naive_utc(),
                     updated_at: chrono::Utc::now().naive_utc(),
+                    ..Default::default()
                 },
             );
 
@@ -221,12 +209,16 @@ mod tests {
             unimplemented!("update_profile not implemented for MockAssetRepository")
         }
 
-        async fn update_pricing_mode(
+        async fn update_quote_mode(
             &self,
             _asset_id: &str,
-            _pricing_mode: &str,
+            _quote_mode: &str,
         ) -> AppResult<Asset> {
-            unimplemented!("update_pricing_mode not implemented for MockAssetRepository")
+            unimplemented!("update_quote_mode not implemented for MockAssetRepository")
+        }
+
+        fn find_by_instrument_key(&self, _instrument_key: &str) -> AppResult<Option<Asset>> {
+            Ok(None)
         }
 
         async fn delete(&self, _asset_id: &str) -> AppResult<()> {

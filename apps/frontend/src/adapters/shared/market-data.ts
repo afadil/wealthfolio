@@ -74,11 +74,11 @@ export const deleteAsset = async (id: string): Promise<void> => {
   }
 };
 
-export const updatePricingMode = async (assetId: string, pricingMode: string): Promise<Asset> => {
+export const updateQuoteMode = async (assetId: string, quoteMode: string): Promise<Asset> => {
   try {
-    return await invoke<Asset>("update_pricing_mode", { id: assetId, pricingMode });
+    return await invoke<Asset>("update_quote_mode", { id: assetId, quoteMode });
   } catch (error) {
-    logger.error("Error updating asset pricing mode.");
+    logger.error("Error updating asset quote mode.");
     throw error;
   }
 };

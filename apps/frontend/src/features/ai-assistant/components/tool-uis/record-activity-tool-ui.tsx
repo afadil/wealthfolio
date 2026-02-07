@@ -79,7 +79,7 @@ interface ActivityDraft {
   subtype?: string;
   notes?: string;
   priceSource: string;
-  pricingMode: string;
+  quoteMode: string;
   isCustomAsset: boolean;
   assetKind?: string;
 }
@@ -214,7 +214,12 @@ function normalizeResult(result: unknown, fallbackCurrency: string): RecordActiv
     subtype: (draftRaw.subtype as string) ?? undefined,
     notes: (draftRaw.notes as string) ?? undefined,
     priceSource: (draftRaw.priceSource as string) ?? (draftRaw.price_source as string) ?? "none",
-    pricingMode: (draftRaw.pricingMode as string) ?? (draftRaw.pricing_mode as string) ?? "MARKET",
+    quoteMode:
+      (draftRaw.quoteMode as string) ??
+      (draftRaw.quote_mode as string) ??
+      (draftRaw.pricingMode as string) ??
+      (draftRaw.pricing_mode as string) ??
+      "MARKET",
     isCustomAsset: Boolean(draftRaw.isCustomAsset ?? draftRaw.is_custom_asset ?? false),
     assetKind: (draftRaw.assetKind as string) ?? (draftRaw.asset_kind as string) ?? undefined,
   };

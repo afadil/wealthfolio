@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ActivityType, PricingMode } from "@/lib/constants";
+import { ActivityType, QuoteMode } from "@/lib/constants";
 
 // Asset metadata schema for custom assets
 export const assetMetadataSchema = z
@@ -44,7 +44,7 @@ export const holdingsActivitySchema = baseActivitySchema.extend({
       invalid_type_error: "Average cost must be a number.",
     })
     .positive(),
-  pricingMode: z.enum([PricingMode.MARKET, PricingMode.MANUAL]).default(PricingMode.MARKET),
+  quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).default(QuoteMode.MARKET),
   // Metadata to mark as external transfer (affects net_contribution)
   metadata: z
     .object({
@@ -73,7 +73,7 @@ export const bulkHoldingRowSchema = z.object({
     .positive({ message: "Average cost must be greater than 0" }),
   totalValue: z.number().optional(),
   assetId: z.string().optional(),
-  pricingMode: z.enum([PricingMode.MARKET, PricingMode.MANUAL]).optional(),
+  quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).optional(),
   // Exchange MIC for canonical asset ID generation (e.g., "XNAS", "XTSE")
   exchangeMic: z.string().optional(),
 });
@@ -104,7 +104,7 @@ export const tradeActivitySchema = baseActivitySchema.extend({
     })
     .min(0, { message: "Fee must be a non-negative number." })
     .default(0),
-  pricingMode: z.enum([PricingMode.MARKET, PricingMode.MANUAL]).default(PricingMode.MARKET),
+  quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).default(QuoteMode.MARKET),
 });
 
 // Cash activity schema - DEPOSIT/WITHDRAWAL only
@@ -125,7 +125,7 @@ export const cashActivitySchema = baseActivitySchema.extend({
     .min(0, { message: "Fee must be a non-negative number." })
     .default(0)
     .optional(),
-  pricingMode: z.enum([PricingMode.MARKET, PricingMode.MANUAL]).default(PricingMode.MANUAL),
+  quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).default(QuoteMode.MANUAL),
 });
 
 export const incomeActivitySchema = baseActivitySchema.extend({

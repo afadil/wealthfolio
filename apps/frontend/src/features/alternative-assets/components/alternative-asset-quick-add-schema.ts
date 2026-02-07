@@ -32,7 +32,7 @@ export const ASSET_KIND_OPTIONS = [
   { value: AlternativeAssetKind.PROPERTY, label: "Property" },
   { value: AlternativeAssetKind.VEHICLE, label: "Vehicle" },
   { value: AlternativeAssetKind.COLLECTIBLE, label: "Collectible" },
-  { value: AlternativeAssetKind.PHYSICAL_PRECIOUS, label: "Precious Metal" },
+  { value: AlternativeAssetKind.PRECIOUS_METAL, label: "Precious Metal" },
   { value: AlternativeAssetKind.LIABILITY, label: "Liability" },
   { value: AlternativeAssetKind.OTHER, label: "Other" },
 ] as const;
@@ -45,7 +45,7 @@ export const alternativeAssetQuickAddSchema = z
       AlternativeAssetKind.PROPERTY,
       AlternativeAssetKind.VEHICLE,
       AlternativeAssetKind.COLLECTIBLE,
-      AlternativeAssetKind.PHYSICAL_PRECIOUS,
+      AlternativeAssetKind.PRECIOUS_METAL,
       AlternativeAssetKind.LIABILITY,
       AlternativeAssetKind.OTHER,
     ]),
@@ -93,7 +93,7 @@ export const alternativeAssetQuickAddSchema = z
   .refine(
     (data) => {
       // Precious metals require metal type and weight unit
-      if (data.kind === AlternativeAssetKind.PHYSICAL_PRECIOUS) {
+      if (data.kind === AlternativeAssetKind.PRECIOUS_METAL) {
         return !!data.metalType && !!data.weightUnit;
       }
       return true;

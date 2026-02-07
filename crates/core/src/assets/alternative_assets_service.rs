@@ -25,7 +25,7 @@ use super::alternative_assets_model::{
 use super::alternative_assets_traits::{
     AlternativeAssetRepositoryTrait, AlternativeAssetServiceTrait,
 };
-use super::{generate_asset_id, AssetKind, AssetRepositoryTrait, NewAsset, PricingMode};
+use super::{AssetKind, AssetRepositoryTrait, NewAsset, QuoteMode};
 use crate::errors::{Error, Result, ValidationError};
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::quotes::{DataSource, Quote, QuoteServiceTrait};
@@ -70,7 +70,7 @@ impl AlternativeAssetService {
             AssetKind::Property
             | AssetKind::Vehicle
             | AssetKind::Collectible
-            | AssetKind::PhysicalPrecious
+            | AssetKind::PreciousMetal
             | AssetKind::PrivateEquity
             | AssetKind::Liability
             | AssetKind::Other => Ok(()),
@@ -152,11 +152,11 @@ impl AlternativeAssetService {
         Some(meta)
     }
 
-    /// Derives the display symbol for an alternative asset from its metadata.
+    /// Derives the display code for an alternative asset from its metadata.
     ///
     /// Uses the unified `sub_type` field (e.g., "gold" → "Gold", "mortgage" → "Mortgage").
     /// Falls back to the kind's display name if sub_type is not set.
-    pub fn derive_symbol(kind: &AssetKind, metadata: &Option<Value>) -> String {
+    pub fn derive_display_code(kind: &AssetKind, metadata: &Option<Value>) -> String {
         metadata
             .as_ref()
             .and_then(|m| m.get("sub_type"))
@@ -217,38 +217,34 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
             request.name, request.kind
         );
 
-        // 1. Generate unique asset ID
-        let asset_id = generate_asset_id(&request.kind);
-        debug!("Generated asset ID: {}", asset_id);
-
-        // 2. Build asset metadata
+        // 1. Build asset metadata
         let metadata = Self::build_asset_metadata(&request);
 
-        // 3. Determine symbol from metadata
-        let symbol = Self::derive_symbol(&request.kind, &metadata);
+        // 2. Determine display_code from metadata
+        let display_code = Self::derive_display_code(&request.kind, &metadata);
 
-        // 4. Create the asset record
+        // 3. Create the asset record (DB generates UUID)
         let new_asset = NewAsset {
-            id: Some(asset_id.clone()),
+            id: None, // DB generates UUID
             name: Some(request.name.clone()),
-            symbol,
-            currency: request.currency.clone(),
+            display_code: Some(display_code),
+            quote_ccy: request.currency.clone(),
             kind: request.kind.clone(),
-            pricing_mode: PricingMode::Manual,
+            quote_mode: QuoteMode::Manual,
             is_active: true,
             metadata,
             ..Default::default()
         };
 
         let asset = self.asset_repository.create(new_asset).await?;
-        debug!("Created asset: {}", asset.id);
+        let asset_id = asset.id.clone();
+        debug!("Created asset: {}", asset_id);
 
         // Emit asset created event
         self.event_sink
-            .emit(DomainEvent::assets_created(vec![asset.id.clone()]));
+            .emit(DomainEvent::assets_created(vec![asset_id.clone()]));
 
         // 4. Create purchase/origination quote if both price and date are provided
-        // This gives us historical data for charts showing value progression
         if let (Some(purchase_price), Some(purchase_date)) =
             (request.purchase_price, request.purchase_date)
         {
@@ -275,7 +271,6 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
         }
 
         // 5. Create current valuation quote
-        // For alternative assets, close = total value (not unit price)
         let quote_id = Uuid::new_v4().to_string();
         let quote = Quote {
             id: quote_id.clone(),
@@ -311,21 +306,13 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
             request.asset_id, request.value, request.date
         );
 
-        // Validate asset_id is a valid alternative asset ID
-        if !super::is_valid_alternative_asset_id(&request.asset_id) {
-            return Err(Error::Validation(ValidationError::InvalidInput(format!(
-                "Invalid alternative asset ID: {}",
-                request.asset_id
-            ))));
-        }
+        // Verify the asset exists
+        self.asset_repository.get_by_id(&request.asset_id)?;
 
         // Get the existing quote to find the currency
-        // If no existing quote, we need to fetch the asset to get currency
         let currency = match self.quote_service.get_latest_quote(&request.asset_id) {
             Ok(existing_quote) => existing_quote.currency,
             Err(_) => {
-                // Fallback: try to get from recent quotes or default
-                // In a complete implementation, we'd fetch the asset's currency
                 return Err(Error::Validation(ValidationError::InvalidInput(format!(
                     "Cannot find existing valuation for asset: {}. Please check the asset exists.",
                     request.asset_id
@@ -364,18 +351,15 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
     async fn delete_alternative_asset(&self, asset_id: &str) -> Result<()> {
         debug!("Deleting alternative asset: {}", asset_id);
 
-        // Validate asset_id is a valid alternative asset ID
-        if !super::is_valid_alternative_asset_id(asset_id) {
+        // Verify the asset exists and is an alternative asset
+        let asset = self.asset_repository.get_by_id(asset_id)?;
+        if !asset.kind.is_alternative() {
             return Err(Error::Validation(ValidationError::InvalidInput(format!(
-                "Invalid alternative asset ID: {}",
-                asset_id
+                "Asset {} is not an alternative asset (kind: {:?})",
+                asset_id, asset.kind
             ))));
         }
 
-        // The repository handles the transactional deletion:
-        // 1. Unlink any liabilities referencing this asset
-        // 2. Delete all quotes for this asset (WHERE data_source = 'MANUAL')
-        // 3. Delete the asset record
         self.alternative_asset_repository
             .delete_alternative_asset(asset_id)
             .await?;
@@ -390,25 +374,25 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
             request.liability_id, request.target_asset_id
         );
 
-        // Validate liability_id is a valid liability asset ID
-        if !request.liability_id.starts_with("LIAB-") {
+        // Validate liability is actually a Liability kind
+        let liability = self.asset_repository.get_by_id(&request.liability_id)?;
+        if liability.kind != AssetKind::Liability {
             return Err(Error::Validation(ValidationError::InvalidInput(format!(
-                "Asset {} is not a liability",
-                request.liability_id
+                "Asset {} is not a liability (kind: {:?})",
+                request.liability_id, liability.kind
             ))));
         }
 
-        // Validate target_asset_id is a valid alternative asset ID
-        if !super::is_valid_alternative_asset_id(&request.target_asset_id) {
+        // Validate target asset exists and is an alternative asset
+        let target = self.asset_repository.get_by_id(&request.target_asset_id)?;
+        if !target.kind.is_alternative() {
             return Err(Error::Validation(ValidationError::InvalidInput(format!(
-                "Invalid target asset ID: {}",
-                request.target_asset_id
+                "Target asset {} is not an alternative asset (kind: {:?})",
+                request.target_asset_id, target.kind
             ))));
         }
 
-        // Get current liability metadata and update it
-        // This requires fetching the current asset, which we'd do via asset repository
-        // For now, we'll use the repository's update_asset_metadata method
+        // Update liability metadata with linked_asset_id
         let new_metadata = Self::set_linked_asset_id(None, &request.target_asset_id);
         self.alternative_asset_repository
             .update_asset_metadata(&request.liability_id, Some(new_metadata))
@@ -428,11 +412,12 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
     async fn unlink_liability(&self, liability_id: &str) -> Result<LinkLiabilityResponse> {
         debug!("Unlinking liability {}", liability_id);
 
-        // Validate liability_id is a valid liability asset ID
-        if !liability_id.starts_with("LIAB-") {
+        // Validate liability is actually a Liability kind
+        let liability = self.asset_repository.get_by_id(liability_id)?;
+        if liability.kind != AssetKind::Liability {
             return Err(Error::Validation(ValidationError::InvalidInput(format!(
-                "Asset {} is not a liability",
-                liability_id
+                "Asset {} is not a liability (kind: {:?})",
+                liability_id, liability.kind
             ))));
         }
 
@@ -455,16 +440,14 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
     ) -> Result<UpdateAssetDetailsResponse> {
         debug!("Updating asset details for {}", request.asset_id);
 
-        // Validate asset_id is a valid alternative asset ID
-        if !super::is_valid_alternative_asset_id(&request.asset_id) {
+        // Verify the asset exists and is an alternative asset
+        let asset = self.asset_repository.get_by_id(&request.asset_id)?;
+        if !asset.kind.is_alternative() {
             return Err(Error::Validation(ValidationError::InvalidInput(format!(
-                "Invalid alternative asset ID: {}",
-                request.asset_id
+                "Asset {} is not an alternative asset (kind: {:?})",
+                request.asset_id, asset.kind
             ))));
         }
-
-        // Get the current asset
-        let asset = self.asset_repository.get_by_id(&request.asset_id)?;
 
         // Parse existing metadata
         let mut metadata_obj = asset
@@ -507,20 +490,20 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        // Recalculate symbol from updated metadata
+        // Recalculate display_code from updated metadata
         let updated_metadata = if metadata_obj.is_empty() {
             None
         } else {
             Some(Value::Object(metadata_obj))
         };
-        let symbol = Self::derive_symbol(&asset.kind, &updated_metadata);
+        let display_code = Self::derive_display_code(&asset.kind, &updated_metadata);
 
         // Persist asset details update
         self.alternative_asset_repository
             .update_asset_details(
                 &request.asset_id,
                 request.name.as_deref(),
-                Some(&symbol),
+                Some(&display_code),
                 updated_metadata,
                 request.notes.as_deref(),
             )
@@ -533,7 +516,6 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
 
         if purchase_info_changed {
             if let (Some(price_str), Some(date_str)) = (&new_purchase_price, &new_purchase_date) {
-                // Parse new purchase info
                 let purchase_price: Decimal = price_str.parse().map_err(|_| {
                     Error::Validation(ValidationError::InvalidInput(
                         "Invalid purchase price format".to_string(),
@@ -546,8 +528,6 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
                         ))
                     })?;
 
-                // Create/update purchase quote
-                // The quote service's add_quote uses upsert semantics on (asset_id, date, data_source)
                 let purchase_quote = Quote {
                     id: Uuid::new_v4().to_string(),
                     asset_id: request.asset_id.clone(),
@@ -559,7 +539,7 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
                     close: purchase_price,
                     adjclose: purchase_price,
                     volume: Decimal::ZERO,
-                    currency: asset.currency.clone(),
+                    currency: asset.quote_ccy.clone(),
                     data_source: DataSource::Manual,
                     created_at: Utc::now(),
                     notes: None,
@@ -601,7 +581,7 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
             return Ok(vec![]);
         }
 
-        // Get asset IDs for quote lookup (quotes are stored by asset_id, not symbol)
+        // Get asset IDs for quote lookup
         let asset_ids: Vec<String> = alternative_assets
             .iter()
             .map(|a| a.id.clone())
@@ -614,7 +594,6 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
         let holdings: Vec<AlternativeHolding> = alternative_assets
             .into_iter()
             .filter_map(|asset| {
-                // Get the latest quote for this asset (quotes are keyed by asset_id)
                 let quote = quotes.get(&asset.id)?;
 
                 // Extract purchase_price from metadata
@@ -642,9 +621,6 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
                     .map(|s| s.to_string());
 
                 // Calculate unrealized gain if we have purchase price
-                // Note: unrealized_gain_pct is returned as decimal (e.g., 0.0652 for 6.52%)
-                // because the frontend formatPercent uses Intl.NumberFormat style:"percent"
-                // which multiplies by 100 automatically
                 let (unrealized_gain, unrealized_gain_pct) = if let Some(pp) = purchase_price {
                     let gain = quote.close - pp;
                     let pct = if pp != Decimal::ZERO {
@@ -660,9 +636,12 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
                 Some(AlternativeHolding {
                     id: asset.id.clone(),
                     kind: asset.kind.clone(),
-                    name: asset.name.clone().unwrap_or_else(|| asset.symbol.clone()),
-                    symbol: asset.symbol,
-                    currency: asset.currency,
+                    name: asset
+                        .name
+                        .clone()
+                        .unwrap_or_else(|| asset.display_code.clone().unwrap_or_default()),
+                    symbol: asset.display_code.unwrap_or_default(),
+                    currency: asset.quote_ccy,
                     market_value: quote.close,
                     purchase_price,
                     purchase_date,
@@ -699,7 +678,7 @@ mod tests {
                 .is_ok()
         );
         assert!(AlternativeAssetService::validate_alternative_asset_kind(
-            &AssetKind::PhysicalPrecious
+            &AssetKind::PreciousMetal
         )
         .is_ok());
         assert!(
@@ -711,13 +690,11 @@ mod tests {
 
         // Invalid asset kinds
         assert!(
-            AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Security).is_err()
+            AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Investment)
+                .is_err()
         );
         assert!(
-            AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Crypto).is_err()
-        );
-        assert!(
-            AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Cash).is_err()
+            AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Fx).is_err()
         );
     }
 
@@ -745,11 +722,15 @@ mod tests {
 
     #[test]
     fn test_set_and_remove_linked_asset_id() {
-        let metadata = AlternativeAssetService::set_linked_asset_id(None, "PROP-a1b2c3d4");
-        assert_eq!(metadata.get("linked_asset_id").unwrap(), "PROP-a1b2c3d4");
+        let metadata =
+            AlternativeAssetService::set_linked_asset_id(None, "some-uuid-for-property");
+        assert_eq!(
+            metadata.get("linked_asset_id").unwrap(),
+            "some-uuid-for-property"
+        );
 
         let linked_id = AlternativeAssetService::get_linked_asset_id(&Some(metadata.clone()));
-        assert_eq!(linked_id, Some("PROP-a1b2c3d4".to_string()));
+        assert_eq!(linked_id, Some("some-uuid-for-property".to_string()));
 
         let removed = AlternativeAssetService::remove_linked_asset_id(Some(metadata));
         assert!(removed.is_none()); // Only had linked_asset_id, so should be None when removed

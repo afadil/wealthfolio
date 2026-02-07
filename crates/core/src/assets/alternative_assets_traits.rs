@@ -169,7 +169,7 @@ pub trait AlternativeAssetRepositoryTrait: Send + Sync {
     /// # Arguments
     /// * `asset_id` - The ID of the asset to update
     /// * `name` - Optional new name for the asset
-    /// * `symbol` - Optional new symbol for the asset
+    /// * `display_code` - Optional new display code for the asset
     /// * `metadata` - Optional new metadata JSON
     /// * `notes` - Optional notes for the asset
     ///
@@ -179,7 +179,7 @@ pub trait AlternativeAssetRepositoryTrait: Send + Sync {
         &self,
         asset_id: &str,
         name: Option<&str>,
-        symbol: Option<&str>,
+        display_code: Option<&str>,
         metadata: Option<serde_json::Value>,
         notes: Option<&str>,
     ) -> Result<()>;

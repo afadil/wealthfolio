@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { ActivityType, PricingMode } from "@/lib/constants";
+import { ActivityType, QuoteMode } from "@/lib/constants";
 import type { ActivityDetails } from "@/lib/types";
 import { BuyForm, type BuyFormValues } from "../components/forms/buy-form";
 import { SellForm, type SellFormValues } from "../components/forms/sell-form";
@@ -97,8 +97,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
       unitPrice: activity?.unitPrice,
       amount: activity?.amount,
       fee: activity?.fee ?? "0",
-      pricingMode:
-        activity?.assetPricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET,
+      quoteMode: activity?.assetQuoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
       // Advanced options
       currency: activity?.currency,
       fxRate: activity?.fxRate ?? undefined,
@@ -114,7 +113,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
         unitPrice: d.unitPrice,
         fee: d.fee,
         comment: d.comment,
-        pricingMode: d.pricingMode,
+        quoteMode: d.quoteMode,
         exchangeMic: d.exchangeMic,
         currency: d.currency,
         fxRate: d.fxRate,
@@ -133,8 +132,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
       unitPrice: activity?.unitPrice,
       amount: activity?.amount,
       fee: activity?.fee ?? "0",
-      pricingMode:
-        activity?.assetPricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET,
+      quoteMode: activity?.assetQuoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
       // Advanced options
       currency: activity?.currency,
       fxRate: activity?.fxRate ?? undefined,
@@ -150,7 +148,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
         unitPrice: d.unitPrice,
         fee: d.fee,
         comment: d.comment,
-        pricingMode: d.pricingMode,
+        quoteMode: d.quoteMode,
         exchangeMic: d.exchangeMic,
         currency: d.currency,
         fxRate: d.fxRate,
@@ -262,8 +260,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
         currency: activity?.currency,
         fxRate: activity?.fxRate ?? undefined,
         subtype: activity?.subtype ?? null,
-        pricingMode:
-          activity?.assetPricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET,
+        quoteMode: activity?.assetQuoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
         exchangeMic: activity?.exchangeMic,
       };
     },
@@ -281,7 +278,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
         subtype: d.subtype,
         currency: d.currency,
         fxRate: d.fxRate,
-        pricingMode: d.pricingMode,
+        quoteMode: d.quoteMode,
         exchangeMic: d.exchangeMic,
         assetMetadata: d.assetMetadata,
         // Include external transfer metadata

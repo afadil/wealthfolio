@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { ActivityType, PricingMode } from "@/lib/constants";
+import { ActivityType, QuoteMode } from "@/lib/constants";
 import { useSettings } from "@/hooks/use-settings";
 import { useHoldings } from "@/hooks/use-holdings";
 import {
@@ -63,7 +63,7 @@ export const sellFormSchema = z.object({
     .positive({ message: "FX Rate must be positive." })
     .optional(),
   // Internal fields
-  pricingMode: z.enum([PricingMode.MARKET, PricingMode.MANUAL]).default(PricingMode.MARKET),
+  quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).default(QuoteMode.MARKET),
   exchangeMic: z.string().optional(),
   // Asset metadata for custom assets (name, etc.)
   assetMetadata: assetMetadataSchema,
@@ -119,7 +119,7 @@ export function SellForm({
       comment: null,
       currency: initialCurrency,
       fxRate: undefined,
-      pricingMode: PricingMode.MARKET,
+      quoteMode: QuoteMode.MARKET,
       exchangeMic: undefined,
       ...defaultValues,
     },
@@ -129,8 +129,8 @@ export function SellForm({
   const accountId = watch("accountId");
   const assetId = watch("assetId");
   const quantity = watch("quantity");
-  const pricingMode = watch("pricingMode");
-  const isManualAsset = pricingMode === PricingMode.MANUAL;
+  const quoteMode = watch("quoteMode");
+  const isManualAsset = quoteMode === QuoteMode.MANUAL;
 
   // Get account currency from selected account
   const selectedAccount = useMemo(
@@ -172,7 +172,7 @@ export function SellForm({
               name="assetId"
               isManualAsset={isManualAsset}
               exchangeMicName="exchangeMic"
-              pricingModeName="pricingMode"
+              quoteModeName="quoteMode"
               currencyName="currency"
               assetMetadataName="assetMetadata"
             />

@@ -38,10 +38,8 @@ impl FxService {
 
     /// Initialize the currency converter with all exchange rates, filling missing days
     fn initialize_converter(&self) -> Result<()> {
-        // Fetch ALL historical rates instead of just the latest
         let all_historical_rates = self.repository.get_historical_exchange_rates()?;
 
-        // Only initialize the converter if we have exchange rates
         if all_historical_rates.is_empty() {
             log::warn!("No exchange rates available, converter not initialized");
             let mut converter_lock = self
@@ -52,7 +50,6 @@ impl FxService {
             return Ok(());
         }
 
-        // Directly use the fetched rates without filling gaps
         match CurrencyConverter::new(all_historical_rates) {
             Ok(converter) => {
                 let mut converter_lock = self
@@ -75,19 +72,18 @@ impl FxService {
     }
 
     fn load_latest_exchange_rate(&self, from: &str, to: &str) -> Result<ExchangeRate> {
-        // Fetch from repository
         match self.repository.get_latest_exchange_rate(from, to)? {
             Some(rate) => Ok(rate),
             None => {
-                // Try inverse rate
-                let inverse_symbol = ExchangeRate::make_fx_symbol(to, from);
+                // Try inverse rate via instrument_key
+                let inverse_key = ExchangeRate::make_instrument_key(to, from);
                 match self
                     .repository
-                    .get_latest_exchange_rate_by_symbol(&inverse_symbol)?
+                    .get_latest_exchange_rate_by_symbol(&inverse_key)?
                 {
                     Some(inverse_rate) => {
                         let direct_rate = ExchangeRate {
-                            id: ExchangeRate::make_fx_symbol(from, to),
+                            id: inverse_rate.id,
                             from_currency: from.to_string(),
                             to_currency: to.to_string(),
                             rate: Decimal::ONE / inverse_rate.rate,
@@ -117,7 +113,6 @@ impl FxService {
         let source_multiplier = if normalized_from == from_currency {
             Decimal::ONE
         } else {
-            // We converted from a minor to a major unit
             Decimal::ONE / denormalization_multiplier(from_currency)
         };
 
@@ -185,14 +180,14 @@ impl FxService {
 #[async_trait]
 impl FxServiceTrait for FxService {
     fn initialize(&self) -> Result<()> {
-        // Initialize currency converter with all exchange rates
         self.initialize_converter()?;
         Ok(())
     }
 
     async fn add_exchange_rate(&self, new_rate: NewExchangeRate) -> Result<ExchangeRate> {
-        // Create the FX asset with the original currency codes (not normalized)
-        self.repository
+        // Create/get the FX asset — returns the asset UUID
+        let asset_id = self
+            .repository
             .create_fx_asset(
                 &new_rate.from_currency,
                 &new_rate.to_currency,
@@ -201,7 +196,7 @@ impl FxServiceTrait for FxService {
             .await?;
 
         let rate = ExchangeRate {
-            id: ExchangeRate::make_fx_symbol(&new_rate.from_currency, &new_rate.to_currency),
+            id: asset_id,
             from_currency: new_rate.from_currency,
             to_currency: new_rate.to_currency,
             rate: new_rate.rate,
@@ -216,18 +211,24 @@ impl FxServiceTrait for FxService {
         let normalized_from = normalize_currency_code(from);
         let normalized_to = normalize_currency_code(to);
 
-        let symbol = ExchangeRate::make_fx_symbol(normalized_from, normalized_to);
+        let instrument_key = ExchangeRate::make_instrument_key(normalized_from, normalized_to);
         let end = Utc::now();
         let start = end - chrono::Duration::days(days);
 
-        // Fetch from repository
         match self
             .repository
-            .get_historical_quotes(&symbol, start.naive_utc(), end.naive_utc())
+            .get_historical_quotes(&instrument_key, start.naive_utc(), end.naive_utc())
         {
             Ok(quotes) => Ok(quotes
                 .into_iter()
-                .map(|q| ExchangeRate::from_quote(&q))
+                .map(|q| ExchangeRate {
+                    id: q.asset_id.clone(),
+                    from_currency: normalized_from.to_string(),
+                    to_currency: normalized_to.to_string(),
+                    rate: q.close,
+                    source: q.data_source.clone(),
+                    timestamp: q.timestamp,
+                })
                 .collect()),
             Err(e) => {
                 Err(FxError::FetchError(format!("Failed to fetch historical rates: {}", e)).into())
@@ -280,7 +281,6 @@ impl FxServiceTrait for FxService {
         to_currency: &str,
         date: NaiveDate,
     ) -> Result<Decimal> {
-        // Check for valid currency codes
         if from_currency.len() != 3 || !from_currency.chars().all(|c| c.is_alphabetic()) {
             return Err(FxError::InvalidCurrencyCode(format!(
                 "Invalid currency code: {}",
@@ -352,9 +352,7 @@ impl FxServiceTrait for FxService {
         Ok(())
     }
 
-    /// Register a new currency pair and create necessary FX assets
     async fn register_currency_pair(&self, from: &str, to: &str) -> Result<()> {
-        // Return early if trying to register the same currency or if either currency is empty
         if from == to || from.is_empty() || to.is_empty() {
             return Ok(());
         }
@@ -362,33 +360,28 @@ impl FxServiceTrait for FxService {
         let normalized_from = normalize_currency_code(from);
         let normalized_to = normalize_currency_code(to);
 
-        // Safety check: ensure normalized codes are also valid
         if normalized_from.is_empty() || normalized_to.is_empty() {
             return Ok(());
         }
 
-        // Try to get existing rate first
         let existing_rate = self
             .load_latest_exchange_rate(normalized_from, normalized_to)
             .ok();
 
-        // Create FX asset and add default rate if no rate exists
         if existing_rate.is_none() {
-            self.repository
+            let asset_id = self
+                .repository
                 .create_fx_asset(normalized_from, normalized_to, DataSource::Yahoo.as_str())
                 .await?;
 
-            // Emit asset created event for the FX asset
-            let fx_asset_id = ExchangeRate::make_fx_symbol(normalized_from, normalized_to);
             self.event_sink
-                .emit(DomainEvent::assets_created(vec![fx_asset_id]));
+                .emit(DomainEvent::assets_created(vec![asset_id]));
         }
 
         Ok(())
     }
 
     async fn register_currency_pair_manual(&self, from: &str, to: &str) -> Result<()> {
-        // Return early if trying to register the same currency or if either currency is empty
         if from == to || from.is_empty() || to.is_empty() {
             return Ok(());
         }
@@ -396,38 +389,32 @@ impl FxServiceTrait for FxService {
         let normalized_from = normalize_currency_code(from);
         let normalized_to = normalize_currency_code(to);
 
-        // Safety check: ensure normalized codes are also valid
         if normalized_from.is_empty() || normalized_to.is_empty() {
             return Ok(());
         }
 
-        // Try to get existing rate first
         let existing_rate = self
             .load_latest_exchange_rate(normalized_from, normalized_to)
             .ok();
 
-        // Create FX asset and add default rate if no rate exists
         if existing_rate.is_none() {
-            self.repository
+            let asset_id = self
+                .repository
                 .create_fx_asset(normalized_from, normalized_to, DataSource::Manual.as_str())
                 .await?;
 
-            // Emit asset created event for the FX asset
-            let fx_asset_id = ExchangeRate::make_fx_symbol(normalized_from, normalized_to);
             self.event_sink
-                .emit(DomainEvent::assets_created(vec![fx_asset_id]));
+                .emit(DomainEvent::assets_created(vec![asset_id]));
         }
 
         Ok(())
     }
 
     async fn ensure_fx_pairs(&self, pairs: Vec<(String, String)>) -> Result<()> {
-        // Deduplicate pairs
         let unique_pairs: HashSet<(String, String)> = pairs.into_iter().collect();
 
         for (from, to) in unique_pairs {
             if from != to {
-                // register_currency_pair is already idempotent
                 self.register_currency_pair(&from, &to).await?;
             }
         }

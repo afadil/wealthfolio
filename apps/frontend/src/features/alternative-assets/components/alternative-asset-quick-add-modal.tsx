@@ -65,7 +65,7 @@ const ASSET_TYPES = [
     borderColor: "border-purple-400/50",
   },
   {
-    kind: AlternativeAssetKind.PHYSICAL_PRECIOUS,
+    kind: AlternativeAssetKind.PRECIOUS_METAL,
     label: "Precious Metal",
     description: "Gold, silver & platinum",
     icon: Icons.PreciousDuotone,
@@ -98,7 +98,7 @@ const kindToApiKind: Record<AlternativeAssetKind, AlternativeAssetKindApi> = {
   [AlternativeAssetKind.PROPERTY]: "property",
   [AlternativeAssetKind.VEHICLE]: "vehicle",
   [AlternativeAssetKind.COLLECTIBLE]: "collectible",
-  [AlternativeAssetKind.PHYSICAL_PRECIOUS]: "precious",
+  [AlternativeAssetKind.PRECIOUS_METAL]: "precious_metal",
   [AlternativeAssetKind.LIABILITY]: "liability",
   [AlternativeAssetKind.OTHER]: "other",
 };
@@ -248,7 +248,7 @@ export function AlternativeAssetQuickAddModal({
     const isLiability = formData.kind === AlternativeAssetKind.LIABILITY;
 
     // Use unified 'sub_type' field for all asset types
-    if (formData.kind === AlternativeAssetKind.PHYSICAL_PRECIOUS) {
+    if (formData.kind === AlternativeAssetKind.PRECIOUS_METAL) {
       if (formData.metalType) metadata.sub_type = formData.metalType;
       if (formData.quantity) metadata.quantity = formData.quantity;
       if (formData.unit) metadata.unit = formData.unit;
@@ -301,7 +301,7 @@ export function AlternativeAssetQuickAddModal({
         return "Beach House, City Apartment...";
       case AlternativeAssetKind.VEHICLE:
         return "Tesla Model 3, Porsche 911...";
-      case AlternativeAssetKind.PHYSICAL_PRECIOUS:
+      case AlternativeAssetKind.PRECIOUS_METAL:
         return "Gold Bars, Silver Coins...";
       case AlternativeAssetKind.LIABILITY:
         return "Home Mortgage, Car Loan...";
@@ -425,7 +425,7 @@ export function AlternativeAssetQuickAddModal({
                 className="space-y-5 p-6"
               >
                 {/* Type-specific fields */}
-                {formData.kind === AlternativeAssetKind.PHYSICAL_PRECIOUS && (
+                {formData.kind === AlternativeAssetKind.PRECIOUS_METAL && (
                   <>
                     <div className="space-y-2">
                       <Label className="text-foreground text-sm font-medium">Metal Type</Label>

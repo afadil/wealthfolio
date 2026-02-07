@@ -9,7 +9,6 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::canonical_asset_id;
 use crate::errors::Result;
 use crate::errors::ValidationError;
 use crate::Error;
@@ -17,46 +16,80 @@ use crate::Error;
 // Re-export InstrumentId from market-data crate for convenience
 pub use wealthfolio_market_data::InstrumentId;
 
-/// Asset behavior classification
+/// Asset behavior classification.
+///
+/// `kind` is a behavioral category — broad for market instruments, granular for alternatives.
+/// Market instruments are all `INVESTMENT`; the `instrument_type` field carries the
+/// market-specific classification (EQUITY, CRYPTO, OPTION, etc.).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum AssetKind {
     #[default]
-    Security, // Stocks, ETFs, bonds, funds
-    Crypto,           // Cryptocurrencies
-    Cash,             // Holdable cash position (CASH:USD)
-    FxRate,           // Currency exchange rate (not holdable)
-    Option,           // Options contracts
-    Commodity,        // Physical commodities (ETFs/futures)
-    PrivateEquity,    // Private shares, startup equity
-    Property,         // Real estate (any type)
-    Vehicle,          // Cars, motorcycles, boats, RVs
-    Collectible,      // Art, wine, watches, jewelry, memorabilia
-    PhysicalPrecious, // Physical gold/silver bars, coins (not ETFs)
-    Liability,        // Debts (mortgages, loans, credit cards)
-    Other,            // Catch-all for uncategorized assets
+    Investment, // All tradable, lot-tracked market instruments (stocks, ETFs, crypto, options)
+    Property,      // Real estate
+    Vehicle,       // Cars, motorcycles, boats, RVs
+    Collectible,   // Art, wine, watches, jewelry, memorabilia
+    PreciousMetal, // Physical gold/silver bars, coins (not ETFs)
+    PrivateEquity, // Private shares, startup equity
+    Liability,     // Debts (mortgages, loans, credit cards)
+    Other,         // Catch-all for uncategorized assets
+    Fx,            // Currency exchange rate (infrastructure, not holdable)
 }
 
-/// How the asset is priced
+/// Market instrument type for provider routing.
+///
+/// Orthogonal to `kind` — tells the market data system which API/endpoint to use.
+/// Only meaningful for `kind=INVESTMENT` or `kind=FX`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum InstrumentType {
+    Equity, // Stocks, ETFs, bonds, funds, commodity ETFs
+    Crypto, // Cryptocurrencies
+    Fx,     // Currency exchange rates
+    Option, // Options contracts
+    Metal,  // Precious metal spot prices (XAU, XAG)
+}
+
+/// How the asset is priced/quoted
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum PricingMode {
+pub enum QuoteMode {
     #[default]
     Market, // Priced via market data providers
-    Manual,  // User-entered quotes only
-    Derived, // Calculated from other assets (e.g., options from underlying)
-    None,    // No pricing needed (e.g., cash is always 1:1)
+    Manual, // User-entered quotes only
 }
 
-impl PricingMode {
+impl QuoteMode {
     /// Returns the database string representation (SCREAMING_SNAKE_CASE).
-    /// Use this instead of magic strings in SQL queries and database operations.
     pub const fn as_db_str(&self) -> &'static str {
         match self {
-            PricingMode::Market => "MARKET",
-            PricingMode::Manual => "MANUAL",
-            PricingMode::Derived => "DERIVED",
-            PricingMode::None => "NONE",
+            QuoteMode::Market => "MARKET",
+            QuoteMode::Manual => "MANUAL",
+        }
+    }
+}
+
+impl InstrumentType {
+    /// Returns the database string representation (SCREAMING_SNAKE_CASE).
+    pub const fn as_db_str(&self) -> &'static str {
+        match self {
+            InstrumentType::Equity => "EQUITY",
+            InstrumentType::Crypto => "CRYPTO",
+            InstrumentType::Fx => "FX",
+            InstrumentType::Option => "OPTION",
+            InstrumentType::Metal => "METAL",
+        }
+    }
+
+    /// Parses an instrument type from its database string.
+    pub fn from_db_str(s: &str) -> Option<Self> {
+        match s {
+            "EQUITY" => Some(InstrumentType::Equity),
+            "CRYPTO" => Some(InstrumentType::Crypto),
+            "FX" => Some(InstrumentType::Fx),
+            "OPTION" => Some(InstrumentType::Option),
+            "METAL" => Some(InstrumentType::Metal),
+            _ => None,
         }
     }
 }
@@ -73,39 +106,46 @@ pub struct OptionSpec {
     pub occ_symbol: Option<String>,
 }
 
-/// Domain model representing an asset in the system
-/// Provider-agnostic: no data_source or quote_symbol (use provider_overrides instead)
-/// Classification is handled via taxonomy system, not legacy fields
+/// Domain model representing an asset in the system.
+///
+/// Identity is opaque (UUID). Classification is mutable.
+/// Market instrument identity is in `instrument_*` fields.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Asset {
     pub id: String,
 
     // Core identity
-    pub kind: AssetKind, // Behavior classification (NOT NULL)
+    pub kind: AssetKind,
     pub name: Option<String>,
-    pub symbol: String, // Canonical ticker (no provider suffix)
-
-    // Market identity (for SECURITY)
-    pub exchange_mic: Option<String>, // ISO 10383 MIC code
-    #[serde(skip_deserializing)]
-    pub exchange_name: Option<String>, // Friendly exchange name (derived from MIC)
-
-    // Currency
-    pub currency: String,
-
-    // Pricing configuration
-    pub pricing_mode: PricingMode,          // How this asset is priced
-    pub preferred_provider: Option<String>, // Provider hint (YAHOO, ALPHA_VANTAGE)
-    pub provider_overrides: Option<Value>,  // JSON for per-provider overrides
-
-    // Metadata
+    pub display_code: Option<String>, // User-visible ticker/label
     pub notes: Option<String>,
-    pub metadata: Option<Value>, // JSON for extensions (OptionSpec, identifiers like ISIN, etc.)
+    pub metadata: Option<Value>,
 
     // Status
     #[serde(default = "default_is_active")]
     pub is_active: bool,
+
+    // Valuation
+    pub quote_mode: QuoteMode,
+    pub quote_ccy: String, // Currency prices/valuations are quoted in
+
+    // Instrument identity (NULL for non-market assets)
+    pub instrument_type: Option<InstrumentType>,
+    pub instrument_symbol: Option<String>, // Canonical symbol (AAPL, BTC, EUR)
+    pub instrument_exchange_mic: Option<String>, // ISO 10383 MIC (XNAS, XTSE)
+
+    // Computed canonical key (read-only from DB generated column)
+    #[serde(skip_deserializing)]
+    pub instrument_key: Option<String>,
+
+    // Provider configuration (single JSON blob)
+    pub provider_config: Option<Value>,
+
+    // Derived (not stored in DB)
+    #[serde(skip_deserializing)]
+    pub exchange_name: Option<String>, // Friendly exchange name (derived from MIC)
+
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
 }
@@ -116,105 +156,32 @@ fn default_is_active() -> bool {
 
 impl AssetKind {
     /// Returns the database string representation (SCREAMING_SNAKE_CASE).
-    /// Use this instead of magic strings in SQL queries and database operations.
     pub const fn as_db_str(&self) -> &'static str {
         match self {
-            AssetKind::Security => "SECURITY",
-            AssetKind::Crypto => "CRYPTO",
-            AssetKind::Cash => "CASH",
-            AssetKind::FxRate => "FX_RATE",
-            AssetKind::Option => "OPTION",
-            AssetKind::Commodity => "COMMODITY",
-            AssetKind::PrivateEquity => "PRIVATE_EQUITY",
+            AssetKind::Investment => "INVESTMENT",
             AssetKind::Property => "PROPERTY",
             AssetKind::Vehicle => "VEHICLE",
             AssetKind::Collectible => "COLLECTIBLE",
-            AssetKind::PhysicalPrecious => "PHYSICAL_PRECIOUS",
+            AssetKind::PreciousMetal => "PRECIOUS_METAL",
+            AssetKind::PrivateEquity => "PRIVATE_EQUITY",
             AssetKind::Liability => "LIABILITY",
             AssetKind::Other => "OTHER",
+            AssetKind::Fx => "FX",
         }
     }
 
     /// Returns a human-readable display name for the asset kind.
-    /// Used for UI display (e.g., "Property", "Vehicle", "Precious Metal").
     pub const fn display_name(&self) -> &'static str {
         match self {
-            AssetKind::Security => "Security",
-            AssetKind::Crypto => "Crypto",
-            AssetKind::Cash => "Cash",
-            AssetKind::FxRate => "FX Rate",
-            AssetKind::Option => "Option",
-            AssetKind::Commodity => "Commodity",
-            AssetKind::PrivateEquity => "Private Equity",
+            AssetKind::Investment => "Investment",
             AssetKind::Property => "Property",
             AssetKind::Vehicle => "Vehicle",
             AssetKind::Collectible => "Collectible",
-            AssetKind::PhysicalPrecious => "Precious Metal",
+            AssetKind::PreciousMetal => "Precious Metal",
+            AssetKind::PrivateEquity => "Private Equity",
             AssetKind::Liability => "Liability",
             AssetKind::Other => "Other",
-        }
-    }
-
-    /// Returns the ID prefix for canonical asset ID format.
-    ///
-    /// All asset IDs use typed prefixes: `{PREFIX}:{symbol}:{qualifier}`
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use wealthfolio_core::assets::AssetKind;
-    ///
-    /// assert_eq!(AssetKind::Security.id_prefix(), "SEC");
-    /// assert_eq!(AssetKind::Crypto.id_prefix(), "CRYPTO");
-    /// assert_eq!(AssetKind::Cash.id_prefix(), "CASH");
-    /// ```
-    pub const fn id_prefix(&self) -> &'static str {
-        match self {
-            AssetKind::Security => "SEC",
-            AssetKind::Crypto => "CRYPTO",
-            AssetKind::Cash => "CASH",
-            AssetKind::FxRate => "FX",
-            AssetKind::Option => "OPT",
-            AssetKind::Commodity => "CMDTY",
-            AssetKind::PrivateEquity => "PEQ",
-            AssetKind::Property => "PROP",
-            AssetKind::Vehicle => "VEH",
-            AssetKind::Collectible => "COLL",
-            AssetKind::PhysicalPrecious => "PREC",
-            AssetKind::Liability => "LIAB",
-            AssetKind::Other => "ALT",
-        }
-    }
-
-    /// Parses an asset kind from an ID prefix.
-    ///
-    /// Returns `None` if the prefix is not recognized.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use wealthfolio_core::assets::AssetKind;
-    ///
-    /// assert_eq!(AssetKind::from_id_prefix("SEC"), Some(AssetKind::Security));
-    /// assert_eq!(AssetKind::from_id_prefix("CRYPTO"), Some(AssetKind::Crypto));
-    /// assert_eq!(AssetKind::from_id_prefix("INVALID"), None);
-    /// ```
-    pub fn from_id_prefix(prefix: &str) -> Option<Self> {
-        match prefix {
-            "SEC" => Some(AssetKind::Security),
-            "CRYPTO" => Some(AssetKind::Crypto),
-            "CASH" => Some(AssetKind::Cash),
-            "FX" => Some(AssetKind::FxRate),
-            "OPT" => Some(AssetKind::Option),
-            "CMDTY" => Some(AssetKind::Commodity),
-            "PEQ" => Some(AssetKind::PrivateEquity),
-            "PROP" => Some(AssetKind::Property),
-            "VEH" => Some(AssetKind::Vehicle),
-            "COLL" => Some(AssetKind::Collectible),
-            "PREC" => Some(AssetKind::PhysicalPrecious),
-            "LIAB" => Some(AssetKind::Liability),
-            "ALT" => Some(AssetKind::Other),
-            _ => None,
+            AssetKind::Fx => "FX Rate",
         }
     }
 
@@ -226,28 +193,36 @@ impl AssetKind {
             AssetKind::Property
                 | AssetKind::Vehicle
                 | AssetKind::Collectible
-                | AssetKind::PhysicalPrecious
+                | AssetKind::PreciousMetal
                 | AssetKind::Liability
                 | AssetKind::Other
         )
     }
 
     /// Check if this asset kind should be included in investment performance calculations (TWR/IRR).
-    /// Only Security, Crypto, Option, Commodity, and PrivateEquity are included.
     pub fn is_investment(&self) -> bool {
-        matches!(
-            self,
-            AssetKind::Security
-                | AssetKind::Crypto
-                | AssetKind::Option
-                | AssetKind::Commodity
-                | AssetKind::PrivateEquity
-        )
+        matches!(self, AssetKind::Investment | AssetKind::PrivateEquity)
     }
 
     /// Check if this asset kind is a liability (debts that reduce net worth).
     pub fn is_liability(&self) -> bool {
         matches!(self, AssetKind::Liability)
+    }
+
+    /// Parses an asset kind from its database string.
+    pub fn from_db_str(s: &str) -> Option<Self> {
+        match s {
+            "INVESTMENT" => Some(AssetKind::Investment),
+            "PROPERTY" => Some(AssetKind::Property),
+            "VEHICLE" => Some(AssetKind::Vehicle),
+            "COLLECTIBLE" => Some(AssetKind::Collectible),
+            "PRECIOUS_METAL" => Some(AssetKind::PreciousMetal),
+            "PRIVATE_EQUITY" => Some(AssetKind::PrivateEquity),
+            "LIABILITY" => Some(AssetKind::Liability),
+            "OTHER" => Some(AssetKind::Other),
+            "FX" => Some(AssetKind::Fx),
+            _ => None,
+        }
     }
 }
 
@@ -256,7 +231,7 @@ impl Asset {
     /// Call this when returning assets to the frontend.
     pub fn enrich(mut self) -> Self {
         self.exchange_name = self
-            .exchange_mic
+            .instrument_exchange_mic
             .as_ref()
             .and_then(|mic| wealthfolio_market_data::mic_to_exchange_name(mic))
             .map(String::from);
@@ -265,16 +240,15 @@ impl Asset {
 
     /// Check if this asset is holdable (can have positions)
     pub fn is_holdable(&self) -> bool {
-        !matches!(self.kind, AssetKind::FxRate)
+        !matches!(self.kind, AssetKind::Fx)
     }
 
     /// Check if this asset needs pricing
     pub fn needs_pricing(&self) -> bool {
-        self.pricing_mode == PricingMode::Market
+        self.quote_mode == QuoteMode::Market
     }
 
     /// Check if this asset is an alternative asset type.
-    /// Alternative assets use MANUAL pricing mode for valuations.
     pub fn is_alternative(&self) -> bool {
         self.kind.is_alternative()
     }
@@ -289,9 +263,9 @@ impl Asset {
         self.kind.is_liability()
     }
 
-    /// Get option metadata if this is an option
+    /// Get option metadata if this is an option (instrument_type = OPTION)
     pub fn option_spec(&self) -> Option<OptionSpec> {
-        if self.kind != AssetKind::Option {
+        if self.instrument_type.as_ref() != Some(&InstrumentType::Option) {
             return None;
         }
         self.metadata
@@ -300,61 +274,50 @@ impl Asset {
             .and_then(|v| serde_json::from_value(v.clone()).ok())
     }
 
-    /// Get the kind (backward compat alias)
-    pub fn effective_kind(&self) -> AssetKind {
-        self.kind.clone()
-    }
-
     /// Convert to canonical instrument for market data resolution.
     /// Returns None for asset kinds that are not resolvable to market data.
     pub fn to_instrument_id(&self) -> Option<InstrumentId> {
-        match &self.kind {
-            AssetKind::Security => Some(InstrumentId::Equity {
-                ticker: Arc::from(self.symbol.as_str()),
-                mic: self.exchange_mic.as_ref().map(|s| Cow::Owned(s.clone())),
+        let inst_type = self.instrument_type.as_ref()?;
+        let symbol = self.instrument_symbol.as_ref()?;
+
+        match inst_type {
+            InstrumentType::Equity => Some(InstrumentId::Equity {
+                ticker: Arc::from(symbol.as_str()),
+                mic: self
+                    .instrument_exchange_mic
+                    .as_ref()
+                    .map(|s| Cow::Owned(s.clone())),
             }),
-            AssetKind::Crypto => Some(InstrumentId::Crypto {
-                base: Arc::from(self.symbol.as_str()),
-                quote: Cow::Owned(self.currency.clone()),
+            InstrumentType::Crypto => Some(InstrumentId::Crypto {
+                base: Arc::from(symbol.as_str()),
+                quote: Cow::Owned(self.quote_ccy.clone()),
             }),
-            AssetKind::FxRate => {
-                // New canonical format: symbol = base currency (EUR), currency = quote (USD)
-                // Legacy format: symbol = "EURUSD" or "EURUSD=X"
-                // Detect legacy format by checking if symbol contains the currency
-                let base = if self.symbol.len() > 3 {
-                    // Legacy format - extract base from first 3 chars
-                    let base_symbol = self.symbol.strip_suffix("=X").unwrap_or(&self.symbol);
-                    base_symbol[..3].to_string()
-                } else {
-                    // New canonical format - symbol is already the base currency
-                    self.symbol.clone()
-                };
-                Some(InstrumentId::Fx {
-                    base: Cow::Owned(base),
-                    quote: Cow::Owned(self.currency.clone()),
-                })
-            }
-            AssetKind::Commodity if self.is_precious_metal() => Some(InstrumentId::Metal {
-                code: Arc::from(self.symbol.as_str()),
-                quote: Cow::Owned(self.currency.clone()),
+            InstrumentType::Fx => Some(InstrumentId::Fx {
+                base: Cow::Owned(symbol.clone()),
+                quote: Cow::Owned(self.quote_ccy.clone()),
             }),
-            // These kinds are not resolvable to market data
-            AssetKind::Cash
-            | AssetKind::Option
-            | AssetKind::Commodity
-            | AssetKind::PrivateEquity
-            | AssetKind::Property
-            | AssetKind::Vehicle
-            | AssetKind::Collectible
-            | AssetKind::PhysicalPrecious
-            | AssetKind::Liability
-            | AssetKind::Other => None,
+            InstrumentType::Metal => Some(InstrumentId::Metal {
+                code: Arc::from(symbol.as_str()),
+                quote: Cow::Owned(self.quote_ccy.clone()),
+            }),
+            InstrumentType::Option => None, // Options not resolvable to market data yet
         }
     }
 
-    /// Check if this asset represents a precious metal commodity
-    fn is_precious_metal(&self) -> bool {
-        matches!(self.symbol.as_str(), "XAU" | "XAG" | "XPT" | "XPD")
+    /// Get the preferred provider from provider_config JSON.
+    pub fn preferred_provider(&self) -> Option<String> {
+        self.provider_config
+            .as_ref()
+            .and_then(|c| c.get("preferred_provider"))
+            .and_then(|v| v.as_str())
+            .map(String::from)
+    }
+
+    /// Get provider overrides from provider_config JSON.
+    pub fn provider_overrides(&self) -> Option<&Value> {
+        self.provider_config
+            .as_ref()
+            .and_then(|c| c.get("overrides"))
     }
 }
 
@@ -401,135 +364,116 @@ pub struct ProviderProfile {
     pub week_52_low: Option<f64>,
 }
 
-/// Input model for creating a new asset
-/// Provider-agnostic: no data_source or quote_symbol (use provider_overrides instead)
-/// Classification is handled via taxonomy system, not legacy fields
+/// Input model for creating a new asset.
+///
+/// If `id` is None, the database generates a UUID.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct NewAsset {
     pub id: Option<String>,
 
     // Core identity
-    pub kind: AssetKind, // Behavior classification (NOT NULL)
+    pub kind: AssetKind,
     pub name: Option<String>,
-    pub symbol: String, // Canonical ticker (no provider suffix)
-
-    // Market identity (for SECURITY)
-    pub exchange_mic: Option<String>, // ISO 10383 MIC code
-
-    // Currency
-    pub currency: String,
-
-    // Pricing configuration
-    pub pricing_mode: PricingMode,          // How this asset is priced
-    pub preferred_provider: Option<String>, // Provider hint (YAHOO, ALPHA_VANTAGE)
-    pub provider_overrides: Option<Value>,  // JSON for per-provider overrides
-
-    // Metadata
-    pub notes: Option<String>,
-    pub metadata: Option<Value>, // JSON for extensions (OptionSpec, identifiers like ISIN, etc.)
+    pub display_code: Option<String>,
 
     // Status
     #[serde(default = "default_is_active")]
     pub is_active: bool,
+
+    // Valuation
+    pub quote_mode: QuoteMode,
+    pub quote_ccy: String,
+
+    // Instrument identity (for market assets)
+    pub instrument_type: Option<InstrumentType>,
+    pub instrument_symbol: Option<String>,
+    pub instrument_exchange_mic: Option<String>,
+
+    // Provider configuration
+    pub provider_config: Option<Value>,
+
+    // Metadata
+    pub notes: Option<String>,
+    pub metadata: Option<Value>,
 }
 
 impl NewAsset {
     /// Validates the new asset data
     pub fn validate(&self) -> Result<()> {
-        if self.symbol.trim().is_empty() {
+        if self.quote_ccy.trim().is_empty() {
             return Err(Error::Validation(ValidationError::InvalidInput(
-                "Asset symbol cannot be empty".to_string(),
-            )));
-        }
-        if self.currency.trim().is_empty() {
-            return Err(Error::Validation(ValidationError::InvalidInput(
-                "Currency cannot be empty".to_string(),
+                "Currency (quote_ccy) cannot be empty".to_string(),
             )));
         }
 
-        // Securities with MARKET pricing require exchange_mic for proper identification
-        // This ensures unique identification via the SEC:{symbol}:{exchange_mic} format
-        if self.kind == AssetKind::Security
-            && self.pricing_mode == PricingMode::Market
-            && self
-                .exchange_mic
+        // Investments with MARKET pricing require instrument fields
+        if self.kind == AssetKind::Investment && self.quote_mode == QuoteMode::Market {
+            if self
+                .instrument_symbol
                 .as_ref()
-                .is_none_or(|mic| mic.trim().is_empty())
-        {
-            return Err(Error::Validation(ValidationError::InvalidInput(
-                "Securities with MARKET pricing require an exchange MIC code (e.g., XNAS, XNYS)"
-                    .to_string(),
-            )));
+                .is_none_or(|s| s.trim().is_empty())
+            {
+                return Err(Error::Validation(ValidationError::InvalidInput(
+                    "Investments with MARKET pricing require an instrument_symbol".to_string(),
+                )));
+            }
         }
 
         Ok(())
     }
 
-    /// Creates a new cash asset.
+    /// Creates a new FX asset.
     ///
-    /// Uses canonical ID format: `CASH:{currency}` (e.g., "CASH:USD")
-    pub fn new_cash_asset(currency: &str) -> Self {
-        let currency_upper = currency.to_uppercase();
-        let asset_id = canonical_asset_id(&AssetKind::Cash, &currency_upper, None, &currency_upper);
-        Self {
-            id: Some(asset_id),
-            kind: AssetKind::Cash,
-            symbol: currency_upper.clone(), // Symbol is just the currency code
-            currency: currency_upper,
-            pricing_mode: PricingMode::None,
-            is_active: true,
-            ..Default::default()
-        }
-    }
-
-    /// Creates a new FX asset following the canonical format:
-    /// - `id`: "FX:EUR:USD" format (FX:base:quote)
-    /// - `symbol`: Base currency only (e.g., "EUR")
-    /// - `currency`: Quote currency (e.g., "USD")
-    /// - `provider_overrides`: Contains provider-specific symbol formats (e.g., "EURUSD=X" for Yahoo)
+    /// - `kind`: FX
+    /// - `instrument_type`: FX
+    /// - `instrument_symbol`: base currency (e.g., "EUR")
+    /// - `quote_ccy`: quote currency (e.g., "USD")
+    /// - `instrument_key` (generated): "FX:EUR/USD"
     pub fn new_fx_asset(base_currency: &str, quote_currency: &str, provider: &str) -> Self {
         let base_upper = base_currency.to_uppercase();
         let quote_upper = quote_currency.to_uppercase();
 
-        // Canonical ID format: FX:EUR:USD
-        let asset_id = canonical_asset_id(&AssetKind::FxRate, &base_upper, None, &quote_upper);
         let readable_name = format!("{}/{} Exchange Rate", base_upper, quote_upper);
-        let notes = format!(
-            "Currency pair for converting from {} to {}",
-            base_upper, quote_upper
-        );
+        let display = format!("{}/{}", base_upper, quote_upper);
 
-        // Build provider_overrides with provider-specific symbol format
-        let provider_overrides = if provider == "YAHOO" {
+        let provider_config = if provider == "YAHOO" {
             Some(serde_json::json!({
-                "YAHOO": {
-                    "type": "fx_symbol",
-                    "symbol": format!("{}{}=X", base_upper, quote_upper)
+                "preferred_provider": "YAHOO",
+                "overrides": {
+                    "YAHOO": {
+                        "type": "fx_symbol",
+                        "symbol": format!("{}{}=X", base_upper, quote_upper)
+                    }
                 }
             }))
         } else if provider == "ALPHA_VANTAGE" {
             Some(serde_json::json!({
-                "ALPHA_VANTAGE": {
-                    "type": "fx_pair",
-                    "from": base_upper,
-                    "to": quote_upper
+                "preferred_provider": "ALPHA_VANTAGE",
+                "overrides": {
+                    "ALPHA_VANTAGE": {
+                        "type": "fx_pair",
+                        "from": base_upper,
+                        "to": quote_upper
+                    }
                 }
             }))
         } else {
-            None
+            Some(serde_json::json!({ "preferred_provider": provider }))
         };
 
         Self {
-            id: Some(asset_id),
-            kind: AssetKind::FxRate,
+            id: None, // DB generates UUID
+            kind: AssetKind::Fx,
             name: Some(readable_name),
-            symbol: base_upper,    // Base currency only (EUR in EUR:USD)
-            currency: quote_upper, // Quote currency (USD in EUR:USD)
-            pricing_mode: PricingMode::Market,
-            preferred_provider: Some(provider.to_string()),
-            provider_overrides,
-            notes: Some(notes),
+            display_code: Some(display),
+            quote_mode: QuoteMode::Market,
+            quote_ccy: quote_upper,
+            instrument_type: Some(InstrumentType::Fx),
+            instrument_symbol: Some(base_upper),
+            instrument_exchange_mic: None,
+            provider_config,
+            notes: None,
             is_active: true,
             ..Default::default()
         }
@@ -538,20 +482,39 @@ impl NewAsset {
 
 impl From<ProviderProfile> for NewAsset {
     fn from(profile: ProviderProfile) -> Self {
-        // Build provider_overrides from quote_symbol if different from symbol
-        let provider_overrides = profile.quote_symbol.as_ref().and_then(|qs| {
+        // Build provider_config from profile
+        let mut config = serde_json::Map::new();
+
+        // Set preferred_provider
+        let data_source = profile.data_source.clone();
+        if matches!(
+            data_source.as_str(),
+            "YAHOO" | "ALPHA_VANTAGE" | "MARKETDATA_APP" | "METAL_PRICE_API"
+        ) {
+            config.insert(
+                "preferred_provider".to_string(),
+                Value::String(data_source.clone()),
+            );
+        }
+
+        // Build overrides if quote_symbol differs from symbol
+        if let Some(ref qs) = profile.quote_symbol {
             if qs != &profile.symbol {
-                // Store provider-specific symbol in overrides
-                Some(serde_json::json!({
-                    profile.data_source.clone(): {
+                let overrides = serde_json::json!({
+                    data_source.clone(): {
                         "type": "equity_symbol",
                         "symbol": qs
                     }
-                }))
-            } else {
-                None
+                });
+                config.insert("overrides".to_string(), overrides);
             }
-        });
+        }
+
+        let provider_config = if config.is_empty() {
+            None
+        } else {
+            Some(Value::Object(config))
+        };
 
         // Build metadata.identifiers from provider profile (only ISIN for now)
         let metadata = profile
@@ -562,14 +525,15 @@ impl From<ProviderProfile> for NewAsset {
 
         Self {
             id: profile.id,
-            kind: AssetKind::Security, // Default to Security for provider profiles
+            kind: AssetKind::Investment,
             name: profile.name,
-            symbol: profile.symbol,
-            exchange_mic: None,
-            currency: profile.currency,
-            pricing_mode: PricingMode::Market,
-            preferred_provider: Some(profile.data_source.clone()),
-            provider_overrides,
+            display_code: Some(profile.symbol.clone()),
+            quote_mode: QuoteMode::Market,
+            quote_ccy: profile.currency,
+            instrument_type: Some(InstrumentType::Equity), // Default; caller can override
+            instrument_symbol: Some(profile.symbol),
+            instrument_exchange_mic: None,
+            provider_config,
             notes: profile.notes,
             metadata,
             is_active: true,
@@ -578,39 +542,37 @@ impl From<ProviderProfile> for NewAsset {
 }
 
 /// Input model for updating an asset profile
-/// Classification (asset_class, sectors, countries) is now handled via taxonomy system
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateAssetProfile {
-    pub symbol: String,
     pub name: Option<String>,
+    pub display_code: Option<String>,
     pub notes: String,
-    pub kind: Option<AssetKind>,      // Asset behavior classification
-    pub exchange_mic: Option<String>, // ISO 10383 MIC code
-    pub pricing_mode: Option<PricingMode>,
-    pub provider_overrides: Option<Value>, // JSON for per-provider overrides
-    pub metadata: Option<Value>, // JSON for provider profile data (sector, industry, etc.)
+    pub kind: Option<AssetKind>,
+    pub quote_mode: Option<QuoteMode>,
+    pub instrument_type: Option<InstrumentType>,
+    pub instrument_symbol: Option<String>,
+    pub instrument_exchange_mic: Option<String>,
+    pub provider_config: Option<Value>,
+    pub metadata: Option<Value>,
 }
 
 /// Optional asset metadata that can be passed during activity creation.
 /// Allows users to provide/override asset details inline.
-/// Classification is handled via taxonomy system, not here.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AssetMetadata {
     pub name: Option<String>,
     pub kind: Option<AssetKind>,
-    pub exchange_mic: Option<String>,
+    pub instrument_exchange_mic: Option<String>,
+    pub instrument_symbol: Option<String>,
+    pub instrument_type: Option<InstrumentType>,
+    pub display_code: Option<String>,
 }
 
 impl UpdateAssetProfile {
     /// Validates the asset profile update data
     pub fn validate(&self) -> Result<()> {
-        if self.symbol.trim().is_empty() {
-            return Err(Error::Validation(ValidationError::InvalidInput(
-                "Asset symbol cannot be empty".to_string(),
-            )));
-        }
         Ok(())
     }
 }
@@ -619,20 +581,53 @@ impl UpdateAssetProfile {
 /// Used by `ensure_assets()` to batch-create missing assets.
 #[derive(Debug, Clone)]
 pub struct AssetSpec {
-    /// Canonical asset ID (e.g., "SEC:AAPL:XNAS")
-    pub id: String,
-    /// The symbol/ticker
-    pub symbol: String,
+    /// Optional pre-assigned ID. If None, DB generates UUID.
+    pub id: Option<String>,
+    /// Display code (user-visible ticker)
+    pub display_code: Option<String>,
+    /// Instrument symbol for market data
+    pub instrument_symbol: Option<String>,
     /// Exchange MIC code for securities
-    pub exchange_mic: Option<String>,
-    /// Currency for the asset
-    pub currency: String,
-    /// Asset kind (Security, Crypto, etc.)
+    pub instrument_exchange_mic: Option<String>,
+    /// Instrument type for routing
+    pub instrument_type: Option<InstrumentType>,
+    /// Currency for quotes/valuations
+    pub quote_ccy: String,
+    /// Asset kind
     pub kind: AssetKind,
-    /// Optional pricing mode override
-    pub pricing_mode: Option<PricingMode>,
+    /// Optional quote mode override
+    pub quote_mode: Option<QuoteMode>,
     /// User-provided name
     pub name: Option<String>,
+}
+
+impl AssetSpec {
+    /// Computes the instrument_key that would be generated for this spec's instrument fields.
+    /// Mirrors the DB GENERATED STORED column: `{TYPE}:{SYMBOL}@{MIC}` or `{TYPE}:{SYMBOL}`.
+    pub fn instrument_key(&self) -> Option<String> {
+        let instrument_type = self.instrument_type.as_ref()?;
+        let instrument_symbol = self.instrument_symbol.as_ref()?;
+        if instrument_symbol.is_empty() {
+            return None;
+        }
+        match self
+            .instrument_exchange_mic
+            .as_ref()
+            .filter(|s| !s.is_empty())
+        {
+            Some(mic) => Some(format!(
+                "{}:{}@{}",
+                instrument_type.as_db_str(),
+                instrument_symbol.to_uppercase(),
+                mic.to_uppercase()
+            )),
+            None => Some(format!(
+                "{}:{}",
+                instrument_type.as_db_str(),
+                instrument_symbol.to_uppercase()
+            )),
+        }
+    }
 }
 
 /// Result of ensuring assets exist via `ensure_assets()`.

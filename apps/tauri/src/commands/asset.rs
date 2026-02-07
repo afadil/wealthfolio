@@ -43,15 +43,15 @@ pub async fn update_asset_profile(
 }
 
 #[tauri::command]
-pub async fn update_pricing_mode(
+pub async fn update_quote_mode(
     id: String,
-    pricing_mode: String,
+    quote_mode: String,
     state: State<'_, Arc<ServiceContext>>,
     handle: AppHandle,
 ) -> Result<Asset, String> {
     let asset = state
         .asset_service()
-        .update_pricing_mode(&id, &pricing_mode)
+        .update_quote_mode(&id, &quote_mode)
         .await
         .map_err(|e| e.to_string())?;
 

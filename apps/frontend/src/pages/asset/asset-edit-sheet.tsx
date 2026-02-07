@@ -58,32 +58,28 @@ const providerOverrideSchema = z.object({
 // Derive override type from asset kind
 function getOverrideTypeForKind(kind: string): "equity_symbol" | "crypto_symbol" | "fx_symbol" {
   switch (kind) {
-    case "CRYPTO":
-      return "crypto_symbol";
-    case "FX_RATE":
+    case "FX":
       return "fx_symbol";
     default:
       return "equity_symbol";
   }
 }
 
-// PricingMode values matching Rust enum
-const PricingMode = {
+// QuoteMode values matching Rust enum
+const QuoteMode = {
   MARKET: "MARKET",
   MANUAL: "MANUAL",
-  DERIVED: "DERIVED",
-  NONE: "NONE",
 } as const;
 
-type PricingMode = (typeof PricingMode)[keyof typeof PricingMode];
+type QuoteMode = (typeof QuoteMode)[keyof typeof QuoteMode];
 
 const assetFormSchema = z.object({
   name: z.string().optional(),
   notes: z.string().optional(),
   kind: z.string().optional(),
-  exchangeMic: z.string().optional(),
-  pricingMode: z.enum([PricingMode.MARKET, PricingMode.MANUAL]),
-  providerOverrides: z.array(providerOverrideSchema).optional(),
+  instrumentExchangeMic: z.string().optional(),
+  quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]),
+  providerConfig: z.array(providerOverrideSchema).optional(),
 });
 
 type AssetFormValues = z.infer<typeof assetFormSchema>;
@@ -245,11 +241,11 @@ export function AssetEditSheet({
     defaultValues: {
       name: asset?.name ?? "",
       notes: asset?.notes ?? "",
-      kind: asset?.kind ?? "SECURITY",
-      exchangeMic: asset?.exchangeMic ?? "",
-      pricingMode: asset?.pricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET,
-      providerOverrides: parseProviderOverrides(
-        asset?.providerOverrides as Record<string, unknown> | null,
+      kind: asset?.kind ?? "INVESTMENT",
+      instrumentExchangeMic: asset?.instrumentExchangeMic ?? "",
+      quoteMode: asset?.quoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
+      providerConfig: parseProviderOverrides(
+        asset?.providerConfig as Record<string, unknown> | null,
       ),
     },
   });
@@ -260,7 +256,7 @@ export function AssetEditSheet({
     remove: removeOverride,
   } = useFieldArray({
     control: form.control,
-    name: "providerOverrides",
+    name: "providerConfig",
   });
 
   // Reset form when asset changes
@@ -269,11 +265,11 @@ export function AssetEditSheet({
       form.reset({
         name: asset.name ?? "",
         notes: asset.notes ?? "",
-        kind: asset.kind ?? "SECURITY",
-        exchangeMic: asset.exchangeMic ?? "",
-        pricingMode: asset.pricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET,
-        providerOverrides: parseProviderOverrides(
-          asset.providerOverrides as Record<string, unknown> | null,
+        kind: asset.kind ?? "INVESTMENT",
+        instrumentExchangeMic: asset.instrumentExchangeMic ?? "",
+        quoteMode: asset.quoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
+        providerConfig: parseProviderOverrides(
+          asset.providerConfig as Record<string, unknown> | null,
         ),
       });
     }
@@ -291,23 +287,22 @@ export function AssetEditSheet({
       if (!asset) return;
 
       // Serialize provider overrides back to JSON format (type derived from asset kind)
-      const assetKind = values.kind ?? asset.kind ?? "SECURITY";
+      const assetKind = values.kind ?? asset.kind ?? "INVESTMENT";
       const serializedOverrides = serializeProviderOverrides(
-        values.providerOverrides ?? [],
+        values.providerConfig ?? [],
         assetKind,
       );
 
       try {
-        // Update profile with all fields including pricing mode
+        // Update profile with all fields including quote mode
         await updateAssetProfileMutation.mutateAsync({
           id: asset.id,
-          symbol: asset.symbol,
+          displayCode: asset.displayCode,
           name: values.name || "",
           notes: values.notes ?? "",
           kind: values.kind as AssetKind | undefined,
-          exchangeMic: values.exchangeMic || null,
-          pricingMode: values.pricingMode,
-          providerOverrides: serializedOverrides,
+          quoteMode: values.quoteMode,
+          providerConfig: serializedOverrides,
         });
 
         onOpenChange(false);
@@ -319,11 +314,11 @@ export function AssetEditSheet({
     [asset, updateAssetProfileMutation, onOpenChange],
   );
 
-  const isManualMode = form.watch("pricingMode") === PricingMode.MANUAL;
+  const isManualMode = form.watch("quoteMode") === QuoteMode.MANUAL;
   const isSaving = updateAssetProfileMutation.isPending;
 
   // Check if current asset kind is system-managed (shouldn't allow editing)
-  const isSystemManagedKind = asset?.kind === "CASH" || asset?.kind === "FX_RATE";
+  const isSystemManagedKind = asset?.kind === "FX";
 
   if (!asset) return null;
 
@@ -332,9 +327,11 @@ export function AssetEditSheet({
       <SheetContent side="right" className="flex h-full w-full flex-col sm:max-w-2xl">
         <SheetHeader className="shrink-0 pb-4">
           <div className="flex items-center gap-3">
-            <TickerAvatar symbol={asset.symbol} className="size-10" />
+            <TickerAvatar symbol={asset.displayCode ?? ""} className="size-10" />
             <div className="min-w-0 flex-1">
-              <SheetTitle className="truncate text-lg">{asset.symbol}</SheetTitle>
+              <SheetTitle className="truncate text-lg">
+                {asset.displayCode ?? asset.name ?? "Unknown"}
+              </SheetTitle>
               <SheetDescription className="truncate text-sm">
                 {asset.name || "Edit asset"}
               </SheetDescription>
@@ -362,11 +359,11 @@ export function AssetEditSheet({
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Symbol</label>
-                      <Input value={asset.symbol} disabled className="bg-muted/50" />
+                      <Input value={asset.displayCode ?? ""} disabled className="bg-muted/50" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Currency</label>
-                      <Input value={asset.currency} disabled className="bg-muted/50 uppercase" />
+                      <Input value={asset.quoteCcy} disabled className="bg-muted/50 uppercase" />
                     </div>
                   </div>
 
@@ -409,7 +406,7 @@ export function AssetEditSheet({
                           <FormLabel>Asset Type</FormLabel>
                           <FormControl>
                             <ResponsiveSelect
-                              value={field.value ?? "SECURITY"}
+                              value={field.value ?? "INVESTMENT"}
                               onValueChange={field.onChange}
                               options={kindOptions}
                               placeholder="Select type"
@@ -426,7 +423,7 @@ export function AssetEditSheet({
 
                     <FormField
                       control={form.control}
-                      name="exchangeMic"
+                      name="instrumentExchangeMic"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Exchange (MIC)</FormLabel>
@@ -555,8 +552,8 @@ export function AssetEditSheet({
                       isManualMode={isManualMode}
                       onConfirm={() => {
                         form.setValue(
-                          "pricingMode",
-                          isManualMode ? PricingMode.MARKET : PricingMode.MANUAL,
+                          "quoteMode",
+                          isManualMode ? QuoteMode.MARKET : QuoteMode.MANUAL,
                         );
                       }}
                     />
@@ -590,7 +587,7 @@ export function AssetEditSheet({
                               No symbol mappings configured
                             </p>
                             <p className="text-muted-foreground text-xs">
-                              Using &quot;{asset.symbol}&quot; for all providers.
+                              Using &quot;{asset.displayCode ?? ""}&quot; for all providers.
                             </p>
                           </div>
                         ) : (
@@ -613,7 +610,7 @@ export function AssetEditSheet({
                                     <td className="px-4 py-2">
                                       <FormField
                                         control={form.control}
-                                        name={`providerOverrides.${index}.provider`}
+                                        name={`providerConfig.${index}.provider`}
                                         render={({ field: providerField }) => (
                                           <FormItem className="space-y-0">
                                             <FormControl>
@@ -636,7 +633,7 @@ export function AssetEditSheet({
                                     <td className="px-4 py-2">
                                       <FormField
                                         control={form.control}
-                                        name={`providerOverrides.${index}.symbol`}
+                                        name={`providerConfig.${index}.symbol`}
                                         render={({ field: symbolField }) => (
                                           <FormItem className="space-y-0">
                                             <FormControl>

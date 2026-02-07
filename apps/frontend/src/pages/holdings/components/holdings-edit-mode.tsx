@@ -28,7 +28,7 @@ import {
   type HoldingInput,
 } from "@/adapters";
 import { Holding, Account, SymbolSearchResult } from "@/lib/types";
-import { buildCanonicalAssetId } from "@/lib/asset-utils";
+import { getAssetIdFromSearchResult } from "@/lib/asset-utils";
 import { HoldingType } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -202,7 +202,7 @@ export const HoldingsEditMode = ({
       if (!searchResult) return;
 
       // Build the canonical asset ID using the same format as the backend
-      const assetId = buildCanonicalAssetId(searchResult, account.currency);
+      const assetId = getAssetIdFromSearchResult(searchResult, account.currency);
 
       // Check for duplicates
       if (editableHoldings.some((h) => h.assetId === assetId)) {

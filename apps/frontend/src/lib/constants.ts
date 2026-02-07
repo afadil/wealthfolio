@@ -42,302 +42,32 @@ export function defaultGroupForAccountType(accountType: AccountType): string {
   }
 }
 
-/**
- * Asset ID delimiter used in all asset IDs (colon).
- * Format: {primary}:{qualifier}
- * Examples: AAPL:XNAS, BTC:USD, CASH:USD, PROP:abc12345
- */
-export const ASSET_ID_DELIMITER = ":";
-
-/**
- * Alternative asset ID prefixes (per spec: PROP:, VEH:, COLL:, PREC:, LIAB:, ALT:)
- */
-export const ALTERNATIVE_ASSET_ID_PREFIXES = [
-  "PROP:",
-  "VEH:",
-  "COLL:",
-  "PREC:",
-  "LIAB:",
-  "ALT:",
-] as const;
-
-/**
- * Cash asset ID prefix
- */
-export const CASH_ASSET_ID_PREFIX = "CASH:";
-
 // =============================================================================
-// Canonical Asset ID Parsing
+// Asset kind helpers
 // =============================================================================
 
-/**
- * Canonical prefixes requiring 3 parts: PREFIX:symbol:qualifier
- * - SEC: Security (symbol:MIC)
- * - CRYPTO: Cryptocurrency (base:quote)
- * - FX: Foreign exchange rate (base:quote)
- * - OPT: Option (symbol:MIC)
- */
-const THREE_PART_PREFIXES = ["SEC", "CRYPTO", "FX", "OPT"] as const;
+/** Alternative asset kinds for filtering */
+const ALTERNATIVE_ASSET_KINDS = new Set<AssetKind>([
+  "PROPERTY",
+  "VEHICLE",
+  "COLLECTIBLE",
+  "PRECIOUS_METAL",
+  "LIABILITY",
+  "OTHER",
+]);
 
 /**
- * Canonical prefixes requiring 2 parts: PREFIX:value
- * - CASH: Cash position (currency)
- * - CMDTY: Commodity (symbol)
- * - PEQ: Private equity (random)
- * - PROP/VEH/COLL/PREC/LIAB/ALT: Alternative assets (random)
+ * Returns true if an asset kind is an alternative (non-market) asset.
  */
-const TWO_PART_PREFIXES = [
-  "CASH",
-  "CMDTY",
-  "PEQ",
-  "PROP",
-  "VEH",
-  "COLL",
-  "PREC",
-  "LIAB",
-  "ALT",
-] as const;
-
-type ThreePartPrefix = (typeof THREE_PART_PREFIXES)[number];
-type TwoPartPrefix = (typeof TWO_PART_PREFIXES)[number];
-export type CanonicalPrefix = ThreePartPrefix | TwoPartPrefix;
-
-/**
- * Parsed canonical asset ID structure.
- * Only returned for valid canonical IDs (typed prefix with correct part count).
- */
-export interface CanonicalAssetId {
-  /** Typed prefix (SEC, CRYPTO, FX, CASH, etc.) */
-  prefix: CanonicalPrefix;
-  /** Symbol component (ticker, base currency, or random suffix) */
-  symbol: string;
-  /** Qualifier component (MIC, quote currency, or same as symbol for 2-part) */
-  qualifier: string;
+export function isAlternativeAssetKind(kind: AssetKind): boolean {
+  return ALTERNATIVE_ASSET_KINDS.has(kind);
 }
 
 /**
- * Maps canonical prefix to AssetKind.
+ * Returns true if an asset kind is a liability.
  */
-const PREFIX_TO_ASSET_KIND: Record<CanonicalPrefix, AssetKind> = {
-  SEC: "SECURITY",
-  CRYPTO: "CRYPTO",
-  FX: "FX_RATE",
-  OPT: "OPTION",
-  CASH: "CASH",
-  CMDTY: "COMMODITY",
-  PEQ: "PRIVATE_EQUITY",
-  PROP: "PROPERTY",
-  VEH: "VEHICLE",
-  COLL: "COLLECTIBLE",
-  PREC: "PHYSICAL_PRECIOUS",
-  LIAB: "LIABILITY",
-  ALT: "OTHER",
-};
-
-/**
- * Parses a canonical asset ID (typed prefix format only).
- *
- * Canonical IDs have typed prefixes with strict part-count rules:
- * - 3-part: SEC:AAPL:XNAS, CRYPTO:BTC:USD, FX:EUR:USD, OPT:AAPL240119C:XNAS
- * - 2-part: CASH:USD, CMDTY:GC, PROP:a1b2c3d4, PEQ:x9y8z7w6
- *
- * Returns null for:
- * - Legacy 2-part IDs without typed prefix (e.g., "AAPL:XNAS")
- * - IDs with wrong part count for the prefix (e.g., "SEC:AAPL" or "CASH:USD:EXTRA")
- * - Empty or malformed IDs
- *
- * @example
- * parseCanonicalAssetId("SEC:AAPL:XNAS") // { prefix: "SEC", symbol: "AAPL", qualifier: "XNAS" }
- * parseCanonicalAssetId("CASH:USD") // { prefix: "CASH", symbol: "USD", qualifier: "USD" }
- * parseCanonicalAssetId("AAPL:XNAS") // null (legacy format, no typed prefix)
- * parseCanonicalAssetId("SEC:AAPL") // null (wrong part count for SEC)
- */
-export function parseCanonicalAssetId(assetId: string): CanonicalAssetId | null {
-  if (!assetId || typeof assetId !== "string") {
-    return null;
-  }
-
-  const parts = assetId.split(ASSET_ID_DELIMITER);
-  if (parts.length < 2 || parts.length > 3) {
-    return null;
-  }
-
-  const maybePrefix = parts[0];
-
-  // Check 3-part prefixes (SEC, CRYPTO, FX, OPT)
-  if ((THREE_PART_PREFIXES as readonly string[]).includes(maybePrefix)) {
-    if (parts.length !== 3) {
-      return null; // Wrong part count for this prefix
-    }
-    return {
-      prefix: maybePrefix as ThreePartPrefix,
-      symbol: parts[1],
-      qualifier: parts[2],
-    };
-  }
-
-  // Check 2-part prefixes (CASH, CMDTY, PEQ, PROP, VEH, COLL, PREC, LIAB, ALT)
-  if ((TWO_PART_PREFIXES as readonly string[]).includes(maybePrefix)) {
-    if (parts.length !== 2) {
-      return null; // Wrong part count for this prefix
-    }
-    return {
-      prefix: maybePrefix as TwoPartPrefix,
-      symbol: parts[1],
-      qualifier: parts[1], // For 2-part IDs, symbol IS the qualifier
-    };
-  }
-
-  // Not a recognized canonical prefix
-  return null;
-}
-
-/**
- * Checks if an asset ID is in canonical format (has typed prefix with correct arity).
- */
-export function isCanonicalAssetId(assetId: string): boolean {
-  return parseCanonicalAssetId(assetId) !== null;
-}
-
-/**
- * Gets the AssetKind for a canonical asset ID.
- * Returns undefined for non-canonical IDs.
- */
-export function getAssetKindFromCanonicalId(assetId: string): AssetKind | undefined {
-  const parsed = parseCanonicalAssetId(assetId);
-  if (!parsed) return undefined;
-  return PREFIX_TO_ASSET_KIND[parsed.prefix];
-}
-
-/**
- * Parsed asset ID structure
- */
-export interface ParsedAssetId {
-  primary: string;
-  qualifier: string;
-  kind?: "security" | "crypto" | "fx" | "cash" | "alternative";
-}
-
-/**
- * Parses an asset ID into its components.
- * Returns null if the ID doesn't contain the delimiter.
- *
- * @example
- * parseAssetId("AAPL:XNAS") // { primary: "AAPL", qualifier: "XNAS", kind: "security" }
- * parseAssetId("BTC:USD") // { primary: "BTC", qualifier: "USD", kind: "crypto" }
- * parseAssetId("CASH:USD") // { primary: "CASH", qualifier: "USD", kind: "cash" }
- * parseAssetId("PROP:abc12345") // { primary: "PROP", qualifier: "abc12345", kind: "alternative" }
- */
-export function parseAssetId(assetId: string): ParsedAssetId | null {
-  const parts = assetId.split(ASSET_ID_DELIMITER);
-  if (parts.length !== 2) {
-    return null;
-  }
-
-  const [primary, qualifier] = parts;
-
-  // Determine kind based on the ID format
-  let kind: ParsedAssetId["kind"];
-
-  if (primary === "CASH" && /^[A-Z]{3}$/.test(qualifier)) {
-    kind = "cash";
-  } else if (["PROP", "VEH", "COLL", "PREC", "LIAB", "ALT"].includes(primary)) {
-    kind = "alternative";
-  } else if (qualifier.length === 4 && /^[A-Z]{4}$/.test(qualifier)) {
-    // 4-letter qualifier is MIC code (security)
-    kind = "security";
-  } else if (qualifier.length === 3 && /^[A-Z]{3}$/.test(qualifier)) {
-    // 3-letter qualifier could be FX or crypto
-    kind = primary.length === 3 ? "fx" : "crypto";
-  }
-
-  return { primary, qualifier, kind };
-}
-
-/**
- * Formats an asset ID for display.
- * Handles both canonical (typed prefix) and legacy formats.
- *
- * Canonical examples:
- * - SEC:AAPL:XNAS -> "AAPL"
- * - CRYPTO:BTC:USD -> "BTC"
- * - FX:EUR:USD -> "EUR/USD"
- * - CASH:USD -> "USD"
- * - PROP:abc12345 -> "abc12345"
- *
- * Legacy examples:
- * - AAPL:XNAS -> "AAPL"
- * - BTC:USD -> "BTC"
- */
-export function formatAssetIdForDisplay(assetId: string): string {
-  if (!assetId) return "";
-
-  // Try canonical parsing first
-  const canonical = parseCanonicalAssetId(assetId);
-  if (canonical) {
-    switch (canonical.prefix) {
-      case "CASH":
-        return canonical.symbol; // "USD"
-      case "FX":
-        return `${canonical.symbol}/${canonical.qualifier}`; // "EUR/USD"
-      case "SEC":
-      case "CRYPTO":
-      case "OPT":
-      case "CMDTY":
-        return canonical.symbol; // "AAPL", "BTC", "GC"
-      case "PEQ":
-      case "PROP":
-      case "VEH":
-      case "COLL":
-      case "PREC":
-      case "LIAB":
-      case "ALT":
-        return canonical.symbol; // Random suffix (user sees name elsewhere)
-      default:
-        return canonical.symbol;
-    }
-  }
-
-  // Fall back to legacy parsing
-  const legacy = parseAssetId(assetId);
-  if (legacy) {
-    switch (legacy.kind) {
-      case "cash":
-        return legacy.qualifier; // Show currency code
-      case "alternative":
-        return assetId; // Show full ID for alternatives
-      default:
-        return legacy.primary; // Show symbol for securities/crypto/fx
-    }
-  }
-
-  return assetId;
-}
-
-/**
- * Returns true if the asset ID (symbol) belongs to an alternative asset.
- * Alternative assets have prefixed IDs like PROP:xxxxx, VEH:xxxxx, etc.
- */
-export function isAlternativeAssetId(assetId: string): boolean {
-  return ALTERNATIVE_ASSET_ID_PREFIXES.some((prefix) => assetId.startsWith(prefix));
-}
-
-/**
- * Returns true if the asset ID belongs to a liability (LIAB: prefix).
- */
-export function isLiabilityAssetId(assetId: string): boolean {
-  return assetId.startsWith("LIAB:");
-}
-
-/**
- * Returns true if the asset ID belongs to a cash position (CASH:{currency}).
- */
-export function isCashAssetId(assetId: string): boolean {
-  if (!assetId.startsWith(CASH_ASSET_ID_PREFIX)) {
-    return false;
-  }
-  const currency = assetId.slice(CASH_ASSET_ID_PREFIX.length);
-  return /^[A-Z]{3}$/.test(currency);
+export function isLiabilityAssetKind(kind: AssetKind): boolean {
+  return kind === "LIABILITY";
 }
 
 // DataSource: Where quote data comes from (used on Quote objects)
@@ -351,23 +81,21 @@ export type DataSource = (typeof DataSource)[keyof typeof DataSource];
 // Zod schema for data source validation
 export const dataSourceSchema = z.enum([DataSource.YAHOO, DataSource.MANUAL]);
 
-// PricingMode: How an asset's price is determined (used on Asset/Activity objects)
-export const PricingMode = {
+// QuoteMode: How an asset's price is determined (used on Asset/Activity objects)
+export const QuoteMode = {
   MARKET: "MARKET", // Auto-fetch prices from market data providers
   MANUAL: "MANUAL", // User manages prices manually
-  DERIVED: "DERIVED", // Calculated from other assets
-  NONE: "NONE", // No pricing needed (e.g., cash)
 } as const;
 
-export type PricingMode = (typeof PricingMode)[keyof typeof PricingMode];
+export type QuoteMode = (typeof QuoteMode)[keyof typeof QuoteMode];
 
-// Zod schema for pricing mode validation
-export const pricingModeSchema = z.enum([
-  PricingMode.MARKET,
-  PricingMode.MANUAL,
-  PricingMode.DERIVED,
-  PricingMode.NONE,
-]);
+// Zod schema for quote mode validation
+export const quoteModeSchema = z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]);
+
+// Legacy alias for backward compatibility during migration
+export const PricingMode = QuoteMode;
+export type PricingMode = QuoteMode;
+export const pricingModeSchema = quoteModeSchema;
 
 export const ImportFormat = {
   DATE: "date",
@@ -594,51 +322,40 @@ export const SUBTYPES_BY_ACTIVITY_TYPE: Record<string, string[]> = {
 
 // Asset kinds for behavior classification
 export const AssetKind = {
-  SECURITY: "SECURITY",
-  CRYPTO: "CRYPTO",
-  CASH: "CASH",
-  FX_RATE: "FX_RATE",
-  OPTION: "OPTION",
-  COMMODITY: "COMMODITY",
-  PRIVATE_EQUITY: "PRIVATE_EQUITY",
+  INVESTMENT: "INVESTMENT",
   PROPERTY: "PROPERTY",
   VEHICLE: "VEHICLE",
   COLLECTIBLE: "COLLECTIBLE",
-  PHYSICAL_PRECIOUS: "PHYSICAL_PRECIOUS",
+  PRECIOUS_METAL: "PRECIOUS_METAL",
+  PRIVATE_EQUITY: "PRIVATE_EQUITY",
   LIABILITY: "LIABILITY",
   OTHER: "OTHER",
+  FX: "FX",
 } as const;
 
 export type AssetKind = (typeof AssetKind)[keyof typeof AssetKind];
 
 // Display names for all asset kinds
 export const ASSET_KIND_DISPLAY_NAMES: Record<AssetKind, string> = {
-  SECURITY: "Security",
-  CRYPTO: "Cryptocurrency",
-  CASH: "Cash",
-  FX_RATE: "FX Rate",
-  OPTION: "Option",
-  COMMODITY: "Commodity",
-  PRIVATE_EQUITY: "Private Equity",
+  INVESTMENT: "Investment",
   PROPERTY: "Property",
   VEHICLE: "Vehicle",
   COLLECTIBLE: "Collectible",
-  PHYSICAL_PRECIOUS: "Precious Metal",
+  PRECIOUS_METAL: "Precious Metal",
+  PRIVATE_EQUITY: "Private Equity",
   LIABILITY: "Liability",
   OTHER: "Other",
+  FX: "FX",
 };
 
-// User-editable asset kinds (excludes system-managed types like CASH and FX_RATE)
+// User-editable asset kinds (excludes system-managed types like FX)
 export const EDITABLE_ASSET_KINDS: AssetKind[] = [
-  "SECURITY",
-  "CRYPTO",
-  "OPTION",
-  "COMMODITY",
+  "INVESTMENT",
   "PRIVATE_EQUITY",
   "PROPERTY",
   "VEHICLE",
   "COLLECTIBLE",
-  "PHYSICAL_PRECIOUS",
+  "PRECIOUS_METAL",
   "LIABILITY",
   "OTHER",
 ];
@@ -648,7 +365,7 @@ export const AlternativeAssetKind = {
   PROPERTY: "PROPERTY",
   VEHICLE: "VEHICLE",
   COLLECTIBLE: "COLLECTIBLE",
-  PHYSICAL_PRECIOUS: "PHYSICAL_PRECIOUS",
+  PRECIOUS_METAL: "PRECIOUS_METAL",
   LIABILITY: "LIABILITY",
   OTHER: "OTHER",
 } as const;
@@ -660,7 +377,7 @@ export const ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES: Record<AlternativeAssetKind, 
   [AlternativeAssetKind.PROPERTY]: "Property",
   [AlternativeAssetKind.VEHICLE]: "Vehicle",
   [AlternativeAssetKind.COLLECTIBLE]: "Collectible",
-  [AlternativeAssetKind.PHYSICAL_PRECIOUS]: "Precious Metal",
+  [AlternativeAssetKind.PRECIOUS_METAL]: "Precious Metal",
   [AlternativeAssetKind.LIABILITY]: "Liability",
   [AlternativeAssetKind.OTHER]: "Other",
 };
@@ -670,7 +387,7 @@ export const ALTERNATIVE_ASSET_DEFAULT_GROUPS: Record<AlternativeAssetKind, stri
   [AlternativeAssetKind.PROPERTY]: "Properties",
   [AlternativeAssetKind.VEHICLE]: "Vehicles",
   [AlternativeAssetKind.COLLECTIBLE]: "Collectibles",
-  [AlternativeAssetKind.PHYSICAL_PRECIOUS]: "Precious Metals",
+  [AlternativeAssetKind.PRECIOUS_METAL]: "Precious Metals",
   [AlternativeAssetKind.LIABILITY]: "Liabilities",
   [AlternativeAssetKind.OTHER]: "Other Assets",
 };
@@ -680,29 +397,38 @@ const API_KIND_TO_ENUM: Record<string, AlternativeAssetKind> = {
   property: AlternativeAssetKind.PROPERTY,
   vehicle: AlternativeAssetKind.VEHICLE,
   collectible: AlternativeAssetKind.COLLECTIBLE,
-  precious: AlternativeAssetKind.PHYSICAL_PRECIOUS,
+  precious_metal: AlternativeAssetKind.PRECIOUS_METAL,
+  precious: AlternativeAssetKind.PRECIOUS_METAL,
   liability: AlternativeAssetKind.LIABILITY,
   other: AlternativeAssetKind.OTHER,
 };
 
 /**
- * Convert an API kind string (lowercase like "precious") to the AlternativeAssetKind enum value.
+ * Convert an API kind string to the AlternativeAssetKind enum value.
  * Returns OTHER if the kind is not recognized.
  */
 export function apiKindToAlternativeAssetKind(apiKind: string): AlternativeAssetKind {
   return API_KIND_TO_ENUM[apiKind.toLowerCase()] ?? AlternativeAssetKind.OTHER;
 }
 
-// Asset subclass types (from Rust AssetSubClass enum)
-export const ASSET_SUBCLASS_TYPES = [
-  { label: "Stock", value: "Stock" },
-  { label: "ETF", value: "ETF" },
-  { label: "Mutual Fund", value: "Mutual Fund" },
-  { label: "Cryptocurrency", value: "Cryptocurrency" },
-  { label: "Commodity", value: "Commodity" },
-  { label: "Precious Metal", value: "Precious Metal" },
-  { label: "Alternative", value: "Alternative" },
-  { label: "Cash", value: "Cash" },
+// Instrument types (from Rust InstrumentType enum)
+export const InstrumentType = {
+  EQUITY: "EQUITY",
+  CRYPTO: "CRYPTO",
+  FX: "FX",
+  OPTION: "OPTION",
+  METAL: "METAL",
+} as const;
+
+export type InstrumentType = (typeof InstrumentType)[keyof typeof InstrumentType];
+
+/** Display options for instrument type filters */
+export const INSTRUMENT_TYPE_OPTIONS = [
+  { value: InstrumentType.EQUITY, label: "Equity" },
+  { value: InstrumentType.CRYPTO, label: "Crypto" },
+  { value: InstrumentType.FX, label: "FX" },
+  { value: InstrumentType.OPTION, label: "Option" },
+  { value: InstrumentType.METAL, label: "Metal" },
 ] as const;
 
 /**
@@ -715,12 +441,12 @@ export const HOLDING_CATEGORY_FILTERS = [
   {
     id: "investments",
     label: "Investments",
-    assetKinds: ["SECURITY", "CRYPTO", "OPTION", "COMMODITY", "PRIVATE_EQUITY"],
+    assetKinds: ["INVESTMENT", "PRIVATE_EQUITY"],
   },
   {
     id: "assets",
     label: "Personal Assets",
-    assetKinds: ["PROPERTY", "VEHICLE", "COLLECTIBLE", "PHYSICAL_PRECIOUS", "OTHER"],
+    assetKinds: ["PROPERTY", "VEHICLE", "COLLECTIBLE", "PRECIOUS_METAL", "OTHER"],
   },
   { id: "liabilities", label: "Liabilities", assetKinds: ["LIABILITY"] },
 ] as const;

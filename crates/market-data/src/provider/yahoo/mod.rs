@@ -10,8 +10,8 @@ mod models;
 use std::sync::RwLock;
 use std::time::Duration;
 
-use async_trait::async_trait;
 use crate::SymbolResolver;
+use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
 use lazy_static::lazy_static;
 use log::{debug, warn};
@@ -439,12 +439,6 @@ impl YahooProvider {
             .into_iter()
             .next()
             .ok_or_else(|| MarketDataError::SymbolNotFound(symbol.to_string()))?;
-
-        // Log raw Yahoo response for debugging
-        debug!(
-            "[YAHOO PROFILE RAW] symbol={}, price={:?}, summary_profile={:?}, summary_detail={:?}",
-            symbol, result.price, result.summary_profile, result.summary_detail
-        );
 
         self.map_quote_summary_to_profile(symbol, &result)
     }

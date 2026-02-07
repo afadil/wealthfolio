@@ -146,8 +146,8 @@ export interface AssetInput {
   kind?: string;
   /** Asset name for custom/manual assets */
   name?: string;
-  /** Pricing mode: "MARKET" or "MANUAL" - controls how asset is priced */
-  pricingMode?: string;
+  /** Quote mode: "MARKET" or "MANUAL" - controls how asset is priced */
+  quoteMode?: string;
 }
 
 /**
@@ -160,7 +160,7 @@ export interface AssetInput {
  * IMPORTANT: asset.id is NOT allowed for creates - backend generates canonical IDs
  */
 export interface ActivityCreatePayload extends ActivityBasePayload {
-  /** Asset input - consolidates id, symbol, exchangeMic, kind, name, pricingMode */
+  /** Asset input - consolidates id, symbol, exchangeMic, kind, name, quoteMode */
   asset?: AssetInput;
 }
 
@@ -172,7 +172,7 @@ export interface ActivityCreatePayload extends ActivityBasePayload {
  * - Or send asset.symbol + asset.exchangeMic to re-resolve the asset
  */
 export interface ActivityUpdatePayload extends ActivityBasePayload {
-  /** Asset input - consolidates id, symbol, exchangeMic, kind, name, pricingMode */
+  /** Asset input - consolidates id, symbol, exchangeMic, kind, name, quoteMode */
   asset?: AssetInput;
 }
 

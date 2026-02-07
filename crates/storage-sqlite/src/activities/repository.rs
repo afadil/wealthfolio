@@ -255,9 +255,9 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 activities::updated_at,
                 accounts::name,
                 accounts::currency,
-                assets::symbol.nullable(),
+                assets::display_code.nullable(),
                 assets::name.nullable(),
-                assets::pricing_mode.nullable(),
+                assets::quote_mode.nullable(),
                 activities::metadata,
             ))
             .limit(page_size)

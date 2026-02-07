@@ -3,7 +3,7 @@
 mod tests {
     use crate::activities::{Activity, ActivityStatus, ActivityType};
     use crate::assets::{
-        Asset, AssetKind, AssetRepositoryTrait, NewAsset, PricingMode, UpdateAssetProfile,
+        Asset, AssetKind, AssetRepositoryTrait, NewAsset, QuoteMode, UpdateAssetProfile,
     };
     use crate::errors::Result;
     use crate::fx::{ExchangeRate, FxError, FxServiceTrait, NewExchangeRate};
@@ -46,11 +46,11 @@ mod tests {
         fn add_asset(&mut self, symbol: &str, currency: &str) {
             let asset = Asset {
                 id: symbol.to_string(),
-                symbol: symbol.to_string(),
-                currency: currency.to_string(),
+                display_code: Some(symbol.to_string()),
+                quote_ccy: currency.to_string(),
                 name: Some(format!("Mock Asset {}", symbol)),
-                kind: AssetKind::Security,
-                pricing_mode: PricingMode::Market,
+                kind: AssetKind::Investment,
+                quote_mode: QuoteMode::Market,
                 created_at: Utc::now().naive_utc(),
                 updated_at: Utc::now().naive_utc(),
                 ..Default::default()
@@ -77,8 +77,12 @@ mod tests {
             unimplemented!("Not needed for tests")
         }
 
-        async fn update_pricing_mode(&self, _asset_id: &str, _pricing_mode: &str) -> Result<Asset> {
+        async fn update_quote_mode(&self, _asset_id: &str, _quote_mode: &str) -> Result<Asset> {
             unimplemented!("Not needed for tests")
+        }
+
+        fn find_by_instrument_key(&self, _instrument_key: &str) -> Result<Option<Asset>> {
+            Ok(None)
         }
 
         async fn delete(&self, _asset_id: &str) -> Result<()> {
@@ -405,7 +409,7 @@ mod tests {
         Activity {
             id: id.to_string(),
             account_id: "acc_1".to_string(),
-            asset_id: Some(format!("CASH:{}", currency)),
+            asset_id: None,
             activity_type: activity_type.as_str().to_string(),
             activity_type_override: None,
             source_type: None,
@@ -2444,7 +2448,7 @@ mod tests {
         Activity {
             id: id.to_string(),
             account_id: "acc_1".to_string(),
-            asset_id: Some(format!("CASH:{}", currency)),
+            asset_id: None,
             activity_type: activity_type.as_str().to_string(),
             activity_type_override: None,
             source_type: None,

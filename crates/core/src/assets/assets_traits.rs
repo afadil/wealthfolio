@@ -1,4 +1,6 @@
-use super::assets_model::{Asset, AssetMetadata, AssetSpec, EnsureAssetsResult, NewAsset, UpdateAssetProfile};
+use super::assets_model::{
+    Asset, AssetMetadata, AssetSpec, EnsureAssetsResult, NewAsset, UpdateAssetProfile,
+};
 use crate::errors::Result;
 
 /// Trait defining the contract for Asset service operations.
@@ -12,24 +14,22 @@ pub trait AssetServiceTrait: Send + Sync {
         asset_id: &str,
         payload: UpdateAssetProfile,
     ) -> Result<Asset>;
-    /// Ensures a cash asset exists (and is properly classified). Idempotent.
-    async fn ensure_cash_asset(&self, currency: &str) -> Result<Asset>;
     /// Creates a new asset directly without network lookups.
     /// Used for alternative assets and other manually created assets.
     async fn create_asset(&self, new_asset: NewAsset) -> Result<Asset>;
     /// Creates a minimal asset without network calls.
     /// Returns the existing asset if found, or creates a new minimal one.
     /// Accepts optional metadata hints from the caller (e.g., user-provided asset details).
-    /// If `pricing_mode_hint` is provided, it overrides the default pricing mode for the asset kind.
+    /// If `quote_mode_hint` is provided, it overrides the default quote mode for the asset kind.
     /// Should be followed by an enrichment event for full profile data.
     async fn get_or_create_minimal_asset(
         &self,
         asset_id: &str,
         context_currency: Option<String>,
         metadata: Option<AssetMetadata>,
-        pricing_mode_hint: Option<String>,
+        quote_mode_hint: Option<String>,
     ) -> Result<Asset>;
-    async fn update_pricing_mode(&self, asset_id: &str, pricing_mode: &str) -> Result<Asset>;
+    async fn update_quote_mode(&self, asset_id: &str, quote_mode: &str) -> Result<Asset>;
     async fn get_assets_by_asset_ids(&self, asset_ids: &[String]) -> Result<Vec<Asset>>;
     /// Enriches an existing asset's profile with data from market data provider.
     /// Updates the profile JSON (sectors, countries, website) and notes fields.
@@ -76,7 +76,7 @@ pub trait AssetRepositoryTrait: Send + Sync {
     /// Creates multiple assets in a single transaction. All-or-nothing.
     async fn create_batch(&self, new_assets: Vec<NewAsset>) -> Result<Vec<Asset>>;
     async fn update_profile(&self, asset_id: &str, payload: UpdateAssetProfile) -> Result<Asset>;
-    async fn update_pricing_mode(&self, asset_id: &str, pricing_mode: &str) -> Result<Asset>;
+    async fn update_quote_mode(&self, asset_id: &str, quote_mode: &str) -> Result<Asset>;
     fn get_by_id(&self, asset_id: &str) -> Result<Asset>;
     fn list(&self) -> Result<Vec<Asset>>;
     fn list_by_asset_ids(&self, asset_ids: &[String]) -> Result<Vec<Asset>>;
@@ -85,6 +85,10 @@ pub trait AssetRepositoryTrait: Send + Sync {
     /// Search for assets by symbol (case-insensitive partial match).
     /// Used for merging existing assets into search results.
     fn search_by_symbol(&self, query: &str) -> Result<Vec<Asset>>;
+
+    /// Find an asset by its instrument_key (e.g., "FX:EUR/USD", "EQUITY:AAPL@XNAS").
+    /// Returns None if not found.
+    fn find_by_instrument_key(&self, instrument_key: &str) -> Result<Option<Asset>>;
 
     /// Removes the $.legacy structure from asset metadata.
     /// Preserves $.identifiers if present.

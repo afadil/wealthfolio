@@ -131,7 +131,7 @@ pub fn gather_legacy_migration_status(
         {
             assets_needing_migration.push(LegacyAssetInfo {
                 asset_id: asset.id.clone(),
-                symbol: asset.symbol.clone(),
+                symbol: asset.display_code.clone().unwrap_or_default(),
                 name: asset.name.clone(),
             });
         } else if has_gics_assignment || has_regions_assignment {

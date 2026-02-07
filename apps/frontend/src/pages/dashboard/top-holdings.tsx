@@ -1,7 +1,7 @@
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { HoldingType, isAlternativeAssetId } from "@/lib/constants";
+import { HoldingType, isAlternativeAssetKind, type AssetKind } from "@/lib/constants";
 import { Holding } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { AmountDisplay, Button, GainAmount, GainPercent, Icons } from "@wealthfolio/ui";
@@ -189,8 +189,7 @@ export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsPr
         // Exclude cash holdings
         if (h.holdingType === HoldingType.CASH) return false;
         // Exclude alternative assets (properties, vehicles, liabilities, etc.)
-        const symbol = h.instrument?.symbol ?? h.id;
-        if (isAlternativeAssetId(symbol)) return false;
+        if (h.assetKind && isAlternativeAssetKind(h.assetKind as AssetKind)) return false;
         return true;
       })
       .sort((a, b) => (b.marketValue?.base ?? 0) - (a.marketValue?.base ?? 0));

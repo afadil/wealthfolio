@@ -41,13 +41,13 @@ export function useActivityMutations(
   const addActivityMutation = useMutation({
     mutationFn: async (data: NewActivityFormValues) => {
       // Extract asset-related fields from form data
-      const { assetId, exchangeMic, metadata, assetMetadata, pricingMode, assetKind, ...rest } =
+      const { assetId, exchangeMic, metadata, assetMetadata, quoteMode, assetKind, ...rest } =
         data as NewActivityFormValues & {
           assetId?: string;
           exchangeMic?: string;
           metadata?: Record<string, unknown>;
           assetMetadata?: { name?: string; kind?: string; exchangeMic?: string };
-          pricingMode?: string;
+          quoteMode?: string;
           assetKind?: string;
         };
       const quantity = "quantity" in rest ? rest.quantity : undefined;
@@ -70,7 +70,7 @@ export function useActivityMutations(
           exchangeMic,
           kind: assetKind || assetMetadata?.kind,
           name: assetMetadata?.name,
-          pricingMode: pricingMode as ActivityCreate["asset"] extends { pricingMode?: infer P }
+          quoteMode: quoteMode as ActivityCreate["asset"] extends { quoteMode?: infer P }
             ? P
             : never,
         },
@@ -86,14 +86,14 @@ export function useActivityMutations(
   const updateActivityMutation = useMutation({
     mutationFn: async (data: NewActivityFormValues & { id: string }) => {
       // Extract asset-related fields from form data
-      const { assetId, exchangeMic, metadata, assetMetadata, pricingMode, assetKind, ...rest } =
+      const { assetId, exchangeMic, metadata, assetMetadata, quoteMode, assetKind, ...rest } =
         data as NewActivityFormValues & {
           id: string;
           assetId?: string;
           exchangeMic?: string;
           metadata?: Record<string, unknown>;
           assetMetadata?: { name?: string; kind?: string; exchangeMic?: string };
-          pricingMode?: string;
+          quoteMode?: string;
           assetKind?: string;
         };
       const quantity = "quantity" in rest ? rest.quantity : undefined;
@@ -117,7 +117,7 @@ export function useActivityMutations(
           exchangeMic,
           kind: assetKind || assetMetadata?.kind,
           name: assetMetadata?.name,
-          pricingMode: pricingMode as ActivityUpdate["asset"] extends { pricingMode?: infer P }
+          quoteMode: quoteMode as ActivityUpdate["asset"] extends { quoteMode?: infer P }
             ? P
             : never,
         },
@@ -145,7 +145,7 @@ export function useActivityMutations(
       assetId: _assetId,
       assetSymbol,
       exchangeMic,
-      assetPricingMode,
+      assetQuoteMode,
       ...restOfActivityData
     } = activityToDuplicate;
 
@@ -166,7 +166,7 @@ export function useActivityMutations(
       asset: {
         symbol: assetSymbol,
         exchangeMic,
-        pricingMode: assetPricingMode,
+        quoteMode: assetQuoteMode,
       },
     };
 

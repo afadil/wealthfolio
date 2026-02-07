@@ -103,7 +103,7 @@ export default function AssetsPage() {
             <AlertDialogTitle>Delete security</AlertDialogTitle>
             <AlertDialogDescription>
               {assetPendingDelete
-                ? `Are you sure you want to delete ${assetPendingDelete.symbol}? This will also remove its related quote and cannot be undone.`
+                ? `Are you sure you want to delete ${assetPendingDelete.displayCode ?? assetPendingDelete.name ?? "this security"}? This will also remove its related quote and cannot be undone.`
                 : "Are you sure you want to delete this security? This will also remove related quotes and cannot be undone."}
             </AlertDialogDescription>
           </AlertDialogHeader>

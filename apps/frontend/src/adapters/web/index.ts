@@ -143,7 +143,7 @@ export {
   getLatestQuotes,
   updateAssetProfile,
   deleteAsset,
-  updatePricingMode,
+  updateQuoteMode,
   updateQuote,
   syncMarketData,
   deleteQuote,

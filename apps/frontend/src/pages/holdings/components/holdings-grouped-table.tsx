@@ -184,20 +184,17 @@ function HoldingRow({
   navigate,
   isIndented = false,
 }: HoldingRowProps) {
-  const isCash = holding.assetKind === AssetKind.CASH;
   const symbol = holding.instrument?.symbol ?? holding.id;
-  const displaySymbol = isCash ? "Cash" : symbol;
-  const avatarSymbol = isCash ? "$CASH" : symbol;
 
   const handleNavigate = () => {
     // Use instrument.id (asset ID) for navigation, not symbol (which may be stripped)
     const assetId = holding.instrument?.id;
-    if (!isCash && assetId) {
+    if (assetId) {
       navigate(`/holdings/${encodeURIComponent(assetId)}`, { state: { holding } });
     }
   };
 
-  const isClickable = !isCash && holding.instrument?.id;
+  const isClickable = !!holding.instrument?.id;
 
   // Calculate display values
   const fxRate = holding.fxRate ?? 1;
@@ -224,10 +221,10 @@ function HoldingRow({
       >
         {/* Symbol/Name Column */}
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <TickerAvatar symbol={avatarSymbol} className="h-8 w-8 flex-shrink-0" />
+          <TickerAvatar symbol={symbol} className="h-8 w-8 flex-shrink-0" />
           <div className="flex min-w-0 flex-1 flex-col">
             <div className="flex items-center gap-2">
-              <span className="truncate font-medium">{displaySymbol}</span>
+              <span className="truncate font-medium">{symbol}</span>
               {holding.isLiability && (
                 <Badge variant="destructive" className="text-xs">
                   Debt
@@ -235,7 +232,7 @@ function HoldingRow({
               )}
             </div>
             <span className="text-muted-foreground truncate text-sm">
-              {isCash ? holding.localCurrency : (holding.instrument?.name ?? holding.id)}
+              {holding.instrument?.name ?? holding.id}
             </span>
           </div>
         </div>

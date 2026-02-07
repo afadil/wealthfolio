@@ -178,8 +178,8 @@ pub struct AssetInput {
     pub kind: Option<String>,
     /// Asset name for custom/manual assets
     pub name: Option<String>,
-    /// Pricing mode: "MARKET" or "MANUAL" - controls how asset is priced
-    pub pricing_mode: Option<String>,
+    /// Quote mode: "MARKET" or "MANUAL" - controls how asset is priced
+    pub quote_mode: Option<String>,
 }
 
 /// Input model for creating a new activity
@@ -189,7 +189,7 @@ pub struct NewActivity {
     pub id: Option<String>,
     pub account_id: String,
 
-    /// Asset input - consolidates id, symbol, exchangeMic, kind, name, pricingMode
+    /// Asset input - consolidates id, symbol, exchangeMic, kind, name, quoteMode
     /// Optional for cash activities which don't require an asset
     pub asset: Option<AssetInput>,
 
@@ -280,8 +280,8 @@ impl NewActivity {
         self.asset.as_ref().and_then(|a| a.name.as_deref())
     }
 
-    pub fn get_pricing_mode(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.pricing_mode.as_deref())
+    pub fn get_quote_mode(&self) -> Option<&str> {
+        self.asset.as_ref().and_then(|a| a.quote_mode.as_deref())
     }
 }
 
@@ -292,7 +292,7 @@ pub struct ActivityUpdate {
     pub id: String,
     pub account_id: String,
 
-    /// Asset input - consolidates id, symbol, exchangeMic, kind, name, pricingMode
+    /// Asset input - consolidates id, symbol, exchangeMic, kind, name, quoteMode
     /// Optional for cash activities which don't require an asset
     pub asset: Option<AssetInput>,
 
@@ -376,8 +376,8 @@ impl ActivityUpdate {
         self.asset.as_ref().and_then(|a| a.name.as_deref())
     }
 
-    pub fn get_pricing_mode(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.pricing_mode.as_deref())
+    pub fn get_quote_mode(&self) -> Option<&str> {
+        self.asset.as_ref().and_then(|a| a.quote_mode.as_deref())
     }
 }
 
@@ -1031,7 +1031,7 @@ impl From<ActivityImport> for NewActivity {
                 exchange_mic: import.exchange_mic,
                 kind: None,
                 name: import.symbol_name,
-                pricing_mode: None,
+                quote_mode: None,
             })
         };
 

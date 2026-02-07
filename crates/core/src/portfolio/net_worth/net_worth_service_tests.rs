@@ -3,7 +3,7 @@
 use super::*;
 use crate::accounts::{Account, AccountRepositoryTrait, AccountUpdate, NewAccount};
 use crate::assets::{
-    Asset, AssetKind, AssetRepositoryTrait, NewAsset, PricingMode, ProviderProfile,
+    Asset, AssetKind, AssetRepositoryTrait, NewAsset, QuoteMode, ProviderProfile,
     UpdateAssetProfile,
 };
 use crate::errors::Result;
@@ -103,8 +103,12 @@ impl AssetRepositoryTrait for MockAssetRepository {
         unimplemented!()
     }
 
-    async fn update_pricing_mode(&self, _asset_id: &str, _pricing_mode: &str) -> Result<Asset> {
+    async fn update_quote_mode(&self, _asset_id: &str, _quote_mode: &str) -> Result<Asset> {
         unimplemented!()
+    }
+
+    fn find_by_instrument_key(&self, _instrument_key: &str) -> Result<Option<Asset>> {
+        Ok(None)
     }
 
     fn get_by_id(&self, asset_id: &str) -> Result<Asset> {
@@ -782,17 +786,19 @@ fn create_test_asset(id: &str, kind: AssetKind, currency: &str) -> Asset {
     Asset {
         id: id.to_string(),
         name: Some(format!("Asset {}", id)),
-        symbol: id.to_string(),
+        display_code: Some(id.to_string()),
         notes: None,
         created_at: now,
         updated_at: now,
-        currency: currency.to_string(),
+        quote_ccy: currency.to_string(),
         kind,
-        exchange_mic: None,
+        instrument_type: None,
+        instrument_symbol: None,
+        instrument_exchange_mic: None,
+        instrument_key: None,
         exchange_name: None,
-        pricing_mode: PricingMode::default(),
-        preferred_provider: None,
-        provider_overrides: None,
+        quote_mode: QuoteMode::Market,
+        provider_config: None,
         is_active: true,
         metadata: None,
     }
@@ -957,7 +963,7 @@ async fn test_empty_accounts_returns_zero_net_worth() {
 #[tokio::test]
 async fn test_single_investment_account() {
     let account = create_test_account("acc1", "SECURITIES", "USD");
-    let asset = create_test_asset("AAPL", AssetKind::Security, "USD");
+    let asset = create_test_asset("AAPL", AssetKind::Investment, "USD");
     let position = create_test_position("acc1", "AAPL", dec!(100), dec!(15000), "USD");
     let snapshot = create_test_snapshot("acc1", vec![position], HashMap::new());
     let quote = create_test_quote(
@@ -983,7 +989,7 @@ async fn test_single_investment_account() {
 async fn test_net_worth_with_liability() {
     // Investment account
     let inv_account = create_test_account("inv1", "SECURITIES", "USD");
-    let asset = create_test_asset("AAPL", AssetKind::Security, "USD");
+    let asset = create_test_asset("AAPL", AssetKind::Investment, "USD");
     let position = create_test_position("inv1", "AAPL", dec!(100), dec!(15000), "USD");
     let inv_snapshot = create_test_snapshot("inv1", vec![position], HashMap::new());
     let quote = create_test_quote(
@@ -1067,7 +1073,7 @@ async fn test_cash_included_in_investments() {
 #[tokio::test]
 async fn test_staleness_detection() {
     let account = create_test_account("acc1", "SECURITIES", "USD");
-    let asset = create_test_asset("AAPL", AssetKind::Security, "USD");
+    let asset = create_test_asset("AAPL", AssetKind::Investment, "USD");
     let position = create_test_position("acc1", "AAPL", dec!(100), dec!(15000), "USD");
     let snapshot = create_test_snapshot("acc1", vec![position], HashMap::new());
 
@@ -1091,7 +1097,7 @@ async fn test_staleness_detection() {
 async fn test_multiple_asset_categories() {
     // Securities account
     let sec_account = create_test_account("sec1", "SECURITIES", "USD");
-    let sec_asset = create_test_asset("AAPL", AssetKind::Security, "USD");
+    let sec_asset = create_test_asset("AAPL", AssetKind::Investment, "USD");
     let sec_position = create_test_position("sec1", "AAPL", dec!(50), dec!(7500), "USD");
     let sec_snapshot = create_test_snapshot("sec1", vec![sec_position], HashMap::new());
     let sec_quote = create_test_quote(
@@ -1166,7 +1172,7 @@ async fn test_multiple_asset_categories() {
 #[tokio::test]
 async fn test_precious_metals_category() {
     let account = create_test_account("prec1", "PRECIOUS", "USD");
-    let asset = create_test_asset("PREC-gold", AssetKind::PhysicalPrecious, "USD");
+    let asset = create_test_asset("PREC-gold", AssetKind::PreciousMetal, "USD");
     // 10 oz of gold
     let position = create_test_position("prec1", "PREC-gold", dec!(10), dec!(18000), "USD");
     let snapshot = create_test_snapshot("prec1", vec![position], HashMap::new());
@@ -1213,7 +1219,7 @@ async fn test_collectibles_category() {
 #[tokio::test]
 async fn test_no_quote_falls_back_to_cost_basis() {
     let account = create_test_account("acc1", "SECURITIES", "USD");
-    let asset = create_test_asset("NEWSTOCK", AssetKind::Security, "USD");
+    let asset = create_test_asset("NEWSTOCK", AssetKind::Investment, "USD");
     // Position with $10,000 cost basis, 100 shares -> implied price $100/share
     let position = create_test_position("acc1", "NEWSTOCK", dec!(100), dec!(10000), "USD");
     let snapshot = create_test_snapshot("acc1", vec![position], HashMap::new());
@@ -1599,7 +1605,7 @@ fn test_history_multiple_alt_assets() {
     ];
 
     let property = create_test_asset("PROP-house", AssetKind::Property, "USD");
-    let gold = create_test_asset("PREC-gold", AssetKind::PhysicalPrecious, "USD");
+    let gold = create_test_asset("PREC-gold", AssetKind::PreciousMetal, "USD");
     let mortgage = create_test_asset("LIAB-mortgage", AssetKind::Liability, "USD");
 
     let quotes = vec![
@@ -1677,7 +1683,7 @@ async fn test_closed_account_in_net_worth_when_not_archived() {
     // Account is closed (is_active=false) but NOT archived (is_archived=false)
     // Should be included in net worth calculations
     let account = create_test_account_with_archive_state("closed_acc", "SECURITIES", "USD", false, false);
-    let asset = create_test_asset("AAPL", AssetKind::Security, "USD");
+    let asset = create_test_asset("AAPL", AssetKind::Investment, "USD");
     let position = create_test_position("closed_acc", "AAPL", dec!(100), dec!(15000), "USD");
     let snapshot = create_test_snapshot("closed_acc", vec![position], HashMap::new());
     let quote = create_test_quote(
@@ -1703,7 +1709,7 @@ async fn test_archived_account_excluded_from_net_worth() {
     // Account is archived (is_archived=true)
     // Should be excluded from net worth calculations
     let account = create_test_account_with_archive_state("archived_acc", "SECURITIES", "USD", true, true);
-    let asset = create_test_asset("AAPL", AssetKind::Security, "USD");
+    let asset = create_test_asset("AAPL", AssetKind::Investment, "USD");
     let position = create_test_position("archived_acc", "AAPL", dec!(100), dec!(15000), "USD");
     let snapshot = create_test_snapshot("archived_acc", vec![position], HashMap::new());
     let quote = create_test_quote(
@@ -1737,10 +1743,10 @@ async fn test_net_worth_with_mixed_account_states() {
     let acc_c = create_test_account_with_archive_state("acc_c", "SECURITIES", "USD", true, true);
     let acc_d = create_test_account_with_archive_state("acc_d", "SECURITIES", "USD", false, true);
 
-    let asset_a = create_test_asset("ASSET_A", AssetKind::Security, "USD");
-    let asset_b = create_test_asset("ASSET_B", AssetKind::Security, "USD");
-    let asset_c = create_test_asset("ASSET_C", AssetKind::Security, "USD");
-    let asset_d = create_test_asset("ASSET_D", AssetKind::Security, "USD");
+    let asset_a = create_test_asset("ASSET_A", AssetKind::Investment, "USD");
+    let asset_b = create_test_asset("ASSET_B", AssetKind::Investment, "USD");
+    let asset_c = create_test_asset("ASSET_C", AssetKind::Investment, "USD");
+    let asset_d = create_test_asset("ASSET_D", AssetKind::Investment, "USD");
 
     let pos_a = create_test_position("acc_a", "ASSET_A", dec!(100), dec!(10000), "USD");
     let pos_b = create_test_position("acc_b", "ASSET_B", dec!(50), dec!(5000), "USD");
@@ -1779,8 +1785,8 @@ async fn test_all_accounts_archived_returns_zero_net_worth() {
     let acc1 = create_test_account_with_archive_state("archived1", "SECURITIES", "USD", true, true);
     let acc2 = create_test_account_with_archive_state("archived2", "SECURITIES", "USD", false, true);
 
-    let asset1 = create_test_asset("ASSET_1", AssetKind::Security, "USD");
-    let asset2 = create_test_asset("ASSET_2", AssetKind::Security, "USD");
+    let asset1 = create_test_asset("ASSET_1", AssetKind::Investment, "USD");
+    let asset2 = create_test_asset("ASSET_2", AssetKind::Investment, "USD");
 
     let pos1 = create_test_position("archived1", "ASSET_1", dec!(100), dec!(10000), "USD");
     let pos2 = create_test_position("archived2", "ASSET_2", dec!(200), dec!(20000), "USD");

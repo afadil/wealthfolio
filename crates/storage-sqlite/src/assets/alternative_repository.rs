@@ -142,18 +142,18 @@ impl AlternativeAssetRepositoryTrait for AlternativeAssetRepository {
         Ok(liability_ids)
     }
 
-    /// Updates an asset's details (name, symbol, metadata, and/or notes).
+    /// Updates an asset's details (name, display_code, metadata, and/or notes).
     async fn update_asset_details(
         &self,
         asset_id: &str,
         name: Option<&str>,
-        symbol: Option<&str>,
+        display_code: Option<&str>,
         metadata: Option<serde_json::Value>,
         notes: Option<&str>,
     ) -> Result<()> {
         let asset_id_owned = asset_id.to_string();
         let name_owned = name.map(|n| n.to_string());
-        let symbol_owned = symbol.map(|s| s.to_string());
+        let display_code_owned = display_code.map(|s| s.to_string());
         let metadata_str = metadata.and_then(|v| serde_json::to_string(&v).ok());
         let notes_owned = notes.map(|n| n.to_string());
 
@@ -161,7 +161,7 @@ impl AlternativeAssetRepositoryTrait for AlternativeAssetRepository {
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
                 // Build dynamic update based on which fields are provided
                 let has_updates = name_owned.is_some()
-                    || symbol_owned.is_some()
+                    || display_code_owned.is_some()
                     || metadata_str.is_some()
                     || notes_owned.is_some();
 
@@ -173,7 +173,7 @@ impl AlternativeAssetRepositoryTrait for AlternativeAssetRepository {
                 let updated = diesel::update(assets::table.filter(assets::id.eq(&asset_id_owned)))
                     .set((
                         name_owned.as_ref().map(|n| assets::name.eq(n)),
-                        symbol_owned.as_ref().map(|s| assets::symbol.eq(s)),
+                        display_code_owned.as_ref().map(|s| assets::display_code.eq(s)),
                         metadata_str.as_ref().map(|m| assets::metadata.eq(Some(m))),
                         notes_owned.as_ref().map(|n| assets::notes.eq(Some(n))),
                     ))

@@ -3,7 +3,7 @@ import { TickerAvatar } from "@/components/ticker-avatar";
 import TickerSearchInput from "@/components/ticker-search";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Account, SymbolSearchResult } from "@/lib/types";
-import { PricingMode } from "@/lib/constants";
+import { QuoteMode } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import {
   Button,
@@ -33,7 +33,7 @@ export interface BulkHoldingRow {
   averageCost: number | string;
   totalValue: number;
   assetId?: string;
-  pricingMode?: PricingMode;
+  quoteMode?: QuoteMode;
 }
 
 interface BulkHoldingsFormProps {
@@ -120,8 +120,8 @@ const HoldingRow = memo(
       (_symbol: string, searchResult?: SymbolSearchResult) => {
         const isManualAsset = searchResult?.dataSource === "MANUAL";
         setValue(
-          `holdings.${index}.pricingMode`,
-          isManualAsset ? PricingMode.MANUAL : PricingMode.MARKET,
+          `holdings.${index}.quoteMode`,
+          isManualAsset ? QuoteMode.MANUAL : QuoteMode.MARKET,
           { shouldDirty: true },
         );
 
@@ -285,7 +285,7 @@ export const BulkHoldingsForm = ({ onAccountChange }: BulkHoldingsFormProps) => 
       ticker: "",
       name: "",
       assetId: "",
-      pricingMode: PricingMode.MARKET,
+      quoteMode: QuoteMode.MARKET,
       sharesOwned: 0,
       averageCost: 0,
     });

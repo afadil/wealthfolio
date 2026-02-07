@@ -37,10 +37,7 @@ use super::sync_state::{
 };
 use super::types::{AssetId, Day, ProviderId};
 use crate::activities::ActivityRepositoryTrait;
-use crate::assets::{
-    is_cash_asset_id, is_fx_asset_id, parse_canonical_asset_id, Asset, AssetKind,
-    AssetRepositoryTrait, PricingMode,
-};
+use crate::assets::{Asset, AssetKind, AssetRepositoryTrait, QuoteMode};
 use crate::errors::Result;
 use crate::utils::time_utils;
 
@@ -79,21 +76,8 @@ impl Drop for SyncLockGuard {
     }
 }
 
-fn effective_market_today(now: DateTime<Utc>, asset_id: &str) -> NaiveDate {
-    let mic = parse_canonical_asset_id(asset_id).and_then(|parsed| {
-        match parsed.kind {
-            Some(AssetKind::Security) | Some(AssetKind::Option) => {
-                if parsed.qualifier == "UNKNOWN" {
-                    None
-                } else {
-                    Some(parsed.qualifier)
-                }
-            }
-            _ => None,
-        }
-    });
-
-    time_utils::market_effective_date(now, mic.as_deref())
+fn effective_market_today(now: DateTime<Utc>, exchange_mic: Option<&str>) -> NaiveDate {
+    time_utils::market_effective_date(now, exchange_mic)
 }
 
 // Test helpers - expose lock functions for testing
@@ -365,8 +349,7 @@ where
         let mut assets_by_provider: HashMap<String, Vec<String>> = HashMap::new();
         for asset in assets.iter().filter(|a| self.should_sync_asset(a)) {
             let provider = asset
-                .preferred_provider
-                .clone()
+                .preferred_provider()
                 .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string());
             assets_by_provider
                 .entry(provider)
@@ -396,13 +379,8 @@ where
     /// Get the reason why an asset should be skipped, if any.
     /// Returns None if the asset should be synced.
     fn get_skip_reason(&self, asset: &Asset) -> Option<AssetSkipReason> {
-        // Skip cash assets - they don't need quote syncing (always 1:1)
-        if asset.kind == AssetKind::Cash {
-            return Some(AssetSkipReason::CashAsset);
-        }
-
         // Only sync market-priced assets (including FX rates for currency conversion)
-        if asset.pricing_mode != PricingMode::Market {
+        if asset.quote_mode != QuoteMode::Market {
             return Some(AssetSkipReason::ManualPricing);
         }
 
@@ -423,7 +401,7 @@ where
         activity_bounds: &HashMap<String, (Option<NaiveDate>, Option<NaiveDate>)>,
         quote_bounds: &HashMap<String, (NaiveDate, NaiveDate)>,
     ) -> Option<SymbolSyncPlan> {
-        let effective_today = effective_market_today(now, &asset.id);
+        let effective_today = effective_market_today(now, asset.instrument_exchange_mic.as_deref());
         // Get existing sync state
         let state = self
             .sync_state_store
@@ -480,11 +458,10 @@ where
                 .map(|s| s.sync_priority)
                 .unwrap_or_else(|| SyncCategory::New.default_priority()),
             data_source: asset
-                .preferred_provider
-                .clone()
+                .preferred_provider()
                 .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string()),
             quote_symbol: None, // Derived from asset during fetch
-            currency: asset.currency.clone(),
+            currency: asset.quote_ccy.clone(),
         })
     }
 
@@ -507,7 +484,7 @@ where
         inputs: &SyncPlanningInputs,
         mode: SyncMode,
         today: NaiveDate,
-        asset_id: &str,
+        asset: &Asset,
     ) -> (NaiveDate, NaiveDate) {
         match mode {
             SyncMode::Incremental => {
@@ -525,7 +502,7 @@ where
             SyncMode::BackfillHistory { days: _days } => {
                 // For FX assets in BackfillHistory mode, use global earliest activity date
                 // FX assets have no activities, so activity_min is always NULL
-                if is_fx_asset_id(asset_id) {
+                if asset.kind == AssetKind::Fx {
                     let global_earliest = self
                         .activity_repo
                         .get_first_activity_date_overall()
@@ -538,7 +515,7 @@ where
 
                     debug!(
                         "FX asset {} BackfillHistory: global_earliest={:?}, start={}",
-                        asset_id, global_earliest, start
+                        asset.id, global_earliest, start
                     );
                     (start, today)
                 } else {
@@ -798,7 +775,7 @@ where
                 quote_max,
             };
 
-            let effective_today = effective_market_today(now, &state.asset_id);
+            let effective_today = effective_market_today(now, None);
             let category = determine_sync_category(
                 &inputs,
                 CLOSED_POSITION_GRACE_PERIOD_DAYS,
@@ -901,8 +878,7 @@ where
                 let mut state = QuoteSyncState::new(
                     asset.id.clone(),
                     asset
-                        .preferred_provider
-                        .clone()
+                        .preferred_provider()
                         .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string()),
                 );
                 // is_active is derived from position_closed_date (None = active)
@@ -981,8 +957,7 @@ where
         let mut assets_by_provider: HashMap<String, Vec<String>> = HashMap::new();
         for asset in &syncable {
             let provider = asset
-                .preferred_provider
-                .clone()
+                .preferred_provider()
                 .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string());
             assets_by_provider
                 .entry(provider)
@@ -1058,11 +1033,10 @@ where
                             end_date,
                             priority: SyncCategory::Active.default_priority(),
                             data_source: asset
-                                .preferred_provider
-                                .clone()
+                                .preferred_provider()
                                 .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string()),
                             quote_symbol: None,
-                            currency: asset.currency.clone(),
+                            currency: asset.quote_ccy.clone(),
                         });
                     }
                 }
@@ -1078,11 +1052,10 @@ where
                             end_date,
                             priority: category.default_priority(),
                             data_source: asset
-                                .preferred_provider
-                                .clone()
+                                .preferred_provider()
                                 .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string()),
                             quote_symbol: None,
-                            currency: asset.currency.clone(),
+                            currency: asset.quote_ccy.clone(),
                         });
                     }
                 }
@@ -1090,7 +1063,7 @@ where
             }
 
             let (start_date, end_date) =
-                self.calculate_date_range_for_mode(&inputs, mode, today, &asset.id);
+                self.calculate_date_range_for_mode(&inputs, mode, today, asset);
 
             plans.push(SymbolSyncPlan {
                 asset_id: asset.id.clone(),
@@ -1099,11 +1072,10 @@ where
                 end_date,
                 priority: category.default_priority(),
                 data_source: asset
-                    .preferred_provider
-                    .clone()
+                    .preferred_provider()
                     .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string()),
                 quote_symbol: None,
-                currency: asset.currency.clone(),
+                currency: asset.quote_ccy.clone(),
             });
         }
 
@@ -1145,8 +1117,7 @@ where
     async fn handle_activity_created(&self, asset_id: &AssetId, activity_date: Day) -> Result<()> {
         let symbol = asset_id.as_str();
 
-        // Skip assets that don't need quote syncing (cash, FX)
-        if symbol.is_empty() || is_cash_asset_id(symbol) || is_fx_asset_id(symbol) {
+        if symbol.is_empty() {
             return Ok(());
         }
 
@@ -1192,14 +1163,14 @@ where
         } else {
             // Check if asset should be synced (only market-priced assets)
             if let Ok(asset) = self.asset_repo.get_by_id(symbol) {
-                if asset.pricing_mode != PricingMode::Market {
+                if asset.quote_mode != QuoteMode::Market {
                     return Ok(());
                 }
 
                 let mut state = QuoteSyncState::new(
                     symbol.to_string(),
                     asset
-                        .preferred_provider
+                        .preferred_provider()
                         .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string()),
                 );
                 // is_active is derived from position_closed_date (None = active)
@@ -1216,8 +1187,7 @@ where
     async fn handle_activity_deleted(&self, asset_id: &AssetId) -> Result<()> {
         let symbol = asset_id.as_str();
 
-        // Skip assets that don't need quote syncing (cash, FX)
-        if symbol.is_empty() || is_cash_asset_id(symbol) || is_fx_asset_id(symbol) {
+        if symbol.is_empty() {
             return Ok(());
         }
 
@@ -1716,14 +1686,9 @@ mod tests {
         use super::*;
 
         #[test]
-        fn test_fx_asset_id_detection() {
-            // FX assets are identified by the FX: prefix
-            assert!(is_fx_asset_id("FX:EUR:USD"));
-            assert!(is_fx_asset_id("FX:GBP:USD"));
-            assert!(is_fx_asset_id("FX:JPY:USD"));
-            assert!(!is_fx_asset_id("AAPL"));
-            assert!(!is_fx_asset_id("MSFT"));
-            assert!(!is_fx_asset_id("CASH:USD"));
+        fn test_fx_asset_kind_detection() {
+            // FX assets are identified by AssetKind::Fx
+            assert_eq!(AssetKind::Fx.as_db_str(), "FX");
         }
 
         #[test]

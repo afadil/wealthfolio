@@ -20,7 +20,7 @@ use rust_decimal::Decimal;
 use std::collections::HashSet;
 use wealthfolio_core::accounts::{Account, AccountServiceTrait, NewAccount, TrackingMode};
 use wealthfolio_core::activities::{self, compute_idempotency_key, AssetInput, NewActivity};
-use wealthfolio_core::assets::{canonical_asset_id, AssetKind, AssetServiceTrait, NewAsset};
+use wealthfolio_core::assets::{AssetKind, AssetServiceTrait};
 use wealthfolio_core::errors::Result;
 use wealthfolio_core::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use wealthfolio_core::fx::currency::{get_normalization_rule, normalize_amount, resolve_currency};
@@ -33,7 +33,7 @@ use wealthfolio_core::sync::{
 };
 use wealthfolio_core::utils::time_utils::valuation_date_today;
 use wealthfolio_storage_sqlite::activities::ActivityDB;
-use wealthfolio_storage_sqlite::assets::AssetDB;
+use wealthfolio_storage_sqlite::assets::InsertableAssetDB;
 use wealthfolio_storage_sqlite::db::{DbPool, WriteHandle};
 use wealthfolio_storage_sqlite::errors::StorageError;
 use wealthfolio_storage_sqlite::portfolio::snapshot::AccountStateSnapshotDB;
@@ -315,8 +315,9 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
 
         let now_rfc3339 = chrono::Utc::now().to_rfc3339();
 
-        let mut asset_rows: Vec<AssetDB> = Vec::new();
-        let mut seen_assets: HashSet<String> = HashSet::new();
+        let mut asset_rows: Vec<InsertableAssetDB> = Vec::new();
+        let mut seen_assets: std::collections::HashMap<String, String> =
+            std::collections::HashMap::new();
 
         let mut activity_rows: Vec<ActivityDB> = Vec::new();
         let mut seen_activity_ids: HashSet<String> = HashSet::new();
@@ -403,36 +404,31 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             // Determine the display symbol based on asset type
             // For crypto: we want the base symbol (e.g., "SOL" not "SOL-USD")
             // For securities: use raw_symbol if available, else broker symbol
-            let display_symbol: Option<String> = match asset_kind {
-                AssetKind::Crypto => {
-                    // For crypto: raw_symbol > extract base from symbol field
-                    symbol_ref
-                        .and_then(|s| s.raw_symbol.clone())
-                        .filter(|r| !r.trim().is_empty())
-                        .or_else(|| {
-                            // Try to extract base from symbol field (e.g., "SOL-CAD" -> "SOL")
-                            symbol_ref
-                                .and_then(|s| s.symbol.clone())
-                                .filter(|sym| !sym.trim().is_empty())
-                                .map(|sym| sym.split('-').next().unwrap_or(&sym).to_string())
-                        })
-                }
-                _ => {
-                    // For securities/other: raw_symbol > symbol (without exchange suffix)
-                    symbol_ref
-                        .and_then(|s| s.raw_symbol.clone())
-                        .filter(|r| !r.trim().is_empty())
-                        .or_else(|| {
-                            symbol_ref
-                                .and_then(|s| s.symbol.clone())
-                                .filter(|sym| !sym.trim().is_empty())
-                                .map(|sym| {
-                                    // Remove exchange suffix like ".TO" for canonical ID
-                                    // The exchange is stored separately in exchange_mic
-                                    sym.split('.').next().unwrap_or(&sym).to_string()
-                                })
-                        })
-                }
+            let is_crypto = is_broker_crypto(symbol_type_code);
+            let display_symbol: Option<String> = if is_crypto {
+                // For crypto: raw_symbol > extract base from symbol field
+                symbol_ref
+                    .and_then(|s| s.raw_symbol.clone())
+                    .filter(|r| !r.trim().is_empty())
+                    .or_else(|| {
+                        symbol_ref
+                            .and_then(|s| s.symbol.clone())
+                            .filter(|sym| !sym.trim().is_empty())
+                            .map(|sym| sym.split('-').next().unwrap_or(&sym).to_string())
+                    })
+            } else {
+                // For securities/other: raw_symbol > symbol (without exchange suffix)
+                symbol_ref
+                    .and_then(|s| s.raw_symbol.clone())
+                    .filter(|r| !r.trim().is_empty())
+                    .or_else(|| {
+                        symbol_ref
+                            .and_then(|s| s.symbol.clone())
+                            .filter(|sym| !sym.trim().is_empty())
+                            .map(|sym| {
+                                sym.split('.').next().unwrap_or(&sym).to_string()
+                            })
+                    })
             };
 
             // Also get option symbol if present
@@ -442,90 +438,77 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 .and_then(|s| s.ticker.clone())
                 .filter(|t| !t.trim().is_empty());
 
-            // Determine asset currency for canonical ID
+            // Determine asset currency
             let asset_currency = symbol_currency
                 .clone()
                 .unwrap_or_else(|| currency_code.clone());
 
-            // Generate canonical asset_id using the new format
-            let asset_id = if is_cash_like && display_symbol.is_none() && option_symbol.is_none() {
-                // Cash activity without symbol - generate CASH:{currency}
-                canonical_asset_id(&AssetKind::Cash, &asset_currency, None, &asset_currency)
-            } else if let Some(ref opt_sym) = option_symbol {
-                // Option symbol takes priority
-                canonical_asset_id(
-                    &asset_kind,
-                    opt_sym,
-                    exchange_mic.as_deref(),
-                    &asset_currency,
-                )
-            } else if let Some(ref sym) = display_symbol {
-                // Regular symbol
-                canonical_asset_id(&asset_kind, sym, exchange_mic.as_deref(), &asset_currency)
-            } else {
-                // No symbol available - generate UNKNOWN placeholder
-                format!("SEC:UNKNOWN:{}", currency_code)
-            };
-
-            // Track asset IDs and currencies for domain events
-            activity_asset_ids.insert(asset_id.clone());
-            activity_currencies.insert(currency_code.clone());
-
-            if seen_assets.insert(asset_id.clone()) {
-                let asset_db = if asset_id.starts_with("CASH:") {
-                    // Cash asset
-                    let new_asset = NewAsset::new_cash_asset(&asset_currency);
-                    let mut db: AssetDB = new_asset.into();
-                    db.created_at = now_rfc3339.clone();
-                    db.updated_at = now_rfc3339.clone();
-                    db
-                } else if asset_id.contains(":UNKNOWN:") {
-                    // Unknown placeholder - use SECURITY kind with NONE pricing
-                    AssetDB {
-                        id: asset_id.clone(),
-                        symbol: "UNKNOWN".to_string(),
-                        name: Some("Unknown Asset".to_string()),
-                        currency: currency_code.clone(),
-                        kind: "SECURITY".to_string(),
-                        pricing_mode: "NONE".to_string(),
-                        is_active: 1,
-                        created_at: now_rfc3339.clone(),
-                        updated_at: now_rfc3339.clone(),
-                        ..Default::default()
-                    }
+            // Generate asset_id (UUID) for non-cash activities
+            let asset_id: Option<String> =
+                if is_cash_like && display_symbol.is_none() && option_symbol.is_none() {
+                    // Cash activity without symbol - no asset needed
+                    None
                 } else {
-                    // Build metadata with broker info (raw_symbol, exchange, option details)
-                    let metadata = build_asset_metadata(&activity);
-
-                    // Use display_symbol for the symbol field, fallback to extracting from asset_id
                     let symbol = option_symbol
                         .clone()
                         .or(display_symbol.clone())
-                        .unwrap_or_else(|| {
-                            // Extract symbol from canonical ID (e.g., "SEC:AAPL:XNAS" -> "AAPL")
-                            asset_id.split(':').nth(1).unwrap_or(&asset_id).to_string()
-                        });
+                        .unwrap_or_else(|| "UNKNOWN".to_string());
 
-                    AssetDB {
-                        id: asset_id.clone(),
-                        symbol,
-                        name: symbol_ref
-                            .and_then(|s| s.description.clone())
-                            .filter(|d| !d.trim().is_empty()),
-                        exchange_mic: exchange_mic.clone(),
-                        currency: asset_currency.clone(),
-                        kind: asset_kind_to_string(&asset_kind),
-                        pricing_mode: "MARKET".to_string(),
-                        preferred_provider: Some(DataSource::Yahoo.as_str().to_string()),
-                        metadata,
-                        is_active: 1,
-                        created_at: now_rfc3339.clone(),
-                        updated_at: now_rfc3339.clone(),
-                        ..Default::default()
-                    }
+                    // Dedup key: symbol + exchange_mic
+                    let dedup_key = format!(
+                        "{}:{}",
+                        symbol.to_uppercase(),
+                        exchange_mic.as_deref().unwrap_or("")
+                    );
+
+                    let id = if let Some(existing_id) = seen_assets.get(&dedup_key) {
+                        existing_id.clone()
+                    } else {
+                        let new_id = uuid::Uuid::new_v4().to_string();
+
+                        // Build metadata with broker info
+                        let metadata = build_asset_metadata(&activity);
+
+                        let provider_config = serde_json::to_string(&serde_json::json!({
+                            "preferred_provider": DataSource::Yahoo.as_str()
+                        }))
+                        .ok();
+
+                        let asset_db = InsertableAssetDB {
+                            id: Some(new_id.clone()),
+                            display_code: Some(symbol.clone()),
+                            instrument_symbol: Some(symbol.clone()),
+                            name: symbol_ref
+                                .and_then(|s| s.description.clone())
+                                .filter(|d| !d.trim().is_empty()),
+                            instrument_exchange_mic: exchange_mic.clone(),
+                            quote_ccy: asset_currency.clone(),
+                            kind: asset_kind_to_string(&asset_kind),
+                            quote_mode: "MARKET".to_string(),
+                            provider_config,
+                            metadata,
+                            is_active: 1,
+                            instrument_type: if is_crypto {
+                                Some("CRYPTO".to_string())
+                            } else {
+                                Some("EQUITY".to_string())
+                            },
+                            created_at: now_rfc3339.clone(),
+                            updated_at: now_rfc3339.clone(),
+                            notes: None,
+                        };
+                        asset_rows.push(asset_db);
+                        seen_assets.insert(dedup_key, new_id.clone());
+                        new_id
+                    };
+                    Some(id)
                 };
-                asset_rows.push(asset_db);
+
+            // Track asset IDs and currencies for domain events
+            if let Some(ref id) = asset_id {
+                activity_asset_ids.insert(id.clone());
             }
+            activity_currencies.insert(currency_code.clone());
 
             let activity_date = activity
                 .trade_date
@@ -588,7 +571,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 &account_id,
                 &activity_type,
                 &activity_datetime,
-                Some(&asset_id),
+                asset_id.as_deref(),
                 Some(quantity),
                 Some(unit_price),
                 amount,
@@ -601,13 +584,13 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 id: Some(activity_id),
                 account_id: account_id.clone(),
                 // Broker sync provides asset_id directly (already resolved by mapping)
-                asset: Some(AssetInput {
-                    id: Some(asset_id),
+                asset: asset_id.as_ref().map(|id| AssetInput {
+                    id: Some(id.clone()),
                     symbol: None, // Broker sync uses resolved asset_id directly
                     exchange_mic: None,
                     kind: None,
                     name: None, // Broker sync uses enrichment events for asset metadata
-                    pricing_mode: None,
+                    quote_mode: None,
                 }),
                 activity_type,
                 subtype,
@@ -648,12 +631,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
         let assets_count = asset_rows.len();
 
         // Collect new asset IDs before the closure moves asset_rows
-        // Filter out cash and unknown placeholders - they don't need enrichment
-        let new_asset_ids: Vec<String> = asset_rows
-            .iter()
-            .map(|a| a.id.clone())
-            .filter(|id| !id.starts_with("CASH:") && !id.contains(":UNKNOWN:"))
-            .collect();
+        let new_asset_ids: Vec<String> = asset_rows.iter().filter_map(|a| a.id.clone()).collect();
 
         debug!(
             "Preparing to upsert {} activities and {} assets for account {}",
@@ -990,7 +968,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
         }
 
         // Build assets and positions
-        let mut asset_rows: Vec<AssetDB> = Vec::new();
+        let mut asset_rows: Vec<InsertableAssetDB> = Vec::new();
         let mut positions_map: HashMap<String, Position> = HashMap::new();
         let mut total_cost_basis = Decimal::ZERO;
 
@@ -1028,21 +1006,30 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 .and_then(|t| t.code.clone());
             let kind = broker_symbol_type_to_kind(symbol_type_code.as_deref());
 
-            // Generate asset ID
-            let asset_id = canonical_asset_id(&kind, &symbol, None, &currency);
+            // Generate asset ID (UUID)
+            let asset_id = uuid::Uuid::new_v4().to_string();
 
-            // Create asset if needed (same fields as activity sync for consistency)
+            let is_crypto_asset = is_broker_crypto(symbol_type_code.as_deref());
             let asset_name = symbol_info.and_then(|s| s.name.clone().or(s.description.clone()));
-            let asset = AssetDB {
-                id: asset_id.clone(),
+            let provider_config = serde_json::to_string(&serde_json::json!({
+                "preferred_provider": DataSource::Yahoo.as_str()
+            }))
+            .ok();
+            let asset = InsertableAssetDB {
+                id: Some(asset_id.clone()),
                 kind: asset_kind_to_string(&kind),
                 name: asset_name,
-                symbol: symbol.clone(),
-                exchange_mic: None,
-                currency: currency.clone(),
-                pricing_mode: "MARKET".to_string(),
-                preferred_provider: Some(DataSource::Yahoo.as_str().to_string()),
-                provider_overrides: None,
+                display_code: Some(symbol.clone()),
+                instrument_symbol: Some(symbol.clone()),
+                instrument_exchange_mic: None,
+                quote_ccy: currency.clone(),
+                quote_mode: "MARKET".to_string(),
+                provider_config,
+                instrument_type: if is_crypto_asset {
+                    Some("CRYPTO".to_string())
+                } else {
+                    Some("EQUITY".to_string())
+                },
                 notes: None,
                 metadata: None,
                 is_active: 1,
@@ -1134,12 +1121,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
         }
 
         // Collect new asset IDs before the closure moves asset_rows
-        // Filter out cash and unknown placeholders - they don't need enrichment (same as activity sync)
-        let new_asset_ids: Vec<String> = asset_rows
-            .iter()
-            .map(|a| a.id.clone())
-            .filter(|id| !id.starts_with("CASH:") && !id.contains(":UNKNOWN:"))
-            .collect();
+        let new_asset_ids: Vec<String> = asset_rows.iter().filter_map(|a| a.id.clone()).collect();
 
         // Insert assets via raw SQL (keep current behavior)
         let writer = self.writer.clone();
@@ -1155,7 +1137,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                     {
                         Ok(count) => inserted += count,
                         Err(e) => {
-                            warn!("Failed to insert asset {}: {:?}", asset.id, e);
+                            warn!("Failed to insert asset {:?}: {:?}", asset.id, e);
                         }
                     }
                 }
@@ -1372,23 +1354,19 @@ impl BrokerSyncService {
 }
 
 /// Map broker symbol type code to AssetKind.
-/// Returns None for unknown types (will default to Security).
+/// All investment types (stocks, crypto, options, commodities) are now AssetKind::Investment.
 fn broker_symbol_type_to_kind(code: Option<&str>) -> AssetKind {
-    let code = match code {
-        Some(c) => c.to_uppercase(),
-        None => return AssetKind::Security,
-    };
+    // All broker symbols are investments in the new model
+    let _ = code;
+    AssetKind::Investment
+}
 
-    match code.as_str() {
-        // Crypto
-        "CRYPTOCURRENCY" | "CRYPTO" => AssetKind::Crypto,
-        // Options
-        "EQUITY_OPTION" | "OPTION" | "OPTIONS" => AssetKind::Option,
-        // Commodities
-        "COMMODITY" | "COMMODITIES" => AssetKind::Commodity,
-        // Everything else is a security (stocks, ETFs, bonds, funds, etc.)
-        _ => AssetKind::Security,
-    }
+/// Check if a broker symbol type code represents a crypto asset.
+fn is_broker_crypto(code: Option<&str>) -> bool {
+    matches!(
+        code.map(|c| c.to_uppercase()).as_deref(),
+        Some("CRYPTOCURRENCY" | "CRYPTO")
+    )
 }
 
 /// Convert AssetKind to database string representation.

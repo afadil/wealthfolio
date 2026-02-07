@@ -70,18 +70,13 @@ impl NetWorthService {
     /// Determine the asset category based on AssetKind.
     fn categorize_by_asset_kind(kind: &AssetKind) -> AssetCategory {
         match kind {
-            AssetKind::Security
-            | AssetKind::Crypto
-            | AssetKind::Option
-            | AssetKind::Commodity
-            | AssetKind::PrivateEquity => AssetCategory::Investment,
+            AssetKind::Investment | AssetKind::PrivateEquity => AssetCategory::Investment,
             AssetKind::Property => AssetCategory::Property,
             AssetKind::Vehicle => AssetCategory::Vehicle,
             AssetKind::Collectible => AssetCategory::Collectible,
-            AssetKind::PhysicalPrecious => AssetCategory::PreciousMetal,
+            AssetKind::PreciousMetal => AssetCategory::PreciousMetal,
             AssetKind::Liability => AssetCategory::Liability,
-            AssetKind::Cash => AssetCategory::Cash,
-            AssetKind::FxRate => AssetCategory::Other, // FxRate is not holdable
+            AssetKind::Fx => AssetCategory::Other, // Fx is not holdable
             AssetKind::Other => AssetCategory::Other,
         }
     }
@@ -304,7 +299,7 @@ impl NetWorthServiceTrait for NetWorthService {
 
                 // Determine category: prefer asset kind if available, fallback to account type
                 let category = if let Some(asset) = asset {
-                    Self::categorize_by_asset_kind(&asset.effective_kind())
+                    Self::categorize_by_asset_kind(&asset.kind)
                 } else {
                     account_category
                 };
@@ -427,7 +422,7 @@ impl NetWorthServiceTrait for NetWorthService {
             let market_value_base = match self.calculate_market_value(
                 quantity,
                 price,
-                &asset.currency,
+                &asset.quote_ccy,
                 &base_currency,
                 date,
             ) {
@@ -545,7 +540,7 @@ impl NetWorthServiceTrait for NetWorthService {
         // Build currency lookup for FX conversion
         let asset_currency_map: HashMap<String, String> = alternative_assets
             .iter()
-            .map(|a| (a.id.clone(), a.currency.clone()))
+            .map(|a| (a.id.clone(), a.quote_ccy.clone()))
             .collect();
 
         // =====================================================================
@@ -592,13 +587,13 @@ impl NetWorthServiceTrait for NetWorthService {
 
         for asset in &alternative_assets {
             if let Some((price, _)) = self.get_latest_quote_as_of(&asset.id, start_date) {
-                let value_base = if asset.currency == base_currency {
+                let value_base = if asset.quote_ccy == base_currency {
                     price
                 } else {
                     self.fx_service
                         .convert_currency_for_date(
                             price,
-                            &asset.currency,
+                            &asset.quote_ccy,
                             &base_currency,
                             start_date,
                         )

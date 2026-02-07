@@ -284,32 +284,24 @@ impl MarketDataClient {
             ))
         })?;
 
-        // Build provider overrides from asset.provider_overrides JSON
-        let overrides = asset.provider_overrides.as_ref().and_then(|json| {
-            // Parse the JSON into ProviderOverrides
-            // Format: { "YAHOO": { "type": "equity_symbol", "symbol": "MSFT" } }
-            wealthfolio_market_data::ProviderOverrides::from_json(json).ok()
-        });
+        // Build provider overrides from asset.provider_config JSON
+        let overrides = asset
+            .provider_overrides()
+            .and_then(|json| wealthfolio_market_data::ProviderOverrides::from_json(json).ok());
 
-        // Currency hint: prefer asset.currency, fall back to MIC-derived currency
-        // Note: For LSE stocks, mic_to_currency returns "GBp" (pence) which enables
-        // proper normalization when calculating holdings values.
-        let currency_hint: Option<Cow<'static, str>> = if !asset.currency.is_empty() {
-            Some(Cow::Owned(asset.currency.clone()))
+        // Currency hint: prefer asset.quote_ccy, fall back to MIC-derived currency
+        let currency_hint: Option<Cow<'static, str>> = if !asset.quote_ccy.is_empty() {
+            Some(Cow::Owned(asset.quote_ccy.clone()))
         } else {
-            // Derive currency from exchange MIC (single source of truth)
             asset
-                .exchange_mic
+                .instrument_exchange_mic
                 .as_ref()
                 .and_then(|mic| mic_to_currency(mic))
                 .map(Cow::Borrowed)
         };
 
         // Preferred provider from asset
-        let preferred_provider: Option<ProviderId> = asset
-            .preferred_provider
-            .as_ref()
-            .map(|p| Cow::Owned(p.clone()));
+        let preferred_provider: Option<ProviderId> = asset.preferred_provider().map(Cow::Owned);
 
         Ok(QuoteContext {
             instrument,
@@ -457,8 +449,6 @@ impl MarketDataClient {
     ///
     /// Asset profile from providers that support profiles.
     pub async fn get_profile(&self, asset: &Asset) -> Result<ProviderProfile> {
-        debug!("Fetching profile for asset '{}'", asset.id);
-
         let context = self.build_quote_context(asset)?;
 
         let profile = self
@@ -467,7 +457,8 @@ impl MarketDataClient {
             .await
             .map_err(MarketDataClientError::from)?;
 
-        Ok(Self::convert_profile(profile, &asset.symbol))
+        let symbol = asset.instrument_symbol.as_deref().unwrap_or_default();
+        Ok(Self::convert_profile(profile, symbol))
     }
 
     /// Convert a market-data SearchResult to core SymbolSearchResult.
@@ -548,9 +539,12 @@ impl MarketDataClient {
             // Create a minimal asset for the fetch
             let asset = Asset {
                 id: symbol.clone(),
-                symbol: symbol.clone(),
-                currency: currency.clone(),
-                kind: crate::assets::AssetKind::Security, // Default to security
+                instrument_symbol: Some(symbol.clone()),
+                display_code: Some(symbol.clone()),
+                quote_ccy: currency.clone(),
+                kind: crate::assets::AssetKind::Investment,
+                instrument_type: Some(crate::assets::InstrumentType::Equity),
+                quote_mode: crate::assets::QuoteMode::Market,
                 ..Default::default()
             };
 
@@ -726,22 +720,32 @@ mod tests {
     // =========================================================================
 
     fn create_test_asset(kind: AssetKind, symbol: &str, currency: &str) -> Asset {
+        use crate::assets::{InstrumentType, QuoteMode};
+
+        // Determine instrument_type from kind for test purposes
+        let instrument_type = match kind {
+            AssetKind::Investment => Some(InstrumentType::Equity),
+            AssetKind::Fx => Some(InstrumentType::Fx),
+            _ => None,
+        };
+
         Asset {
             id: symbol.to_string(),
             kind,
-            symbol: symbol.to_string(),
+            instrument_symbol: Some(symbol.to_string()),
+            display_code: Some(symbol.to_string()),
             name: Some(format!("Test {}", symbol)),
-            currency: currency.to_string(),
-            exchange_mic: Some("XNAS".to_string()),
+            quote_ccy: currency.to_string(),
+            instrument_exchange_mic: Some("XNAS".to_string()),
+            instrument_type,
+            quote_mode: QuoteMode::Market,
             ..Default::default()
         }
     }
 
     #[test]
-    fn test_build_quote_context_security() {
-        // Create a minimal client for testing (we can't easily create a full one)
-        // So we test the logic indirectly through the Asset's to_instrument_id
-        let asset = create_test_asset(AssetKind::Security, "AAPL", "USD");
+    fn test_build_quote_context_equity() {
+        let asset = create_test_asset(AssetKind::Investment, "AAPL", "USD");
 
         let instrument = asset.to_instrument_id();
         assert!(instrument.is_some());
@@ -757,7 +761,9 @@ mod tests {
 
     #[test]
     fn test_build_quote_context_crypto() {
-        let asset = create_test_asset(AssetKind::Crypto, "BTC", "USD");
+        let mut asset = create_test_asset(AssetKind::Investment, "BTC", "USD");
+        asset.instrument_type = Some(crate::assets::InstrumentType::Crypto);
+        asset.instrument_exchange_mic = None;
 
         let instrument = asset.to_instrument_id();
         assert!(instrument.is_some());
@@ -773,8 +779,9 @@ mod tests {
 
     #[test]
     fn test_build_quote_context_fx() {
-        let mut asset = create_test_asset(AssetKind::FxRate, "EUR", "USD");
-        asset.exchange_mic = None;
+        let mut asset = create_test_asset(AssetKind::Fx, "EUR", "USD");
+        asset.instrument_type = Some(crate::assets::InstrumentType::Fx);
+        asset.instrument_exchange_mic = None;
 
         let instrument = asset.to_instrument_id();
         assert!(instrument.is_some());
@@ -791,11 +798,10 @@ mod tests {
     #[test]
     fn test_build_quote_context_unsupported_asset_kinds() {
         let unsupported_kinds = [
-            AssetKind::Cash,
             AssetKind::Property,
             AssetKind::Vehicle,
             AssetKind::Collectible,
-            AssetKind::PhysicalPrecious,
+            AssetKind::PreciousMetal,
             AssetKind::Liability,
             AssetKind::Other,
             AssetKind::PrivateEquity,

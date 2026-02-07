@@ -38,9 +38,9 @@ interface SymbolSelectorMobileProps {
   defaultCurrency?: string;
 }
 
-// Asset type options for inline form
+// Asset type options for inline form (values are InstrumentType)
 const ASSET_TYPE_OPTIONS = [
-  { value: "SECURITY", label: "Security" },
+  { value: "EQUITY", label: "Security" },
   { value: "CRYPTO", label: "Crypto" },
   { value: "OTHER", label: "Other" },
 ] as const;
@@ -69,9 +69,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
     // Custom asset form state
     const [customSymbol, setCustomSymbol] = useState("");
     const [customName, setCustomName] = useState("");
-    const [customAssetType, setCustomAssetType] = useState<"SECURITY" | "CRYPTO" | "OTHER">(
-      "SECURITY",
-    );
+    const [customAssetType, setCustomAssetType] = useState<"EQUITY" | "CRYPTO" | "OTHER">("EQUITY");
     const [customCurrency, setCustomCurrency] = useState("");
 
     // Reset state when sheet closes
@@ -81,7 +79,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
         setShowCustomAssetForm(false);
         setCustomSymbol("");
         setCustomName("");
-        setCustomAssetType("SECURITY");
+        setCustomAssetType("EQUITY");
         setCustomCurrency("");
       }
       baseSetOpen(isOpen);
@@ -112,7 +110,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
       setShowCustomAssetForm(false);
       setCustomSymbol("");
       setCustomName("");
-      setCustomAssetType("SECURITY");
+      setCustomAssetType("EQUITY");
       setCustomCurrency("");
     };
 
@@ -145,7 +143,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
         dataSource: "MANUAL",
         score: 0,
         currency: customCurrency,
-        assetKind: customAssetType,
+        assetKind: customAssetType === "OTHER" ? "OTHER" : "INVESTMENT",
       };
 
       handleSymbolSelect(searchResult);
@@ -230,7 +228,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                           <Select
                             value={customAssetType}
                             onValueChange={(value) =>
-                              setCustomAssetType(value as "SECURITY" | "CRYPTO" | "OTHER")
+                              setCustomAssetType(value as "EQUITY" | "CRYPTO" | "OTHER")
                             }
                           >
                             <SelectTrigger>

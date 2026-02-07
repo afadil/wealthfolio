@@ -10,7 +10,7 @@ import { AnimatedToggleGroup } from "@wealthfolio/ui/components/ui/animated-togg
 import { Checkbox } from "@wealthfolio/ui/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@wealthfolio/ui/components/ui/radio-group";
 import { Label } from "@wealthfolio/ui/components/ui/label";
-import { ActivityType, PricingMode } from "@/lib/constants";
+import { ActivityType, QuoteMode } from "@/lib/constants";
 import { useSettings } from "@/hooks/use-settings";
 import {
   AccountSelect,
@@ -78,8 +78,8 @@ export const transferFormSchema = z
       .positive({ message: "FX Rate must be positive." })
       .optional(),
     subtype: z.string().optional().nullable(),
-    // Internal field for manual pricing mode
-    pricingMode: z.enum([PricingMode.MARKET, PricingMode.MANUAL]).default(PricingMode.MARKET),
+    // Internal field for manual quote mode
+    quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).default(QuoteMode.MARKET),
     exchangeMic: z.string().optional(),
     // Asset metadata for custom assets (name, etc.)
     assetMetadata: assetMetadataSchema,
@@ -255,7 +255,7 @@ export function TransferForm({
       currency: initialCurrency,
       fxRate: undefined,
       subtype: null,
-      pricingMode: PricingMode.MARKET,
+      quoteMode: QuoteMode.MARKET,
       exchangeMic: undefined,
       ...defaultValues,
     },
@@ -266,12 +266,12 @@ export function TransferForm({
   const direction = watch("direction");
   const accountId = watch("accountId");
   const fromAccountId = watch("fromAccountId");
-  const pricingMode = watch("pricingMode");
+  const quoteMode = watch("quoteMode");
   const transferMode = watch("transferMode");
   const amount = watch("amount");
   const assetId = watch("assetId");
   const quantity = watch("quantity");
-  const isManualAsset = pricingMode === PricingMode.MANUAL;
+  const isManualAsset = quoteMode === QuoteMode.MANUAL;
   const isCashMode = transferMode === "cash";
 
   // Get account currency from selected account (internal: fromAccount, external: accountId)
@@ -447,7 +447,7 @@ export function TransferForm({
                   name="assetId"
                   isManualAsset={isManualAsset}
                   exchangeMicName="exchangeMic"
-                  pricingModeName="pricingMode"
+                  quoteModeName="quoteMode"
                   currencyName="currency"
                   assetMetadataName="assetMetadata"
                 />

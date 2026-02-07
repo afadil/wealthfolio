@@ -25,8 +25,7 @@ use super::sync_state::{QuoteSyncState, SymbolSyncPlan, SyncMode, SyncStateStore
 use super::types::{AssetId, Day};
 use crate::activities::ActivityRepositoryTrait;
 use crate::assets::{
-    is_fx_asset_id, needs_market_quotes, Asset, AssetKind, AssetRepositoryTrait, PricingMode,
-    ProviderProfile,
+    Asset, AssetKind, AssetRepositoryTrait, InstrumentType, QuoteMode, ProviderProfile,
 };
 use crate::errors::Result;
 use crate::secrets::SecretStore;
@@ -432,32 +431,38 @@ where
     /// Marks the result as existing and includes the asset ID.
     fn asset_to_quote_summary(asset: &Asset) -> SymbolSearchResult {
         let exchange_name = asset
-            .exchange_mic
+            .instrument_exchange_mic
             .as_ref()
             .and_then(|mic| mic_to_exchange_name(mic))
             .map(String::from);
 
-        let quote_type = match asset.kind {
-            AssetKind::Security => "EQUITY",
-            AssetKind::Crypto => "CRYPTOCURRENCY",
-            AssetKind::Option => "OPTION",
-            AssetKind::Commodity => "COMMODITY",
-            _ => "OTHER",
+        let quote_type = match asset.instrument_type {
+            Some(InstrumentType::Equity) => "EQUITY",
+            Some(InstrumentType::Crypto) => "CRYPTOCURRENCY",
+            Some(InstrumentType::Metal) => "COMMODITY",
+            Some(InstrumentType::Option) => "OPTION",
+            Some(InstrumentType::Fx) => "FOREX",
+            None => "OTHER",
         };
 
+        let display = asset
+            .display_code
+            .clone()
+            .or_else(|| asset.instrument_symbol.clone())
+            .unwrap_or_default();
+
         SymbolSearchResult {
-            symbol: asset.symbol.clone(),
-            short_name: asset.name.clone().unwrap_or_else(|| asset.symbol.clone()),
-            long_name: asset.name.clone().unwrap_or_else(|| asset.symbol.clone()),
+            symbol: display.clone(),
+            short_name: asset.name.clone().unwrap_or_else(|| display.clone()),
+            long_name: asset.name.clone().unwrap_or(display),
             exchange: exchange_name.clone().unwrap_or_default(),
-            exchange_mic: asset.exchange_mic.clone(),
+            exchange_mic: asset.instrument_exchange_mic.clone(),
             exchange_name,
             quote_type: quote_type.to_string(),
             type_display: quote_type.to_string(),
-            currency: Some(asset.currency.clone()),
+            currency: Some(asset.quote_ccy.clone()),
             data_source: asset
-                .preferred_provider
-                .clone()
+                .preferred_provider()
                 .or_else(|| Some("MANUAL".to_string())),
             is_existing: true,
             existing_asset_id: Some(asset.id.clone()),
@@ -624,7 +629,7 @@ where
         // 3. Convert existing assets to SymbolSearchResult with is_existing flag
         let existing_summaries: Vec<SymbolSearchResult> = existing_assets
             .iter()
-            .filter(|a| a.kind != AssetKind::Cash && a.kind != AssetKind::FxRate)
+            .filter(|a| a.kind != AssetKind::Fx)
             .map(|asset| Self::asset_to_quote_summary(asset))
             .collect();
 
@@ -731,33 +736,15 @@ where
                 .await;
         }
 
-        // Parse canonical asset ID format: SEC:{symbol}:{mic}
-        // Fall back to treating the whole string as a symbol if not in canonical format
-        let (symbol, exchange_mic) = if asset_id.starts_with("SEC:") {
-            let parts: Vec<&str> = asset_id.split(':').collect();
-            if parts.len() >= 3 {
-                let sym = parts[1].to_string();
-                let mic = if parts[2] == "INDEX" || parts[2] == "UNKNOWN" {
-                    None
-                } else {
-                    Some(parts[2].to_string())
-                };
-                (sym, mic)
-            } else {
-                (asset_id.to_string(), None)
-            }
-        } else {
-            (asset_id.to_string(), None)
-        };
-
-        // Create a minimal temporary Asset for fetching quotes from provider
+        // Asset not found by ID — create a minimal temporary Asset for fetching
         let temp_asset = Asset {
             id: asset_id.to_string(),
-            symbol,
-            kind: AssetKind::Security,
-            currency: currency.to_string(),
-            exchange_mic,
-            pricing_mode: PricingMode::Market,
+            instrument_symbol: Some(asset_id.to_string()),
+            display_code: Some(asset_id.to_string()),
+            kind: AssetKind::Investment,
+            instrument_type: Some(InstrumentType::Equity),
+            quote_ccy: currency.to_string(),
+            quote_mode: QuoteMode::Market,
             ..Default::default()
         };
 
@@ -854,8 +841,10 @@ where
             // Skip FX assets - they don't have "positions" in the holdings sense.
             // FX rates are always needed for currency conversion as long as there are
             // foreign-currency activities or holdings. Their lifecycle is managed separately.
-            if is_fx_asset_id(asset_id) {
-                continue;
+            if let Ok(asset) = self.asset_repo.get_by_id(asset_id) {
+                if asset.kind == AssetKind::Fx {
+                    continue;
+                }
             }
 
             let current_qty = current_holdings
@@ -1122,12 +1111,12 @@ where
 
         for asset in &all_assets {
             asset_by_id.insert(asset.id.to_lowercase(), asset);
-            asset_by_symbol.insert(asset.symbol.to_lowercase(), asset);
+            asset_by_symbol.insert(asset.display_code.as_deref().unwrap_or_default().to_lowercase(), asset);
 
             // Build symbol.exchange key if asset has exchange_mic
-            if let Some(ref mic) = asset.exchange_mic {
+            if let Some(ref mic) = asset.instrument_exchange_mic {
                 if let Some(suffix) = mic_to_yahoo_suffix(mic) {
-                    let key = format!("{}.{}", asset.symbol.to_lowercase(), suffix.to_lowercase());
+                    let key = format!("{}.{}", asset.display_code.as_deref().unwrap_or_default().to_lowercase(), suffix.to_lowercase());
                     asset_by_symbol_exchange.insert(key, asset);
                 }
             }
@@ -1351,18 +1340,6 @@ fn fill_missing_quotes(
         return Vec::new();
     }
 
-    // Filter to only symbols that need market quotes
-    // Excludes: cash, FX, alternative assets (PROP, VEH, COLL, PREC, LIAB, ALT), private equity
-    let required_symbols: HashSet<String> = required_symbols
-        .iter()
-        .filter(|s| needs_market_quotes(s))
-        .cloned()
-        .collect();
-
-    if required_symbols.is_empty() {
-        return Vec::new();
-    }
-
     // Build quotes_by_date map
     let mut quotes_by_date: HashMap<NaiveDate, HashMap<String, Quote>> = HashMap::new();
     for quote in quotes {
@@ -1407,7 +1384,7 @@ fn fill_missing_quotes(
         }
 
         // Output a quote for each required symbol using last known value
-        for symbol in &required_symbols {
+        for symbol in required_symbols {
             if let Some(last_quote) = last_known_quotes.get(symbol) {
                 let mut quote_for_today = last_quote.clone();
                 // Update timestamp to current date at noon UTC

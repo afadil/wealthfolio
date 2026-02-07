@@ -829,12 +829,12 @@ pub async fn get_snapshot_by_date(
 
         let instrument = wealthfolio_core::holdings::Instrument {
             id: asset.id.clone(),
-            symbol: asset.symbol.clone(),
+            symbol: asset.display_code.clone().unwrap_or_default(),
             name: asset.name.clone(),
-            currency: asset.currency.clone(),
+            currency: asset.quote_ccy.clone(),
             notes: asset.notes.clone(),
-            pricing_mode: asset.pricing_mode.as_db_str().to_string(),
-            preferred_provider: asset.preferred_provider.clone(),
+            pricing_mode: asset.quote_mode.as_db_str().to_string(),
+            preferred_provider: asset.preferred_provider(),
             classifications: None,
         };
 
@@ -884,7 +884,7 @@ pub async fn get_snapshot_by_date(
             account_id: account_id.clone(),
             holding_type: wealthfolio_core::holdings::HoldingType::Cash,
             instrument: None,
-            asset_kind: Some(wealthfolio_core::assets::AssetKind::Cash),
+            asset_kind: None, // Cash holdings have no asset
             quantity: amount,
             open_date: None,
             lots: None,

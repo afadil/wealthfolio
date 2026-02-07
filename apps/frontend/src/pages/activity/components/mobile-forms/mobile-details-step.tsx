@@ -2,7 +2,7 @@ import { SymbolSelectorMobile } from "@/components/symbol-selector-mobile";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { ScrollArea } from "@wealthfolio/ui/components/ui/scroll-area";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
-import { PricingMode, type ActivityType } from "@/lib/constants";
+import { QuoteMode, type ActivityType } from "@/lib/constants";
 import type { SymbolSearchResult } from "@/lib/types";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { AdvancedOptionsSection } from "../forms/fields/advanced-options-section";
@@ -36,7 +36,7 @@ interface MobileDetailsStepProps {
 export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepProps) {
   const { control, watch, setValue } = useFormContext<NewActivityFormValues>();
   const { settings } = useSettingsContext();
-  const isManualAsset = watch("pricingMode") === PricingMode.MANUAL;
+  const isManualAsset = watch("quoteMode") === QuoteMode.MANUAL;
   const accountId = watch("accountId");
   const assetCurrency = watch("currency");
   const [accountSheetOpen, setAccountSheetOpen] = useState(false);
@@ -99,7 +99,7 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
 
     // Auto-set manual pricing for custom assets
     if (searchResult?.dataSource === "MANUAL") {
-      setValue("pricingMode", PricingMode.MANUAL);
+      setValue("quoteMode", QuoteMode.MANUAL);
     }
 
     setSymbolSheetOpen(false);

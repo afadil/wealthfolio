@@ -10,7 +10,7 @@ import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholde
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
-import { AssetKind } from "@/lib/constants";
+
 import { QueryKeys } from "@/lib/query-keys";
 import type { IncomeSummary } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
@@ -107,7 +107,7 @@ export default function IncomePage() {
   const interestPercentage = totalIncome > 0 ? (interestIncome / totalIncome) * 100 : 0;
 
   const topDividendStocks = Object.values(periodSummary.byAsset)
-    .filter((asset) => asset.income > 0 && asset.kind !== AssetKind.CASH)
+    .filter((asset) => asset.income > 0)
     .sort((a, b) => b.income - a.income)
     .slice(0, 10);
 

@@ -35,7 +35,7 @@ const ALTERNATIVE_ASSET_KINDS: AssetKind[] = [
   "PROPERTY",
   "VEHICLE",
   "COLLECTIBLE",
-  "PHYSICAL_PRECIOUS",
+  "PRECIOUS_METAL",
   "LIABILITY",
   "OTHER",
 ];
@@ -135,7 +135,7 @@ export const AssetProfilePage = () => {
   // Taxonomy data for category badges - use same approach as edit sheet
   const { data: assignments = [], isLoading: isAssignmentsLoading } =
     useAssetTaxonomyAssignments(assetId);
-  const { updatePricingModeMutation } = useAssetProfileMutations();
+  const { updateQuoteModeMutation } = useAssetProfileMutations();
 
   // Fetch taxonomy details for taxonomies with assignments
   // We need the categories to get name and color
@@ -272,8 +272,8 @@ export const AssetProfilePage = () => {
   const { saveQuoteMutation, deleteQuoteMutation } = useQuoteMutations(assetId);
   const syncMarketDataMutation = useSyncMarketDataMutation();
 
-  // Determine if manual tracking based on asset's pricingMode
-  const isManualPricingMode = assetProfile?.pricingMode === "MANUAL";
+  // Determine if manual tracking based on asset's quoteMode
+  const isManualPricingMode = assetProfile?.quoteMode === "MANUAL";
 
   // Determine if this is an alternative asset (property, vehicle, liability, etc.)
   const isAltAsset = isAlternativeAsset(assetProfile?.kind);
@@ -308,7 +308,7 @@ export const AssetProfilePage = () => {
 
     return {
       id: instrument?.id ?? asset?.id ?? "",
-      symbol: instrument?.symbol ?? asset?.symbol ?? assetId,
+      symbol: instrument?.symbol ?? asset?.displayCode ?? assetId,
       name: instrument?.name ?? asset?.name ?? "-",
       isin: null,
       assetType: null,
@@ -321,7 +321,7 @@ export const AssetProfilePage = () => {
       attributes: null,
       createdAt: holding?.openDate ? new Date(holding.openDate) : new Date(),
       updatedAt: new Date(),
-      currency: instrument?.currency ?? asset?.currency ?? baseCurrency,
+      currency: instrument?.currency ?? asset?.quoteCcy ?? baseCurrency,
       sectors: JSON.stringify(parseJsonField(legacy?.sectors) ?? []),
       url: null,
       marketPrice: quote?.close ?? 0,
@@ -522,9 +522,9 @@ export const AssetProfilePage = () => {
           onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
           onChangeDataSource={(isManual) => {
             if (profile) {
-              updatePricingModeMutation.mutate({
+              updateQuoteModeMutation.mutate({
                 assetId: assetId,
-                pricingMode: isManual ? "MANUAL" : "MARKET",
+                quoteMode: isManual ? "MANUAL" : "MARKET",
               });
             }
           }}
@@ -581,7 +581,7 @@ export const AssetProfilePage = () => {
     ); // Show loading spinner
 
   // Simplified view for quote-only assets (like FX rates)
-  if (assetProfile?.kind === "FX_RATE") {
+  if (assetProfile?.kind === "FX") {
     return (
       <Page>
         <PageHeader
@@ -612,9 +612,9 @@ export const AssetProfilePage = () => {
             onSaveQuote={(quote: Quote) => saveQuoteMutation.mutate(quote)}
             onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
             onChangeDataSource={(isManual) => {
-              updatePricingModeMutation.mutate({
+              updateQuoteModeMutation.mutate({
                 assetId: assetId,
-                pricingMode: isManual ? "MANUAL" : "MARKET",
+                quoteMode: isManual ? "MANUAL" : "MARKET",
               });
             }}
           />
@@ -785,9 +785,14 @@ export const AssetProfilePage = () => {
               <AlternativeAssetIcon kind={altHolding.kind} size={20} />
             </div>
           ) : (
-            (profile?.symbol ?? holding?.instrument?.symbol) && (
+            (profile?.symbol ?? holding?.instrument?.symbol ?? assetProfile?.displayCode) && (
               <TickerAvatar
-                symbol={profile?.symbol ?? holding?.instrument?.symbol ?? assetId}
+                symbol={
+                  profile?.symbol ??
+                  holding?.instrument?.symbol ??
+                  assetProfile?.displayCode ??
+                  assetId
+                }
                 className="size-9"
               />
             )
@@ -799,12 +804,7 @@ export const AssetProfilePage = () => {
             <p className="text-muted-foreground text-xs leading-tight md:text-sm">
               {isAltAsset && altHolding
                 ? getAlternativeAssetKindLabel(altHolding.kind)
-                : (() => {
-                    const fullSymbol =
-                      assetProfile?.symbol ?? holding?.instrument?.symbol ?? assetId;
-                    const parts = fullSymbol.split(":");
-                    return parts.length >= 2 ? parts[1] : fullSymbol;
-                  })()}
+                : (assetProfile?.displayCode ?? holding?.instrument?.symbol ?? assetId)}
             </p>
           </div>
         </div>
@@ -1012,9 +1012,9 @@ export const AssetProfilePage = () => {
                   onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
                   onChangeDataSource={(isManual) => {
                     if (profile) {
-                      updatePricingModeMutation.mutate({
+                      updateQuoteModeMutation.mutate({
                         assetId: assetId,
-                        pricingMode: isManual ? "MANUAL" : "MARKET",
+                        quoteMode: isManual ? "MANUAL" : "MARKET",
                       });
                     }
                   }}

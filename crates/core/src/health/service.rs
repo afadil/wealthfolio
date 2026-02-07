@@ -255,6 +255,7 @@ impl HealthService {
                             asset_id: instrument.id.clone(),
                             symbol: instrument.symbol.clone(),
                             name: instrument.name.clone(),
+                            exchange_mic: None, // TODO: populate from instrument once holdings model is updated
                             market_value: market_value_f64,
                             uses_market_pricing,
                         });
@@ -651,6 +652,7 @@ mod tests {
             asset_id: "SEC:AAPL:XNAS".to_string(),
             symbol: "AAPL".to_string(),
             name: Some("Apple Inc.".to_string()),
+            exchange_mic: None,
             market_value: 10_000.0,
             uses_market_pricing: true,
         }];
@@ -688,6 +690,7 @@ mod tests {
             asset_id: "SEC:AAPL:XNAS".to_string(),
             symbol: "AAPL".to_string(),
             name: Some("Apple Inc.".to_string()),
+            exchange_mic: None,
             market_value: 10_000.0,
             uses_market_pricing: true,
         }];

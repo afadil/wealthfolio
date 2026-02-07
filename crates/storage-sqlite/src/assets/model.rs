@@ -1,13 +1,14 @@
 //! Database model for assets.
-//! Provider-agnostic: no data_source or quote_symbol (use provider_overrides instead)
-//! Clean schema: optional identifiers stored in metadata.identifiers JSON (e.g., ISIN)
+//!
+//! Split into read (AssetDB) and write (InsertableAssetDB) structs because
+//! `instrument_key` is a STORED generated column — readable but not writable.
 
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use log::error;
 use serde::{Deserialize, Serialize};
 
-use wealthfolio_core::assets::{Asset, AssetKind, NewAsset, PricingMode};
+use wealthfolio_core::assets::{Asset, AssetKind, InstrumentType, NewAsset, QuoteMode};
 
 /// Helper to parse datetime string to NaiveDateTime.
 ///
@@ -42,91 +43,73 @@ fn text_to_datetime(s: &str) -> NaiveDateTime {
     chrono::Utc::now().naive_utc()
 }
 
-/// Database model for assets
-/// Optional identifiers (ISIN) stored in metadata.identifiers JSON
+/// Database read model for assets (includes generated columns).
 #[derive(
-    Queryable,
-    Identifiable,
-    Insertable,
-    AsChangeset,
-    Selectable,
-    PartialEq,
-    Serialize,
-    Deserialize,
-    Debug,
-    Clone,
-    Default,
+    Queryable, Identifiable, Selectable, PartialEq, Serialize, Deserialize, Debug, Clone, Default,
 )]
 #[diesel(table_name = crate::schema::assets)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct AssetDB {
     pub id: String,
-
-    // Core identity
-    pub kind: String, // AssetKind enum (NOT NULL)
+    pub kind: String,
     pub name: Option<String>,
-    pub symbol: String, // Canonical ticker (no provider suffix)
-
-    // Market identity (for SECURITY)
-    pub exchange_mic: Option<String>, // ISO 10383 MIC code
-
-    // Currency
-    pub currency: String,
-
-    // Pricing configuration
-    pub pricing_mode: String, // MARKET, MANUAL, DERIVED, NONE (NOT NULL)
-    pub preferred_provider: Option<String>,
-    pub provider_overrides: Option<String>, // JSON for per-provider overrides
-
-    // Metadata
+    pub display_code: Option<String>,
     pub notes: Option<String>,
-    pub metadata: Option<String>, // JSON: $.identifiers.isin (optional)
-
-    // Status
+    pub metadata: Option<String>,
     pub is_active: i32,
+    pub quote_mode: String,
+    pub quote_ccy: String,
+    pub instrument_type: Option<String>,
+    pub instrument_symbol: Option<String>,
+    pub instrument_exchange_mic: Option<String>,
+    pub instrument_key: Option<String>, // STORED generated column (read-only)
+    pub provider_config: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
 
-// Conversion implementations
+/// Database write model for assets (excludes generated columns).
+#[derive(Insertable, AsChangeset, Debug, Clone)]
+#[diesel(table_name = crate::schema::assets)]
+pub struct InsertableAssetDB {
+    pub id: Option<String>,
+    pub kind: String,
+    pub name: Option<String>,
+    pub display_code: Option<String>,
+    pub notes: Option<String>,
+    pub metadata: Option<String>,
+    pub is_active: i32,
+    pub quote_mode: String,
+    pub quote_ccy: String,
+    pub instrument_type: Option<String>,
+    pub instrument_symbol: Option<String>,
+    pub instrument_exchange_mic: Option<String>,
+    // instrument_key: NOT included (STORED generated column)
+    pub provider_config: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+// Conversion: DB read model → domain model
 impl From<AssetDB> for Asset {
     fn from(db: AssetDB) -> Self {
-        // Parse kind string to AssetKind enum (NOT NULL, defaults to Security)
-        let kind = match db.kind.as_str() {
-            "SECURITY" => AssetKind::Security,
-            "CRYPTO" => AssetKind::Crypto,
-            "CASH" => AssetKind::Cash,
-            "FX_RATE" => AssetKind::FxRate,
-            "OPTION" => AssetKind::Option,
-            "COMMODITY" => AssetKind::Commodity,
-            "PRIVATE_EQUITY" => AssetKind::PrivateEquity,
-            "PROPERTY" => AssetKind::Property,
-            "VEHICLE" => AssetKind::Vehicle,
-            "COLLECTIBLE" => AssetKind::Collectible,
-            "PHYSICAL_PRECIOUS" => AssetKind::PhysicalPrecious,
-            "LIABILITY" => AssetKind::Liability,
-            "OTHER" => AssetKind::Other,
-            _ => AssetKind::Security,
+        let kind = AssetKind::from_db_str(&db.kind).unwrap_or_default();
+        let quote_mode = match db.quote_mode.as_str() {
+            "MANUAL" => QuoteMode::Manual,
+            _ => QuoteMode::Market,
         };
+        let instrument_type = db
+            .instrument_type
+            .as_deref()
+            .and_then(InstrumentType::from_db_str);
 
-        // Parse pricing_mode string to PricingMode enum (NOT NULL)
-        let pricing_mode = match db.pricing_mode.as_str() {
-            "MARKET" => PricingMode::Market,
-            "MANUAL" => PricingMode::Manual,
-            "DERIVED" => PricingMode::Derived,
-            "NONE" => PricingMode::None,
-            _ => PricingMode::Market,
-        };
-
-        // Parse metadata JSON if present (includes identifiers like ISIN)
         let metadata = db
             .metadata
             .as_ref()
             .and_then(|s| serde_json::from_str(s).ok());
 
-        // Parse provider_overrides JSON if present
-        let provider_overrides = db
-            .provider_overrides
+        let provider_config = db
+            .provider_config
             .as_ref()
             .and_then(|s| serde_json::from_str(s).ok());
 
@@ -134,55 +117,61 @@ impl From<AssetDB> for Asset {
             id: db.id,
             kind,
             name: db.name,
-            symbol: db.symbol,
-            exchange_mic: db.exchange_mic,
-            exchange_name: None, // Computed by Asset::enrich()
-            currency: db.currency,
-            pricing_mode,
-            preferred_provider: db.preferred_provider,
-            provider_overrides,
+            display_code: db.display_code,
             notes: db.notes,
             metadata,
             is_active: db.is_active != 0,
+            quote_mode,
+            quote_ccy: db.quote_ccy,
+            instrument_type,
+            instrument_symbol: db.instrument_symbol,
+            instrument_exchange_mic: db.instrument_exchange_mic,
+            instrument_key: db.instrument_key,
+            provider_config,
+            exchange_name: None, // Computed by Asset::enrich()
             created_at: text_to_datetime(&db.created_at),
             updated_at: text_to_datetime(&db.updated_at),
         }
     }
 }
 
-impl From<NewAsset> for AssetDB {
+// Conversion: domain NewAsset → DB write model
+impl From<NewAsset> for InsertableAssetDB {
     fn from(domain: NewAsset) -> Self {
         let now = chrono::Utc::now().to_rfc3339();
 
-        // Convert enums to database strings using as_db_str()
         let kind = domain.kind.as_db_str().to_string();
-        let pricing_mode = domain.pricing_mode.as_db_str().to_string();
+        let quote_mode = domain.quote_mode.as_db_str().to_string();
 
-        // Serialize provider_overrides to JSON string
-        let provider_overrides = domain
-            .provider_overrides
+        let instrument_type = domain
+            .instrument_type
+            .as_ref()
+            .map(|t| t.as_db_str().to_string());
+
+        let provider_config = domain
+            .provider_config
             .as_ref()
             .and_then(|v| serde_json::to_string(v).ok());
 
-        // Serialize metadata to JSON string (includes identifiers like ISIN)
         let metadata = domain
             .metadata
             .as_ref()
             .and_then(|v| serde_json::to_string(v).ok());
 
         Self {
-            id: domain.id.unwrap_or_default(),
+            id: domain.id,
             kind,
             name: domain.name,
-            symbol: domain.symbol,
-            exchange_mic: domain.exchange_mic,
-            currency: domain.currency,
-            pricing_mode,
-            preferred_provider: domain.preferred_provider,
-            provider_overrides,
+            display_code: domain.display_code,
             notes: domain.notes,
             metadata,
             is_active: if domain.is_active { 1 } else { 0 },
+            quote_mode,
+            quote_ccy: domain.quote_ccy,
+            instrument_type,
+            instrument_symbol: domain.instrument_symbol,
+            instrument_exchange_mic: domain.instrument_exchange_mic,
+            provider_config,
             created_at: now.clone(),
             updated_at: now,
         }

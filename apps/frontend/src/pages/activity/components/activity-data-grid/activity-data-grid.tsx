@@ -96,11 +96,13 @@ export function ActivityDataGrid({
   const assetCurrencyLookup = useMemo(() => {
     const entries = new Map<string, string>();
     assets.forEach((asset) => {
-      if (!asset.currency) return;
-      const symbolKey = asset.symbol?.trim().toUpperCase();
+      if (!asset.quoteCcy) return;
+      const displayKey = asset.displayCode?.trim().toUpperCase();
+      const symbolKey = asset.instrumentSymbol?.trim().toUpperCase();
       const idKey = asset.id?.trim().toUpperCase();
-      if (symbolKey) entries.set(symbolKey, asset.currency);
-      if (idKey) entries.set(idKey, asset.currency);
+      if (displayKey) entries.set(displayKey, asset.quoteCcy);
+      if (symbolKey && symbolKey !== displayKey) entries.set(symbolKey, asset.quoteCcy);
+      if (idKey) entries.set(idKey, asset.quoteCcy);
     });
     return entries;
   }, [assets]);
@@ -175,7 +177,7 @@ export function ActivityDataGrid({
           updated[rowIndex] = {
             ...row,
             exchangeMic: result.exchangeMic,
-            assetPricingMode: result.dataSource === "MANUAL" ? "MANUAL" : "MARKET",
+            assetQuoteMode: result.dataSource === "MANUAL" ? "MANUAL" : "MARKET",
             currency,
             // Capture asset metadata for custom assets
             pendingAssetName: result.longName,
@@ -209,7 +211,7 @@ export function ActivityDataGrid({
             ...row,
             assetSymbol: result.symbol,
             exchangeMic: result.exchangeMic,
-            assetPricingMode: "MANUAL",
+            assetQuoteMode: "MANUAL",
             currency,
             pendingAssetName: result.longName,
             pendingAssetKind: result.assetKind,

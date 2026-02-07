@@ -5,5 +5,5 @@ mod model;
 mod repository;
 
 pub use alternative_repository::AlternativeAssetRepository;
-pub use model::AssetDB;
+pub use model::{AssetDB, InsertableAssetDB};
 pub use repository::AssetRepository;
