@@ -314,6 +314,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         BrokerSyncService::new(
             account_service.clone(),
             asset_service.clone(),
+            activity_service.clone(),
             platform_repository,
             pool.clone(),
             writer.clone(),
@@ -380,7 +381,6 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
 
     // Domain event sink - Phase 2: Start the worker now that all services are ready
     domain_event_sink.start_worker(
-        base_currency.clone(),
         asset_service.clone(),
         connect_sync_service.clone(),
         event_bus.clone(),

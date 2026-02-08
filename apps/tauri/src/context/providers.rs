@@ -237,6 +237,7 @@ pub async fn initialize_context(
         BrokerSyncService::new(
             account_service.clone(),
             asset_service.clone(),
+            activity_service.clone(),
             platform_repository.clone(),
             pool.clone(),
             writer.clone(),
