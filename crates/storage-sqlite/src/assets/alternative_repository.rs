@@ -173,7 +173,9 @@ impl AlternativeAssetRepositoryTrait for AlternativeAssetRepository {
                 let updated = diesel::update(assets::table.filter(assets::id.eq(&asset_id_owned)))
                     .set((
                         name_owned.as_ref().map(|n| assets::name.eq(n)),
-                        display_code_owned.as_ref().map(|s| assets::display_code.eq(s)),
+                        display_code_owned
+                            .as_ref()
+                            .map(|s| assets::display_code.eq(s)),
                         metadata_str.as_ref().map(|m| assets::metadata.eq(Some(m))),
                         notes_owned.as_ref().map(|n| assets::notes.eq(Some(n))),
                     ))

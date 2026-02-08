@@ -79,6 +79,7 @@ pub mod test_env {
     use std::collections::{HashMap, HashSet};
     use std::sync::RwLock;
     use wealthfolio_core::{
+        accounts::TrackingMode,
         accounts::{Account, AccountServiceTrait, AccountUpdate, NewAccount},
         activities::{
             Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityDetails,
@@ -89,9 +90,8 @@ pub mod test_env {
         errors::DatabaseError,
         goals::{Goal, GoalServiceTrait, GoalsAllocation, NewGoal},
         holdings::{Holding, HoldingsServiceTrait},
-        accounts::TrackingMode,
         portfolio::allocation::{AllocationHoldings, AllocationServiceTrait, PortfolioAllocations},
-        portfolio::income::{IncomeSummary, IncomeServiceTrait},
+        portfolio::income::{IncomeServiceTrait, IncomeSummary},
         portfolio::performance::{PerformanceMetrics, PerformanceServiceTrait},
         quotes::{
             LatestQuotePair, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait, QuoteSyncState,

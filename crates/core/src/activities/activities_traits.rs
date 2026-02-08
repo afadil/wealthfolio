@@ -85,8 +85,10 @@ pub trait ActivityRepositoryTrait: Send + Sync {
     /// Respects is_user_modified flag - skips updates to user-modified activities.
     ///
     /// Returns statistics about the operation.
-    async fn bulk_upsert(&self, activities: Vec<super::ActivityUpsert>)
-        -> Result<super::BulkUpsertResult>;
+    async fn bulk_upsert(
+        &self,
+        activities: Vec<super::ActivityUpsert>,
+    ) -> Result<super::BulkUpsertResult>;
 
     /// Reassigns all activities from one asset to another.
     /// Used when merging UNKNOWN assets into resolved ones.

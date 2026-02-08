@@ -158,9 +158,7 @@ impl FxRepository {
                     from_currency,
                     to_currency,
                     rate: Decimal::ZERO,
-                    source: DataSource::from(
-                        preferred_provider.as_deref().unwrap_or("MANUAL"),
-                    ),
+                    source: DataSource::from(preferred_provider.as_deref().unwrap_or("MANUAL")),
                     timestamp,
                 });
             }
@@ -236,11 +234,7 @@ impl FxRepository {
 
         let result: Option<(QuoteDB, AssetDB)> = quotes::table
             .inner_join(assets::table.on(quotes::asset_id.eq(assets::id)))
-            .filter(
-                assets::instrument_key
-                    .eq(id)
-                    .or(quotes::asset_id.eq(id)),
-            )
+            .filter(assets::instrument_key.eq(id).or(quotes::asset_id.eq(id)))
             .order_by(quotes::timestamp.desc())
             .select((quotes::all_columns, assets::all_columns))
             .first(&mut conn)
@@ -277,11 +271,7 @@ impl FxRepository {
 
         // symbol is an instrument_key (e.g., "FX:EUR/USD") or asset_id
         let asset_ids: Vec<String> = assets::table
-            .filter(
-                assets::instrument_key
-                    .eq(symbol)
-                    .or(assets::id.eq(symbol)),
-            )
+            .filter(assets::instrument_key.eq(symbol).or(assets::id.eq(symbol)))
             .select(assets::id)
             .load(&mut conn)
             .map_err(StorageError::from)?;

@@ -284,5 +284,4 @@ impl TaxonomyServiceTrait for TaxonomyService {
     async fn remove_asset_assignment(&self, id: &str) -> Result<usize> {
         self.repository.delete_assignment(id).await
     }
-
 }

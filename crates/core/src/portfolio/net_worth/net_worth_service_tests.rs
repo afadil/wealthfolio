@@ -3,7 +3,7 @@
 use super::*;
 use crate::accounts::{Account, AccountRepositoryTrait, AccountUpdate, NewAccount};
 use crate::assets::{
-    Asset, AssetKind, AssetRepositoryTrait, NewAsset, QuoteMode, ProviderProfile,
+    Asset, AssetKind, AssetRepositoryTrait, NewAsset, ProviderProfile, QuoteMode,
     UpdateAssetProfile,
 };
 use crate::errors::Result;
@@ -1690,7 +1690,8 @@ fn create_test_account_with_archive_state(
 async fn test_closed_account_in_net_worth_when_not_archived() {
     // Account is closed (is_active=false) but NOT archived (is_archived=false)
     // Should be included in net worth calculations
-    let account = create_test_account_with_archive_state("closed_acc", "SECURITIES", "USD", false, false);
+    let account =
+        create_test_account_with_archive_state("closed_acc", "SECURITIES", "USD", false, false);
     let asset = create_test_asset("AAPL", AssetKind::Investment, "USD");
     let position = create_test_position("closed_acc", "AAPL", dec!(100), dec!(15000), "USD");
     let snapshot = create_test_snapshot("closed_acc", vec![position], HashMap::new());
@@ -1716,7 +1717,8 @@ async fn test_closed_account_in_net_worth_when_not_archived() {
 async fn test_archived_account_excluded_from_net_worth() {
     // Account is archived (is_archived=true)
     // Should be excluded from net worth calculations
-    let account = create_test_account_with_archive_state("archived_acc", "SECURITIES", "USD", true, true);
+    let account =
+        create_test_account_with_archive_state("archived_acc", "SECURITIES", "USD", true, true);
     let asset = create_test_asset("AAPL", AssetKind::Investment, "USD");
     let position = create_test_position("archived_acc", "AAPL", dec!(100), dec!(15000), "USD");
     let snapshot = create_test_snapshot("archived_acc", vec![position], HashMap::new());
@@ -1791,7 +1793,8 @@ async fn test_net_worth_with_mixed_account_states() {
 async fn test_all_accounts_archived_returns_zero_net_worth() {
     // All accounts are archived - net worth should be zero
     let acc1 = create_test_account_with_archive_state("archived1", "SECURITIES", "USD", true, true);
-    let acc2 = create_test_account_with_archive_state("archived2", "SECURITIES", "USD", false, true);
+    let acc2 =
+        create_test_account_with_archive_state("archived2", "SECURITIES", "USD", false, true);
 
     let asset1 = create_test_asset("ASSET_1", AssetKind::Investment, "USD");
     let asset2 = create_test_asset("ASSET_2", AssetKind::Investment, "USD");
@@ -1824,9 +1827,18 @@ async fn test_all_accounts_archived_returns_zero_net_worth() {
 async fn test_newly_created_account_has_default_archive_values_net_worth() {
     // Verify default values for newly created accounts
     let account = Account::default();
-    assert!(!account.is_archived, "New accounts should not be archived by default");
+    assert!(
+        !account.is_archived,
+        "New accounts should not be archived by default"
+    );
 
     let account = create_test_account("new_acc", "SECURITIES", "USD");
-    assert!(!account.is_archived, "Test helper should create non-archived accounts");
-    assert!(account.is_active, "Test helper should create active accounts");
+    assert!(
+        !account.is_archived,
+        "Test helper should create non-archived accounts"
+    );
+    assert!(
+        account.is_active,
+        "Test helper should create active accounts"
+    );
 }

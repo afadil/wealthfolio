@@ -9,7 +9,9 @@ use crate::assets::AssetServiceTrait;
 use crate::errors::Result;
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::fx::FxServiceTrait;
-use crate::portfolio::snapshot::{AccountStateSnapshot, Position, SnapshotServiceTrait, SnapshotSource};
+use crate::portfolio::snapshot::{
+    AccountStateSnapshot, Position, SnapshotServiceTrait, SnapshotSource,
+};
 
 #[derive(Debug, Clone)]
 pub struct ManualHoldingInput {

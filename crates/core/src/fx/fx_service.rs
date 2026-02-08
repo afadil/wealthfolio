@@ -215,10 +215,11 @@ impl FxServiceTrait for FxService {
         let end = Utc::now();
         let start = end - chrono::Duration::days(days);
 
-        match self
-            .repository
-            .get_historical_quotes(&instrument_key, start.naive_utc(), end.naive_utc())
-        {
+        match self.repository.get_historical_quotes(
+            &instrument_key,
+            start.naive_utc(),
+            end.naive_utc(),
+        ) {
             Ok(quotes) => Ok(quotes
                 .into_iter()
                 .map(|q| ExchangeRate {

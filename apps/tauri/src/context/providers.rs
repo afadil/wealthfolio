@@ -226,12 +226,14 @@ pub async fn initialize_context(
         writer.clone(),
     ));
 
-    let alternative_asset_service = Arc::new(AlternativeAssetService::new(
-        alternative_asset_repository.clone(),
-        asset_repository.clone(),
-        quote_service.clone(),
-    )
-    .with_event_sink(domain_event_sink.clone()));
+    let alternative_asset_service = Arc::new(
+        AlternativeAssetService::new(
+            alternative_asset_repository.clone(),
+            asset_repository.clone(),
+            quote_service.clone(),
+        )
+        .with_event_sink(domain_event_sink.clone()),
+    );
 
     let sync_service = Arc::new(
         BrokerSyncService::new(

@@ -85,5 +85,4 @@ pub trait TaxonomyServiceTrait: Send + Sync {
         assignment: NewAssetTaxonomyAssignment,
     ) -> Result<AssetTaxonomyAssignment>;
     async fn remove_asset_assignment(&self, id: &str) -> Result<usize>;
-
 }

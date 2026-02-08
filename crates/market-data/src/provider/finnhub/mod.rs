@@ -10,8 +10,8 @@
 
 use std::time::Duration;
 
-use async_trait::async_trait;
 use crate::SymbolResolver;
+use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
 use reqwest::Client;
 use rust_decimal::Decimal;

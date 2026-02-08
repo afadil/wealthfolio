@@ -465,15 +465,27 @@ mod tests {
 
     #[test]
     fn test_map_quote_type_to_instrument_type() {
-        assert_eq!(map_quote_type_to_instrument_type("EQUITY"), Some("STOCK_COMMON"));
+        assert_eq!(
+            map_quote_type_to_instrument_type("EQUITY"),
+            Some("STOCK_COMMON")
+        );
         assert_eq!(map_quote_type_to_instrument_type("ETF"), Some("ETF"));
-        assert_eq!(map_quote_type_to_instrument_type("MUTUALFUND"), Some("FUND_MUTUAL"));
+        assert_eq!(
+            map_quote_type_to_instrument_type("MUTUALFUND"),
+            Some("FUND_MUTUAL")
+        );
         assert_eq!(
             map_quote_type_to_instrument_type("CRYPTOCURRENCY"),
             Some("CRYPTO_NATIVE")
         );
-        assert_eq!(map_quote_type_to_instrument_type("BOND"), Some("BOND_CORPORATE"));
-        assert_eq!(map_quote_type_to_instrument_type("MONEYMARKET"), Some("MONEY_MARKET_DEBT"));
+        assert_eq!(
+            map_quote_type_to_instrument_type("BOND"),
+            Some("BOND_CORPORATE")
+        );
+        assert_eq!(
+            map_quote_type_to_instrument_type("MONEYMARKET"),
+            Some("MONEY_MARKET_DEBT")
+        );
         assert_eq!(map_quote_type_to_instrument_type("FUTURE"), Some("FUTURE"));
         assert_eq!(map_quote_type_to_instrument_type("FUTURES"), Some("FUTURE"));
         assert_eq!(map_quote_type_to_instrument_type("OPTION"), Some("OPTION"));
@@ -493,7 +505,10 @@ mod tests {
         // Fixed Income class
         assert_eq!(map_quote_type_to_asset_class("BOND"), Some("FIXED_INCOME"));
         // Cash class (assigned to child category for drill-down)
-        assert_eq!(map_quote_type_to_asset_class("CURRENCY"), Some("CASH_BANK_DEPOSITS"));
+        assert_eq!(
+            map_quote_type_to_asset_class("CURRENCY"),
+            Some("CASH_BANK_DEPOSITS")
+        );
         // Commodities class
         assert_eq!(
             map_quote_type_to_asset_class("COMMODITY"),

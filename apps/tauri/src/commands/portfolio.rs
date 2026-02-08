@@ -725,7 +725,11 @@ pub async fn get_snapshots(
         })
         .collect();
 
-    debug!("Found {} snapshots for account {}", result.len(), account_id);
+    debug!(
+        "Found {} snapshots for account {}",
+        result.len(),
+        account_id
+    );
 
     Ok(result)
 }

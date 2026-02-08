@@ -697,7 +697,11 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         match provider_id.as_str() {
             "anthropic" => {
                 let client = create_anthropic_client(api_key, &provider_id)?;
-                build_with_tools_and_stream!(client, anthropic_thinking_params.clone(), Some(anthropic_max_tokens))
+                build_with_tools_and_stream!(
+                    client,
+                    anthropic_thinking_params.clone(),
+                    Some(anthropic_max_tokens)
+                )
             }
             "gemini" | "google" => {
                 let client = create_gemini_client(api_key, &provider_id)?;
@@ -729,7 +733,11 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         match provider_id.as_str() {
             "anthropic" => {
                 let client = create_anthropic_client(api_key, &provider_id)?;
-                build_without_tools_and_stream!(client, anthropic_thinking_params.clone(), Some(anthropic_max_tokens))
+                build_without_tools_and_stream!(
+                    client,
+                    anthropic_thinking_params.clone(),
+                    Some(anthropic_max_tokens)
+                )
             }
             "gemini" | "google" => {
                 let client = create_gemini_client(api_key, &provider_id)?;

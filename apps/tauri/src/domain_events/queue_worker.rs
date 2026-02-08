@@ -216,7 +216,10 @@ async fn run_portfolio_job(
                 // Initialize the FxService after successful sync
                 let fx_service = context.fx_service();
                 if let Err(e) = fx_service.initialize() {
-                    error!("Failed to initialize FxService after market data sync: {}", e);
+                    error!(
+                        "Failed to initialize FxService after market data sync: {}",
+                        e
+                    );
                 }
 
                 // Continue to portfolio calculation
@@ -316,8 +319,8 @@ async fn run_portfolio_calculation(
     }
 
     // Update position status from TOTAL snapshot
-    if let Ok(Some(total_snapshot)) = snapshot_service
-        .get_latest_holdings_snapshot(PORTFOLIO_TOTAL_ACCOUNT_ID)
+    if let Ok(Some(total_snapshot)) =
+        snapshot_service.get_latest_holdings_snapshot(PORTFOLIO_TOTAL_ACCOUNT_ID)
     {
         let current_holdings: std::collections::HashMap<String, rust_decimal::Decimal> =
             total_snapshot

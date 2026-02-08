@@ -409,18 +409,15 @@ impl AiProviderServiceTrait for AiProviderService {
         let config = self.get_provider_config(provider_id)?;
 
         // Build the model list URL based on provider
-        let base_url = config
-            .base_url
-            .as_deref()
-            .unwrap_or(match provider_id {
-                "anthropic" => "https://api.anthropic.com",
-                "openai" => "https://api.openai.com",
-                "groq" => "https://api.groq.com/openai",
-                "openrouter" => "https://openrouter.ai/api",
-                "google" => "https://generativelanguage.googleapis.com",
-                "ollama" => "http://localhost:11434",
-                _ => "https://api.openai.com",
-            });
+        let base_url = config.base_url.as_deref().unwrap_or(match provider_id {
+            "anthropic" => "https://api.anthropic.com",
+            "openai" => "https://api.openai.com",
+            "groq" => "https://api.groq.com/openai",
+            "openrouter" => "https://openrouter.ai/api",
+            "google" => "https://generativelanguage.googleapis.com",
+            "ollama" => "http://localhost:11434",
+            _ => "https://api.openai.com",
+        });
 
         let models_url = match provider_id {
             "ollama" => format!("{}/api/tags", base_url.trim_end_matches('/')),

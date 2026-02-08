@@ -68,10 +68,7 @@ impl BrokerSyncService {
             account_service,
             asset_service,
             activity_service,
-            activity_repository: Arc::new(ActivityRepository::new(
-                pool.clone(),
-                writer.clone(),
-            )),
+            activity_repository: Arc::new(ActivityRepository::new(pool.clone(), writer.clone())),
             platform_repository,
             brokers_sync_state_repository: Arc::new(BrokerSyncStateRepository::new(
                 pool.clone(),
@@ -384,10 +381,9 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             activity_currencies.insert(act.currency.clone());
 
             // Parse activity date for idempotency key computation
-            let activity_datetime: DateTime<Utc> =
-                DateTime::parse_from_rfc3339(&act.activity_date)
-                    .map(|dt| dt.with_timezone(&Utc))
-                    .unwrap_or_else(|_| Utc::now());
+            let activity_datetime: DateTime<Utc> = DateTime::parse_from_rfc3339(&act.activity_date)
+                .map(|dt| dt.with_timezone(&Utc))
+                .unwrap_or_else(|_| Utc::now());
 
             // Compute idempotency key for content-based deduplication
             let idempotency_key = compute_idempotency_key(
@@ -763,8 +759,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 InstrumentType::Equity
             };
 
-            let asset_name =
-                symbol_info.and_then(|s| s.name.clone().or(s.description.clone()));
+            let asset_name = symbol_info.and_then(|s| s.name.clone().or(s.description.clone()));
 
             let spec_key = format!("{}:{}", symbol.to_uppercase(), currency);
             if !spec_key_to_idx.contains_key(&spec_key) {
@@ -924,7 +919,8 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                         .do_update()
                         .set((
                             schema::holdings_snapshots::positions.eq(&snapshot_db.positions),
-                            schema::holdings_snapshots::cash_balances.eq(&snapshot_db.cash_balances),
+                            schema::holdings_snapshots::cash_balances
+                                .eq(&snapshot_db.cash_balances),
                             schema::holdings_snapshots::cost_basis.eq(&snapshot_db.cost_basis),
                             schema::holdings_snapshots::net_contribution
                                 .eq(&snapshot_db.net_contribution),
@@ -934,7 +930,8 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                                 .eq(&snapshot_db.cash_total_account_currency),
                             schema::holdings_snapshots::cash_total_base_currency
                                 .eq(&snapshot_db.cash_total_base_currency),
-                            schema::holdings_snapshots::calculated_at.eq(&snapshot_db.calculated_at),
+                            schema::holdings_snapshots::calculated_at
+                                .eq(&snapshot_db.calculated_at),
                             schema::holdings_snapshots::source.eq(&snapshot_db.source),
                         ))
                         .execute(conn)
@@ -1058,9 +1055,7 @@ impl BrokerSyncService {
         };
 
         // Normalize institution name for matching
-        let institution_normalized = institution_name
-            .to_uppercase()
-            .replace([' ', '-'], "_");
+        let institution_normalized = institution_name.to_uppercase().replace([' ', '-'], "_");
 
         // Try exact match first
         for platform in &platforms {
@@ -1101,4 +1096,3 @@ impl BrokerSyncService {
         Ok(None)
     }
 }
-

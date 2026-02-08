@@ -89,9 +89,11 @@ impl ActivityService {
     }
 
     fn get_base_currency_or_usd(&self) -> String {
-        resolve_currency(&[
-            self.account_service.get_base_currency().as_deref().unwrap_or(""),
-        ])
+        resolve_currency(&[self
+            .account_service
+            .get_base_currency()
+            .as_deref()
+            .unwrap_or("")])
     }
 
     fn resolve_activity_currency(
@@ -104,7 +106,10 @@ impl ActivityService {
             activity_currency,
             asset_currency.unwrap_or(""),
             account_currency,
-            self.account_service.get_base_currency().as_deref().unwrap_or(""),
+            self.account_service
+                .get_base_currency()
+                .as_deref()
+                .unwrap_or(""),
         ])
     }
 
@@ -263,9 +268,7 @@ impl ActivityService {
                 }
                 "CRYPTO" => return (AssetKind::Investment, Some(InstrumentType::Crypto)),
                 "FX_RATE" | "FX" => return (AssetKind::Fx, Some(InstrumentType::Fx)),
-                "OPTION" | "OPT" => {
-                    return (AssetKind::Investment, Some(InstrumentType::Option))
-                }
+                "OPTION" | "OPT" => return (AssetKind::Investment, Some(InstrumentType::Option)),
                 "COMMODITY" | "CMDTY" | "METAL" => {
                     return (AssetKind::Investment, Some(InstrumentType::Metal))
                 }
@@ -286,9 +289,9 @@ impl ActivityService {
         if let Some((_base, quote)) = upper_symbol.rsplit_once('-') {
             let quote = quote.trim();
             let crypto_quotes = [
-                "USD", "CAD", "EUR", "GBP", "JPY", "CHF", "AUD", "NZD", "HKD", "SGD", "CNY",
-                "SEK", "NOK", "DKK", "PLN", "CZK", "HUF", "TRY", "MXN", "BRL", "KRW", "INR",
-                "ZAR", "BTC", "ETH", "USDT", "USDC", "DAI", "BUSD", "USDP", "TUSD", "FDUSD",
+                "USD", "CAD", "EUR", "GBP", "JPY", "CHF", "AUD", "NZD", "HKD", "SGD", "CNY", "SEK",
+                "NOK", "DKK", "PLN", "CZK", "HUF", "TRY", "MXN", "BRL", "KRW", "INR", "ZAR", "BTC",
+                "ETH", "USDT", "USDC", "DAI", "BUSD", "USDP", "TUSD", "FDUSD",
             ];
             if crypto_quotes.contains(&quote) {
                 return (AssetKind::Investment, Some(InstrumentType::Crypto));
@@ -302,9 +305,9 @@ impl ActivityService {
 
         // 4. Common crypto symbols heuristic (no MIC, bare symbol like BTC, ETH)
         let common_crypto = [
-            "BTC", "ETH", "XRP", "LTC", "BCH", "ADA", "DOT", "LINK", "XLM", "DOGE", "UNI",
-            "SOL", "AVAX", "MATIC", "ATOM", "ALGO", "VET", "FIL", "TRX", "ETC", "XMR", "AAVE",
-            "MKR", "COMP", "SNX", "YFI", "SUSHI", "CRV",
+            "BTC", "ETH", "XRP", "LTC", "BCH", "ADA", "DOT", "LINK", "XLM", "DOGE", "UNI", "SOL",
+            "AVAX", "MATIC", "ATOM", "ALGO", "VET", "FIL", "TRX", "ETC", "XMR", "AAVE", "MKR",
+            "COMP", "SNX", "YFI", "SUSHI", "CRV",
         ];
         if common_crypto.contains(&upper_symbol.as_str()) {
             return (AssetKind::Investment, Some(InstrumentType::Crypto));
@@ -356,9 +359,9 @@ impl ActivityService {
         let asset_name = activity.get_name().map(|s| s.to_string());
         let quote_mode = activity.get_quote_mode().map(|s| s.to_string());
 
-        let inferred = symbol.as_deref().map(|s| {
-            self.infer_asset_kind(s, exchange_mic.as_deref(), asset_kind_hint.as_deref())
-        });
+        let inferred = symbol
+            .as_deref()
+            .map(|s| self.infer_asset_kind(s, exchange_mic.as_deref(), asset_kind_hint.as_deref()));
         let inferred_instrument_type = inferred.as_ref().and_then(|(_, it)| it.clone());
 
         // Crypto/FX assets don't have exchange MICs — clear any that leaked from frontend
@@ -465,13 +468,13 @@ impl ActivityService {
                 name: asset_name.clone(),
                 kind: inferred.as_ref().map(|(k, _)| k.clone()),
                 instrument_exchange_mic: exchange_mic.clone(),
-                instrument_symbol: symbol.as_deref().map(|s| {
-                    parse_symbol_with_exchange_suffix(s).0.to_string()
-                }),
+                instrument_symbol: symbol
+                    .as_deref()
+                    .map(|s| parse_symbol_with_exchange_suffix(s).0.to_string()),
                 instrument_type: inferred_instrument_type.clone(),
-                display_code: symbol.as_deref().map(|s| {
-                    parse_symbol_with_exchange_suffix(s).0.to_string()
-                }),
+                display_code: symbol
+                    .as_deref()
+                    .map(|s| parse_symbol_with_exchange_suffix(s).0.to_string()),
             };
             let asset = self
                 .asset_service
@@ -527,8 +530,7 @@ impl ActivityService {
         } else {
             // For pure cash movements without asset, just register FX if needed
             if activity.currency.is_empty() {
-                activity.currency =
-                    self.resolve_activity_currency("", None, &account_currency);
+                activity.currency = self.resolve_activity_currency("", None, &account_currency);
             }
 
             if activity.currency != account_currency {
@@ -563,9 +565,8 @@ impl ActivityService {
         if let Ok(date) = DateTime::parse_from_rfc3339(&activity.activity_date)
             .map(|dt| dt.with_timezone(&Utc))
             .or_else(|_| {
-                NaiveDate::parse_from_str(&activity.activity_date, "%Y-%m-%d").map(|d| {
-                    Utc.from_utc_datetime(&d.and_hms_opt(0, 0, 0).unwrap_or_default())
-                })
+                NaiveDate::parse_from_str(&activity.activity_date, "%Y-%m-%d")
+                    .map(|d| Utc.from_utc_datetime(&d.and_hms_opt(0, 0, 0).unwrap_or_default()))
             })
         {
             let key = compute_idempotency_key(
@@ -602,9 +603,9 @@ impl ActivityService {
         let asset_name = activity.get_name().map(|s| s.to_string());
         let quote_mode = activity.get_quote_mode().map(|s| s.to_string());
 
-        let inferred = symbol.as_deref().map(|s| {
-            self.infer_asset_kind(s, exchange_mic.as_deref(), asset_kind_hint.as_deref())
-        });
+        let inferred = symbol
+            .as_deref()
+            .map(|s| self.infer_asset_kind(s, exchange_mic.as_deref(), asset_kind_hint.as_deref()));
         let inferred_instrument_type = inferred.as_ref().and_then(|(_, it)| it.clone());
 
         // Use asset currency for crypto pairs
@@ -688,13 +689,13 @@ impl ActivityService {
                 name: asset_name.clone(),
                 kind: inferred.as_ref().map(|(k, _)| k.clone()),
                 instrument_exchange_mic: exchange_mic.clone(),
-                instrument_symbol: symbol.as_deref().map(|s| {
-                    parse_symbol_with_exchange_suffix(s).0.to_string()
-                }),
+                instrument_symbol: symbol
+                    .as_deref()
+                    .map(|s| parse_symbol_with_exchange_suffix(s).0.to_string()),
                 instrument_type: inferred_instrument_type.clone(),
-                display_code: symbol.as_deref().map(|s| {
-                    parse_symbol_with_exchange_suffix(s).0.to_string()
-                }),
+                display_code: symbol
+                    .as_deref()
+                    .map(|s| parse_symbol_with_exchange_suffix(s).0.to_string()),
             };
             let asset = self
                 .asset_service
@@ -746,8 +747,7 @@ impl ActivityService {
             }
         } else {
             if activity.currency.is_empty() {
-                activity.currency =
-                    self.resolve_activity_currency("", None, &account_currency);
+                activity.currency = self.resolve_activity_currency("", None, &account_currency);
             }
 
             if activity.currency != account_currency {
@@ -858,8 +858,11 @@ impl ActivityService {
         };
 
         // Infer asset kind and instrument type using base symbol
-        let (kind, instrument_type) =
-            self.infer_asset_kind(base_symbol, exchange_mic.as_deref(), activity.get_kind_hint());
+        let (kind, instrument_type) = self.infer_asset_kind(
+            base_symbol,
+            exchange_mic.as_deref(),
+            activity.get_kind_hint(),
+        );
 
         // Crypto/FX assets don't have exchange MICs — clear any that leaked from frontend/suffix
         let is_crypto = instrument_type.as_ref() == Some(&InstrumentType::Crypto);
@@ -891,13 +894,13 @@ impl ActivityService {
         );
 
         // Parse quote mode if provided
-        let quote_mode = activity.get_quote_mode().and_then(|s| {
-            match s.to_uppercase().as_str() {
+        let quote_mode = activity
+            .get_quote_mode()
+            .and_then(|s| match s.to_uppercase().as_str() {
                 "MARKET" => Some(QuoteMode::Market),
                 "MANUAL" => Some(QuoteMode::Manual),
                 _ => None,
-            }
-        });
+            });
 
         Ok(Some(AssetSpec {
             id: existing_id,
@@ -1010,12 +1013,11 @@ impl ActivityServiceTrait for ActivityService {
         let account_ids = vec![created.account_id.clone()];
         let asset_ids = created.asset_id.clone().into_iter().collect();
         let currencies = vec![created.currency.clone()];
-        self.event_sink
-            .emit(DomainEvent::activities_changed(
-                account_ids,
-                asset_ids,
-                currencies,
-            ));
+        self.event_sink.emit(DomainEvent::activities_changed(
+            account_ids,
+            asset_ids,
+            currencies,
+        ));
 
         Ok(created)
     }
@@ -1052,12 +1054,11 @@ impl ActivityServiceTrait for ActivityService {
         let account_ids: Vec<String> = account_ids_set.into_iter().collect();
         let asset_ids: Vec<String> = asset_ids_set.into_iter().collect();
         let currencies: Vec<String> = currencies_set.into_iter().collect();
-        self.event_sink
-            .emit(DomainEvent::activities_changed(
-                account_ids,
-                asset_ids,
-                currencies,
-            ));
+        self.event_sink.emit(DomainEvent::activities_changed(
+            account_ids,
+            asset_ids,
+            currencies,
+        ));
 
         Ok(updated)
     }
@@ -1073,12 +1074,11 @@ impl ActivityServiceTrait for ActivityService {
         let account_ids = vec![deleted.account_id.clone()];
         let asset_ids = deleted.asset_id.clone().into_iter().collect();
         let currencies = vec![deleted.currency.clone()];
-        self.event_sink
-            .emit(DomainEvent::activities_changed(
-                account_ids,
-                asset_ids,
-                currencies,
-            ));
+        self.event_sink.emit(DomainEvent::activities_changed(
+            account_ids,
+            asset_ids,
+            currencies,
+        ));
 
         Ok(deleted)
     }
@@ -1105,7 +1105,8 @@ impl ActivityServiceTrait for ActivityService {
             let account = self.account_service.get_account(account_id)?;
 
             // Store temp_ids for error reporting (prepare_activities uses indices)
-            let temp_ids: Vec<Option<String>> = request.creates.iter().map(|a| a.id.clone()).collect();
+            let temp_ids: Vec<Option<String>> =
+                request.creates.iter().map(|a| a.id.clone()).collect();
 
             let prepare_result = self.prepare_activities(request.creates, &account).await?;
 
@@ -1257,12 +1258,11 @@ impl ActivityServiceTrait for ActivityService {
             let account_ids: Vec<String> = account_ids_set.into_iter().collect();
             let asset_ids: Vec<String> = asset_ids_set.into_iter().collect();
             let currencies: Vec<String> = currencies_set.into_iter().collect();
-            self.event_sink
-                .emit(DomainEvent::activities_changed(
-                    account_ids,
-                    asset_ids,
-                    currencies,
-                ));
+            self.event_sink.emit(DomainEvent::activities_changed(
+                account_ids,
+                asset_ids,
+                currencies,
+            ));
         }
 
         Ok(persisted)
@@ -1292,12 +1292,7 @@ impl ActivityServiceTrait for ActivityService {
                 let sym = a.symbol.trim();
                 !sym.is_empty()
                     && matches!(
-                        classify_import_activity(
-                            &a.activity_type,
-                            sym,
-                            a.quantity,
-                            a.unit_price,
-                        ),
+                        classify_import_activity(&a.activity_type, sym, a.quantity, a.unit_price,),
                         ImportSymbolDisposition::ResolveAsset
                     )
                     && a.exchange_mic.is_none()
@@ -1312,9 +1307,7 @@ impl ActivityServiceTrait for ActivityService {
             })
             .collect();
 
-        let symbol_mic_cache = self
-            .resolve_symbols_batch(symbol_currency_pairs)
-            .await;
+        let symbol_mic_cache = self.resolve_symbols_batch(symbol_currency_pairs).await;
 
         let mut activities_with_status: Vec<ActivityImport> = Vec::new();
 
@@ -1395,15 +1388,12 @@ impl ActivityServiceTrait for ActivityService {
             } else {
                 activity.currency.clone()
             };
-            let exchange_mic = activity
-                .exchange_mic
-                .clone()
-                .or_else(|| {
-                    symbol_mic_cache
-                        .get(&(activity.symbol.clone(), resolve_ccy))
-                        .cloned()
-                        .flatten()
-                });
+            let exchange_mic = activity.exchange_mic.clone().or_else(|| {
+                symbol_mic_cache
+                    .get(&(activity.symbol.clone(), resolve_ccy))
+                    .cloned()
+                    .flatten()
+            });
 
             // Strip Yahoo suffix to get base symbol (e.g. GOOG.TO → GOOG)
             let (base_symbol, suffix_mic) = parse_symbol_with_exchange_suffix(&symbol);
@@ -1580,8 +1570,7 @@ impl ActivityServiceTrait for ActivityService {
                 }
             }
 
-            let skipped_count =
-                validated_activities.iter().filter(|a| !a.is_valid).count() as u32;
+            let skipped_count = validated_activities.iter().filter(|a| !a.is_valid).count() as u32;
 
             if let Some(ref repo) = self.import_run_repository {
                 let mut failed_run = import_run;
@@ -1630,8 +1619,7 @@ impl ActivityServiceTrait for ActivityService {
         let mut duplicate_count: u32 = 0;
         {
             // 1. Compute keys for each activity
-            let mut keys: Vec<Option<String>> =
-                Vec::with_capacity(activities_to_insert.len());
+            let mut keys: Vec<Option<String>> = Vec::with_capacity(activities_to_insert.len());
             for activity in &mut activities_to_insert {
                 let date = DateTime::parse_from_rfc3339(&activity.activity_date)
                     .map(|dt| dt.with_timezone(&Utc))
@@ -1676,7 +1664,8 @@ impl ActivityServiceTrait for ActivityService {
             // 3. DB dedup: check existing keys
             let unique_keys: Vec<String> = seen_keys.into_iter().collect();
             let existing = if !unique_keys.is_empty() {
-                self.check_existing_duplicates(unique_keys).unwrap_or_default()
+                self.check_existing_duplicates(unique_keys)
+                    .unwrap_or_default()
             } else {
                 HashMap::new()
             };
@@ -1869,12 +1858,11 @@ impl ActivityServiceTrait for ActivityService {
 
         // Emit single aggregated event if any activities were affected
         if result.upserted > 0 {
-            self.event_sink
-                .emit(DomainEvent::activities_changed(
-                    account_ids,
-                    asset_ids,
-                    currencies,
-                ));
+            self.event_sink.emit(DomainEvent::activities_changed(
+                account_ids,
+                asset_ids,
+                currencies,
+            ));
         }
 
         Ok(result)
@@ -1941,9 +1929,10 @@ impl ActivityServiceTrait for ActivityService {
         let unique_specs: Vec<AssetSpec> = asset_specs
             .into_iter()
             .fold(HashMap::new(), |mut map, spec| {
-                let key = spec.id.clone().unwrap_or_else(|| {
-                    spec.instrument_key().unwrap_or_default()
-                });
+                let key = spec
+                    .id
+                    .clone()
+                    .unwrap_or_else(|| spec.instrument_key().unwrap_or_default());
                 map.entry(key).or_insert(spec);
                 map
             })
@@ -1991,8 +1980,7 @@ impl ActivityServiceTrait for ActivityService {
         for (idx, a) in activities.iter().enumerate() {
             let activity_currency = if !a.currency.is_empty() {
                 a.currency.clone()
-            } else if let Some(asset_id) = activity_asset_map.get(idx).and_then(|id| id.as_ref())
-            {
+            } else if let Some(asset_id) = activity_asset_map.get(idx).and_then(|id| id.as_ref()) {
                 ensure_result
                     .assets
                     .get(asset_id)

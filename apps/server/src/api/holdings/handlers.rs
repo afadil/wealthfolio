@@ -23,8 +23,8 @@ use wealthfolio_core::{
 use crate::{error::ApiResult, main_lib::AppState};
 
 use super::dto::{
-    AllocationHoldingsQuery, DeleteSnapshotQuery, HistoryQuery, HoldingItemQuery,
-    HoldingsQuery, HoldingsSnapshotInput, ImportHoldingsCsvRequest, ImportHoldingsCsvResult,
+    AllocationHoldingsQuery, DeleteSnapshotQuery, HistoryQuery, HoldingItemQuery, HoldingsQuery,
+    HoldingsSnapshotInput, ImportHoldingsCsvRequest, ImportHoldingsCsvResult,
     SaveManualHoldingsRequest, SnapshotDateQuery, SnapshotInfo, SnapshotsQuery,
 };
 use super::mappers::{parse_date, parse_date_optional, snapshot_source_to_string};
@@ -143,9 +143,10 @@ pub async fn get_snapshots(
     let start_date = parse_date_optional(q.date_from, "dateFrom")?;
     let end_date = parse_date_optional(q.date_to, "dateTo")?;
 
-    let snapshots = state
-        .snapshot_service
-        .get_holdings_keyframes(&q.account_id, start_date, end_date)?;
+    let snapshots =
+        state
+            .snapshot_service
+            .get_holdings_keyframes(&q.account_id, start_date, end_date)?;
 
     let result: Vec<SnapshotInfo> = snapshots
         .into_iter()

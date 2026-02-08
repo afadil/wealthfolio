@@ -82,8 +82,7 @@ async fn derive_dek(
     State(_state): State<Arc<AppState>>,
     Json(body): Json<DeriveDekRequest>,
 ) -> ApiResult<Json<StringResponse>> {
-    let value =
-        crypto::derive_dek(&body.root_key, body.version).map_err(ApiError::BadRequest)?;
+    let value = crypto::derive_dek(&body.root_key, body.version).map_err(ApiError::BadRequest)?;
     Ok(Json(StringResponse { value }))
 }
 
@@ -124,8 +123,7 @@ async fn decrypt(
     State(_state): State<Arc<AppState>>,
     Json(body): Json<DecryptRequest>,
 ) -> ApiResult<Json<StringResponse>> {
-    let value =
-        crypto::decrypt(&body.key, &body.ciphertext).map_err(ApiError::BadRequest)?;
+    let value = crypto::decrypt(&body.key, &body.ciphertext).map_err(ApiError::BadRequest)?;
     Ok(Json(StringResponse { value }))
 }
 

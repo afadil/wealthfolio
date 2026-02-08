@@ -129,8 +129,7 @@ impl AssetRepositoryTrait for AssetRepository {
         for asset in &new_assets {
             asset.validate()?;
         }
-        let assets_db: Vec<InsertableAssetDB> =
-            new_assets.into_iter().map(|a| a.into()).collect();
+        let assets_db: Vec<InsertableAssetDB> = new_assets.into_iter().map(|a| a.into()).collect();
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<Vec<Asset>> {
@@ -224,11 +223,9 @@ impl AssetRepositoryTrait for AssetRepository {
                             assets::display_code.eq(&payload_owned.display_code),
                             assets::notes.eq(&payload_owned.notes),
                             assets::metadata.eq(&metadata_json),
-                            assets::quote_mode.eq(
-                                quote_mode_str
-                                    .clone()
-                                    .unwrap_or_else(|| "MARKET".to_string()),
-                            ),
+                            assets::quote_mode.eq(quote_mode_str
+                                .clone()
+                                .unwrap_or_else(|| "MARKET".to_string())),
                             assets::instrument_type.eq(&instrument_type_value),
                             assets::instrument_symbol.eq(&instrument_symbol_value),
                             assets::instrument_exchange_mic.eq(&instrument_exchange_mic_value),

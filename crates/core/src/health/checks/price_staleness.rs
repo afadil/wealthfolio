@@ -82,8 +82,10 @@ impl PriceStalenessCheck {
                     // Only check staleness for assets with positive market value
                     // (assets with 0 quantity are not actively held)
                     if holding.market_value > 0.0 {
-                        let effective_today =
-                            time_utils::market_effective_date(ctx.now, holding.exchange_mic.as_deref());
+                        let effective_today = time_utils::market_effective_date(
+                            ctx.now,
+                            holding.exchange_mic.as_deref(),
+                        );
                         let days_stale = trading_days_since(*quote_time, effective_today);
 
                         if days_stale >= critical_trading_days {

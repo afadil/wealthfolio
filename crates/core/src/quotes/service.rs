@@ -25,7 +25,7 @@ use super::sync_state::{QuoteSyncState, SymbolSyncPlan, SyncMode, SyncStateStore
 use super::types::{AssetId, Day};
 use crate::activities::ActivityRepositoryTrait;
 use crate::assets::{
-    Asset, AssetKind, AssetRepositoryTrait, InstrumentType, QuoteMode, ProviderProfile,
+    Asset, AssetKind, AssetRepositoryTrait, InstrumentType, ProviderProfile, QuoteMode,
 };
 use crate::errors::Result;
 use crate::secrets::SecretStore;
@@ -1111,12 +1111,27 @@ where
 
         for asset in &all_assets {
             asset_by_id.insert(asset.id.to_lowercase(), asset);
-            asset_by_symbol.insert(asset.display_code.as_deref().unwrap_or_default().to_lowercase(), asset);
+            asset_by_symbol.insert(
+                asset
+                    .display_code
+                    .as_deref()
+                    .unwrap_or_default()
+                    .to_lowercase(),
+                asset,
+            );
 
             // Build symbol.exchange key if asset has exchange_mic
             if let Some(ref mic) = asset.instrument_exchange_mic {
                 if let Some(suffix) = mic_to_yahoo_suffix(mic) {
-                    let key = format!("{}.{}", asset.display_code.as_deref().unwrap_or_default().to_lowercase(), suffix.to_lowercase());
+                    let key = format!(
+                        "{}.{}",
+                        asset
+                            .display_code
+                            .as_deref()
+                            .unwrap_or_default()
+                            .to_lowercase(),
+                        suffix.to_lowercase()
+                    );
                     asset_by_symbol_exchange.insert(key, asset);
                 }
             }

@@ -180,7 +180,11 @@ impl AccountServiceTrait for AccountService {
         self.repository.delete(account_id).await?;
 
         // Clean up orphaned assets (activities are already CASCADE-deleted)
-        match self.asset_repository.deactivate_orphaned_investments().await {
+        match self
+            .asset_repository
+            .deactivate_orphaned_investments()
+            .await
+        {
             Ok(deactivated_ids) => {
                 if !deactivated_ids.is_empty() {
                     info!(
@@ -189,13 +193,19 @@ impl AccountServiceTrait for AccountService {
                     );
                     for id in &deactivated_ids {
                         if let Err(e) = self.sync_state_store.delete(id).await {
-                            warn!("Failed to delete sync state for orphaned asset {}: {}", id, e);
+                            warn!(
+                                "Failed to delete sync state for orphaned asset {}: {}",
+                                id, e
+                            );
                         }
                     }
                 }
             }
             Err(e) => {
-                warn!("Failed to deactivate orphaned assets after account deletion: {}", e);
+                warn!(
+                    "Failed to deactivate orphaned assets after account deletion: {}",
+                    e
+                );
             }
         }
 

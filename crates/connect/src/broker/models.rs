@@ -593,7 +593,11 @@ impl BrokerAccount {
         self.balance
             .as_ref()
             .and_then(|b| b.currency.clone())
-            .or_else(|| base_currency.filter(|c| !c.is_empty()).map(|c| c.to_string()))
+            .or_else(|| {
+                base_currency
+                    .filter(|c| !c.is_empty())
+                    .map(|c| c.to_string())
+            })
             .unwrap_or_else(|| "USD".to_string())
     }
 

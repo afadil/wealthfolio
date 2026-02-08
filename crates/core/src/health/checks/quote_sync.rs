@@ -71,7 +71,12 @@ pub fn gather_quote_sync_errors(
     let asset_map: HashMap<String, (String, QuoteMode)> = all_assets
         .into_iter()
         .filter(|a| asset_ids_set.contains(&a.id))
-        .map(|a| (a.id.clone(), (a.display_code.clone().unwrap_or_default(), a.quote_mode)))
+        .map(|a| {
+            (
+                a.id.clone(),
+                (a.display_code.clone().unwrap_or_default(), a.quote_mode),
+            )
+        })
         .collect();
 
     // Convert to QuoteSyncErrorInfo, filtering out manual pricing assets
@@ -414,7 +419,10 @@ mod tests {
         }];
 
         let issues = check.analyze(&sync_errors, &ctx);
-        assert!(issues.is_empty(), "Low error count never-synced assets should be ignored");
+        assert!(
+            issues.is_empty(),
+            "Low error count never-synced assets should be ignored"
+        );
     }
 
     #[test]

@@ -511,8 +511,8 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
 
         // Check if purchase info changed and update/create purchase quote
         let mut purchase_quote_updated = false;
-        let purchase_info_changed = old_purchase_price != new_purchase_price
-            || old_purchase_date != new_purchase_date;
+        let purchase_info_changed =
+            old_purchase_price != new_purchase_price || old_purchase_date != new_purchase_date;
 
         if purchase_info_changed {
             if let (Some(price_str), Some(date_str)) = (&new_purchase_price, &new_purchase_date) {
@@ -521,8 +521,8 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
                         "Invalid purchase price format".to_string(),
                     ))
                 })?;
-                let purchase_date =
-                    chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d").map_err(|_| {
+                let purchase_date = chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+                    .map_err(|_| {
                         Error::Validation(ValidationError::InvalidInput(
                             "Invalid purchase date format".to_string(),
                         ))
@@ -531,8 +531,7 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
                 let purchase_quote = Quote {
                     id: Uuid::new_v4().to_string(),
                     asset_id: request.asset_id.clone(),
-                    timestamp: Utc
-                        .from_utc_datetime(&purchase_date.and_hms_opt(12, 0, 0).unwrap()),
+                    timestamp: Utc.from_utc_datetime(&purchase_date.and_hms_opt(12, 0, 0).unwrap()),
                     open: purchase_price,
                     high: purchase_price,
                     low: purchase_price,
@@ -582,10 +581,7 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
         }
 
         // Get asset IDs for quote lookup
-        let asset_ids: Vec<String> = alternative_assets
-            .iter()
-            .map(|a| a.id.clone())
-            .collect();
+        let asset_ids: Vec<String> = alternative_assets.iter().map(|a| a.id.clone()).collect();
 
         // Fetch latest quotes for all alternative assets
         let quotes = self.quote_service.get_latest_quotes(&asset_ids)?;
@@ -693,9 +689,7 @@ mod tests {
             AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Investment)
                 .is_err()
         );
-        assert!(
-            AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Fx).is_err()
-        );
+        assert!(AlternativeAssetService::validate_alternative_asset_kind(&AssetKind::Fx).is_err());
     }
 
     #[test]
@@ -722,8 +716,7 @@ mod tests {
 
     #[test]
     fn test_set_and_remove_linked_asset_id() {
-        let metadata =
-            AlternativeAssetService::set_linked_asset_id(None, "some-uuid-for-property");
+        let metadata = AlternativeAssetService::set_linked_asset_id(None, "some-uuid-for-property");
         assert_eq!(
             metadata.get("linked_asset_id").unwrap(),
             "some-uuid-for-property"

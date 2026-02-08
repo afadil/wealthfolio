@@ -571,10 +571,7 @@ impl AssetServiceTrait for AssetService {
 
         // 5. Emit activities_changed to trigger recalculation for affected accounts
         if activities_migrated > 0 {
-            let asset_ids = vec![
-                unknown_asset_id.to_string(),
-                resolved_asset_id.to_string(),
-            ];
+            let asset_ids = vec![unknown_asset_id.to_string(), resolved_asset_id.to_string()];
             self.event_sink.emit(DomainEvent::activities_changed(
                 account_ids,
                 asset_ids,

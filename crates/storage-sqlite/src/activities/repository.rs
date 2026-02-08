@@ -34,10 +34,7 @@ pub struct ActivityRepository {
     writer: WriteHandle,
 }
 
-fn apply_decimal_patch(
-    existing: Option<String>,
-    patch: Option<Option<Decimal>>,
-) -> Option<String> {
+fn apply_decimal_patch(existing: Option<String>, patch: Option<Option<Decimal>>) -> Option<String> {
     match patch {
         None => existing,
         Some(None) => None,
@@ -328,12 +325,15 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 } = existing;
 
                 activity_to_update.created_at = created_at;
-                activity_to_update.quantity = apply_decimal_patch(quantity, activity_update_owned.quantity);
+                activity_to_update.quantity =
+                    apply_decimal_patch(quantity, activity_update_owned.quantity);
                 activity_to_update.unit_price =
                     apply_decimal_patch(unit_price, activity_update_owned.unit_price);
-                activity_to_update.amount = apply_decimal_patch(amount, activity_update_owned.amount);
+                activity_to_update.amount =
+                    apply_decimal_patch(amount, activity_update_owned.amount);
                 activity_to_update.fee = apply_decimal_patch(fee, activity_update_owned.fee);
-                activity_to_update.fx_rate = apply_decimal_patch(fx_rate, activity_update_owned.fx_rate);
+                activity_to_update.fx_rate =
+                    apply_decimal_patch(fx_rate, activity_update_owned.fx_rate);
                 // Preserve source identity fields
                 if activity_to_update.source_system.is_none() {
                     activity_to_update.source_system = source_system;
@@ -450,7 +450,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
                         activity_db.created_at = created_at;
                         activity_db.quantity = apply_decimal_patch(quantity, update_owned.quantity);
-                        activity_db.unit_price = apply_decimal_patch(unit_price, update_owned.unit_price);
+                        activity_db.unit_price =
+                            apply_decimal_patch(unit_price, update_owned.unit_price);
                         activity_db.amount = apply_decimal_patch(amount, update_owned.amount);
                         activity_db.fee = apply_decimal_patch(fee, update_owned.fee);
                         activity_db.fx_rate = apply_decimal_patch(fx_rate, update_owned.fx_rate);
@@ -1128,10 +1129,11 @@ impl ActivityRepositoryTrait for ActivityRepository {
         let new_id = new_asset_id.to_string();
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<u32> {
-                let count = diesel::update(activities::table.filter(activities::asset_id.eq(&old_id)))
-                    .set(activities::asset_id.eq(&new_id))
-                    .execute(conn)
-                    .map_err(StorageError::from)?;
+                let count =
+                    diesel::update(activities::table.filter(activities::asset_id.eq(&old_id)))
+                        .set(activities::asset_id.eq(&new_id))
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
                 Ok(count as u32)
             })
             .await
@@ -1143,28 +1145,33 @@ impl ActivityRepositoryTrait for ActivityRepository {
     ) -> Result<(Vec<String>, Vec<String>)> {
         let asset_id_owned = asset_id.to_string();
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<(Vec<String>, Vec<String>)> {
-                let rows: Vec<(String, String)> = activities::table
-                    .filter(activities::asset_id.eq(&asset_id_owned))
-                    .select((activities::account_id, activities::currency))
-                    .distinct()
-                    .load(conn)
-                    .map_err(StorageError::from)?;
+            .exec(
+                move |conn: &mut SqliteConnection| -> Result<(Vec<String>, Vec<String>)> {
+                    let rows: Vec<(String, String)> = activities::table
+                        .filter(activities::asset_id.eq(&asset_id_owned))
+                        .select((activities::account_id, activities::currency))
+                        .distinct()
+                        .load(conn)
+                        .map_err(StorageError::from)?;
 
-                let mut account_ids: HashSet<String> = HashSet::new();
-                let mut currencies: HashSet<String> = HashSet::new();
+                    let mut account_ids: HashSet<String> = HashSet::new();
+                    let mut currencies: HashSet<String> = HashSet::new();
 
-                for (account_id, currency) in rows {
-                    if !account_id.is_empty() {
-                        account_ids.insert(account_id);
+                    for (account_id, currency) in rows {
+                        if !account_id.is_empty() {
+                            account_ids.insert(account_id);
+                        }
+                        if !currency.is_empty() {
+                            currencies.insert(currency);
+                        }
                     }
-                    if !currency.is_empty() {
-                        currencies.insert(currency);
-                    }
-                }
 
-                Ok((account_ids.into_iter().collect(), currencies.into_iter().collect()))
-            })
+                    Ok((
+                        account_ids.into_iter().collect(),
+                        currencies.into_iter().collect(),
+                    ))
+                },
+            )
             .await
     }
 }

@@ -837,14 +837,8 @@ impl<E: AiEnvironment> ImportCsvTool<E> {
     /// Validate an activity draft.
     fn validate_draft(&self, draft: &mut CsvActivityDraft) {
         let activity_type = draft.activity_type.as_deref().unwrap_or("");
-        let quantity_value = draft
-            .quantity
-            .as_deref()
-            .and_then(parse_decimal_value);
-        let unit_price_value = draft
-            .unit_price
-            .as_deref()
-            .and_then(parse_decimal_value);
+        let quantity_value = draft.quantity.as_deref().and_then(parse_decimal_value);
+        let unit_price_value = draft.unit_price.as_deref().and_then(parse_decimal_value);
         let fee_value = draft.fee.as_deref().and_then(parse_decimal_value);
 
         // Date is required for all activities

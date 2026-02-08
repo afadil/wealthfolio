@@ -8,10 +8,10 @@ use crate::{
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, EnvFilter};
 use wealthfolio_ai::{AiProviderService, AiProviderServiceTrait, ChatConfig, ChatService};
-use wealthfolio_core::addons::{AddonService, AddonServiceTrait};
 use wealthfolio_connect::{
     BrokerSyncService, BrokerSyncServiceTrait, PlatformRepository, DEFAULT_CLOUD_API_URL,
 };
+use wealthfolio_core::addons::{AddonService, AddonServiceTrait};
 use wealthfolio_core::{
     accounts::AccountService,
     activities::{ActivityService as CoreActivityService, ActivityServiceTrait},
@@ -300,13 +300,14 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         ));
 
     // Alternative asset service (delegates to core service)
-    let alternative_asset_service: Arc<dyn AlternativeAssetServiceTrait + Send + Sync> =
-        Arc::new(AlternativeAssetService::new(
+    let alternative_asset_service: Arc<dyn AlternativeAssetServiceTrait + Send + Sync> = Arc::new(
+        AlternativeAssetService::new(
             alternative_asset_repository.clone(),
             asset_repository.clone(),
             quote_service.clone(),
         )
-        .with_event_sink(domain_event_sink.clone()));
+        .with_event_sink(domain_event_sink.clone()),
+    );
 
     // Connect sync service for broker data synchronization
     let platform_repository = Arc::new(PlatformRepository::new(pool.clone(), writer.clone()));

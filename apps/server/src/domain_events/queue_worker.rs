@@ -173,8 +173,7 @@ async fn process_event_batch(events: &[DomainEvent], deps: Arc<QueueWorkerDeps>)
         let secret_store = deps.secret_store.clone();
 
         tokio::spawn(async move {
-            match perform_broker_sync(connect_sync_service, event_bus, secret_store).await
-            {
+            match perform_broker_sync(connect_sync_service, event_bus, secret_store).await {
                 Ok(result) => {
                     tracing::info!(
                         "Broker sync completed after tracking mode change: success={}, message={}",
@@ -443,9 +442,7 @@ impl wealthfolio_connect::SyncProgressReporter for EventBusProgressReporter {
 }
 
 /// Mint a fresh access token using the stored refresh token.
-async fn mint_access_token(
-    secret_store: &Arc<dyn SecretStore>,
-) -> Result<String, String> {
+async fn mint_access_token(secret_store: &Arc<dyn SecretStore>) -> Result<String, String> {
     // Get the stored refresh token
     let refresh_token = secret_store
         .get_secret(CLOUD_REFRESH_TOKEN_KEY)
@@ -524,13 +521,15 @@ async fn perform_broker_sync(
 
     // Create API client with fresh access token
     let token = mint_access_token(&secret_store).await?;
-    let client =
-        ConnectApiClient::new(&cloud_api_base_url(), &token).map_err(|e| e.to_string())?;
+    let client = ConnectApiClient::new(&cloud_api_base_url(), &token).map_err(|e| e.to_string())?;
 
     // Create progress reporter and orchestrator
     let reporter = Arc::new(EventBusProgressReporter::new(event_bus));
-    let orchestrator =
-        SyncOrchestrator::new(connect_sync_service.clone(), reporter, SyncConfig::default());
+    let orchestrator = SyncOrchestrator::new(
+        connect_sync_service.clone(),
+        reporter,
+        SyncConfig::default(),
+    );
 
     // Run the sync via the centralized orchestrator
     // Note: Asset enrichment is handled automatically via domain events (AssetsCreated)

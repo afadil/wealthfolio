@@ -21,7 +21,8 @@ async fn get_net_worth(
     State(state): State<Arc<AppState>>,
     Query(q): Query<NetWorthQuery>,
 ) -> ApiResult<Json<NetWorthResponse>> {
-    let as_of_date = parse_date_optional(q.date, "date")?.unwrap_or_else(|| Utc::now().date_naive());
+    let as_of_date =
+        parse_date_optional(q.date, "date")?.unwrap_or_else(|| Utc::now().date_naive());
     let response = state.net_worth_service.get_net_worth(as_of_date).await?;
     Ok(Json(response))
 }

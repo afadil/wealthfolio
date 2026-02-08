@@ -392,7 +392,6 @@ where
         None
     }
 
-
     /// Build sync plan for a single asset.
     fn build_asset_sync_plan(
         &self,
@@ -429,11 +428,8 @@ where
             quote_max,
         };
 
-        let category = determine_sync_category(
-            &inputs,
-            CLOSED_POSITION_GRACE_PERIOD_DAYS,
-            effective_today,
-        );
+        let category =
+            determine_sync_category(&inputs, CLOSED_POSITION_GRACE_PERIOD_DAYS, effective_today);
 
         // Skip closed positions
         if matches!(category, SyncCategory::Closed) {

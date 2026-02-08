@@ -1595,7 +1595,9 @@ impl SnapshotServiceTrait for SnapshotService {
 
         // Emit HoldingsChanged event after successful save
         let asset_ids: Vec<String> = snapshot
-            .positions.values().map(|p| p.asset_id.clone())
+            .positions
+            .values()
+            .map(|p| p.asset_id.clone())
             .collect();
         self.emit_holdings_changed(vec![account_id.to_string()], asset_ids);
 

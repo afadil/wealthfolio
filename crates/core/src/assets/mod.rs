@@ -24,9 +24,7 @@ pub use alternative_assets_service::AlternativeAssetService;
 pub use alternative_assets_traits::{
     AlternativeAssetRepositoryTrait, AlternativeAssetServiceTrait,
 };
-pub use asset_id::{
-    parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix,
-};
+pub use asset_id::{parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix};
 pub use assets_model::{
     Asset, AssetKind, AssetMetadata, AssetSpec, Country, EnsureAssetsResult, InstrumentId,
     InstrumentType, NewAsset, OptionSpec, ProviderProfile, QuoteMode, Sector, UpdateAssetProfile,

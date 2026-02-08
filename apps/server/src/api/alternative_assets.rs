@@ -26,7 +26,8 @@ use serde_json::Value;
 use wealthfolio_core::{
     assets::{
         AssetKind, CreateAlternativeAssetRequest as CoreCreateRequest,
-        LinkLiabilityRequest as CoreLinkRequest, UpdateAssetDetailsRequest as CoreUpdateDetailsRequest,
+        LinkLiabilityRequest as CoreLinkRequest,
+        UpdateAssetDetailsRequest as CoreUpdateDetailsRequest,
         UpdateValuationRequest as CoreValuationRequest,
     },
     quotes::MarketSyncMode,
