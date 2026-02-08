@@ -480,7 +480,7 @@ export function ImportReviewGrid({
 
   // Handle horizontal scroll with mouse wheel (Shift + wheel or just wheel)
   const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
-    const target = e.currentTarget.querySelector('[data-slot="grid"]') as HTMLElement;
+    const target = e.currentTarget.querySelector<HTMLElement>('[data-slot="grid"]');
     if (!target) return;
 
     // If user is scrolling horizontally with trackpad (deltaX), let it happen naturally

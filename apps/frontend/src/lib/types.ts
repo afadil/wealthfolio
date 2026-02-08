@@ -411,6 +411,8 @@ export interface ImportActivitiesSummary {
   imported: number;
   /** Number of activities skipped (invalid or errors) */
   skipped: number;
+  /** Number of duplicate activities detected and skipped */
+  duplicates: number;
   /** Number of new assets created during import */
   assetsCreated: number;
   /** Whether the import was successful (no validation errors) */
