@@ -682,6 +682,19 @@ where
             }
         }
 
+        // Replace asset IDs with display codes in failures for human-readable messages
+        result.failures = result
+            .failures
+            .into_iter()
+            .map(|(id, err)| {
+                let display = asset_map
+                    .get(&id)
+                    .and_then(|a| a.display_code.clone())
+                    .unwrap_or(id);
+                (display, err)
+            })
+            .collect();
+
         debug!(
             "Sync complete: {} synced, {} failed, {} skipped, {} quotes total",
             result.synced, result.failed, result.skipped, result.quotes_synced
