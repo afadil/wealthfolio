@@ -15,6 +15,7 @@ import {
   ImportFormat,
   ImportMappingData,
   ImportRequiredField,
+  type SymbolSearchResult,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
@@ -27,7 +28,11 @@ interface MappingTableProps {
   accounts: Account[];
   handleColumnMapping: (field: ImportFormat, value: string) => void;
   handleActivityTypeMapping: (csvActivity: string, activityType: ActivityType) => void;
-  handleSymbolMapping: (csvSymbol: string, newSymbol: string) => void;
+  handleSymbolMapping: (
+    csvSymbol: string,
+    newSymbol: string,
+    searchResult?: SymbolSearchResult,
+  ) => void;
   handleAccountIdMapping: (csvAccountId: string, accountId: string) => void;
   getMappedValue: (row: CsvRowData, field: ImportFormat) => string;
   invalidSymbols: string[];

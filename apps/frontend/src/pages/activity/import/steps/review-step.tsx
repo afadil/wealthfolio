@@ -1,29 +1,35 @@
-import { useMemo, useState, useCallback, useEffect } from "react";
-import { Badge } from "@wealthfolio/ui/components/ui/badge";
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { ProgressIndicator } from "@wealthfolio/ui/components/ui/progress-indicator";
 import {
-  useImportContext,
-  setDraftActivities,
-  setDuplicates,
-  updateDraft,
+  checkActivitiesImport,
+  checkExistingDuplicates,
+  logger,
+  saveAccountImportMapping,
+} from "@/adapters";
+import {
+  ACTIVITY_SUBTYPES,
+  ActivityType,
+  ImportFormat,
+  SUBTYPES_BY_ACTIVITY_TYPE,
+} from "@/lib/constants";
+import type { ActivityImport, SymbolSearchResult } from "@/lib/types";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { ProgressIndicator } from "@wealthfolio/ui/components/ui/progress-indicator";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ImportAlert } from "../components/import-alert";
+import { ImportReviewGrid, type ImportReviewFilter } from "../components/import-review-grid";
+import { SymbolResolutionPanel } from "../components/symbol-resolution-panel";
+import {
+  bulkSetAccount,
+  bulkSetCurrency,
   bulkSkipDrafts,
   bulkUnskipDrafts,
-  bulkSetCurrency,
-  bulkSetAccount,
+  setDraftActivities,
+  setDuplicates,
+  setMapping,
+  updateDraft,
+  useImportContext,
   type DraftActivity,
   type DraftActivityStatus,
 } from "../context";
-import { ImportReviewGrid, type ImportReviewFilter } from "../components/import-review-grid";
-import { ImportAlert } from "../components/import-alert";
-import {
-  ActivityType,
-  ImportFormat,
-  ACTIVITY_SUBTYPES,
-  SUBTYPES_BY_ACTIVITY_TYPE,
-} from "@/lib/constants";
-import { checkActivitiesImport, checkExistingDuplicates, logger } from "@/adapters";
-import type { ActivityImport } from "@/lib/types";
 import { computeIdempotencyKeys, type IdempotencyKeyInput } from "../utils/idempotency";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -202,16 +208,19 @@ function mapActivityType(
 }
 
 /**
- * Map a CSV symbol to a resolved symbol
+ * Map a CSV symbol to a resolved symbol, optionally with exchange MIC and name metadata
  */
 function mapSymbol(
   csvSymbol: string | undefined,
   symbolMappings: Record<string, string>,
-): string | undefined {
-  if (!csvSymbol) return undefined;
+  symbolMappingMeta?: Record<string, { exchangeMic?: string; symbolName?: string }>,
+): { symbol: string | undefined; exchangeMic?: string; symbolName?: string } {
+  if (!csvSymbol) return { symbol: undefined };
 
   const trimmed = csvSymbol.trim();
-  return symbolMappings[trimmed] || trimmed;
+  const symbol = symbolMappings[trimmed] || trimmed;
+  const meta = symbolMappingMeta?.[trimmed];
+  return { symbol, exchangeMic: meta?.exchangeMic, symbolName: meta?.symbolName };
 }
 
 /**
@@ -401,6 +410,7 @@ function createDraftActivities(
     activityMappings: Record<string, string[]>;
     symbolMappings: Record<string, string>;
     accountMappings: Record<string, string>;
+    symbolMappingMeta?: Record<string, { exchangeMic?: string; symbolName?: string }>;
   },
   parseConfig: {
     dateFormat: string;
@@ -410,7 +420,8 @@ function createDraftActivities(
   },
   defaultAccountId: string,
 ): DraftActivity[] {
-  const { fieldMappings, activityMappings, symbolMappings, accountMappings } = mapping;
+  const { fieldMappings, activityMappings, symbolMappings, accountMappings, symbolMappingMeta } =
+    mapping;
   const { dateFormat, decimalSeparator, thousandsSeparator, defaultCurrency } = parseConfig;
 
   // Create header index lookup
@@ -446,7 +457,11 @@ function createDraftActivities(
     // Parse and normalize values
     const activityDate = parseDateValue(rawDate, dateFormat);
     const activityType = mapActivityType(rawType, activityMappings);
-    const symbol = mapSymbol(rawSymbol, symbolMappings);
+    const {
+      symbol,
+      exchangeMic: mappedExchangeMic,
+      symbolName: mappedSymbolName,
+    } = mapSymbol(rawSymbol, symbolMappings, symbolMappingMeta);
     const quantity = parseNumericValue(rawQuantity, decimalSeparator, thousandsSeparator);
     const unitPrice = parseNumericValue(rawUnitPrice, decimalSeparator, thousandsSeparator);
     const amount = parseNumericValue(rawAmount, decimalSeparator, thousandsSeparator);
@@ -475,6 +490,8 @@ function createDraftActivities(
       activityDate,
       activityType,
       symbol,
+      exchangeMic: mappedExchangeMic,
+      symbolName: mappedSymbolName,
       quantity,
       unitPrice,
       amount,
@@ -575,6 +592,7 @@ export function ReviewStep() {
           activityMappings: mapping.activityMappings,
           symbolMappings: mapping.symbolMappings,
           accountMappings: mapping.accountMappings || {},
+          symbolMappingMeta: mapping.symbolMappingMeta || {},
         },
         {
           dateFormat: parseConfig.dateFormat,
@@ -620,6 +638,7 @@ export function ReviewStep() {
                   activityType: draft.activityType as ActivityImport["activityType"],
                   date: draft.activityDate || "",
                   symbol: draft.symbol || "",
+                  exchangeMic: draft.exchangeMic,
                   quantity: draft.quantity,
                   unitPrice: draft.unitPrice,
                   amount: draft.amount,
@@ -893,6 +912,83 @@ export function ReviewStep() {
     [dispatch],
   );
 
+  const handleSymbolResolution = useCallback(
+    (mappings: Record<string, SymbolSearchResult>) => {
+      // 1. Update all affected drafts
+      for (const [csvSymbol, result] of Object.entries(mappings)) {
+        const affectedDrafts = draftActivities.filter(
+          (d) => d.symbol === csvSymbol && d.errors.symbol,
+        );
+
+        for (const draft of affectedDrafts) {
+          const symbolUpdates: Partial<DraftActivity> = {
+            symbol: result.symbol,
+            exchangeMic: result.exchangeMic,
+            symbolName: result.longName,
+          };
+
+          // Remove symbol errors, keep other (backend) errors
+          const { symbol: _removed, ...otherErrors } = draft.errors;
+
+          // Re-run frontend validation with updated fields
+          const merged = { ...draft, ...symbolUpdates };
+          const validation = validateDraft(merged);
+
+          // Merge: preserved non-symbol errors + fresh frontend validation
+          const finalErrors = { ...otherErrors, ...validation.errors };
+          const hasErrors = Object.keys(finalErrors).length > 0;
+          const hasWarnings = Object.keys(validation.warnings).length > 0;
+
+          dispatch(
+            updateDraft(draft.rowIndex, {
+              ...symbolUpdates,
+              errors: finalErrors,
+              warnings: validation.warnings,
+              status:
+                draft.status === "skipped" || draft.status === "duplicate"
+                  ? draft.status
+                  : hasErrors
+                    ? "error"
+                    : hasWarnings
+                      ? "warning"
+                      : "valid",
+            }),
+          );
+        }
+      }
+
+      // 2. Save resolved symbols to mapping profile for future imports
+      if (mapping) {
+        const newSymbolMappings = { ...mapping.symbolMappings };
+        const newSymbolMappingMeta = { ...(mapping.symbolMappingMeta || {}) };
+
+        for (const [csvSymbol, result] of Object.entries(mappings)) {
+          newSymbolMappings[csvSymbol] = result.symbol;
+          newSymbolMappingMeta[csvSymbol] = {
+            exchangeMic: result.exchangeMic,
+            symbolName: result.longName,
+          };
+        }
+
+        const updatedMapping = {
+          ...mapping,
+          symbolMappings: newSymbolMappings,
+          symbolMappingMeta: newSymbolMappingMeta,
+        };
+
+        dispatch(setMapping(updatedMapping));
+
+        // Persist to backend
+        if (accountId) {
+          saveAccountImportMapping({ ...updatedMapping, accountId }).catch((err) =>
+            logger.error(`Failed to save symbol mappings: ${err}`),
+          );
+        }
+      }
+    },
+    [draftActivities, dispatch, mapping, accountId],
+  );
+
   // Show loading state while drafts are being created or validated
   if ((draftActivities.length === 0 && parsedRows.length > 0) || isValidating) {
     return (
@@ -948,6 +1044,9 @@ export function ReviewStep() {
           description="Your data is ready for import. You can still review and make adjustments if needed."
         />
       )}
+
+      {/* Symbol resolution for unrecognized symbols */}
+      <SymbolResolutionPanel drafts={draftActivities} onApplyMappings={handleSymbolResolution} />
 
       {/* Stats and filter */}
       <div className="flex flex-col gap-3">

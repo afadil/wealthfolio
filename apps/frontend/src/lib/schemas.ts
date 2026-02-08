@@ -45,6 +45,16 @@ export const importMappingSchema = z.object({
   activityMappings: z.record(z.string(), z.array(z.string())).optional().default({}),
   symbolMappings: z.record(z.string(), z.string()).optional().default({}),
   accountMappings: z.record(z.string(), z.string()).optional().default({}),
+  /** Rich metadata for resolved symbol mappings (exchange MIC, display name) */
+  symbolMappingMeta: z
+    .record(
+      z.string(),
+      z.object({
+        exchangeMic: z.string().optional(),
+        symbolName: z.string().optional(),
+      }),
+    )
+    .optional(),
   /** CSV parsing configuration */
   parseConfig: parseConfigSchema.optional(),
 });

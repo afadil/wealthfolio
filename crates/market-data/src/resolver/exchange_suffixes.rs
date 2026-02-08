@@ -60,6 +60,14 @@ impl ExchangeMap {
             "XASE",
             &[("YAHOO", "", "USD"), ("ALPHA_VANTAGE", "", "USD")],
         );
+        // BATS (Cboe BZX Exchange)
+        self.add("BATS", &[("YAHOO", "", "USD")]);
+        // NYSE Arca
+        self.add("ARCX", &[("YAHOO", "", "USD")]);
+        // OTC Markets (Pink Sheets, OTCQX, OTCQB)
+        self.add("OTCM", &[("YAHOO", "", "USD")]);
+        // NEO Exchange (Canada)
+        self.add("XNEO", &[("YAHOO", ".NE", "CAD")]);
         // Toronto Stock Exchange
         self.add(
             "XTSE",
@@ -372,6 +380,16 @@ pub fn yahoo_exchange_to_mic(code: &str) -> Option<Mic> {
         "NYQ" | "NYS" => "XNYS",
         // NYSE American (AMEX)
         "PCX" | "ASE" => "XASE",
+        // BATS (Cboe BZX)
+        "BTS" => "BATS",
+        // NYSE Arca
+        "ARC" => "ARCX",
+        // OTC Markets
+        "PNK" | "OQB" | "OQX" => "OTCM",
+        // NEO Exchange (Canada)
+        "NEO" => "XNEO",
+        // Nasdaq (generic variant)
+        "NAS" => "XNAS",
         // Toronto
         "TOR" => "XTSE",
         // TSX Venture
@@ -477,7 +495,7 @@ pub fn yahoo_exchange_to_mic(code: &str) -> Option<Mic> {
 /// avoiding false positives like BRK.B or RDS.A.
 pub const YAHOO_EXCHANGE_SUFFIXES: &[&str] = &[
     // North America
-    ".TO", ".V", ".CN", ".MX", // UK & Europe
+    ".TO", ".V", ".CN", ".NE", ".MX", // UK & Europe
     ".L", ".IL", ".IR", ".DE", ".F", ".SG", ".HM", ".DU", ".MU", ".BE", ".HA", ".PA", ".AS", ".BR",
     ".LS", ".MI", ".MC", ".AT", // Nordic
     ".ST", ".HE", ".CO", ".OL", ".IC", // Central/Eastern Europe
@@ -502,10 +520,11 @@ pub const YAHOO_EXCHANGE_SUFFIXES: &[&str] = &[
 pub fn yahoo_suffix_to_mic(suffix: &str) -> Option<&'static str> {
     match suffix.to_uppercase().as_str() {
         // North America
-        "TO" => Some("XTSE"),        // Toronto Stock Exchange
-        "V" | "VN" => Some("XTSX"),  // TSX Venture
-        "CN" | "NE" => Some("XCNQ"), // Canadian Securities Exchange
-        "MX" => Some("XMEX"),        // Mexican Stock Exchange
+        "TO" => Some("XTSE"),       // Toronto Stock Exchange
+        "V" | "VN" => Some("XTSX"), // TSX Venture
+        "CN" => Some("XCNQ"),       // Canadian Securities Exchange
+        "NE" => Some("XNEO"),       // NEO Exchange
+        "MX" => Some("XMEX"),       // Mexican Stock Exchange
 
         // UK & Ireland
         "L" => Some("XLON"),  // London Stock Exchange

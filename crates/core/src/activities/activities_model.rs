@@ -586,6 +586,16 @@ pub struct ImportMapping {
     pub updated_at: NaiveDateTime,
 }
 
+/// Rich metadata for a resolved symbol mapping (exchange MIC, display name, etc.)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SymbolMappingMeta {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exchange_mic: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symbol_name: Option<String>,
+}
+
 /// Model for activity import mapping data with structured mappings
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -601,6 +611,9 @@ pub struct ImportMappingData {
     pub symbol_mappings: std::collections::HashMap<String, String>,
     #[serde(default)]
     pub account_mappings: std::collections::HashMap<String, String>,
+    /// Rich metadata for resolved symbol mappings (exchange MIC, display name)
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    pub symbol_mapping_meta: std::collections::HashMap<String, SymbolMappingMeta>,
     /// CSV parsing configuration (delimiter, date format, etc.)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parse_config: Option<ParseConfig>,
@@ -618,6 +631,8 @@ pub struct ImportMappingConfig {
     pub symbol_mappings: std::collections::HashMap<String, String>,
     #[serde(default)]
     pub account_mappings: std::collections::HashMap<String, String>,
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    pub symbol_mapping_meta: std::collections::HashMap<String, SymbolMappingMeta>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parse_config: Option<ParseConfig>,
 }
@@ -658,6 +673,7 @@ impl Default for ImportMappingData {
             activity_mappings,
             symbol_mappings: std::collections::HashMap::new(),
             account_mappings: std::collections::HashMap::new(),
+            symbol_mapping_meta: std::collections::HashMap::new(),
             parse_config: None,
         }
     }
@@ -675,6 +691,7 @@ impl ImportMapping {
             activity_mappings: config.activity_mappings,
             symbol_mappings: config.symbol_mappings,
             account_mappings: config.account_mappings,
+            symbol_mapping_meta: config.symbol_mapping_meta,
             parse_config: config.parse_config,
         })
     }
@@ -688,6 +705,7 @@ impl ImportMapping {
             activity_mappings: data.activity_mappings.clone(),
             symbol_mappings: data.symbol_mappings.clone(),
             account_mappings: data.account_mappings.clone(),
+            symbol_mapping_meta: data.symbol_mapping_meta.clone(),
             parse_config: data.parse_config.clone(),
         };
 

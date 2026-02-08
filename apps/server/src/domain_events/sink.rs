@@ -3,7 +3,7 @@
 //! Receives domain events and sends them to a background queue worker
 //! for debounced processing.
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use tokio::sync::mpsc;
 use wealthfolio_connect::BrokerSyncServiceTrait;
@@ -56,7 +56,6 @@ impl WebDomainEventSink {
     #[allow(clippy::too_many_arguments)]
     pub fn start_worker(
         &self,
-        base_currency: Arc<RwLock<String>>,
         asset_service: Arc<dyn AssetServiceTrait + Send + Sync>,
         connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync>,
         event_bus: EventBus,
@@ -80,7 +79,6 @@ impl WebDomainEventSink {
             .expect("start_worker() can only be called once");
 
         let deps = Arc::new(QueueWorkerDeps {
-            base_currency,
             asset_service,
             connect_sync_service,
             event_bus,

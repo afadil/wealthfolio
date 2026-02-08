@@ -9,6 +9,7 @@ import {
   ImportFormat,
   ImportMappingData,
   ImportRequiredField,
+  type SymbolSearchResult,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { isCashSymbol, isSymbolRequired } from "@/lib/activity-utils";
@@ -225,7 +226,11 @@ interface SymbolDisplayCellProps {
   csvSymbol: string;
   mappedSymbol: string | undefined;
   isInvalid: boolean;
-  handleSymbolMapping: (csvSymbol: string, newSymbol: string) => void;
+  handleSymbolMapping: (
+    csvSymbol: string,
+    newSymbol: string,
+    searchResult?: SymbolSearchResult,
+  ) => void;
 }
 function SymbolDisplayCell({
   csvSymbol,
@@ -260,8 +265,8 @@ function SymbolDisplayCell({
           <TickerSearchInput
             defaultValue={mappedSymbol || ""}
             placeholder="Map symbol"
-            onSelectResult={(newSymbol, _searchResult) => {
-              handleSymbolMapping(csvSymbol, newSymbol);
+            onSelectResult={(newSymbol, searchResult) => {
+              handleSymbolMapping(csvSymbol, newSymbol, searchResult);
               setIsEditing(false);
             }}
             className={MAPPING_TRIGGER_UNMAPPED_CLASS}
@@ -320,7 +325,11 @@ export function MappingCell({
   accounts: Account[];
   getMappedValue: (row: CsvRowData, field: ImportFormat) => string;
   handleActivityTypeMapping: (csvActivity: string, activityType: ActivityType) => void;
-  handleSymbolMapping: (csvSymbol: string, newSymbol: string) => void;
+  handleSymbolMapping: (
+    csvSymbol: string,
+    newSymbol: string,
+    searchResult?: SymbolSearchResult,
+  ) => void;
   handleAccountIdMapping?: (csvAccountId: string, accountId: string) => void;
   invalidSymbols: string[];
   invalidAccounts: string[];

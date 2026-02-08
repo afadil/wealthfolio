@@ -5,7 +5,7 @@
 //! and broker sync.
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::sync::mpsc;
@@ -20,7 +20,6 @@ const DEBOUNCE_DURATION: Duration = Duration::from_millis(1000);
 
 /// Dependencies needed by the queue worker for processing events.
 pub struct QueueWorkerDeps {
-    pub base_currency: Arc<RwLock<String>>,
     pub asset_service: Arc<dyn AssetServiceTrait + Send + Sync>,
     pub connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync>,
     pub event_bus: EventBus,
@@ -120,10 +119,8 @@ pub async fn event_queue_worker(
 async fn process_event_batch(events: &[DomainEvent], deps: Arc<QueueWorkerDeps>) {
     tracing::info!("Processing batch of {} domain event(s)", events.len());
 
-    let base_currency = deps.base_currency.read().unwrap().clone();
-
     // 1. Plan and trigger portfolio job
-    if let Some(config) = plan_portfolio_job(events, &base_currency) {
+    if let Some(config) = plan_portfolio_job(events) {
         tracing::info!(
             "Triggering portfolio job for accounts: {:?}, market_sync: {:?}",
             config.account_ids,

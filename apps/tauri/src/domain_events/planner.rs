@@ -18,10 +18,7 @@ use crate::events::PortfolioRequestPayload;
 /// - AccountsChanged (including FX asset IDs for currency changes)
 ///
 /// Returns `None` if no events require portfolio recalculation.
-pub fn plan_portfolio_job(
-    events: &[DomainEvent],
-    base_currency: &str,
-) -> Option<PortfolioRequestPayload> {
+pub fn plan_portfolio_job(events: &[DomainEvent]) -> Option<PortfolioRequestPayload> {
     let mut account_ids: HashSet<String> = HashSet::new();
     let mut asset_ids: HashSet<String> = HashSet::new();
     let mut has_recalc_events = false;
@@ -31,19 +28,11 @@ pub fn plan_portfolio_job(
             DomainEvent::ActivitiesChanged {
                 account_ids: acc_ids,
                 asset_ids: a_ids,
-                currencies,
+                ..
             } => {
                 has_recalc_events = true;
                 account_ids.extend(acc_ids.iter().cloned());
                 asset_ids.extend(a_ids.iter().cloned());
-                for currency in currencies {
-                    if !currency.is_empty()
-                        && !base_currency.is_empty()
-                        && currency != base_currency
-                    {
-                        asset_ids.insert(format!("FX:{}:{}", currency, base_currency));
-                    }
-                }
             }
             DomainEvent::HoldingsChanged {
                 account_ids: acc_ids,
@@ -55,35 +44,24 @@ pub fn plan_portfolio_job(
             }
             DomainEvent::AccountsChanged {
                 account_ids: acc_ids,
-                currency_changes,
+                ..
             } => {
                 has_recalc_events = true;
                 account_ids.extend(acc_ids.iter().cloned());
-
-                // Add FX asset IDs for currency changes
-                for change in currency_changes {
-                    if change.new_currency != base_currency {
-                        // FX asset ID format: FX:{currency}:{base_currency}
-                        let fx_asset_id = format!("FX:{}:{}", change.new_currency, base_currency);
-                        asset_ids.insert(fx_asset_id);
-                    }
-                    // Also handle old currency if it was different
-                    if let Some(ref old_currency) = change.old_currency {
-                        if old_currency != base_currency && old_currency != &change.new_currency {
-                            let fx_asset_id = format!("FX:{}:{}", old_currency, base_currency);
-                            asset_ids.insert(fx_asset_id);
-                        }
-                    }
-                }
             }
             DomainEvent::ManualSnapshotSaved { account_id } => {
                 has_recalc_events = true;
                 account_ids.insert(account_id.clone());
             }
-            // AssetsCreated, AssetsMerged, and TrackingModeChanged don't trigger portfolio recalc directly
-            DomainEvent::AssetsCreated { .. }
-            | DomainEvent::AssetsMerged { .. }
-            | DomainEvent::TrackingModeChanged { .. } => {}
+            // AssetsCreated: include IDs for sync (e.g., FX assets), but don't trigger recalc alone
+            DomainEvent::AssetsCreated { asset_ids: ids } => {
+                for id in ids {
+                    if !id.is_empty() {
+                        asset_ids.insert(id.clone());
+                    }
+                }
+            }
+            DomainEvent::AssetsMerged { .. } | DomainEvent::TrackingModeChanged { .. } => {}
         }
     }
 
@@ -180,7 +158,7 @@ mod tests {
     #[test]
     fn test_plan_portfolio_job_empty_events() {
         let events: Vec<DomainEvent> = vec![];
-        let result = plan_portfolio_job(&events, "USD");
+        let result = plan_portfolio_job(&events);
         assert!(result.is_none());
     }
 
@@ -192,7 +170,7 @@ mod tests {
             currencies: vec!["USD".to_string()],
         }];
 
-        let result = plan_portfolio_job(&events, "USD");
+        let result = plan_portfolio_job(&events);
         assert!(result.is_some());
 
         let payload = result.unwrap();
@@ -202,7 +180,7 @@ mod tests {
     }
 
     #[test]
-    fn test_plan_portfolio_job_with_currency_changes() {
+    fn test_plan_portfolio_job_accounts_changed_no_fake_fx_ids() {
         let events = vec![DomainEvent::AccountsChanged {
             account_ids: vec!["acc1".to_string()],
             currency_changes: vec![CurrencyChange {
@@ -212,17 +190,40 @@ mod tests {
             }],
         }];
 
-        let result = plan_portfolio_job(&events, "USD");
+        let result = plan_portfolio_job(&events);
         assert!(result.is_some());
 
         let payload = result.unwrap();
-        // Should have FX asset IDs for both currencies
+        // FX assets are synced via AssetsCreated events, not constructed from currencies
         if let wealthfolio_core::quotes::MarketSyncMode::Incremental { asset_ids } =
             payload.market_sync_mode
         {
+            assert!(asset_ids.is_none());
+        } else {
+            panic!("Expected Incremental sync mode");
+        }
+    }
+
+    #[test]
+    fn test_plan_portfolio_job_assets_created_contributes_ids() {
+        let events = vec![
+            DomainEvent::ActivitiesChanged {
+                account_ids: vec!["acc1".to_string()],
+                asset_ids: vec!["equity-uuid".to_string()],
+                currencies: vec!["USD".to_string()],
+            },
+            DomainEvent::AssetsCreated {
+                asset_ids: vec!["fx-uuid".to_string()],
+            },
+        ];
+
+        let result = plan_portfolio_job(&events).unwrap();
+        if let wealthfolio_core::quotes::MarketSyncMode::Incremental { asset_ids } =
+            result.market_sync_mode
+        {
             let ids = asset_ids.unwrap();
-            assert!(ids.contains(&"FX:GBP:USD".to_string()));
-            assert!(ids.contains(&"FX:EUR:USD".to_string()));
+            assert!(ids.contains(&"equity-uuid".to_string()));
+            assert!(ids.contains(&"fx-uuid".to_string()));
         } else {
             panic!("Expected Incremental sync mode");
         }
@@ -234,7 +235,7 @@ mod tests {
             asset_ids: vec!["AAPL".to_string()],
         }];
 
-        let result = plan_portfolio_job(&events, "USD");
+        let result = plan_portfolio_job(&events);
         assert!(result.is_none());
     }
 

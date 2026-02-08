@@ -88,8 +88,14 @@ impl AccountServiceTrait for AccountService {
 
         let result = self.repository.update(account_update).await?;
 
-        // Detect currency changes
+        // Detect currency changes and register FX pair if needed
         let currency_changes = if existing.currency != result.currency {
+            let base_currency = self.base_currency.read().unwrap().clone();
+            if result.currency != base_currency {
+                self.fx_service
+                    .register_currency_pair(result.currency.as_str(), base_currency.as_str())
+                    .await?;
+            }
             vec![CurrencyChange {
                 account_id: result.id.clone(),
                 old_currency: Some(existing.currency.clone()),

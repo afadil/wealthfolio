@@ -103,12 +103,9 @@ async fn process_event_batch(
 
     info!("Processing batch of {} domain events", events.len());
 
-    // Get base currency for FX asset ID generation
-    let base_currency = context.get_base_currency();
-
     // Plan and run portfolio job directly (not via event emission)
     // This ensures the is_processing guard properly tracks completion
-    if let Some(payload) = plan_portfolio_job(events, &base_currency) {
+    if let Some(payload) = plan_portfolio_job(events) {
         info!(
             "Running portfolio job (accounts: {:?})",
             payload.account_ids

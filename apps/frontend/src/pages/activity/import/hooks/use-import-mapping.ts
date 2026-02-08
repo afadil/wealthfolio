@@ -1,5 +1,10 @@
 import { useState, useCallback, useEffect } from "react";
-import { ImportFormat, ActivityType, ImportMappingData } from "@/lib/types";
+import {
+  ImportFormat,
+  ActivityType,
+  ImportMappingData,
+  type SymbolSearchResult,
+} from "@/lib/types";
 import { ACTIVITY_TYPE_PREFIX_LENGTH } from "@/lib/types";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getAccountImportMapping, saveAccountImportMapping, logger } from "@/adapters";
@@ -264,6 +269,7 @@ const initialMapping: ImportMappingData = {
   activityMappings: {},
   symbolMappings: {},
   accountMappings: {},
+  symbolMappingMeta: {},
 };
 
 interface UseImportMappingProps {
@@ -337,6 +343,10 @@ export function useImportMapping({
         },
         symbolMappings: { ...prev.symbolMappings, ...(fetchedMappingData.symbolMappings || {}) },
         accountMappings: { ...prev.accountMappings, ...(fetchedMappingData.accountMappings || {}) },
+        symbolMappingMeta: {
+          ...prev.symbolMappingMeta,
+          ...(fetchedMappingData.symbolMappingMeta || {}),
+        },
       }));
       setHasInitializedFromHeaders(false);
     }
@@ -394,15 +404,29 @@ export function useImportMapping({
     [],
   );
 
-  const handleSymbolMapping = useCallback((csvSymbol: string, newSymbol: string) => {
-    setMapping((prev) => ({
-      ...prev,
-      symbolMappings: {
-        ...prev.symbolMappings,
-        [csvSymbol.trim()]: newSymbol.trim(),
-      },
-    }));
-  }, []);
+  const handleSymbolMapping = useCallback(
+    (csvSymbol: string, newSymbol: string, searchResult?: SymbolSearchResult) => {
+      setMapping((prev) => ({
+        ...prev,
+        symbolMappings: {
+          ...prev.symbolMappings,
+          [csvSymbol.trim()]: newSymbol.trim(),
+        },
+        symbolMappingMeta: {
+          ...prev.symbolMappingMeta,
+          ...(searchResult
+            ? {
+                [csvSymbol.trim()]: {
+                  exchangeMic: searchResult.exchangeMic,
+                  symbolName: searchResult.longName,
+                },
+              }
+            : {}),
+        },
+      }));
+    },
+    [],
+  );
 
   const handleAccountIdMapping = useCallback((csvAccountId: string, accountId: string) => {
     setMapping((prev) => {

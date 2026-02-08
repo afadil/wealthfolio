@@ -20,9 +20,11 @@ pub fn mic_to_exchange_name(mic: &str) -> Option<&'static str> {
         "XASE" => Some("NYSE American"),
         "ARCX" => Some("NYSE Arca"),
         "BATS" => Some("BATS"),
+        "OTCM" => Some("OTC Markets"),
         "XTSE" => Some("TSX"),
         "XTSX" => Some("TSX-V"),
         "XCNQ" => Some("CSE"),
+        "XNEO" => Some("NEO"),
         "XMEX" => Some("BMV"),
 
         // UK & Ireland
@@ -124,8 +126,8 @@ pub fn mic_to_exchange_name(mic: &str) -> Option<&'static str> {
 pub fn mic_to_currency(mic: &str) -> Option<&'static str> {
     match mic {
         // North America
-        "XNYS" | "XNAS" | "XASE" | "ARCX" | "BATS" => Some("USD"),
-        "XTSE" | "XTSX" | "XCNQ" => Some("CAD"),
+        "XNYS" | "XNAS" | "XASE" | "ARCX" | "BATS" | "OTCM" => Some("USD"),
+        "XTSE" | "XTSX" | "XCNQ" | "XNEO" => Some("CAD"),
         "XMEX" => Some("MXN"),
 
         // UK & Ireland
@@ -206,8 +208,8 @@ pub fn mic_to_currency(mic: &str) -> Option<&'static str> {
 pub fn mic_to_timezone(mic: &str) -> Option<&'static str> {
     match mic {
         // North America
-        "XNYS" | "XNAS" | "XASE" | "ARCX" | "BATS" => Some("America/New_York"),
-        "XTSE" | "XTSX" | "XCNQ" => Some("America/Toronto"),
+        "XNYS" | "XNAS" | "XASE" | "ARCX" | "BATS" | "OTCM" => Some("America/New_York"),
+        "XTSE" | "XTSX" | "XCNQ" | "XNEO" => Some("America/Toronto"),
         "XMEX" => Some("America/Mexico_City"),
 
         // UK & Ireland
@@ -294,8 +296,8 @@ pub fn mic_to_timezone(mic: &str) -> Option<&'static str> {
 pub fn mic_to_market_close(mic: &str) -> Option<(u8, u8)> {
     match mic {
         // North America
-        "XNYS" | "XNAS" | "XASE" | "ARCX" | "BATS" => Some((16, 0)),
-        "XTSE" | "XTSX" | "XCNQ" => Some((16, 0)),
+        "XNYS" | "XNAS" | "XASE" | "ARCX" | "BATS" | "OTCM" => Some((16, 0)),
+        "XTSE" | "XTSX" | "XCNQ" | "XNEO" => Some((16, 0)),
         "XMEX" => Some((15, 0)),
 
         // UK & Ireland
@@ -384,8 +386,8 @@ pub fn mic_to_market_close(mic: &str) -> Option<(u8, u8)> {
 /// A list of MIC codes in priority order.
 pub fn exchanges_for_currency(currency: &str) -> &'static [&'static str] {
     match currency {
-        "USD" => &["XNYS", "XNAS", "ARCX", "BATS", "XASE"],
-        "CAD" => &["XTSE", "XTSX", "XCNQ"],
+        "USD" => &["XNYS", "XNAS", "ARCX", "BATS", "XASE", "OTCM"],
+        "CAD" => &["XTSE", "XTSX", "XCNQ", "XNEO"],
         "GBP" => &["XLON"],
         "EUR" => &["XETR", "XPAR", "XAMS", "XMIL", "XMAD"],
         "CHF" => &["XSWX"],

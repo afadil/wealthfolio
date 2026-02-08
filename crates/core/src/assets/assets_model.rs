@@ -603,29 +603,40 @@ pub struct AssetSpec {
 
 impl AssetSpec {
     /// Computes the instrument_key that would be generated for this spec's instrument fields.
-    /// Mirrors the DB GENERATED STORED column: `{TYPE}:{SYMBOL}@{MIC}` or `{TYPE}:{SYMBOL}`.
+    /// Mirrors the DB GENERATED STORED column:
+    ///   - Crypto/FX: `{TYPE}:{SYMBOL}/{QUOTE_CCY}`
+    ///   - With MIC:  `{TYPE}:{SYMBOL}@{MIC}`
+    ///   - Bare:      `{TYPE}:{SYMBOL}`
     pub fn instrument_key(&self) -> Option<String> {
         let instrument_type = self.instrument_type.as_ref()?;
         let instrument_symbol = self.instrument_symbol.as_ref()?;
         if instrument_symbol.is_empty() {
             return None;
         }
-        match self
-            .instrument_exchange_mic
-            .as_ref()
-            .filter(|s| !s.is_empty())
-        {
-            Some(mic) => Some(format!(
-                "{}:{}@{}",
+        match instrument_type {
+            InstrumentType::Crypto | InstrumentType::Fx => Some(format!(
+                "{}:{}/{}",
                 instrument_type.as_db_str(),
                 instrument_symbol.to_uppercase(),
-                mic.to_uppercase()
+                self.quote_ccy.to_uppercase()
             )),
-            None => Some(format!(
-                "{}:{}",
-                instrument_type.as_db_str(),
-                instrument_symbol.to_uppercase()
-            )),
+            _ => match self
+                .instrument_exchange_mic
+                .as_ref()
+                .filter(|s| !s.is_empty())
+            {
+                Some(mic) => Some(format!(
+                    "{}:{}@{}",
+                    instrument_type.as_db_str(),
+                    instrument_symbol.to_uppercase(),
+                    mic.to_uppercase()
+                )),
+                None => Some(format!(
+                    "{}:{}",
+                    instrument_type.as_db_str(),
+                    instrument_symbol.to_uppercase()
+                )),
+            },
         }
     }
 }
