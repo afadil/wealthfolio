@@ -80,5 +80,7 @@ export default function PortfolioPage() {
     [sharedActions],
   );
 
-  return <SwipablePage className="pt-0" views={views} defaultView="investments" withPadding={false} />;
+  return (
+    <SwipablePage className="pt-0" views={views} defaultView="investments" withPadding={false} />
+  );
 }

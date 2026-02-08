@@ -39,24 +39,24 @@ run_portfolio_job()
 
 ### Automatic (Domain Events)
 
-| Event                  | Market Sync                          | Portfolio Recalc |
-| ---------------------- | ------------------------------------ | ---------------- |
-| `ActivitiesChanged`    | Incremental for affected assets + FX | Yes              |
-| `HoldingsChanged`      | Incremental for affected assets      | Yes              |
-| `AccountsChanged`      | Incremental + FX for currency change | Yes              |
-| `ManualSnapshotSaved`  | None                                 | Yes              |
-| `AssetsCreated`        | None (profile enrichment only)       | No               |
-| `TrackingModeChanged`  | None (broker sync only)              | No               |
+| Event                 | Market Sync                          | Portfolio Recalc |
+| --------------------- | ------------------------------------ | ---------------- |
+| `ActivitiesChanged`   | Incremental for affected assets + FX | Yes              |
+| `HoldingsChanged`     | Incremental for affected assets      | Yes              |
+| `AccountsChanged`     | Incremental + FX for currency change | Yes              |
+| `ManualSnapshotSaved` | None                                 | Yes              |
+| `AssetsCreated`       | None (profile enrichment only)       | No               |
+| `TrackingModeChanged` | None (broker sync only)              | No               |
 
 ### Manual (Frontend)
 
-| UI Action                  | Mode                    | Scope         |
-| -------------------------- | ----------------------- | ------------- |
-| "Update" (settings)        | Incremental             | All assets    |
-| "Rebuild History" (settings)| BackfillHistory         | All assets    |
-| "Refresh Quotes" (asset)   | Incremental             | Single asset  |
-| "Refetch Recent" (assets)  | RefetchRecent 45d       | All assets    |
-| Pull-to-refresh (mobile)   | triggerPortfolioUpdate() | All assets    |
+| UI Action                    | Mode                     | Scope        |
+| ---------------------------- | ------------------------ | ------------ |
+| "Update" (settings)          | Incremental              | All assets   |
+| "Rebuild History" (settings) | BackfillHistory          | All assets   |
+| "Refresh Quotes" (asset)     | Incremental              | Single asset |
+| "Refetch Recent" (assets)    | RefetchRecent 45d        | All assets   |
+| Pull-to-refresh (mobile)     | triggerPortfolioUpdate() | All assets   |
 
 ### Event Debouncing
 
@@ -68,11 +68,11 @@ run_portfolio_job()
 
 ## Sync Modes
 
-| Mode                       | Start Date                      | End Date | Use Case                             |
-| -------------------------- | ------------------------------- | -------- | ------------------------------------ |
-| `Incremental` (default)    | `quote_max - 5d` (overlap heal) | today    | Regular sync                         |
-| `RefetchRecent { days }`   | `today - days`                  | today    | Force refresh recent window          |
-| `BackfillHistory { days }` | `activity_min - 45d`            | today    | Full rebuild, resync                 |
+| Mode                       | Start Date                      | End Date | Use Case                    |
+| -------------------------- | ------------------------------- | -------- | --------------------------- |
+| `Incremental` (default)    | `quote_max - 5d` (overlap heal) | today    | Regular sync                |
+| `RefetchRecent { days }`   | `today - days`                  | today    | Force refresh recent window |
+| `BackfillHistory { days }` | `activity_min - 45d`            | today    | Full rebuild, resync        |
 
 ---
 
@@ -141,16 +141,16 @@ Triggered by `AssetsCreated` events (spawned as background task):
 
 ## Constants
 
-| Constant                          | Value  | Purpose                                 |
-| --------------------------------- | ------ | --------------------------------------- |
-| `DEFAULT_HISTORY_DAYS`            | 1825   | 5yr fallback for new symbols            |
-| `CLOSED_POSITION_GRACE_PERIOD_DAYS` | 30   | Days to keep syncing after close        |
-| `QUOTE_HISTORY_BUFFER_DAYS`       | 45     | Days before first activity to fetch     |
-| `BACKFILL_SAFETY_MARGIN_DAYS`     | 7      | Conservative backfill detection margin  |
-| `MIN_SYNC_LOOKBACK_DAYS`          | 5      | Minimum window for weekends/holidays    |
-| `OVERLAP_DAYS`                    | 5      | Incremental overlap for healing corrections |
-| `MAX_SYNC_ERRORS`                 | 10     | Skip asset after N consecutive failures |
-| `DEBOUNCE_MS`                     | 1000   | Event debounce window                   |
+| Constant                            | Value | Purpose                                     |
+| ----------------------------------- | ----- | ------------------------------------------- |
+| `DEFAULT_HISTORY_DAYS`              | 1825  | 5yr fallback for new symbols                |
+| `CLOSED_POSITION_GRACE_PERIOD_DAYS` | 30    | Days to keep syncing after close            |
+| `QUOTE_HISTORY_BUFFER_DAYS`         | 45    | Days before first activity to fetch         |
+| `BACKFILL_SAFETY_MARGIN_DAYS`       | 7     | Conservative backfill detection margin      |
+| `MIN_SYNC_LOOKBACK_DAYS`            | 5     | Minimum window for weekends/holidays        |
+| `OVERLAP_DAYS`                      | 5     | Incremental overlap for healing corrections |
+| `MAX_SYNC_ERRORS`                   | 10    | Skip asset after N consecutive failures     |
+| `DEBOUNCE_MS`                       | 1000  | Event debounce window                       |
 
 ---
 
@@ -159,13 +159,13 @@ Triggered by `AssetsCreated` events (spawned as background task):
 ### E1: Sequential sync execution
 
 Assets sync sequentially in `execute_sync_plans()`. No parallelism. With many
-assets and slow providers, total time = N * avg_fetch_time.
+assets and slow providers, total time = N \* avg_fetch_time.
 
 ### E2: NeedsBackfill creates two plans for same asset
 
-When an active asset needs backfill, TWO plans are created: one for the gap,
-one for recent data. Wastes API calls on overlapping data (harmless due to
-upsert, but inefficient).
+When an active asset needs backfill, TWO plans are created: one for the gap, one
+for recent data. Wastes API calls on overlapping data (harmless due to upsert,
+but inefficient).
 
 ### E3: FX assets + Incremental + no quotes = 45d only
 
@@ -210,8 +210,8 @@ background. Emit "quotes updated" event for incremental refresh.
 
 ### P3: Profile enrichment TTL
 
-Add staleness check: `profile_enriched_at + 30d < now`. Re-enrich stale
-profiles during sync or on-demand.
+Add staleness check: `profile_enriched_at + 30d < now`. Re-enrich stale profiles
+during sync or on-demand.
 
 ### P4: Surface per-asset sync errors in UI
 
