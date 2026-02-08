@@ -30,13 +30,24 @@ export function useHealthStatus() {
 /**
  * Hook for running health checks.
  */
-export function useRunHealthChecks() {
+export function useRunHealthChecks(options?: { navigate?: (path: string) => void }) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: runHealthChecks,
-    onSuccess: (data) => {
+    onSuccess: (data: HealthStatus) => {
       queryClient.setQueryData([QueryKeys.HEALTH_STATUS], data);
+      const issueCount = data.issues?.length ?? 0;
+      if (issueCount === 0) {
+        toast.success("All checks passed", { description: "No issues found." });
+      } else {
+        toast.error(`${issueCount} issue${issueCount > 1 ? "s" : ""} found`, {
+          description: "Review the details in the Health Center.",
+          action: options?.navigate
+            ? { label: "View", onClick: () => options.navigate!("/health") }
+            : undefined,
+        });
+      }
     },
     onError: (error: Error) => {
       toast.error("Health check failed", { description: error.message });

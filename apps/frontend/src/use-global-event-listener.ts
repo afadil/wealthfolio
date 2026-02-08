@@ -81,6 +81,17 @@ const useGlobalEventListener = () => {
           id: `market-sync-error-${failedSymbols || "unknown"}`,
           description: `Unable to update market data for: ${failedSymbols}. This may affect your portfolio calculations and analytics. Please try again later.`,
           duration: 15000,
+          action: {
+            label: "View Securities",
+            onClick: () => {
+              navigateRef.current("/settings/securities");
+            },
+          },
+          classNames: {
+            toast: "!flex-wrap",
+            content: "!flex-[1_0_calc(100%-2rem)]",
+            actionButton: "!ml-auto",
+          },
         });
       }
     };

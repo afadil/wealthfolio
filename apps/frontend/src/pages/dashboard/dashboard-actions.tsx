@@ -18,7 +18,7 @@ export function DashboardActions() {
   // Portfolio update mutations
   const updatePortfolioMutation = useUpdatePortfolioMutation();
   const recalculatePortfolioMutation = useRecalculatePortfolioMutation();
-  const runHealthChecksMutation = useRunHealthChecks();
+  const runHealthChecksMutation = useRunHealthChecks({ navigate });
 
   // Wealthfolio Connect sync
   const { isEnabled, isConnected, userInfo } = useWealthfolioConnect();
