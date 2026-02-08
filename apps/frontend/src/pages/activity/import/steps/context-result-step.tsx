@@ -185,6 +185,13 @@ export function ContextResultStep() {
       <motion.div className="mb-10 flex items-center justify-center gap-12" variants={itemVariants}>
         <StatItem label="Imported" value={stats.imported} variant="success" />
 
+        {stats.duplicates > 0 && (
+          <>
+            <div className="bg-border h-12 w-px" />
+            <StatItem label="Duplicates" value={stats.duplicates} variant="muted" />
+          </>
+        )}
+
         <div className="bg-border h-12 w-px" />
 
         <StatItem label="Skipped" value={stats.skipped} variant="muted" />

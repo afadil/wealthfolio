@@ -12,6 +12,7 @@ use crate::activities::activities_constants::{
 use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
 use crate::activities::csv_parser::{self, ParseConfig, ParsedCsvResult};
+use crate::activities::idempotency::compute_idempotency_key;
 use crate::activities::{ActivityRepositoryTrait, ActivityServiceTrait};
 use crate::assets::{
     parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix, AssetKind, AssetServiceTrait,
@@ -556,6 +557,30 @@ impl ActivityService {
                 let (_, normalized_currency) = normalize_amount(Decimal::ZERO, &activity.currency);
                 activity.currency = normalized_currency.to_string();
             }
+        }
+
+        // Compute idempotency key for deduplication
+        if let Ok(date) = DateTime::parse_from_rfc3339(&activity.activity_date)
+            .map(|dt| dt.with_timezone(&Utc))
+            .or_else(|_| {
+                NaiveDate::parse_from_str(&activity.activity_date, "%Y-%m-%d").map(|d| {
+                    Utc.from_utc_datetime(&d.and_hms_opt(0, 0, 0).unwrap_or_default())
+                })
+            })
+        {
+            let key = compute_idempotency_key(
+                &activity.account_id,
+                &activity.activity_type,
+                &date,
+                activity.get_symbol_id(),
+                activity.quantity,
+                activity.unit_price,
+                activity.amount,
+                &activity.currency,
+                None,
+                activity.notes.as_deref(),
+            );
+            activity.idempotency_key = Some(key);
         }
 
         Ok(activity)
@@ -1516,6 +1541,7 @@ impl ActivityServiceTrait for ActivityService {
                     total: total_count,
                     imported: 0,
                     skipped: skipped_count,
+                    duplicates: 0,
                     assets_created: 0,
                     success: false,
                 },
@@ -1582,6 +1608,7 @@ impl ActivityServiceTrait for ActivityService {
                     total: total_count,
                     imported: 0,
                     skipped: skipped_count,
+                    duplicates: 0,
                     assets_created: prepare_result.assets_created,
                     success: false,
                 },
@@ -1598,6 +1625,96 @@ impl ActivityServiceTrait for ActivityService {
             .collect();
 
         self.link_imported_transfer_pairs(&validated_activities, &mut activities_to_insert);
+
+        // Compute idempotency keys and deduplicate
+        let mut duplicate_count: u32 = 0;
+        {
+            // 1. Compute keys for each activity
+            let mut keys: Vec<Option<String>> =
+                Vec::with_capacity(activities_to_insert.len());
+            for activity in &mut activities_to_insert {
+                let date = DateTime::parse_from_rfc3339(&activity.activity_date)
+                    .map(|dt| dt.with_timezone(&Utc))
+                    .or_else(|_| {
+                        NaiveDate::parse_from_str(&activity.activity_date, "%Y-%m-%d").map(|d| {
+                            Utc.from_utc_datetime(&d.and_hms_opt(0, 0, 0).unwrap_or_default())
+                        })
+                    })
+                    .ok();
+
+                if let Some(date) = date {
+                    let key = compute_idempotency_key(
+                        &activity.account_id,
+                        &activity.activity_type,
+                        &date,
+                        activity.get_symbol_id(),
+                        activity.quantity,
+                        activity.unit_price,
+                        activity.amount,
+                        &activity.currency,
+                        None,
+                        activity.notes.as_deref(),
+                    );
+                    activity.idempotency_key = Some(key.clone());
+                    keys.push(Some(key));
+                } else {
+                    keys.push(None);
+                }
+            }
+
+            // 2. Within-batch dedup: mark later occurrences
+            let mut seen_keys: HashSet<String> = HashSet::new();
+            let mut batch_dup_indices: HashSet<usize> = HashSet::new();
+            for (i, key) in keys.iter().enumerate() {
+                if let Some(ref k) = key {
+                    if !seen_keys.insert(k.clone()) {
+                        batch_dup_indices.insert(i);
+                    }
+                }
+            }
+
+            // 3. DB dedup: check existing keys
+            let unique_keys: Vec<String> = seen_keys.into_iter().collect();
+            let existing = if !unique_keys.is_empty() {
+                self.check_existing_duplicates(unique_keys).unwrap_or_default()
+            } else {
+                HashMap::new()
+            };
+
+            // 4. Collect all duplicate indices (batch + DB)
+            let mut dup_indices: HashSet<usize> = batch_dup_indices;
+            for (i, key) in keys.iter().enumerate() {
+                if let Some(ref k) = key {
+                    if existing.contains_key(k) {
+                        dup_indices.insert(i);
+                    }
+                }
+            }
+
+            // 5. Mark duplicates in validated_activities and remove from insert list
+            if !dup_indices.is_empty() {
+                duplicate_count = dup_indices.len() as u32;
+                // Map back to validated_activities indices via import_index_map
+                for &insert_idx in &dup_indices {
+                    if let Some(&import_idx) = import_index_map.get(insert_idx) {
+                        let activity = &mut validated_activities[import_idx];
+                        activity.is_valid = false;
+                        let mut errors = activity.errors.take().unwrap_or_default();
+                        errors
+                            .entry("_duplicate".to_string())
+                            .or_default()
+                            .push("Duplicate activity already exists".to_string());
+                        activity.errors = Some(errors);
+                    }
+                }
+                // Remove duplicates from insert list (reverse order to preserve indices)
+                let mut sorted_dups: Vec<usize> = dup_indices.into_iter().collect();
+                sorted_dups.sort_unstable_by(|a, b| b.cmp(a));
+                for idx in sorted_dups {
+                    activities_to_insert.remove(idx);
+                }
+            }
+        }
 
         // Collect unique asset_ids and currencies before consuming activities
         let asset_ids: Vec<String> = activities_to_insert
@@ -1636,7 +1753,7 @@ impl ActivityServiceTrait for ActivityService {
                 fetched: total_count,
                 inserted: count as u32,
                 updated: 0,
-                skipped: 0,
+                skipped: duplicate_count,
                 warnings: 0,
                 errors: 0,
                 removed: 0,
@@ -1653,7 +1770,8 @@ impl ActivityServiceTrait for ActivityService {
             summary: ImportActivitiesSummary {
                 total: total_count,
                 imported: count as u32,
-                skipped: 0,
+                skipped: duplicate_count,
+                duplicates: duplicate_count,
                 assets_created: assets_created_count,
                 success: true,
             },

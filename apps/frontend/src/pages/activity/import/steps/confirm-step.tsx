@@ -185,6 +185,7 @@ export function ConfirmStep() {
             total: result.summary.total,
             imported: result.summary.imported,
             skipped: result.summary.skipped,
+            duplicates: result.summary.duplicates ?? 0,
             errors: 0,
           },
           importRunId: result.importRunId,

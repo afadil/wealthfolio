@@ -60,6 +60,7 @@ export interface ImportResultStats {
   total: number;
   imported: number;
   skipped: number;
+  duplicates: number;
   errors: number;
 }
 

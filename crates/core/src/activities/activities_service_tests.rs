@@ -832,6 +832,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         // Execute
@@ -903,6 +904,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         // Execute
@@ -975,6 +977,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         // Execute
@@ -1050,6 +1053,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1115,6 +1119,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1183,6 +1188,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1236,6 +1242,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1288,6 +1295,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1340,6 +1348,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1402,6 +1411,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1468,6 +1478,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1537,6 +1548,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1604,6 +1616,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1668,6 +1681,7 @@ mod tests {
                 source_system: None,
                 source_record_id: None,
                 source_group_id: None,
+                idempotency_key: None,
             };
 
             let result = activity_service.create_activity(new_activity).await;
@@ -1738,6 +1752,7 @@ mod tests {
                 source_system: None,
                 source_record_id: None,
                 source_group_id: None,
+                idempotency_key: None,
             }],
             updates: vec![],
             delete_ids: vec![],
@@ -1819,6 +1834,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1907,6 +1923,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1968,6 +1985,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -2029,6 +2047,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;

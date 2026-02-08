@@ -352,6 +352,7 @@ pub fn map_broker_activity(
             .or(Some("SNAPTRADE".to_string())),
         source_record_id: activity.source_record_id.clone().or(activity.id.clone()),
         source_group_id: activity.source_group_id.clone(),
+        idempotency_key: None,
     })
 }
 

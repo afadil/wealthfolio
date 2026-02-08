@@ -231,6 +231,7 @@ pub struct NewActivity {
     pub source_system: Option<String>,    // SNAPTRADE, PLAID, MANUAL, CSV
     pub source_record_id: Option<String>, // Provider's record ID
     pub source_group_id: Option<String>,  // Provider grouping key
+    pub idempotency_key: Option<String>,  // Stable hash for dedupe
 }
 
 impl NewActivity {
@@ -975,6 +976,8 @@ pub struct ImportActivitiesSummary {
     pub imported: u32,
     /// Number of activities skipped (invalid or errors)
     pub skipped: u32,
+    /// Number of duplicate activities detected and skipped
+    pub duplicates: u32,
     /// Number of new assets created during import
     pub assets_created: u32,
     /// Whether the import was successful (no validation errors)
@@ -1081,6 +1084,7 @@ impl From<ActivityImport> for NewActivity {
             source_system: Some("CSV".to_string()),
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         }
     }
 }

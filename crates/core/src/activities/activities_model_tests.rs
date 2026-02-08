@@ -285,6 +285,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         }
     }
 
