@@ -2518,6 +2518,9 @@ export function SymbolCell<TData>({
   const onSearch = symbolCellOpts?.onSearch;
   const onSelectCallback = symbolCellOpts?.onSelect;
   const onCreateCustomAssetCallback = symbolCellOpts?.onCreateCustomAsset;
+  const isDisabledFn = symbolCellOpts?.isDisabled;
+  const rowData = cell.row.original;
+  const disabled = isDisabledFn ? isDisabledFn(rowData) : false;
   const sideOffset = -(containerRef.current?.clientHeight ?? 0);
 
   const prevInitialValueRef = React.useRef(initialValue);
@@ -2680,13 +2683,13 @@ export function SymbolCell<TData>({
       cellState={cellState}
       onKeyDown={onWrapperKeyDown}
     >
-      <Popover open={isEditing} onOpenChange={onOpenChange}>
+      <Popover open={isEditing && !disabled} onOpenChange={onOpenChange}>
         <PopoverAnchor asChild>
           <span data-slot="grid-cell-content" className={cn(!value && "text-muted-foreground")}>
-            {value || "TICKER"}
+            {disabled ? value || "—" : value || "TICKER"}
           </span>
         </PopoverAnchor>
-        {isEditing && (
+        {isEditing && !disabled && (
           <PopoverContent
             data-grid-cell-editor=""
             align="start"

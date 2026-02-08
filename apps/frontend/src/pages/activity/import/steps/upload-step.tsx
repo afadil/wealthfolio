@@ -5,8 +5,10 @@ import { useAccounts } from "@/hooks/use-accounts";
 import { usePlatform } from "@/hooks/use-platform";
 import type { Account } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { QueryKeys } from "@/lib/query-keys";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
 import { Checkbox } from "@wealthfolio/ui/components/ui/checkbox";
 import {
   Collapsible,
@@ -23,7 +25,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@wealthfolio/ui/components/ui/select";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CSVFileViewer, type CSVLine } from "../components/csv-file-viewer";
 import { FileDropzone } from "../components/file-dropzone";
 import { HelpTooltip } from "../components/help-tooltip";
 import {
@@ -39,85 +42,136 @@ import { useImportContext, type ParseConfig } from "../context/import-context";
 // CSV Preview Component
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface CsvPreviewProps {
+interface CsvPreviewTableProps {
   headers: string[];
   rows: string[][];
   maxRows?: number;
 }
 
-function CsvPreview({ headers, rows, maxRows = 50 }: CsvPreviewProps) {
+function CsvPreviewTable({ headers, rows, maxRows = 50 }: CsvPreviewTableProps) {
   const displayRows = rows.slice(0, maxRows);
   const hasMoreRows = rows.length > maxRows;
 
-  if (headers.length === 0 && rows.length === 0) {
-    return null;
-  }
+  return (
+    <>
+      <table className="w-full">
+        <thead className="bg-muted/50 sticky top-0">
+          <tr>
+            <th className="text-muted-foreground bg-muted w-12 border-r px-2 py-1.5 text-right font-mono text-xs">
+              #
+            </th>
+            {headers.map((header, idx) => (
+              <th
+                key={idx}
+                className="border-r px-2 py-1.5 text-left font-mono text-xs font-semibold last:border-r-0"
+              >
+                {header || <span className="text-muted-foreground italic">empty</span>}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="font-mono text-xs">
+          {displayRows.map((row, rowIdx) => (
+            <tr
+              key={rowIdx}
+              className={cn(
+                "border-t transition-colors",
+                rowIdx % 2 === 0 ? "bg-background" : "bg-muted/30",
+                "hover:bg-muted/50",
+              )}
+            >
+              <td className="text-muted-foreground bg-muted/20 w-12 border-r px-2 py-1 text-right">
+                {rowIdx + 1}
+              </td>
+              {row.map((cell, cellIdx) => (
+                <td
+                  key={cellIdx}
+                  className="max-w-[200px] truncate border-r px-2 py-1 last:border-r-0"
+                  title={cell}
+                >
+                  {cell || <span className="text-muted-foreground italic">-</span>}
+                </td>
+              ))}
+              {/* Fill empty cells if row has fewer columns than headers */}
+              {row.length < headers.length &&
+                Array.from({ length: headers.length - row.length }).map((_, idx) => (
+                  <td key={`empty-${idx}`} className="border-r px-2 py-1 last:border-r-0">
+                    <span className="text-muted-foreground italic">-</span>
+                  </td>
+                ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {hasMoreRows && (
+        <div className="text-muted-foreground border-t px-3 py-2 text-center text-xs">
+          Showing first {maxRows} of {rows.length} rows
+        </div>
+      )}
+    </>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CSV Preview Tabs Component
+// ─────────────────────────────────────────────────────────────────────────────
+
+function CsvPreviewTabs({
+  file,
+  headers,
+  rows,
+}: {
+  file: File;
+  headers: string[];
+  rows: string[][];
+}) {
+  const [csvLines, setCsvLines] = useState<CSVLine[] | null>(null);
+
+  const handleTabChange = useCallback(
+    (value: string) => {
+      if (value === "raw" && csvLines === null) {
+        file.text().then((text) => {
+          const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+          setCsvLines(lines.map((line, i) => ({ id: i, content: line, isValid: true })));
+        });
+      }
+    },
+    [file, csvLines],
+  );
 
   return (
-    <Card>
-      <CardHeader className="px-4 py-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">CSV Preview</CardTitle>
-          <span className="text-muted-foreground text-xs">
-            {rows.length} row{rows.length !== 1 ? "s" : ""}
-            {hasMoreRows && ` (showing first ${maxRows})`}
-          </span>
-        </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="max-h-[300px] overflow-auto border-t">
-          <table className="w-full">
-            <thead className="bg-muted/50 sticky top-0">
-              <tr>
-                <th className="text-muted-foreground bg-muted w-12 border-r px-2 py-1.5 text-right font-mono text-xs">
-                  #
-                </th>
-                {headers.map((header, idx) => (
-                  <th
-                    key={idx}
-                    className="border-r px-2 py-1.5 text-left font-mono text-xs font-semibold last:border-r-0"
-                  >
-                    {header || <span className="text-muted-foreground italic">empty</span>}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="font-mono text-xs">
-              {displayRows.map((row, rowIdx) => (
-                <tr
-                  key={rowIdx}
-                  className={cn(
-                    "border-t transition-colors",
-                    rowIdx % 2 === 0 ? "bg-background" : "bg-muted/30",
-                    "hover:bg-muted/50",
-                  )}
-                >
-                  <td className="text-muted-foreground bg-muted/20 w-12 border-r px-2 py-1 text-right">
-                    {rowIdx + 1}
-                  </td>
-                  {row.map((cell, cellIdx) => (
-                    <td
-                      key={cellIdx}
-                      className="max-w-[200px] truncate border-r px-2 py-1 last:border-r-0"
-                      title={cell}
-                    >
-                      {cell || <span className="text-muted-foreground italic">-</span>}
-                    </td>
-                  ))}
-                  {/* Fill empty cells if row has fewer columns than headers */}
-                  {row.length < headers.length &&
-                    Array.from({ length: headers.length - row.length }).map((_, idx) => (
-                      <td key={`empty-${idx}`} className="border-r px-2 py-1 last:border-r-0">
-                        <span className="text-muted-foreground italic">-</span>
-                      </td>
-                    ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </CardContent>
-    </Card>
+    <Tabs defaultValue="parsed" onValueChange={handleTabChange}>
+      <Card>
+        <CardHeader className="px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-sm font-medium">CSV Preview</CardTitle>
+              <span className="text-muted-foreground text-xs">
+                {rows.length} row{rows.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+            <TabsList className="bg-secondary flex space-x-1 rounded-full p-1">
+              <TabsTrigger className="h-8 rounded-full px-2 text-sm" value="parsed">
+                Parsed
+              </TabsTrigger>
+              <TabsTrigger className="h-8 rounded-full px-2 text-sm" value="raw">
+                Raw File
+              </TabsTrigger>
+            </TabsList>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <TabsContent value="parsed" className="m-0 border-0 p-0">
+            <div className="max-h-[300px] overflow-auto border-t">
+              <CsvPreviewTable headers={headers} rows={rows} maxRows={50} />
+            </div>
+          </TabsContent>
+          <TabsContent value="raw" className="m-0 border-0 p-0">
+            <CSVFileViewer data={csvLines ?? []} className="w-full" maxHeight="50vh" />
+          </TabsContent>
+        </CardContent>
+      </Card>
+    </Tabs>
   );
 }
 
@@ -349,95 +403,72 @@ function ParseSettingsPanel({ config, onChange, hasErrors = false }: ParseSettin
 export function UploadStep() {
   const { state, dispatch } = useImportContext();
   const [parseError, setParseError] = useState<string | null>(null);
-  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const { accounts } = useAccounts();
   const { isMobile } = usePlatform();
 
-  // Sync selected account with context accountId on mount
+  // Derive selected account from context (covers both URL params and user selection)
+  const selectedAccount = useMemo(
+    () => accounts?.find((a: Account) => a.id === state.accountId) ?? null,
+    [accounts, state.accountId],
+  );
+
+  // Fetch import profile for the selected account
+  const { data: mappingProfile } = useQuery({
+    queryKey: [QueryKeys.IMPORT_MAPPING, state.accountId],
+    queryFn: () => getAccountImportMapping(state.accountId),
+    enabled: !!state.accountId,
+  });
+
+  // Apply profile (mapping + parseConfig) when it loads or account changes.
+  // Refs avoid re-firing when file/parseConfig change.
+  const fileRef = useRef(state.file);
+  fileRef.current = state.file;
+  const parseConfigRef = useRef(state.parseConfig);
+  parseConfigRef.current = state.parseConfig;
+
   useEffect(() => {
-    if (state.accountId && accounts) {
-      const account = accounts.find((a: Account) => a.id === state.accountId);
-      if (account) {
-        setSelectedAccount(account);
-      }
+    if (!mappingProfile || !selectedAccount) return;
+
+    dispatch(setMapping(mappingProfile));
+
+    const updates: Partial<ParseConfig> = {
+      defaultCurrency: selectedAccount.currency,
+    };
+    if (mappingProfile.parseConfig) {
+      const pc = mappingProfile.parseConfig;
+      if (pc.hasHeaderRow !== undefined) updates.hasHeaderRow = pc.hasHeaderRow;
+      if (pc.headerRowIndex !== undefined) updates.headerRowIndex = pc.headerRowIndex;
+      if (pc.delimiter) updates.delimiter = pc.delimiter;
+      if (pc.skipTopRows !== undefined) updates.skipTopRows = pc.skipTopRows;
+      if (pc.skipBottomRows !== undefined) updates.skipBottomRows = pc.skipBottomRows;
+      if (pc.skipEmptyRows !== undefined) updates.skipEmptyRows = pc.skipEmptyRows;
+      if (pc.dateFormat) updates.dateFormat = pc.dateFormat;
+      if (pc.decimalSeparator) updates.decimalSeparator = pc.decimalSeparator;
+      if (pc.thousandsSeparator) updates.thousandsSeparator = pc.thousandsSeparator;
+      if (pc.defaultCurrency) updates.defaultCurrency = pc.defaultCurrency;
     }
-  }, [state.accountId, accounts]);
+    dispatch(setParseConfig(updates));
 
+    // Re-parse file with profile config if already loaded
+    if (fileRef.current) {
+      const newConfig = { ...parseConfigRef.current, ...updates };
+      parseCsv(fileRef.current, newConfig)
+        .then((result) => {
+          setParseError(null);
+          dispatch(setParsedData(result.headers, result.rows));
+        })
+        .catch((error) => {
+          setParseError(error instanceof Error ? error.message : "Failed to parse CSV file");
+        });
+    }
+  }, [mappingProfile, selectedAccount, dispatch]);
+
+  // User selects account — just set the ID; useQuery + effect handle the rest
   const handleAccountSelect = useCallback(
-    async (account: Account) => {
-      setSelectedAccount(account);
+    (account: Account) => {
       dispatch(setAccountId(account.id));
-
-      // Start with account's currency as default
-      const parseConfigUpdates: Partial<ParseConfig> = {
-        defaultCurrency: account.currency,
-      };
-
-      // Fetch and apply the import mapping profile for this account
-      try {
-        const mappingProfile = await getAccountImportMapping(account.id);
-        if (mappingProfile) {
-          // Store the mapping in context for the mapping step
-          dispatch(setMapping(mappingProfile));
-
-          // Apply parse config from the profile if available
-          if (mappingProfile.parseConfig) {
-            // Only apply non-null/undefined values from the profile
-            if (mappingProfile.parseConfig.hasHeaderRow !== undefined) {
-              parseConfigUpdates.hasHeaderRow = mappingProfile.parseConfig.hasHeaderRow;
-            }
-            if (mappingProfile.parseConfig.headerRowIndex !== undefined) {
-              parseConfigUpdates.headerRowIndex = mappingProfile.parseConfig.headerRowIndex;
-            }
-            if (mappingProfile.parseConfig.delimiter) {
-              parseConfigUpdates.delimiter = mappingProfile.parseConfig.delimiter;
-            }
-            if (mappingProfile.parseConfig.skipTopRows !== undefined) {
-              parseConfigUpdates.skipTopRows = mappingProfile.parseConfig.skipTopRows;
-            }
-            if (mappingProfile.parseConfig.skipBottomRows !== undefined) {
-              parseConfigUpdates.skipBottomRows = mappingProfile.parseConfig.skipBottomRows;
-            }
-            if (mappingProfile.parseConfig.skipEmptyRows !== undefined) {
-              parseConfigUpdates.skipEmptyRows = mappingProfile.parseConfig.skipEmptyRows;
-            }
-            if (mappingProfile.parseConfig.dateFormat) {
-              parseConfigUpdates.dateFormat = mappingProfile.parseConfig.dateFormat;
-            }
-            if (mappingProfile.parseConfig.decimalSeparator) {
-              parseConfigUpdates.decimalSeparator = mappingProfile.parseConfig.decimalSeparator;
-            }
-            if (mappingProfile.parseConfig.thousandsSeparator) {
-              parseConfigUpdates.thousandsSeparator = mappingProfile.parseConfig.thousandsSeparator;
-            }
-            // Profile's default currency takes precedence over account currency
-            if (mappingProfile.parseConfig.defaultCurrency) {
-              parseConfigUpdates.defaultCurrency = mappingProfile.parseConfig.defaultCurrency;
-            }
-          }
-        }
-      } catch {
-        // Silently ignore errors - mapping profile may not exist for this account
-        // This is expected for new accounts or accounts that haven't imported before
-      }
-
-      // Apply the config updates
-      dispatch(setParseConfig(parseConfigUpdates));
-
-      // Re-parse the file if one is already loaded
-      if (state.file) {
-        const newConfig = { ...state.parseConfig, ...parseConfigUpdates };
-        parseCsv(state.file, newConfig)
-          .then((result) => {
-            setParseError(null);
-            dispatch(setParsedData(result.headers, result.rows));
-          })
-          .catch((error) => {
-            setParseError(error instanceof Error ? error.message : "Failed to parse CSV file");
-          });
-      }
     },
-    [dispatch, state.file, state.parseConfig],
+    [dispatch],
   );
 
   const { mutate: parseFile, isPending } = useMutation({
@@ -572,9 +603,9 @@ export function UploadStep() {
         />
       )}
 
-      {/* CSV Preview */}
+      {/* CSV Preview with tabs */}
       {state.file && state.headers.length > 0 && (
-        <CsvPreview headers={state.headers} rows={state.parsedRows} maxRows={50} />
+        <CsvPreviewTabs file={state.file} headers={state.headers} rows={state.parsedRows} />
       )}
     </div>
   );

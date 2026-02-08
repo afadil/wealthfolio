@@ -1,4 +1,5 @@
 import { searchTicker } from "@/adapters";
+import { isCashActivity } from "@/lib/activity-utils";
 import {
   ActivityStatus,
   ActivityType,
@@ -220,6 +221,10 @@ export function useActivityColumns({
         meta: {
           cell: {
             variant: "symbol",
+            isDisabled: (rowData: unknown) => {
+              const row = rowData as LocalTransaction;
+              return isCashActivity(row.activityType ?? "");
+            },
             onSearch: handleSymbolSearch,
             onSelect: onSymbolSelect
               ? (rowIndex: number, _symbol: string, result?: SymbolSearchResult) => {

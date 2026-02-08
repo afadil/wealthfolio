@@ -107,17 +107,16 @@ impl ActivityService {
         ])
     }
 
-    /// Resolves symbols to exchange MICs in batch.
-    /// First checks existing assets in the database, then falls back to quote service
-    /// for symbols not found locally.
+    /// Resolves (symbol, currency) pairs to exchange MICs in batch.
+    /// Uses the activity-level currency to rank exchange results correctly.
+    /// First checks existing assets in the database, then falls back to quote service.
     async fn resolve_symbols_batch(
         &self,
-        symbols: HashSet<String>,
-        currency: &str,
-    ) -> HashMap<String, Option<String>> {
-        let mut cache: HashMap<String, Option<String>> = HashMap::new();
+        symbol_currency_pairs: HashSet<(String, String)>,
+    ) -> HashMap<(String, String), Option<String>> {
+        let mut cache: HashMap<(String, String), Option<String>> = HashMap::new();
 
-        if symbols.is_empty() {
+        if symbol_currency_pairs.is_empty() {
             return cache;
         }
 
@@ -132,35 +131,51 @@ impl ActivityService {
             .collect();
 
         // 2. Check each symbol against existing assets first
-        let mut missing_symbols: Vec<String> = Vec::new();
+        let mut missing: Vec<(String, String)> = Vec::new();
 
-        for symbol in &symbols {
+        for (symbol, currency) in &symbol_currency_pairs {
             if symbol.trim().is_empty() {
-                cache.insert(symbol.clone(), None);
+                cache.insert((symbol.clone(), currency.clone()), None);
                 continue;
             }
             if let Some(exchange_mic) = existing_map.get(&symbol.to_lowercase()) {
-                // Found in existing assets
-                cache.insert(symbol.clone(), exchange_mic.clone());
+                cache.insert((symbol.clone(), currency.clone()), exchange_mic.clone());
             } else {
-                // Need to resolve via quote service
-                missing_symbols.push(symbol.clone());
+                missing.push((symbol.clone(), currency.clone()));
             }
         }
 
-        // 3. Resolve missing symbols via quote service (with provider lookup)
-        for symbol in missing_symbols {
+        // 3. Resolve missing symbols via quote service using the activity currency
+        for (symbol, currency) in missing {
             let results = self
                 .quote_service
-                .search_symbol_with_currency(&symbol, Some(currency))
+                .search_symbol_with_currency(&symbol, Some(&currency))
                 .await
                 .unwrap_or_default();
 
             let exchange_mic = results.first().and_then(|r| r.exchange_mic.clone());
-            cache.insert(symbol, exchange_mic);
+            cache.insert((symbol, currency), exchange_mic);
         }
 
         cache
+    }
+
+    /// Convenience wrapper: resolves symbols using a single currency for all.
+    /// Used by callers where per-activity currency isn't available (broker sync, prepare).
+    async fn resolve_symbols_batch_single_currency(
+        &self,
+        symbols: HashSet<String>,
+        currency: &str,
+    ) -> HashMap<String, Option<String>> {
+        let pairs: HashSet<(String, String)> = symbols
+            .into_iter()
+            .map(|s| (s, currency.to_string()))
+            .collect();
+        self.resolve_symbols_batch(pairs)
+            .await
+            .into_iter()
+            .map(|((sym, _), mic)| (sym, mic))
+            .collect()
     }
 
     /// Creates a manual quote from activity data when quote_mode is MANUAL.
@@ -345,8 +360,11 @@ impl ActivityService {
         });
         let inferred_instrument_type = inferred.as_ref().and_then(|(_, it)| it.clone());
 
-        // Use asset currency for crypto pairs (e.g., BTC-USD -> USD) instead of activity currency.
+        // Crypto/FX assets don't have exchange MICs — clear any that leaked from frontend
         let is_crypto = inferred_instrument_type.as_ref() == Some(&InstrumentType::Crypto);
+        let exchange_mic = if is_crypto { None } else { exchange_mic };
+
+        // Use asset currency for crypto pairs (e.g., BTC-USD -> USD) instead of activity currency.
         let asset_currency = if is_crypto {
             symbol
                 .as_deref()
@@ -365,9 +383,13 @@ impl ActivityService {
             if !sym.is_empty() {
                 // Strip Yahoo suffix (e.g. GOOG.TO → GOOG + XTSE)
                 let (base_symbol, suffix_mic) = parse_symbol_with_exchange_suffix(sym);
-                let effective_mic = exchange_mic
-                    .clone()
-                    .or_else(|| suffix_mic.map(|s| s.to_string()));
+                let effective_mic = if is_crypto {
+                    None
+                } else {
+                    exchange_mic
+                        .clone()
+                        .or_else(|| suffix_mic.map(|s| s.to_string()))
+                };
 
                 // For crypto pairs (e.g. BTC-USD), normalize to base symbol (BTC)
                 let normalized_symbol = if is_crypto {
@@ -814,8 +836,11 @@ impl ActivityService {
         let (kind, instrument_type) =
             self.infer_asset_kind(base_symbol, exchange_mic.as_deref(), activity.get_kind_hint());
 
-        // For crypto, use the quote currency from the pair if available
+        // Crypto/FX assets don't have exchange MICs — clear any that leaked from frontend/suffix
         let is_crypto = instrument_type.as_ref() == Some(&InstrumentType::Crypto);
+        let exchange_mic = if is_crypto { None } else { exchange_mic };
+
+        // For crypto, use the quote currency from the pair if available
         let asset_currency = if is_crypto {
             parse_crypto_pair_symbol(base_symbol)
                 .map(|(_, quote)| quote)
@@ -1094,7 +1119,7 @@ impl ActivityServiceTrait for ActivityService {
 
         let update_symbol_mic_cache = if !update_symbols_to_resolve.is_empty() {
             let base_currency = self.get_base_currency_or_usd();
-            self.resolve_symbols_batch(update_symbols_to_resolve, &base_currency)
+            self.resolve_symbols_batch_single_currency(update_symbols_to_resolve, &base_currency)
                 .await
         } else {
             HashMap::new()
@@ -1235,8 +1260,8 @@ impl ActivityServiceTrait for ActivityService {
         let base_ccy = self.account_service.get_base_currency().unwrap_or_default();
         let account_currency = resolve_currency(&[&account.currency, &base_ccy]);
 
-        // Resolve symbols that will actually be used (only ResolveAsset disposition)
-        let unique_symbols: HashSet<String> = activities
+        // Resolve (symbol, currency) pairs for activities that need asset resolution
+        let symbol_currency_pairs: HashSet<(String, String)> = activities
             .iter()
             .filter(|a| {
                 let sym = a.symbol.trim();
@@ -1252,11 +1277,18 @@ impl ActivityServiceTrait for ActivityService {
                     )
                     && a.exchange_mic.is_none()
             })
-            .map(|a| a.symbol.clone())
+            .map(|a| {
+                let ccy = if a.currency.is_empty() {
+                    account_currency.clone()
+                } else {
+                    a.currency.clone()
+                };
+                (a.symbol.clone(), ccy)
+            })
             .collect();
 
         let symbol_mic_cache = self
-            .resolve_symbols_batch(unique_symbols, &account_currency)
+            .resolve_symbols_batch(symbol_currency_pairs)
             .await;
 
         let mut activities_with_status: Vec<ActivityImport> = Vec::new();
@@ -1333,10 +1365,20 @@ impl ActivityServiceTrait for ActivityService {
             }
 
             // Get exchange_mic: prefer already-set value (from prior check), then cache
+            let resolve_ccy = if activity.currency.is_empty() {
+                account_currency.clone()
+            } else {
+                activity.currency.clone()
+            };
             let exchange_mic = activity
                 .exchange_mic
                 .clone()
-                .or_else(|| symbol_mic_cache.get(&activity.symbol).cloned().flatten());
+                .or_else(|| {
+                    symbol_mic_cache
+                        .get(&(activity.symbol.clone(), resolve_ccy))
+                        .cloned()
+                        .flatten()
+                });
 
             // Strip Yahoo suffix to get base symbol (e.g. GOOG.TO → GOOG)
             let (base_symbol, suffix_mic) = parse_symbol_with_exchange_suffix(&symbol);
@@ -1345,6 +1387,10 @@ impl ActivityServiceTrait for ActivityService {
             // Infer asset kind and instrument type using base symbol and resolved MIC
             let (inferred_kind, inferred_instrument_type) =
                 self.infer_asset_kind(base_symbol, resolved_mic.as_deref(), None);
+
+            // Crypto/FX assets don't have exchange MICs
+            let is_crypto = inferred_instrument_type.as_ref() == Some(&InstrumentType::Crypto);
+            let resolved_mic = if is_crypto { None } else { resolved_mic };
 
             // Equities (Investment + Equity instrument) must have a resolved exchange MIC
             let is_equity = inferred_kind == AssetKind::Investment
@@ -1747,7 +1793,7 @@ impl ActivityServiceTrait for ActivityService {
             .collect();
 
         let symbol_mic_cache = self
-            .resolve_symbols_batch(symbols_to_resolve, &account_currency)
+            .resolve_symbols_batch_single_currency(symbols_to_resolve, &account_currency)
             .await;
 
         // 2. Build AssetSpecs for each activity
