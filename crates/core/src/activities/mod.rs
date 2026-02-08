@@ -23,7 +23,7 @@ pub use activities_model::{
     ActivityDetails, ActivityImport, ActivitySearchResponse, ActivitySearchResponseMeta,
     ActivityStatus, ActivityType, ActivityUpdate, ActivityUpsert, BulkUpsertResult,
     ImportActivitiesResult, ImportActivitiesSummary, ImportMapping, ImportMappingData, IncomeData,
-    NewActivity, Sort, SymbolInput,
+    NewActivity, PrepareActivitiesResult, Sort, SymbolInput,
 };
 pub use activities_service::ActivityService;
 pub use activities_traits::{ActivityRepositoryTrait, ActivityServiceTrait};

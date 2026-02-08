@@ -350,6 +350,14 @@ pub mod test_env {
             wealthfolio_core::activities::parse_csv(content, config)
         }
 
+        async fn prepare_activities(
+            &self,
+            _activities: Vec<NewActivity>,
+            _account: &Account,
+        ) -> CoreResult<wealthfolio_core::activities::PrepareActivitiesResult> {
+            unimplemented!("MockActivityService::prepare_activities")
+        }
+
         async fn upsert_activities_bulk(
             &self,
             _activities: Vec<wealthfolio_core::activities::ActivityUpsert>,

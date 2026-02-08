@@ -1103,8 +1103,8 @@ mod tests {
 
     #[test]
     fn normalize_holdings_symbol_normalizes_crypto_pairs() {
-        let normalized = BrokerSyncService::normalize_holdings_symbol(None, Some("BTC-USD"), true)
-            .unwrap();
+        let normalized =
+            BrokerSyncService::normalize_holdings_symbol(None, Some("BTC-USD"), true).unwrap();
 
         assert_eq!(normalized.0, "BTC");
         assert_eq!(normalized.1, None);

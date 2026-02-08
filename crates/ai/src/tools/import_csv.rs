@@ -477,12 +477,11 @@ fn parse_number(input: &str, strip_sign: bool) -> Option<String> {
             let parts: Vec<&str> = cleaned.split(',').collect();
             if parts.len() > 1 {
                 let decimal_part = parts.last().unwrap_or(&"");
-                let integer_part = parts[..parts.len() - 1].join("");
+                let integer_part = parts[..parts.len() - 1].join("").replace('.', "");
                 cleaned = format!("{}.{}", integer_part, decimal_part);
             } else {
                 cleaned = cleaned.replace(',', "");
             }
-            cleaned = cleaned.replace('.', "");
         }
         Some('.') => {
             let parts: Vec<&str> = cleaned.split('.').collect();
@@ -1235,10 +1234,16 @@ mod tests {
 
     #[test]
     fn test_parse_number() {
-        assert_eq!(parse_number("100.50", false), Some(100.50));
-        assert_eq!(parse_number("$1,234.56", true), Some(1234.56));
-        assert_eq!(parse_number("(100.00)", true), Some(100.00));
-        assert_eq!(parse_number("1234,56", false), Some(1234.56));
+        assert_eq!(parse_number("100.50", false), Some("100.5".to_string()));
+        assert_eq!(
+            parse_number("$1,234.56", true),
+            Some("1234.56".to_string())
+        );
+        assert_eq!(parse_number("(100.00)", true), Some("100".to_string()));
+        assert_eq!(
+            parse_number("1234,56", false),
+            Some("1234.56".to_string())
+        );
         assert_eq!(parse_number("invalid", false), None);
     }
 
