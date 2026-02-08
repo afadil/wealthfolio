@@ -8,22 +8,22 @@
 //! The resolver uses a chain of responsibility pattern:
 //!
 //! ```text
-//! ┌─────────────────────────────────────────────────────────────┐
-//! │                      ResolverChain                           │
-//! │                                                              │
-//! │  ┌────────────────────────────────────────────────────────┐ │
-//! │  │ 1. Asset Resolver (provider_overrides)                  │ │
-//! │  │    - Checks Asset.provider_overrides[provider_id]       │ │
-//! │  │    - User can set explicit overrides per provider       │ │
-//! │  └────────────────────────────────────────────────────────┘ │
-//! │                           │ miss                             │
-//! │                           ▼                                  │
-//! │  ┌────────────────────────────────────────────────────────┐ │
-//! │  │ 2. Rules Resolver (deterministic)                       │ │
-//! │  │    - MIC → suffix mappings for equities                 │ │
-//! │  │    - FX/Crypto format rules per provider                │ │
-//! │  └────────────────────────────────────────────────────────┘ │
-//! └─────────────────────────────────────────────────────────────┘
+//! ┌─────────────────────────────────────────────────────────────────────────────┐
+//! │                      ResolverChain                                           │
+//! │                                                                              │
+//! │  ┌────────────────────────────────────────────────────────────────────────┐ │
+//! │  │ 1. Asset Resolver (provider_overrides)                                  │ │
+//! │  │    - Checks Asset.provider_overrides[provider_id]                       │ │
+//! │  │    - User can set explicit overrides per provider                       │ │
+//! │  └────────────────────────────────────────────────────────────────────────┘ │
+//! │                           │ miss                                             │
+//! │                           ▼                                                  │
+//! │  ┌────────────────────────────────────────────────────────────────────────┐ │
+//! │  │ 2. Rules Resolver (deterministic)                                       │ │
+//! │  │    - MIC → suffix mappings for equities                                 │ │
+//! │  │    - FX/Crypto format rules per provider                                │ │
+//! │  └────────────────────────────────────────────────────────────────────────┘ │
+//! └─────────────────────────────────────────────────────────────────────────────┘
 //! ```
 //!
 //! # Resolution Precedence
@@ -78,6 +78,7 @@
 mod asset_resolver;
 mod chain;
 pub mod exchange_metadata;
+pub(crate) mod exchange_registry;
 mod exchange_suffixes;
 mod rules_resolver;
 mod traits;
@@ -89,9 +90,10 @@ pub use exchange_metadata::{
     exchanges_for_currency, mic_to_currency, mic_to_exchange_name, mic_to_market_close,
     mic_to_timezone,
 };
+pub use exchange_registry::{get_exchange_list, ExchangeInfo};
 pub use exchange_suffixes::{
-    strip_yahoo_suffix, yahoo_exchange_to_mic, yahoo_suffix_to_mic, ExchangeMap, ExchangeSuffix,
-    YAHOO_EXCHANGE_SUFFIXES,
+    strip_yahoo_suffix, yahoo_exchange_suffixes, yahoo_exchange_to_mic, yahoo_suffix_to_mic,
+    ExchangeMap, ExchangeSuffix,
 };
 pub use rules_resolver::RulesResolver;
 pub use traits::{ResolutionSource, ResolvedInstrument, Resolver, SymbolResolver};

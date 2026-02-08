@@ -582,32 +582,21 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 .and_then(|s| s.symbol.clone())
                 .filter(|s| !s.trim().is_empty());
 
-            let (symbol, exchange_mic) = if is_crypto_asset {
-                let normalized = raw_symbol.or_else(|| {
-                    api_symbol.as_deref().map(|sym| {
-                        parse_crypto_pair_symbol(sym)
-                            .map(|(base, _)| base)
-                            .unwrap_or_else(|| sym.to_string())
-                    })
-                });
-                match normalized {
-                    Some(s) if !s.is_empty() => (s, None),
-                    _ => {
-                        debug!("Skipping crypto position without symbol");
-                        continue;
-                    }
+            let normalized_symbol = Self::normalize_holdings_symbol(
+                raw_symbol.as_deref(),
+                api_symbol.as_deref(),
+                is_crypto_asset,
+            );
+            let (symbol, exchange_mic) = match normalized_symbol {
+                Some(pair) => pair,
+                None if is_crypto_asset => {
+                    debug!("Skipping crypto position without symbol");
+                    continue;
                 }
-            } else {
-                let normalized = if let Some(raw) = raw_symbol {
-                    (raw, None)
-                } else if let Some(sym) = api_symbol.as_deref() {
-                    let (base, mic) = parse_symbol_with_exchange_suffix(sym);
-                    (base.to_string(), mic.map(|m| m.to_string()))
-                } else {
+                None => {
                     debug!("Skipping position without symbol");
                     continue;
-                };
-                normalized
+                }
             };
 
             let units = pos.units.unwrap_or(0.0);
@@ -837,6 +826,46 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
 }
 
 impl BrokerSyncService {
+    fn normalize_holdings_symbol(
+        raw_symbol: Option<&str>,
+        api_symbol: Option<&str>,
+        is_crypto: bool,
+    ) -> Option<(String, Option<String>)> {
+        let raw_symbol = raw_symbol.map(str::trim).filter(|s| !s.is_empty());
+        let api_symbol = api_symbol.map(str::trim).filter(|s| !s.is_empty());
+
+        if is_crypto {
+            let symbol = raw_symbol.map(str::to_string).or_else(|| {
+                api_symbol.map(|sym| {
+                    parse_crypto_pair_symbol(sym)
+                        .map(|(base, _)| base)
+                        .unwrap_or_else(|| sym.to_string())
+                })
+            })?;
+            return Some((symbol, None));
+        }
+
+        let raw_parsed = raw_symbol.map(|sym| {
+            let (base, mic) = parse_symbol_with_exchange_suffix(sym);
+            (base.to_string(), mic.map(|m| m.to_string()))
+        });
+        let api_parsed = api_symbol.map(|sym| {
+            let (base, mic) = parse_symbol_with_exchange_suffix(sym);
+            (base.to_string(), mic.map(|m| m.to_string()))
+        });
+
+        let symbol = raw_parsed
+            .as_ref()
+            .map(|(base, _)| base.clone())
+            .or_else(|| api_parsed.as_ref().map(|(base, _)| base.clone()))?;
+        let exchange_mic = raw_parsed
+            .as_ref()
+            .and_then(|(_, mic)| mic.clone())
+            .or_else(|| api_parsed.as_ref().and_then(|(_, mic)| mic.clone()));
+
+        Some((symbol, exchange_mic))
+    }
+
     /// Ensures HOLDINGS mode accounts have at least 2 snapshots for proper history.
     /// If only 1 non-calculated snapshot exists, creates a synthetic snapshot 3 months prior.
     async fn ensure_holdings_history(&self, account_id: &str) -> Result<()> {
@@ -1045,5 +1074,39 @@ impl BrokerSyncService {
             broker_account.institution_name, external_id_candidates
         );
         Ok(None)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::BrokerSyncService;
+
+    #[test]
+    fn normalize_holdings_symbol_uses_api_suffix_when_raw_has_no_suffix() {
+        let normalized =
+            BrokerSyncService::normalize_holdings_symbol(Some("SHOP"), Some("SHOP.TO"), false)
+                .unwrap();
+
+        assert_eq!(normalized.0, "SHOP");
+        assert_eq!(normalized.1.as_deref(), Some("XTSE"));
+    }
+
+    #[test]
+    fn normalize_holdings_symbol_parses_suffix_from_raw_symbol() {
+        let normalized =
+            BrokerSyncService::normalize_holdings_symbol(Some("VOD.L"), Some("VOD"), false)
+                .unwrap();
+
+        assert_eq!(normalized.0, "VOD");
+        assert_eq!(normalized.1.as_deref(), Some("XLON"));
+    }
+
+    #[test]
+    fn normalize_holdings_symbol_normalizes_crypto_pairs() {
+        let normalized = BrokerSyncService::normalize_holdings_symbol(None, Some("BTC-USD"), true)
+            .unwrap();
+
+        assert_eq!(normalized.0, "BTC");
+        assert_eq!(normalized.1, None);
     }
 }

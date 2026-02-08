@@ -9,6 +9,8 @@ use std::collections::HashMap;
 
 use crate::models::{Mic, ProviderId};
 
+use super::exchange_registry::REGISTRY;
+
 /// Provider-specific exchange suffix and currency.
 #[derive(Clone, Debug)]
 pub struct ExchangeSuffix {
@@ -42,289 +44,49 @@ impl ExchangeMap {
         map
     }
 
-    /// Load all default exchange mappings.
+    /// Load all default exchange mappings from the JSON registry.
     fn load_defaults(&mut self) {
-        // ===== North America =====
-        // NYSE
-        self.add(
-            "XNYS",
-            &[("YAHOO", "", "USD"), ("ALPHA_VANTAGE", "", "USD")],
-        );
-        // NASDAQ
-        self.add(
-            "XNAS",
-            &[("YAHOO", "", "USD"), ("ALPHA_VANTAGE", "", "USD")],
-        );
-        // NYSE American (AMEX)
-        self.add(
-            "XASE",
-            &[("YAHOO", "", "USD"), ("ALPHA_VANTAGE", "", "USD")],
-        );
-        // BATS (Cboe BZX Exchange)
-        self.add("BATS", &[("YAHOO", "", "USD")]);
-        // NYSE Arca
-        self.add("ARCX", &[("YAHOO", "", "USD")]);
-        // OTC Markets (Pink Sheets, OTCQX, OTCQB)
-        self.add("OTCM", &[("YAHOO", "", "USD")]);
-        // NEO Exchange (Canada)
-        self.add("XNEO", &[("YAHOO", ".NE", "CAD")]);
-        // Toronto Stock Exchange
-        self.add(
-            "XTSE",
-            &[("YAHOO", ".TO", "CAD"), ("ALPHA_VANTAGE", ".TRT", "CAD")],
-        );
-        // TSX Venture
-        self.add(
-            "XTSX",
-            &[("YAHOO", ".V", "CAD"), ("ALPHA_VANTAGE", ".TRV", "CAD")],
-        );
-        // Canadian Securities Exchange
-        self.add(
-            "XCNQ",
-            &[("YAHOO", ".CN", "CAD"), ("ALPHA_VANTAGE", ".CNQ", "CAD")],
-        );
-        // Mexican Stock Exchange
-        self.add(
-            "XMEX",
-            &[("YAHOO", ".MX", "MXN"), ("ALPHA_VANTAGE", ".MEX", "MXN")],
-        );
+        for entry in &REGISTRY.catalog.exchanges {
+            let mut provider_map: HashMap<ProviderId, ExchangeSuffix> = HashMap::new();
 
-        // ===== UK & Ireland =====
-        // London Stock Exchange - Yahoo returns prices in pence (GBp), not pounds
-        self.add(
-            "XLON",
-            &[("YAHOO", ".L", "GBp"), ("ALPHA_VANTAGE", ".LON", "GBP")],
-        );
-        // London International - also in pence
-        self.add("XLON_IL", &[("YAHOO", ".IL", "GBp")]);
-        // Euronext Dublin
-        self.add(
-            "XDUB",
-            &[("YAHOO", ".IR", "EUR"), ("ALPHA_VANTAGE", ".DUB", "EUR")],
-        );
+            if let Some(ref yahoo) = entry.yahoo {
+                let currency = yahoo
+                    .currency
+                    .as_deref()
+                    .or(entry.currency.as_deref())
+                    .unwrap_or("USD");
+                provider_map.insert(
+                    Cow::Owned("YAHOO".to_string()),
+                    ExchangeSuffix {
+                        suffix: Cow::Owned(yahoo.suffix.clone()),
+                        currency: Cow::Owned(currency.to_string()),
+                    },
+                );
+            }
 
-        // ===== Germany =====
-        // XETRA
-        self.add(
-            "XETR",
-            &[("YAHOO", ".DE", "EUR"), ("ALPHA_VANTAGE", ".DEX", "EUR")],
-        );
-        // Frankfurt
-        self.add(
-            "XFRA",
-            &[("YAHOO", ".F", "EUR"), ("ALPHA_VANTAGE", ".FRK", "EUR")],
-        );
-        // Stuttgart
-        self.add(
-            "XSTU",
-            &[("YAHOO", ".SG", "EUR"), ("ALPHA_VANTAGE", ".STU", "EUR")],
-        );
-        // Hamburg
-        self.add("XHAM", &[("YAHOO", ".HM", "EUR")]);
-        // Dusseldorf
-        self.add("XDUS", &[("YAHOO", ".DU", "EUR")]);
-        // Munich
-        self.add("XMUN", &[("YAHOO", ".MU", "EUR")]);
-        // Berlin
-        self.add("XBER", &[("YAHOO", ".BE", "EUR")]);
-        // Hanover
-        self.add("XHAN", &[("YAHOO", ".HA", "EUR")]);
+            if let Some(ref av) = entry.alpha_vantage {
+                let currency = av
+                    .currency
+                    .as_deref()
+                    .or(entry.currency.as_deref())
+                    .unwrap_or("USD");
+                provider_map.insert(
+                    Cow::Owned("ALPHA_VANTAGE".to_string()),
+                    ExchangeSuffix {
+                        suffix: Cow::Owned(av.suffix.clone()),
+                        currency: Cow::Owned(currency.to_string()),
+                    },
+                );
+            }
 
-        // ===== Euronext =====
-        // Paris
-        self.add(
-            "XPAR",
-            &[("YAHOO", ".PA", "EUR"), ("ALPHA_VANTAGE", ".PAR", "EUR")],
-        );
-        // Amsterdam
-        self.add(
-            "XAMS",
-            &[("YAHOO", ".AS", "EUR"), ("ALPHA_VANTAGE", "", "EUR")],
-        );
-        // Brussels
-        self.add(
-            "XBRU",
-            &[("YAHOO", ".BR", "EUR"), ("ALPHA_VANTAGE", ".BRU", "EUR")],
-        );
-        // Lisbon
-        self.add(
-            "XLIS",
-            &[("YAHOO", ".LS", "EUR"), ("ALPHA_VANTAGE", ".LIS", "EUR")],
-        );
-
-        // ===== Southern Europe =====
-        // Milan
-        self.add(
-            "XMIL",
-            &[("YAHOO", ".MI", "EUR"), ("ALPHA_VANTAGE", ".MIL", "EUR")],
-        );
-        // Madrid
-        self.add(
-            "XMAD",
-            &[("YAHOO", ".MC", "EUR"), ("ALPHA_VANTAGE", ".MCE", "EUR")],
-        );
-        // Athens
-        self.add("XATH", &[("YAHOO", ".AT", "EUR")]);
-
-        // ===== Nordic =====
-        // Stockholm
-        self.add(
-            "XSTO",
-            &[("YAHOO", ".ST", "SEK"), ("ALPHA_VANTAGE", ".STO", "SEK")],
-        );
-        // Helsinki
-        self.add(
-            "XHEL",
-            &[("YAHOO", ".HE", "EUR"), ("ALPHA_VANTAGE", ".HEL", "EUR")],
-        );
-        // Copenhagen
-        self.add(
-            "XCSE",
-            &[("YAHOO", ".CO", "DKK"), ("ALPHA_VANTAGE", ".CPH", "DKK")],
-        );
-        // Oslo
-        self.add(
-            "XOSL",
-            &[("YAHOO", ".OL", "NOK"), ("ALPHA_VANTAGE", ".OSL", "NOK")],
-        );
-        // Iceland
-        self.add("XICE", &[("YAHOO", ".IC", "ISK")]);
-
-        // ===== Central/Eastern Europe =====
-        // Swiss Exchange
-        self.add(
-            "XSWX",
-            &[("YAHOO", ".SW", "CHF"), ("ALPHA_VANTAGE", ".SWX", "CHF")],
-        );
-        // Vienna
-        self.add(
-            "XWBO",
-            &[("YAHOO", ".VI", "EUR"), ("ALPHA_VANTAGE", ".VIE", "EUR")],
-        );
-        // Warsaw
-        self.add("XWAR", &[("YAHOO", ".WA", "PLN")]);
-        // Prague
-        self.add("XPRA", &[("YAHOO", ".PR", "CZK")]);
-        // Budapest
-        self.add("XBUD", &[("YAHOO", ".BD", "HUF")]);
-        // Istanbul
-        self.add("XIST", &[("YAHOO", ".IS", "TRY")]);
-
-        // ===== Asia - China =====
-        // Shanghai
-        self.add(
-            "XSHG",
-            &[("YAHOO", ".SS", "CNY"), ("ALPHA_VANTAGE", ".SHH", "CNY")],
-        );
-        // Shenzhen
-        self.add(
-            "XSHE",
-            &[("YAHOO", ".SZ", "CNY"), ("ALPHA_VANTAGE", ".SHZ", "CNY")],
-        );
-        // Hong Kong
-        self.add(
-            "XHKG",
-            &[("YAHOO", ".HK", "HKD"), ("ALPHA_VANTAGE", ".HKG", "HKD")],
-        );
-
-        // ===== Asia - Japan & Korea =====
-        // Tokyo
-        self.add(
-            "XTKS",
-            &[("YAHOO", ".T", "JPY"), ("ALPHA_VANTAGE", ".TYO", "JPY")],
-        );
-        // Korea (KOSPI)
-        self.add("XKRX", &[("YAHOO", ".KS", "KRW")]);
-        // Korea (KOSDAQ)
-        self.add("XKOS", &[("YAHOO", ".KQ", "KRW")]);
-
-        // ===== Asia - Southeast =====
-        // Singapore
-        self.add("XSES", &[("YAHOO", ".SI", "SGD")]);
-        // Bangkok
-        self.add("XBKK", &[("YAHOO", ".BK", "THB")]);
-        // Jakarta
-        self.add("XIDX", &[("YAHOO", ".JK", "IDR")]);
-        // Kuala Lumpur
-        self.add("XKLS", &[("YAHOO", ".KL", "MYR")]);
-
-        // ===== Asia - South (India) =====
-        // Bombay Stock Exchange
-        self.add(
-            "XBOM",
-            &[("YAHOO", ".BO", "INR"), ("ALPHA_VANTAGE", ".BSE", "INR")],
-        );
-        // National Stock Exchange of India
-        self.add(
-            "XNSE",
-            &[("YAHOO", ".NS", "INR"), ("ALPHA_VANTAGE", ".NSE", "INR")],
-        );
-
-        // ===== Asia - Taiwan =====
-        // Taiwan Stock Exchange
-        self.add("XTAI", &[("YAHOO", ".TW", "TWD")]);
-        // Taiwan OTC
-        self.add("XTAI_OTC", &[("YAHOO", ".TWO", "TWD")]);
-
-        // ===== Oceania =====
-        // Australian Securities Exchange
-        self.add(
-            "XASX",
-            &[("YAHOO", ".AX", "AUD"), ("ALPHA_VANTAGE", ".AX", "AUD")],
-        );
-        // New Zealand
-        self.add("XNZE", &[("YAHOO", ".NZ", "NZD")]);
-
-        // ===== South America =====
-        // B3 (Brazil)
-        self.add("BVMF", &[("YAHOO", ".SA", "BRL")]);
-        // Buenos Aires
-        self.add("XBUE", &[("YAHOO", ".BA", "ARS")]);
-        // Santiago
-        self.add("XSGO", &[("YAHOO", ".SN", "CLP")]);
-
-        // ===== Middle East =====
-        // Tel Aviv
-        self.add("XTAE", &[("YAHOO", ".TA", "ILS")]);
-        // Saudi Arabia
-        self.add("XSAU", &[("YAHOO", ".SAU", "SAR")]);
-        // Dubai Financial Market
-        self.add("XDFM", &[("YAHOO", ".AE", "AED")]);
-        // Abu Dhabi Securities Exchange
-        self.add("XADS", &[("YAHOO", ".AE", "AED")]);
-        // Qatar
-        self.add("DSMD", &[("YAHOO", ".QA", "QAR")]);
-
-        // ===== Africa =====
-        // Johannesburg
-        self.add("XJSE", &[("YAHOO", ".JO", "ZAR")]);
-        // Cairo
-        self.add("XCAI", &[("YAHOO", ".CA", "EGP")]);
-    }
-
-    /// Add exchange mapping for a MIC.
-    fn add(&mut self, mic: &'static str, providers: &[(&'static str, &'static str, &'static str)]) {
-        let mut provider_map = HashMap::new();
-        for (provider, suffix, currency) in providers {
-            provider_map.insert(
-                Cow::Borrowed(*provider),
-                ExchangeSuffix {
-                    suffix: Cow::Borrowed(*suffix),
-                    currency: Cow::Borrowed(*currency),
-                },
-            );
+            if !provider_map.is_empty() {
+                self.mappings
+                    .insert(Cow::Owned(entry.mic.clone()), provider_map);
+            }
         }
-        self.mappings.insert(Cow::Borrowed(mic), provider_map);
     }
 
     /// Get the suffix for a MIC and provider.
-    ///
-    /// # Arguments
-    /// * `mic` - The ISO 10383 Market Identifier Code
-    /// * `provider` - The provider ID
-    ///
-    /// # Returns
-    /// The suffix string if found, or None if the MIC/provider combination is not mapped.
     pub fn get_suffix(&self, mic: &Mic, provider: &ProviderId) -> Option<&str> {
         self.mappings
             .get(mic)?
@@ -333,13 +95,6 @@ impl ExchangeMap {
     }
 
     /// Get the currency for a MIC and provider.
-    ///
-    /// # Arguments
-    /// * `mic` - The ISO 10383 Market Identifier Code
-    /// * `provider` - The provider ID
-    ///
-    /// # Returns
-    /// The currency code if found, or None if the MIC/provider combination is not mapped.
     pub fn get_currency(&self, mic: &Mic, provider: &ProviderId) -> Option<&str> {
         self.mappings
             .get(mic)?
@@ -362,268 +117,33 @@ impl ExchangeMap {
 }
 
 /// Map Yahoo exchange code to MIC.
-///
-/// Yahoo Finance uses its own exchange codes in search results. This function
-/// maps those codes to standard ISO 10383 MICs.
-///
-/// # Arguments
-/// * `code` - The Yahoo exchange code (e.g., "NMS", "TOR", "LSE")
-///
-/// # Returns
-/// The corresponding MIC if known, or None for unknown codes.
 pub fn yahoo_exchange_to_mic(code: &str) -> Option<Mic> {
-    let mic = match code {
-        // ===== North America =====
-        // NASDAQ variants
-        "NMS" | "NGM" | "NCM" => "XNAS",
-        // NYSE
-        "NYQ" | "NYS" => "XNYS",
-        // NYSE American (AMEX)
-        "PCX" | "ASE" => "XASE",
-        // BATS (Cboe BZX)
-        "BTS" => "BATS",
-        // NYSE Arca
-        "ARC" => "ARCX",
-        // OTC Markets
-        "PNK" | "OQB" | "OQX" => "OTCM",
-        // NEO Exchange (Canada)
-        "NEO" => "XNEO",
-        // Nasdaq (generic variant)
-        "NAS" => "XNAS",
-        // Toronto
-        "TOR" => "XTSE",
-        // TSX Venture
-        "VAN" | "CVE" => "XTSX",
-        // CSE Canada
-        "CNQ" => "XCNQ",
-        // Mexico
-        "MEX" => "XMEX",
-
-        // ===== UK & Ireland =====
-        "LSE" => "XLON",
-        "IOB" => "XLON", // London IOB
-        "ISE" => "XDUB", // Dublin
-
-        // ===== Germany =====
-        "GER" | "XETRA" => "XETR",
-        "FRA" => "XFRA",
-        "STU" => "XSTU",
-        "HAM" => "XHAM",
-        "DUS" => "XDUS",
-        "MUN" => "XMUN",
-        "BER" => "XBER",
-
-        // ===== Euronext =====
-        "PAR" | "ENX" => "XPAR",
-        "AMS" => "XAMS",
-        "BRU" => "XBRU",
-        "LIS" => "XLIS",
-
-        // ===== Southern Europe =====
-        "MIL" => "XMIL",
-        "MCE" => "XMAD",
-        "ATH" => "XATH",
-
-        // ===== Nordic =====
-        "STO" => "XSTO",
-        "HEL" => "XHEL",
-        "CPH" => "XCSE",
-        "OSL" => "XOSL",
-
-        // ===== Switzerland & Central Europe =====
-        "EBS" | "SWX" => "XSWX",
-        "VIE" => "XWBO",
-        "WSE" => "XWAR",
-        "PRA" => "XPRA",
-        "BUD" => "XBUD",
-        "IST" => "XIST",
-
-        // ===== China & Hong Kong =====
-        "SHH" => "XSHG",
-        "SHZ" => "XSHE",
-        "HKG" => "XHKG",
-
-        // ===== Japan & Korea =====
-        "TYO" | "JPX" => "XTKS",
-        "KSC" | "KRX" => "XKRX",
-        "KOE" | "KOSDAQ" => "XKOS",
-
-        // ===== Southeast Asia =====
-        "SES" | "SGX" => "XSES",
-        "BKK" | "SET" => "XBKK",
-        "JKT" | "IDX" => "XIDX",
-        "KLS" | "KLSE" => "XKLS",
-
-        // ===== India =====
-        "BSE" | "BOM" => "XBOM",
-        "NSI" | "NSE" => "XNSE",
-
-        // ===== Taiwan =====
-        "TAI" | "TPE" => "XTAI",
-        "TWO" => "XTAI_OTC",
-
-        // ===== Oceania =====
-        "ASX" | "AX" => "XASX",
-        "NZE" => "XNZE",
-
-        // ===== South America =====
-        "SAO" | "BVMF" => "BVMF",
-        "BUE" => "XBUE",
-        "SGO" => "XSGO",
-
-        // ===== Middle East =====
-        "TLV" => "XTAE",
-        "SAU" => "XSAU",
-        "DFM" => "XDFM",
-        "ADX" => "XADS",
-        "DOH" => "DSMD",
-
-        // ===== Africa =====
-        "JNB" | "JSE" => "XJSE",
-        "CAI" => "XCAI",
-
-        _ => return None,
-    };
-
-    Some(Cow::Borrowed(mic))
+    REGISTRY
+        .yahoo_code_to_mic
+        .get(code)
+        .map(|mic| Cow::Owned(mic.clone()))
 }
 
 /// Known Yahoo exchange suffixes.
 ///
-/// This whitelist is used by `strip_yahoo_suffix` to safely extract the canonical
-/// ticker from a Yahoo symbol. Only suffixes in this list will be stripped,
-/// avoiding false positives like BRK.B or RDS.A.
-pub const YAHOO_EXCHANGE_SUFFIXES: &[&str] = &[
-    // North America
-    ".TO", ".V", ".CN", ".NE", ".MX", // UK & Europe
-    ".L", ".IL", ".IR", ".DE", ".F", ".SG", ".HM", ".DU", ".MU", ".BE", ".HA", ".PA", ".AS", ".BR",
-    ".LS", ".MI", ".MC", ".AT", // Nordic
-    ".ST", ".HE", ".CO", ".OL", ".IC", // Central/Eastern Europe
-    ".SW", ".VI", ".WA", ".PR", ".BD", ".IS", // Asia
-    ".SS", ".SZ", ".HK", ".T", ".KS", ".KQ", ".SI", ".BK", ".JK", ".KL", ".BO", ".NS", ".TW",
-    ".TWO", // Oceania
-    ".AX", ".NZ", // South America
-    ".SA", ".BA", ".SN", // Middle East & Africa
-    ".TA", ".SAU", ".AE", ".QA", ".JO", ".CA",
-];
+/// Returns the whitelist used by `strip_yahoo_suffix` to safely extract
+/// the canonical ticker from a Yahoo symbol.
+pub fn yahoo_exchange_suffixes() -> &'static [&'static str] {
+    REGISTRY.yahoo_suffixes
+}
 
 /// Map Yahoo Finance symbol suffix to canonical MIC.
-///
-/// This function maps the suffix part of Yahoo symbols (e.g., ".TO" from "SHOP.TO")
-/// to ISO 10383 Market Identifier Codes.
-///
-/// # Arguments
-/// * `suffix` - The suffix portion without the dot (e.g., "TO", "L", "DE")
-///
-/// # Returns
-/// The corresponding MIC if known, or None for unknown suffixes.
 pub fn yahoo_suffix_to_mic(suffix: &str) -> Option<&'static str> {
-    match suffix.to_uppercase().as_str() {
-        // North America
-        "TO" => Some("XTSE"),       // Toronto Stock Exchange
-        "V" | "VN" => Some("XTSX"), // TSX Venture
-        "CN" => Some("XCNQ"),       // Canadian Securities Exchange
-        "NE" => Some("XNEO"),       // NEO Exchange
-        "MX" => Some("XMEX"),       // Mexican Stock Exchange
-
-        // UK & Ireland
-        "L" => Some("XLON"),  // London Stock Exchange
-        "IL" => Some("XLON"), // London International
-        "IR" => Some("XDUB"), // Dublin
-
-        // Germany
-        "DE" => Some("XETR"), // XETRA
-        "F" => Some("XFRA"),  // Frankfurt
-        "SG" => Some("XSTU"), // Stuttgart
-        "HM" => Some("XHAM"), // Hamburg
-        "DU" => Some("XDUS"), // Dusseldorf
-        "MU" => Some("XMUN"), // Munich
-        "BE" => Some("XBER"), // Berlin
-        "HA" => Some("XHAN"), // Hanover
-
-        // Euronext
-        "PA" => Some("XPAR"), // Paris
-        "AS" => Some("XAMS"), // Amsterdam
-        "BR" => Some("XBRU"), // Brussels
-        "LS" => Some("XLIS"), // Lisbon
-
-        // Southern Europe
-        "MI" => Some("XMIL"), // Milan
-        "MC" => Some("XMAD"), // Madrid
-        "AT" => Some("XATH"), // Athens
-
-        // Nordic
-        "ST" => Some("XSTO"), // Stockholm
-        "HE" => Some("XHEL"), // Helsinki
-        "CO" => Some("XCSE"), // Copenhagen
-        "OL" => Some("XOSL"), // Oslo
-        "IC" => Some("XICE"), // Iceland
-
-        // Central/Eastern Europe
-        "SW" => Some("XSWX"), // Swiss Exchange
-        "VI" => Some("XWBO"), // Vienna
-        "WA" => Some("XWAR"), // Warsaw
-        "PR" => Some("XPRA"), // Prague
-        "BD" => Some("XBUD"), // Budapest
-        "IS" => Some("XIST"), // Istanbul
-
-        // Asia - China & Hong Kong
-        "SS" => Some("XSHG"), // Shanghai
-        "SZ" => Some("XSHE"), // Shenzhen
-        "HK" => Some("XHKG"), // Hong Kong
-
-        // Asia - Japan & Korea
-        "T" => Some("XTKS"),  // Tokyo
-        "KS" => Some("XKRX"), // Korea (KOSPI)
-        "KQ" => Some("XKOS"), // Korea (KOSDAQ)
-
-        // Southeast Asia
-        "SI" => Some("XSES"), // Singapore
-        "BK" => Some("XBKK"), // Bangkok
-        "JK" => Some("XIDX"), // Jakarta
-        "KL" => Some("XKLS"), // Kuala Lumpur
-
-        // India
-        "BO" => Some("XBOM"), // Bombay
-        "NS" => Some("XNSE"), // National Stock Exchange India
-
-        // Taiwan
-        "TW" => Some("XTAI"),  // Taiwan
-        "TWO" => Some("XTAI"), // Taiwan OTC (simplified to main exchange)
-
-        // Oceania
-        "AX" => Some("XASX"), // Australia
-        "NZ" => Some("XNZE"), // New Zealand
-
-        // South America
-        "SA" => Some("BVMF"), // Brazil (B3)
-        "BA" => Some("XBUE"), // Buenos Aires
-        "SN" => Some("XSGO"), // Santiago
-
-        // Middle East
-        "TA" => Some("XTAE"),  // Tel Aviv
-        "SAU" => Some("XSAU"), // Saudi Arabia
-        "AE" => Some("XDFM"),  // Dubai Financial Market
-        "QA" => Some("DSMD"),  // Qatar
-
-        // Africa
-        "JO" => Some("XJSE"), // Johannesburg
-        "CA" => Some("XCAI"), // Cairo
-
-        _ => None,
-    }
+    REGISTRY
+        .yahoo_suffix_to_mic
+        .get(&suffix.to_uppercase())
+        .copied()
 }
 
 /// Extract canonical ticker from Yahoo provider symbol.
 ///
 /// Uses a whitelist approach to safely strip exchange suffixes while preserving
 /// share classes like BRK.B or RDS.A (since .B and .A are not in the whitelist).
-///
-/// # Arguments
-/// * `symbol` - The Yahoo symbol (e.g., "SHOP.TO", "EURUSD=X", "BRK.B")
-///
-/// # Returns
-/// The canonical ticker with exchange suffix removed if applicable.
 pub fn strip_yahoo_suffix(symbol: &str) -> &str {
     // Handle special suffixes first
     if let Some(stripped) = symbol.strip_suffix("=X") {
@@ -636,7 +156,7 @@ pub fn strip_yahoo_suffix(symbol: &str) -> &str {
     }
 
     // Only strip if suffix is in our known exchange whitelist
-    for suffix in YAHOO_EXCHANGE_SUFFIXES {
+    for suffix in yahoo_exchange_suffixes() {
         if let Some(stripped) = symbol.strip_suffix(suffix) {
             return stripped;
         }
@@ -703,11 +223,20 @@ mod tests {
     #[test]
     fn test_yahoo_exchange_to_mic() {
         // NASDAQ variants
-        assert_eq!(yahoo_exchange_to_mic("NMS"), Some(Cow::Borrowed("XNAS")));
-        assert_eq!(yahoo_exchange_to_mic("NGM"), Some(Cow::Borrowed("XNAS")));
+        assert_eq!(
+            yahoo_exchange_to_mic("NMS"),
+            Some(Cow::Owned("XNAS".to_string()))
+        );
+        assert_eq!(
+            yahoo_exchange_to_mic("NGM"),
+            Some(Cow::Owned("XNAS".to_string()))
+        );
 
         // Toronto
-        assert_eq!(yahoo_exchange_to_mic("TOR"), Some(Cow::Borrowed("XTSE")));
+        assert_eq!(
+            yahoo_exchange_to_mic("TOR"),
+            Some(Cow::Owned("XTSE".to_string()))
+        );
 
         // Unknown
         assert_eq!(yahoo_exchange_to_mic("UNKNOWN"), None);

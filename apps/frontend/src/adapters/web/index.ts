@@ -153,6 +153,7 @@ export {
   updateMarketDataProviderSettings,
   importManualQuotes,
   checkQuotesImport,
+  getExchanges,
 } from "../shared/market-data";
 
 // Contribution Limits Commands

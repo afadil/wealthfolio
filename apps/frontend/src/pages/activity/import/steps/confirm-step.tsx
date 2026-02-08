@@ -190,13 +190,14 @@ export function ConfirmStep() {
         }
       }
 
+      const frontendSkipped = summary.skipped + summary.errors;
       dispatch(
         setImportResult({
           success: result.summary.success,
           stats: {
-            total: result.summary.total,
+            total: summary.total,
             imported: result.summary.imported,
-            skipped: result.summary.skipped,
+            skipped: result.summary.skipped + frontendSkipped,
             duplicates: result.summary.duplicates ?? 0,
             errors: 0,
           },

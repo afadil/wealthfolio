@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 # Internal crates
+wealthfolio-market-data = { workspace = true }
 wealthfolio-core = { workspace = true }
 wealthfolio-connect = { workspace = true }
 wealthfolio-storage-sqlite = { workspace = true }

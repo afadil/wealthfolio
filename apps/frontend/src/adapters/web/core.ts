@@ -71,6 +71,7 @@ export const COMMANDS: CommandMap = {
   get_account_import_mapping: { method: "GET", path: "/activities/import/mapping" },
   save_account_import_mapping: { method: "POST", path: "/activities/import/mapping" },
   // Market data providers
+  get_exchanges: { method: "GET", path: "/exchanges" },
   get_market_data_providers: { method: "GET", path: "/providers" },
   get_market_data_providers_settings: { method: "GET", path: "/providers/settings" },
   update_market_data_provider_settings: { method: "PUT", path: "/providers/settings" },
@@ -470,6 +471,7 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       url += `/${encodeURIComponent(rateId)}`;
       break;
     }
+    case "get_exchanges":
     case "synch_quotes":
       break;
     case "search_activities": {

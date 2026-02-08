@@ -14,6 +14,7 @@ use axum::{
 use wealthfolio_core::quotes::{
     MarketSyncMode, ProviderInfo, Quote, QuoteImport, SymbolSearchResult,
 };
+use wealthfolio_market_data::ExchangeInfo;
 
 async fn get_market_data_providers(
     State(state): State<Arc<AppState>>,
@@ -222,8 +223,13 @@ async fn get_latest_quotes(
     Ok(Json(quotes))
 }
 
+async fn get_exchanges() -> Json<Vec<ExchangeInfo>> {
+    Json(wealthfolio_market_data::get_exchange_list())
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
+        .route("/exchanges", get(get_exchanges))
         .route("/providers", get(get_market_data_providers))
         .route(
             "/providers/settings",

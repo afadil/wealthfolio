@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
+import { useQuery } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
@@ -10,6 +11,7 @@ import {
   SheetDescription,
   ResponsiveSelect,
   type ResponsiveSelectOption,
+  SearchableSelect,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -40,6 +42,7 @@ import { useTaxonomies } from "@/hooks/use-taxonomies";
 import { EDITABLE_ASSET_KINDS, ASSET_KIND_DISPLAY_NAMES, type AssetKind } from "@/lib/constants";
 import type { Asset, Quote } from "@/lib/types";
 import { formatAmount } from "@/lib/utils";
+import { getExchanges } from "@/adapters";
 import { useAssetProfileMutations } from "./hooks/use-asset-profile-mutations";
 
 const PROVIDERS = [
@@ -226,6 +229,17 @@ export function AssetEditSheet({
   const [activeTab, setActiveTab] = useState<EditTab>(defaultTab);
   const { data: taxonomies = [], isLoading: isTaxonomiesLoading } = useTaxonomies();
   const { updateAssetProfileMutation } = useAssetProfileMutations();
+
+  const { data: exchanges = [] } = useQuery({
+    queryKey: ["exchanges"],
+    queryFn: getExchanges,
+    staleTime: Infinity,
+  });
+
+  const exchangeOptions = useMemo(
+    () => exchanges.map((e) => ({ value: e.mic, label: `${e.longName} (${e.name})` })),
+    [exchanges],
+  );
 
   // Split taxonomies by selection type
   const { singleSelectTaxonomies, multiSelectTaxonomies } = useMemo(() => {
@@ -428,17 +442,15 @@ export function AssetEditSheet({
                         <FormItem>
                           <FormLabel>Exchange</FormLabel>
                           <FormControl>
-                            <Input
-                              placeholder="e.g., XNYS, XTSE"
-                              {...field}
-                              className="uppercase"
+                            <SearchableSelect
+                              options={exchangeOptions}
+                              value={field.value ?? ""}
+                              onValueChange={field.onChange}
+                              placeholder="Select exchange"
+                              searchPlaceholder="Search exchanges..."
+                              className="h-11"
                             />
                           </FormControl>
-                          <p className="text-muted-foreground text-xs">
-                            {asset.exchangeName
-                              ? `${asset.exchangeName} (MIC)`
-                              : "ISO 10383 Market Identifier Code"}
-                          </p>
                           <FormMessage />
                         </FormItem>
                       )}

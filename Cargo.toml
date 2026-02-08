@@ -64,6 +64,7 @@ sha2 = "0.10"
 rand = "0.8"
 
 # Internal crates
+wealthfolio-market-data = { path = "crates/market-data" }
 wealthfolio-core = { path = "crates/core" }
 wealthfolio-connect = { path = "crates/connect" }
 wealthfolio-storage-sqlite = { path = "crates/storage-sqlite" }

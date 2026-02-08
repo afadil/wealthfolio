@@ -316,6 +316,7 @@ pub fn run() {
             commands::market_data::get_market_data_providers,
             commands::market_data::check_quotes_import,
             commands::market_data::import_quotes_csv,
+            commands::market_data::get_exchanges,
             // Taxonomy commands
             commands::taxonomy::get_taxonomies,
             commands::taxonomy::get_taxonomy,

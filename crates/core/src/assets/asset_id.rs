@@ -4,7 +4,7 @@
 //! This module retains only symbol parsing helpers needed by other modules.
 //! The typed prefix ID system (SEC:AAPL:XNAS) is removed.
 
-use wealthfolio_market_data::{strip_yahoo_suffix, yahoo_suffix_to_mic, YAHOO_EXCHANGE_SUFFIXES};
+use wealthfolio_market_data::{strip_yahoo_suffix, yahoo_exchange_suffixes, yahoo_suffix_to_mic};
 
 /// Parse crypto pair symbols like "BTC-USD" or "BTC-USDT" into (base, quote).
 /// Returns None if the symbol doesn't match the expected pair pattern.
@@ -39,7 +39,7 @@ pub fn parse_crypto_pair_symbol(symbol: &str) -> Option<(String, String)> {
 pub fn parse_symbol_with_exchange_suffix(symbol: &str) -> (&str, Option<&'static str>) {
     let base_symbol = strip_yahoo_suffix(symbol);
 
-    let mic = YAHOO_EXCHANGE_SUFFIXES
+    let mic = yahoo_exchange_suffixes()
         .iter()
         .find(|suffix| symbol.ends_with(*suffix))
         .and_then(|suffix| {

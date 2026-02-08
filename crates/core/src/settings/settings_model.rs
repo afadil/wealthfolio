@@ -18,7 +18,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            theme: "dark".to_string(),
+            theme: "light".to_string(),
             font: "font-mono".to_string(),
             base_currency: "".to_string(),
             instance_id: "".to_string(),

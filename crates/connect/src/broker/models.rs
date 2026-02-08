@@ -3,13 +3,20 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Broker account balance total (amount + currency)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct BrokerBalanceTotal {
+    /// Balance amount
+    pub amount: Option<f64>,
+    /// Currency code (e.g., "USD", "CAD")
+    pub currency: Option<String>,
+}
+
 /// Broker account balance information (new API format)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BrokerAccountBalance {
-    /// Currency code (e.g., "USD", "CAD")
-    pub currency: Option<String>,
-    /// Cash balance amount
-    pub cash: Option<f64>,
+    /// Total balance with currency
+    pub total: Option<BrokerBalanceTotal>,
 }
 
 /// Account owner information from the API
@@ -594,10 +601,11 @@ impl BrokerAccount {
                 return currency.clone();
             }
         }
-        // Fall back to balance currency
+        // Fall back to balance.total.currency
         self.balance
             .as_ref()
-            .and_then(|b| b.currency.clone())
+            .and_then(|b| b.total.as_ref())
+            .and_then(|t| t.currency.clone())
             .or_else(|| {
                 base_currency
                     .filter(|c| !c.is_empty())

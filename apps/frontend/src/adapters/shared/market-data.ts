@@ -5,6 +5,7 @@ import type {
   Quote,
   UpdateAssetProfile,
   MarketDataProviderInfo,
+  ExchangeInfo,
 } from "@/lib/types";
 import type { QuoteImport } from "@/lib/types/quote-import";
 import type { MarketDataProviderSetting } from "../types";
@@ -164,6 +165,15 @@ export const checkQuotesImport = async (
     return await invoke<QuoteImport[]>("check_quotes_import", { content, hasHeaderRow });
   } catch (error) {
     logger.error("Error checking quotes import.");
+    throw error;
+  }
+};
+
+export const getExchanges = async (): Promise<ExchangeInfo[]> => {
+  try {
+    return await invoke<ExchangeInfo[]>("get_exchanges");
+  } catch (error) {
+    logger.error("Error fetching exchanges.");
     throw error;
   }
 };

@@ -356,6 +356,13 @@ export interface SymbolSearchResult {
   existingAssetId?: string;
 }
 
+export interface ExchangeInfo {
+  mic: string;
+  name: string;
+  longName: string;
+  currency: string;
+}
+
 export interface MarketDataProviderInfo {
   id: string;
   name: string;

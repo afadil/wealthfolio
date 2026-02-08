@@ -150,7 +150,7 @@ impl SettingsRepositoryTrait for SettingsRepository {
             Err(diesel::result::Error::NotFound) => {
                 // Return default values for known settings
                 let default_value = match setting_key_param {
-                    "theme" => "dark",
+                    "theme" => "light",
                     "font" => "font-mono",
                     "onboarding_completed" => "false",
                     "auto_update_check_enabled" => "true",
