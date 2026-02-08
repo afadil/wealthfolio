@@ -674,10 +674,7 @@ export const AssetProfilePage = () => {
               title={
                 isAltAsset && altHolding
                   ? altHolding.name
-                  : (() => {
-                      const parts = assetId.split(":");
-                      return parts.length >= 2 ? parts[1] : assetId;
-                    })()
+                  : (assetProfile?.displayCode ?? assetProfile?.name ?? assetId)
               }
               groups={
                 isAltAsset && altHolding
