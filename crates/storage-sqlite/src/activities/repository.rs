@@ -68,7 +68,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
         let activities_db = activities::table
             .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
-            .filter(accounts::is_active.eq(true))
+            .filter(accounts::is_archived.eq(false))
             .filter(activities::activity_type.eq_any(TRADING_ACTIVITY_TYPES))
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
@@ -83,7 +83,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
         let activities_db = activities::table
             .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
-            .filter(accounts::is_active.eq(true))
+            .filter(accounts::is_archived.eq(false))
             .filter(activities::activity_type.eq_any(INCOME_ACTIVITY_TYPES))
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
@@ -98,7 +98,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
         let activities_db = activities::table
             .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
-            .filter(accounts::is_active.eq(true))
+            .filter(accounts::is_archived.eq(false))
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
             .load::<ActivityDB>(&mut conn)
@@ -530,7 +530,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
         let activities_db = activities::table
             .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
-            .filter(accounts::is_active.eq(true))
+            .filter(accounts::is_archived.eq(false))
             .filter(activities::account_id.eq(account_id))
             .select(ActivityDB::as_select())
             .order(activities::activity_date.asc())
@@ -672,7 +672,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
         let results = activities::table
             .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
             .filter(accounts::id.eq_any(account_ids))
-            .filter(accounts::is_active.eq(true))
+            .filter(accounts::is_archived.eq(false))
             .filter(activities::activity_type.eq_any(CONTRIBUTION_TYPES))
             .filter(activities::activity_date.between(
                 Utc.from_utc_datetime(&start_date).to_rfc3339(),
@@ -768,7 +768,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
              LEFT JOIN quotes q ON a.asset_id = q.asset_id
                  AND date(a.activity_date) = q.day
              WHERE a.activity_type IN ('DIVIDEND', 'INTEREST', 'OTHER_INCOME')
-             AND acc.is_active = 1
+             AND acc.is_archived = 0
              ORDER BY a.activity_date";
 
         // Define a struct to hold the raw query results
@@ -822,7 +822,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
         let min_date_str = activities::table
             .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
-            .filter(accounts::is_active.eq(true))
+            .filter(accounts::is_archived.eq(false))
             .select(min(activities::activity_date))
             .first::<Option<String>>(&mut conn)
             .map_err(StorageError::from)?
@@ -842,8 +842,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
         let mut conn = get_connection(&self.pool)?;
 
         let mut query = activities::table
-            .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
-            .filter(accounts::is_active.eq(true))
+            .inner_join(accounts::table.on(accounts::id.eq(activities::account_id)))
+            .filter(accounts::is_archived.eq(false))
             .select(min(activities::activity_date))
             .into_boxed();
 
@@ -885,7 +885,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
             // Query to get MIN and MAX activity dates per asset_id
             let results = activities::table
                 .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
-                .filter(accounts::is_active.eq(true))
+                .filter(accounts::is_archived.eq(false))
                 .filter(activities::asset_id.eq_any(chunk))
                 .group_by(activities::asset_id)
                 .select((
