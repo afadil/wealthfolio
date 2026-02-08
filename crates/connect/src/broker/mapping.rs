@@ -13,6 +13,7 @@ use rust_decimal::Decimal;
 
 use super::models::AccountUniversalActivity;
 use wealthfolio_core::activities::{self, NewActivity, SymbolInput};
+use wealthfolio_core::assets::parse_symbol_with_exchange_suffix;
 use wealthfolio_core::fx::currency::{get_normalization_rule, normalize_amount, resolve_currency};
 
 /// Minimum confidence score to consider a mapping reliable
@@ -125,6 +126,13 @@ pub fn build_activity_metadata(activity: &AccountUniversalActivity) -> Option<St
         );
     }
 
+    if let Some(ref provider_type) = activity.provider_type {
+        metadata.insert(
+            "provider_type".to_string(),
+            serde_json::json!(provider_type),
+        );
+    }
+
     if let Some(ref source_record_id) = activity.source_record_id {
         metadata.insert(
             "source_record_id".to_string(),
@@ -137,6 +145,54 @@ pub fn build_activity_metadata(activity: &AccountUniversalActivity) -> Option<St
             "source_group_id".to_string(),
             serde_json::json!(source_group_id),
         );
+    }
+
+    if let Some(ref external_reference_id) = activity.external_reference_id {
+        metadata.insert(
+            "external_reference_id".to_string(),
+            serde_json::json!(external_reference_id),
+        );
+    }
+
+    if let Some(ref institution) = activity.institution {
+        metadata.insert("institution".to_string(), serde_json::json!(institution));
+    }
+
+    if let Some(option_leg_type) = activity
+        .option_type
+        .as_ref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+    {
+        metadata.insert(
+            "option_leg_type".to_string(),
+            serde_json::json!(option_leg_type),
+        );
+    }
+
+    if let Some(ref option_symbol) = activity.option_symbol {
+        if let Some(contract_type) = option_symbol
+            .option_type
+            .as_ref()
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
+            metadata.insert(
+                "option_contract_type".to_string(),
+                serde_json::json!(contract_type),
+            );
+        }
+        if let Some(ref ticker) = option_symbol.ticker {
+            metadata.insert("option_ticker".to_string(), serde_json::json!(ticker));
+        }
+        if let Some(ref underlying) = option_symbol.underlying_symbol {
+            if let Some(ref underlying_symbol) = underlying.symbol {
+                metadata.insert(
+                    "option_underlying_symbol".to_string(),
+                    serde_json::json!(underlying_symbol),
+                );
+            }
+        }
     }
 
     if metadata.is_empty() {
@@ -183,7 +239,18 @@ pub fn map_broker_activity(
         .filter(|t| !t.is_empty())
         .unwrap_or_else(|| "UNKNOWN".to_string());
 
-    let subtype = activity.subtype.clone();
+    let option_leg_type = activity
+        .option_type
+        .as_ref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
+
+    let subtype = activity
+        .subtype
+        .clone()
+        .or(option_leg_type.clone())
+        .or(activity.raw_type.clone());
 
     // Calculate needs_review flag
     let needs_review_flag = needs_review(activity);
@@ -210,12 +277,24 @@ pub fn map_broker_activity(
     let is_crypto = is_broker_crypto(symbol_type_code);
 
     // Extract exchange MIC from broker data (prefer mic_code over code)
-    let exchange_mic = symbol_ref.and_then(|s| s.exchange.as_ref()).and_then(|e| {
+    let exchange_mic_from_symbol = symbol_ref.and_then(|s| s.exchange.as_ref()).and_then(|e| {
         e.mic_code
             .clone()
             .filter(|c| !c.trim().is_empty())
             .or_else(|| e.code.clone().filter(|c| !c.trim().is_empty()))
     });
+    let exchange_mic_from_underlying = activity
+        .option_symbol
+        .as_ref()
+        .and_then(|o| o.underlying_symbol.as_ref())
+        .and_then(|u| u.exchange.as_ref())
+        .and_then(|e| {
+            e.mic_code
+                .clone()
+                .filter(|c| !c.trim().is_empty())
+                .or_else(|| e.code.clone().filter(|c| !c.trim().is_empty()))
+        });
+    let exchange_mic = exchange_mic_from_symbol.or(exchange_mic_from_underlying);
 
     // Get the symbol's currency
     let symbol_currency = symbol_ref
@@ -243,7 +322,8 @@ pub fn map_broker_activity(
                     .map(|sym| sym.split('-').next().unwrap_or(&sym).to_string())
             })
     } else {
-        // For securities: raw_symbol > symbol (without exchange suffix)
+        // For securities: raw_symbol > symbol normalized via Yahoo suffix parser.
+        // This preserves valid share-class symbols like BRK.B while trimming real exchange suffixes.
         symbol_ref
             .and_then(|s| s.raw_symbol.clone())
             .filter(|r| !r.trim().is_empty())
@@ -251,7 +331,7 @@ pub fn map_broker_activity(
                 symbol_ref
                     .and_then(|s| s.symbol.clone())
                     .filter(|sym| !sym.trim().is_empty())
-                    .map(|sym| sym.split('.').next().unwrap_or(&sym).to_string())
+                    .map(|sym| parse_symbol_with_exchange_suffix(&sym).0.to_string())
             })
     };
 
@@ -261,6 +341,13 @@ pub fn map_broker_activity(
         .as_ref()
         .and_then(|s| s.ticker.clone())
         .filter(|t| !t.trim().is_empty());
+    let is_option_activity = option_symbol.is_some() || option_leg_type.is_some();
+    // Option contracts are uniquely identified by OCC ticker; adding underlying MIC can fragment identity.
+    let exchange_mic = if is_option_activity {
+        None
+    } else {
+        exchange_mic
+    };
 
     // Build SymbolInput for non-cash activities that have a symbol
     let symbol_input = if is_cash_like && display_symbol.is_none() && option_symbol.is_none() {
@@ -269,14 +356,24 @@ pub fn map_broker_activity(
     } else {
         let symbol = option_symbol.clone().or(display_symbol.clone());
         symbol.map(|sym| {
-            let kind_hint = if is_crypto {
+            let kind_hint = if is_option_activity {
+                Some("OPTION".to_string())
+            } else if is_crypto {
                 Some("CRYPTO".to_string())
             } else {
                 None
             };
             let asset_name = symbol_ref
                 .and_then(|s| s.description.clone())
-                .filter(|d| !d.trim().is_empty());
+                .filter(|d| !d.trim().is_empty())
+                .or_else(|| {
+                    activity
+                        .option_symbol
+                        .as_ref()
+                        .and_then(|o| o.underlying_symbol.as_ref())
+                        .and_then(|u| u.description.clone())
+                        .filter(|d| !d.trim().is_empty())
+                });
             SymbolInput {
                 id: None, // Let prepare_activities resolve via instrument_key
                 symbol: Some(sym),
@@ -349,8 +446,13 @@ pub fn map_broker_activity(
         source_system: activity
             .source_system
             .clone()
+            .or(activity.provider_type.clone())
             .or(Some("SNAPTRADE".to_string())),
-        source_record_id: activity.source_record_id.clone().or(activity.id.clone()),
+        source_record_id: activity
+            .source_record_id
+            .clone()
+            .or(activity.external_reference_id.clone())
+            .or(activity.id.clone()),
         source_group_id: activity.source_group_id.clone(),
         idempotency_key: None,
     })
@@ -359,7 +461,10 @@ pub fn map_broker_activity(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::broker::models::MappingMetadata;
+    use crate::broker::models::{
+        AccountUniversalActivityExchange, AccountUniversalActivityOptionSymbol,
+        AccountUniversalActivityUnderlyingSymbol, MappingMetadata,
+    };
 
     #[test]
     fn test_needs_review_unknown_type() {
@@ -405,5 +510,79 @@ mod tests {
         assert!(has_warning_reasons(&["Ambiguous mapping".to_string()]));
         assert!(!has_warning_reasons(&["Matched by symbol".to_string()]));
         assert!(!has_warning_reasons(&[]));
+    }
+
+    #[test]
+    fn test_map_broker_activity_uses_provider_and_external_reference_fallbacks() {
+        let activity = AccountUniversalActivity {
+            id: Some("act-1".to_string()),
+            activity_type: Some("BUY".to_string()),
+            provider_type: Some("SNAPTRADE".to_string()),
+            external_reference_id: Some("ext-123".to_string()),
+            ..Default::default()
+        };
+
+        let mapped = map_broker_activity(&activity, "acct-1", Some("USD"), Some("USD")).unwrap();
+
+        assert_eq!(mapped.source_system.as_deref(), Some("SNAPTRADE"));
+        assert_eq!(mapped.source_record_id.as_deref(), Some("ext-123"));
+
+        let metadata_json = mapped.metadata.expect("metadata should be present");
+        let metadata: serde_json::Value = serde_json::from_str(&metadata_json).unwrap();
+        assert_eq!(metadata["provider_type"], "SNAPTRADE");
+        assert_eq!(metadata["external_reference_id"], "ext-123");
+    }
+
+    #[test]
+    fn test_map_broker_activity_marks_option_with_option_kind() {
+        let activity = AccountUniversalActivity {
+            id: Some("act-opt".to_string()),
+            activity_type: Some("BUY".to_string()),
+            option_type: Some("BUY_TO_OPEN".to_string()),
+            option_symbol: Some(AccountUniversalActivityOptionSymbol {
+                ticker: Some("AAPL  261218C00240000".to_string()),
+                underlying_symbol: Some(AccountUniversalActivityUnderlyingSymbol {
+                    exchange: Some(AccountUniversalActivityExchange {
+                        mic_code: Some("XNAS".to_string()),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let mapped = map_broker_activity(&activity, "acct-1", Some("USD"), Some("USD")).unwrap();
+        let symbol = mapped
+            .symbol
+            .expect("option activities should produce symbol");
+
+        assert_eq!(symbol.kind.as_deref(), Some("OPTION"));
+        assert_eq!(symbol.exchange_mic, None);
+        assert_eq!(mapped.subtype.as_deref(), Some("BUY_TO_OPEN"));
+    }
+
+    #[test]
+    fn test_map_broker_activity_does_not_mark_empty_option_type_as_option() {
+        let activity = AccountUniversalActivity {
+            id: Some("act-eq".to_string()),
+            activity_type: Some("BUY".to_string()),
+            option_type: Some(String::new()),
+            symbol: Some(crate::broker::models::AccountUniversalActivitySymbol {
+                symbol: Some("AAPL".to_string()),
+                raw_symbol: Some("AAPL".to_string()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let mapped = map_broker_activity(&activity, "acct-1", Some("USD"), Some("USD")).unwrap();
+        let symbol = mapped
+            .symbol
+            .expect("equity activity should produce symbol");
+
+        assert_eq!(symbol.symbol.as_deref(), Some("AAPL"));
+        assert_ne!(symbol.kind.as_deref(), Some("OPTION"));
     }
 }

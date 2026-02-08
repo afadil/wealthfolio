@@ -15,7 +15,9 @@ use crate::events::PortfolioRequestPayload;
 /// Merges account_ids and asset_ids from:
 /// - ActivitiesChanged
 /// - HoldingsChanged
-/// - AccountsChanged (including FX asset IDs for currency changes)
+/// - AccountsChanged
+/// Also carries through asset IDs from AssetsCreated when a recalc-triggering
+/// event exists in the same batch.
 ///
 /// Returns `None` if no events require portfolio recalculation.
 pub fn plan_portfolio_job(events: &[DomainEvent]) -> Option<PortfolioRequestPayload> {

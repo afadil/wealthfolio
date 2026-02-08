@@ -30,6 +30,13 @@ interface ImportSummary {
   bySkipReason: Record<string, number>;
 }
 
+function hasDuplicateWarning(draft: DraftActivity): boolean {
+  const hasDuplicateLineNumber = typeof draft.duplicateOfLineNumber === "number";
+  return Boolean(
+    draft.duplicateOfId || hasDuplicateLineNumber || draft.warnings?._duplicate?.length,
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper Functions
 // ─────────────────────────────────────────────────────────────────────────────
@@ -58,6 +65,9 @@ function computeSummary(draftActivities: DraftActivity[]): ImportSummary {
       case "warning": {
         summary.toImport++;
         summary.warnings++;
+        if (hasDuplicateWarning(draft)) {
+          summary.duplicates++;
+        }
         // Also count by type for warnings (they will be imported)
         const warnType = draft.activityType ?? "UNKNOWN";
         summary.byType[warnType] = (summary.byType[warnType] ?? 0) + 1;
@@ -70,9 +80,11 @@ function computeSummary(draftActivities: DraftActivity[]): ImportSummary {
         break;
       }
       case "duplicate": {
+        summary.toImport++;
+        summary.warnings++;
         summary.duplicates++;
-        const duplicateKey = "Duplicate";
-        summary.bySkipReason[duplicateKey] = (summary.bySkipReason[duplicateKey] ?? 0) + 1;
+        const duplicateType = draft.activityType ?? "UNKNOWN";
+        summary.byType[duplicateType] = (summary.byType[duplicateType] ?? 0) + 1;
         break;
       }
       case "error": {
@@ -202,7 +214,7 @@ export function ConfirmStep() {
 
   const summary = useMemo(() => computeSummary(state.draftActivities), [state.draftActivities]);
 
-  const skippedTotal = summary.skipped + summary.duplicates + summary.errors;
+  const skippedTotal = summary.skipped + summary.errors;
 
   const handleImport = () => {
     // Filter only valid/warning activities for import
@@ -243,7 +255,7 @@ export function ConfirmStep() {
         <ImportAlert
           variant="warning"
           title="No Activities to Import"
-          description="All activities have been skipped, marked as duplicates, or have validation errors. Go back to review and fix any issues."
+          description="All activities have been skipped or have validation errors. Go back to review and fix any issues."
         />
       ) : summary.warnings > 0 ? (
         <ImportAlert

@@ -53,6 +53,7 @@ export interface DraftActivity {
   warnings: Record<string, string[]>;
   skipReason?: string;
   duplicateOfId?: string;
+  duplicateOfLineNumber?: number;
   isEdited: boolean;
 }
 

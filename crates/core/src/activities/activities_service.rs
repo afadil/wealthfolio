@@ -113,6 +113,58 @@ impl ActivityService {
         ])
     }
 
+    fn parse_import_date_for_idempotency(date: &str) -> Option<DateTime<Utc>> {
+        DateTime::parse_from_rfc3339(date)
+            .map(|dt| dt.with_timezone(&Utc))
+            .or_else(|_| {
+                NaiveDate::parse_from_str(date, "%Y-%m-%d")
+                    .map(|d| Utc.from_utc_datetime(&d.and_hms_opt(0, 0, 0).unwrap_or_default()))
+            })
+            .ok()
+    }
+
+    fn build_import_idempotency_key(
+        activity: &ActivityImport,
+        default_account_id: &str,
+    ) -> Option<String> {
+        let date = Self::parse_import_date_for_idempotency(&activity.date)?;
+        let account_id = activity.account_id.as_deref().unwrap_or(default_account_id);
+        let currency = if activity.currency.trim().is_empty() {
+            "USD"
+        } else {
+            activity.currency.as_str()
+        };
+        let symbol = activity.symbol.trim();
+        let asset_id = if symbol.is_empty() {
+            None
+        } else if let Some(exchange_mic) = activity.exchange_mic.as_deref() {
+            Some(format!("{}@{}", symbol, exchange_mic))
+        } else {
+            Some(symbol.to_string())
+        };
+
+        Some(compute_idempotency_key(
+            account_id,
+            &activity.activity_type,
+            &date,
+            asset_id.as_deref(),
+            activity.quantity,
+            activity.unit_price,
+            activity.amount,
+            currency,
+            None,
+            activity.comment.as_deref(),
+        ))
+    }
+
+    fn add_activity_warning(activity: &mut ActivityImport, key: &str, message: &str) {
+        let warnings = activity.warnings.get_or_insert_with(HashMap::new);
+        let entry = warnings.entry(key.to_string()).or_default();
+        if !entry.iter().any(|m| m == message) {
+            entry.push(message.to_string());
+        }
+    }
+
     /// Resolves (symbol, currency) pairs to exchange MICs in batch.
     /// Uses the activity-level currency to rank exchange results correctly.
     /// First checks existing assets in the database, then falls back to quote service.
@@ -323,21 +375,70 @@ impl ActivityService {
         symbol: &str,
         exchange_mic: Option<&str>,
         instrument_type: Option<&InstrumentType>,
+        quote_ccy: Option<&str>,
     ) -> Option<String> {
         let assets = self.asset_service.get_assets().unwrap_or_default();
         let upper_symbol = symbol.to_uppercase();
+        let expected_key = instrument_type.and_then(|itype| match itype {
+            InstrumentType::Crypto | InstrumentType::Fx => quote_ccy.and_then(|ccy| {
+                let normalized_ccy = ccy.trim().to_uppercase();
+                if normalized_ccy.is_empty() {
+                    None
+                } else {
+                    Some(format!(
+                        "{}:{}/{}",
+                        itype.as_db_str(),
+                        upper_symbol,
+                        normalized_ccy
+                    ))
+                }
+            }),
+            _ => exchange_mic
+                .filter(|mic| !mic.trim().is_empty())
+                .map(|mic| {
+                    format!(
+                        "{}:{}@{}",
+                        itype.as_db_str(),
+                        upper_symbol,
+                        mic.trim().to_uppercase()
+                    )
+                })
+                .or_else(|| Some(format!("{}:{}", itype.as_db_str(), upper_symbol))),
+        });
+
+        if let Some(ref key) = expected_key {
+            for asset in &assets {
+                if asset.instrument_key.as_deref() == Some(key) {
+                    return Some(asset.id.clone());
+                }
+            }
+        }
+
         for asset in &assets {
             if let (Some(ref a_symbol), Some(ref a_type)) =
                 (&asset.instrument_symbol, &asset.instrument_type)
             {
                 let type_matches = instrument_type.map_or(true, |t| t == a_type);
                 let symbol_matches = a_symbol.to_uppercase() == upper_symbol;
-                let mic_matches = match (exchange_mic, &asset.instrument_exchange_mic) {
-                    (Some(mic), Some(a_mic)) => mic.eq_ignore_ascii_case(a_mic),
-                    (None, None) => true,
-                    _ => false,
+                let mic_matches = if matches!(a_type, InstrumentType::Option) {
+                    // OCC option ticker is globally unique; tolerate legacy MIC mismatch to avoid duplicates.
+                    match (exchange_mic, &asset.instrument_exchange_mic) {
+                        (Some(mic), Some(a_mic)) => mic.eq_ignore_ascii_case(a_mic),
+                        _ => true,
+                    }
+                } else {
+                    match (exchange_mic, &asset.instrument_exchange_mic) {
+                        (Some(mic), Some(a_mic)) => mic.eq_ignore_ascii_case(a_mic),
+                        (None, None) => true,
+                        _ => false,
+                    }
                 };
-                if type_matches && symbol_matches && mic_matches {
+                let ccy_matches = if matches!(a_type, InstrumentType::Crypto | InstrumentType::Fx) {
+                    quote_ccy.map_or(true, |ccy| asset.quote_ccy.eq_ignore_ascii_case(ccy))
+                } else {
+                    true
+                };
+                if type_matches && symbol_matches && mic_matches && ccy_matches {
                     return Some(asset.id.clone());
                 }
             }
@@ -409,6 +510,7 @@ impl ActivityService {
                     &normalized_symbol,
                     effective_mic.as_deref(),
                     inferred_instrument_type.as_ref(),
+                    Some(&asset_currency),
                 );
 
                 if let Some(id) = existing_id {
@@ -632,6 +734,7 @@ impl ActivityService {
                     base_symbol,
                     effective_mic.as_deref(),
                     inferred_instrument_type.as_ref(),
+                    Some(&asset_currency),
                 );
 
                 if let Some(id) = existing_id {
@@ -891,6 +994,7 @@ impl ActivityService {
             &normalized_symbol,
             exchange_mic.as_deref(),
             instrument_type.as_ref(),
+            Some(&asset_currency),
         );
 
         // Parse quote mode if provided
@@ -1431,10 +1535,28 @@ impl ActivityServiceTrait for ActivityService {
 
             // Read-only: check if asset exists for name/currency enrichment
             let mut asset_currency: Option<String> = None;
+            let quote_ccy_hint = if matches!(
+                inferred_instrument_type,
+                Some(InstrumentType::Crypto | InstrumentType::Fx)
+            ) {
+                parse_crypto_pair_symbol(base_symbol)
+                    .map(|(_, quote)| quote)
+                    .or_else(|| {
+                        let c = activity.currency.trim();
+                        if c.is_empty() {
+                            None
+                        } else {
+                            Some(c.to_string())
+                        }
+                    })
+            } else {
+                None
+            };
             let existing_id = self.find_existing_asset_id(
                 base_symbol,
                 resolved_mic.as_deref(),
                 inferred_instrument_type.as_ref(),
+                quote_ccy_hint.as_deref(),
             );
             if let Some(ref id) = existing_id {
                 if let Ok(asset) = self.asset_service.get_asset_by_id(id) {
@@ -1458,6 +1580,76 @@ impl ActivityServiceTrait for ActivityService {
             activity.is_valid = true;
             self.validate_currency(&mut activity, &account_currency);
             activities_with_status.push(activity);
+        }
+
+        let mut keys: Vec<Option<String>> = Vec::with_capacity(activities_with_status.len());
+        let mut first_index_by_key: HashMap<String, usize> = HashMap::new();
+        let mut batch_dup_sources: HashMap<usize, usize> = HashMap::new();
+
+        for (idx, activity) in activities_with_status.iter().enumerate() {
+            if !activity.is_valid
+                || activity
+                    .errors
+                    .as_ref()
+                    .is_some_and(|errors| !errors.is_empty())
+            {
+                keys.push(None);
+                continue;
+            }
+
+            let Some(key) = Self::build_import_idempotency_key(activity, &account_id) else {
+                keys.push(None);
+                continue;
+            };
+
+            if let Some(first_idx) = first_index_by_key.get(&key).copied() {
+                batch_dup_sources.insert(idx, first_idx);
+            } else {
+                first_index_by_key.insert(key.clone(), idx);
+            }
+            keys.push(Some(key));
+        }
+
+        let unique_keys: Vec<String> = first_index_by_key.into_keys().collect();
+        let existing = if unique_keys.is_empty() {
+            HashMap::new()
+        } else {
+            self.check_existing_duplicates(unique_keys)
+                .unwrap_or_default()
+        };
+
+        for (idx, maybe_key) in keys.iter().enumerate() {
+            let Some(key) = maybe_key else {
+                continue;
+            };
+
+            if let Some(existing_id) = existing.get(key) {
+                let activity = &mut activities_with_status[idx];
+                Self::add_activity_warning(
+                    activity,
+                    "_duplicate",
+                    "Duplicate activity already exists",
+                );
+                activity.duplicate_of_id = Some(existing_id.clone());
+                continue;
+            }
+
+            if let Some(first_idx) = batch_dup_sources.get(&idx).copied() {
+                let duplicate_line_number = activities_with_status
+                    .get(first_idx)
+                    .and_then(|a| a.line_number)
+                    .unwrap_or((first_idx + 1) as i32);
+                let activity = &mut activities_with_status[idx];
+                Self::add_activity_warning(
+                    activity,
+                    "_duplicate",
+                    &format!(
+                        "Duplicate of line {} in this import batch",
+                        duplicate_line_number
+                    ),
+                );
+                activity.duplicate_of_line_number = Some(duplicate_line_number);
+            }
         }
 
         Ok(activities_with_status)
@@ -1650,19 +1842,21 @@ impl ActivityServiceTrait for ActivityService {
                 }
             }
 
-            // 2. Within-batch dedup: mark later occurrences
-            let mut seen_keys: HashSet<String> = HashSet::new();
-            let mut batch_dup_indices: HashSet<usize> = HashSet::new();
+            // 2. Within-batch dedup: mark later occurrences and keep the first source index
+            let mut first_index_by_key: HashMap<String, usize> = HashMap::new();
+            let mut batch_dup_sources: HashMap<usize, usize> = HashMap::new();
             for (i, key) in keys.iter().enumerate() {
                 if let Some(ref k) = key {
-                    if !seen_keys.insert(k.clone()) {
-                        batch_dup_indices.insert(i);
+                    if let Some(first_idx) = first_index_by_key.get(k).copied() {
+                        batch_dup_sources.insert(i, first_idx);
+                    } else {
+                        first_index_by_key.insert(k.clone(), i);
                     }
                 }
             }
 
             // 3. DB dedup: check existing keys
-            let unique_keys: Vec<String> = seen_keys.into_iter().collect();
+            let unique_keys: Vec<String> = first_index_by_key.keys().cloned().collect();
             let existing = if !unique_keys.is_empty() {
                 self.check_existing_duplicates(unique_keys)
                     .unwrap_or_default()
@@ -1671,7 +1865,7 @@ impl ActivityServiceTrait for ActivityService {
             };
 
             // 4. Collect all duplicate indices (batch + DB)
-            let mut dup_indices: HashSet<usize> = batch_dup_indices;
+            let mut dup_indices: HashSet<usize> = batch_dup_sources.keys().copied().collect();
             for (i, key) in keys.iter().enumerate() {
                 if let Some(ref k) = key {
                     if existing.contains_key(k) {
@@ -1686,14 +1880,54 @@ impl ActivityServiceTrait for ActivityService {
                 // Map back to validated_activities indices via import_index_map
                 for &insert_idx in &dup_indices {
                     if let Some(&import_idx) = import_index_map.get(insert_idx) {
+                        let key = keys.get(insert_idx).and_then(|k| k.as_ref());
+                        let existing_id = key.and_then(|k| existing.get(k)).cloned();
+                        let duplicate_line_number = if existing_id.is_none() {
+                            batch_dup_sources
+                                .get(&insert_idx)
+                                .and_then(|first_insert_idx| {
+                                    import_index_map.get(*first_insert_idx).and_then(
+                                        |first_import_idx| {
+                                            validated_activities
+                                                .get(*first_import_idx)
+                                                .and_then(|a| a.line_number)
+                                        },
+                                    )
+                                })
+                                .or_else(|| {
+                                    batch_dup_sources
+                                        .get(&insert_idx)
+                                        .map(|first_insert_idx| (*first_insert_idx + 1) as i32)
+                                })
+                        } else {
+                            None
+                        };
+
                         let activity = &mut validated_activities[import_idx];
-                        activity.is_valid = false;
-                        let mut errors = activity.errors.take().unwrap_or_default();
-                        errors
-                            .entry("_duplicate".to_string())
-                            .or_default()
-                            .push("Duplicate activity already exists".to_string());
-                        activity.errors = Some(errors);
+                        if let Some(existing_id) = existing_id {
+                            Self::add_activity_warning(
+                                activity,
+                                "_duplicate",
+                                "Duplicate activity already exists",
+                            );
+                            activity.duplicate_of_id = Some(existing_id);
+                        } else if let Some(duplicate_line_number) = duplicate_line_number {
+                            Self::add_activity_warning(
+                                activity,
+                                "_duplicate",
+                                &format!(
+                                    "Duplicate of line {} in this import batch",
+                                    duplicate_line_number
+                                ),
+                            );
+                            activity.duplicate_of_line_number = Some(duplicate_line_number);
+                        } else {
+                            Self::add_activity_warning(
+                                activity,
+                                "_duplicate",
+                                "Duplicate activity appears multiple times in this import batch",
+                            );
+                        }
                     }
                 }
                 // Remove duplicates from insert list (reverse order to preserve indices)
@@ -1945,6 +2179,7 @@ impl ActivityServiceTrait for ActivityService {
             .await?;
 
         result.assets_created = ensure_result.created_ids.len() as u32;
+        result.created_asset_ids = ensure_result.created_ids.clone();
 
         // Build reverse lookup: instrument_key → asset_id for resolving activity_asset_map entries
         let mut key_to_asset_id: HashMap<String, String> = HashMap::new();

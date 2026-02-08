@@ -1,7 +1,7 @@
 //! Service for synchronizing broker data to the local database.
 
 use async_trait::async_trait;
-use log::{debug, error, info, warn};
+use log::{debug, info, warn};
 use std::sync::Arc;
 
 use super::mapping;
@@ -19,9 +19,12 @@ use rust_decimal::Decimal;
 use std::collections::HashSet;
 use wealthfolio_core::accounts::{Account, AccountServiceTrait, NewAccount, TrackingMode};
 use wealthfolio_core::activities::{
-    compute_idempotency_key, ActivityServiceTrait, NewActivity, SymbolInput,
+    compute_idempotency_key, ActivityServiceTrait, ActivityUpsert, NewActivity,
 };
-use wealthfolio_core::assets::{AssetKind, AssetServiceTrait, AssetSpec};
+use wealthfolio_core::assets::{
+    parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix, AssetKind, AssetServiceTrait,
+    AssetSpec,
+};
 use wealthfolio_core::errors::Result;
 use wealthfolio_core::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use wealthfolio_core::portfolio::snapshot::{
@@ -31,7 +34,7 @@ use wealthfolio_core::sync::{
     ImportRun, ImportRunMode, ImportRunStatus, ImportRunSummary, ImportRunType, ReviewMode,
 };
 use wealthfolio_core::utils::time_utils::valuation_date_today;
-use wealthfolio_storage_sqlite::activities::{ActivityDB, ActivityRepository};
+use wealthfolio_storage_sqlite::activities::ActivityRepository;
 use wealthfolio_storage_sqlite::db::{DbPool, WriteHandle};
 use wealthfolio_storage_sqlite::errors::StorageError;
 use wealthfolio_storage_sqlite::portfolio::snapshot::AccountStateSnapshotDB;
@@ -299,8 +302,6 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
         import_run_id: Option<String>,
         activities_data: Vec<AccountUniversalActivity>,
     ) -> Result<(usize, usize, Vec<String>, usize)> {
-        use diesel::prelude::*;
-
         if activities_data.is_empty() {
             return Ok((0, 0, Vec::new(), 0));
         }
@@ -343,19 +344,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             .activity_service
             .prepare_activities(new_activities, &account)
             .await?;
-
-        let new_asset_ids: Vec<String> = if prepare_result.assets_created > 0 {
-            // Collect asset IDs that were created (from prepared activities)
-            prepare_result
-                .prepared
-                .iter()
-                .filter_map(|p| p.resolved_asset_id.clone())
-                .collect::<HashSet<_>>()
-                .into_iter()
-                .collect()
-        } else {
-            Vec::new()
-        };
+        let new_asset_ids = prepare_result.created_asset_ids.clone();
 
         let assets_created = prepare_result.assets_created as usize;
 
@@ -366,19 +355,16 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             .filter(|p| p.activity.needs_review.unwrap_or(false))
             .count();
 
-        // 3. Convert prepared activities → ActivityDB for broker-specific upsert
-        let mut activity_rows: Vec<ActivityDB> = Vec::new();
-        let mut activity_asset_ids: HashSet<String> = HashSet::new();
-        let mut activity_currencies: HashSet<String> = HashSet::new();
+        // 3. Convert prepared activities into ActivityUpsert payloads
+        let mut activity_upserts: Vec<ActivityUpsert> = Vec::new();
 
         for prepared in prepare_result.prepared {
-            let act = &prepared.activity;
+            let act = prepared.activity;
             let asset_id = prepared.resolved_asset_id.clone();
-
-            if let Some(ref id) = asset_id {
-                activity_asset_ids.insert(id.clone());
+            let activity_id = act.id.unwrap_or_default();
+            if activity_id.is_empty() {
+                continue;
             }
-            activity_currencies.insert(act.currency.clone());
 
             // Parse activity date for idempotency key computation
             let activity_datetime: DateTime<Utc> = DateTime::parse_from_rfc3339(&act.activity_date)
@@ -399,193 +385,52 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 act.notes.as_deref(),
             );
 
-            // Build NewActivity with resolved asset_id for DB conversion
-            let resolved_activity = NewActivity {
-                symbol: asset_id.as_ref().map(|id| SymbolInput {
-                    id: Some(id.clone()),
-                    ..Default::default()
-                }),
-                ..prepared.activity
-            };
-
-            let mut activity_db: ActivityDB = resolved_activity.into();
-            activity_db.idempotency_key = Some(idempotency_key);
-            activity_db.import_run_id = import_run_id.clone();
-
-            activity_rows.push(activity_db);
+            activity_upserts.push(ActivityUpsert {
+                id: activity_id,
+                account_id: act.account_id,
+                asset_id,
+                activity_type: act.activity_type,
+                subtype: act.subtype,
+                activity_date: act.activity_date,
+                quantity: act.quantity,
+                unit_price: act.unit_price,
+                currency: act.currency,
+                fee: act.fee,
+                amount: act.amount,
+                status: act.status,
+                notes: act.notes,
+                fx_rate: act.fx_rate,
+                metadata: act.metadata,
+                needs_review: act.needs_review,
+                source_system: act.source_system,
+                source_record_id: act.source_record_id,
+                source_group_id: act.source_group_id,
+                idempotency_key: Some(idempotency_key),
+                import_run_id: import_run_id.clone(),
+            });
         }
 
-        // 4. Broker-specific activity upsert (idempotency + user-modified check)
-        let writer = self.writer.clone();
-        let account_id_for_log = account_id.clone();
-        let activities_count = activity_rows.len();
+        let activities_count = activity_upserts.len();
 
         debug!(
             "Preparing to upsert {} activities and {} assets for account {}",
-            activities_count, assets_created, account_id_for_log
+            activities_count, assets_created, account_id
         );
 
-        let activities_upserted = writer
-            .exec(move |conn| {
-                use diesel::upsert::excluded;
-
-                // Collect all activity IDs and idempotency keys for batch lookup
-                let activity_ids: Vec<String> =
-                    activity_rows.iter().map(|a| a.id.clone()).collect();
-                let idempotency_keys: Vec<String> = activity_rows
-                    .iter()
-                    .filter_map(|a| a.idempotency_key.clone())
-                    .collect();
-
-                // Fetch existing activities by ID or idempotency_key in one query
-                let existing_activities: Vec<(String, Option<String>, i32)> =
-                    schema::activities::table
-                        .filter(
-                            schema::activities::id
-                                .eq_any(&activity_ids)
-                                .or(schema::activities::idempotency_key
-                                    .eq_any(&idempotency_keys)),
-                        )
-                        .select((
-                            schema::activities::id,
-                            schema::activities::idempotency_key,
-                            schema::activities::is_user_modified,
-                        ))
-                        .load::<(String, Option<String>, i32)>(conn)
-                        .map_err(StorageError::from)?;
-
-                // Build lookup maps
-                let mut existing_by_id: std::collections::HashMap<String, i32> =
-                    std::collections::HashMap::new();
-                let mut existing_by_idemp: std::collections::HashMap<String, (String, i32)> =
-                    std::collections::HashMap::new();
-
-                for (id, idemp_key, is_modified) in existing_activities {
-                    existing_by_id.insert(id.clone(), is_modified);
-                    if let Some(key) = idemp_key {
-                        existing_by_idemp.insert(key, (id, is_modified));
-                    }
-                }
-
-                let mut activities_upserted: usize = 0;
-                let mut activities_skipped: usize = 0;
-
-                for (idx, mut activity_db) in activity_rows.into_iter().enumerate() {
-                    let now_update = chrono::Utc::now().to_rfc3339();
-                    let activity_id = activity_db.id.clone();
-                    let activity_type = activity_db.activity_type.clone();
-                    let idempotency_key = activity_db.idempotency_key.clone();
-
-                    // Check if this activity exists and is user-modified (by ID)
-                    if let Some(&is_modified) = existing_by_id.get(&activity_id) {
-                        if is_modified != 0 {
-                            debug!(
-                                "Skipping user-modified activity {} (type={})",
-                                activity_id, activity_type
-                            );
-                            activities_skipped += 1;
-                            continue;
-                        }
-                    }
-
-                    // If not found by ID, check by idempotency_key
-                    if !existing_by_id.contains_key(&activity_id) {
-                        if let Some(ref key) = idempotency_key {
-                            if let Some((existing_id, is_modified)) = existing_by_idemp.get(key) {
-                                if *is_modified != 0 {
-                                    debug!(
-                                        "Skipping update for user-modified activity (matched by idempotency_key: {} -> {})",
-                                        activity_id, existing_id
-                                    );
-                                    activities_skipped += 1;
-                                    continue;
-                                }
-                                debug!(
-                                    "Activity {} matched existing {} by idempotency_key, updating existing",
-                                    activity_id, existing_id
-                                );
-                                activity_db.id = existing_id.clone();
-                            }
-                        }
-                    }
-
-                    match diesel::insert_into(schema::activities::table)
-                        .values(&activity_db)
-                        .on_conflict(schema::activities::id)
-                        .do_update()
-                        .set((
-                            schema::activities::account_id
-                                .eq(excluded(schema::activities::account_id)),
-                            schema::activities::asset_id.eq(excluded(schema::activities::asset_id)),
-                            schema::activities::activity_type
-                                .eq(excluded(schema::activities::activity_type)),
-                            schema::activities::subtype.eq(excluded(schema::activities::subtype)),
-                            schema::activities::activity_date
-                                .eq(excluded(schema::activities::activity_date)),
-                            schema::activities::quantity.eq(excluded(schema::activities::quantity)),
-                            schema::activities::unit_price
-                                .eq(excluded(schema::activities::unit_price)),
-                            schema::activities::currency.eq(excluded(schema::activities::currency)),
-                            schema::activities::fee.eq(excluded(schema::activities::fee)),
-                            schema::activities::amount.eq(excluded(schema::activities::amount)),
-                            schema::activities::status.eq(excluded(schema::activities::status)),
-                            schema::activities::notes.eq(excluded(schema::activities::notes)),
-                            schema::activities::fx_rate.eq(excluded(schema::activities::fx_rate)),
-                            schema::activities::metadata.eq(excluded(schema::activities::metadata)),
-                            schema::activities::source_system
-                                .eq(excluded(schema::activities::source_system)),
-                            schema::activities::source_record_id
-                                .eq(excluded(schema::activities::source_record_id)),
-                            schema::activities::source_group_id
-                                .eq(excluded(schema::activities::source_group_id)),
-                            schema::activities::needs_review
-                                .eq(excluded(schema::activities::needs_review)),
-                            schema::activities::idempotency_key
-                                .eq(excluded(schema::activities::idempotency_key)),
-                            schema::activities::import_run_id
-                                .eq(excluded(schema::activities::import_run_id)),
-                            schema::activities::updated_at.eq(now_update),
-                        ))
-                        .execute(conn)
-                    {
-                        Ok(count) => activities_upserted += count,
-                        Err(e) => {
-                            error!(
-                                "Failed to upsert activity {} (idx={}, type={}): {:?}",
-                                activity_id, idx, activity_type, e
-                            );
-                            return Err(StorageError::from(e).into());
-                        }
-                    }
-                }
-
-                if activities_skipped > 0 {
-                    info!(
-                        "Skipped {} user-modified activities during sync",
-                        activities_skipped
-                    );
-                }
-
-                debug!("Successfully upserted {} activities", activities_upserted);
-                Ok(activities_upserted)
-            })
+        let bulk_result = self
+            .activity_service
+            .upsert_activities_bulk(activity_upserts)
             .await?;
+        let activities_upserted = bulk_result.upserted;
 
         debug!(
             "Upserted {} activities for account {} ({} assets created, {} new asset IDs, {} need review)",
-            activities_count, account_id_for_log, assets_created, new_asset_ids.len(), needs_review_count
+            activities_count,
+            account_id,
+            assets_created,
+            new_asset_ids.len(),
+            needs_review_count
         );
-
-        // Emit domain events for activities
-        if activities_upserted > 0 {
-            let asset_ids: Vec<String> = activity_asset_ids.into_iter().collect();
-            let currencies: Vec<String> = activity_currencies.into_iter().collect();
-            self.event_sink.emit(DomainEvent::ActivitiesChanged {
-                account_ids: vec![account_id_for_log.clone()],
-                asset_ids,
-                currencies,
-            });
-        }
 
         Ok((
             activities_upserted,
@@ -725,16 +570,44 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
 
         for pos in &positions {
             let symbol_info = pos.symbol.as_ref().and_then(|s| s.symbol.as_ref());
-            let symbol = symbol_info
-                .and_then(|s| s.symbol.clone())
-                .or_else(|| symbol_info.and_then(|s| s.raw_symbol.clone()));
+            let symbol_type_code = symbol_info
+                .and_then(|s| s.symbol_type.as_ref())
+                .and_then(|t| t.code.clone());
+            let is_crypto_asset = mapping::is_broker_crypto(symbol_type_code.as_deref());
 
-            let symbol = match symbol {
-                Some(s) if !s.is_empty() => s,
-                _ => {
+            let raw_symbol = symbol_info
+                .and_then(|s| s.raw_symbol.clone())
+                .filter(|s| !s.trim().is_empty());
+            let api_symbol = symbol_info
+                .and_then(|s| s.symbol.clone())
+                .filter(|s| !s.trim().is_empty());
+
+            let (symbol, exchange_mic) = if is_crypto_asset {
+                let normalized = raw_symbol.or_else(|| {
+                    api_symbol.as_deref().map(|sym| {
+                        parse_crypto_pair_symbol(sym)
+                            .map(|(base, _)| base)
+                            .unwrap_or_else(|| sym.to_string())
+                    })
+                });
+                match normalized {
+                    Some(s) if !s.is_empty() => (s, None),
+                    _ => {
+                        debug!("Skipping crypto position without symbol");
+                        continue;
+                    }
+                }
+            } else {
+                let normalized = if let Some(raw) = raw_symbol {
+                    (raw, None)
+                } else if let Some(sym) = api_symbol.as_deref() {
+                    let (base, mic) = parse_symbol_with_exchange_suffix(sym);
+                    (base.to_string(), mic.map(|m| m.to_string()))
+                } else {
                     debug!("Skipping position without symbol");
                     continue;
-                }
+                };
+                normalized
             };
 
             let units = pos.units.unwrap_or(0.0);
@@ -749,10 +622,6 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 .and_then(|c| c.code.clone())
                 .unwrap_or_else(|| account_currency.clone());
 
-            let symbol_type_code = symbol_info
-                .and_then(|s| s.symbol_type.as_ref())
-                .and_then(|t| t.code.clone());
-            let is_crypto_asset = mapping::is_broker_crypto(symbol_type_code.as_deref());
             let instrument_type = if is_crypto_asset {
                 InstrumentType::Crypto
             } else {
@@ -761,20 +630,30 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
 
             let asset_name = symbol_info.and_then(|s| s.name.clone().or(s.description.clone()));
 
-            let spec_key = format!("{}:{}", symbol.to_uppercase(), currency);
+            let spec = AssetSpec {
+                id: None, // Let ensure_assets resolve via instrument_key
+                display_code: Some(symbol.clone()),
+                instrument_symbol: Some(symbol.clone()),
+                instrument_exchange_mic: exchange_mic,
+                instrument_type: Some(instrument_type),
+                quote_ccy: currency.clone(),
+                kind: AssetKind::Investment,
+                quote_mode: None,
+                name: asset_name,
+            };
+
+            let spec_key = spec.instrument_key().unwrap_or_else(|| {
+                format!(
+                    "{}:{}:{}",
+                    symbol.to_uppercase(),
+                    currency.to_uppercase(),
+                    if is_crypto_asset { "CRYPTO" } else { "EQUITY" }
+                )
+            });
+
             if !spec_key_to_idx.contains_key(&spec_key) {
                 let idx = asset_specs.len();
-                asset_specs.push(AssetSpec {
-                    id: None, // Let ensure_assets resolve via instrument_key
-                    display_code: Some(symbol.clone()),
-                    instrument_symbol: Some(symbol.clone()),
-                    instrument_exchange_mic: None,
-                    instrument_type: Some(instrument_type),
-                    quote_ccy: currency.clone(),
-                    kind: AssetKind::Investment,
-                    quote_mode: None,
-                    name: asset_name,
-                });
+                asset_specs.push(spec);
                 spec_key_to_idx.insert(spec_key.clone(), idx);
             }
 
@@ -1040,58 +919,130 @@ impl BrokerSyncService {
         Ok(())
     }
 
-    /// Find the platform ID for a broker account based on its institution name
+    /// Find the platform ID for a broker account using institution/broker metadata.
     fn find_platform_for_account(&self, broker_account: &BrokerAccount) -> Result<Option<String>> {
-        // First, try to find platform by matching institution name
         let platforms = self.platform_repository.list()?;
-
-        // Get institution name, returning None if not available
-        let institution_name = match &broker_account.institution_name {
-            Some(name) if !name.is_empty() => name,
-            _ => {
-                warn!("No institution name for broker account, cannot find platform");
-                return Ok(None);
+        const MIN_PARTIAL_MATCH_LEN: usize = 6;
+        let is_confident_partial_match = |left: &str, right: &str| -> bool {
+            let (shorter, longer) = if left.len() <= right.len() {
+                (left, right)
+            } else {
+                (right, left)
+            };
+            if shorter.len() < MIN_PARTIAL_MATCH_LEN {
+                return false;
             }
+            if !longer.contains(shorter) {
+                return false;
+            }
+            // Require at least one meaningful token from shorter to be present in longer.
+            shorter
+                .split('_')
+                .filter(|t| t.len() >= 3)
+                .any(|token| longer.contains(token))
         };
 
-        // Normalize institution name for matching
-        let institution_normalized = institution_name.to_uppercase().replace([' ', '-'], "_");
+        let mut name_candidates: Vec<String> = Vec::new();
+        if let Some(name) = broker_account
+            .institution_name
+            .as_ref()
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
+            name_candidates.push(name.to_string());
+        }
 
-        // Try exact match first
-        for platform in &platforms {
-            if platform.id.to_uppercase() == institution_normalized {
-                return Ok(Some(platform.id.clone()));
+        let mut external_id_candidates: Vec<String> = Vec::new();
+        if let Some(meta) = broker_account.meta.as_ref() {
+            let read_path = |path: &[&str]| -> Option<String> {
+                let mut value = meta;
+                for key in path {
+                    value = value.get(*key)?;
+                }
+                value
+                    .as_str()
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+            };
+
+            for path in [
+                &["institution_name"][..],
+                &["institutionName"][..],
+                &["brokerage_name"][..],
+                &["brokerageName"][..],
+                &["institution", "name"][..],
+                &["brokerage", "name"][..],
+                &["brokerage", "display_name"][..],
+                &["brokerage", "displayName"][..],
+            ] {
+                if let Some(name) = read_path(path) {
+                    name_candidates.push(name);
+                }
+            }
+
+            for path in [
+                &["brokerage_id"][..],
+                &["brokerageId"][..],
+                &["brokerage", "id"][..],
+                &["brokerage", "uuid"][..],
+            ] {
+                if let Some(external_id) = read_path(path) {
+                    external_id_candidates.push(external_id);
+                }
             }
         }
 
-        // Try partial match
-        for platform in &platforms {
-            let platform_normalized = platform.id.to_uppercase();
-            if institution_normalized.contains(&platform_normalized)
-                || platform_normalized.contains(&institution_normalized)
-            {
-                return Ok(Some(platform.id.clone()));
-            }
+        if let Some(auth_id) = broker_account
+            .brokerage_authorization
+            .as_ref()
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
+            external_id_candidates.push(auth_id.to_string());
         }
 
-        // Try matching by platform name
-        for platform in &platforms {
-            if let Some(name) = &platform.name {
-                let name_normalized = name.to_uppercase().replace([' ', '-'], "_");
-                if name_normalized == institution_normalized
-                    || institution_normalized.contains(&name_normalized)
-                    || name_normalized.contains(&institution_normalized)
-                {
+        name_candidates.sort();
+        name_candidates.dedup();
+        external_id_candidates.sort();
+        external_id_candidates.dedup();
+
+        // 1) Match by known external IDs first (most reliable)
+        for candidate in &external_id_candidates {
+            for platform in &platforms {
+                if platform.external_id.as_deref() == Some(candidate.as_str()) {
                     return Ok(Some(platform.id.clone()));
                 }
             }
         }
 
-        // No match found - create a new platform entry
-        // This ensures we always have a platform for the account
+        // 2) Match by normalized institution/broker names
+        for candidate in &name_candidates {
+            let candidate_norm = candidate.to_uppercase().replace([' ', '-'], "_");
+
+            for platform in &platforms {
+                let id_norm = platform.id.to_uppercase();
+                if id_norm == candidate_norm
+                    || is_confident_partial_match(&candidate_norm, &id_norm)
+                {
+                    return Ok(Some(platform.id.clone()));
+                }
+            }
+
+            for platform in &platforms {
+                if let Some(name) = &platform.name {
+                    let name_norm = name.to_uppercase().replace([' ', '-'], "_");
+                    if name_norm == candidate_norm
+                        || is_confident_partial_match(&candidate_norm, &name_norm)
+                    {
+                        return Ok(Some(platform.id.clone()));
+                    }
+                }
+            }
+        }
+
         warn!(
-            "No existing platform found for institution: {}",
-            institution_name
+            "No existing platform found for broker account (institution={:?}, external_ids={:?})",
+            broker_account.institution_name, external_id_candidates
         );
         Ok(None)
     }

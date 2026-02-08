@@ -556,6 +556,13 @@ pub struct ActivityImport {
     /// Resolved exchange MIC for the symbol (populated during validation)
     pub exchange_mic: Option<String>,
     pub errors: Option<std::collections::HashMap<String, Vec<String>>>,
+    pub warnings: Option<std::collections::HashMap<String, Vec<String>>>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duplicate_of_id: Option<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duplicate_of_line_number: Option<i32>,
     pub is_draft: bool,
     pub is_valid: bool,
     pub line_number: Option<i32>,
@@ -1041,6 +1048,7 @@ pub struct PrepareActivitiesResult {
     pub prepared: Vec<PreparedActivity>,
     pub errors: Vec<(usize, String)>, // (index, error_message)
     pub assets_created: u32,
+    pub created_asset_ids: Vec<String>,
 }
 
 impl From<ActivityImport> for NewActivity {

@@ -621,10 +621,12 @@ impl AssetServiceTrait for AssetService {
 
         // Pre-resolve specs without IDs by looking up via instrument_key
         let mut resolved_specs: Vec<AssetSpec> = Vec::with_capacity(unique_specs.len());
+        let mut preexisting_keys: HashSet<String> = HashSet::new();
         for mut spec in unique_specs {
             if spec.id.is_none() {
                 if let Some(key) = spec.instrument_key() {
                     if let Ok(Some(existing)) = self.asset_repository.find_by_instrument_key(&key) {
+                        preexisting_keys.insert(key);
                         spec.id = Some(existing.id);
                     }
                 }
@@ -662,20 +664,7 @@ impl AssetServiceTrait for AssetService {
             }
         }
 
-        // Newly created = all spec IDs minus pre-existing
-        let created_ids: Vec<String> = ids
-            .iter()
-            .filter(|id| !existing_ids.contains(*id))
-            .cloned()
-            .collect();
-
-        // 3. Emit batch event for created assets
-        if !created_ids.is_empty() {
-            self.event_sink
-                .emit(DomainEvent::assets_created(created_ids.clone()));
-        }
-
-        // 4. Fetch all requested assets (by ID + by instrument_key for specs without IDs)
+        // 3. Fetch all requested assets (by ID + by instrument_key for specs without IDs)
         let mut assets_map: HashMap<String, Asset> = if !ids.is_empty() {
             self.asset_repository
                 .list_by_asset_ids(&ids)?
@@ -695,6 +684,38 @@ impl AssetServiceTrait for AssetService {
                     }
                 }
             }
+        }
+
+        // Newly created (ID-based specs): all spec IDs minus pre-existing IDs
+        let mut created_ids: HashSet<String> = ids
+            .iter()
+            .filter(|id| !existing_ids.contains(*id))
+            .cloned()
+            .collect();
+
+        // Newly created (instrument-key specs with DB-generated UUIDs)
+        for spec in &resolved_specs {
+            if spec.id.is_none() {
+                if let Some(key) = spec.instrument_key() {
+                    if preexisting_keys.contains(&key) {
+                        continue;
+                    }
+                    if let Some(asset) = assets_map
+                        .values()
+                        .find(|a| a.instrument_key.as_deref() == Some(&key))
+                    {
+                        created_ids.insert(asset.id.clone());
+                    }
+                }
+            }
+        }
+
+        let created_ids: Vec<String> = created_ids.into_iter().collect();
+
+        // 4. Emit batch event for created assets
+        if !created_ids.is_empty() {
+            self.event_sink
+                .emit(DomainEvent::assets_created(created_ids.clone()));
         }
 
         Ok(EnsureAssetsResult {

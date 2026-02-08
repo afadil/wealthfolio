@@ -153,6 +153,9 @@ export const importActivitySchema = z
     /** Resolved exchange MIC for the symbol (populated during validation) */
     exchangeMic: z.string().optional(),
     errors: z.record(z.string(), z.array(z.string())).optional(),
+    warnings: z.record(z.string(), z.array(z.string())).optional(),
+    duplicateOfId: z.string().optional(),
+    duplicateOfLineNumber: z.number().optional(),
     isValid: z.boolean().default(false),
     lineNumber: z.number().optional(),
     isDraft: z.boolean(),

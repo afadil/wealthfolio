@@ -426,7 +426,7 @@ export function AssetEditSheet({
                       name="instrumentExchangeMic"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Exchange (MIC)</FormLabel>
+                          <FormLabel>Exchange</FormLabel>
                           <FormControl>
                             <Input
                               placeholder="e.g., XNYS, XTSE"
@@ -435,7 +435,9 @@ export function AssetEditSheet({
                             />
                           </FormControl>
                           <p className="text-muted-foreground text-xs">
-                            ISO 10383 Market Identifier Code
+                            {asset.exchangeName
+                              ? `${asset.exchangeName} (MIC)`
+                              : "ISO 10383 Market Identifier Code"}
                           </p>
                           <FormMessage />
                         </FormItem>

@@ -46,6 +46,7 @@ export interface ImportRowData {
   warnings?: Record<string, string[]> | string[];
   skipReason?: string;
   duplicateOfId?: string;
+  duplicateOfLineNumber?: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

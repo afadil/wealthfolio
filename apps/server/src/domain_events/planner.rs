@@ -12,7 +12,8 @@ use crate::api::shared::PortfolioJobConfig;
 /// Plans a portfolio job from a batch of domain events.
 ///
 /// Merges account_ids and asset_ids from ActivitiesChanged, HoldingsChanged,
-/// and AccountsChanged events. Adds FX asset IDs for currency changes.
+/// and AccountsChanged events. Also carries through asset IDs from AssetsCreated
+/// when a recalc-triggering event exists in the same batch.
 ///
 /// Returns None if no events require portfolio recalculation.
 pub fn plan_portfolio_job(events: &[DomainEvent]) -> Option<PortfolioJobConfig> {

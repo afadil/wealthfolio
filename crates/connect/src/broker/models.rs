@@ -217,7 +217,7 @@ pub struct PaginationDetails {
     pub total: Option<i64>,
     /// Whether there are more results available (new API)
     #[serde(default)]
-    pub has_more: bool,
+    pub has_more: Option<bool>,
 }
 
 /// A paginated list of universal activity objects.
@@ -280,8 +280,13 @@ pub struct AccountUniversalActivitySymbolType {
 pub struct AccountUniversalActivityUnderlyingSymbol {
     pub id: Option<String>,
     pub symbol: Option<String>,
+    pub raw_symbol: Option<String>,
     pub description: Option<String>,
     pub currency: Option<AccountUniversalActivityCurrency>,
+    pub exchange: Option<AccountUniversalActivityExchange>,
+    #[serde(rename = "type")]
+    pub symbol_type: Option<AccountUniversalActivitySymbolType>,
+    pub figi_code: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
