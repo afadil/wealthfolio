@@ -195,8 +195,13 @@ export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsPr
       .sort((a, b) => (b.marketValue?.base ?? 0) - (a.marketValue?.base ?? 0));
   }, [holdings]);
 
-  const topHoldings = sortedHoldings.slice(0, MAX_DISPLAYED_HOLDINGS);
-  const remainingHoldings = sortedHoldings.slice(MAX_DISPLAYED_HOLDINGS);
+  // Show one extra holding directly rather than displaying "+1 more"
+  const displayCount =
+    sortedHoldings.length === MAX_DISPLAYED_HOLDINGS + 1
+      ? MAX_DISPLAYED_HOLDINGS + 1
+      : MAX_DISPLAYED_HOLDINGS;
+  const topHoldings = sortedHoldings.slice(0, displayCount);
+  const remainingHoldings = sortedHoldings.slice(displayCount);
   const hasRemainingHoldings = remainingHoldings.length > 0;
 
   if (isLoading) {
