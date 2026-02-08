@@ -2,7 +2,7 @@ import { getAssetProfile, getHolding } from "@/adapters";
 import { AssetEditSheet } from "./asset-edit-sheet";
 import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
 import { TickerAvatar } from "@/components/ticker-avatar";
-import { ValueHistoryDataGrid } from "@/features/alternative-assets";
+import { ValueHistoryDataGrid } from "./alternative-assets";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";

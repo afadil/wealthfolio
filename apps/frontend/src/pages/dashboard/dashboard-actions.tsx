@@ -11,7 +11,12 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-export function DashboardActions() {
+interface DashboardActionsProps {
+  onAddAsset?: () => void;
+  onAddLiability?: () => void;
+}
+
+export function DashboardActions({ onAddAsset, onAddLiability }: DashboardActionsProps) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
@@ -29,14 +34,32 @@ export function DashboardActions() {
   const showSyncAction = isEnabled && isConnected && hasSubscription;
 
   const groups = useMemo((): ActionPaletteGroup[] => {
+    const primaryActions =
+      onAddAsset && onAddLiability
+        ? [
+            {
+              icon: Icons.Plus,
+              label: "Add Asset",
+              onClick: onAddAsset,
+            },
+            {
+              icon: Icons.Plus,
+              label: "Add Liability",
+              onClick: onAddLiability,
+            },
+          ]
+        : [
+            {
+              icon: Icons.Plus,
+              label: "Record Transaction",
+              onClick: () => navigate("/activities/manage"),
+            },
+          ];
+
     return [
       {
         items: [
-          {
-            icon: Icons.Plus,
-            label: "Record Transaction",
-            onClick: () => navigate("/activities/manage"),
-          },
+          ...primaryActions,
           ...(showSyncAction
             ? [
                 {
@@ -66,6 +89,8 @@ export function DashboardActions() {
     ];
   }, [
     navigate,
+    onAddAsset,
+    onAddLiability,
     showSyncAction,
     syncBrokerData,
     updatePortfolioMutation,

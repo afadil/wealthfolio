@@ -128,7 +128,6 @@ impl ActivityRepositoryTrait for ActivityRepository {
             let mut query = activities::table
                 .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
                 .left_join(assets::table.on(activities::asset_id.eq(assets::id.nullable())))
-                .filter(accounts::is_active.eq(true))
                 .filter(accounts::is_archived.eq(false))
                 .into_boxed();
 

@@ -156,11 +156,36 @@ const AccountPage = () => {
     enabled: showSnapshotMarkers && !!account,
   });
 
-  // Extract snapshot dates for chart markers
+  // Extract snapshot dates for chart markers (used in HOLDINGS mode)
   const snapshotDates = useMemo(() => {
     if (!snapshots) return [];
     return snapshots.map((s) => s.snapshotDate);
   }, [snapshots]);
+
+  // In TRANSACTIONS mode, fetch activity dates for markers (snapshot dates include
+  // carry-forward days with no activities, so we need actual activity dates instead)
+  const { data: activityMarkerDates } = useQuery<string[], Error>({
+    queryKey: ["activities", "markerDates", id, snapshotDateFrom, snapshotDateTo],
+    queryFn: async () => {
+      const response = await searchActivities(
+        0,
+        1000,
+        { accountIds: [id], dateFrom: snapshotDateFrom, dateTo: snapshotDateTo },
+        "",
+        { id: "date", desc: true },
+      );
+      const dates = new Set<string>();
+      response.data.forEach((a) => {
+        const d = typeof a.date === "string" ? a.date : a.date.toISOString();
+        dates.add(d.split("T")[0]);
+      });
+      return [...dates];
+    },
+    enabled: showSnapshotMarkers && !isHoldingsMode && !!account,
+  });
+
+  // Use activity dates for TRANSACTIONS mode, snapshot dates for HOLDINGS mode
+  const markerDates = isHoldingsMode ? snapshotDates : (activityMarkerDates ?? []);
 
   // Query activities for selected date (Transactions mode marker click)
   const { data: dateActivities, isLoading: isDateActivitiesLoading } = useQuery<
@@ -595,7 +620,7 @@ const AccountPage = () => {
                           data={chartData}
                           isLoading={false}
                           showMarkers={showSnapshotMarkers}
-                          snapshotDates={snapshotDates}
+                          snapshotDates={markerDates}
                           onMarkerClick={(date) => {
                             if (isHoldingsMode) {
                               // Holdings mode: open edit holdings sheet

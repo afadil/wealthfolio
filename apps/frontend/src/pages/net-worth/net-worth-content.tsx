@@ -23,10 +23,9 @@ import {
 import { useNetWorth, useNetWorthHistory } from "@/hooks/use-alternative-assets";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { formatDateISO } from "@/lib/utils";
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlternativeAssetKind, type DateRange } from "@/lib/types";
-import { AlternativeAssetQuickAddModal } from "@/features/alternative-assets/components";
+import type { DateRange } from "@/lib/types";
 import { NetWorthChart } from "./net-worth-chart";
 import Balance from "@/pages/dashboard/balance";
 
@@ -290,7 +289,12 @@ const INTERVAL_STORAGE_KEY = "networth-interval";
 /**
  * Net Worth Content - Embeddable content for the combined portfolio page
  */
-export function NetWorthContent() {
+interface NetWorthContentProps {
+  onAddAsset?: () => void;
+  onAddLiability?: () => void;
+}
+
+export function NetWorthContent({ onAddAsset, onAddLiability }: NetWorthContentProps) {
   const { settings } = useSettingsContext();
   const { data: netWorthData, isLoading, isError, error } = useNetWorth();
 
@@ -384,34 +388,6 @@ export function NetWorthContent() {
 
   const currency = netWorthData?.currency || settings?.baseCurrency || "USD";
   const hasStaleValuations = netWorthData && netWorthData.staleAssets.length > 0;
-
-  // Alternative asset quick-add modal state
-  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
-  const [modalDefaultKind, setModalDefaultKind] = useState<AlternativeAssetKind | undefined>();
-  const [pendingLiabilityLink, setPendingLiabilityLink] = useState<string | null>(null);
-  const [pendingLiabilityType, setPendingLiabilityType] = useState<string | undefined>();
-  const [pendingMortgageName, setPendingMortgageName] = useState<string | undefined>();
-
-  const handleAddAsset = useCallback(() => {
-    setModalDefaultKind(undefined);
-    setIsQuickAddOpen(true);
-  }, []);
-
-  const handleAddLiability = useCallback(() => {
-    setModalDefaultKind(AlternativeAssetKind.LIABILITY);
-    setIsQuickAddOpen(true);
-  }, []);
-
-  const handleOpenLiabilityQuickAdd = useCallback(
-    (propertyId: string, _purchaseDate?: Date, propertyName?: string) => {
-      setPendingLiabilityLink(propertyId);
-      setPendingLiabilityType("mortgage");
-      setPendingMortgageName(propertyName ? `${propertyName} Mortgage` : undefined);
-      setModalDefaultKind(AlternativeAssetKind.LIABILITY);
-      setIsQuickAddOpen(true);
-    },
-    [],
-  );
 
   // Error state
   if (isError && error) {
@@ -635,14 +611,14 @@ export function NetWorthContent() {
                   Manage accounts
                 </Link>
                 <button
-                  onClick={handleAddAsset}
+                  onClick={onAddAsset}
                   className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-sm transition-colors"
                 >
                   <Icons.Plus className="h-4 w-4" />
                   Add asset
                 </button>
                 <button
-                  onClick={handleAddLiability}
+                  onClick={onAddLiability}
                   className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-sm transition-colors"
                 >
                   <Icons.Plus className="h-4 w-4" />
@@ -653,24 +629,6 @@ export function NetWorthContent() {
           </div>
         </div>
       </div>
-
-      <AlternativeAssetQuickAddModal
-        open={isQuickAddOpen}
-        onOpenChange={(open) => {
-          setIsQuickAddOpen(open);
-          if (!open) {
-            setModalDefaultKind(undefined);
-            setPendingLiabilityLink(null);
-            setPendingLiabilityType(undefined);
-            setPendingMortgageName(undefined);
-          }
-        }}
-        defaultKind={modalDefaultKind}
-        linkedAssetId={pendingLiabilityLink ?? undefined}
-        defaultLiabilityType={pendingLiabilityType}
-        defaultName={pendingMortgageName}
-        onOpenLiabilityQuickAdd={handleOpenLiabilityQuickAdd}
-      />
     </div>
   );
 }
