@@ -98,6 +98,10 @@ pub trait AssetRepositoryTrait: Send + Sync {
     /// Used when merging UNKNOWN assets into resolved ones.
     async fn deactivate(&self, asset_id: &str) -> Result<()>;
 
+    /// Reactivates an asset (sets is_active=1).
+    /// Used when new activities reference a previously deactivated asset.
+    async fn reactivate(&self, asset_id: &str) -> Result<()>;
+
     /// Copies user-editable fields from source asset to target asset.
     /// Used during UNKNOWN asset merge to preserve user customizations.
     async fn copy_user_metadata(&self, source_id: &str, target_id: &str) -> Result<()>;

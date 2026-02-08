@@ -383,6 +383,19 @@ impl AssetRepositoryTrait for AssetRepository {
             .await
     }
 
+    async fn reactivate(&self, asset_id: &str) -> Result<()> {
+        let asset_id_owned = asset_id.to_string();
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                diesel::update(assets::table.filter(assets::id.eq(&asset_id_owned)))
+                    .set(assets::is_active.eq(1))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                Ok(())
+            })
+            .await
+    }
+
     async fn copy_user_metadata(&self, source_id: &str, target_id: &str) -> Result<()> {
         let source_id_owned = source_id.to_string();
         let target_id_owned = target_id.to_string();

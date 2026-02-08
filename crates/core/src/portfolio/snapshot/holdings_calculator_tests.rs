@@ -119,6 +119,10 @@ mod tests {
             Ok(())
         }
 
+        async fn reactivate(&self, _asset_id: &str) -> Result<()> {
+            Ok(())
+        }
+
         async fn copy_user_metadata(&self, _source_id: &str, _target_id: &str) -> Result<()> {
             Ok(())
         }

@@ -164,7 +164,14 @@ impl AssetServiceTrait for AssetService {
     ) -> Result<Asset> {
         // Try to get existing asset first
         match self.asset_repository.get_by_id(asset_id) {
-            Ok(existing_asset) => return Ok(existing_asset),
+            Ok(existing_asset) => {
+                // Reactivate if previously deactivated (e.g., after account deletion)
+                if !existing_asset.is_active {
+                    info!("Reactivating previously deactivated asset: {}", asset_id);
+                    self.asset_repository.reactivate(asset_id).await?;
+                }
+                return Ok(existing_asset);
+            }
             Err(Error::Database(DatabaseError::NotFound(_))) => {
                 debug!(
                     "Asset not found locally, creating minimal asset: {}",
@@ -649,6 +656,14 @@ impl AssetServiceTrait for AssetService {
             .collect();
 
         self.asset_repository.create_batch(new_assets).await?;
+
+        // Reactivate any pre-existing assets that were deactivated
+        for asset in self.asset_repository.list_by_asset_ids(&ids)? {
+            if !asset.is_active && existing_ids.contains(&asset.id) {
+                info!("Reactivating previously deactivated asset: {}", asset.id);
+                self.asset_repository.reactivate(&asset.id).await?;
+            }
+        }
 
         // Newly created = all spec IDs minus pre-existing
         let created_ids: Vec<String> = ids
