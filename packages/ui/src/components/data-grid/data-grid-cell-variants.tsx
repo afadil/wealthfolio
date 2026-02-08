@@ -2519,8 +2519,10 @@ export function SymbolCell<TData>({
   const onSelectCallback = symbolCellOpts?.onSelect;
   const onCreateCustomAssetCallback = symbolCellOpts?.onCreateCustomAsset;
   const isDisabledFn = symbolCellOpts?.isDisabled;
+  const isClearableFn = symbolCellOpts?.isClearable;
   const rowData = cell.row.original;
   const disabled = isDisabledFn ? isDisabledFn(rowData) : false;
+  const clearable = isClearableFn ? isClearableFn(rowData) : false;
   const sideOffset = -(containerRef.current?.clientHeight ?? 0);
 
   const prevInitialValueRef = React.useRef(initialValue);
@@ -2594,6 +2596,15 @@ export function SymbolCell<TData>({
       handleSelect(trimmed, undefined);
     }
   }, [searchQuery, handleSelect, onCreateCustomAssetCallback, rowIndex, tableMeta]);
+
+  const handleClear = React.useCallback(() => {
+    setValue("");
+    tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: "" });
+    onSelectCallback?.(rowIndex, "", undefined);
+    setSearchQuery("");
+    setOptions([]);
+    tableMeta?.onCellEditingStop?.();
+  }, [tableMeta, rowIndex, columnId, onSelectCallback]);
 
   const onOpenChange = React.useCallback(
     (isOpen: boolean) => {
@@ -2745,6 +2756,14 @@ export function SymbolCell<TData>({
                           <span className="text-muted-foreground text-xs font-light">Create custom asset</span>
                         </div>
                       </div>
+                    </CommandItem>
+                  </CommandGroup>
+                ) : null}
+                {clearable && value && trimmedQuery.length === 0 ? (
+                  <CommandGroup>
+                    <CommandItem value="__clear__" onSelect={handleClear} className="flex items-center gap-3">
+                      <Icons.X className="text-muted-foreground size-4" />
+                      <span className="text-muted-foreground text-xs">Clear symbol</span>
                     </CommandItem>
                   </CommandGroup>
                 ) : null}

@@ -88,6 +88,8 @@ export type CellOpts =
       onCreateCustomAsset?: (rowIndex: number, symbol: string) => void;
       /** Function to determine if symbol cell is disabled based on row data */
       isDisabled?: (rowData: unknown) => boolean;
+      /** Function to determine if symbol can be cleared (set to empty) based on row data */
+      isClearable?: (rowData: unknown) => boolean;
     }
   | {
       variant: "currency";

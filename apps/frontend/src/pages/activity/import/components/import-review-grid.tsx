@@ -17,6 +17,7 @@ import {
   SUBTYPES_BY_ACTIVITY_TYPE,
   SUBTYPE_DISPLAY_NAMES,
 } from "@/lib/constants";
+import { isSymbolRequired } from "@/lib/activity-utils";
 import { ActivityTypeBadge } from "../../components/activity-type-badge";
 import type { DraftActivity, DraftActivityStatus } from "../context";
 import { ImportToolbar, ImportContextMenu } from "./import-toolbar";
@@ -315,6 +316,10 @@ function useImportReviewColumns({
             onSearch: onSymbolSearch,
             onSelect: onSymbolSelect,
             onCreateCustomAsset,
+            isClearable: (rowData: unknown) => {
+              const row = rowData as DraftActivity;
+              return !isSymbolRequired(row.activityType ?? "");
+            },
           },
         },
       },

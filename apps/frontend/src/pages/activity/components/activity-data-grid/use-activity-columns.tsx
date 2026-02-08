@@ -1,5 +1,5 @@
 import { searchTicker } from "@/adapters";
-import { isCashActivity } from "@/lib/activity-utils";
+import { isCashActivity, isSymbolRequired } from "@/lib/activity-utils";
 import {
   ActivityStatus,
   ActivityType,
@@ -224,6 +224,10 @@ export function useActivityColumns({
             isDisabled: (rowData: unknown) => {
               const row = rowData as LocalTransaction;
               return isCashActivity(row.activityType ?? "");
+            },
+            isClearable: (rowData: unknown) => {
+              const row = rowData as LocalTransaction;
+              return !isSymbolRequired(row.activityType ?? "");
             },
             onSearch: handleSymbolSearch,
             onSelect: onSymbolSelect
