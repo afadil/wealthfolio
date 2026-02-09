@@ -672,7 +672,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
         }
 
         // Also map by direct asset id
-        for (id, _asset) in &ensure_result.assets {
+        for id in ensure_result.assets.keys() {
             key_to_asset_id.insert(id.clone(), id.clone());
         }
 

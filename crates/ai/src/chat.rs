@@ -403,6 +403,7 @@ struct TitleContext<E: AiEnvironment> {
 }
 
 /// Spawn a chat stream with the appropriate provider.
+#[allow(clippy::too_many_arguments)]
 async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     env: Arc<E>,
     tx: mpsc::Sender<AiStreamEvent>,
@@ -919,6 +920,7 @@ impl ThinkTagParser {
 // ============================================================================
 
 /// Stream responses from a rig agent, converting to AiStreamEvent.
+#[allow(clippy::too_many_arguments)]
 async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 'static>(
     agent: Agent<M>,
     prompt: Message,

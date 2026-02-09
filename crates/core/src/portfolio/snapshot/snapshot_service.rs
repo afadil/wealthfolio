@@ -571,6 +571,7 @@ impl SnapshotService {
     // --- Step 7: Calculate daily holdings snapshots (in memory) and identify keyframes ---
     // Iterates through dates and calculates holdings for each account needing processing (incl. TOTAL).
     // Returns (final_states, keyframes, warnings) - warnings contain info about activities that couldn't be processed.
+    #[allow(clippy::type_complexity)]
     fn calculate_daily_holdings_snapshots(
         &self,
         accounts_needing_calculation: &AccountsMap, // Actual accounts to process

@@ -311,6 +311,7 @@ where
     /// Secret store for API keys.
     secret_store: Arc<dyn SecretStore>,
     /// Sync service.
+    #[allow(clippy::type_complexity)]
     sync_service: Arc<RwLock<Option<Arc<QuoteSyncService<Q, S, A, R>>>>>,
 }
 

@@ -418,7 +418,7 @@ impl ActivityService {
             if let (Some(ref a_symbol), Some(ref a_type)) =
                 (&asset.instrument_symbol, &asset.instrument_type)
             {
-                let type_matches = instrument_type.map_or(true, |t| t == a_type);
+                let type_matches = instrument_type.is_none_or(|t| t == a_type);
                 let symbol_matches = a_symbol.to_uppercase() == upper_symbol;
                 let mic_matches = if matches!(a_type, InstrumentType::Option) {
                     // OCC option ticker is globally unique; tolerate legacy MIC mismatch to avoid duplicates.
@@ -434,7 +434,7 @@ impl ActivityService {
                     }
                 };
                 let ccy_matches = if matches!(a_type, InstrumentType::Crypto | InstrumentType::Fx) {
-                    quote_ccy.map_or(true, |ccy| asset.quote_ccy.eq_ignore_ascii_case(ccy))
+                    quote_ccy.is_none_or(|ccy| asset.quote_ccy.eq_ignore_ascii_case(ccy))
                 } else {
                     true
                 };

@@ -1,5 +1,7 @@
 // Extend the root Prettier configuration
-const baseConfig = require("../../.prettierrc.cjs");
+const rootConfig = require("../../.prettierrc.cjs");
+const baseConfig = { ...rootConfig };
+delete baseConfig.plugins;
 
 module.exports = {
   ...baseConfig,
@@ -11,7 +13,6 @@ module.exports = {
       options: {
         // Consistent with main app formatting
         printWidth: 100,
-        singleQuote: true,
       },
     },
   ],

@@ -56,6 +56,7 @@ impl AllocationService {
     /// Aggregates holdings into a taxonomy allocation.
     /// For hierarchical taxonomies (GICS, Regions), rolls up to top-level categories
     /// and populates children for drill-down.
+    #[allow(clippy::too_many_arguments)]
     fn aggregate_by_taxonomy(
         &self,
         holdings: &[Holding],
@@ -249,6 +250,7 @@ impl AllocationService {
     }
 
     /// Recursively finds the top-level ancestor of a category.
+    #[allow(clippy::only_used_in_recursion)]
     fn find_top_level_ancestor<'a>(
         &self,
         category_id: &'a str,

@@ -926,6 +926,7 @@ mod tests {
     }
 
     /// Helper to create test activities with the new Activity model
+    #[allow(clippy::too_many_arguments)]
     fn create_test_activity(
         id: &str,
         account_id: &str,
@@ -2707,12 +2708,12 @@ mod tests {
         assert_eq!(dates[5], d2);
 
         // Gap days (Jan 11-14) should carry forward d1's value
-        for i in 1..5 {
+        for (i, snapshot) in daily[1..5].iter().enumerate() {
             assert_eq!(
-                daily[i].cash_balances.get("USD"),
+                snapshot.cash_balances.get("USD"),
                 Some(&dec!(5000)),
                 "Day {} should carry forward",
-                i
+                i + 1
             );
         }
 

@@ -1,8 +1,4 @@
-import {
-  checkActivitiesImport,
-  logger,
-  saveAccountImportMapping,
-} from "@/adapters";
+import { checkActivitiesImport, logger, saveAccountImportMapping } from "@/adapters";
 import {
   ACTIVITY_SUBTYPES,
   ActivityType,

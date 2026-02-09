@@ -1,4 +1,4 @@
-import type { AddonContext } from '@wealthfolio/addon-sdk';
+import type { AddonContext } from "@wealthfolio/addon-sdk";
 import {
   AnimatedToggleGroup,
   Button,
@@ -13,39 +13,48 @@ import {
   PageContent,
   PageHeader,
   Skeleton,
-} from '@wealthfolio/ui';
-import { useState } from 'react';
-import { AdaptiveCalendarView } from '../components/adaptive-calendar-view';
-import { DistributionCharts } from '../components/distribution-charts';
-import { EquityCurveChart } from '../components/equity-curve-chart';
-import { OpenTradesTable } from '../components/open-trades-table';
-import { useSwingDashboard } from '../hooks/use-swing-dashboard';
-import { useSwingPreferences } from '../hooks/use-swing-preferences';
+} from "@wealthfolio/ui";
+import { useState } from "react";
+import { AdaptiveCalendarView } from "../components/adaptive-calendar-view";
+import { DistributionCharts } from "../components/distribution-charts";
+import { EquityCurveChart } from "../components/equity-curve-chart";
+import { OpenTradesTable } from "../components/open-trades-table";
+import { useSwingDashboard } from "../hooks/use-swing-dashboard";
+import { useSwingPreferences } from "../hooks/use-swing-preferences";
 
 const periods = [
-  { value: '1M' as const, label: '1M' },
-  { value: '3M' as const, label: '3M' },
-  { value: '6M' as const, label: '6M' },
-  { value: 'YTD' as const, label: 'YTD' },
-  { value: '1Y' as const, label: '1Y' },
-  { value: 'ALL' as const, label: 'ALL' },
+  { value: "1M" as const, label: "1M" },
+  { value: "3M" as const, label: "3M" },
+  { value: "6M" as const, label: "6M" },
+  { value: "YTD" as const, label: "YTD" },
+  { value: "1Y" as const, label: "1Y" },
+  { value: "ALL" as const, label: "ALL" },
 ];
 
 // Chart period type is now automatically determined based on selected period
-const getChartPeriodDisplay = (period: '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'ALL') => {
+const getChartPeriodDisplay = (period: "1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL") => {
   switch (period) {
-    case '1M':
-      return { type: 'Daily', description: 'Daily P/L and cumulative equity performance' };
-    case '3M':
-      return { type: 'Weekly', description: 'Weekly P/L and cumulative equity performance' };
+    case "1M":
+      return {
+        type: "Daily",
+        description: "Daily P/L and cumulative equity performance",
+      };
+    case "3M":
+      return {
+        type: "Weekly",
+        description: "Weekly P/L and cumulative equity performance",
+      };
     default:
-      return { type: 'Monthly', description: 'Monthly P/L and cumulative equity performance' };
+      return {
+        type: "Monthly",
+        description: "Monthly P/L and cumulative equity performance",
+      };
   }
 };
 
 const PeriodSelector: React.FC<{
-  selectedPeriod: '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'ALL';
-  onPeriodSelect: (period: '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'ALL') => void;
+  selectedPeriod: "1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL";
+  onPeriodSelect: (period: "1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL") => void;
 }> = ({ selectedPeriod, onPeriodSelect }) => (
   <AnimatedToggleGroup
     items={periods}
@@ -61,8 +70,8 @@ interface DashboardPageProps {
 }
 
 export default function DashboardPage({ ctx }: DashboardPageProps) {
-  const [selectedPeriod, setSelectedPeriod] = useState<'1M' | '3M' | '6M' | 'YTD' | '1Y' | 'ALL'>(
-    'YTD',
+  const [selectedPeriod, setSelectedPeriod] = useState<"1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL">(
+    "YTD",
   );
   const [selectedYear, setSelectedYear] = useState(new Date());
 
@@ -70,11 +79,11 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
   const { preferences } = useSwingPreferences(ctx);
 
   const handleNavigateToActivities = () => {
-    ctx.api.navigation.navigate('/addons/swingfolio/activities');
+    ctx.api.navigation.navigate("/addons/swingfolio/activities");
   };
 
   const handleNavigateToSettings = () => {
-    ctx.api.navigation.navigate('/addons/swingfolio/settings');
+    ctx.api.navigation.navigate("/addons/swingfolio/settings");
   };
 
   if (isLoading) {
@@ -91,7 +100,7 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
               <Icons.AlertCircle className="text-muted-foreground mx-auto mb-4 h-10 w-10 sm:h-12 sm:w-12" />
               <h3 className="mb-2 text-base font-semibold sm:text-lg">Failed to load dashboard</h3>
               <p className="text-muted-foreground mb-4 text-sm sm:text-base">
-                {error?.message || 'Unable to load swing trading data'}
+                {error?.message || "Unable to load swing trading data"}
               </p>
               <Button onClick={() => refetch()}>Try Again</Button>
             </div>
@@ -188,7 +197,7 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
             {/* Widget 1: Overall P/L Summary - Clean Design */}
 
             <Card
-              className={`${metrics.totalPL >= 0 ? 'border-success/10 bg-success/10' : 'border-destructive/10 bg-destructive/10'}`}
+              className={`${metrics.totalPL >= 0 ? "border-success/10 bg-success/10" : "border-destructive/10 bg-destructive/10"}`}
             >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pt-4 pb-3">
                 <CardTitle className="text-sm font-medium">P/L</CardTitle>
@@ -294,7 +303,7 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
                     <span className="text-muted-foreground text-xs">Profit Factor</span>
                     <span className="text-sm font-semibold">
                       {metrics.profitFactor === Number.POSITIVE_INFINITY
-                        ? '∞'
+                        ? "∞"
                         : metrics.profitFactor.toFixed(2)}
                     </span>
                   </div>
@@ -333,11 +342,11 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
                   data={chartEquityData}
                   currency={metrics.currency}
                   periodType={
-                    selectedPeriod === '1M'
-                      ? 'daily'
-                      : selectedPeriod === '3M'
-                        ? 'weekly'
-                        : 'monthly'
+                    selectedPeriod === "1M"
+                      ? "daily"
+                      : selectedPeriod === "3M"
+                        ? "weekly"
+                        : "monthly"
                   }
                 />
               </CardContent>
@@ -360,7 +369,7 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-base sm:text-lg">Open Positions</CardTitle>
               <span className="text-muted-foreground text-sm">
-                {openPositions.length} {openPositions.length === 1 ? 'position' : 'positions'}
+                {openPositions.length} {openPositions.length === 1 ? "position" : "positions"}
               </span>
             </CardHeader>
             <CardContent className="px-2 sm:px-6">

@@ -1,24 +1,24 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { AddonContext } from '@wealthfolio/addon-sdk';
-import type { SwingTradePreferences } from '../types';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { AddonContext } from "@wealthfolio/addon-sdk";
+import type { SwingTradePreferences } from "../types";
 
 const DEFAULT_PREFERENCES: SwingTradePreferences = {
   selectedActivityIds: [],
   includeSwingTag: true,
   selectedAccounts: [],
-  lotMatchingMethod: 'FIFO',
-  defaultDateRange: 'YTD',
+  lotMatchingMethod: "FIFO",
+  defaultDateRange: "YTD",
   includeFees: true,
   includeDividends: false,
 };
 
-const PREFERENCES_KEY = 'swingfolio_preferences';
+const PREFERENCES_KEY = "swingfolio_preferences";
 
 export function useSwingPreferences(ctx: AddonContext) {
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: ['swing-preferences'],
+    queryKey: ["swing-preferences"],
     queryFn: async (): Promise<SwingTradePreferences> => {
       try {
         const stored = localStorage.getItem(PREFERENCES_KEY);
@@ -28,7 +28,7 @@ export function useSwingPreferences(ctx: AddonContext) {
         return DEFAULT_PREFERENCES;
       } catch (error) {
         ctx.api.logger.warn(
-          'Failed to load preferences, using defaults: ' + (error as Error).message,
+          "Failed to load preferences, using defaults: " + (error as Error).message,
         );
         return DEFAULT_PREFERENCES;
       }
@@ -44,11 +44,11 @@ export function useSwingPreferences(ctx: AddonContext) {
       return updated;
     },
     onSuccess: (data) => {
-      queryClient.setQueryData(['swing-preferences'], data);
-      ctx.api.logger.debug('Swing preferences updated successfully');
+      queryClient.setQueryData(["swing-preferences"], data);
+      ctx.api.logger.debug("Swing preferences updated successfully");
     },
     onError: (error) => {
-      ctx.api.logger.error('Failed to save preferences: ' + error.message);
+      ctx.api.logger.error("Failed to save preferences: " + error.message);
     },
   });
 

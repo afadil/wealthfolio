@@ -1235,15 +1235,9 @@ mod tests {
     #[test]
     fn test_parse_number() {
         assert_eq!(parse_number("100.50", false), Some("100.5".to_string()));
-        assert_eq!(
-            parse_number("$1,234.56", true),
-            Some("1234.56".to_string())
-        );
+        assert_eq!(parse_number("$1,234.56", true), Some("1234.56".to_string()));
         assert_eq!(parse_number("(100.00)", true), Some("100".to_string()));
-        assert_eq!(
-            parse_number("1234,56", false),
-            Some("1234.56".to_string())
-        );
+        assert_eq!(parse_number("1234,56", false), Some("1234.56".to_string()));
         assert_eq!(parse_number("invalid", false), None);
     }
 

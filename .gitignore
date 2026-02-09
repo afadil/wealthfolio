@@ -84,4 +84,6 @@ Thumbs.db
 # AI tools
 .ralph-tui/
 .kiro/
+.conductor/
+db/
 tasks

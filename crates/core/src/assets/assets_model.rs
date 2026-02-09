@@ -408,16 +408,16 @@ impl NewAsset {
         }
 
         // Investments with MARKET pricing require instrument fields
-        if self.kind == AssetKind::Investment && self.quote_mode == QuoteMode::Market {
-            if self
+        if self.kind == AssetKind::Investment
+            && self.quote_mode == QuoteMode::Market
+            && self
                 .instrument_symbol
                 .as_ref()
                 .is_none_or(|s| s.trim().is_empty())
-            {
-                return Err(Error::Validation(ValidationError::InvalidInput(
-                    "Investments with MARKET pricing require an instrument_symbol".to_string(),
-                )));
-            }
+        {
+            return Err(Error::Validation(ValidationError::InvalidInput(
+                "Investments with MARKET pricing require an instrument_symbol".to_string(),
+            )));
         }
 
         Ok(())

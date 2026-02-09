@@ -2390,6 +2390,7 @@ mod tests {
     // ==========================================
 
     /// Helper to create an activity with a specific fx_rate
+    #[allow(clippy::too_many_arguments)]
     fn create_activity_with_fx_rate(
         id: &str,
         activity_type: ActivityType,

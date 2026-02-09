@@ -134,12 +134,12 @@ pub fn plan_broker_sync(events: &[DomainEvent]) -> Vec<String> {
             // Check for eligible transitions:
             // NOT_SET -> TRANSACTIONS or HOLDINGS (initial sync)
             // HOLDINGS -> TRANSACTIONS (need transaction history)
-            let needs_sync = match (old_mode, new_mode) {
-                (TrackingMode::NotSet, TrackingMode::Transactions) => true,
-                (TrackingMode::NotSet, TrackingMode::Holdings) => true,
-                (TrackingMode::Holdings, TrackingMode::Transactions) => true,
-                _ => false,
-            };
+            let needs_sync = matches!(
+                (old_mode, new_mode),
+                (TrackingMode::NotSet, TrackingMode::Transactions)
+                    | (TrackingMode::NotSet, TrackingMode::Holdings)
+                    | (TrackingMode::Holdings, TrackingMode::Transactions)
+            );
 
             if needs_sync {
                 account_ids.push(account_id.clone());

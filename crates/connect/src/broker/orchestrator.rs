@@ -200,7 +200,7 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
                     && acc
                         .provider_account_id
                         .as_ref()
-                        .map_or(false, |id| sync_enabled_broker_ids.contains(id))
+                        .is_some_and(|id| sync_enabled_broker_ids.contains(id))
             })
             .map(|acc| NewAccountInfo {
                 local_account_id: acc.id.clone(),
@@ -580,6 +580,7 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
     /// Sync activities for a single account with full pagination.
     ///
     /// Returns (fetched, inserted, assets_created, needs_review, new_asset_ids).
+    #[allow(clippy::too_many_arguments)]
     async fn sync_account_activities(
         &self,
         api_client: &dyn BrokerApiClient,

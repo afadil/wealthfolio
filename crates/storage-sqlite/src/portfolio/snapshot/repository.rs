@@ -1002,9 +1002,12 @@ mod tests {
         );
 
         // Overwrite - this should only delete CALCULATED, keeping MANUAL_ENTRY and BROKER_IMPORTED
-        repo.overwrite_all_snapshots_for_account(account_id, &[new_calculated_snapshot.clone()])
-            .await
-            .expect("Failed to overwrite snapshots");
+        repo.overwrite_all_snapshots_for_account(
+            account_id,
+            std::slice::from_ref(&new_calculated_snapshot),
+        )
+        .await
+        .expect("Failed to overwrite snapshots");
 
         // Verify: should have 3 snapshots (2 preserved + 1 new)
         let final_snapshots = repo
@@ -1068,7 +1071,7 @@ mod tests {
             account_id,
             start_date,
             end_date,
-            &[new_snapshot.clone()],
+            std::slice::from_ref(&new_snapshot),
         )
         .await
         .expect("Failed to overwrite in range");
@@ -1165,7 +1168,7 @@ mod tests {
             SnapshotSource::Calculated,
         );
 
-        repo.overwrite_all_snapshots_for_account(account_id, &[new_calculated.clone()])
+        repo.overwrite_all_snapshots_for_account(account_id, std::slice::from_ref(&new_calculated))
             .await
             .expect("Failed to rebuild");
 

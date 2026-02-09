@@ -26,6 +26,7 @@ pub trait ActivityRepositoryTrait: Send + Sync {
         start_date: NaiveDateTime,
         end_date: NaiveDateTime,
     ) -> Result<Vec<ContributionActivity>>;
+    #[allow(clippy::too_many_arguments)]
     fn search_activities(
         &self,
         page: i64,
@@ -68,6 +69,7 @@ pub trait ActivityRepositoryTrait: Send + Sync {
     ///
     /// A map from asset_id to a tuple of (first_activity_date, last_activity_date).
     /// Both dates may be None if no activities exist for the asset.
+    #[allow(clippy::type_complexity)]
     fn get_activity_bounds_for_assets(
         &self,
         asset_ids: &[String],
@@ -112,6 +114,7 @@ pub trait ActivityServiceTrait: Send + Sync {
     fn get_activities_by_account_ids(&self, account_ids: &[String]) -> Result<Vec<Activity>>;
     fn get_trading_activities(&self) -> Result<Vec<Activity>>;
     fn get_income_activities(&self) -> Result<Vec<Activity>>;
+    #[allow(clippy::too_many_arguments)]
     fn search_activities(
         &self,
         page: i64,

@@ -7,22 +7,22 @@ import {
   EmptyPlaceholder,
   Icons,
   formatAmount,
-} from '@wealthfolio/ui';
-import { Bar, CartesianGrid, Cell, ComposedChart, Line, XAxis, YAxis } from '@wealthfolio/ui/chart';
-import { format, parseISO } from 'date-fns';
-import type { EquityPoint } from '../types';
+} from "@wealthfolio/ui";
+import { Bar, CartesianGrid, Cell, ComposedChart, Line, XAxis, YAxis } from "@wealthfolio/ui/chart";
+import { format, parseISO } from "date-fns";
+import type { EquityPoint } from "../types";
 
 interface EquityCurveChartProps {
   data: EquityPoint[];
   currency: string;
   height?: number;
-  periodType?: 'daily' | 'weekly' | 'monthly';
+  periodType?: "daily" | "weekly" | "monthly";
 }
 
 export function EquityCurveChart({
   data,
   currency,
-  periodType = 'monthly',
+  periodType = "monthly",
 }: EquityCurveChartProps) {
   // Transform data for chart - calculate period P/L from cumulative values
   const chartData = data.map((point, index) => {
@@ -30,7 +30,7 @@ export function EquityCurveChart({
     const periodPL = point.cumulativeRealizedPL - prevCumulative;
 
     // Format date based on period type
-    const dateFormat = periodType === 'daily' ? 'MMM dd' : 'MMM yy';
+    const dateFormat = periodType === "daily" ? "MMM dd" : "MMM yy";
 
     return {
       date: point.date,
@@ -53,9 +53,9 @@ export function EquityCurveChart({
     );
   }
 
-  const periodLabel = periodType === 'daily' ? 'Daily' : 'Monthly';
-  const dateFormat = periodType === 'daily' ? 'MMM dd' : 'MMM yy';
-  const tooltipDateFormat = periodType === 'daily' ? 'MMMM dd, yyyy' : 'MMMM yyyy';
+  const periodLabel = periodType === "daily" ? "Daily" : "Monthly";
+  const dateFormat = periodType === "daily" ? "MMM dd" : "MMM yy";
+  const tooltipDateFormat = periodType === "daily" ? "MMMM dd, yyyy" : "MMMM yyyy";
 
   return (
     <div className="flex h-full min-h-[300px] w-full items-center justify-center py-12">
@@ -63,11 +63,11 @@ export function EquityCurveChart({
         config={{
           periodPL: {
             label: `${periodLabel} P/L`,
-            color: 'var(--chart-1)',
+            color: "var(--chart-1)",
           },
           cumulativeRealizedPL: {
-            label: 'Cumulative Equity',
-            color: 'var(--primary)',
+            label: "Cumulative Equity",
+            color: "var(--primary)",
           },
         }}
         className="h-full w-full"
@@ -94,17 +94,17 @@ export function EquityCurveChart({
                         className="border-border h-2.5 w-2.5 shrink-0 rounded-[2px] bg-(--color-bg)"
                         style={
                           {
-                            '--color-bg': entry.color,
-                            '--color-border': entry.color,
+                            "--color-bg": entry.color,
+                            "--color-border": entry.color,
                           } as React.CSSProperties
                         }
                       />
                       <div className="flex flex-1 items-center justify-between">
                         <span className="text-muted-foreground">
-                          {name === 'periodPL'
+                          {name === "periodPL"
                             ? `${periodLabel} P/L`
-                            : name === 'cumulativeRealizedPL'
-                              ? 'Cumulative Equity'
+                            : name === "cumulativeRealizedPL"
+                              ? "Cumulative Equity"
                               : name}
                         </span>
                         <span className="text-foreground ml-2 font-mono font-medium tabular-nums">
@@ -115,7 +115,7 @@ export function EquityCurveChart({
                   );
                 }}
                 labelFormatter={(label) =>
-                  typeof label === 'string' ? format(parseISO(label), tooltipDateFormat) : ''
+                  typeof label === "string" ? format(parseISO(label), tooltipDateFormat) : ""
                 }
               />
             }
@@ -131,7 +131,7 @@ export function EquityCurveChart({
             {chartData.map((entry, index) => (
               <Cell
                 key={`cell-${index}`}
-                fill={entry.periodPL >= 0 ? 'var(--success)' : 'var(--destructive)'}
+                fill={entry.periodPL >= 0 ? "var(--success)" : "var(--destructive)"}
                 fillOpacity={0.6}
               />
             ))}

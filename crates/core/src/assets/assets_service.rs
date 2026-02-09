@@ -79,7 +79,7 @@ impl AssetService {
 
     /// Builds a NewAsset from an AssetSpec without any I/O.
     fn new_asset_from_spec(&self, spec: &AssetSpec) -> NewAsset {
-        let quote_mode = spec.quote_mode.unwrap_or_else(|| match &spec.kind {
+        let quote_mode = spec.quote_mode.unwrap_or(match &spec.kind {
             AssetKind::Investment | AssetKind::Fx => QuoteMode::Market,
             _ => QuoteMode::Manual,
         });

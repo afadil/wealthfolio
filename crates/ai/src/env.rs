@@ -1048,9 +1048,9 @@ pub mod test_env {
                 secret_store: Arc::new(MockSecretStore::default()),
                 chat_repository: Arc::new(MockChatRepository::default()),
                 quote_service: Arc::new(MockQuoteService::default()),
-                allocation_service: Arc::new(MockAllocationService::default()),
-                performance_service: Arc::new(MockPerformanceService::default()),
-                income_service: Arc::new(MockIncomeService::default()),
+                allocation_service: Arc::new(MockAllocationService),
+                performance_service: Arc::new(MockPerformanceService),
+                income_service: Arc::new(MockIncomeService),
             }
         }
 

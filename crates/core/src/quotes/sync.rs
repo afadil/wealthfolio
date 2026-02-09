@@ -1715,7 +1715,7 @@ mod tests {
             // - User has activities starting 2020-01-15
             // - FX:EUR:USD needs quotes from 2020-01-15 - BUFFER_DAYS
             // - Without this, base currency changes would fail for historical data
-            assert!(true, "FX backfill design documented");
+            // FX backfill design documented
         }
 
         #[test]
@@ -1725,7 +1725,7 @@ mod tests {
             //
             // This is important for performance - we don't want every incremental
             // sync to fetch years of FX history
-            assert!(true, "FX incremental behavior documented");
+            // FX incremental behavior documented
         }
     }
 
@@ -1870,7 +1870,7 @@ mod tests {
             // - Historical accuracy (ensuring end-of-position values are correct)
             //
             // After the grace period, quotes are no longer fetched to save resources.
-            assert!(true, "Grace period purpose documented");
+            // Grace period purpose documented
         }
     }
 }

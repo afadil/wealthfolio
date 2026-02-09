@@ -1,7 +1,7 @@
-/// Activity types
-///
-/// Each constant represents one of the supported activity categories.
-/// The descriptions mirror `docs/activity-types.md` for quick reference.
+//! Activity types
+//!
+//! Each constant represents one of the supported activity categories.
+//! The descriptions mirror `docs/activity-types.md` for quick reference.
 
 /// Purchase of a security or other asset. Decreases cash and increases quantity.
 pub const ACTIVITY_TYPE_BUY: &str = "BUY";
@@ -174,8 +174,8 @@ pub fn classify_import_activity(
 
     // 4–5. Transfer types: disambiguate via qty/price
     if TRANSFER_TYPES.contains(&activity_type) {
-        let has_qty = quantity.map_or(false, |q| !q.is_zero());
-        let has_price = unit_price.map_or(false, |p| !p.is_zero());
+        let has_qty = quantity.is_some_and(|q| !q.is_zero());
+        let has_price = unit_price.is_some_and(|p| !p.is_zero());
         if has_qty || has_price {
             return ImportSymbolDisposition::ResolveAsset;
         }

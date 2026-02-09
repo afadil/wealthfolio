@@ -35,6 +35,7 @@ pub struct ServerAiEnvironment {
 
 impl ServerAiEnvironment {
     /// Create a new server AI environment.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         base_currency: Arc<RwLock<String>>,
         account_service: Arc<dyn AccountServiceTrait + Send + Sync>,

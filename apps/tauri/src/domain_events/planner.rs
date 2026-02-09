@@ -16,6 +16,7 @@ use crate::events::PortfolioRequestPayload;
 /// - ActivitiesChanged
 /// - HoldingsChanged
 /// - AccountsChanged
+///
 /// Also carries through asset IDs from AssetsCreated when a recalc-triggering
 /// event exists in the same batch.
 ///
