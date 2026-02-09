@@ -138,7 +138,11 @@ export const calculateActivityValue = (activity: ActivityDetails): number => {
   }
 
   if (activityType === ActivityType.FEE || activityType === ActivityType.TAX) {
-    return roundCurrency(getAmount(activity));
+    const amount = getAmount(activity);
+    if (amount !== 0) {
+      return roundCurrency(amount);
+    }
+    return roundCurrency(getFee(activity));
   }
 
   // Handle cash activities
