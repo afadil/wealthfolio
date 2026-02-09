@@ -123,7 +123,7 @@ impl MarketDataError {
     /// use wealthfolio_market_data::errors::{MarketDataError, RetryClass};
     ///
     /// let error = MarketDataError::RateLimited { provider: "YAHOO".to_string() };
-    /// assert_eq!(error.retry_class(), RetryClass::FailoverWithPenalty);
+    /// assert_eq!(error.retry_class(), RetryClass::NextProvider);
     ///
     /// let error = MarketDataError::SymbolNotFound("INVALID".to_string());
     /// assert_eq!(error.retry_class(), RetryClass::Never);
