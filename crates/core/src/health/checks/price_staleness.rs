@@ -9,7 +9,6 @@ use chrono::{DateTime, Datelike, NaiveDate, Utc, Weekday};
 use std::collections::HashMap;
 
 use crate::errors::Result;
-use crate::assets::{parse_canonical_asset_id, AssetKind};
 use crate::health::model::{AffectedItem, FixAction, HealthCategory, HealthIssue, Severity};
 use crate::health::traits::{HealthCheck, HealthContext};
 use crate::utils::time_utils;
@@ -17,12 +16,14 @@ use crate::utils::time_utils;
 /// Data about an asset holding for staleness checks.
 #[derive(Debug, Clone)]
 pub struct AssetHoldingInfo {
-    /// Asset ID (e.g., "SEC:AAPL:XNAS")
+    /// Asset ID (opaque UUID)
     pub asset_id: String,
     /// Asset symbol for display (e.g., "AAPL")
     pub symbol: String,
     /// Asset name for display (e.g., "Apple Inc.")
     pub name: Option<String>,
+    /// Exchange MIC for market-effective-date calculation (e.g., "XNAS")
+    pub exchange_mic: Option<String>,
     /// Market value in base currency
     pub market_value: f64,
     /// Whether this asset uses market pricing (vs manual)
@@ -81,9 +82,10 @@ impl PriceStalenessCheck {
                     // Only check staleness for assets with positive market value
                     // (assets with 0 quantity are not actively held)
                     if holding.market_value > 0.0 {
-                        let mic = extract_exchange_mic(&holding.asset_id);
-                        let effective_today =
-                            time_utils::market_effective_date(ctx.now, mic.as_deref());
+                        let effective_today = time_utils::market_effective_date(
+                            ctx.now,
+                            holding.exchange_mic.as_deref(),
+                        );
                         let days_stale = trading_days_since(*quote_time, effective_today);
 
                         if days_stale >= critical_trading_days {
@@ -280,21 +282,6 @@ fn trading_days_since(last_quote: DateTime<Utc>, today: NaiveDate) -> i64 {
     trading_days_between(last_date, today)
 }
 
-fn extract_exchange_mic(asset_id: &str) -> Option<String> {
-    parse_canonical_asset_id(asset_id).and_then(|parsed| {
-        match parsed.kind {
-            Some(AssetKind::Security) | Some(AssetKind::Option) => {
-                if parsed.qualifier == "UNKNOWN" {
-                    None
-                } else {
-                    Some(parsed.qualifier)
-                }
-            }
-            _ => None,
-        }
-    })
-}
-
 #[async_trait]
 impl HealthCheck for PriceStalenessCheck {
     fn id(&self) -> &'static str {
@@ -440,6 +427,7 @@ mod tests {
             asset_id: "SEC:AAPL:XNAS".to_string(),
             symbol: "AAPL".to_string(),
             name: Some("Apple Inc.".to_string()),
+            exchange_mic: None,
             market_value: 10_000.0,
             uses_market_pricing: true,
         }];
@@ -468,6 +456,7 @@ mod tests {
             asset_id: "SEC:AAPL:XNAS".to_string(),
             symbol: "AAPL".to_string(),
             name: Some("Apple Inc.".to_string()),
+            exchange_mic: None,
             market_value: 10_000.0,
             uses_market_pricing: true,
         }];
@@ -497,6 +486,7 @@ mod tests {
             asset_id: "SEC:AAPL:XNAS".to_string(),
             symbol: "AAPL".to_string(),
             name: Some("Apple Inc.".to_string()),
+            exchange_mic: None,
             market_value: 10_000.0,
             uses_market_pricing: true,
         }];
@@ -525,6 +515,7 @@ mod tests {
             asset_id: "SEC:AAPL:XNAS".to_string(),
             symbol: "AAPL".to_string(),
             name: Some("Apple Inc.".to_string()),
+            exchange_mic: None,
             market_value: 10_000.0,
             uses_market_pricing: true,
         }];
@@ -553,6 +544,7 @@ mod tests {
             asset_id: "SEC:AAPL:XNAS".to_string(),
             symbol: "AAPL".to_string(),
             name: Some("Apple Inc.".to_string()),
+            exchange_mic: None,
             market_value: 10_000.0,
             uses_market_pricing: true,
         }];
@@ -576,6 +568,7 @@ mod tests {
             asset_id: "SEC:AAPL:XNAS".to_string(),
             symbol: "AAPL".to_string(),
             name: None,
+            exchange_mic: None,
             market_value: 10_000.0,
             uses_market_pricing: true,
         }];
@@ -597,6 +590,7 @@ mod tests {
             asset_id: "ALT:HOUSE".to_string(),
             symbol: "HOUSE".to_string(),
             name: Some("My House".to_string()),
+            exchange_mic: None,
             market_value: 500_000.0,
             uses_market_pricing: false, // Manual pricing
         }];
@@ -620,6 +614,7 @@ mod tests {
             asset_id: "SEC:AAPL:XNAS".to_string(),
             symbol: "AAPL".to_string(),
             name: Some("Apple Inc.".to_string()),
+            exchange_mic: None,
             market_value: 10_000.0,
             uses_market_pricing: true,
         }];

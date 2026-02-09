@@ -118,7 +118,10 @@ impl<E: AiEnvironment + 'static> Tool for GetIncomeTool<E> {
             .iter()
             .find(|s| s.period == period_upper)
             .ok_or_else(|| {
-                AiError::ToolExecutionFailed(format!("Period '{}' not found in income data", period))
+                AiError::ToolExecutionFailed(format!(
+                    "Period '{}' not found in income data",
+                    period
+                ))
             })?;
 
         // Convert by_type HashMap<String, Decimal> -> HashMap<String, f64>

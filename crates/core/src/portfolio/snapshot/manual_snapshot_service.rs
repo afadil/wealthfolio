@@ -3,12 +3,15 @@ use std::sync::Arc;
 
 use chrono::{NaiveDate, Utc};
 use rust_decimal::Decimal;
+use uuid::Uuid;
 
-use crate::assets::{security_id_from_symbol_with_mic, AssetServiceTrait};
+use crate::assets::{AssetMetadata, AssetServiceTrait};
 use crate::errors::Result;
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::fx::FxServiceTrait;
-use crate::portfolio::snapshot::{AccountStateSnapshot, Position, SnapshotServiceTrait, SnapshotSource};
+use crate::portfolio::snapshot::{
+    AccountStateSnapshot, Position, SnapshotServiceTrait, SnapshotSource,
+};
 
 #[derive(Debug, Clone)]
 pub struct ManualHoldingInput {
@@ -78,16 +81,24 @@ impl ManualSnapshotService {
 
             let asset_id = match holding.asset_id.as_deref() {
                 Some(id) if !id.is_empty() => id.to_string(),
-                _ => security_id_from_symbol_with_mic(
-                    &holding.symbol,
-                    holding.exchange_mic.as_deref(),
-                    &holding.currency,
-                ),
+                _ => Uuid::new_v4().to_string(),
+            };
+
+            let metadata = AssetMetadata {
+                instrument_symbol: Some(holding.symbol.clone()),
+                instrument_exchange_mic: holding.exchange_mic.clone(),
+                display_code: Some(holding.symbol.clone()),
+                ..Default::default()
             };
 
             let asset = self
                 .asset_service
-                .get_or_create_minimal_asset(&asset_id, Some(holding.currency.clone()), None, None)
+                .get_or_create_minimal_asset(
+                    &asset_id,
+                    Some(holding.currency.clone()),
+                    Some(metadata),
+                    None,
+                )
                 .await?;
 
             asset_ids.push(asset.id.clone());
@@ -98,9 +109,9 @@ impl ManualSnapshotService {
                     .await?;
             }
 
-            if asset.currency != request.account_currency && asset.currency != holding.currency {
+            if asset.quote_ccy != request.account_currency && asset.quote_ccy != holding.currency {
                 self.fx_service
-                    .register_currency_pair(&asset.currency, &request.account_currency)
+                    .register_currency_pair(&asset.quote_ccy, &request.account_currency)
                     .await?;
             }
 
@@ -128,10 +139,6 @@ impl ManualSnapshotService {
             if cash.amount.is_zero() {
                 continue;
             }
-
-            self.asset_service
-                .ensure_cash_asset(&cash.currency)
-                .await?;
 
             if cash.currency != request.account_currency {
                 self.fx_service

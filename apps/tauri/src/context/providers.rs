@@ -136,6 +136,8 @@ pub async fn initialize_context(
         fx_service.clone(),
         base_currency.clone(),
         domain_event_sink.clone(),
+        asset_repository.clone(),
+        quote_sync_state_repository.clone(),
     ));
 
     // Import run repository for tracking CSV imports
@@ -224,17 +226,20 @@ pub async fn initialize_context(
         writer.clone(),
     ));
 
-    let alternative_asset_service = Arc::new(AlternativeAssetService::new(
-        alternative_asset_repository.clone(),
-        asset_repository.clone(),
-        quote_service.clone(),
-    )
-    .with_event_sink(domain_event_sink.clone()));
+    let alternative_asset_service = Arc::new(
+        AlternativeAssetService::new(
+            alternative_asset_repository.clone(),
+            asset_repository.clone(),
+            quote_service.clone(),
+        )
+        .with_event_sink(domain_event_sink.clone()),
+    );
 
     let sync_service = Arc::new(
         BrokerSyncService::new(
             account_service.clone(),
             asset_service.clone(),
+            activity_service.clone(),
             platform_repository.clone(),
             pool.clone(),
             writer.clone(),

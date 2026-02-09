@@ -48,21 +48,21 @@ async fn update_asset_profile(
 }
 
 #[derive(serde::Deserialize)]
-struct PricingModeBody {
-    #[serde(rename = "pricingMode")]
-    pricing_mode: String,
+struct QuoteModeBody {
+    #[serde(alias = "pricingMode", alias = "quoteMode")]
+    quote_mode: String,
 }
 
-async fn update_pricing_mode(
+async fn update_quote_mode(
     Path(id): Path<String>,
     State(state): State<Arc<AppState>>,
-    Json(body): Json<PricingModeBody>,
+    Json(body): Json<QuoteModeBody>,
 ) -> ApiResult<Json<CoreAsset>> {
     let asset = state
         .asset_service
-        .update_pricing_mode(&id, &body.pricing_mode)
+        .update_quote_mode(&id, &body.quote_mode)
         .await?;
-    // Pricing mode change requires incremental sync for this asset
+    // Quote mode change requires incremental sync for this asset
     enqueue_portfolio_job(
         state.clone(),
         PortfolioJobConfig {
@@ -90,5 +90,5 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/assets/{id}", delete(delete_asset))
         .route("/assets/profile", get(get_asset_profile))
         .route("/assets/profile/{id}", put(update_asset_profile))
-        .route("/assets/pricing-mode/{id}", put(update_pricing_mode))
+        .route("/assets/pricing-mode/{id}", put(update_quote_mode))
 }

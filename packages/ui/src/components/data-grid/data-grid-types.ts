@@ -86,6 +86,10 @@ export type CellOpts =
       onSelect?: (rowIndex: number, symbol: string, result?: SymbolSearchResult) => void;
       /** Called when user wants to create a custom asset. Opens a dialog to collect asset metadata. */
       onCreateCustomAsset?: (rowIndex: number, symbol: string) => void;
+      /** Function to determine if symbol cell is disabled based on row data */
+      isDisabled?: (rowData: unknown) => boolean;
+      /** Function to determine if symbol can be cleared (set to empty) based on row data */
+      isClearable?: (rowData: unknown) => boolean;
     }
   | {
       variant: "currency";

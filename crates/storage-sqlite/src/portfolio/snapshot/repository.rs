@@ -377,9 +377,9 @@ impl SnapshotRepository {
 
             if !anchor_dates.is_empty() {
                 account_specific_snapshots.retain(|s| {
-                        let date_key = s.snapshot_date.format("%Y-%m-%d").to_string();
-                        !anchor_dates.contains(&date_key)
-                    });
+                    let date_key = s.snapshot_date.format("%Y-%m-%d").to_string();
+                    !anchor_dates.contains(&date_key)
+                });
             }
 
             if !account_specific_snapshots.is_empty() {
@@ -655,7 +655,8 @@ impl SnapshotRepository {
                     .map_err(|e| Error::from(StorageError::from(e)))?;
                 Ok(dates.into_iter().collect())
             })
-            .await}
+            .await
+    }
 
     async fn get_anchor_snapshot_dates_for_account(
         &self,
@@ -675,7 +676,8 @@ impl SnapshotRepository {
                     .map_err(|e| Error::from(StorageError::from(e)))?;
                 Ok(dates.into_iter().collect())
             })
-            .await}
+            .await
+    }
 
     /// Save or update a single snapshot.
     /// Uses replace_into to handle both insert and update cases.
@@ -1000,9 +1002,12 @@ mod tests {
         );
 
         // Overwrite - this should only delete CALCULATED, keeping MANUAL_ENTRY and BROKER_IMPORTED
-        repo.overwrite_all_snapshots_for_account(account_id, &[new_calculated_snapshot.clone()])
-            .await
-            .expect("Failed to overwrite snapshots");
+        repo.overwrite_all_snapshots_for_account(
+            account_id,
+            std::slice::from_ref(&new_calculated_snapshot),
+        )
+        .await
+        .expect("Failed to overwrite snapshots");
 
         // Verify: should have 3 snapshots (2 preserved + 1 new)
         let final_snapshots = repo
@@ -1066,7 +1071,7 @@ mod tests {
             account_id,
             start_date,
             end_date,
-            &[new_snapshot.clone()],
+            std::slice::from_ref(&new_snapshot),
         )
         .await
         .expect("Failed to overwrite in range");
@@ -1163,7 +1168,7 @@ mod tests {
             SnapshotSource::Calculated,
         );
 
-        repo.overwrite_all_snapshots_for_account(account_id, &[new_calculated.clone()])
+        repo.overwrite_all_snapshots_for_account(account_id, std::slice::from_ref(&new_calculated))
             .await
             .expect("Failed to rebuild");
 

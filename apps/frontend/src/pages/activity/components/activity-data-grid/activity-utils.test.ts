@@ -403,8 +403,8 @@ describe("activity-utils", () => {
       );
 
       // Backend now generates CASH:{currency} IDs for cash activities
-      // Frontend doesn't set asset for cash activities
-      expect(result.updates[0].asset).toBeUndefined();
+      // Frontend doesn't set symbol for cash activities
+      expect(result.updates[0].symbol).toBeUndefined();
     });
 
     it("should remove quantity and unitPrice for SPLIT activities", () => {

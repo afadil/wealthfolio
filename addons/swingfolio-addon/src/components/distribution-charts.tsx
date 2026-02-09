@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import {
   Card,
@@ -8,7 +8,7 @@ import {
   EmptyPlaceholder,
   formatAmount,
   Icons,
-} from '@wealthfolio/ui';
+} from "@wealthfolio/ui";
 import {
   Bar,
   BarChart,
@@ -19,8 +19,8 @@ import {
   ChartTooltipContent,
   XAxis,
   YAxis,
-} from '@wealthfolio/ui/chart';
-import type { TradeDistribution } from '../types';
+} from "@wealthfolio/ui/chart";
+import type { TradeDistribution } from "../types";
 
 interface DistributionChartsProps {
   distribution: TradeDistribution;
@@ -54,12 +54,12 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
 
   const chartConfig = {
     pl: {
-      label: 'P/L',
-      color: 'var(--chart-1)',
+      label: "P/L",
+      color: "var(--chart-1)",
     },
     count: {
-      label: 'Trades',
-      color: 'var(--chart-2)',
+      label: "Trades",
+      color: "var(--chart-2)",
     },
   };
 
@@ -103,14 +103,14 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
                               className="border-border h-2.5 w-2.5 shrink-0 rounded-[2px] bg-(--color-bg)"
                               style={
                                 {
-                                  '--color-bg': entry.color,
-                                  '--color-border': entry.color,
+                                  "--color-bg": entry.color,
+                                  "--color-border": entry.color,
                                 } as React.CSSProperties
                               }
                             />
                             <div className="flex flex-1 items-center justify-between gap-2">
                               <span className="text-muted-foreground">
-                                {name === 'pl' ? 'P/L' : name}
+                                {name === "pl" ? "P/L" : name}
                               </span>
                               <span className="text-foreground font-mono font-medium tabular-nums">
                                 {formattedValue}
@@ -120,7 +120,7 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
                         );
                       }}
                       labelFormatter={(label) =>
-                        typeof label === 'string' ? `Symbol: ${label}` : ''
+                        typeof label === "string" ? `Symbol: ${label}` : ""
                       }
                     />
                   }
@@ -129,7 +129,7 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
                   {symbolData.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
-                      fill={entry.pl >= 0 ? 'var(--success)' : 'var(--destructive)'}
+                      fill={entry.pl >= 0 ? "var(--success)" : "var(--destructive)"}
                       fillOpacity={0.6}
                     />
                   ))}
@@ -184,14 +184,14 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
                               className="border-border h-2.5 w-2.5 shrink-0 rounded-[2px] bg-(--color-bg)"
                               style={
                                 {
-                                  '--color-bg': entry.color,
-                                  '--color-border': entry.color,
+                                  "--color-bg": entry.color,
+                                  "--color-border": entry.color,
                                 } as React.CSSProperties
                               }
                             />
                             <div className="flex flex-1 items-center justify-between gap-2">
                               <span className="text-muted-foreground">
-                                {name === 'pl' ? 'P/L' : name}
+                                {name === "pl" ? "P/L" : name}
                               </span>
                               <span className="text-foreground font-mono font-medium tabular-nums">
                                 {formattedValue}
@@ -201,7 +201,7 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
                         );
                       }}
                       labelFormatter={(label) =>
-                        typeof label === 'string' ? `Period: ${label}` : ''
+                        typeof label === "string" ? `Period: ${label}` : ""
                       }
                     />
                   }
@@ -210,7 +210,7 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
                   {holdingPeriodData.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
-                      fill={entry.pl >= 0 ? 'var(--success)' : 'var(--destructive)'}
+                      fill={entry.pl >= 0 ? "var(--success)" : "var(--destructive)"}
                       fillOpacity={0.6}
                     />
                   ))}

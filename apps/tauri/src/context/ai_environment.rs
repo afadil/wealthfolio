@@ -35,6 +35,7 @@ pub struct TauriAiEnvironment {
 
 impl TauriAiEnvironment {
     /// Create a new Tauri AI environment.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         base_currency: Arc<RwLock<String>>,
         account_service: Arc<dyn AccountServiceTrait + Send + Sync>,

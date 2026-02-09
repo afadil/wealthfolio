@@ -26,7 +26,8 @@ use serde_json::Value;
 use wealthfolio_core::{
     assets::{
         AssetKind, CreateAlternativeAssetRequest as CoreCreateRequest,
-        LinkLiabilityRequest as CoreLinkRequest, UpdateAssetDetailsRequest as CoreUpdateDetailsRequest,
+        LinkLiabilityRequest as CoreLinkRequest,
+        UpdateAssetDetailsRequest as CoreUpdateDetailsRequest,
         UpdateValuationRequest as CoreValuationRequest,
     },
     quotes::MarketSyncMode,
@@ -53,7 +54,7 @@ impl AlternativeAssetKind {
             AlternativeAssetKind::Property => AssetKind::Property,
             AlternativeAssetKind::Vehicle => AssetKind::Vehicle,
             AlternativeAssetKind::Collectible => AssetKind::Collectible,
-            AlternativeAssetKind::Precious => AssetKind::PhysicalPrecious,
+            AlternativeAssetKind::Precious => AssetKind::PreciousMetal,
             AlternativeAssetKind::Liability => AssetKind::Liability,
             AlternativeAssetKind::Other => AssetKind::Other,
         }
@@ -345,7 +346,7 @@ async fn get_alternative_holdings(
                 AssetKind::Property => "property",
                 AssetKind::Vehicle => "vehicle",
                 AssetKind::Collectible => "collectible",
-                AssetKind::PhysicalPrecious => "precious",
+                AssetKind::PreciousMetal => "precious",
                 AssetKind::Liability => "liability",
                 AssetKind::Other => "other",
                 _ => "other",

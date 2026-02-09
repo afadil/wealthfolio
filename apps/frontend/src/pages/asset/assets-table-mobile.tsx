@@ -78,9 +78,9 @@ export function AssetsTableMobile({
     );
   };
 
-  // Get unique pricing modes
-  const pricingModeOptions = useMemo(() => {
-    const modes = new Set(assets.map((asset) => asset.pricingMode).filter(Boolean));
+  // Get unique quote modes
+  const quoteModeOptions = useMemo(() => {
+    const modes = new Set(assets.map((asset) => asset.quoteMode).filter(Boolean));
     return Array.from(modes);
   }, [assets]);
 
@@ -97,7 +97,7 @@ export function AssetsTableMobile({
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter((asset) =>
-        [asset.symbol, asset.name ?? "", asset.kind ?? ""].some((value) =>
+        [asset.displayCode ?? "", asset.name ?? "", asset.kind ?? ""].some((value) =>
           value.toLowerCase().includes(query),
         ),
       );
@@ -105,7 +105,7 @@ export function AssetsTableMobile({
 
     // Filter by pricing mode
     if (selectedDataSources.length > 0) {
-      filtered = filtered.filter((asset) => selectedDataSources.includes(asset.pricingMode));
+      filtered = filtered.filter((asset) => selectedDataSources.includes(asset.quoteMode));
     }
 
     // Filter by asset kind
@@ -122,8 +122,8 @@ export function AssetsTableMobile({
       });
     }
 
-    // Sort by symbol
-    filtered.sort((a, b) => a.symbol.localeCompare(b.symbol));
+    // Sort by displayCode
+    filtered.sort((a, b) => (a.displayCode ?? "").localeCompare(b.displayCode ?? ""));
 
     return filtered;
   }, [
@@ -206,12 +206,17 @@ export function AssetsTableMobile({
                 onClick={() => navigate(`/holdings/${encodeURIComponent(asset.id)}`)}
                 className="hover:bg-muted/60 focus-visible:ring-ring flex flex-1 items-center gap-3 overflow-hidden rounded-md text-left transition"
               >
-                <TickerAvatar symbol={asset.symbol} className="h-10 w-10 flex-shrink-0" />
+                <TickerAvatar
+                  symbol={asset.displayCode ?? ""}
+                  className="h-10 w-10 flex-shrink-0"
+                />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="truncate font-semibold">{asset.symbol}</p>
+                    <p className="truncate font-semibold">
+                      {asset.displayCode ?? asset.name ?? "Unknown"}
+                    </p>
                     <Badge variant="secondary" className="text-[10px] uppercase">
-                      {asset.currency}
+                      {asset.quoteCcy}
                     </Badge>
                   </div>
                   <p className="text-muted-foreground truncate text-sm">{asset.name ?? "-"}</p>
@@ -225,7 +230,7 @@ export function AssetsTableMobile({
                       <div className="flex items-center justify-end gap-1 font-semibold">
                         {formatAmount(
                           latestQuotes[asset.id].close,
-                          latestQuotes[asset.id].currency ?? asset.currency ?? baseCurrency,
+                          latestQuotes[asset.id].currency ?? asset.quoteCcy ?? baseCurrency,
                         )}
                         {isStaleQuote(latestQuotes[asset.id]) ? (
                           <Tooltip>
@@ -317,9 +322,9 @@ export function AssetsTableMobile({
                   )}
                 </div>
                 <div className="space-y-2">
-                  {pricingModeOptions.map((mode) => {
+                  {quoteModeOptions.map((mode) => {
                     const isSelected = selectedDataSources.includes(mode);
-                    const count = assets.filter((a) => a.pricingMode === mode).length;
+                    const count = assets.filter((a) => a.quoteMode === mode).length;
                     return (
                       <button
                         key={mode}

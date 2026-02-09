@@ -26,6 +26,7 @@ const TOP_INSTRUMENT_TYPES = [
   "ETP", // ETFs
   "FUND", // Funds
   "DEBT_SECURITY", // Bonds
+  "OTHER", // Other
 ];
 
 interface CategoryNode extends TaxonomyCategory {
@@ -217,7 +218,8 @@ export function SingleSelectTaxonomy({
         >
           {/* Quick toggle buttons for top categories */}
           {topCategories.map((category) => {
-            const isSelected = selectedCategoryId === category.id;
+            const isSelected =
+              selectedCategoryId === category.id || selectedCategory?.parentId === category.id;
             const displayName = getDisplayName(category.name);
 
             return (

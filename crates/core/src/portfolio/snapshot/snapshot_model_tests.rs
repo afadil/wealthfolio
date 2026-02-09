@@ -67,13 +67,15 @@ mod tests {
         use crate::portfolio::snapshot::AccountStateSnapshot;
         use chrono::{NaiveDate, Utc};
 
-        let mut snapshot = AccountStateSnapshot::default();
-        snapshot.id = "test-id".to_string();
-        snapshot.account_id = "account-1".to_string();
-        snapshot.snapshot_date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
-        snapshot.currency = "USD".to_string();
-        snapshot.source = SnapshotSource::ManualEntry;
-        snapshot.calculated_at = Utc::now().naive_utc();
+        let snapshot = AccountStateSnapshot {
+            id: "test-id".to_string(),
+            account_id: "account-1".to_string(),
+            snapshot_date: NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+            currency: "USD".to_string(),
+            source: SnapshotSource::ManualEntry,
+            calculated_at: Utc::now().naive_utc(),
+            ..Default::default()
+        };
 
         let json = serde_json::to_string(&snapshot).unwrap();
         assert!(json.contains("\"source\":\"MANUAL_ENTRY\""));
@@ -171,19 +173,23 @@ mod tests {
         use crate::portfolio::snapshot::AccountStateSnapshot;
         use chrono::{NaiveDate, Utc};
 
-        let mut snapshot1 = AccountStateSnapshot::default();
-        snapshot1.id = "snapshot-1".to_string();
-        snapshot1.account_id = "account-1".to_string();
-        snapshot1.snapshot_date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
-        snapshot1.source = SnapshotSource::BrokerImported;
-        snapshot1.calculated_at = Utc::now().naive_utc();
+        let snapshot1 = AccountStateSnapshot {
+            id: "snapshot-1".to_string(),
+            account_id: "account-1".to_string(),
+            snapshot_date: NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+            source: SnapshotSource::BrokerImported,
+            calculated_at: Utc::now().naive_utc(),
+            ..Default::default()
+        };
 
-        let mut snapshot2 = AccountStateSnapshot::default();
-        snapshot2.id = "snapshot-2".to_string(); // Different ID
-        snapshot2.account_id = "account-1".to_string();
-        snapshot2.snapshot_date = NaiveDate::from_ymd_opt(2024, 2, 20).unwrap(); // Different date
-        snapshot2.source = SnapshotSource::ManualEntry; // Different source
-        snapshot2.calculated_at = Utc::now().naive_utc();
+        let snapshot2 = AccountStateSnapshot {
+            id: "snapshot-2".to_string(), // Different ID
+            account_id: "account-1".to_string(),
+            snapshot_date: NaiveDate::from_ymd_opt(2024, 2, 20).unwrap(), // Different date
+            source: SnapshotSource::ManualEntry,                          // Different source
+            calculated_at: Utc::now().naive_utc(),
+            ..Default::default()
+        };
 
         // Should be equal because positions and cash_balances are the same (empty)
         assert!(snapshot1.is_content_equal(&snapshot2));

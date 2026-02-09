@@ -59,9 +59,11 @@ impl ContributionLimitService {
             });
         }
 
-        let activities = self
-            .activity_repository
-            .get_contribution_activities(account_ids, start_date, end_date)?;
+        let activities = self.activity_repository.get_contribution_activities(
+            account_ids,
+            start_date,
+            end_date,
+        )?;
 
         // Build set of limit account_ids for O(1) lookup
         let limit_accounts: HashSet<&str> = account_ids.iter().map(|s| s.as_str()).collect();

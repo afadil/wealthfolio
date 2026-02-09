@@ -96,7 +96,7 @@ export const collectibleDetailsSchema = baseSchema.extend({
 
 // Precious metal-specific schema
 export const preciousMetalDetailsSchema = baseSchema.extend({
-  kind: z.literal(AlternativeAssetKind.PHYSICAL_PRECIOUS),
+  kind: z.literal(AlternativeAssetKind.PRECIOUS_METAL),
   metalType: z.enum(["gold", "silver", "platinum", "palladium"]).optional().nullable(),
   quantity: z.coerce.number().positive("Quantity must be greater than 0").optional().nullable(),
   unit: z.enum(["oz", "g", "kg"]).optional().nullable(),
@@ -202,13 +202,13 @@ export function getDefaultDetailsFormValues(
         description: (metadata?.description as string) ?? null,
       };
 
-    case AlternativeAssetKind.PHYSICAL_PRECIOUS:
+    case AlternativeAssetKind.PRECIOUS_METAL:
       return {
         ...base,
         purchasePrice: metadata?.purchase_price_per_unit
           ? parseFloat(metadata.purchase_price_per_unit as string)
           : null,
-        kind: AlternativeAssetKind.PHYSICAL_PRECIOUS,
+        kind: AlternativeAssetKind.PRECIOUS_METAL,
         metalType: subType as PreciousMetalDetailsFormValues["metalType"],
         quantity: metadata?.quantity ? parseFloat(metadata.quantity as string) : null,
         unit: (metadata?.unit as PreciousMetalDetailsFormValues["unit"]) ?? null,
@@ -247,7 +247,7 @@ export function formValuesToMetadata(values: AssetDetailsFormValues): Record<str
   // Common fields
   if (values.purchasePrice != null) {
     // For precious metals, use purchase_price_per_unit
-    if (values.kind === AlternativeAssetKind.PHYSICAL_PRECIOUS) {
+    if (values.kind === AlternativeAssetKind.PRECIOUS_METAL) {
       metadata.purchase_price_per_unit = values.purchasePrice.toString();
     } else {
       metadata.purchase_price = values.purchasePrice.toString();
@@ -277,7 +277,7 @@ export function formValuesToMetadata(values: AssetDetailsFormValues): Record<str
       if (values.description) metadata.description = values.description;
       break;
 
-    case AlternativeAssetKind.PHYSICAL_PRECIOUS:
+    case AlternativeAssetKind.PRECIOUS_METAL:
       if (values.metalType) metadata.sub_type = values.metalType;
       if (values.quantity != null) metadata.quantity = values.quantity.toString();
       if (values.unit) metadata.unit = values.unit;

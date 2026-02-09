@@ -10,9 +10,9 @@ import {
   TableRow,
   Icons,
   EmptyPlaceholder,
-} from '@wealthfolio/ui';
-import { TickerAvatar } from './ticker-avatar';
-import type { OpenPosition } from '../types';
+} from "@wealthfolio/ui";
+import { TickerAvatar } from "./ticker-avatar";
+import type { OpenPosition } from "../types";
 
 interface OpenTradesTableProps {
   positions: OpenPosition[];
@@ -69,14 +69,14 @@ export function OpenTradesTable({ positions }: OpenTradesTableProps) {
                 </TableCell>
                 <TableCell className="text-right">{position.quantity.toLocaleString()}</TableCell>
                 <TableCell className="text-right">
-                  {position.averageCost.toLocaleString('en-US', {
-                    style: 'currency',
+                  {position.averageCost.toLocaleString("en-US", {
+                    style: "currency",
                     currency: position.currency,
                   })}
                 </TableCell>
                 <TableCell className="text-right">
-                  {position.currentPrice.toLocaleString('en-US', {
-                    style: 'currency',
+                  {position.currentPrice.toLocaleString("en-US", {
+                    style: "currency",
                     currency: position.currency,
                   })}
                 </TableCell>

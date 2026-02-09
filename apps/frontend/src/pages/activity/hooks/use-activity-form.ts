@@ -108,7 +108,7 @@ export function useActivityForm({
               activityType: ActivityType.TRANSFER_OUT,
               currency: fromAccount?.currency,
               sourceGroupId,
-              asset: assetId ? { symbol: assetId } : undefined,
+              symbol: assetId ? { symbol: assetId } : undefined,
             } as ActivityCreate;
 
             // Create TRANSFER_IN on destination account (fxRate applies if currencies differ)
@@ -118,7 +118,7 @@ export function useActivityForm({
               activityType: ActivityType.TRANSFER_IN,
               currency: toAccount?.currency,
               sourceGroupId,
-              asset: assetId ? { symbol: assetId } : undefined,
+              symbol: assetId ? { symbol: assetId } : undefined,
               fxRate,
             } as ActivityCreate;
 

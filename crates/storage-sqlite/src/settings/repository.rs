@@ -150,7 +150,7 @@ impl SettingsRepositoryTrait for SettingsRepository {
             Err(diesel::result::Error::NotFound) => {
                 // Return default values for known settings
                 let default_value = match setting_key_param {
-                    "theme" => "dark",
+                    "theme" => "light",
                     "font" => "font-mono",
                     "onboarding_completed" => "false",
                     "auto_update_check_enabled" => "true",
@@ -190,9 +190,9 @@ impl SettingsRepositoryTrait for SettingsRepository {
         let mut conn = get_connection(&self.pool)?;
 
         let currency_assets: Vec<String> = assets::table
-            .filter(assets::kind.eq(AssetKind::FxRate.as_db_str()))
-            .filter(assets::currency.ne(base_currency))
-            .select(assets::currency)
+            .filter(assets::kind.eq(AssetKind::Fx.as_db_str()))
+            .filter(assets::quote_ccy.ne(base_currency))
+            .select(assets::quote_ccy)
             .distinct()
             .load::<String>(&mut conn)
             .map_err(StorageError::from)?;

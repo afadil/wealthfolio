@@ -3,13 +3,20 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Broker account balance total (amount + currency)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct BrokerBalanceTotal {
+    /// Balance amount
+    pub amount: Option<f64>,
+    /// Currency code (e.g., "USD", "CAD")
+    pub currency: Option<String>,
+}
+
 /// Broker account balance information (new API format)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BrokerAccountBalance {
-    /// Currency code (e.g., "USD", "CAD")
-    pub currency: Option<String>,
-    /// Cash balance amount
-    pub cash: Option<f64>,
+    /// Total balance with currency
+    pub total: Option<BrokerBalanceTotal>,
 }
 
 /// Account owner information from the API
@@ -217,7 +224,7 @@ pub struct PaginationDetails {
     pub total: Option<i64>,
     /// Whether there are more results available (new API)
     #[serde(default)]
-    pub has_more: bool,
+    pub has_more: Option<bool>,
 }
 
 /// A paginated list of universal activity objects.
@@ -280,8 +287,13 @@ pub struct AccountUniversalActivitySymbolType {
 pub struct AccountUniversalActivityUnderlyingSymbol {
     pub id: Option<String>,
     pub symbol: Option<String>,
+    pub raw_symbol: Option<String>,
     pub description: Option<String>,
     pub currency: Option<AccountUniversalActivityCurrency>,
+    pub exchange: Option<AccountUniversalActivityExchange>,
+    #[serde(rename = "type")]
+    pub symbol_type: Option<AccountUniversalActivitySymbolType>,
+    pub figi_code: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -589,11 +601,16 @@ impl BrokerAccount {
                 return currency.clone();
             }
         }
-        // Fall back to balance currency
+        // Fall back to balance.total.currency
         self.balance
             .as_ref()
-            .and_then(|b| b.currency.clone())
-            .or_else(|| base_currency.filter(|c| !c.is_empty()).map(|c| c.to_string()))
+            .and_then(|b| b.total.as_ref())
+            .and_then(|t| t.currency.clone())
+            .or_else(|| {
+                base_currency
+                    .filter(|c| !c.is_empty())
+                    .map(|c| c.to_string())
+            })
             .unwrap_or_else(|| "USD".to_string())
     }
 

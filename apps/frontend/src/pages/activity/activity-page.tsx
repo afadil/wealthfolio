@@ -23,7 +23,7 @@ import { MobileActivityForm } from "./components/mobile-forms/mobile-activity-fo
 import { useActivityMutations } from "./hooks/use-activity-mutations";
 import { useActivitySearch, type ActivityStatusFilter } from "./hooks/use-activity-search";
 import { SyncButton } from "@/features/wealthfolio-connect/components/sync-button";
-import { AlternativeAssetQuickAddModal } from "@/features/alternative-assets";
+import { AlternativeAssetQuickAddModal } from "@/pages/asset/alternative-assets";
 import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
 
 const ActivityPage = () => {
@@ -182,7 +182,7 @@ const ActivityPage = () => {
           },
           {
             icon: Icons.House,
-            label: "Add Alternative Asset",
+            label: "Add Personal Asset",
             onClick: () => setShowAlternativeAssetModal(true),
           },
         ],

@@ -107,7 +107,7 @@ fn period_to_start_date(period: &str, end_date: NaiveDate) -> Option<NaiveDate> 
         "6M" => Some(end_date - chrono::Duration::days(180)),
         "YTD" => NaiveDate::from_ymd_opt(end_date.year(), 1, 1),
         "1Y" => Some(end_date - chrono::Duration::days(365)),
-        "ALL" | _ => None, // None means no start date filter
+        _ => None, // None means no start date filter
     }
 }
 

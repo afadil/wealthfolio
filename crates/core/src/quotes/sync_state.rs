@@ -18,8 +18,7 @@ use crate::errors::Result;
 ///
 /// This is a per-request parameter, NOT a persisted setting. Each sync call
 /// can specify a different mode based on the caller's needs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SyncMode {
     /// Continue from last_quote_date with overlap, fill gaps to activity_min_date.
     /// This is the default mode for regular sync operations.
@@ -127,7 +126,6 @@ impl MarketSyncMode {
         }
     }
 }
-
 
 impl std::fmt::Display for SyncMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -873,7 +871,10 @@ mod tests {
         );
 
         let window = calculate_sync_window(&category, &inputs, today);
-        assert!(window.is_some(), "Should return valid window even for 0-day gap");
+        assert!(
+            window.is_some(),
+            "Should return valid window even for 0-day gap"
+        );
 
         let (start, end) = window.unwrap();
         let window_size = (end - start).num_days();

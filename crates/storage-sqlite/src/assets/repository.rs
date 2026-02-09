@@ -7,7 +7,7 @@ use std::sync::Arc;
 use wealthfolio_core::assets::{Asset, AssetRepositoryTrait, NewAsset, UpdateAssetProfile};
 use wealthfolio_core::{Error, Result};
 
-use super::model::AssetDB;
+use super::model::{AssetDB, InsertableAssetDB};
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
 use crate::schema::{activities, assets, quotes};
@@ -75,25 +75,28 @@ impl AssetRepository {
         Ok(all_results)
     }
 
-    /// Search for assets by symbol (case-insensitive partial match).
+    /// Search for assets by display_code or name (case-insensitive partial match).
     pub fn search_by_symbol_impl(&self, query: &str) -> Result<Vec<Asset>> {
         let mut conn = get_connection(&self.pool)?;
 
-        // Use LIKE for case-insensitive partial matching
         let pattern = format!("%{}%", query.to_uppercase());
 
         let results = assets::table
             .select(AssetDB::as_select())
             .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
-                "UPPER(symbol) LIKE '{}'",
+                "UPPER(display_code) LIKE '{}'",
+                pattern.replace('\'', "''")
+            )))
+            .or_filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
+                "UPPER(instrument_symbol) LIKE '{}'",
                 pattern.replace('\'', "''")
             )))
             .or_filter(diesel::dsl::sql::<diesel::sql_types::Bool>(&format!(
                 "UPPER(name) LIKE '{}'",
                 pattern.replace('\'', "''")
             )))
-            .order(assets::symbol.asc())
-            .limit(50) // Limit results to avoid huge result sets
+            .order(assets::display_code.asc())
+            .limit(50)
             .load::<AssetDB>(&mut conn)
             .map_err(StorageError::from)?;
 
@@ -106,7 +109,7 @@ impl AssetRepositoryTrait for AssetRepository {
     /// Creates a new asset in the database
     async fn create(&self, new_asset: NewAsset) -> Result<Asset> {
         new_asset.validate()?;
-        let asset_db: AssetDB = new_asset.into();
+        let asset_db: InsertableAssetDB = new_asset.into();
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<Asset> {
@@ -126,7 +129,7 @@ impl AssetRepositoryTrait for AssetRepository {
         for asset in &new_assets {
             asset.validate()?;
         }
-        let assets_db: Vec<AssetDB> = new_assets.into_iter().map(|a| a.into()).collect();
+        let assets_db: Vec<InsertableAssetDB> = new_assets.into_iter().map(|a| a.into()).collect();
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<Vec<Asset>> {
@@ -141,7 +144,7 @@ impl AssetRepositoryTrait for AssetRepository {
                 }
 
                 // Re-read all to return the full set
-                let ids: Vec<String> = assets_db.into_iter().map(|a| a.id).collect();
+                let ids: Vec<String> = assets_db.into_iter().filter_map(|a| a.id).collect();
                 let results = assets::table
                     .filter(assets::id.eq_any(&ids))
                     .load::<AssetDB>(conn)
@@ -159,7 +162,7 @@ impl AssetRepositoryTrait for AssetRepository {
 
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<Asset> {
-                // First, get the existing asset to preserve its metadata if not provided
+                // First, get the existing asset to preserve fields if not provided
                 let existing: AssetDB = assets::table
                     .filter(assets::id.eq(&asset_id_owned))
                     .first(conn)
@@ -179,40 +182,54 @@ impl AssetRepositoryTrait for AssetRepository {
                     .as_ref()
                     .map(|k| k.as_db_str().to_string());
 
-                // Serialize pricing_mode to string if present
-                let pricing_mode_str = payload_owned.pricing_mode.as_ref().map(|pm| {
-                    serde_json::to_string(pm)
-                        .unwrap_or_default()
-                        .trim_matches('"')
-                        .to_string()
-                });
-
-                // Serialize provider_overrides to JSON string if present
-                let provider_overrides_str = payload_owned
-                    .provider_overrides
+                // Serialize quote_mode to string if present
+                let quote_mode_str = payload_owned
+                    .quote_mode
                     .as_ref()
-                    .map(|po| serde_json::to_string(po).unwrap_or_default());
+                    .map(|qm| qm.as_db_str().to_string());
 
-                // Determine exchange_mic - use payload if present, otherwise keep existing
-                let exchange_mic_value = if payload_owned.exchange_mic.is_some() {
-                    payload_owned.exchange_mic.clone()
+                // Serialize provider_config to JSON string if present
+                let provider_config_str = payload_owned
+                    .provider_config
+                    .as_ref()
+                    .map(|pc| serde_json::to_string(pc).unwrap_or_default());
+
+                // Instrument fields - use payload if present, otherwise keep existing
+                let instrument_type_value = payload_owned
+                    .instrument_type
+                    .as_ref()
+                    .map(|t| Some(t.as_db_str().to_string()))
+                    .unwrap_or_else(|| existing.instrument_type.clone());
+
+                let instrument_symbol_value = if payload_owned.instrument_symbol.is_some() {
+                    payload_owned.instrument_symbol.clone()
                 } else {
-                    existing.exchange_mic.clone()
+                    existing.instrument_symbol.clone()
                 };
 
-                // Build the update query - only include kind if it's provided
+                let instrument_exchange_mic_value =
+                    if payload_owned.instrument_exchange_mic.is_some() {
+                        payload_owned.instrument_exchange_mic.clone()
+                    } else {
+                        existing.instrument_exchange_mic.clone()
+                    };
+
+                // Build the update query
                 let result_db = if let Some(kind_value) = kind_str {
                     diesel::update(assets::table.filter(assets::id.eq(&asset_id_owned)))
                         .set((
                             assets::name.eq(&payload_owned.name),
                             assets::kind.eq(kind_value),
-                            assets::exchange_mic.eq(&exchange_mic_value),
+                            assets::display_code.eq(&payload_owned.display_code),
                             assets::notes.eq(&payload_owned.notes),
                             assets::metadata.eq(&metadata_json),
-                            assets::pricing_mode.eq(pricing_mode_str
+                            assets::quote_mode.eq(quote_mode_str
                                 .clone()
                                 .unwrap_or_else(|| "MARKET".to_string())),
-                            assets::provider_overrides.eq(&provider_overrides_str),
+                            assets::instrument_type.eq(&instrument_type_value),
+                            assets::instrument_symbol.eq(&instrument_symbol_value),
+                            assets::instrument_exchange_mic.eq(&instrument_exchange_mic_value),
+                            assets::provider_config.eq(&provider_config_str),
                         ))
                         .get_result::<AssetDB>(conn)
                         .map_err(StorageError::from)?
@@ -220,12 +237,15 @@ impl AssetRepositoryTrait for AssetRepository {
                     diesel::update(assets::table.filter(assets::id.eq(&asset_id_owned)))
                         .set((
                             assets::name.eq(&payload_owned.name),
-                            assets::exchange_mic.eq(&exchange_mic_value),
+                            assets::display_code.eq(&payload_owned.display_code),
                             assets::notes.eq(&payload_owned.notes),
                             assets::metadata.eq(&metadata_json),
-                            assets::pricing_mode
-                                .eq(pricing_mode_str.unwrap_or_else(|| "MARKET".to_string())),
-                            assets::provider_overrides.eq(&provider_overrides_str),
+                            assets::quote_mode
+                                .eq(quote_mode_str.unwrap_or_else(|| "MARKET".to_string())),
+                            assets::instrument_type.eq(&instrument_type_value),
+                            assets::instrument_symbol.eq(&instrument_symbol_value),
+                            assets::instrument_exchange_mic.eq(&instrument_exchange_mic_value),
+                            assets::provider_config.eq(&provider_config_str),
                         ))
                         .get_result::<AssetDB>(conn)
                         .map_err(StorageError::from)?
@@ -235,14 +255,14 @@ impl AssetRepositoryTrait for AssetRepository {
             .await
     }
 
-    /// Updates the pricing mode of an asset (MARKET, MANUAL, DERIVED, NONE)
-    async fn update_pricing_mode(&self, asset_id: &str, pricing_mode: &str) -> Result<Asset> {
+    /// Updates the quote mode of an asset (MARKET, MANUAL)
+    async fn update_quote_mode(&self, asset_id: &str, quote_mode: &str) -> Result<Asset> {
         let asset_id_owned = asset_id.to_string();
-        let pricing_mode_owned = pricing_mode.to_string();
+        let quote_mode_owned = quote_mode.to_string();
         self.writer
             .exec(move |conn: &mut SqliteConnection| -> Result<Asset> {
                 let result_db = diesel::update(assets::table.filter(assets::id.eq(asset_id_owned)))
-                    .set(assets::pricing_mode.eq(pricing_mode_owned))
+                    .set(assets::quote_mode.eq(quote_mode_owned))
                     .get_result::<AssetDB>(conn)
                     .map_err(StorageError::from)?;
                 Ok(result_db.into())
@@ -301,6 +321,20 @@ impl AssetRepositoryTrait for AssetRepository {
         self.search_by_symbol_impl(query)
     }
 
+    /// Find an asset by its instrument_key
+    fn find_by_instrument_key(&self, instrument_key: &str) -> Result<Option<Asset>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let result = assets::table
+            .select(AssetDB::as_select())
+            .filter(assets::instrument_key.eq(instrument_key))
+            .first::<AssetDB>(&mut conn)
+            .optional()
+            .map_err(StorageError::from)?;
+
+        Ok(result.map(Asset::from))
+    }
+
     async fn cleanup_legacy_metadata(&self, asset_id: &str) -> Result<()> {
         let asset_id_owned = asset_id.to_string();
         self.writer
@@ -317,7 +351,8 @@ impl AssetRepositoryTrait for AssetRepository {
                         .ok()
                         .and_then(|meta| {
                             let identifiers = meta.get("identifiers").cloned();
-                            identifiers.map(|ids| serde_json::json!({ "identifiers": ids }).to_string())
+                            identifiers
+                                .map(|ids| serde_json::json!({ "identifiers": ids }).to_string())
                         })
                 });
 
@@ -338,6 +373,19 @@ impl AssetRepositoryTrait for AssetRepository {
             .exec(move |conn: &mut SqliteConnection| -> Result<()> {
                 diesel::update(assets::table.filter(assets::id.eq(&asset_id_owned)))
                     .set(assets::is_active.eq(0))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                Ok(())
+            })
+            .await
+    }
+
+    async fn reactivate(&self, asset_id: &str) -> Result<()> {
+        let asset_id_owned = asset_id.to_string();
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                diesel::update(assets::table.filter(assets::id.eq(&asset_id_owned)))
+                    .set(assets::is_active.eq(1))
                     .execute(conn)
                     .map_err(StorageError::from)?;
                 Ok(())
@@ -368,6 +416,34 @@ impl AssetRepositoryTrait for AssetRepository {
                 }
 
                 Ok(())
+            })
+            .await
+    }
+
+    async fn deactivate_orphaned_investments(&self) -> Result<Vec<String>> {
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<Vec<String>> {
+                // Find active INVESTMENT assets with zero activities
+                let orphan_ids: Vec<String> = assets::table
+                    .select(assets::id)
+                    .filter(assets::kind.eq("INVESTMENT"))
+                    .filter(assets::is_active.eq(1))
+                    .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
+                        "id NOT IN (SELECT DISTINCT asset_id FROM activities WHERE asset_id IS NOT NULL)",
+                    ))
+                    .load::<String>(conn)
+                    .map_err(StorageError::from)?;
+
+                if !orphan_ids.is_empty() {
+                    diesel::update(
+                        assets::table.filter(assets::id.eq_any(&orphan_ids)),
+                    )
+                    .set(assets::is_active.eq(0))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                }
+
+                Ok(orphan_ids)
             })
             .await
     }

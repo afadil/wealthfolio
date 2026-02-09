@@ -14,7 +14,7 @@ mod tests {
         Sort as ActivitySort,
     };
     use crate::assets::{
-        Asset, AssetKind, AssetRepositoryTrait, NewAsset, PricingMode, UpdateAssetProfile,
+        Asset, AssetKind, AssetRepositoryTrait, NewAsset, QuoteMode, UpdateAssetProfile,
     };
     use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
     use crate::errors::{Error, Result as AppResult};
@@ -161,20 +161,14 @@ mod tests {
                 "AAPL".to_string(),
                 Asset {
                     id: "AAPL".to_string(),
-                    kind: AssetKind::Security,
+                    kind: AssetKind::Investment,
                     name: Some("Apple Inc.".to_string()),
-                    symbol: "AAPL".to_string(),
-                    exchange_mic: None,
-                    exchange_name: None,
-                    currency: "USD".to_string(), // USD listing
-                    pricing_mode: PricingMode::Market,
-                    preferred_provider: None,
-                    provider_overrides: None,
-                    notes: None,
-                    metadata: None,
-                    is_active: true,
+                    display_code: Some("AAPL".to_string()),
+                    quote_ccy: "USD".to_string(), // USD listing
+                    quote_mode: QuoteMode::Market,
                     created_at: chrono::Utc::now().naive_utc(),
                     updated_at: chrono::Utc::now().naive_utc(),
+                    ..Default::default()
                 },
             );
 
@@ -182,20 +176,14 @@ mod tests {
                 "SHOP".to_string(),
                 Asset {
                     id: "SHOP".to_string(),
-                    kind: AssetKind::Security,
+                    kind: AssetKind::Investment,
                     name: Some("Shopify Inc.".to_string()),
-                    symbol: "SHOP".to_string(),
-                    exchange_mic: None,
-                    exchange_name: None,
-                    currency: "CAD".to_string(), // CAD listing
-                    pricing_mode: PricingMode::Market,
-                    preferred_provider: None,
-                    provider_overrides: None,
-                    notes: None,
-                    metadata: None,
-                    is_active: true,
+                    display_code: Some("SHOP".to_string()),
+                    quote_ccy: "CAD".to_string(), // CAD listing
+                    quote_mode: QuoteMode::Market,
                     created_at: chrono::Utc::now().naive_utc(),
                     updated_at: chrono::Utc::now().naive_utc(),
+                    ..Default::default()
                 },
             );
 
@@ -221,12 +209,12 @@ mod tests {
             unimplemented!("update_profile not implemented for MockAssetRepository")
         }
 
-        async fn update_pricing_mode(
-            &self,
-            _asset_id: &str,
-            _pricing_mode: &str,
-        ) -> AppResult<Asset> {
-            unimplemented!("update_pricing_mode not implemented for MockAssetRepository")
+        async fn update_quote_mode(&self, _asset_id: &str, _quote_mode: &str) -> AppResult<Asset> {
+            unimplemented!("update_quote_mode not implemented for MockAssetRepository")
+        }
+
+        fn find_by_instrument_key(&self, _instrument_key: &str) -> AppResult<Option<Asset>> {
+            Ok(None)
         }
 
         async fn delete(&self, _asset_id: &str) -> AppResult<()> {
@@ -265,8 +253,16 @@ mod tests {
             Ok(())
         }
 
+        async fn reactivate(&self, _asset_id: &str) -> AppResult<()> {
+            Ok(())
+        }
+
         async fn copy_user_metadata(&self, _source_id: &str, _target_id: &str) -> AppResult<()> {
             Ok(())
+        }
+
+        async fn deactivate_orphaned_investments(&self) -> AppResult<Vec<String>> {
+            Ok(vec![])
         }
     }
 
@@ -930,6 +926,7 @@ mod tests {
     }
 
     /// Helper to create test activities with the new Activity model
+    #[allow(clippy::too_many_arguments)]
     fn create_test_activity(
         id: &str,
         account_id: &str,
@@ -2711,12 +2708,12 @@ mod tests {
         assert_eq!(dates[5], d2);
 
         // Gap days (Jan 11-14) should carry forward d1's value
-        for i in 1..5 {
+        for (i, snapshot) in daily[1..5].iter().enumerate() {
             assert_eq!(
-                daily[i].cash_balances.get("USD"),
+                snapshot.cash_balances.get("USD"),
                 Some(&dec!(5000)),
                 "Day {} should carry forward",
-                i
+                i + 1
             );
         }
 
@@ -4214,8 +4211,13 @@ mod tests {
 
         // Account is closed (is_active=false) but NOT archived (is_archived=false)
         let mut account_repo = MockAccountRepository::new();
-        let closed_account =
-            create_test_account_with_archive_state("closed_acc", "USD", "Closed Account", false, false);
+        let closed_account = create_test_account_with_archive_state(
+            "closed_acc",
+            "USD",
+            "Closed Account",
+            false,
+            false,
+        );
         account_repo.add_account(closed_account.clone());
 
         // Create snapshot for the closed account
@@ -4225,7 +4227,8 @@ mod tests {
         snapshot.net_contribution_base = dec!(5000);
 
         // Non-archived account IDs include the closed account
-        let non_archived_ids: HashSet<String> = vec!["closed_acc".to_string()].into_iter().collect();
+        let non_archived_ids: HashSet<String> =
+            vec!["closed_acc".to_string()].into_iter().collect();
         let mock_snapshot_repo = MockArchiveAwareSnapshotRepository::new(non_archived_ids);
         mock_snapshot_repo.add_snapshots(vec![snapshot]);
 
@@ -4273,13 +4276,20 @@ mod tests {
 
         // Account is archived (is_archived=true)
         let mut account_repo = MockAccountRepository::new();
-        let archived_account =
-            create_test_account_with_archive_state("archived_acc", "USD", "Archived Account", true, true);
+        let archived_account = create_test_account_with_archive_state(
+            "archived_acc",
+            "USD",
+            "Archived Account",
+            true,
+            true,
+        );
         account_repo.add_account(archived_account.clone());
 
         // Create snapshot for the archived account
         let mut snapshot = create_blank_snapshot(&archived_account.id, "USD", date_str);
-        snapshot.cash_balances.insert("USD".to_string(), dec!(10000));
+        snapshot
+            .cash_balances
+            .insert("USD".to_string(), dec!(10000));
         snapshot.net_contribution = dec!(10000);
         snapshot.net_contribution_base = dec!(10000);
 
@@ -4328,8 +4338,10 @@ mod tests {
 
         let acc_a = create_test_account_with_archive_state("acc_a", "USD", "Active", true, false);
         let acc_b = create_test_account_with_archive_state("acc_b", "USD", "Closed", false, false);
-        let acc_c = create_test_account_with_archive_state("acc_c", "USD", "Active Archived", true, true);
-        let acc_d = create_test_account_with_archive_state("acc_d", "USD", "Closed Archived", false, true);
+        let acc_c =
+            create_test_account_with_archive_state("acc_c", "USD", "Active Archived", true, true);
+        let acc_d =
+            create_test_account_with_archive_state("acc_d", "USD", "Closed Archived", false, true);
 
         account_repo.add_account(acc_a.clone());
         account_repo.add_account(acc_b.clone());
@@ -4358,8 +4370,9 @@ mod tests {
         snap_d.net_contribution_base = dec!(4000);
 
         // Non-archived accounts: A and B (C and D are archived)
-        let non_archived_ids: HashSet<String> =
-            vec!["acc_a".to_string(), "acc_b".to_string()].into_iter().collect();
+        let non_archived_ids: HashSet<String> = vec!["acc_a".to_string(), "acc_b".to_string()]
+            .into_iter()
+            .collect();
         let mock_snapshot_repo = MockArchiveAwareSnapshotRepository::new(non_archived_ids);
         mock_snapshot_repo.add_snapshots(vec![snap_a, snap_b, snap_c, snap_d]);
 
@@ -4472,12 +4485,15 @@ mod tests {
 
         // Create snapshot
         let mut snapshot = create_blank_snapshot("test_acc", "USD", date_str);
-        snapshot.cash_balances.insert("USD".to_string(), dec!(10000));
+        snapshot
+            .cash_balances
+            .insert("USD".to_string(), dec!(10000));
         snapshot.net_contribution = dec!(10000);
         snapshot.net_contribution_base = dec!(10000);
 
         // Initially non-archived
-        let mut non_archived_ids: HashSet<String> = vec!["test_acc".to_string()].into_iter().collect();
+        let mut non_archived_ids: HashSet<String> =
+            vec!["test_acc".to_string()].into_iter().collect();
         let mock_snapshot_repo = MockArchiveAwareSnapshotRepository::new(non_archived_ids.clone());
         mock_snapshot_repo.add_snapshots(vec![snapshot.clone()]);
 
@@ -4499,7 +4515,11 @@ mod tests {
         assert!(result.is_ok());
 
         let saved = mock_snapshot_repo.get_saved_snapshots();
-        assert_eq!(saved.len(), 1, "Should have TOTAL snapshot when not archived");
+        assert_eq!(
+            saved.len(),
+            1,
+            "Should have TOTAL snapshot when not archived"
+        );
         assert_eq!(
             saved[0].cash_balances.get("USD"),
             Some(&dec!(10000)),
@@ -4529,7 +4549,11 @@ mod tests {
         assert!(result.is_ok());
 
         let saved = mock_snapshot_repo.get_saved_snapshots();
-        assert_eq!(saved.len(), 1, "Should have TOTAL snapshot after unarchiving");
+        assert_eq!(
+            saved.len(),
+            1,
+            "Should have TOTAL snapshot after unarchiving"
+        );
         assert_eq!(
             saved[0].cash_balances.get("USD"),
             Some(&dec!(10000)),
@@ -4547,8 +4571,13 @@ mod tests {
         let target_date2 = NaiveDate::parse_from_str(date2_str, "%Y-%m-%d").unwrap();
 
         let mut account_repo = MockAccountRepository::new();
-        let account =
-            create_test_account_with_archive_state("zero_bal_acc", "USD", "Zero Balance", true, false);
+        let account = create_test_account_with_archive_state(
+            "zero_bal_acc",
+            "USD",
+            "Zero Balance",
+            true,
+            false,
+        );
         account_repo.add_account(account.clone());
 
         // Historical snapshot with value
@@ -4563,7 +4592,8 @@ mod tests {
         snap2.net_contribution = dec!(0);
         snap2.net_contribution_base = dec!(0);
 
-        let non_archived_ids: HashSet<String> = vec!["zero_bal_acc".to_string()].into_iter().collect();
+        let non_archived_ids: HashSet<String> =
+            vec!["zero_bal_acc".to_string()].into_iter().collect();
         let mock_snapshot_repo = MockArchiveAwareSnapshotRepository::new(non_archived_ids);
         mock_snapshot_repo.add_snapshots(vec![snap1, snap2]);
 
@@ -4584,7 +4614,11 @@ mod tests {
         assert!(result.is_ok());
 
         let saved = mock_snapshot_repo.get_saved_snapshots();
-        assert_eq!(saved.len(), 2, "Should have 2 TOTAL snapshots for both dates");
+        assert_eq!(
+            saved.len(),
+            2,
+            "Should have 2 TOTAL snapshots for both dates"
+        );
 
         // Both historical and current snapshots should be included
         let mut sorted = saved.clone();
@@ -4609,10 +4643,19 @@ mod tests {
     async fn test_newly_created_account_has_default_archive_values() {
         // Verify that newly created accounts have is_archived=false by default
         let account = Account::default();
-        assert!(!account.is_archived, "New accounts should not be archived by default");
+        assert!(
+            !account.is_archived,
+            "New accounts should not be archived by default"
+        );
 
         let account = create_test_account("new_acc", "USD", "New Account");
-        assert!(!account.is_archived, "Test helper should create non-archived accounts");
-        assert!(account.is_active, "Test helper should create active accounts");
+        assert!(
+            !account.is_archived,
+            "Test helper should create non-archived accounts"
+        );
+        assert!(
+            account.is_active,
+            "Test helper should create active accounts"
+        );
     }
 }

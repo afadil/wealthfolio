@@ -7,7 +7,7 @@ import {
   ACTIVITY_TYPE_DISPLAY_NAMES,
   AssetKind,
   HoldingType,
-  PricingMode,
+  QuoteMode,
   SUBTYPE_DISPLAY_NAMES,
 } from "./constants";
 
@@ -33,6 +33,7 @@ export {
   HoldingType,
   ImportFormat,
   PricingMode,
+  QuoteMode,
   SUBTYPE_DISPLAY_NAMES,
 } from "./constants";
 
@@ -78,7 +79,7 @@ export interface ActivityLegacy {
   createdAt: Date | string;
   symbolProfileId: string;
   updatedAt: Date | string;
-  pricingMode?: PricingMode;
+  quoteMode?: QuoteMode;
 }
 
 /**
@@ -178,7 +179,7 @@ export interface ActivityDetails {
   accountCurrency: string;
   assetSymbol: string;
   assetName?: string;
-  assetPricingMode?: PricingMode;
+  assetQuoteMode?: QuoteMode;
   /** Canonical exchange MIC code for asset identification */
   exchangeMic?: string;
   // Sync/source metadata
@@ -208,16 +209,16 @@ export interface ActivitySearchResponse {
  * IMPORTANT: assetId is NOT allowed for creates - backend generates canonical IDs
  */
 /**
- * Asset input for creating/updating activities.
- * Groups all asset-related fields into a single nested object.
+ * Symbol input for creating/updating activities.
+ * Groups all symbol-related fields into a single nested object.
  */
-export interface AssetInput {
+export interface SymbolInput {
   id?: string; // Only for updates (backend generates ID for creates)
   symbol?: string; // e.g., "AAPL" or undefined for cash
   exchangeMic?: string; // e.g., "XNAS" or undefined
-  kind?: string; // e.g., "Security", "Crypto" - helps backend determine ID format
+  kind?: string; // e.g., "INVESTMENT", "OTHER" - asset kind
   name?: string; // Asset name (for custom assets)
-  pricingMode?: PricingMode;
+  quoteMode?: QuoteMode;
 }
 
 export interface ActivityCreate {
@@ -228,13 +229,7 @@ export interface ActivityCreate {
   activityDate: string | Date;
   /** Optional grouping key (links paired transfer legs). */
   sourceGroupId?: string;
-  // Nested asset input (preferred)
-  asset?: AssetInput;
-  // Legacy flat fields (deprecated - use asset object instead)
-  symbol?: string;
-  exchangeMic?: string;
-  assetKind?: string;
-  pricingMode?: PricingMode;
+  symbol?: SymbolInput;
   quantity?: string | number | null;
   unitPrice?: string | number | null;
   amount?: string | number | null;
@@ -247,10 +242,6 @@ export interface ActivityCreate {
 
 /**
  * Payload for updating an EXISTING activity.
- *
- * Asset identification:
- * - Use nested asset object (preferred)
- * - Or use legacy flat fields (assetId, symbol, exchangeMic)
  */
 export interface ActivityUpdate {
   id: string;
@@ -260,14 +251,7 @@ export interface ActivityUpdate {
   activityDate: string | Date;
   /** Optional grouping key (links paired transfer legs). */
   sourceGroupId?: string;
-  // Nested asset input (preferred)
-  asset?: AssetInput;
-  // Legacy flat fields (deprecated - use asset object instead)
-  assetId?: string;
-  symbol?: string;
-  exchangeMic?: string;
-  assetKind?: string;
-  pricingMode?: PricingMode;
+  symbol?: SymbolInput;
   quantity?: string | number | null;
   unitPrice?: string | number | null;
   amount?: string | number | null;
@@ -372,6 +356,13 @@ export interface SymbolSearchResult {
   existingAssetId?: string;
 }
 
+export interface ExchangeInfo {
+  mic: string;
+  name: string;
+  longName: string;
+  currency: string;
+}
+
 export interface MarketDataProviderInfo {
   id: string;
   name: string;
@@ -427,6 +418,8 @@ export interface ImportActivitiesSummary {
   imported: number;
   /** Number of activities skipped (invalid or errors) */
   skipped: number;
+  /** Number of duplicate activities detected and skipped */
+  duplicates: number;
   /** Number of new assets created during import */
   assetsCreated: number;
   /** Whether the import was successful (no validation errors) */
@@ -443,7 +436,7 @@ export interface Instrument {
   name?: string | null;
   currency: string;
   notes?: string | null;
-  pricingMode: PricingMode;
+  quoteMode: QuoteMode;
   preferredProvider?: string | null;
 
   // Taxonomy-based classifications
@@ -550,30 +543,34 @@ export interface AllocationHoldings {
  */
 export interface Asset {
   id: string;
-  symbol: string; // Canonical ticker (no provider suffix)
-  name?: string | null;
 
-  // Behavior classification (NOT NULL in backend)
+  // Core identity
   kind: AssetKind;
-
-  // Market identity
-  exchangeMic?: string | null; // ISO 10383 MIC code
-  exchangeName?: string | null; // Friendly exchange name (e.g., "NASDAQ")
-  currency: string;
-
-  // Pricing configuration
-  pricingMode: "MARKET" | "MANUAL" | "DERIVED" | "NONE";
-  preferredProvider?: string | null; // Provider hint (YAHOO, ALPHA_VANTAGE)
-  providerOverrides?: Record<string, unknown> | null; // Per-provider params
-
-  // Metadata
+  name?: string | null;
+  displayCode?: string | null; // User-visible ticker/label
   notes?: string | null;
+  metadata?: Record<string, unknown>;
 
   // Status
   isActive?: boolean;
 
-  // Extensions - JSON metadata with $.identifiers.isin (optional)
-  metadata?: Record<string, unknown>;
+  // Valuation
+  quoteMode: "MARKET" | "MANUAL";
+  quoteCcy: string; // Currency prices/valuations are quoted in
+
+  // Instrument identity (null for non-market assets)
+  instrumentType?: string | null; // EQUITY, CRYPTO, FX, OPTION, METAL
+  instrumentSymbol?: string | null; // Canonical symbol (AAPL, BTC, EUR)
+  instrumentExchangeMic?: string | null; // ISO 10383 MIC (XNAS, XTSE)
+
+  // Computed canonical key (read-only from DB)
+  instrumentKey?: string | null;
+
+  // Provider configuration (single JSON blob)
+  providerConfig?: Record<string, unknown> | null;
+
+  // Derived
+  exchangeName?: string | null; // Friendly exchange name (e.g., "NASDAQ")
 
   // Audit
   createdAt: string; // ISO date string
@@ -804,14 +801,13 @@ export interface PerformanceMetrics {
 }
 
 export interface UpdateAssetProfile {
-  id: string; // Asset ID (e.g., "SEC:AAPL:XNAS")
-  symbol: string;
+  id: string;
+  displayCode?: string | null;
   name?: string | null;
-  notes: string;
+  notes?: string | null;
   kind?: AssetKind | null;
-  exchangeMic?: string | null;
-  pricingMode?: "MARKET" | "MANUAL" | "DERIVED" | "NONE" | null;
-  providerOverrides?: Record<string, unknown> | null;
+  quoteMode?: QuoteMode | null;
+  providerConfig?: Record<string, unknown> | null;
 }
 
 // Rename ComparisonItem to TrackedItem

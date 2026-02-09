@@ -158,12 +158,13 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
             .filter_map(|a| a.id.clone())
             .collect();
 
-        let accounts: Vec<_> = all_accounts.into_iter().collect();
+        // Only create/update local accounts for sync-enabled broker accounts
+        let accounts: Vec<_> = all_accounts
+            .into_iter()
+            .filter(|a| a.sync_enabled)
+            .collect();
 
-        info!(
-            "Syncing {} broker accounts (including sync_disabled)",
-            accounts.len()
-        );
+        info!("Syncing {} sync-enabled broker accounts", accounts.len());
 
         let accounts_result = self
             .sync_service
@@ -187,14 +188,20 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
             .sync_account_data(api_client, &sync_enabled_broker_ids, &new_accounts_info)
             .await?;
 
-        // Build the accounts_needing_setup list - includes ALL accounts with trackingMode=NOT_SET
+        // Build the accounts_needing_setup list - sync-enabled accounts with trackingMode=NOT_SET
         // This ensures the "review" toast appears on every sync until user configures all accounts
         let accounts_needing_setup: Vec<NewAccountInfo> = self
             .sync_service
             .get_synced_accounts()
             .map_err(|e| format!("Failed to get synced accounts: {}", e))?
             .into_iter()
-            .filter(|acc| acc.tracking_mode == TrackingMode::NotSet)
+            .filter(|acc| {
+                acc.tracking_mode == TrackingMode::NotSet
+                    && acc
+                        .provider_account_id
+                        .as_ref()
+                        .is_some_and(|id| sync_enabled_broker_ids.contains(id))
+            })
             .map(|acc| NewAccountInfo {
                 local_account_id: acc.id.clone(),
                 provider_account_id: acc.provider_account_id.unwrap_or_default(),
@@ -573,6 +580,7 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
     /// Sync activities for a single account with full pagination.
     ///
     /// Returns (fetched, inserted, assets_created, needs_review, new_asset_ids).
+    #[allow(clippy::too_many_arguments)]
     async fn sync_account_activities(
         &self,
         api_client: &dyn BrokerApiClient,
@@ -684,15 +692,35 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
                 all_new_asset_ids.extend(new_asset_ids);
             }
 
-            // Check if there are more pages
-            let has_more = page
-                .pagination
-                .as_ref()
-                .map(|p| p.has_more)
-                .unwrap_or(false);
+            let received = data.len() as i64;
+            let next_offset = offset + received;
+
+            // Avoid spinning forever if API reports more pages but returns no data.
+            if received == 0 {
+                break;
+            }
+
+            // Check if there are more pages.
+            // Prefer explicit has_more when provided, then fall back to total/limit inference.
+            let has_more = match page.pagination.as_ref() {
+                Some(p) => match p.has_more {
+                    Some(true) => true,
+                    Some(false) => false,
+                    None => {
+                        if let Some(total) = p.total {
+                            next_offset < total
+                        } else if let Some(page_limit) = p.limit {
+                            received >= page_limit
+                        } else {
+                            received >= limit
+                        }
+                    }
+                },
+                None => received >= limit,
+            };
 
             // Advance offset by number of items received
-            offset += data.len() as i64;
+            offset = next_offset;
 
             if !has_more {
                 break;

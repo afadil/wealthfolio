@@ -289,7 +289,12 @@ const INTERVAL_STORAGE_KEY = "networth-interval";
 /**
  * Net Worth Content - Embeddable content for the combined portfolio page
  */
-export function NetWorthContent() {
+interface NetWorthContentProps {
+  onAddAsset?: () => void;
+  onAddLiability?: () => void;
+}
+
+export function NetWorthContent({ onAddAsset, onAddLiability }: NetWorthContentProps) {
   const { settings } = useSettingsContext();
   const { data: netWorthData, isLoading, isError, error } = useNetWorth();
 
@@ -402,9 +407,9 @@ export function NetWorthContent() {
   return (
     <div className="flex min-h-screen flex-col">
       {/* Top section: Net Worth value */}
-      <div className="px-4 pb-6 md:px-6 md:pb-8 lg:px-8">
+      <div className="px-4 pb-1 pt-2 md:px-6 md:pb-2 lg:px-8">
         <div className="flex items-start gap-2">
-          <div className="min-h-[4.5rem]">
+          <div>
             <div className="flex items-center gap-3">
               <Balance
                 isLoading={isLoading}
@@ -605,6 +610,20 @@ export function NetWorthContent() {
                   <Icons.ChevronRight className="h-4 w-4" />
                   Manage accounts
                 </Link>
+                <button
+                  onClick={onAddAsset}
+                  className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-sm transition-colors"
+                >
+                  <Icons.Plus className="h-4 w-4" />
+                  Add asset
+                </button>
+                <button
+                  onClick={onAddLiability}
+                  className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-sm transition-colors"
+                >
+                  <Icons.Plus className="h-4 w-4" />
+                  Add liability
+                </button>
               </div>
             </div>
           </div>

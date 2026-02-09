@@ -14,12 +14,8 @@ const normalizeDate = (value: Date | string): Date => {
 // Get decimal precision based on asset kind
 const getDecimalPrecision = (assetKind?: AssetKind | null): number => {
   switch (assetKind) {
-    case "CRYPTO":
-      return 8; // Crypto needs high precision (e.g., 0.00012345 BTC)
-    case "FX_RATE":
+    case "FX":
       return 6; // FX rates need high precision
-    case "OPTION":
-      return 4; // Options often have more decimal places
     default:
       return 2; // Standard precision for stocks, ETFs, etc.
   }

@@ -11,6 +11,7 @@ use tauri::{AppHandle, State};
 use wealthfolio_core::quotes::{
     service::ProviderInfo, MarketSyncMode, Quote, QuoteImport, SymbolSearchResult,
 };
+use wealthfolio_market_data::ExchangeInfo;
 
 #[tauri::command]
 pub async fn search_symbol(
@@ -194,4 +195,9 @@ pub async fn import_quotes_csv(
     });
 
     Ok(result)
+}
+
+#[tauri::command]
+pub fn get_exchanges() -> Vec<ExchangeInfo> {
+    wealthfolio_market_data::get_exchange_list()
 }

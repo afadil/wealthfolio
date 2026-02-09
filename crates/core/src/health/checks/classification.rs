@@ -117,13 +117,13 @@ pub fn gather_legacy_migration_status(
             .get_asset_assignments(&asset.id)
             .unwrap_or_default();
 
-        let has_gics_assignment = gics_taxonomy.as_ref().is_some_and(|t| {
-            assignments.iter().any(|a| a.taxonomy_id == t.taxonomy.id)
-        });
+        let has_gics_assignment = gics_taxonomy
+            .as_ref()
+            .is_some_and(|t| assignments.iter().any(|a| a.taxonomy_id == t.taxonomy.id));
 
-        let has_regions_assignment = regions_taxonomy.as_ref().is_some_and(|t| {
-            assignments.iter().any(|a| a.taxonomy_id == t.taxonomy.id)
-        });
+        let has_regions_assignment = regions_taxonomy
+            .as_ref()
+            .is_some_and(|t| assignments.iter().any(|a| a.taxonomy_id == t.taxonomy.id));
 
         // If has legacy data but no corresponding taxonomy assignments, needs migration
         if (has_legacy_sectors && !has_gics_assignment)
@@ -131,7 +131,7 @@ pub fn gather_legacy_migration_status(
         {
             assets_needing_migration.push(LegacyAssetInfo {
                 asset_id: asset.id.clone(),
-                symbol: asset.symbol.clone(),
+                symbol: asset.display_code.clone().unwrap_or_default(),
                 name: asset.name.clone(),
             });
         } else if has_gics_assignment || has_regions_assignment {

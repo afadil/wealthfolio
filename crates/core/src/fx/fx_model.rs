@@ -16,25 +16,13 @@ pub struct ExchangeRate {
 }
 
 impl ExchangeRate {
-    pub fn from_quote(quote: &Quote) -> Self {
-        let (from_currency, to_currency) = Self::parse_fx_symbol(&quote.asset_id);
-
-        ExchangeRate {
-            id: Self::make_fx_symbol(&from_currency, &to_currency),
-            from_currency,
-            to_currency,
-            rate: quote.close,
-            source: quote.data_source.clone(),
-            timestamp: quote.timestamp,
-        }
-    }
-
+    /// Converts this exchange rate into a Quote for database storage.
+    /// `self.id` must be the asset UUID.
     pub fn to_quote(&self) -> Quote {
-        let formatted_date = self.timestamp.format("%Y%m%d").to_string();
-        let asset_id = Self::make_fx_symbol(&self.from_currency, &self.to_currency);
+        let day = self.timestamp.format("%Y-%m-%d").to_string();
         Quote {
-            id: format!("{}_{}", formatted_date, asset_id),
-            asset_id,
+            id: format!("{}_{}_{}", self.id, day, self.source.as_str()),
+            asset_id: self.id.clone(),
             timestamp: self.timestamp,
             open: self.rate,
             high: self.rate,
@@ -49,37 +37,41 @@ impl ExchangeRate {
         }
     }
 
-    /// Parses an FX ID/symbol into (from_currency, to_currency).
-    /// Supports multiple formats:
-    /// - New canonical: "EUR:USD" -> ("EUR", "USD")
+    /// Creates an instrument_key for FX pair lookup.
+    /// Returns format: "FX:EUR/USD"
+    pub fn make_instrument_key(from: &str, to: &str) -> String {
+        format!("FX:{}/{}", from, to)
+    }
+
+    /// Parses an instrument_key or legacy symbol into (from_currency, to_currency).
+    /// Supports:
+    /// - Instrument key: "FX:EUR/USD" -> ("EUR", "USD")
+    /// - Legacy colon: "EUR:USD" -> ("EUR", "USD")
     /// - Legacy slash: "EUR/USD" -> ("EUR", "USD")
     /// - Legacy concatenated: "EURUSD" -> ("EUR", "USD")
     /// - Legacy Yahoo: "EURUSD=X" -> ("EUR", "USD")
-    pub fn parse_fx_symbol(symbol: &str) -> (String, String) {
-        // Handle new canonical format with colon (primary format)
-        if let Some((base, quote)) = symbol.split_once(':') {
+    pub fn parse_fx_pair(key: &str) -> (String, String) {
+        // Handle instrument_key format: "FX:EUR/USD"
+        if let Some(pair) = key.strip_prefix("FX:") {
+            if let Some((base, quote)) = pair.split_once('/') {
+                return (base.to_string(), quote.to_string());
+            }
+        }
+        // Handle legacy colon format: "EUR:USD"
+        if let Some((base, quote)) = key.split_once(':') {
             return (base.to_string(), quote.to_string());
         }
-
-        // Handle legacy format with slash
-        if let Some((base, quote)) = symbol.split_once('/') {
+        // Handle legacy slash format: "EUR/USD"
+        if let Some((base, quote)) = key.split_once('/') {
             return (base.to_string(), quote.to_string());
         }
-
-        // Handle legacy Yahoo format with =X suffix
-        let base_symbol = symbol.strip_suffix("=X").unwrap_or(symbol);
+        // Handle legacy Yahoo format: "EURUSD=X" or "EURUSD"
+        let base_symbol = key.strip_suffix("=X").unwrap_or(key);
         if base_symbol.len() >= 6 {
             (base_symbol[..3].to_string(), base_symbol[3..6].to_string())
         } else {
-            // Fallback for malformed symbols
             (base_symbol.to_string(), String::new())
         }
-    }
-
-    /// Creates a canonical FX asset ID from currency pair.
-    /// Returns format like "EUR:USD" per spec.
-    pub fn make_fx_symbol(from: &str, to: &str) -> String {
-        format!("{}:{}", from, to)
     }
 }
 
@@ -99,27 +91,4 @@ pub struct NewExchangeRate {
     #[serde(serialize_with = "serialize_decimal_6")]
     pub rate: Decimal,
     pub source: DataSource,
-}
-
-impl NewExchangeRate {
-    pub fn to_quote(&self) -> Quote {
-        let now = Utc::now();
-        let formatted_date = now.format("%Y%m%d").to_string();
-        let asset_id = ExchangeRate::make_fx_symbol(&self.from_currency, &self.to_currency);
-        Quote {
-            id: format!("{}_{}", formatted_date, asset_id),
-            asset_id,
-            timestamp: now,
-            open: self.rate,
-            high: self.rate,
-            low: self.rate,
-            close: self.rate,
-            adjclose: self.rate,
-            volume: Decimal::ZERO,
-            data_source: self.source.clone(),
-            created_at: now,
-            currency: self.from_currency.clone(),
-            notes: None,
-        }
-    }
 }

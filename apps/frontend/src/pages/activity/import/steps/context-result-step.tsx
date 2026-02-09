@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { useImportContext, reset } from "../context";
+import { useImportContext, reset, setStep } from "../context";
 import { ImportAlert } from "../components/import-alert";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -136,8 +136,8 @@ export function ContextResultStep() {
         />
 
         <motion.div className="flex justify-center gap-3" variants={itemVariants}>
-          <Button variant="outline" onClick={handleImportAnother}>
-            <Icons.Import className="mr-2 h-4 w-4" />
+          <Button variant="outline" onClick={() => dispatch(setStep("confirm"))}>
+            <Icons.ArrowLeft className="mr-2 h-4 w-4" />
             Try Again
           </Button>
         </motion.div>
@@ -184,6 +184,13 @@ export function ContextResultStep() {
       {/* Stats row */}
       <motion.div className="mb-10 flex items-center justify-center gap-12" variants={itemVariants}>
         <StatItem label="Imported" value={stats.imported} variant="success" />
+
+        {stats.duplicates > 0 && (
+          <>
+            <div className="bg-border h-12 w-px" />
+            <StatItem label="Duplicates" value={stats.duplicates} variant="muted" />
+          </>
+        )}
 
         <div className="bg-border h-12 w-px" />
 

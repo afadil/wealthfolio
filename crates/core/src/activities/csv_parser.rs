@@ -109,7 +109,7 @@ pub struct ParseError {
 }
 
 impl ParseError {
-    fn parse_error(row: Option<usize>, col: Option<usize>, message: impl Into<String>) -> Self {
+    fn new_parse(row: Option<usize>, col: Option<usize>, message: impl Into<String>) -> Self {
         Self {
             row_index: row,
             column_index: col,
@@ -299,7 +299,7 @@ fn parse_csv_content(
                 all_records.push(row);
             }
             Err(e) => {
-                errors.push(ParseError::parse_error(
+                errors.push(ParseError::new_parse(
                     Some(idx),
                     None,
                     format!("Failed to parse row {}: {}", idx + 1, e),

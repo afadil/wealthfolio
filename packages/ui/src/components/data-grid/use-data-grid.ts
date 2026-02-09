@@ -824,9 +824,10 @@ function useDataGrid<TData>({
                 if (!trimmedClipboard) {
                   processedValue = null;
                 } else {
-                  const normalized = trimmedClipboard.includes(" ") && !trimmedClipboard.includes("T")
-                    ? trimmedClipboard.replace(" ", "T")
-                    : trimmedClipboard;
+                  const normalized =
+                    trimmedClipboard.includes(" ") && !trimmedClipboard.includes("T")
+                      ? trimmedClipboard.replace(" ", "T")
+                      : trimmedClipboard;
                   const date = new Date(normalized);
                   if (Number.isNaN(date.getTime())) shouldSkip = true;
                   else processedValue = date;
@@ -1012,9 +1013,10 @@ function useDataGrid<TData>({
                 if (!pastedValue) {
                   processedValue = null;
                 } else {
-                  const normalized = pastedValue.includes(" ") && !pastedValue.includes("T")
-                    ? pastedValue.replace(" ", "T")
-                    : pastedValue;
+                  const normalized =
+                    pastedValue.includes(" ") && !pastedValue.includes("T")
+                      ? pastedValue.replace(" ", "T")
+                      : pastedValue;
                   const date = new Date(normalized);
                   if (Number.isNaN(date.getTime())) shouldSkip = true;
                   else processedValue = date;
@@ -3046,9 +3048,7 @@ function useDataGrid<TData>({
       if (ctrlKey || metaKey) return;
 
       const isEditableTarget =
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable;
+        target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
       if (isEditableTarget) return;
 
       const isInDataGrid = dataGridElement.contains(target);

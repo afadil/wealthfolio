@@ -23,6 +23,7 @@ pub const CLOSED_POSITION_GRACE_PERIOD_DAYS: i64 = 30;
 /// - Weekends (8-9 days lost per month)
 /// - Holidays (varies by market, ~1-2 per month)
 /// - Potential data gaps from providers
+///
 /// This ensures we always have enough historical data for valuation and performance calculations.
 pub const QUOTE_HISTORY_BUFFER_DAYS: i64 = 45;
 

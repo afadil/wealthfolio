@@ -167,7 +167,7 @@ impl Activity {
 /// Consolidates all asset-related fields into a single nested object.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct AssetInput {
+pub struct SymbolInput {
     /// Asset ID - optional, for backward compatibility with existing assets
     pub id: Option<String>,
     /// Symbol (e.g., "AAPL", "BTC") - used to generate canonical asset ID
@@ -178,8 +178,8 @@ pub struct AssetInput {
     pub kind: Option<String>,
     /// Asset name for custom/manual assets
     pub name: Option<String>,
-    /// Pricing mode: "MARKET" or "MANUAL" - controls how asset is priced
-    pub pricing_mode: Option<String>,
+    /// Quote mode: "MARKET" or "MANUAL" - controls how asset is priced
+    pub quote_mode: Option<String>,
 }
 
 /// Input model for creating a new activity
@@ -189,9 +189,10 @@ pub struct NewActivity {
     pub id: Option<String>,
     pub account_id: String,
 
-    /// Asset input - consolidates id, symbol, exchangeMic, kind, name, pricingMode
+    /// Symbol input - consolidates id, symbol, exchangeMic, kind, name, quoteMode
     /// Optional for cash activities which don't require an asset
-    pub asset: Option<AssetInput>,
+    #[serde(alias = "asset")]
+    pub symbol: Option<SymbolInput>,
 
     pub activity_type: String,
     pub subtype: Option<String>, // Semantic variation (DRIP, STAKING_REWARD, etc.)
@@ -230,6 +231,7 @@ pub struct NewActivity {
     pub source_system: Option<String>,    // SNAPTRADE, PLAID, MANUAL, CSV
     pub source_record_id: Option<String>, // Provider's record ID
     pub source_group_id: Option<String>,  // Provider grouping key
+    pub idempotency_key: Option<String>,  // Stable hash for dedupe
 }
 
 impl NewActivity {
@@ -258,30 +260,30 @@ impl NewActivity {
         Ok(())
     }
 
-    // Helper methods to extract asset fields from nested `asset`
+    // Helper methods to extract fields from nested `symbol`
 
-    pub fn get_asset_id(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.id.as_deref())
+    pub fn get_symbol_id(&self) -> Option<&str> {
+        self.symbol.as_ref().and_then(|a| a.id.as_deref())
     }
 
-    pub fn get_symbol(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.symbol.as_deref())
+    pub fn get_symbol_code(&self) -> Option<&str> {
+        self.symbol.as_ref().and_then(|a| a.symbol.as_deref())
     }
 
     pub fn get_exchange_mic(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.exchange_mic.as_deref())
+        self.symbol.as_ref().and_then(|a| a.exchange_mic.as_deref())
     }
 
-    pub fn get_asset_kind(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.kind.as_deref())
+    pub fn get_kind_hint(&self) -> Option<&str> {
+        self.symbol.as_ref().and_then(|a| a.kind.as_deref())
     }
 
-    pub fn get_asset_name(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.name.as_deref())
+    pub fn get_name(&self) -> Option<&str> {
+        self.symbol.as_ref().and_then(|a| a.name.as_deref())
     }
 
-    pub fn get_pricing_mode(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.pricing_mode.as_deref())
+    pub fn get_quote_mode(&self) -> Option<&str> {
+        self.symbol.as_ref().and_then(|a| a.quote_mode.as_deref())
     }
 }
 
@@ -292,9 +294,10 @@ pub struct ActivityUpdate {
     pub id: String,
     pub account_id: String,
 
-    /// Asset input - consolidates id, symbol, exchangeMic, kind, name, pricingMode
+    /// Symbol input - consolidates id, symbol, exchangeMic, kind, name, quoteMode
     /// Optional for cash activities which don't require an asset
-    pub asset: Option<AssetInput>,
+    #[serde(alias = "asset")]
+    pub symbol: Option<SymbolInput>,
 
     pub activity_type: String,
     pub subtype: Option<String>, // Semantic variation (DRIP, STAKING_REWARD, etc.)
@@ -354,30 +357,30 @@ impl ActivityUpdate {
         Ok(())
     }
 
-    // Helper methods to extract asset fields from nested `asset`
+    // Helper methods to extract fields from nested `symbol`
 
-    pub fn get_asset_id(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.id.as_deref())
+    pub fn get_symbol_id(&self) -> Option<&str> {
+        self.symbol.as_ref().and_then(|a| a.id.as_deref())
     }
 
-    pub fn get_symbol(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.symbol.as_deref())
+    pub fn get_symbol_code(&self) -> Option<&str> {
+        self.symbol.as_ref().and_then(|a| a.symbol.as_deref())
     }
 
     pub fn get_exchange_mic(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.exchange_mic.as_deref())
+        self.symbol.as_ref().and_then(|a| a.exchange_mic.as_deref())
     }
 
-    pub fn get_asset_kind(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.kind.as_deref())
+    pub fn get_kind_hint(&self) -> Option<&str> {
+        self.symbol.as_ref().and_then(|a| a.kind.as_deref())
     }
 
-    pub fn get_asset_name(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.name.as_deref())
+    pub fn get_name(&self) -> Option<&str> {
+        self.symbol.as_ref().and_then(|a| a.name.as_deref())
     }
 
-    pub fn get_pricing_mode(&self) -> Option<&str> {
-        self.asset.as_ref().and_then(|a| a.pricing_mode.as_deref())
+    pub fn get_quote_mode(&self) -> Option<&str> {
+        self.symbol.as_ref().and_then(|a| a.quote_mode.as_deref())
     }
 }
 
@@ -553,6 +556,13 @@ pub struct ActivityImport {
     /// Resolved exchange MIC for the symbol (populated during validation)
     pub exchange_mic: Option<String>,
     pub errors: Option<std::collections::HashMap<String, Vec<String>>>,
+    pub warnings: Option<std::collections::HashMap<String, Vec<String>>>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duplicate_of_id: Option<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duplicate_of_line_number: Option<i32>,
     pub is_draft: bool,
     pub is_valid: bool,
     pub line_number: Option<i32>,
@@ -584,6 +594,16 @@ pub struct ImportMapping {
     pub updated_at: NaiveDateTime,
 }
 
+/// Rich metadata for a resolved symbol mapping (exchange MIC, display name, etc.)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SymbolMappingMeta {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exchange_mic: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symbol_name: Option<String>,
+}
+
 /// Model for activity import mapping data with structured mappings
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -599,6 +619,9 @@ pub struct ImportMappingData {
     pub symbol_mappings: std::collections::HashMap<String, String>,
     #[serde(default)]
     pub account_mappings: std::collections::HashMap<String, String>,
+    /// Rich metadata for resolved symbol mappings (exchange MIC, display name)
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    pub symbol_mapping_meta: std::collections::HashMap<String, SymbolMappingMeta>,
     /// CSV parsing configuration (delimiter, date format, etc.)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parse_config: Option<ParseConfig>,
@@ -616,6 +639,8 @@ pub struct ImportMappingConfig {
     pub symbol_mappings: std::collections::HashMap<String, String>,
     #[serde(default)]
     pub account_mappings: std::collections::HashMap<String, String>,
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    pub symbol_mapping_meta: std::collections::HashMap<String, SymbolMappingMeta>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parse_config: Option<ParseConfig>,
 }
@@ -656,6 +681,7 @@ impl Default for ImportMappingData {
             activity_mappings,
             symbol_mappings: std::collections::HashMap::new(),
             account_mappings: std::collections::HashMap::new(),
+            symbol_mapping_meta: std::collections::HashMap::new(),
             parse_config: None,
         }
     }
@@ -673,6 +699,7 @@ impl ImportMapping {
             activity_mappings: config.activity_mappings,
             symbol_mappings: config.symbol_mappings,
             account_mappings: config.account_mappings,
+            symbol_mapping_meta: config.symbol_mapping_meta,
             parse_config: config.parse_config,
         })
     }
@@ -686,6 +713,7 @@ impl ImportMapping {
             activity_mappings: data.activity_mappings.clone(),
             symbol_mappings: data.symbol_mappings.clone(),
             account_mappings: data.account_mappings.clone(),
+            symbol_mapping_meta: data.symbol_mapping_meta.clone(),
             parse_config: data.parse_config.clone(),
         };
 
@@ -955,6 +983,8 @@ pub struct ImportActivitiesSummary {
     pub imported: u32,
     /// Number of activities skipped (invalid or errors)
     pub skipped: u32,
+    /// Number of duplicate activities detected and skipped
+    pub duplicates: u32,
     /// Number of new assets created during import
     pub assets_created: u32,
     /// Whether the import was successful (no validation errors)
@@ -1018,20 +1048,21 @@ pub struct PrepareActivitiesResult {
     pub prepared: Vec<PreparedActivity>,
     pub errors: Vec<(usize, String)>, // (index, error_message)
     pub assets_created: u32,
+    pub created_asset_ids: Vec<String>,
 }
 
 impl From<ActivityImport> for NewActivity {
     fn from(import: ActivityImport) -> Self {
-        let asset = if import.symbol.is_empty() {
+        let symbol = if import.symbol.is_empty() {
             None
         } else {
-            Some(AssetInput {
+            Some(SymbolInput {
                 id: None,
                 symbol: Some(import.symbol),
                 exchange_mic: import.exchange_mic,
                 kind: None,
                 name: import.symbol_name,
-                pricing_mode: None,
+                quote_mode: None,
             })
         };
 
@@ -1044,7 +1075,7 @@ impl From<ActivityImport> for NewActivity {
         NewActivity {
             id: import.id,
             account_id: import.account_id.unwrap_or_default(),
-            asset,
+            symbol,
             activity_type: import.activity_type,
             subtype: import.subtype,
             activity_date: import.date,
@@ -1061,6 +1092,7 @@ impl From<ActivityImport> for NewActivity {
             source_system: Some("CSV".to_string()),
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         }
     }
 }

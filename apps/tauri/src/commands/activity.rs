@@ -10,6 +10,7 @@ use wealthfolio_core::activities::{
     ParseConfig, ParsedCsvResult, Sort,
 };
 
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn search_activities(
     page: i64,                                 // Page number, 1-based

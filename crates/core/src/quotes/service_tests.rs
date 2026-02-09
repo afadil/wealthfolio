@@ -193,7 +193,7 @@ mod tests {
         }
 
         fn get_latest_quotes(&self, symbols: &[String]) -> Result<HashMap<String, Quote>> {
-            let asset_ids: Vec<AssetId> = symbols.iter().map(|s| AssetId::new(s)).collect();
+            let asset_ids: Vec<AssetId> = symbols.iter().map(AssetId::new).collect();
             let result = self.latest_batch(&asset_ids, None)?;
             Ok(result
                 .into_iter()
@@ -205,7 +205,7 @@ mod tests {
             &self,
             symbols: &[String],
         ) -> Result<HashMap<String, LatestQuotePair>> {
-            let asset_ids: Vec<AssetId> = symbols.iter().map(|s| AssetId::new(s)).collect();
+            let asset_ids: Vec<AssetId> = symbols.iter().map(AssetId::new).collect();
             let result = self.latest_with_previous(&asset_ids)?;
             Ok(result
                 .into_iter()
@@ -442,7 +442,7 @@ mod tests {
         //
         // Recommendation: Add fill_missing_quotes as a method on QuoteServiceTrait
         // to keep the interface clean and maintain backward compatibility.
-        assert!(true, "Gap filling requirement documented");
+        // Gap filling requirement documented
     }
 
     /// Test that demonstrates the fill_missing_quotes algorithm:
@@ -467,7 +467,7 @@ mod tests {
         // fn fill_missing_quotes(&self, quotes: &[Quote], required_symbols: &HashSet<String>,
         //                        start_date: NaiveDate, end_date: NaiveDate) -> Vec<Quote>
 
-        assert!(true, "Algorithm documented");
+        // Algorithm documented
     }
 
     // =========================================================================
@@ -612,6 +612,6 @@ mod tests {
         // - get_quotes_in_range does NOT fill gaps
         // - Solution: Add fill_missing_quotes or get_quotes_in_range_filled
 
-        assert!(true, "Method mapping documented");
+        // Method mapping documented
     }
 }

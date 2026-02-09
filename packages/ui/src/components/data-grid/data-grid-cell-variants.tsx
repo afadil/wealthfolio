@@ -1410,10 +1410,19 @@ export function DateCell<TData>({
   );
 }
 
+// Parse date string as local timezone. new Date("YYYY-MM-DD") parses as UTC midnight,
+// which shifts back a day in negative UTC offsets. Appending T00:00:00 forces local parsing.
+function parseDateLocal(value: string): Date {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return new Date(value + "T00:00:00");
+  }
+  return new Date(value);
+}
+
 // Helper functions for date-input variant
 function formatDateInputForDisplay(date: Date | string | undefined): string {
   if (!date) return "";
-  const d = date instanceof Date ? date : new Date(date);
+  const d = date instanceof Date ? date : parseDateLocal(date);
   if (Number.isNaN(d.getTime())) return "";
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, "0");
@@ -1423,7 +1432,7 @@ function formatDateInputForDisplay(date: Date | string | undefined): string {
 
 function toDateInputString(date: Date | string | undefined): string {
   if (!date) return "";
-  const d = date instanceof Date ? date : new Date(date);
+  const d = date instanceof Date ? date : parseDateLocal(date);
   if (Number.isNaN(d.getTime())) return "";
   // Format: YYYY-MM-DD (required format for date input)
   const year = d.getFullYear();
@@ -1435,7 +1444,7 @@ function toDateInputString(date: Date | string | undefined): string {
 // Helper to get date-only timestamp (midnight) for comparison
 function getDateOnlyTimestamp(value: Date | string | undefined): number | null {
   if (!value) return null;
-  const d = value instanceof Date ? value : new Date(value);
+  const d = value instanceof Date ? value : parseDateLocal(value);
   if (Number.isNaN(d.getTime())) return null;
   // Normalize to midnight for date-only comparison
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -1473,11 +1482,11 @@ export function DateInputCell<TData>({
       tableMeta?.onCellEditingStop?.();
       return;
     }
-    const date = value ? new Date(value) : undefined;
+    const date = value ? parseDateLocal(value) : undefined;
     const initialDate = initialValue
       ? initialValue instanceof Date
         ? initialValue
-        : new Date(initialValue)
+        : parseDateLocal(initialValue)
       : undefined;
 
     // Compare date-only (ignore time)
@@ -1502,11 +1511,11 @@ export function DateInputCell<TData>({
     // When editing stops (transitions from true to false), save the value
     if (wasEditingRef.current && !isEditing) {
       const currentValue = valueRef.current;
-      const date = currentValue ? new Date(currentValue) : undefined;
+      const date = currentValue ? parseDateLocal(currentValue) : undefined;
       const initialDate = initialValue
         ? initialValue instanceof Date
           ? initialValue
-          : new Date(initialValue)
+          : parseDateLocal(initialValue)
         : undefined;
 
       const newTimestamp = getDateOnlyTimestamp(date);
@@ -1523,11 +1532,11 @@ export function DateInputCell<TData>({
       if (isEditing) {
         if (event.key === "Enter") {
           event.preventDefault();
-          const date = value ? new Date(value) : undefined;
+          const date = value ? parseDateLocal(value) : undefined;
           const initialDate = initialValue
             ? initialValue instanceof Date
               ? initialValue
-              : new Date(initialValue)
+              : parseDateLocal(initialValue)
             : undefined;
           const newTimestamp = getDateOnlyTimestamp(date);
           const oldTimestamp = getDateOnlyTimestamp(initialDate);
@@ -1537,11 +1546,11 @@ export function DateInputCell<TData>({
           tableMeta?.onCellEditingStop?.({ moveToNextRow: true });
         } else if (event.key === "Tab") {
           event.preventDefault();
-          const date = value ? new Date(value) : undefined;
+          const date = value ? parseDateLocal(value) : undefined;
           const initialDate = initialValue
             ? initialValue instanceof Date
               ? initialValue
-              : new Date(initialValue)
+              : parseDateLocal(initialValue)
             : undefined;
           const newTimestamp = getDateOnlyTimestamp(date);
           const oldTimestamp = getDateOnlyTimestamp(initialDate);
@@ -1702,11 +1711,11 @@ export function DateTimeCell<TData>({
     // When editing stops (transitions from true to false), save the value
     if (wasEditingRef.current && !isEditing) {
       const currentValue = valueRef.current;
-      const date = currentValue ? new Date(currentValue) : undefined;
+      const date = currentValue ? parseDateLocal(currentValue) : undefined;
       const initialDate = initialValue
         ? initialValue instanceof Date
           ? initialValue
-          : new Date(initialValue)
+          : parseDateLocal(initialValue)
         : undefined;
 
       if (!readOnly && date?.getTime() !== initialDate?.getTime()) {
@@ -1721,11 +1730,11 @@ export function DateTimeCell<TData>({
       if (isEditing) {
         if (event.key === "Enter") {
           event.preventDefault();
-          const date = value ? new Date(value) : undefined;
+          const date = value ? parseDateLocal(value) : undefined;
           const initialDate = initialValue
             ? initialValue instanceof Date
               ? initialValue
-              : new Date(initialValue)
+              : parseDateLocal(initialValue)
             : undefined;
           if (date?.getTime() !== initialDate?.getTime()) {
             tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: date });
@@ -1733,11 +1742,11 @@ export function DateTimeCell<TData>({
           tableMeta?.onCellEditingStop?.({ moveToNextRow: true });
         } else if (event.key === "Tab") {
           event.preventDefault();
-          const date = value ? new Date(value) : undefined;
+          const date = value ? parseDateLocal(value) : undefined;
           const initialDate = initialValue
             ? initialValue instanceof Date
               ? initialValue
-              : new Date(initialValue)
+              : parseDateLocal(initialValue)
             : undefined;
           if (date?.getTime() !== initialDate?.getTime()) {
             tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: date });
@@ -2518,6 +2527,11 @@ export function SymbolCell<TData>({
   const onSearch = symbolCellOpts?.onSearch;
   const onSelectCallback = symbolCellOpts?.onSelect;
   const onCreateCustomAssetCallback = symbolCellOpts?.onCreateCustomAsset;
+  const isDisabledFn = symbolCellOpts?.isDisabled;
+  const isClearableFn = symbolCellOpts?.isClearable;
+  const rowData = cell.row.original;
+  const disabled = isDisabledFn ? isDisabledFn(rowData) : false;
+  const clearable = isClearableFn ? isClearableFn(rowData) : false;
   const sideOffset = -(containerRef.current?.clientHeight ?? 0);
 
   const prevInitialValueRef = React.useRef(initialValue);
@@ -2591,6 +2605,15 @@ export function SymbolCell<TData>({
       handleSelect(trimmed, undefined);
     }
   }, [searchQuery, handleSelect, onCreateCustomAssetCallback, rowIndex, tableMeta]);
+
+  const handleClear = React.useCallback(() => {
+    setValue("");
+    tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: "" });
+    onSelectCallback?.(rowIndex, "", undefined);
+    setSearchQuery("");
+    setOptions([]);
+    tableMeta?.onCellEditingStop?.();
+  }, [tableMeta, rowIndex, columnId, onSelectCallback]);
 
   const onOpenChange = React.useCallback(
     (isOpen: boolean) => {
@@ -2680,13 +2703,13 @@ export function SymbolCell<TData>({
       cellState={cellState}
       onKeyDown={onWrapperKeyDown}
     >
-      <Popover open={isEditing} onOpenChange={onOpenChange}>
+      <Popover open={isEditing && !disabled} onOpenChange={onOpenChange}>
         <PopoverAnchor asChild>
           <span data-slot="grid-cell-content" className={cn(!value && "text-muted-foreground")}>
-            {value || "TICKER"}
+            {disabled ? value || "—" : value || "TICKER"}
           </span>
         </PopoverAnchor>
-        {isEditing && (
+        {isEditing && !disabled && (
           <PopoverContent
             data-grid-cell-editor=""
             align="start"
@@ -2742,6 +2765,14 @@ export function SymbolCell<TData>({
                           <span className="text-muted-foreground text-xs font-light">Create custom asset</span>
                         </div>
                       </div>
+                    </CommandItem>
+                  </CommandGroup>
+                ) : null}
+                {clearable && value && trimmedQuery.length === 0 ? (
+                  <CommandGroup>
+                    <CommandItem value="__clear__" onSelect={handleClear} className="flex items-center gap-3">
+                      <Icons.X className="text-muted-foreground size-4" />
+                      <span className="text-muted-foreground text-xs">Clear symbol</span>
                     </CommandItem>
                   </CommandGroup>
                 ) : null}

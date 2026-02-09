@@ -35,7 +35,7 @@ import {
   type AssetDetailsSheetAsset,
   type LinkableAsset,
   type LinkedLiability,
-} from "@/features/alternative-assets";
+} from "@/pages/asset/alternative-assets";
 import { updateAlternativeAssetMetadata } from "@/adapters";
 import { ClassificationSheet } from "@/components/classification/classification-sheet";
 import { useUpdatePortfolioMutation } from "@/hooks/use-calculate-portfolio";

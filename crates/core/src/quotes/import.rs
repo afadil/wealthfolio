@@ -111,7 +111,6 @@ impl ValidationStatus {
     }
 }
 
-
 // =============================================================================
 // Quote Import (Input)
 // =============================================================================
@@ -161,6 +160,7 @@ impl QuoteImport {
     }
 
     /// Create a new QuoteImport with all OHLCV fields.
+    #[allow(clippy::too_many_arguments)]
     pub fn with_ohlcv(
         symbol: String,
         date: String,
@@ -253,6 +253,7 @@ pub struct ImportValidation {
 
 impl ImportValidation {
     /// Create a valid import validation.
+    #[allow(clippy::too_many_arguments)]
     pub fn valid(
         asset_id: AssetId,
         day: Day,

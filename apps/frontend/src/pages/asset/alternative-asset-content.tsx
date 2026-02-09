@@ -21,14 +21,14 @@ import {
   formatPercent,
 } from "@wealthfolio/ui";
 import HistoryChart from "@/components/history-chart-symbol";
-import { ValueHistoryDataGrid } from "@/features/alternative-assets";
+import { ValueHistoryDataGrid } from "./alternative-assets";
 import {
   AssetDetailsSheet,
   type AssetDetailsSheetAsset,
   UpdateValuationModal,
   AlternativeAssetQuickAddModal,
-} from "@/features/alternative-assets";
-import { useAlternativeAssetMutations } from "@/features/alternative-assets/hooks/use-alternative-asset-mutations";
+} from "./alternative-assets";
+import { useAlternativeAssetMutations } from "./alternative-assets/hooks/use-alternative-asset-mutations";
 import { LinkedLiabilitiesSection, LinkedAssetSection } from "./linked-liabilities-card";
 import { useQuoteMutations } from "./hooks/use-quote-mutations";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";

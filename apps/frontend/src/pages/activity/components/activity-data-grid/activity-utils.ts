@@ -123,7 +123,7 @@ export function createDraftTransaction(
     accountCurrency: defaultAccount?.currency ?? fallbackCurrency,
     assetSymbol: "",
     assetName: "",
-    assetPricingMode: undefined,
+    assetQuoteMode: undefined,
     subRows: undefined,
     isNew: true,
   };
@@ -429,12 +429,12 @@ export function buildSavePayload(
         // Backend will generate the canonical ID
         const symbol = (transaction.assetSymbol || "").trim().toUpperCase();
         if (symbol) {
-          createPayload.asset = {
+          createPayload.symbol = {
             symbol,
             exchangeMic: transaction.exchangeMic,
             kind: transaction.pendingAssetKind,
             name: transaction.pendingAssetName,
-            pricingMode: transaction.assetPricingMode,
+            quoteMode: transaction.assetQuoteMode,
           };
         }
       }
@@ -452,18 +452,18 @@ export function buildSavePayload(
 
         if (symbolChanged && currentSymbol) {
           // Symbol changed: send symbol + exchangeMic for backend to generate new canonical ID
-          updatePayload.asset = {
+          updatePayload.symbol = {
             symbol: currentSymbol,
             exchangeMic: transaction.exchangeMic,
             kind: transaction.pendingAssetKind,
             name: transaction.pendingAssetName,
-            pricingMode: transaction.assetPricingMode,
+            quoteMode: transaction.assetQuoteMode,
           };
         } else if (transaction._originalAssetId) {
-          // Symbol unchanged: send existing asset ID with pricingMode to allow mode updates
-          updatePayload.asset = {
+          // Symbol unchanged: send existing asset ID with quoteMode to allow mode updates
+          updatePayload.symbol = {
             id: transaction._originalAssetId,
-            pricingMode: transaction.assetPricingMode,
+            quoteMode: transaction.assetQuoteMode,
           };
         }
       }

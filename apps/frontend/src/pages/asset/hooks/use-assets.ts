@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { getAssets } from "@/adapters";
-import { isAlternativeAssetId } from "@/lib/constants";
+import { isAlternativeAssetKind } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { Asset } from "@/lib/types";
 
@@ -17,17 +17,13 @@ export function useAssets() {
   });
 
   const filteredAssets = assets.filter((asset) => {
-    // Filter out FX_RATE and CASH kinds
-    if (asset.kind === "FX_RATE" || asset.kind === "CASH") {
-      return false;
-    }
-
-    if (asset.symbol.startsWith("$CASH")) {
+    // Filter out FX kinds
+    if (asset.kind === "FX") {
       return false;
     }
 
     // Filter out alternative assets (property, vehicle, collectible, etc.)
-    if (isAlternativeAssetId(asset.id)) {
+    if (isAlternativeAssetKind(asset.kind)) {
       return false;
     }
 

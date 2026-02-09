@@ -1320,15 +1320,19 @@ impl AddonService {
         }
         let content = fs::read_to_string(&manifest_path)
             .map_err(|e| format!("Failed to read manifest {}: {}", manifest_path.display(), e))?;
-        let manifest = serde_json::from_str::<AddonManifest>(&content)
-            .map_err(|e| format!("Failed to parse manifest {}: {}", manifest_path.display(), e))?;
+        let manifest = serde_json::from_str::<AddonManifest>(&content).map_err(|e| {
+            format!(
+                "Failed to parse manifest {}: {}",
+                manifest_path.display(),
+                e
+            )
+        })?;
         Ok(Some(manifest))
     }
 
     fn read_manifest_or_error(&self, addon_dir: &Path) -> Result<AddonManifest, String> {
-        self.read_manifest_if_exists(addon_dir)?.ok_or_else(|| {
-            format!("Addon manifest not found in {}", addon_dir.display())
-        })
+        self.read_manifest_if_exists(addon_dir)?
+            .ok_or_else(|| format!("Addon manifest not found in {}", addon_dir.display()))
     }
 
     fn write_addon_files(&self, addon_dir: &Path, files: &[AddonFile]) -> Result<(), String> {
@@ -1412,8 +1416,7 @@ impl AddonServiceTrait for AddonService {
         if !addon_dir.exists() {
             return Err("Addon not found".to_string());
         }
-        fs::remove_dir_all(&addon_dir)
-            .map_err(|e| format!("Failed to remove addon: {}", e))?;
+        fs::remove_dir_all(&addon_dir).map_err(|e| format!("Failed to remove addon: {}", e))?;
         Ok(())
     }
 
@@ -1463,8 +1466,8 @@ impl AddonServiceTrait for AddonService {
         for f in &mut files {
             let normalized_name = f.name.replace('\\', "/");
             let normalized_main = main_file.replace('\\', "/");
-            f.is_main = normalized_name == normalized_main
-                || normalized_name.ends_with(&normalized_main);
+            f.is_main =
+                normalized_name == normalized_main || normalized_name.ends_with(&normalized_main);
         }
 
         if !files.iter().any(|f| f.is_main) {

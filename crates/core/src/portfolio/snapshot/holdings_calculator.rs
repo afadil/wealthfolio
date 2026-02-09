@@ -1,5 +1,4 @@
 use crate::activities::{Activity, ActivityType};
-use crate::assets::is_cash_asset_id;
 use crate::assets::AssetRepositoryTrait;
 use crate::errors::{CalculatorError, Error, Result};
 use crate::fx::FxServiceTrait;
@@ -518,7 +517,7 @@ impl HoldingsCalculator {
         let activity_amount = activity.amt();
         let asset_id = activity.asset_id.as_deref().unwrap_or("");
 
-        if is_cash_asset_id(asset_id) || asset_id.is_empty() {
+        if asset_id.is_empty() {
             // Cash transfer: book in ACTIVITY currency
             let net_amount = activity_amount - activity.fee_amt();
             add_cash(state, activity_currency, net_amount);
@@ -638,7 +637,7 @@ impl HoldingsCalculator {
         let activity_amount = activity.amt();
         let asset_id = activity.asset_id.as_deref().unwrap_or("");
 
-        if is_cash_asset_id(asset_id) || asset_id.is_empty() {
+        if asset_id.is_empty() {
             // Cash transfer: book outflow in ACTIVITY currency (amount + fee)
             let net_amount = activity_amount + activity.fee_amt();
             add_cash(state, activity_currency, -net_amount);
@@ -784,7 +783,7 @@ impl HoldingsCalculator {
         match self.asset_repository.get_by_id(asset_id) {
             Ok(asset) => {
                 let is_alternative = asset.is_alternative();
-                Ok((asset.currency, is_alternative))
+                Ok((asset.quote_ccy, is_alternative))
             }
             Err(e) => {
                 error!("Failed to get asset for asset_id '{}': {}", asset_id, e);
@@ -856,7 +855,7 @@ impl HoldingsCalculator {
         date: DateTime<Utc>,
         cache: &mut HashMap<String, (String, bool)>,
     ) -> std::result::Result<&'a mut Position, CalculatorError> {
-        if asset_id.is_empty() || is_cash_asset_id(asset_id) {
+        if asset_id.is_empty() {
             return Err(CalculatorError::InvalidActivity(format!(
                 "Invalid asset_id for position: {}",
                 asset_id

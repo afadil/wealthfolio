@@ -47,7 +47,7 @@ import {
   searchTicker,
   syncHistoryQuotes,
   syncMarketData,
-  updatePricingMode,
+  updateQuoteMode,
   updateAssetProfile,
   updateQuote,
 } from "@/adapters";
@@ -243,7 +243,7 @@ export function createAddonContext(addonId: string): AddonContext {
           syncHistoryQuotes,
           getAssetProfile,
           updateAssetProfile,
-          updatePricingMode,
+          updateQuoteMode,
           updateQuote,
           syncMarketData,
           getQuoteHistory,

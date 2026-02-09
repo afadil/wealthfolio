@@ -33,7 +33,7 @@ pub trait FxRepositoryTrait: Send + Sync {
         from_currency: &str,
         to_currency: &str,
         source: &str,
-    ) -> Result<()>;
+    ) -> Result<String>;
 }
 
 /// Trait defining the contract for FX service operations.

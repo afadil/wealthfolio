@@ -235,7 +235,7 @@ export function AssetDetailsSheet({
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>
-                            {asset.kind === AlternativeAssetKind.PHYSICAL_PRECIOUS
+                            {asset.kind === AlternativeAssetKind.PRECIOUS_METAL
                               ? "Purchase Price (per unit)"
                               : "Purchase Price"}
                           </FormLabel>
@@ -293,7 +293,7 @@ export function AssetDetailsSheet({
               {asset.kind === AlternativeAssetKind.COLLECTIBLE && <CollectibleFields form={form} />}
 
               {/* Precious Metal-specific fields */}
-              {asset.kind === AlternativeAssetKind.PHYSICAL_PRECIOUS && (
+              {asset.kind === AlternativeAssetKind.PRECIOUS_METAL && (
                 <PreciousMetalFields form={form} />
               )}
 
@@ -399,7 +399,7 @@ function AssetKindIcon({
       return <Icons.VehicleDuotone size={size} className={className} />;
     case AlternativeAssetKind.COLLECTIBLE:
       return <Icons.CollectibleDuotone size={size} className={className} />;
-    case AlternativeAssetKind.PHYSICAL_PRECIOUS:
+    case AlternativeAssetKind.PRECIOUS_METAL:
       return <Icons.PreciousDuotone size={size} className={className} />;
     case AlternativeAssetKind.LIABILITY:
       return <Icons.LiabilityDuotone size={size} className={className} />;
@@ -416,7 +416,7 @@ function getTypeSpecificDescription(kind: AlternativeAssetKind): string {
       return "Vehicle make, model, or description";
     case AlternativeAssetKind.COLLECTIBLE:
       return "Collectible type and description";
-    case AlternativeAssetKind.PHYSICAL_PRECIOUS:
+    case AlternativeAssetKind.PRECIOUS_METAL:
       return "Metal type and unit information";
     case AlternativeAssetKind.LIABILITY:
       return "Loan terms and linked asset information";

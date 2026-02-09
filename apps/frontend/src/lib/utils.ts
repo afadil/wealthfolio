@@ -507,8 +507,7 @@ export function normalizeDecimalString(value: unknown): string | null {
   if (normalized.includes("e")) {
     return normalized;
   }
-  const trimmed =
-    normalized.endsWith(".") ? normalized.slice(0, -1) : normalized;
+  const trimmed = normalized.endsWith(".") ? normalized.slice(0, -1) : normalized;
   if (trimmed.includes(".")) {
     return trimmed.replace(/\.?0+$/, "") || "0";
   }

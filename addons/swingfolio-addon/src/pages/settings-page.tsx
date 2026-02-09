@@ -15,9 +15,9 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@wealthfolio/ui';
-import type { AddonContext } from '@wealthfolio/addon-sdk';
-import { useSwingPreferences } from '../hooks/use-swing-preferences';
+} from "@wealthfolio/ui";
+import type { AddonContext } from "@wealthfolio/addon-sdk";
+import { useSwingPreferences } from "../hooks/use-swing-preferences";
 
 interface SettingsPageProps {
   ctx: AddonContext;
@@ -26,7 +26,7 @@ interface SettingsPageProps {
 export default function SettingsPage({ ctx }: SettingsPageProps) {
   const { preferences, updatePreferences, isUpdating } = useSwingPreferences(ctx);
 
-  const handleLotMethodChange = (method: 'FIFO' | 'LIFO' | 'AVERAGE') => {
+  const handleLotMethodChange = (method: "FIFO" | "LIFO" | "AVERAGE") => {
     updatePreferences({ lotMatchingMethod: method });
   };
 
@@ -42,7 +42,7 @@ export default function SettingsPage({ ctx }: SettingsPageProps) {
     updatePreferences({ includeDividends: checked });
   };
 
-  const pageDescription = 'Configure your swing trading analysis preferences';
+  const pageDescription = "Configure your swing trading analysis preferences";
 
   return (
     <Page>
@@ -52,7 +52,7 @@ export default function SettingsPage({ ctx }: SettingsPageProps) {
         actions={
           <Button
             variant="outline"
-            onClick={() => ctx.api.navigation.navigate('/addons/swingfolio')}
+            onClick={() => ctx.api.navigation.navigate("/addons/swingfolio")}
           >
             <Icons.ArrowLeft className="mr-2 h-4 w-4" />
             Back to Dashboard

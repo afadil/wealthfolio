@@ -62,7 +62,6 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
     "tauri-plugin-web-auth-api": "^1.0.0",
-    "tw-shimmer": "^0.4.3",
     "zod": "^3.25.76",
     "zustand": "^5.0.10"
   },

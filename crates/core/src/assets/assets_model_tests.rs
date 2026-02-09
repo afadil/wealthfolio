@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::assets::{Asset, AssetKind, OptionSpec, PricingMode};
+    use crate::assets::{Asset, AssetKind, InstrumentType, OptionSpec, QuoteMode};
     use chrono::NaiveDateTime;
     use rust_decimal_macros::dec;
     use serde_json::json;
@@ -10,38 +10,16 @@ mod tests {
     // Test AssetKind enum
     #[test]
     fn test_asset_kind_serialization() {
-        // Test SCREAMING_SNAKE_CASE serialization
-        let kind = AssetKind::Security;
+        let kind = AssetKind::Investment;
         let json = serde_json::to_string(&kind).unwrap();
-        assert_eq!(json, "\"SECURITY\"");
+        assert_eq!(json, "\"INVESTMENT\"");
     }
 
     #[test]
     fn test_asset_kind_serialization_all_variants() {
         assert_eq!(
-            serde_json::to_string(&AssetKind::Security).unwrap(),
-            "\"SECURITY\""
-        );
-        assert_eq!(
-            serde_json::to_string(&AssetKind::Crypto).unwrap(),
-            "\"CRYPTO\""
-        );
-        assert_eq!(serde_json::to_string(&AssetKind::Cash).unwrap(), "\"CASH\"");
-        assert_eq!(
-            serde_json::to_string(&AssetKind::FxRate).unwrap(),
-            "\"FX_RATE\""
-        );
-        assert_eq!(
-            serde_json::to_string(&AssetKind::Option).unwrap(),
-            "\"OPTION\""
-        );
-        assert_eq!(
-            serde_json::to_string(&AssetKind::Commodity).unwrap(),
-            "\"COMMODITY\""
-        );
-        assert_eq!(
-            serde_json::to_string(&AssetKind::PrivateEquity).unwrap(),
-            "\"PRIVATE_EQUITY\""
+            serde_json::to_string(&AssetKind::Investment).unwrap(),
+            "\"INVESTMENT\""
         );
         assert_eq!(
             serde_json::to_string(&AssetKind::Property).unwrap(),
@@ -56,8 +34,12 @@ mod tests {
             "\"COLLECTIBLE\""
         );
         assert_eq!(
-            serde_json::to_string(&AssetKind::PhysicalPrecious).unwrap(),
-            "\"PHYSICAL_PRECIOUS\""
+            serde_json::to_string(&AssetKind::PreciousMetal).unwrap(),
+            "\"PRECIOUS_METAL\""
+        );
+        assert_eq!(
+            serde_json::to_string(&AssetKind::PrivateEquity).unwrap(),
+            "\"PRIVATE_EQUITY\""
         );
         assert_eq!(
             serde_json::to_string(&AssetKind::Liability).unwrap(),
@@ -67,43 +49,20 @@ mod tests {
             serde_json::to_string(&AssetKind::Other).unwrap(),
             "\"OTHER\""
         );
+        assert_eq!(serde_json::to_string(&AssetKind::Fx).unwrap(), "\"FX\"");
     }
 
     #[test]
     fn test_asset_kind_deserialization() {
-        let kind: AssetKind = serde_json::from_str("\"CRYPTO\"").unwrap();
-        assert_eq!(kind, AssetKind::Crypto);
+        let kind: AssetKind = serde_json::from_str("\"INVESTMENT\"").unwrap();
+        assert_eq!(kind, AssetKind::Investment);
     }
 
     #[test]
     fn test_asset_kind_deserialization_all_variants() {
         assert_eq!(
-            serde_json::from_str::<AssetKind>("\"SECURITY\"").unwrap(),
-            AssetKind::Security
-        );
-        assert_eq!(
-            serde_json::from_str::<AssetKind>("\"CRYPTO\"").unwrap(),
-            AssetKind::Crypto
-        );
-        assert_eq!(
-            serde_json::from_str::<AssetKind>("\"CASH\"").unwrap(),
-            AssetKind::Cash
-        );
-        assert_eq!(
-            serde_json::from_str::<AssetKind>("\"FX_RATE\"").unwrap(),
-            AssetKind::FxRate
-        );
-        assert_eq!(
-            serde_json::from_str::<AssetKind>("\"OPTION\"").unwrap(),
-            AssetKind::Option
-        );
-        assert_eq!(
-            serde_json::from_str::<AssetKind>("\"COMMODITY\"").unwrap(),
-            AssetKind::Commodity
-        );
-        assert_eq!(
-            serde_json::from_str::<AssetKind>("\"PRIVATE_EQUITY\"").unwrap(),
-            AssetKind::PrivateEquity
+            serde_json::from_str::<AssetKind>("\"INVESTMENT\"").unwrap(),
+            AssetKind::Investment
         );
         assert_eq!(
             serde_json::from_str::<AssetKind>("\"PROPERTY\"").unwrap(),
@@ -118,8 +77,12 @@ mod tests {
             AssetKind::Collectible
         );
         assert_eq!(
-            serde_json::from_str::<AssetKind>("\"PHYSICAL_PRECIOUS\"").unwrap(),
-            AssetKind::PhysicalPrecious
+            serde_json::from_str::<AssetKind>("\"PRECIOUS_METAL\"").unwrap(),
+            AssetKind::PreciousMetal
+        );
+        assert_eq!(
+            serde_json::from_str::<AssetKind>("\"PRIVATE_EQUITY\"").unwrap(),
+            AssetKind::PrivateEquity
         );
         assert_eq!(
             serde_json::from_str::<AssetKind>("\"LIABILITY\"").unwrap(),
@@ -129,36 +92,28 @@ mod tests {
             serde_json::from_str::<AssetKind>("\"OTHER\"").unwrap(),
             AssetKind::Other
         );
+        assert_eq!(
+            serde_json::from_str::<AssetKind>("\"FX\"").unwrap(),
+            AssetKind::Fx
+        );
     }
 
     #[test]
     fn test_asset_kind_default() {
         let kind = AssetKind::default();
-        assert_eq!(kind, AssetKind::Security);
+        assert_eq!(kind, AssetKind::Investment);
     }
 
     // Test is_holdable method
     #[test]
-    fn test_is_holdable_security() {
-        let asset = create_test_asset(AssetKind::Security);
+    fn test_is_holdable_investment() {
+        let asset = create_test_asset(AssetKind::Investment);
         assert!(asset.is_holdable());
     }
 
     #[test]
-    fn test_is_holdable_crypto() {
-        let asset = create_test_asset(AssetKind::Crypto);
-        assert!(asset.is_holdable());
-    }
-
-    #[test]
-    fn test_is_holdable_cash() {
-        let asset = create_test_asset(AssetKind::Cash);
-        assert!(asset.is_holdable());
-    }
-
-    #[test]
-    fn test_is_holdable_fx_rate() {
-        let asset = create_test_asset(AssetKind::FxRate);
+    fn test_is_holdable_fx() {
+        let asset = create_test_asset(AssetKind::Fx);
         assert!(!asset.is_holdable());
     }
 
@@ -169,115 +124,59 @@ mod tests {
     }
 
     #[test]
-    fn test_is_holdable_vehicle() {
-        let asset = create_test_asset(AssetKind::Vehicle);
-        assert!(asset.is_holdable());
-    }
-
-    #[test]
-    fn test_is_holdable_collectible() {
-        let asset = create_test_asset(AssetKind::Collectible);
-        assert!(asset.is_holdable());
-    }
-
-    #[test]
-    fn test_is_holdable_physical_precious() {
-        let asset = create_test_asset(AssetKind::PhysicalPrecious);
-        assert!(asset.is_holdable());
-    }
-
-    #[test]
     fn test_is_holdable_liability() {
         let asset = create_test_asset(AssetKind::Liability);
         assert!(asset.is_holdable());
     }
 
-    #[test]
-    fn test_is_holdable_other() {
-        let asset = create_test_asset(AssetKind::Other);
-        assert!(asset.is_holdable());
-    }
-
     // Test needs_pricing method
     #[test]
-    fn test_needs_pricing_cash() {
-        let asset = create_test_asset(AssetKind::Cash);
+    fn test_needs_pricing_market() {
+        let asset = create_test_asset(AssetKind::Investment);
+        assert!(asset.needs_pricing());
+    }
+
+    #[test]
+    fn test_needs_pricing_manual() {
+        let mut asset = create_test_asset(AssetKind::Property);
+        asset.quote_mode = QuoteMode::Manual;
         assert!(!asset.needs_pricing());
     }
 
+    // Test is_alternative
     #[test]
-    fn test_needs_pricing_security() {
-        let asset = create_test_asset(AssetKind::Security);
-        assert!(asset.needs_pricing());
+    fn test_is_alternative() {
+        assert!(AssetKind::Property.is_alternative());
+        assert!(AssetKind::Vehicle.is_alternative());
+        assert!(AssetKind::Collectible.is_alternative());
+        assert!(AssetKind::PreciousMetal.is_alternative());
+        assert!(AssetKind::Liability.is_alternative());
+        assert!(AssetKind::Other.is_alternative());
+        assert!(!AssetKind::Investment.is_alternative());
+        assert!(!AssetKind::Fx.is_alternative());
+        assert!(!AssetKind::PrivateEquity.is_alternative());
     }
 
+    // Test is_investment
     #[test]
-    fn test_needs_pricing_crypto() {
-        let asset = create_test_asset(AssetKind::Crypto);
-        assert!(asset.needs_pricing());
-    }
-
-    #[test]
-    fn test_needs_pricing_property() {
-        // Alternative assets need pricing (via Manual quotes)
-        let asset = create_test_asset(AssetKind::Property);
-        assert!(asset.needs_pricing());
-    }
-
-    #[test]
-    fn test_needs_pricing_vehicle() {
-        let asset = create_test_asset(AssetKind::Vehicle);
-        assert!(asset.needs_pricing());
-    }
-
-    #[test]
-    fn test_needs_pricing_collectible() {
-        let asset = create_test_asset(AssetKind::Collectible);
-        assert!(asset.needs_pricing());
-    }
-
-    #[test]
-    fn test_needs_pricing_physical_precious() {
-        let asset = create_test_asset(AssetKind::PhysicalPrecious);
-        assert!(asset.needs_pricing());
-    }
-
-    #[test]
-    fn test_needs_pricing_liability() {
-        // Liabilities need pricing (balance updates via Manual quotes)
-        let asset = create_test_asset(AssetKind::Liability);
-        assert!(asset.needs_pricing());
-    }
-
-    #[test]
-    fn test_needs_pricing_other() {
-        let asset = create_test_asset(AssetKind::Other);
-        assert!(asset.needs_pricing());
-    }
-
-    // Test effective_kind method (now just returns kind)
-    #[test]
-    fn test_effective_kind() {
-        let asset = create_test_asset(AssetKind::Crypto);
-        assert_eq!(asset.effective_kind(), AssetKind::Crypto);
+    fn test_is_investment() {
+        assert!(AssetKind::Investment.is_investment());
+        assert!(AssetKind::PrivateEquity.is_investment());
+        assert!(!AssetKind::Property.is_investment());
+        assert!(!AssetKind::Fx.is_investment());
     }
 
     // Test option_spec method
     #[test]
     fn test_option_spec_non_option_asset() {
-        let asset = create_test_asset(AssetKind::Security);
-        assert!(asset.option_spec().is_none());
-    }
-
-    #[test]
-    fn test_option_spec_option_without_metadata() {
-        let asset = create_test_asset(AssetKind::Option);
+        let asset = create_test_asset(AssetKind::Investment);
         assert!(asset.option_spec().is_none());
     }
 
     #[test]
     fn test_option_spec_option_with_metadata() {
-        let mut asset = create_test_asset(AssetKind::Option);
+        let mut asset = create_test_asset(AssetKind::Investment);
+        asset.instrument_type = Some(InstrumentType::Option);
         asset.metadata = Some(json!({
             "option": {
                 "underlyingAssetId": "AAPL",
@@ -315,28 +214,65 @@ mod tests {
         assert!(json.contains("\"right\":\"CALL\""));
     }
 
+    // Test InstrumentType
+    #[test]
+    fn test_instrument_type_db_roundtrip() {
+        for inst_type in [
+            InstrumentType::Equity,
+            InstrumentType::Crypto,
+            InstrumentType::Fx,
+            InstrumentType::Option,
+            InstrumentType::Metal,
+        ] {
+            let db_str = inst_type.as_db_str();
+            let parsed = InstrumentType::from_db_str(db_str).unwrap();
+            assert_eq!(parsed, inst_type);
+        }
+    }
+
+    // Test AssetKind db roundtrip
+    #[test]
+    fn test_asset_kind_db_roundtrip() {
+        for kind in [
+            AssetKind::Investment,
+            AssetKind::Property,
+            AssetKind::Vehicle,
+            AssetKind::Collectible,
+            AssetKind::PreciousMetal,
+            AssetKind::PrivateEquity,
+            AssetKind::Liability,
+            AssetKind::Other,
+            AssetKind::Fx,
+        ] {
+            let db_str = kind.as_db_str();
+            let parsed = AssetKind::from_db_str(db_str).unwrap();
+            assert_eq!(parsed, kind);
+        }
+    }
+
     // Helper function
     fn create_test_asset(kind: AssetKind) -> Asset {
-        // Set pricing_mode based on kind (Cash = None, others = Market)
-        let pricing_mode = match kind {
-            AssetKind::Cash => PricingMode::None,
-            _ => PricingMode::Market,
+        let quote_mode = match kind {
+            AssetKind::Investment | AssetKind::Fx => QuoteMode::Market,
+            _ => QuoteMode::Market, // All kinds use Market by default in tests
         };
 
         Asset {
-            id: "TEST".to_string(),
+            id: "test-uuid".to_string(),
             kind,
             name: Some("Test Asset".to_string()),
-            symbol: "TEST".to_string(),
-            exchange_mic: None,
-            exchange_name: None,
-            currency: "USD".to_string(),
-            pricing_mode,
-            preferred_provider: None,
-            provider_overrides: None,
+            display_code: Some("TEST".to_string()),
             notes: None,
             metadata: None,
             is_active: true,
+            quote_mode,
+            quote_ccy: "USD".to_string(),
+            instrument_type: None,
+            instrument_symbol: None,
+            instrument_exchange_mic: None,
+            instrument_key: None,
+            provider_config: None,
+            exchange_name: None,
             created_at: NaiveDateTime::default(),
             updated_at: NaiveDateTime::default(),
         }

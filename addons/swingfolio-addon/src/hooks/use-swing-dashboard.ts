@@ -1,16 +1,16 @@
-import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
-import type { AddonContext, Holding } from '@wealthfolio/addon-sdk';
-import type { SwingDashboardData, ClosedTrade, OpenPosition } from '../types';
-import { useSwingActivities } from './use-swing-activities';
-import { useSwingPreferences } from './use-swing-preferences';
-import { useHoldings } from './use-holdings';
-import { TradeMatcher, PerformanceCalculator } from '../lib';
-import { useCurrencyConversion } from './use-currency-conversion';
-import { startOfDay, endOfDay, startOfYear, subMonths, subYears } from 'date-fns';
+import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
+import type { AddonContext, Holding } from "@wealthfolio/addon-sdk";
+import type { SwingDashboardData, ClosedTrade, OpenPosition } from "../types";
+import { useSwingActivities } from "./use-swing-activities";
+import { useSwingPreferences } from "./use-swing-preferences";
+import { useHoldings } from "./use-holdings";
+import { TradeMatcher, PerformanceCalculator } from "../lib";
+import { useCurrencyConversion } from "./use-currency-conversion";
+import { startOfDay, endOfDay, startOfYear, subMonths, subYears } from "date-fns";
 
-type PeriodType = '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'ALL';
-type ChartPeriodType = 'daily' | 'weekly' | 'monthly';
+type PeriodType = "1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL";
+type ChartPeriodType = "daily" | "weekly" | "monthly";
 
 /**
  * Custom hook for managing swing trading dashboard data
@@ -32,12 +32,12 @@ export function useSwingDashboard(ctx: AddonContext, period: PeriodType) {
   // Auto-detect optimal chart period type based on selected period
   const autoChartPeriodType = useMemo((): ChartPeriodType => {
     switch (period) {
-      case '1M':
-        return 'daily';
-      case '3M':
-        return 'weekly';
+      case "1M":
+        return "daily";
+      case "3M":
+        return "weekly";
       default:
-        return 'monthly';
+        return "monthly";
     }
   }, [period]);
 
@@ -66,7 +66,7 @@ export function useSwingDashboard(ctx: AddonContext, period: PeriodType) {
 
   return useQuery({
     queryKey: [
-      'swing-dashboard',
+      "swing-dashboard",
       period,
       autoChartPeriodType, // Use auto-detected period type
       preferences.selectedActivityIds,
@@ -78,7 +78,7 @@ export function useSwingDashboard(ctx: AddonContext, period: PeriodType) {
     ],
     queryFn: async (): Promise<SwingDashboardData> => {
       if (!activities) {
-        throw new Error('Activities not loaded');
+        throw new Error("Activities not loaded");
       }
 
       // Filter activities based on preferences
@@ -135,7 +135,7 @@ export function useSwingDashboard(ctx: AddonContext, period: PeriodType) {
 
       // Generate calendar data for current year (can be period-filtered)
       const calendarCalculator =
-        period === 'ALL'
+        period === "ALL"
           ? new PerformanceCalculator(closedTrades) // All trades for 'ALL' period
           : historicalCalculator; // Period-filtered for specific periods
 
@@ -265,13 +265,13 @@ function findMatchingHolding(symbol: string, holdings: Holding[]): Holding | und
 
   // If no exact match, try base symbol matching (remove exchange suffixes)
   if (!matchingHolding) {
-    const baseSymbol = symbol.split('.')[0];
+    const baseSymbol = symbol.split(".")[0];
 
     matchingHolding = holdings.find((holding) => {
       const holdingSymbol = holding.instrument?.symbol;
       if (!holdingSymbol) return false;
 
-      const holdingBaseSymbol = holdingSymbol.split('.')[0];
+      const holdingBaseSymbol = holdingSymbol.split(".")[0];
       return holdingBaseSymbol === baseSymbol;
     });
   }
@@ -288,22 +288,22 @@ function getDateRangeForPeriod(period: PeriodType): { startDate: Date; endDate: 
   let startDate: Date;
 
   switch (period) {
-    case '1M':
+    case "1M":
       startDate = startOfDay(subMonths(now, 1));
       break;
-    case '3M':
+    case "3M":
       startDate = startOfDay(subMonths(now, 3));
       break;
-    case '6M':
+    case "6M":
       startDate = startOfDay(subMonths(now, 6));
       break;
-    case 'YTD':
+    case "YTD":
       startDate = startOfYear(now);
       break;
-    case '1Y':
+    case "1Y":
       startDate = startOfDay(subYears(now, 1));
       break;
-    case 'ALL':
+    case "ALL":
     default:
       startDate = new Date(2000, 0, 1); // Far back date
       break;

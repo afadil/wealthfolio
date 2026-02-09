@@ -1,4 +1,4 @@
-import { ActivityType, CASH_ACTIVITY_TYPES, INCOME_ACTIVITY_TYPES } from "./constants";
+import { ActivityType, INCOME_ACTIVITY_TYPES, SYMBOL_REQUIRED_TYPES } from "./constants";
 import { ActivityDetails } from "./types";
 
 const roundCurrency = (value: number, precision = 6) => {
@@ -10,12 +10,11 @@ const roundCurrency = (value: number, precision = 6) => {
 };
 
 /**
- * Determines if an activity is a cash activity based on its type
- * @param activityType The activity type to check
- * @returns True if the activity is a cash activity
+ * Determines if an activity type does not require a symbol (i.e. can be cash-only).
+ * Callers use this for form/grid logic to hide/show symbol fields.
  */
 export const isCashActivity = (activityType: string): boolean => {
-  return (CASH_ACTIVITY_TYPES as readonly string[]).includes(activityType);
+  return !(SYMBOL_REQUIRED_TYPES as readonly string[]).includes(activityType);
 };
 
 /**
@@ -35,23 +34,11 @@ export const isCashSymbol = (symbol?: string): boolean => {
   return /^\$?CASH[-_:][A-Z]{3}$/i.test(symbol.trim());
 };
 
-const SYMBOL_NEVER_NEEDED = new Set<string>([
-  ActivityType.DEPOSIT,
-  ActivityType.WITHDRAWAL,
-  ActivityType.INTEREST,
-  ActivityType.TAX,
-  ActivityType.FEE,
-  ActivityType.CREDIT,
-]);
-
 /**
- * Whether a symbol is required for this activity+symbol combination.
- * Pure cash types → never. Cash symbols (e.g. $CASH-CAD) → never. Otherwise → yes.
+ * Whether a symbol is required for this activity type.
  */
-export const isSymbolRequired = (activityType: string, symbol?: string): boolean => {
-  if (SYMBOL_NEVER_NEEDED.has(activityType)) return false;
-  if (isCashSymbol(symbol)) return false;
-  return true;
+export const isSymbolRequired = (activityType: string): boolean => {
+  return (SYMBOL_REQUIRED_TYPES as readonly string[]).includes(activityType);
 };
 
 /**
@@ -151,7 +138,11 @@ export const calculateActivityValue = (activity: ActivityDetails): number => {
   }
 
   if (activityType === ActivityType.FEE || activityType === ActivityType.TAX) {
-    return roundCurrency(Number(getFee(activity)));
+    const amount = getAmount(activity);
+    if (amount !== 0) {
+      return roundCurrency(amount);
+    }
+    return roundCurrency(getFee(activity));
   }
 
   // Handle cash activities

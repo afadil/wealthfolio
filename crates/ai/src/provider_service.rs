@@ -210,7 +210,7 @@ impl AiProviderServiceTrait for AiProviderService {
                         favorite: catalog_provider.default_config.enabled, // Recommended = favorite
                         selected_model: None,
                         custom_url: catalog_provider.default_config.url.clone(),
-                        priority: 100, // Default priority
+                        priority: catalog_provider.default_config.priority,
                         ..Default::default()
                     }
                 });
@@ -259,7 +259,12 @@ impl AiProviderServiceTrait for AiProviderService {
                     favorite: user.favorite,
                     selected_model: user.selected_model,
                     custom_url: user.custom_url,
-                    priority: user.priority,
+                    // Use catalog priority if user hasn't set one (0 = legacy default)
+                    priority: if user.priority == 0 {
+                        catalog_provider.default_config.priority
+                    } else {
+                        user.priority
+                    },
                     favorite_models: user.favorite_models.clone(),
                     model_capability_overrides: user.model_capability_overrides.clone(),
                     tools_allowlist: user.tools_allowlist.clone(),
@@ -409,18 +414,15 @@ impl AiProviderServiceTrait for AiProviderService {
         let config = self.get_provider_config(provider_id)?;
 
         // Build the model list URL based on provider
-        let base_url = config
-            .base_url
-            .as_deref()
-            .unwrap_or(match provider_id {
-                "anthropic" => "https://api.anthropic.com",
-                "openai" => "https://api.openai.com",
-                "groq" => "https://api.groq.com/openai",
-                "openrouter" => "https://openrouter.ai/api",
-                "google" => "https://generativelanguage.googleapis.com",
-                "ollama" => "http://localhost:11434",
-                _ => "https://api.openai.com",
-            });
+        let base_url = config.base_url.as_deref().unwrap_or(match provider_id {
+            "anthropic" => "https://api.anthropic.com",
+            "openai" => "https://api.openai.com",
+            "groq" => "https://api.groq.com/openai",
+            "openrouter" => "https://openrouter.ai/api",
+            "google" => "https://generativelanguage.googleapis.com",
+            "ollama" => "http://localhost:11434",
+            _ => "https://api.openai.com",
+        });
 
         let models_url = match provider_id {
             "ollama" => format!("{}/api/tags", base_url.trim_end_matches('/')),

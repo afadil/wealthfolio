@@ -12,6 +12,7 @@ tauri-build = { version = "2.5", features = [] }
 
 [dependencies]
 # Internal crates
+wealthfolio-market-data = { workspace = true }
 wealthfolio-core = { workspace = true }
 wealthfolio-connect = { workspace = true }
 wealthfolio-storage-sqlite = { workspace = true }

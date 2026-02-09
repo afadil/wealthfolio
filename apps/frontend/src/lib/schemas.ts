@@ -45,6 +45,16 @@ export const importMappingSchema = z.object({
   activityMappings: z.record(z.string(), z.array(z.string())).optional().default({}),
   symbolMappings: z.record(z.string(), z.string()).optional().default({}),
   accountMappings: z.record(z.string(), z.string()).optional().default({}),
+  /** Rich metadata for resolved symbol mappings (exchange MIC, display name) */
+  symbolMappingMeta: z
+    .record(
+      z.string(),
+      z.object({
+        exchangeMic: z.string().optional(),
+        symbolName: z.string().optional(),
+      }),
+    )
+    .optional(),
   /** CSV parsing configuration */
   parseConfig: parseConfigSchema.optional(),
 });
@@ -143,6 +153,9 @@ export const importActivitySchema = z
     /** Resolved exchange MIC for the symbol (populated during validation) */
     exchangeMic: z.string().optional(),
     errors: z.record(z.string(), z.array(z.string())).optional(),
+    warnings: z.record(z.string(), z.array(z.string())).optional(),
+    duplicateOfId: z.string().optional(),
+    duplicateOfLineNumber: z.number().optional(),
     isValid: z.boolean().default(false),
     lineNumber: z.number().optional(),
     isDraft: z.boolean(),

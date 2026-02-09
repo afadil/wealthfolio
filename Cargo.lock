@@ -7600,6 +7600,7 @@ dependencies = [
  "wealthfolio-connect",
  "wealthfolio-core",
  "wealthfolio-device-sync",
+ "wealthfolio-market-data",
  "wealthfolio-storage-sqlite",
  "x25519-dalek",
 ]
@@ -7745,6 +7746,7 @@ dependencies = [
  "wealthfolio-connect",
  "wealthfolio-core",
  "wealthfolio-device-sync",
+ "wealthfolio-market-data",
  "wealthfolio-storage-sqlite",
 ]
 

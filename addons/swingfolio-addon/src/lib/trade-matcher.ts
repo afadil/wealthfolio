@@ -1,6 +1,6 @@
-import type { ActivityDetails } from '@wealthfolio/addon-sdk';
-import { differenceInDays } from 'date-fns';
-import type { ClosedTrade, OpenPosition, TradeMatchResult } from '../types';
+import type { ActivityDetails } from "@wealthfolio/addon-sdk";
+import { differenceInDays } from "date-fns";
+import type { ClosedTrade, OpenPosition, TradeMatchResult } from "../types";
 
 interface Lot {
   activity: ActivityDetails;
@@ -20,7 +20,7 @@ interface AverageLot {
 }
 
 export interface TradeMatcherOptions {
-  lotMethod?: 'FIFO' | 'LIFO' | 'AVERAGE';
+  lotMethod?: "FIFO" | "LIFO" | "AVERAGE";
   includeFees?: boolean;
   includeDividends?: boolean;
 }
@@ -29,12 +29,12 @@ export interface TradeMatcherOptions {
  * TradeMatcher class for matching buy and sell activities to compute closed trades and open positions
  */
 export class TradeMatcher {
-  private lotMethod: 'FIFO' | 'LIFO' | 'AVERAGE';
+  private lotMethod: "FIFO" | "LIFO" | "AVERAGE";
   private includeFees: boolean;
   private includeDividends: boolean;
 
   constructor(options: TradeMatcherOptions = {}) {
-    this.lotMethod = options.lotMethod || 'FIFO';
+    this.lotMethod = options.lotMethod || "FIFO";
     this.includeFees = options.includeFees !== false; // Default to true
     this.includeDividends = options.includeDividends !== false; // Default to true
   }
@@ -48,9 +48,9 @@ export class TradeMatcher {
 
     // Separate trading activities from dividends
     const tradingActivities = parsedActivities.filter(
-      (a) => a.activityType === 'BUY' || a.activityType === 'SELL',
+      (a) => a.activityType === "BUY" || a.activityType === "SELL",
     );
-    const dividendActivities = parsedActivities.filter((a) => a.activityType === 'DIVIDEND');
+    const dividendActivities = parsedActivities.filter((a) => a.activityType === "DIVIDEND");
 
     // Group activities by symbol
     const bySymbol = this.groupBySymbol(tradingActivities);
@@ -97,8 +97,8 @@ export class TradeMatcher {
    * Safely parse a value to number
    */
   private parseNumber(value: any): number {
-    if (typeof value === 'number') return value;
-    if (typeof value === 'string') return parseFloat(value) || 0;
+    if (typeof value === "number") return value;
+    if (typeof value === "string") return parseFloat(value) || 0;
     return 0;
   }
 
@@ -132,7 +132,7 @@ export class TradeMatcher {
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
     );
 
-    if (this.lotMethod === 'AVERAGE') {
+    if (this.lotMethod === "AVERAGE") {
       return this.matchSymbolTradesAverage(symbol, sortedActivities, dividends);
     } else {
       return this.matchSymbolTradesSpecific(symbol, sortedActivities, dividends);
@@ -155,7 +155,7 @@ export class TradeMatcher {
     let averageLot: AverageLot | null = null;
 
     for (const activity of activities) {
-      if (activity.activityType === 'BUY') {
+      if (activity.activityType === "BUY") {
         // Add to average lot
         if (!averageLot) {
           averageLot = this.createNewAverageLot(activity, symbol);
@@ -178,7 +178,7 @@ export class TradeMatcher {
             averageLot.dividends.push(...uniqueNewDivs);
           }
         }
-      } else if (activity.activityType === 'SELL') {
+      } else if (activity.activityType === "SELL") {
         // Process sell against average lot
         if (!averageLot || averageLot.remainingQuantity <= 0) {
           unmatchedSells.push(activity);
@@ -281,7 +281,7 @@ export class TradeMatcher {
     const lots: Lot[] = [];
 
     for (const activity of activities) {
-      if (activity.activityType === 'BUY') {
+      if (activity.activityType === "BUY") {
         const lot: Lot = {
           activity: activity,
           remainingQuantity: activity.quantity,
@@ -295,11 +295,11 @@ export class TradeMatcher {
         }
 
         lots.push(lot);
-      } else if (activity.activityType === 'SELL') {
+      } else if (activity.activityType === "SELL") {
         let sellQuantityRemaining = activity.quantity;
 
         while (sellQuantityRemaining > 0 && lots.length > 0) {
-          const lotIndex = this.lotMethod === 'FIFO' ? 0 : lots.length - 1;
+          const lotIndex = this.lotMethod === "FIFO" ? 0 : lots.length - 1;
           const lot = lots[lotIndex];
           const matchedQuantity = Math.min(sellQuantityRemaining, lot.remainingQuantity);
 

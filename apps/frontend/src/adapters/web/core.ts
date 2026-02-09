@@ -71,6 +71,7 @@ export const COMMANDS: CommandMap = {
   get_account_import_mapping: { method: "GET", path: "/activities/import/mapping" },
   save_account_import_mapping: { method: "POST", path: "/activities/import/mapping" },
   // Market data providers
+  get_exchanges: { method: "GET", path: "/exchanges" },
   get_market_data_providers: { method: "GET", path: "/providers" },
   get_market_data_providers_settings: { method: "GET", path: "/providers/settings" },
   update_market_data_provider_settings: { method: "PUT", path: "/providers/settings" },
@@ -85,7 +86,7 @@ export const COMMANDS: CommandMap = {
   delete_asset: { method: "DELETE", path: "/assets" },
   get_asset_profile: { method: "GET", path: "/assets/profile" },
   update_asset_profile: { method: "PUT", path: "/assets/profile" },
-  update_pricing_mode: { method: "PUT", path: "/assets/pricing-mode" },
+  update_quote_mode: { method: "PUT", path: "/assets/pricing-mode" },
   // Market data
   search_symbol: { method: "GET", path: "/market-data/search" },
   get_quote_history: { method: "GET", path: "/market-data/quotes/history" },
@@ -470,6 +471,7 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       url += `/${encodeURIComponent(rateId)}`;
       break;
     }
+    case "get_exchanges":
     case "synch_quotes":
       break;
     case "search_activities": {
@@ -559,10 +561,10 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       body = JSON.stringify(bodyPayload);
       break;
     }
-    case "update_pricing_mode": {
-      const { id, pricingMode } = payload as { id: string; pricingMode: string };
+    case "update_quote_mode": {
+      const { id, quoteMode } = payload as { id: string; quoteMode: string };
       url += `/${encodeURIComponent(id)}`;
-      body = JSON.stringify({ pricing_mode: pricingMode });
+      body = JSON.stringify({ quoteMode });
       break;
     }
     case "search_symbol": {

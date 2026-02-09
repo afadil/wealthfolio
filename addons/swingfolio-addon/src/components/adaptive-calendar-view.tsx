@@ -1,5 +1,5 @@
-import { Button, Icons, GainAmount } from '@wealthfolio/ui';
-import type { CalendarMonth, CalendarDay } from '../types';
+import { Button, Icons, GainAmount } from "@wealthfolio/ui";
+import type { CalendarMonth, CalendarDay } from "../types";
 import {
   format,
   addYears,
@@ -13,18 +13,18 @@ import {
   eachDayOfInterval,
   isSameMonth,
   isToday,
-} from 'date-fns';
-import { cn } from '../lib/utils';
+} from "date-fns";
+import { cn } from "../lib/utils";
 
 interface AdaptiveCalendarViewProps {
   calendar: CalendarMonth[];
-  selectedPeriod: '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'ALL';
+  selectedPeriod: "1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL";
   selectedYear: Date;
   onYearChange: (date: Date) => void;
   currency: string;
 }
 
-type CalendarViewType = 'daily' | 'yearly';
+type CalendarViewType = "daily" | "yearly";
 
 /**
  * Adaptive calendar that shows different granularity based on selected period:
@@ -41,10 +41,10 @@ export function AdaptiveCalendarView({
   // Determine view type based on selected period
   const getViewType = (): CalendarViewType => {
     switch (selectedPeriod) {
-      case '1M':
-        return 'daily';
+      case "1M":
+        return "daily";
       default:
-        return 'yearly'; // 3M, 6M, YTD, 1Y, ALL all use yearly calendar
+        return "yearly"; // 3M, 6M, YTD, 1Y, ALL all use yearly calendar
     }
   };
 
@@ -52,7 +52,7 @@ export function AdaptiveCalendarView({
 
   // Get appropriate title based on view type (for future use)
 
-  if (viewType === 'daily') {
+  if (viewType === "daily") {
     return (
       <DailyCalendarView
         calendar={calendar}
@@ -82,7 +82,7 @@ function DailyCalendarView({
   selectedYear,
   onYearChange,
   currency,
-}: Omit<AdaptiveCalendarViewProps, 'selectedPeriod'>) {
+}: Omit<AdaptiveCalendarViewProps, "selectedPeriod">) {
   const currentMonth = selectedYear.getMonth();
   const currentYear = selectedYear.getFullYear();
 
@@ -111,13 +111,13 @@ function DailyCalendarView({
 
   const getDayColor = (day: CalendarDay | undefined, date: Date): string => {
     if (!day || day.tradeCount === 0) {
-      return isToday(date) ? 'bg-primary/10' : 'bg-muted/5';
+      return isToday(date) ? "bg-primary/10" : "bg-muted/5";
     }
 
     if (day.realizedPL > 0) {
-      return 'bg-success/20 hover:bg-success/30';
+      return "bg-success/20 hover:bg-success/30";
     } else {
-      return 'bg-destructive/20 hover:bg-destructive/30';
+      return "bg-destructive/20 hover:bg-destructive/30";
     }
   };
 
@@ -150,7 +150,7 @@ function DailyCalendarView({
           >
             <Icons.ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="px-3 text-sm font-medium">{format(selectedYear, 'MMM yyyy')}</span>
+          <span className="px-3 text-sm font-medium">{format(selectedYear, "MMM yyyy")}</span>
           <Button variant="outline" size="sm" onClick={handleNextMonth} className="rounded-full">
             <Icons.ChevronRight className="h-4 w-4" />
           </Button>
@@ -161,18 +161,18 @@ function DailyCalendarView({
         {/* Calendar table - bulletproof layout with centering */}
         <div className="flex w-full justify-center">
           <div className="w-full max-w-2xl">
-            {' '}
+            {" "}
             {/* Max width to prevent over-stretching */}
             <table className="border-border/50 w-full table-fixed border-collapse overflow-hidden rounded-lg border">
               {/* Header row */}
               <thead>
                 <tr className="border-border/50 border-b">
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
+                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, index) => (
                     <th
                       key={day}
                       className={cn(
-                        'text-muted-foreground bg-muted/20 w-[14.28%] py-2 text-center text-xs font-medium',
-                        index < 6 && 'border-border/50 border-r',
+                        "text-muted-foreground bg-muted/20 w-[14.28%] py-2 text-center text-xs font-medium",
+                        index < 6 && "border-border/50 border-r",
                       )}
                     >
                       {day}
@@ -189,7 +189,7 @@ function DailyCalendarView({
                     key={weekIndex}
                     className={cn(
                       weekIndex < Math.ceil(calendarDays.length / 7) - 1 &&
-                        'border-border/50 border-b',
+                        "border-border/50 border-b",
                     )}
                   >
                     {Array.from({ length: 7 }, (_, dayIndex) => {
@@ -201,14 +201,14 @@ function DailyCalendarView({
                           <td
                             key={dayIndex}
                             className={cn(
-                              'bg-background h-20 w-[14.28%] p-0 align-top',
-                              dayIndex < 6 && 'border-border/50 border-r',
+                              "bg-background h-20 w-[14.28%] p-0 align-top",
+                              dayIndex < 6 && "border-border/50 border-r",
                             )}
                           ></td>
                         );
                       }
 
-                      const dateStr = format(date, 'yyyy-MM-dd');
+                      const dateStr = format(date, "yyyy-MM-dd");
                       const dayData = tradingDataMap.get(dateStr);
                       const isCurrentDay = isToday(date);
                       const isCurrentMonthDay = isSameMonth(date, selectedYear);
@@ -217,27 +217,27 @@ function DailyCalendarView({
                         <td
                           key={dayIndex}
                           className={cn(
-                            'relative h-20 w-[14.28%] p-0 align-top',
-                            dayIndex < 6 && 'border-border/50 border-r',
+                            "relative h-20 w-[14.28%] p-0 align-top",
+                            dayIndex < 6 && "border-border/50 border-r",
                           )}
                         >
                           <div
                             className={cn(
-                              'absolute inset-0 flex flex-col items-center justify-start p-2 text-xs transition-all duration-200',
-                              isCurrentMonthDay ? getDayColor(dayData, date) : 'bg-muted/10',
-                              isCurrentDay && 'ring-primary/60 ring-2 ring-inset',
-                              !isCurrentMonthDay && 'opacity-50',
+                              "absolute inset-0 flex flex-col items-center justify-start p-2 text-xs transition-all duration-200",
+                              isCurrentMonthDay ? getDayColor(dayData, date) : "bg-muted/10",
+                              isCurrentDay && "ring-primary/60 ring-2 ring-inset",
+                              !isCurrentMonthDay && "opacity-50",
                             )}
                           >
                             {/* Day number */}
                             <div
                               className={cn(
-                                'mb-1 text-xs font-medium',
-                                isCurrentDay && 'text-primary font-bold',
-                                !isCurrentMonthDay && 'text-muted-foreground/50',
+                                "mb-1 text-xs font-medium",
+                                isCurrentDay && "text-primary font-bold",
+                                !isCurrentMonthDay && "text-muted-foreground/50",
                               )}
                             >
-                              {format(date, 'd')}
+                              {format(date, "d")}
                             </div>
 
                             {/* Trading data - only show for current month */}
@@ -281,7 +281,7 @@ function YearlyCalendarView({
   selectedYear,
   onYearChange,
   currency,
-}: Omit<AdaptiveCalendarViewProps, 'selectedPeriod'>) {
+}: Omit<AdaptiveCalendarViewProps, "selectedPeriod">) {
   // Filter calendar data for the selected year
   const yearlyData = calendar.filter((cal) => cal.year === selectedYear.getFullYear());
 
@@ -289,12 +289,12 @@ function YearlyCalendarView({
   const yearlyTrades = yearlyData.reduce((sum, month) => sum + month.totalTrades, 0);
 
   const getMonthColor = (month: CalendarMonth): string => {
-    if (month.totalTrades === 0) return 'bg-muted/10';
+    if (month.totalTrades === 0) return "bg-muted/10";
 
     if (month.monthlyPL > 0) {
-      return 'bg-success/20 hover:bg-success/30';
+      return "bg-success/20 hover:bg-success/30";
     } else {
-      return 'bg-destructive/20 hover:bg-destructive/30';
+      return "bg-destructive/20 hover:bg-destructive/30";
     }
   };
 
@@ -322,7 +322,7 @@ function YearlyCalendarView({
           <Button variant="outline" size="sm" onClick={handlePreviousYear} className="rounded-full">
             <Icons.ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="px-3 text-sm font-medium">{format(selectedYear, 'yyyy')}</span>
+          <span className="px-3 text-sm font-medium">{format(selectedYear, "yyyy")}</span>
           <Button variant="outline" size="sm" onClick={handleNextYear} className="rounded-full">
             <Icons.ChevronRight className="h-4 w-4" />
           </Button>
@@ -341,7 +341,7 @@ function YearlyCalendarView({
                     key={rowIndex}
                     className={cn(
                       rowIndex < Math.ceil(yearlyData.length / 3) - 1 &&
-                        'border-border/50 border-b',
+                        "border-border/50 border-b",
                     )}
                   >
                     {Array.from({ length: 3 }, (_, colIndex) => {
@@ -353,26 +353,26 @@ function YearlyCalendarView({
                           <td
                             key={colIndex}
                             className={cn(
-                              'h-32 w-[33.33%] p-0 align-top',
-                              colIndex < 2 && 'border-border/50 border-r',
+                              "h-32 w-[33.33%] p-0 align-top",
+                              colIndex < 2 && "border-border/50 border-r",
                             )}
                           ></td>
                         );
                       }
 
                       const monthNames = [
-                        'Jan',
-                        'Feb',
-                        'Mar',
-                        'Apr',
-                        'May',
-                        'Jun',
-                        'Jul',
-                        'Aug',
-                        'Sep',
-                        'Oct',
-                        'Nov',
-                        'Dec',
+                        "Jan",
+                        "Feb",
+                        "Mar",
+                        "Apr",
+                        "May",
+                        "Jun",
+                        "Jul",
+                        "Aug",
+                        "Sep",
+                        "Oct",
+                        "Nov",
+                        "Dec",
                       ];
                       const isCurrentMonth =
                         new Date().getMonth() + 1 === month.month &&
@@ -382,16 +382,16 @@ function YearlyCalendarView({
                         <td
                           key={colIndex}
                           className={cn(
-                            'relative h-32 w-[33.33%] p-0 align-top',
-                            colIndex < 2 && 'border-border/50 border-r',
+                            "relative h-32 w-[33.33%] p-0 align-top",
+                            colIndex < 2 && "border-border/50 border-r",
                           )}
                         >
                           <div
                             className={cn(
-                              'absolute inset-0 flex cursor-pointer flex-col items-center justify-center p-4 text-xs transition-all duration-200',
+                              "absolute inset-0 flex cursor-pointer flex-col items-center justify-center p-4 text-xs transition-all duration-200",
                               getMonthColor(month),
-                              isCurrentMonth && 'ring-primary/40 ring-2 ring-inset',
-                              month.totalTrades === 0 && 'cursor-default',
+                              isCurrentMonth && "ring-primary/40 ring-2 ring-inset",
+                              month.totalTrades === 0 && "cursor-default",
                             )}
                           >
                             {/* Month Name */}
@@ -405,7 +405,7 @@ function YearlyCalendarView({
                                 <>
                                   <GainAmount value={month.monthlyPL} currency={currency} />
                                   <div className="text-muted-foreground text-xs">
-                                    {month.totalTrades} trade{month.totalTrades !== 1 ? 's' : ''}
+                                    {month.totalTrades} trade{month.totalTrades !== 1 ? "s" : ""}
                                   </div>
                                 </>
                               ) : (

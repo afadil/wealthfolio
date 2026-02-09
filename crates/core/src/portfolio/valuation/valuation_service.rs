@@ -1,4 +1,3 @@
-use crate::assets::CASH_PREFIX;
 use crate::errors::{CalculatorError, Error as CoreError, Result as CoreResult};
 use crate::fx::currency::normalize_currency_code;
 use crate::fx::FxServiceTrait;
@@ -282,8 +281,6 @@ impl ValuationServiceTrait for ValuationService {
                     .iter()
                     .filter(|(_, position)| !position.quantity.is_zero())
                     .map(|(symbol, _)| symbol)
-                    // Cash assets don't need quotes (valued at 1:1)
-                    .filter(|symbol| !symbol.starts_with(CASH_PREFIX))
                     // Only flag as missing if the asset HAS quotes (somewhere) but not for this date
                     .filter(|symbol| assets_with_quotes.contains(*symbol))
                     .filter(|symbol| !quotes_for_current_date.contains_key(*symbol))
@@ -298,12 +295,11 @@ impl ValuationServiceTrait for ValuationService {
                     return None;
                 }
 
-                // Check if there are any non-cash positions that need quotes
+                // Check if there are any positions that need quotes
                 // but only consider positions that HAVE quotes somewhere
                 let has_quotable_positions = holdings_snapshot
                     .positions
                     .keys()
-                    .filter(|symbol| !symbol.starts_with(CASH_PREFIX))
                     .any(|symbol| assets_with_quotes.contains(symbol));
 
                 if quotes_for_current_date.is_empty() && has_quotable_positions {

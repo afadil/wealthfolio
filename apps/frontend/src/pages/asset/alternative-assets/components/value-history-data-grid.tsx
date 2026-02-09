@@ -5,10 +5,24 @@ import type { Quote } from "@/lib/types";
 import { ValueHistoryToolbar } from "./value-history-toolbar";
 import { format } from "date-fns";
 
+const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const UTC_MIDNIGHT_REGEX = /^\d{4}-\d{2}-\d{2}T00:00:00(?:\.\d+)?Z$/;
+
+// Parse YYYY-MM-DD as local midnight to avoid timezone shifts in date-only values.
+const parseLocalDate = (dateOnly: string): Date => new Date(dateOnly + "T00:00:00");
+
+// Preserve legacy non-midnight timestamps while treating canonical midnight UTC as date-only.
+const parseCalendarDate = (value: string): Date => {
+  const trimmed = value.trim();
+  if (DATE_ONLY_REGEX.test(trimmed)) return parseLocalDate(trimmed);
+  if (UTC_MIDNIGHT_REGEX.test(trimmed)) return parseLocalDate(trimmed.substring(0, 10));
+  return new Date(trimmed);
+};
+
 // Helper to normalize date values (handles both Date objects and strings from DateCell)
 const normalizeDate = (value: Date | string): Date => {
   if (value instanceof Date) return value;
-  return new Date(value);
+  return parseCalendarDate(value);
 };
 
 // Round number to 2 decimal places (standard for alternative assets)
@@ -48,7 +62,7 @@ const generateTempId = () => `temp-${Date.now()}-${Math.random().toString(36).sl
 // Convert Quote to ValueHistoryEntry with rounding
 const toValueHistoryEntry = (quote: Quote): ValueHistoryEntry => ({
   id: quote.id,
-  date: new Date(quote.timestamp),
+  date: parseCalendarDate(quote.timestamp),
   value: roundToDecimals(quote.close),
   notes: quote.notes ?? "",
   currency: quote.currency,
@@ -62,7 +76,7 @@ const toQuote = (entry: ValueHistoryEntry, symbol: string): Quote => {
     id: entry.id.startsWith("temp-") ? `${datePart}_${symbol.toUpperCase()}` : entry.id,
     createdAt: new Date().toISOString(),
     dataSource: "MANUAL",
-    timestamp: entry.date.toISOString(),
+    timestamp: format(entry.date, "yyyy-MM-dd'T'00:00:00'Z'"),
     assetId: symbol,
     open: entry.value,
     high: entry.value,

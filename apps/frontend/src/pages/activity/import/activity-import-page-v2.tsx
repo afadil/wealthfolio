@@ -35,7 +35,7 @@ import { HoldingsConfirmStep } from "./steps/holdings-confirm-step";
 
 // Constants
 import { IMPORT_REQUIRED_FIELDS, ImportFormat } from "@/lib/constants";
-import { isSymbolRequired } from "@/lib/activity-utils";
+import { isCashSymbol, isSymbolRequired } from "@/lib/activity-utils";
 import { validateTickerSymbol, findMappedActivityType } from "./utils/validation-utils";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -153,7 +153,7 @@ function useStepValidation(isHoldingsMode: boolean) {
                     csvActivityType,
                     mapping.activityMappings || {},
                   );
-                  if (mappedType && !isSymbolRequired(mappedType, symbol)) return;
+                  if (mappedType && (!isSymbolRequired(mappedType) || isCashSymbol(symbol))) return;
                 }
               }
 

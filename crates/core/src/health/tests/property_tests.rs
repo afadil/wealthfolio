@@ -273,8 +273,8 @@ proptest! {
         }
         // If sev1 == sev2 then neither is greater
         if sev1 == sev2 {
-            prop_assert!(!(sev1 < sev2));
-            prop_assert!(!(sev1 > sev2));
+            prop_assert!(sev1 >= sev2);
+            prop_assert!(sev1 <= sev2);
         }
         // Verify specific orderings
         prop_assert!(Severity::Info <= sev1);

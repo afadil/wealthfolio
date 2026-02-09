@@ -15,7 +15,7 @@ import {
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
-import { PricingMode } from "@/lib/constants";
+import { QuoteMode } from "@/lib/constants";
 import { ResponsiveSelect, type ResponsiveSelectOption } from "@wealthfolio/ui";
 import { SingleSelectTaxonomy } from "@/components/classification/single-select-taxonomy";
 import { MultiSelectTaxonomy } from "@/components/classification/multi-select-taxonomy";
@@ -27,15 +27,15 @@ const assetFormSchema = z.object({
   symbol: z.string().min(1),
   name: z.string().optional(),
   currency: z.string().min(1),
-  pricingMode: z.enum([PricingMode.MARKET, PricingMode.MANUAL]),
+  quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]),
   notes: z.string().optional(),
 });
 
 export type AssetFormValues = z.infer<typeof assetFormSchema>;
 
-const pricingModeOptions: ResponsiveSelectOption[] = [
-  { label: "Market Data", value: PricingMode.MARKET },
-  { label: "Manual", value: PricingMode.MANUAL },
+const quoteModeOptions: ResponsiveSelectOption[] = [
+  { label: "Market Data", value: QuoteMode.MARKET },
+  { label: "Manual", value: QuoteMode.MANUAL },
 ];
 
 interface AssetFormProps {
@@ -60,8 +60,8 @@ export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProp
   const defaultValues: AssetFormValues = {
     symbol: asset.id,
     name: asset.name ?? "",
-    currency: asset.currency,
-    pricingMode: asset.pricingMode === "MANUAL" ? PricingMode.MANUAL : PricingMode.MARKET,
+    currency: asset.quoteCcy,
+    quoteMode: asset.quoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
     notes: asset.notes ?? "",
   };
 
@@ -123,17 +123,17 @@ export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProp
           />
           <FormField
             control={form.control}
-            name="pricingMode"
+            name="quoteMode"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Pricing Mode</FormLabel>
+                <FormLabel>Quote Mode</FormLabel>
                 <FormControl>
                   <ResponsiveSelect
                     value={field.value}
                     onValueChange={field.onChange}
-                    options={pricingModeOptions}
-                    placeholder="Select pricing mode"
-                    sheetTitle="Pricing Mode"
+                    options={quoteModeOptions}
+                    placeholder="Select quote mode"
+                    sheetTitle="Quote Mode"
                     sheetDescription="Choose how prices are managed for this asset."
                   />
                 </FormControl>

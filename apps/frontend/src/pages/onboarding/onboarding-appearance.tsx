@@ -231,7 +231,7 @@ export const OnboardingAppearance = forwardRef<
                   <div className="bg-muted/30 flex flex-1 flex-col items-center justify-center px-3 py-5 text-center sm:px-4 sm:py-6">
                     <div className="w-full space-y-3">
                       {/* Font name as hero */}
-                      <div className="text-2xl font-medium tracking-tight sm:text-3xl">
+                      <div className="text-xl font-medium tracking-tight sm:text-2xl">
                         {f.label}
                       </div>
                       {/* Sample text paragraph */}

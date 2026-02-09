@@ -1,4 +1,4 @@
-use crate::assets::{canonical_asset_id, Asset, AssetClassificationService, AssetKind, AssetServiceTrait};
+use crate::assets::{Asset, AssetClassificationService, AssetKind, AssetServiceTrait};
 use crate::errors::{CalculatorError, Error as CoreError, Result};
 use crate::fx::currency::{get_normalization_rule, normalize_currency_code};
 use crate::portfolio::holdings::holdings_model::{Holding, HoldingType, Instrument, MonetaryValue};
@@ -159,20 +159,7 @@ impl HoldingsServiceTrait for HoldingsService {
             .into_iter()
             .collect();
 
-        let mut cash_asset_ids_by_currency: HashMap<String, String> = HashMap::new();
-        let mut asset_ids_set: HashSet<String> = security_asset_ids.iter().cloned().collect();
-
-        for (currency, &amount) in cash_balances_map {
-            if amount == Decimal::ZERO {
-                continue;
-            }
-
-            let cash_asset_id = canonical_asset_id(&AssetKind::Cash, currency, None, currency);
-            cash_asset_ids_by_currency.insert(currency.clone(), cash_asset_id.clone());
-            asset_ids_set.insert(cash_asset_id);
-        }
-
-        let asset_ids: Vec<String> = asset_ids_set.into_iter().collect();
+        let asset_ids: Vec<String> = security_asset_ids;
 
         // AssetInfo combines instrument data with kind and metadata for holding creation
         struct AssetInfo {
@@ -203,20 +190,16 @@ impl HoldingsServiceTrait for HoldingsService {
                             })
                         });
 
-                        let mut instrument = Instrument {
+                        let instrument = Instrument {
                             id: asset.id.clone(),
-                            symbol: asset.symbol.clone(),
-                            name: asset.name,
-                            currency: asset.currency,
-                            notes: asset.notes,
-                            pricing_mode: asset.pricing_mode.as_db_str().to_string(),
-                            preferred_provider: asset.preferred_provider.clone(),
+                            symbol: asset.display_code.clone().unwrap_or_default(),
+                            name: asset.name.clone(),
+                            currency: asset.quote_ccy.clone(),
+                            notes: asset.notes.clone(),
+                            pricing_mode: asset.quote_mode.as_db_str().to_string(),
+                            preferred_provider: asset.preferred_provider(),
                             classifications: None,
                         };
-
-                        if asset.kind == AssetKind::Cash && instrument.name.is_none() {
-                            instrument.name = Some(format!("Cash ({})", asset.symbol));
-                        }
 
                         let asset_info = AssetInfo {
                             instrument,
@@ -302,34 +285,23 @@ impl HoldingsServiceTrait for HoldingsService {
                 continue;
             }
 
-            let cash_asset_id = match cash_asset_ids_by_currency.get(currency) {
-                Some(id) => id,
-                None => {
-                    warn!(
-                        "Cash asset not available for currency {}. Skipping cash holding view.",
-                        currency
-                    );
-                    continue;
-                }
-            };
-
-            let asset_info = match assets_info_map.get(cash_asset_id) {
-                Some(info) => info,
-                None => {
-                    warn!(
-                        "Asset details not found for cash asset_id {}. Skipping cash holding view.",
-                        cash_asset_id
-                    );
-                    continue;
-                }
+            let cash_instrument = Instrument {
+                id: format!("cash:{}", currency),
+                symbol: currency.clone(),
+                name: Some(format!("Cash ({})", currency)),
+                currency: currency.clone(),
+                notes: None,
+                pricing_mode: "MANUAL".to_string(),
+                preferred_provider: None,
+                classifications: None,
             };
 
             let holding_view = Holding {
                 id: format!("CASH-{}-{}", account_id, currency),
                 account_id: account_id.to_string(),
                 holding_type: HoldingType::Cash,
-                instrument: Some(asset_info.instrument.clone()),
-                asset_kind: Some(asset_info.kind.clone()),
+                instrument: Some(cash_instrument),
+                asset_kind: None,
                 quantity: amount,
                 open_date: None,
                 lots: None,
@@ -360,7 +332,7 @@ impl HoldingsServiceTrait for HoldingsService {
                 }),
                 weight: Decimal::ZERO,
                 as_of_date: today,
-                metadata: asset_info.metadata.clone(),
+                metadata: None,
             };
             holdings.push(holding_view);
         }
@@ -493,12 +465,12 @@ impl HoldingsServiceTrait for HoldingsService {
 
         let instrument = Instrument {
             id: asset_details.id.clone(),
-            symbol: asset_details.symbol.clone(),
-            name: asset_details.name,
-            currency: asset_details.currency,
-            notes: asset_details.notes,
-            pricing_mode: asset_details.pricing_mode.as_db_str().to_string(),
-            preferred_provider: asset_details.preferred_provider.clone(),
+            symbol: asset_details.display_code.clone().unwrap_or_default(),
+            name: asset_details.name.clone(),
+            currency: asset_details.quote_ccy.clone(),
+            notes: asset_details.notes.clone(),
+            pricing_mode: asset_details.quote_mode.as_db_str().to_string(),
+            preferred_provider: asset_details.preferred_provider(),
             classifications: None,
         };
 
@@ -640,12 +612,12 @@ impl HoldingsServiceTrait for HoldingsService {
 
             let instrument = Instrument {
                 id: asset.id.clone(),
-                symbol: asset.symbol.clone(),
+                symbol: asset.display_code.clone().unwrap_or_default(),
                 name: asset.name.clone(),
-                currency: asset.currency.clone(),
+                currency: asset.quote_ccy.clone(),
                 notes: asset.notes.clone(),
-                pricing_mode: asset.pricing_mode.as_db_str().to_string(),
-                preferred_provider: asset.preferred_provider.clone(),
+                pricing_mode: asset.quote_mode.as_db_str().to_string(),
+                preferred_provider: asset.preferred_provider(),
                 classifications: None,
             };
 
@@ -698,7 +670,7 @@ impl HoldingsServiceTrait for HoldingsService {
                 account_id: snapshot.account_id.clone(),
                 holding_type: HoldingType::Cash,
                 instrument: None,
-                asset_kind: Some(AssetKind::Cash),
+                asset_kind: None,
                 quantity: amount,
                 open_date: None,
                 lots: None,

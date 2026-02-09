@@ -1,13 +1,15 @@
 //! Account service implementation.
 
-use log::debug;
+use log::{debug, info, warn};
 use std::sync::{Arc, RwLock};
 
 use super::accounts_model::{Account, AccountUpdate, NewAccount};
 use super::accounts_traits::{AccountRepositoryTrait, AccountServiceTrait};
+use crate::assets::AssetRepositoryTrait;
 use crate::errors::Result;
 use crate::events::{CurrencyChange, DomainEvent, DomainEventSink};
 use crate::fx::FxServiceTrait;
+use crate::quotes::sync_state::SyncStateStore;
 
 /// Service for managing accounts.
 pub struct AccountService {
@@ -15,6 +17,8 @@ pub struct AccountService {
     fx_service: Arc<dyn FxServiceTrait>,
     base_currency: Arc<RwLock<String>>,
     event_sink: Arc<dyn DomainEventSink>,
+    asset_repository: Arc<dyn AssetRepositoryTrait>,
+    sync_state_store: Arc<dyn SyncStateStore>,
 }
 
 impl AccountService {
@@ -24,12 +28,16 @@ impl AccountService {
         fx_service: Arc<dyn FxServiceTrait>,
         base_currency: Arc<RwLock<String>>,
         event_sink: Arc<dyn DomainEventSink>,
+        asset_repository: Arc<dyn AssetRepositoryTrait>,
+        sync_state_store: Arc<dyn SyncStateStore>,
     ) -> Self {
         Self {
             repository,
             fx_service,
             base_currency,
             event_sink,
+            asset_repository,
+            sync_state_store,
         }
     }
 }
@@ -80,8 +88,14 @@ impl AccountServiceTrait for AccountService {
 
         let result = self.repository.update(account_update).await?;
 
-        // Detect currency changes
+        // Detect currency changes and register FX pair if needed
         let currency_changes = if existing.currency != result.currency {
+            let base_currency = self.base_currency.read().unwrap().clone();
+            if result.currency != base_currency {
+                self.fx_service
+                    .register_currency_pair(result.currency.as_str(), base_currency.as_str())
+                    .await?;
+            }
             vec![CurrencyChange {
                 account_id: result.id.clone(),
                 old_currency: Some(existing.currency.clone()),
@@ -164,6 +178,36 @@ impl AccountServiceTrait for AccountService {
     /// Deletes an account by its ID.
     async fn delete_account(&self, account_id: &str) -> Result<()> {
         self.repository.delete(account_id).await?;
+
+        // Clean up orphaned assets (activities are already CASCADE-deleted)
+        match self
+            .asset_repository
+            .deactivate_orphaned_investments()
+            .await
+        {
+            Ok(deactivated_ids) => {
+                if !deactivated_ids.is_empty() {
+                    info!(
+                        "Deactivated {} orphaned investment assets after account deletion",
+                        deactivated_ids.len()
+                    );
+                    for id in &deactivated_ids {
+                        if let Err(e) = self.sync_state_store.delete(id).await {
+                            warn!(
+                                "Failed to delete sync state for orphaned asset {}: {}",
+                                id, e
+                            );
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to deactivate orphaned assets after account deletion: {}",
+                    e
+                );
+            }
+        }
 
         // Emit AccountsChanged event (no currency changes on delete)
         self.event_sink.emit(DomainEvent::accounts_changed(

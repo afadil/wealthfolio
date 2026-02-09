@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "tw-shimmer";
 @plugin "@tailwindcss/typography";
 @source "../../../packages/ui/src";
 /* Fonts - using variable fonts where available for best performance */
@@ -724,15 +723,6 @@ number-flow-react.muted-fraction::part(fraction) {
   }
   50% {
     opacity: 1;
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(400%);
   }
 }
 

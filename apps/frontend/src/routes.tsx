@@ -5,6 +5,9 @@ import { AppLayout } from "@/pages/layouts/app-layout";
 import { OnboardingLayout } from "@/pages/layouts/onboarding-layout";
 import SettingsLayout from "@/pages/settings/settings-layout";
 
+import { getDynamicRoutes, subscribeToNavigationUpdates } from "@/addons/addons-runtime-context";
+import AuthCallbackPage from "@/features/wealthfolio-connect/pages/auth-callback-page";
+import ConnectPage from "@/features/wealthfolio-connect/pages/connect-page";
 import ActivityManagerPage from "@/pages/activity/activity-manager-page";
 import ActivityPage from "@/pages/activity/activity-page";
 import ActivityImportPage from "@/pages/activity/import/activity-import-page-v2";
@@ -13,13 +16,17 @@ import PortfolioPage from "@/pages/dashboard/portfolio-page";
 import HoldingsPage from "@/pages/holdings/holdings-page";
 import IncomePage from "@/pages/income/income-page";
 import PortfolioInsightsPage from "@/pages/insights/portfolio-insights";
+import NotFoundPage from "@/pages/not-found";
 import PerformancePage from "@/pages/performance/performance-page";
 import SettingsAccountsPage from "@/pages/settings/accounts/accounts-page";
 import SettingsAppearancePage from "@/pages/settings/appearance/appearance-page";
 import AccountPage from "./pages/account/account-page";
 import AiAssistantPage from "./pages/ai-assistant/ai-assistant-page";
 import AssetProfilePage from "./pages/asset/asset-profile-page";
+import HealthPage from "./pages/health/health-page";
+import HoldingsInsightsPage from "./pages/holdings/holdings-insights-page";
 import OnboardingPage from "./pages/onboarding/onboarding-page";
+import AboutSettingsPage from "./pages/settings/about/about-page";
 import AddonSettingsPage from "./pages/settings/addons/addon-settings";
 import AiProvidersPage from "./pages/settings/ai-providers/ai-providers-page";
 import ContributionLimitPage from "./pages/settings/contribution-limits/contribution-limits-page";
@@ -30,14 +37,6 @@ import MarketDataImportPage from "./pages/settings/market-data/market-data-impor
 import MarketDataSettingsPage from "./pages/settings/market-data/market-data-settings";
 import TaxonomiesPage from "./pages/settings/taxonomies/taxonomies-page";
 import ConnectSettingsPage from "./pages/settings/wealthfolio-connect/connect-settings-page";
-// import QRScannerPage from './pages/qr-scanner/qr-scanner-page'; // File not found
-import { getDynamicRoutes, subscribeToNavigationUpdates } from "@/addons/addons-runtime-context";
-import AuthCallbackPage from "@/features/wealthfolio-connect/pages/auth-callback-page";
-import ConnectPage from "@/features/wealthfolio-connect/pages/connect-page";
-import NotFoundPage from "@/pages/not-found";
-import HealthPage from "./pages/health/health-page";
-import HoldingsInsightsPage from "./pages/holdings/holdings-insights-page";
-import AboutSettingsPage from "./pages/settings/about/about-page";
 
 export function AppRoutes() {
   const [dynamicRoutes, setDynamicRoutes] = useState<

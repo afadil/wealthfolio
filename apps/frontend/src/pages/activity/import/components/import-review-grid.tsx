@@ -17,6 +17,7 @@ import {
   SUBTYPES_BY_ACTIVITY_TYPE,
   SUBTYPE_DISPLAY_NAMES,
 } from "@/lib/constants";
+import { isSymbolRequired } from "@/lib/activity-utils";
 import { ActivityTypeBadge } from "../../components/activity-type-badge";
 import type { DraftActivity, DraftActivityStatus } from "../context";
 import { ImportToolbar, ImportContextMenu } from "./import-toolbar";
@@ -84,15 +85,33 @@ function getStatusTitle(
   status: DraftActivityStatus,
   skipReason?: string,
   duplicateOfId?: string,
+  duplicateOfLineNumber?: number,
   errors?: Record<string, string[]>,
+  warnings?: Record<string, string[]>,
 ): string | undefined {
   if (status === "valid") return undefined;
   if (status === "skipped" && skipReason) return skipReason;
-  if (status === "duplicate" && duplicateOfId) return `Duplicate of: ${duplicateOfId}`;
+  if (typeof duplicateOfLineNumber === "number") {
+    return `Duplicate of line ${duplicateOfLineNumber} in this import batch`;
+  }
+  if (duplicateOfId) return `Duplicate of existing activity: ${duplicateOfId}`;
   if (errors) {
-    return Object.entries(errors)
+    const errorDetails = Object.entries(errors)
       .flatMap(([field, msgs]) => msgs.map((msg) => `${field}: ${msg}`))
       .join("\n");
+    if (errorDetails) {
+      return errorDetails;
+    }
+  }
+  if (warnings) {
+    const warningDetails = Object.entries(warnings)
+      .flatMap(([field, msgs]) =>
+        msgs.map((msg) => `${field === "_duplicate" ? "duplicate" : field}: ${msg}`),
+      )
+      .join("\n");
+    if (warningDetails) {
+      return warningDetails;
+    }
   }
   return STATUS_CONFIG[status].label;
 }
@@ -104,6 +123,14 @@ const STATUS_DOT_COLOR: Record<DraftActivityStatus, string> = {
   duplicate: "bg-blue-500",
   skipped: "bg-gray-400",
 };
+
+function hasDuplicateWarning(draft: DraftActivity): boolean {
+  const hasDuplicateLineNumber = typeof draft.duplicateOfLineNumber === "number";
+  return (
+    draft.status === "duplicate" ||
+    Boolean(draft.duplicateOfId || hasDuplicateLineNumber || draft.warnings?._duplicate?.length)
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Column Definitions
@@ -188,8 +215,23 @@ function useImportReviewColumns({
         id: "status",
         header: () => "#",
         cell: ({ row }) => {
-          const { status, skipReason, duplicateOfId, errors, rowIndex } = row.original;
-          const title = getStatusTitle(status, skipReason, duplicateOfId, errors);
+          const {
+            status,
+            skipReason,
+            duplicateOfId,
+            duplicateOfLineNumber,
+            errors,
+            warnings,
+            rowIndex,
+          } = row.original;
+          const title = getStatusTitle(
+            status,
+            skipReason,
+            duplicateOfId,
+            duplicateOfLineNumber,
+            errors,
+            warnings,
+          );
           const dotColor = STATUS_DOT_COLOR[status];
           const dot = dotColor ? (
             <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${dotColor}`} />
@@ -315,6 +357,10 @@ function useImportReviewColumns({
             onSearch: onSymbolSearch,
             onSelect: onSymbolSelect,
             onCreateCustomAsset,
+            isClearable: (rowData: unknown) => {
+              const row = rowData as DraftActivity;
+              return !isSymbolRequired(row.activityType ?? "");
+            },
           },
         },
       },
@@ -409,9 +455,9 @@ function filterDrafts(drafts: DraftActivity[], filter: ImportReviewFilter): Draf
       case "errors":
         return draft.status === "error";
       case "warnings":
-        return draft.status === "warning";
+        return draft.status === "warning" || draft.status === "duplicate";
       case "duplicates":
-        return draft.status === "duplicate";
+        return hasDuplicateWarning(draft);
       case "skipped":
         return draft.status === "skipped";
       default:
@@ -475,7 +521,7 @@ export function ImportReviewGrid({
 
   // Handle horizontal scroll with mouse wheel (Shift + wheel or just wheel)
   const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
-    const target = e.currentTarget.querySelector('[data-slot="grid"]') as HTMLElement;
+    const target = e.currentTarget.querySelector<HTMLElement>('[data-slot="grid"]');
     if (!target) return;
 
     // If user is scrolling horizontally with trackpad (deltaX), let it happen naturally

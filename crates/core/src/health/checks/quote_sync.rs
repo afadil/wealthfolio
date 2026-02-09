@@ -5,7 +5,7 @@
 use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
 
-use crate::assets::{AssetServiceTrait, PricingMode};
+use crate::assets::{AssetServiceTrait, QuoteMode};
 use crate::errors::Result;
 use crate::health::model::{
     AffectedItem, FixAction, HealthCategory, HealthIssue, NavigateAction, Severity,
@@ -67,24 +67,29 @@ pub fn gather_quote_sync_errors(
         Err(_) => return Vec::new(),
     };
 
-    // Build a map of asset_id -> (symbol, pricing_mode)
-    let asset_map: HashMap<String, (String, PricingMode)> = all_assets
+    // Build a map of asset_id -> (symbol, quote_mode)
+    let asset_map: HashMap<String, (String, QuoteMode)> = all_assets
         .into_iter()
         .filter(|a| asset_ids_set.contains(&a.id))
-        .map(|a| (a.id.clone(), (a.symbol.clone(), a.pricing_mode)))
+        .map(|a| {
+            (
+                a.id.clone(),
+                (a.display_code.clone().unwrap_or_default(), a.quote_mode),
+            )
+        })
         .collect();
 
     // Convert to QuoteSyncErrorInfo, filtering out manual pricing assets
     sync_states_with_errors
         .into_iter()
         .filter_map(|s| {
-            let (symbol, pricing_mode) = asset_map
+            let (symbol, quote_mode) = asset_map
                 .get(&s.asset_id)
                 .cloned()
-                .unwrap_or_else(|| (s.asset_id.clone(), PricingMode::Market));
+                .unwrap_or_else(|| (s.asset_id.clone(), QuoteMode::Market));
 
             // Skip assets with manual pricing - they don't need quote syncing
-            if pricing_mode == PricingMode::Manual {
+            if quote_mode == QuoteMode::Manual {
                 return None;
             }
 
@@ -133,11 +138,10 @@ impl QuoteSyncCheck {
             return issues;
         }
 
-        // Categorize by error count severity for assets that HAVE synced before:
+        // Categorize by error count severity:
         //   1-2 failures: might be transient, ignore
-        //   3-5 failures: warning
-        //   6+ failures: error (persistent issue)
-        // Note: Assets that have NEVER synced are handled by price_staleness check
+        //   3-5 failures: warning (only if synced before — transient issues)
+        //   6+ failures: error (persistent issue, regardless of sync history)
         let warning_threshold = 3;
         let error_threshold = 6;
 
@@ -152,7 +156,7 @@ impl QuoteSyncCheck {
 
         let persistent_errors: Vec<_> = sync_errors
             .iter()
-            .filter(|e| e.has_synced_before && e.error_count >= error_threshold)
+            .filter(|e| e.error_count >= error_threshold)
             .collect();
 
         // Calculate market value impact
@@ -400,11 +404,11 @@ mod tests {
     }
 
     #[test]
-    fn test_never_synced_ignored() {
+    fn test_never_synced_low_errors_ignored() {
         let check = QuoteSyncCheck::new();
         let ctx = HealthContext::new(HealthConfig::default(), "USD", 100_000.0);
 
-        // Never synced assets are now handled by price_staleness check, not here
+        // Never synced with low error count — still transient, ignore
         let sync_errors = vec![QuoteSyncErrorInfo {
             asset_id: "SEC:GOOGL:XTSE".to_string(),
             symbol: "GOOGL".to_string(),
@@ -415,7 +419,30 @@ mod tests {
         }];
 
         let issues = check.analyze(&sync_errors, &ctx);
-        assert!(issues.is_empty(), "Never-synced assets should be ignored by quote_sync check");
+        assert!(
+            issues.is_empty(),
+            "Low error count never-synced assets should be ignored"
+        );
+    }
+
+    #[test]
+    fn test_never_synced_high_errors_detected() {
+        let check = QuoteSyncCheck::new();
+        let ctx = HealthContext::new(HealthConfig::default(), "USD", 100_000.0);
+
+        // Never synced but 8 consecutive failures — persistent issue, should flag
+        let sync_errors = vec![QuoteSyncErrorInfo {
+            asset_id: "SEC:XEQ:XNAS".to_string(),
+            symbol: "XEQ".to_string(),
+            error_count: 8,
+            last_error: Some("Symbol not found".to_string()),
+            market_value: 0.0,
+            has_synced_before: false,
+        }];
+
+        let issues = check.analyze(&sync_errors, &ctx);
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].severity, Severity::Error);
     }
 
     #[test]

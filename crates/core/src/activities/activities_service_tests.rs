@@ -4,8 +4,7 @@ mod tests {
     use crate::activities::activities_model::*;
     use crate::activities::{ActivityRepositoryTrait, ActivityService, ActivityServiceTrait};
     use crate::assets::{
-        canonical_asset_id, Asset, AssetKind, AssetServiceTrait, PricingMode, ProviderProfile,
-        UpdateAssetProfile,
+        Asset, AssetKind, AssetServiceTrait, InstrumentType, ProviderProfile, UpdateAssetProfile,
     };
     use crate::errors::Result;
     use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
@@ -141,29 +140,7 @@ mod tests {
             unimplemented!()
         }
 
-        async fn ensure_cash_asset(&self, currency: &str) -> Result<Asset> {
-            let currency_upper = currency.to_uppercase();
-            let asset_id =
-                canonical_asset_id(&AssetKind::Cash, &currency_upper, None, &currency_upper);
-
-            if let Ok(asset) = self.get_asset_by_id(&asset_id) {
-                return Ok(asset);
-            }
-
-            let asset = Asset {
-                id: asset_id,
-                kind: AssetKind::Cash,
-                symbol: currency_upper.clone(),
-                currency: currency_upper,
-                pricing_mode: PricingMode::None,
-                is_active: true,
-                ..Default::default()
-            };
-            self.add_asset(asset.clone());
-            Ok(asset)
-        }
-
-        async fn update_pricing_mode(&self, _asset_id: &str, _pricing_mode: &str) -> Result<Asset> {
+        async fn update_quote_mode(&self, _asset_id: &str, _quote_mode: &str) -> Result<Asset> {
             // Return a dummy asset
             Ok(Asset::default())
         }
@@ -217,8 +194,10 @@ mod tests {
 
             // Look up existing assets by spec ID
             for spec in specs {
-                if let Some(asset) = assets.iter().find(|a| a.id == spec.id) {
-                    result.assets.insert(spec.id, asset.clone());
+                if let Some(ref id) = spec.id {
+                    if let Some(asset) = assets.iter().find(|a| a.id == *id) {
+                        result.assets.insert(id.clone(), asset.clone());
+                    }
                 }
             }
 
@@ -610,7 +589,7 @@ mod tests {
         async fn create_activity(&self, new_activity: NewActivity) -> Result<Activity> {
             use crate::activities::ActivityStatus;
             // Extract asset_id before consuming other fields
-            let asset_id = new_activity.get_asset_id().map(|s| s.to_string());
+            let asset_id = new_activity.get_symbol_id().map(|s| s.to_string());
             let activity = Activity {
                 id: new_activity.id.unwrap_or_else(|| "test-id".to_string()),
                 account_id: new_activity.account_id,
@@ -767,9 +746,29 @@ mod tests {
     fn create_test_asset(id: &str, currency: &str) -> Asset {
         Asset {
             id: id.to_string(),
-            symbol: id.to_string(),
-            currency: currency.to_string(),
-            kind: crate::assets::AssetKind::Security,
+            display_code: Some(id.to_string()),
+            quote_ccy: currency.to_string(),
+            kind: AssetKind::Investment,
+            ..Default::default()
+        }
+    }
+
+    /// Create a test asset with proper instrument fields for matching
+    fn create_test_asset_with_instrument(
+        id: &str,
+        symbol: &str,
+        exchange_mic: Option<&str>,
+        instrument_type: Option<InstrumentType>,
+        currency: &str,
+    ) -> Asset {
+        Asset {
+            id: id.to_string(),
+            display_code: Some(symbol.to_string()),
+            instrument_symbol: Some(symbol.to_string()),
+            instrument_exchange_mic: exchange_mic.map(|s| s.to_string()),
+            instrument_type,
+            quote_ccy: currency.to_string(),
+            kind: AssetKind::Investment,
             ..Default::default()
         }
     }
@@ -813,7 +812,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 id: Some("NESN".to_string()),
                 ..Default::default()
             }),
@@ -833,6 +832,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         // Execute
@@ -884,7 +884,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 id: Some("NESN".to_string()),
                 ..Default::default()
             }),
@@ -904,6 +904,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         // Execute
@@ -956,7 +957,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 id: Some("AAPL".to_string()),
                 ..Default::default()
             }),
@@ -976,6 +977,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         // Execute
@@ -998,7 +1000,7 @@ mod tests {
     // resolve_asset_id() and infer_asset_kind() Tests (via create_activity)
     // ==========================================================================
 
-    /// Test: When symbol + exchange_mic are provided, generates canonical SEC:SYMBOL:MIC
+    /// Test: When symbol + exchange_mic are provided, finds existing asset by instrument fields
     #[tokio::test]
     async fn test_resolve_asset_id_with_symbol_and_exchange() {
         let account_service = Arc::new(MockAccountService::new());
@@ -1009,8 +1011,13 @@ mod tests {
         let account = create_test_account("acc-1", "USD");
         account_service.add_account(account);
 
-        // Add asset with canonical ID that will be generated
-        let asset = create_test_asset("SEC:AAPL:XNAS", "USD");
+        let asset = create_test_asset_with_instrument(
+            "aapl-uuid",
+            "AAPL",
+            Some("XNAS"),
+            Some(InstrumentType::Equity),
+            "USD",
+        );
         asset_service.add_asset(asset);
 
         let quote_service = Arc::new(MockQuoteService);
@@ -1025,7 +1032,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 symbol: Some("AAPL".to_string()),
                 exchange_mic: Some("XNAS".to_string()),
                 ..Default::default()
@@ -1046,6 +1053,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1054,8 +1062,8 @@ mod tests {
         let created = result.unwrap();
         assert_eq!(
             created.asset_id,
-            Some("SEC:AAPL:XNAS".to_string()),
-            "Should generate canonical SEC:SYMBOL:MIC format"
+            Some("aapl-uuid".to_string()),
+            "Should find existing asset by instrument fields"
         );
     }
 
@@ -1070,8 +1078,13 @@ mod tests {
         let account = create_test_account("acc-1", "USD");
         account_service.add_account(account);
 
-        // Add asset with UNKNOWN exchange
-        let asset = create_test_asset("SEC:TSLA:UNKNOWN", "USD");
+        let asset = create_test_asset_with_instrument(
+            "tsla-uuid",
+            "TSLA",
+            None,
+            Some(InstrumentType::Equity),
+            "USD",
+        );
         asset_service.add_asset(asset);
 
         let quote_service = Arc::new(MockQuoteService);
@@ -1086,7 +1099,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 symbol: Some("TSLA".to_string()),
                 ..Default::default()
             }),
@@ -1106,6 +1119,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1114,8 +1128,8 @@ mod tests {
         let created = result.unwrap();
         assert_eq!(
             created.asset_id,
-            Some("SEC:TSLA:UNKNOWN".to_string()),
-            "Should default to UNKNOWN exchange"
+            Some("tsla-uuid".to_string()),
+            "Should find existing asset by instrument symbol"
         );
     }
 
@@ -1131,8 +1145,13 @@ mod tests {
         let account = create_test_account("acc-1", "USD");
         account_service.add_account(account);
 
-        // Asset with canonical ID format
-        let asset = create_test_asset("SEC:AAPL:XNAS", "USD");
+        let asset = create_test_asset_with_instrument(
+            "aapl-uuid-2",
+            "AAPL",
+            Some("XNAS"),
+            Some(InstrumentType::Equity),
+            "USD",
+        );
         asset_service.add_asset(asset);
 
         let quote_service = Arc::new(MockQuoteService);
@@ -1147,7 +1166,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 id: Some("IGNORED".to_string()), // Should be ignored when symbol is provided
                 symbol: Some("AAPL".to_string()),
                 exchange_mic: Some("XNAS".to_string()),
@@ -1169,6 +1188,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1177,8 +1197,8 @@ mod tests {
         let created = result.unwrap();
         assert_eq!(
             created.asset_id,
-            Some("SEC:AAPL:XNAS".to_string()),
-            "For NEW activities, symbol + exchange_mic generates canonical ID, ignoring asset_id"
+            Some("aapl-uuid-2".to_string()),
+            "Symbol + exchange_mic should find existing asset, ignoring provided asset_id"
         );
     }
 
@@ -1193,10 +1213,6 @@ mod tests {
         let account = create_test_account("acc-1", "USD");
         account_service.add_account(account);
 
-        // Cash asset should be created
-        let cash_asset = create_test_asset("CASH:USD", "USD");
-        asset_service.add_asset(cash_asset);
-
         let quote_service = Arc::new(MockQuoteService);
         let activity_service = ActivityService::new(
             activity_repository.clone(),
@@ -1209,7 +1225,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: None,
+            symbol: None,
             activity_type: "DEPOSIT".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -1226,6 +1242,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1233,13 +1250,12 @@ mod tests {
 
         let created = result.unwrap();
         assert_eq!(
-            created.asset_id,
-            Some("CASH:USD".to_string()),
-            "DEPOSIT should generate CASH:USD asset ID"
+            created.asset_id, None,
+            "DEPOSIT should have no asset_id (cash activities have no asset in v2)"
         );
     }
 
-    /// Test: Cash activity (WITHDRAWAL) generates CASH:{currency} asset ID
+    /// Test: Cash activity (WITHDRAWAL) has no asset_id
     #[tokio::test]
     async fn test_resolve_asset_id_cash_withdrawal_no_asset() {
         let account_service = Arc::new(MockAccountService::new());
@@ -1249,10 +1265,6 @@ mod tests {
 
         let account = create_test_account("acc-1", "USD");
         account_service.add_account(account);
-
-        // Cash asset should be created
-        let cash_asset = create_test_asset("CASH:USD", "USD");
-        asset_service.add_asset(cash_asset);
 
         let quote_service = Arc::new(MockQuoteService);
         let activity_service = ActivityService::new(
@@ -1266,7 +1278,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: None,
+            symbol: None,
             activity_type: "WITHDRAWAL".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -1283,6 +1295,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1290,9 +1303,8 @@ mod tests {
 
         let created = result.unwrap();
         assert_eq!(
-            created.asset_id,
-            Some("CASH:USD".to_string()),
-            "WITHDRAWAL should generate CASH:USD asset ID"
+            created.asset_id, None,
+            "WITHDRAWAL should have no asset_id (cash activities have no asset in v2)"
         );
     }
 
@@ -1319,7 +1331,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: None, // No asset info
+            symbol: None, // No asset info
             activity_type: "BUY".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
@@ -1336,6 +1348,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1356,8 +1369,14 @@ mod tests {
         let account = create_test_account("acc-1", "USD");
         account_service.add_account(account);
 
-        // Add crypto asset
-        let asset = create_test_asset("CRYPTO:BTC:USD", "USD");
+        // Add crypto asset with instrument fields
+        let asset = create_test_asset_with_instrument(
+            "btc-uuid",
+            "BTC",
+            None,
+            Some(InstrumentType::Crypto),
+            "USD",
+        );
         asset_service.add_asset(asset);
 
         let quote_service = Arc::new(MockQuoteService);
@@ -1372,7 +1391,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 symbol: Some("BTC".to_string()),
                 ..Default::default()
             }),
@@ -1392,6 +1411,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1400,8 +1420,8 @@ mod tests {
         let created = result.unwrap();
         assert_eq!(
             created.asset_id,
-            Some("CRYPTO:BTC:USD".to_string()),
-            "BTC should be inferred as crypto"
+            Some("btc-uuid".to_string()),
+            "BTC should match existing crypto asset"
         );
     }
 
@@ -1416,8 +1436,14 @@ mod tests {
         let account = create_test_account("acc-1", "USD");
         account_service.add_account(account);
 
-        // Add crypto asset with normalized ID (BTC-USD -> BTC with USD quote currency)
-        let asset = create_test_asset("CRYPTO:BTC:USD", "USD");
+        // Add crypto asset with normalized symbol (BTC-USD -> BTC)
+        let asset = create_test_asset_with_instrument(
+            "btc-uuid-2",
+            "BTC",
+            None,
+            Some(InstrumentType::Crypto),
+            "USD",
+        );
         asset_service.add_asset(asset);
 
         let quote_service = Arc::new(MockQuoteService);
@@ -1432,7 +1458,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 symbol: Some("BTC-USD".to_string()),
                 ..Default::default()
             }),
@@ -1452,19 +1478,18 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
         assert!(result.is_ok(), "Expected Ok, got {:?}", result);
 
         let created = result.unwrap();
+        // In v2, asset_id is a UUID. The BTC-USD symbol should be normalized to BTC
+        // and matched against the existing crypto asset.
         assert!(
-            created
-                .asset_id
-                .as_ref()
-                .map(|id| id.starts_with("CRYPTO:"))
-                .unwrap_or(false),
-            "BTC-USD pattern should be inferred as crypto"
+            created.asset_id.is_some(),
+            "BTC-USD pattern should resolve to an asset"
         );
     }
 
@@ -1479,8 +1504,14 @@ mod tests {
         let account = create_test_account("acc-1", "USD");
         account_service.add_account(account);
 
-        // BTC would normally be inferred as crypto, but we're forcing security
-        let asset = create_test_asset("SEC:BTC:XNAS", "USD");
+        // BTC would normally be inferred as crypto, but we're forcing security with exchange_mic
+        let asset = create_test_asset_with_instrument(
+            "btc-equity-uuid",
+            "BTC",
+            Some("XNAS"),
+            Some(InstrumentType::Equity),
+            "USD",
+        );
         asset_service.add_asset(asset);
 
         let quote_service = Arc::new(MockQuoteService);
@@ -1495,7 +1526,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 symbol: Some("BTC".to_string()),
                 exchange_mic: Some("XNAS".to_string()),
                 kind: Some("SECURITY".to_string()), // Explicit hint
@@ -1517,6 +1548,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1525,8 +1557,8 @@ mod tests {
         let created = result.unwrap();
         assert_eq!(
             created.asset_id,
-            Some("SEC:BTC:XNAS".to_string()),
-            "Explicit SECURITY hint should override crypto inference"
+            Some("btc-equity-uuid".to_string()),
+            "Explicit SECURITY hint with exchange should find existing equity asset"
         );
     }
 
@@ -1541,7 +1573,13 @@ mod tests {
         let account = create_test_account("acc-1", "CAD");
         account_service.add_account(account);
 
-        let asset = create_test_asset("SEC:ETH:XTSE", "CAD");
+        let asset = create_test_asset_with_instrument(
+            "eth-equity-uuid",
+            "ETH",
+            Some("XTSE"),
+            Some(InstrumentType::Equity),
+            "CAD",
+        );
         asset_service.add_asset(asset);
 
         let quote_service = Arc::new(MockQuoteService);
@@ -1557,7 +1595,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 symbol: Some("ETH".to_string()),
                 exchange_mic: Some("XTSE".to_string()), // Has exchange = security
                 ..Default::default()
@@ -1578,6 +1616,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1586,8 +1625,8 @@ mod tests {
         let created = result.unwrap();
         assert_eq!(
             created.asset_id,
-            Some("SEC:ETH:XTSE".to_string()),
-            "Exchange MIC should force security kind"
+            Some("eth-equity-uuid".to_string()),
+            "Exchange MIC should match existing equity asset"
         );
     }
 
@@ -1613,10 +1652,6 @@ mod tests {
             let account = create_test_account("acc-1", "USD");
             account_service.add_account(account);
 
-            // Cash asset should be created
-            let cash_asset = create_test_asset("CASH:USD", "USD");
-            asset_service.add_asset(cash_asset);
-
             let quote_service = Arc::new(MockQuoteService);
             let activity_service = ActivityService::new(
                 activity_repository.clone(),
@@ -1629,7 +1664,7 @@ mod tests {
             let new_activity = NewActivity {
                 id: Some(format!("activity-{}", activity_type)),
                 account_id: "acc-1".to_string(),
-                asset: None,
+                symbol: None,
                 activity_type: activity_type.to_string(),
                 subtype: None,
                 activity_date: "2024-01-15".to_string(),
@@ -1646,6 +1681,7 @@ mod tests {
                 source_system: None,
                 source_record_id: None,
                 source_group_id: None,
+                idempotency_key: None,
             };
 
             let result = activity_service.create_activity(new_activity).await;
@@ -1657,9 +1693,8 @@ mod tests {
 
             let created = result.unwrap();
             assert_eq!(
-                created.asset_id,
-                Some("CASH:USD".to_string()),
-                "{} should generate CASH:USD asset_id",
+                created.asset_id, None,
+                "{} should have no asset_id (cash activities have no asset in v2)",
                 activity_type
             );
         }
@@ -1697,7 +1732,7 @@ mod tests {
             creates: vec![NewActivity {
                 id: Some("activity-1".to_string()),
                 account_id: "acc-1".to_string(),
-                asset: Some(AssetInput {
+                symbol: Some(SymbolInput {
                     id: Some("NESN".to_string()),
                     ..Default::default()
                 }),
@@ -1717,6 +1752,7 @@ mod tests {
                 source_system: None,
                 source_record_id: None,
                 source_group_id: None,
+                idempotency_key: None,
             }],
             updates: vec![],
             delete_ids: vec![],
@@ -1778,7 +1814,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 id: Some("SEC:AZN:XLON".to_string()),
                 ..Default::default()
             }),
@@ -1798,6 +1834,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1866,7 +1903,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 id: Some("SEC:VOD:XLON".to_string()),
                 ..Default::default()
             }),
@@ -1886,6 +1923,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1927,7 +1965,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 id: Some("SEC:NPN:XJSE".to_string()),
                 ..Default::default()
             }),
@@ -1947,6 +1985,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;
@@ -1988,7 +2027,7 @@ mod tests {
         let new_activity = NewActivity {
             id: Some("activity-1".to_string()),
             account_id: "acc-1".to_string(),
-            asset: Some(AssetInput {
+            symbol: Some(SymbolInput {
                 id: Some("SEC:LLOY:XLON".to_string()),
                 ..Default::default()
             }),
@@ -2008,6 +2047,7 @@ mod tests {
             source_system: None,
             source_record_id: None,
             source_group_id: None,
+            idempotency_key: None,
         };
 
         let result = activity_service.create_activity(new_activity).await;

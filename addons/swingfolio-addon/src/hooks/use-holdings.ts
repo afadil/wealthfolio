@@ -1,19 +1,19 @@
-import { useQuery } from '@tanstack/react-query';
-import { type AddonContext, type Holding } from '@wealthfolio/addon-sdk';
+import { useQuery } from "@tanstack/react-query";
+import { type AddonContext, type Holding } from "@wealthfolio/addon-sdk";
 
 interface UseHoldingsOptions {
   ctx: AddonContext;
   enabled?: boolean;
 }
 
-const TOTAL_PORTFOLIO_ACCOUNT_ID = 'TOTAL';
+const TOTAL_PORTFOLIO_ACCOUNT_ID = "TOTAL";
 
 export function useHoldings({ ctx, enabled = true }: UseHoldingsOptions) {
   return useQuery({
-    queryKey: ['holdings'],
+    queryKey: ["holdings"],
     queryFn: async (): Promise<Holding[]> => {
       if (!ctx.api) {
-        throw new Error('API context are required');
+        throw new Error("API context are required");
       }
 
       // The API supports "TOTAL" accountId to get aggregated holdings from all accounts

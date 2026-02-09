@@ -214,22 +214,18 @@ fn clean_generated_title(raw: &str) -> String {
         let trimmed = title.trim();
         let mut changed = false;
 
-        if trimmed.starts_with("**") && trimmed.ends_with("**") && trimmed.len() > 4 {
+        if (trimmed.starts_with("**") && trimmed.ends_with("**")
+            || trimmed.starts_with("__") && trimmed.ends_with("__"))
+            && trimmed.len() > 4
+        {
             title = trimmed[2..trimmed.len() - 2].trim().to_string();
             changed = true;
-        } else if trimmed.starts_with("__") && trimmed.ends_with("__") && trimmed.len() > 4 {
-            title = trimmed[2..trimmed.len() - 2].trim().to_string();
-            changed = true;
-        } else if trimmed.starts_with('`') && trimmed.ends_with('`') && trimmed.len() > 2 {
-            title = trimmed[1..trimmed.len() - 1].trim().to_string();
-            changed = true;
-        } else if trimmed.starts_with('"') && trimmed.ends_with('"') && trimmed.len() > 2 {
-            title = trimmed[1..trimmed.len() - 1].trim().to_string();
-            changed = true;
-        } else if trimmed.starts_with('\'') && trimmed.ends_with('\'') && trimmed.len() > 2 {
-            title = trimmed[1..trimmed.len() - 1].trim().to_string();
-            changed = true;
-        } else if trimmed.starts_with('*') && trimmed.ends_with('*') && trimmed.len() > 2 {
+        } else if (trimmed.starts_with('`') && trimmed.ends_with('`')
+            || trimmed.starts_with('"') && trimmed.ends_with('"')
+            || trimmed.starts_with('\'') && trimmed.ends_with('\'')
+            || trimmed.starts_with('*') && trimmed.ends_with('*'))
+            && trimmed.len() > 2
+        {
             title = trimmed[1..trimmed.len() - 1].trim().to_string();
             changed = true;
         }
@@ -291,9 +287,8 @@ pub fn truncate_to_title(text: &str, max_chars: usize) -> String {
     let mut end_byte = text.len();
     let mut last_space_byte: Option<usize> = None;
     let mut last_space_char: Option<usize> = None;
-    let mut chars_seen = 0usize;
 
-    for (idx, ch) in text.char_indices() {
+    for (chars_seen, (idx, ch)) in text.char_indices().enumerate() {
         if chars_seen == max_chars {
             end_byte = idx;
             break;
@@ -302,7 +297,6 @@ pub fn truncate_to_title(text: &str, max_chars: usize) -> String {
             last_space_byte = Some(idx);
             last_space_char = Some(chars_seen);
         }
-        chars_seen += 1;
     }
 
     let truncated = &text[..end_byte];

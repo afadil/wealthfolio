@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/compone
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { SymbolSearchResult } from "@/lib/types";
 import { getExchangeDisplayName } from "@/lib/constants";
-import { buildSecurityAssetId } from "@/lib/asset-utils";
+
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -151,19 +151,17 @@ export function BenchmarkSymbolSelector({
     exchangeMic?: string;
   }) => {
     setValue(benchmark.name);
-    // Construct canonical asset ID: SEC:{symbol}:{mic} (uses INDEX for indices without MIC)
-    const assetId = buildSecurityAssetId(benchmark.symbol, benchmark.exchangeMic);
-    onSelect({ id: assetId, name: benchmark.name });
+    onSelect({ id: benchmark.symbol, name: benchmark.name });
     setOpen(false);
     setSearchQuery(""); // Clear search when selecting
   };
 
   const handleSearchResultSelect = (ticker: SymbolSearchResult) => {
     setValue(ticker.longName || ticker.symbol);
-    // Use existingAssetId if the asset already exists in database, otherwise construct canonical ID
-    const assetId =
-      ticker.existingAssetId || buildSecurityAssetId(ticker.symbol, ticker.exchangeMic);
-    onSelect({ id: assetId, name: ticker.longName || ticker.symbol });
+    onSelect({
+      id: ticker.existingAssetId || ticker.symbol,
+      name: ticker.longName || ticker.symbol,
+    });
     setOpen(false);
     setSearchQuery(""); // Clear search when selecting
   };

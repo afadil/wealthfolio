@@ -7,6 +7,7 @@ import {
   SUBTYPES_BY_ACTIVITY_TYPE,
   SUBTYPE_DISPLAY_NAMES,
 } from "@/lib/constants";
+import { isSymbolRequired } from "@/lib/activity-utils";
 import { ActivityTypeBadge } from "../../components/activity-type-badge";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -45,6 +46,7 @@ export interface ImportRowData {
   warnings?: Record<string, string[]> | string[];
   skipReason?: string;
   duplicateOfId?: string;
+  duplicateOfLineNumber?: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -261,6 +263,10 @@ export function useImportColumns<T extends ImportRowData>({
           onSearch: onSymbolSearch,
           onSelect: onSymbolSelect,
           onCreateCustomAsset,
+          isClearable: (rowData: unknown) => {
+            const row = rowData as ImportRowData;
+            return !isSymbolRequired(row.activityType ?? "");
+          },
         },
       },
     });

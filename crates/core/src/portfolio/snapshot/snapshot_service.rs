@@ -571,6 +571,7 @@ impl SnapshotService {
     // --- Step 7: Calculate daily holdings snapshots (in memory) and identify keyframes ---
     // Iterates through dates and calculates holdings for each account needing processing (incl. TOTAL).
     // Returns (final_states, keyframes, warnings) - warnings contain info about activities that couldn't be processed.
+    #[allow(clippy::type_complexity)]
     fn calculate_daily_holdings_snapshots(
         &self,
         accounts_needing_calculation: &AccountsMap, // Actual accounts to process
@@ -1595,7 +1596,9 @@ impl SnapshotServiceTrait for SnapshotService {
 
         // Emit HoldingsChanged event after successful save
         let asset_ids: Vec<String> = snapshot
-            .positions.values().map(|p| p.asset_id.clone())
+            .positions
+            .values()
+            .map(|p| p.asset_id.clone())
             .collect();
         self.emit_holdings_changed(vec![account_id.to_string()], asset_ids);
 

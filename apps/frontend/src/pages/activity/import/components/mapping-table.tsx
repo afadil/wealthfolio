@@ -15,6 +15,7 @@ import {
   ImportFormat,
   ImportMappingData,
   ImportRequiredField,
+  type SymbolSearchResult,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
@@ -27,7 +28,11 @@ interface MappingTableProps {
   accounts: Account[];
   handleColumnMapping: (field: ImportFormat, value: string) => void;
   handleActivityTypeMapping: (csvActivity: string, activityType: ActivityType) => void;
-  handleSymbolMapping: (csvSymbol: string, newSymbol: string) => void;
+  handleSymbolMapping: (
+    csvSymbol: string,
+    newSymbol: string,
+    searchResult?: SymbolSearchResult,
+  ) => void;
   handleAccountIdMapping: (csvAccountId: string, accountId: string) => void;
   getMappedValue: (row: CsvRowData, field: ImportFormat) => string;
   invalidSymbols: string[];
@@ -78,7 +83,7 @@ export function MappingTable({
                   <TableHead
                     key={field}
                     className={cn(
-                      "whitespace-nowrap p-2 transition-colors",
+                      "border-border whitespace-nowrap border-r p-2 transition-colors last:border-r-0",
                       IMPORT_REQUIRED_FIELDS.includes(field as ImportRequiredField)
                         ? !isFieldMapped(field)
                           ? "bg-amber-50 dark:bg-amber-950/20"
@@ -116,7 +121,10 @@ export function MappingTable({
                       return (
                         <TableCell
                           key={field}
-                          className={cn("p-2 text-xs transition-colors", "group-hover:bg-muted/50")}
+                          className={cn(
+                            "border-border border-r p-2 text-xs transition-colors last:border-r-0",
+                            "group-hover:bg-muted/50",
+                          )}
                         >
                           <MappingCell
                             field={field}

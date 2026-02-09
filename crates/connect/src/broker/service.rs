@@ -1,8 +1,7 @@
 //! Service for synchronizing broker data to the local database.
 
 use async_trait::async_trait;
-use log::{debug, error, info, warn};
-use serde_json::json;
+use log::{debug, info, warn};
 use std::sync::Arc;
 
 use super::mapping;
@@ -19,21 +18,23 @@ use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 use std::collections::HashSet;
 use wealthfolio_core::accounts::{Account, AccountServiceTrait, NewAccount, TrackingMode};
-use wealthfolio_core::activities::{self, compute_idempotency_key, AssetInput, NewActivity};
-use wealthfolio_core::assets::{canonical_asset_id, AssetKind, AssetServiceTrait, NewAsset};
+use wealthfolio_core::activities::{
+    compute_idempotency_key, ActivityServiceTrait, ActivityUpsert, NewActivity,
+};
+use wealthfolio_core::assets::{
+    parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix, AssetKind, AssetServiceTrait,
+    AssetSpec,
+};
 use wealthfolio_core::errors::Result;
 use wealthfolio_core::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
-use wealthfolio_core::fx::currency::{get_normalization_rule, normalize_amount, resolve_currency};
 use wealthfolio_core::portfolio::snapshot::{
     AccountStateSnapshot, Position, SnapshotRepositoryTrait, SnapshotServiceTrait, SnapshotSource,
 };
-use wealthfolio_core::quotes::DataSource;
 use wealthfolio_core::sync::{
     ImportRun, ImportRunMode, ImportRunStatus, ImportRunSummary, ImportRunType, ReviewMode,
 };
 use wealthfolio_core::utils::time_utils::valuation_date_today;
-use wealthfolio_storage_sqlite::activities::ActivityDB;
-use wealthfolio_storage_sqlite::assets::AssetDB;
+use wealthfolio_storage_sqlite::activities::ActivityRepository;
 use wealthfolio_storage_sqlite::db::{DbPool, WriteHandle};
 use wealthfolio_storage_sqlite::errors::StorageError;
 use wealthfolio_storage_sqlite::portfolio::snapshot::AccountStateSnapshotDB;
@@ -46,6 +47,8 @@ const DEFAULT_BROKERAGE_PROVIDER: &str = "snaptrade";
 pub struct BrokerSyncService {
     account_service: Arc<dyn AccountServiceTrait>,
     asset_service: Arc<dyn AssetServiceTrait>,
+    activity_service: Arc<dyn ActivityServiceTrait>,
+    activity_repository: Arc<ActivityRepository>,
     platform_repository: Arc<PlatformRepository>,
     brokers_sync_state_repository: Arc<BrokerSyncStateRepository>,
     import_run_repository: Arc<ImportRunRepository>,
@@ -59,6 +62,7 @@ impl BrokerSyncService {
     pub fn new(
         account_service: Arc<dyn AccountServiceTrait>,
         asset_service: Arc<dyn AssetServiceTrait>,
+        activity_service: Arc<dyn ActivityServiceTrait>,
         platform_repository: Arc<PlatformRepository>,
         pool: Arc<DbPool>,
         writer: WriteHandle,
@@ -66,6 +70,8 @@ impl BrokerSyncService {
         Self {
             account_service,
             asset_service,
+            activity_service,
+            activity_repository: Arc::new(ActivityRepository::new(pool.clone(), writer.clone())),
             platform_repository,
             brokers_sync_state_repository: Arc::new(BrokerSyncStateRepository::new(
                 pool.clone(),
@@ -296,8 +302,6 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
         import_run_id: Option<String>,
         activities_data: Vec<AccountUniversalActivity>,
     ) -> Result<(usize, usize, Vec<String>, usize)> {
-        use diesel::prelude::*;
-
         if activities_data.is_empty() {
             return Ok((0, 0, Vec::new(), 0));
         }
@@ -313,554 +317,124 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             base_currency.clone()
         };
 
-        let now_rfc3339 = chrono::Utc::now().to_rfc3339();
-
-        let mut asset_rows: Vec<AssetDB> = Vec::new();
-        let mut seen_assets: HashSet<String> = HashSet::new();
-
-        let mut activity_rows: Vec<ActivityDB> = Vec::new();
+        // 1. Map broker data → NewActivity (dedup by activity ID)
         let mut seen_activity_ids: HashSet<String> = HashSet::new();
-        let mut needs_review_count: usize = 0;
-        let mut activity_asset_ids: HashSet<String> = HashSet::new();
-        let mut activity_currencies: HashSet<String> = HashSet::new();
+        let mut new_activities: Vec<NewActivity> = Vec::new();
 
-        for activity in activities_data {
-            let activity_id = match activity.id.clone().filter(|v| !v.trim().is_empty()) {
-                Some(v) => v,
-                None => continue,
-            };
-            if !seen_activity_ids.insert(activity_id.clone()) {
+        for activity in &activities_data {
+            if let Some(new_act) = mapping::map_broker_activity(
+                activity,
+                &account_id,
+                account_currency.as_deref(),
+                base_currency.as_deref(),
+            ) {
+                let activity_id = new_act.id.as_deref().unwrap_or("").to_string();
+                if seen_activity_ids.insert(activity_id) {
+                    new_activities.push(new_act);
+                }
+            }
+        }
+
+        if new_activities.is_empty() {
+            return Ok((0, 0, Vec::new(), 0));
+        }
+
+        // 2. Use prepare_activities for asset creation + FX registration
+        let prepare_result = self
+            .activity_service
+            .prepare_activities(new_activities, &account)
+            .await?;
+        let new_asset_ids = prepare_result.created_asset_ids.clone();
+
+        let assets_created = prepare_result.assets_created as usize;
+
+        // Count needs_review activities
+        let needs_review_count = prepare_result
+            .prepared
+            .iter()
+            .filter(|p| p.activity.needs_review.unwrap_or(false))
+            .count();
+
+        // 3. Convert prepared activities into ActivityUpsert payloads
+        let mut activity_upserts: Vec<ActivityUpsert> = Vec::new();
+
+        for prepared in prepare_result.prepared {
+            let act = prepared.activity;
+            let asset_id = prepared.resolved_asset_id.clone();
+            let activity_id = act.id.unwrap_or_default();
+            if activity_id.is_empty() {
                 continue;
             }
 
-            let activity_currency = activity
-                .currency
-                .as_ref()
-                .and_then(|c| c.code.clone())
-                .filter(|c| !c.trim().is_empty());
-
-            // Get activity type from API (should be mapped to canonical type on API side)
-            let activity_type = activity
-                .activity_type
-                .clone()
-                .map(|t| t.trim().to_uppercase())
-                .filter(|t| !t.is_empty())
-                .unwrap_or_else(|| "UNKNOWN".to_string());
-
-            // Use subtype directly from the API (API does the mapping now)
-            let subtype = activity.subtype.clone();
-
-            // Calculate needs_review flag using mapping module
-            let needs_review = mapping::needs_review(&activity);
-            if needs_review {
-                needs_review_count += 1;
-            }
-
-            // Build metadata JSON with flow info, confidence, reasons, and raw_type
-            let metadata = mapping::build_activity_metadata(&activity);
-
-            let is_cash_like = matches!(
-                activity_type.as_str(),
-                activities::ACTIVITY_TYPE_DEPOSIT
-                    | activities::ACTIVITY_TYPE_WITHDRAWAL
-                    | activities::ACTIVITY_TYPE_INTEREST
-                    | activities::ACTIVITY_TYPE_FEE
-                    | activities::ACTIVITY_TYPE_TAX
-                    | activities::ACTIVITY_TYPE_TRANSFER_IN
-                    | activities::ACTIVITY_TYPE_TRANSFER_OUT
-                    | activities::ACTIVITY_TYPE_CREDIT
-            );
-
-            // Extract symbol reference for convenience
-            let symbol_ref = activity.symbol.as_ref();
-            let symbol_type_ref = symbol_ref.and_then(|s| s.symbol_type.as_ref());
-
-            // Determine asset kind from broker symbol type
-            let symbol_type_code = symbol_type_ref.and_then(|t| t.code.as_deref());
-            let asset_kind = broker_symbol_type_to_kind(symbol_type_code);
-
-            // Extract exchange MIC from broker data (prefer mic_code over code)
-            let exchange_mic = symbol_ref.and_then(|s| s.exchange.as_ref()).and_then(|e| {
-                e.mic_code
-                    .clone()
-                    .filter(|c| !c.trim().is_empty())
-                    .or_else(|| e.code.clone().filter(|c| !c.trim().is_empty()))
-            });
-
-            // Get the symbol's currency
-            let symbol_currency = symbol_ref
-                .and_then(|s| s.currency.as_ref())
-                .and_then(|c| c.code.clone())
-                .filter(|c| !c.trim().is_empty());
-
-            let currency_code = resolve_currency(&[
-                activity_currency.as_deref().unwrap_or(""),
-                symbol_currency.as_deref().unwrap_or(""),
-                account_currency.as_deref().unwrap_or(""),
-                base_currency.as_deref().unwrap_or(""),
-            ]);
-
-            // Determine the display symbol based on asset type
-            // For crypto: we want the base symbol (e.g., "SOL" not "SOL-USD")
-            // For securities: use raw_symbol if available, else broker symbol
-            let display_symbol: Option<String> = match asset_kind {
-                AssetKind::Crypto => {
-                    // For crypto: raw_symbol > extract base from symbol field
-                    symbol_ref
-                        .and_then(|s| s.raw_symbol.clone())
-                        .filter(|r| !r.trim().is_empty())
-                        .or_else(|| {
-                            // Try to extract base from symbol field (e.g., "SOL-CAD" -> "SOL")
-                            symbol_ref
-                                .and_then(|s| s.symbol.clone())
-                                .filter(|sym| !sym.trim().is_empty())
-                                .map(|sym| sym.split('-').next().unwrap_or(&sym).to_string())
-                        })
-                }
-                _ => {
-                    // For securities/other: raw_symbol > symbol (without exchange suffix)
-                    symbol_ref
-                        .and_then(|s| s.raw_symbol.clone())
-                        .filter(|r| !r.trim().is_empty())
-                        .or_else(|| {
-                            symbol_ref
-                                .and_then(|s| s.symbol.clone())
-                                .filter(|sym| !sym.trim().is_empty())
-                                .map(|sym| {
-                                    // Remove exchange suffix like ".TO" for canonical ID
-                                    // The exchange is stored separately in exchange_mic
-                                    sym.split('.').next().unwrap_or(&sym).to_string()
-                                })
-                        })
-                }
-            };
-
-            // Also get option symbol if present
-            let option_symbol = activity
-                .option_symbol
-                .as_ref()
-                .and_then(|s| s.ticker.clone())
-                .filter(|t| !t.trim().is_empty());
-
-            // Determine asset currency for canonical ID
-            let asset_currency = symbol_currency
-                .clone()
-                .unwrap_or_else(|| currency_code.clone());
-
-            // Generate canonical asset_id using the new format
-            let asset_id = if is_cash_like && display_symbol.is_none() && option_symbol.is_none() {
-                // Cash activity without symbol - generate CASH:{currency}
-                canonical_asset_id(&AssetKind::Cash, &asset_currency, None, &asset_currency)
-            } else if let Some(ref opt_sym) = option_symbol {
-                // Option symbol takes priority
-                canonical_asset_id(
-                    &asset_kind,
-                    opt_sym,
-                    exchange_mic.as_deref(),
-                    &asset_currency,
-                )
-            } else if let Some(ref sym) = display_symbol {
-                // Regular symbol
-                canonical_asset_id(&asset_kind, sym, exchange_mic.as_deref(), &asset_currency)
-            } else {
-                // No symbol available - generate UNKNOWN placeholder
-                format!("SEC:UNKNOWN:{}", currency_code)
-            };
-
-            // Track asset IDs and currencies for domain events
-            activity_asset_ids.insert(asset_id.clone());
-            activity_currencies.insert(currency_code.clone());
-
-            if seen_assets.insert(asset_id.clone()) {
-                let asset_db = if asset_id.starts_with("CASH:") {
-                    // Cash asset
-                    let new_asset = NewAsset::new_cash_asset(&asset_currency);
-                    let mut db: AssetDB = new_asset.into();
-                    db.created_at = now_rfc3339.clone();
-                    db.updated_at = now_rfc3339.clone();
-                    db
-                } else if asset_id.contains(":UNKNOWN:") {
-                    // Unknown placeholder - use SECURITY kind with NONE pricing
-                    AssetDB {
-                        id: asset_id.clone(),
-                        symbol: "UNKNOWN".to_string(),
-                        name: Some("Unknown Asset".to_string()),
-                        currency: currency_code.clone(),
-                        kind: "SECURITY".to_string(),
-                        pricing_mode: "NONE".to_string(),
-                        is_active: 1,
-                        created_at: now_rfc3339.clone(),
-                        updated_at: now_rfc3339.clone(),
-                        ..Default::default()
-                    }
-                } else {
-                    // Build metadata with broker info (raw_symbol, exchange, option details)
-                    let metadata = build_asset_metadata(&activity);
-
-                    // Use display_symbol for the symbol field, fallback to extracting from asset_id
-                    let symbol = option_symbol
-                        .clone()
-                        .or(display_symbol.clone())
-                        .unwrap_or_else(|| {
-                            // Extract symbol from canonical ID (e.g., "SEC:AAPL:XNAS" -> "AAPL")
-                            asset_id.split(':').nth(1).unwrap_or(&asset_id).to_string()
-                        });
-
-                    AssetDB {
-                        id: asset_id.clone(),
-                        symbol,
-                        name: symbol_ref
-                            .and_then(|s| s.description.clone())
-                            .filter(|d| !d.trim().is_empty()),
-                        exchange_mic: exchange_mic.clone(),
-                        currency: asset_currency.clone(),
-                        kind: asset_kind_to_string(&asset_kind),
-                        pricing_mode: "MARKET".to_string(),
-                        preferred_provider: Some(DataSource::Yahoo.as_str().to_string()),
-                        metadata,
-                        is_active: 1,
-                        created_at: now_rfc3339.clone(),
-                        updated_at: now_rfc3339.clone(),
-                        ..Default::default()
-                    }
-                };
-                asset_rows.push(asset_db);
-            }
-
-            let activity_date = activity
-                .trade_date
-                .clone()
-                .or(activity.settlement_date.clone())
-                .unwrap_or_else(|| now_rfc3339.clone());
-
-            let quantity = activity
-                .units
-                .and_then(Decimal::from_f64)
-                .map(|d| d.abs())
-                .unwrap_or(Decimal::ZERO);
-            let unit_price = activity
-                .price
-                .and_then(Decimal::from_f64)
-                .map(|d| d.abs())
-                .unwrap_or(Decimal::ZERO);
-            let fee = activity
-                .fee
-                .and_then(Decimal::from_f64)
-                .map(|d| d.abs())
-                .unwrap_or(Decimal::ZERO);
-            let amount = activity.amount.and_then(Decimal::from_f64).map(|d| d.abs());
-            let fx_rate = activity.fx_rate.and_then(Decimal::from_f64);
-
-            // Normalize minor currency units (e.g., GBp -> GBP) and convert amounts
-            // This handles edge cases where broker API returns minor currency codes
-            let (unit_price, quantity, fee, amount, currency_code) =
-                if get_normalization_rule(&currency_code).is_some() {
-                    let (norm_price, _) = normalize_amount(unit_price, &currency_code);
-                    let (norm_fee, _) = normalize_amount(fee, &currency_code);
-                    let norm_amount = amount.map(|a| normalize_amount(a, &currency_code).0);
-                    let (_, norm_currency) = normalize_amount(Decimal::ZERO, &currency_code);
-                    // Quantity stays the same (it's shares, not currency)
-                    (
-                        norm_price,
-                        quantity,
-                        norm_fee,
-                        norm_amount,
-                        norm_currency.to_string(),
-                    )
-                } else {
-                    (unit_price, quantity, fee, amount, currency_code)
-                };
-
-            // Determine status: needs_review -> Draft (requires user review), otherwise Posted (ready for calculations)
-            let status = if needs_review {
-                wealthfolio_core::activities::ActivityStatus::Draft
-            } else {
-                wealthfolio_core::activities::ActivityStatus::Posted
-            };
-
             // Parse activity date for idempotency key computation
-            let activity_datetime: DateTime<Utc> = DateTime::parse_from_rfc3339(&activity_date)
+            let activity_datetime: DateTime<Utc> = DateTime::parse_from_rfc3339(&act.activity_date)
                 .map(|dt| dt.with_timezone(&Utc))
                 .unwrap_or_else(|_| Utc::now());
 
             // Compute idempotency key for content-based deduplication
             let idempotency_key = compute_idempotency_key(
                 &account_id,
-                &activity_type,
+                &act.activity_type,
                 &activity_datetime,
-                Some(&asset_id),
-                Some(quantity),
-                Some(unit_price),
-                amount,
-                &currency_code,
-                activity.source_record_id.as_deref(),
-                activity.description.as_deref(),
+                asset_id.as_deref(),
+                act.quantity,
+                act.unit_price,
+                act.amount,
+                &act.currency,
+                act.source_record_id.as_deref(),
+                act.notes.as_deref(),
             );
 
-            let new_activity = NewActivity {
-                id: Some(activity_id),
-                account_id: account_id.clone(),
-                // Broker sync provides asset_id directly (already resolved by mapping)
-                asset: Some(AssetInput {
-                    id: Some(asset_id),
-                    symbol: None, // Broker sync uses resolved asset_id directly
-                    exchange_mic: None,
-                    kind: None,
-                    name: None, // Broker sync uses enrichment events for asset metadata
-                    pricing_mode: None,
-                }),
-                activity_type,
-                subtype,
-                activity_date,
-                quantity: Some(quantity),
-                unit_price: Some(unit_price),
-                currency: currency_code,
-                fee: Some(fee),
-                amount,
-                status: Some(status),
-                notes: activity
-                    .description
-                    .clone()
-                    .filter(|d| !d.trim().is_empty())
-                    .or(activity.external_reference_id.clone()),
-                fx_rate,
-                metadata,
-                needs_review: Some(needs_review),
-                source_system: activity
-                    .source_system
-                    .clone()
-                    .or(Some("SNAPTRADE".to_string())),
-                source_record_id: activity.source_record_id.clone().or(activity.id.clone()),
-                source_group_id: activity.source_group_id.clone(),
-            };
-
-            // Convert to DB model and set idempotency key and import_run_id
-            let mut activity_db: ActivityDB = new_activity.into();
-            activity_db.idempotency_key = Some(idempotency_key);
-            activity_db.import_run_id = import_run_id.clone();
-
-            activity_rows.push(activity_db);
+            activity_upserts.push(ActivityUpsert {
+                id: activity_id,
+                account_id: act.account_id,
+                asset_id,
+                activity_type: act.activity_type,
+                subtype: act.subtype,
+                activity_date: act.activity_date,
+                quantity: act.quantity,
+                unit_price: act.unit_price,
+                currency: act.currency,
+                fee: act.fee,
+                amount: act.amount,
+                status: act.status,
+                notes: act.notes,
+                fx_rate: act.fx_rate,
+                metadata: act.metadata,
+                needs_review: act.needs_review,
+                source_system: act.source_system,
+                source_record_id: act.source_record_id,
+                source_group_id: act.source_group_id,
+                idempotency_key: Some(idempotency_key),
+                import_run_id: import_run_id.clone(),
+            });
         }
 
-        let writer = self.writer.clone();
-        let account_id_for_log = account_id.clone();
-        let activities_count = activity_rows.len();
-        let assets_count = asset_rows.len();
-
-        // Collect new asset IDs before the closure moves asset_rows
-        // Filter out cash and unknown placeholders - they don't need enrichment
-        let new_asset_ids: Vec<String> = asset_rows
-            .iter()
-            .map(|a| a.id.clone())
-            .filter(|id| !id.starts_with("CASH:") && !id.contains(":UNKNOWN:"))
-            .collect();
+        let activities_count = activity_upserts.len();
 
         debug!(
             "Preparing to upsert {} activities and {} assets for account {}",
-            activities_count, assets_count, account_id_for_log
+            activities_count, assets_created, account_id
         );
 
-        // Log first activity for debugging if available
-        if let Some(first_activity) = activity_rows.first() {
-            debug!(
-                "First activity: id={}, type={}, date={}, asset_id={:?}, status={}",
-                first_activity.id,
-                first_activity.activity_type,
-                first_activity.activity_date,
-                first_activity.asset_id,
-                first_activity.status
-            );
-        }
-
-        let (activities_upserted, assets_inserted) = writer
-            .exec(move |conn| {
-                use diesel::upsert::excluded;
-
-                debug!("Starting asset inserts...");
-                let mut assets_inserted: usize = 0;
-                for asset_db in asset_rows {
-                    assets_inserted += diesel::insert_into(schema::assets::table)
-                        .values(&asset_db)
-                        .on_conflict(schema::assets::id)
-                        .do_nothing()
-                        .execute(conn)
-                        .map_err(StorageError::from)?;
-                }
-
-                debug!(
-                    "Starting activity inserts ({} activities)...",
-                    activity_rows.len()
-                );
-
-                // Collect all activity IDs and idempotency keys for batch lookup
-                let activity_ids: Vec<String> =
-                    activity_rows.iter().map(|a| a.id.clone()).collect();
-                let idempotency_keys: Vec<String> = activity_rows
-                    .iter()
-                    .filter_map(|a| a.idempotency_key.clone())
-                    .collect();
-
-                // Fetch existing activities by ID or idempotency_key in one query
-                // This allows us to check is_user_modified and handle idempotency conflicts
-                let existing_activities: Vec<(String, Option<String>, i32)> =
-                    schema::activities::table
-                        .filter(
-                            schema::activities::id
-                                .eq_any(&activity_ids)
-                                .or(schema::activities::idempotency_key
-                                    .eq_any(&idempotency_keys)),
-                        )
-                        .select((
-                            schema::activities::id,
-                            schema::activities::idempotency_key,
-                            schema::activities::is_user_modified,
-                        ))
-                        .load::<(String, Option<String>, i32)>(conn)
-                        .map_err(StorageError::from)?;
-
-                // Build lookup maps for quick access
-                let mut existing_by_id: std::collections::HashMap<String, i32> =
-                    std::collections::HashMap::new();
-                let mut existing_by_idemp: std::collections::HashMap<String, (String, i32)> =
-                    std::collections::HashMap::new();
-
-                for (id, idemp_key, is_modified) in existing_activities {
-                    existing_by_id.insert(id.clone(), is_modified);
-                    if let Some(key) = idemp_key {
-                        existing_by_idemp.insert(key, (id, is_modified));
-                    }
-                }
-
-                let mut activities_upserted: usize = 0;
-                let mut activities_skipped: usize = 0;
-
-                for (idx, mut activity_db) in activity_rows.into_iter().enumerate() {
-                    let now_update = chrono::Utc::now().to_rfc3339();
-                    let activity_id = activity_db.id.clone();
-                    let activity_type = activity_db.activity_type.clone();
-                    let idempotency_key = activity_db.idempotency_key.clone();
-
-                    // Check if this activity exists and is user-modified
-                    // First check by ID
-                    if let Some(&is_modified) = existing_by_id.get(&activity_id) {
-                        if is_modified != 0 {
-                            debug!(
-                                "Skipping user-modified activity {} (type={})",
-                                activity_id, activity_type
-                            );
-                            activities_skipped += 1;
-                            continue;
-                        }
-                    }
-
-                    // If not found by ID, check by idempotency_key
-                    // This handles cases where provider IDs changed but content is the same
-                    if !existing_by_id.contains_key(&activity_id) {
-                        if let Some(ref key) = idempotency_key {
-                            if let Some((existing_id, is_modified)) = existing_by_idemp.get(key) {
-                                if *is_modified != 0 {
-                                    debug!(
-                                        "Skipping update for user-modified activity (matched by idempotency_key: {} -> {})",
-                                        activity_id, existing_id
-                                    );
-                                    activities_skipped += 1;
-                                    continue;
-                                }
-                                // Found by idempotency_key - update the existing record instead
-                                debug!(
-                                    "Activity {} matched existing {} by idempotency_key, updating existing",
-                                    activity_id, existing_id
-                                );
-                                activity_db.id = existing_id.clone();
-                            }
-                        }
-                    }
-
-                    match diesel::insert_into(schema::activities::table)
-                        .values(&activity_db)
-                        .on_conflict(schema::activities::id)
-                        .do_update()
-                        .set((
-                            schema::activities::account_id
-                                .eq(excluded(schema::activities::account_id)),
-                            schema::activities::asset_id.eq(excluded(schema::activities::asset_id)),
-                            schema::activities::activity_type
-                                .eq(excluded(schema::activities::activity_type)),
-                            schema::activities::subtype.eq(excluded(schema::activities::subtype)),
-                            schema::activities::activity_date
-                                .eq(excluded(schema::activities::activity_date)),
-                            schema::activities::quantity.eq(excluded(schema::activities::quantity)),
-                            schema::activities::unit_price
-                                .eq(excluded(schema::activities::unit_price)),
-                            schema::activities::currency.eq(excluded(schema::activities::currency)),
-                            schema::activities::fee.eq(excluded(schema::activities::fee)),
-                            schema::activities::amount.eq(excluded(schema::activities::amount)),
-                            schema::activities::status.eq(excluded(schema::activities::status)),
-                            schema::activities::notes.eq(excluded(schema::activities::notes)),
-                            schema::activities::fx_rate.eq(excluded(schema::activities::fx_rate)),
-                            schema::activities::metadata.eq(excluded(schema::activities::metadata)),
-                            schema::activities::source_system
-                                .eq(excluded(schema::activities::source_system)),
-                            schema::activities::source_record_id
-                                .eq(excluded(schema::activities::source_record_id)),
-                            schema::activities::source_group_id
-                                .eq(excluded(schema::activities::source_group_id)),
-                            schema::activities::needs_review
-                                .eq(excluded(schema::activities::needs_review)),
-                            schema::activities::idempotency_key
-                                .eq(excluded(schema::activities::idempotency_key)),
-                            schema::activities::import_run_id
-                                .eq(excluded(schema::activities::import_run_id)),
-                            schema::activities::updated_at.eq(now_update),
-                        ))
-                        .execute(conn)
-                    {
-                        Ok(count) => activities_upserted += count,
-                        Err(e) => {
-                            error!(
-                                "Failed to upsert activity {} (idx={}, type={}): {:?}",
-                                activity_id, idx, activity_type, e
-                            );
-                            return Err(StorageError::from(e).into());
-                        }
-                    }
-                }
-
-                if activities_skipped > 0 {
-                    info!(
-                        "Skipped {} user-modified activities during sync",
-                        activities_skipped
-                    );
-                }
-
-                debug!("Successfully upserted {} activities", activities_upserted);
-                Ok((activities_upserted, assets_inserted))
-            })
+        let bulk_result = self
+            .activity_service
+            .upsert_activities_bulk(activity_upserts)
             .await?;
+        let activities_upserted = bulk_result.upserted;
 
         debug!(
-            "Upserted {} activities for account {} ({} assets inserted, {} new asset IDs, {} need review)",
-            activities_count, account_id_for_log, assets_inserted, new_asset_ids.len(), needs_review_count
+            "Upserted {} activities for account {} ({} assets created, {} new asset IDs, {} need review)",
+            activities_count,
+            account_id,
+            assets_created,
+            new_asset_ids.len(),
+            needs_review_count
         );
-
-        // Emit domain events for activities and assets
-        if activities_upserted > 0 {
-            let asset_ids: Vec<String> = activity_asset_ids.into_iter().collect();
-            let currencies: Vec<String> = activity_currencies.into_iter().collect();
-            self.event_sink.emit(DomainEvent::ActivitiesChanged {
-                account_ids: vec![account_id_for_log.clone()],
-                asset_ids,
-                currencies,
-            });
-        }
-        if !new_asset_ids.is_empty() {
-            self.event_sink
-                .emit(DomainEvent::assets_created(new_asset_ids.clone()));
-        }
 
         Ok((
             activities_upserted,
-            assets_inserted,
+            assets_created,
             new_asset_ids,
             needs_review_count,
         ))
@@ -965,15 +539,13 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
         balances: Vec<HoldingsBalance>,
         positions: Vec<HoldingsPosition>,
     ) -> Result<(usize, usize, Vec<String>)> {
-        use diesel::prelude::*;
         use std::collections::{HashMap, VecDeque};
+        use wealthfolio_core::assets::InstrumentType;
 
         // Get the account to determine its currency
         let account = self.account_service.get_account(&account_id)?;
         let account_currency = account.currency.clone();
 
-        // Use canonical valuation date (America/New_York by default)
-        // This ensures "today" matches the user's expectation regardless of server timezone
         let today = valuation_date_today();
         let now = chrono::Utc::now();
 
@@ -989,21 +561,39 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             }
         }
 
-        // Build assets and positions
-        let mut asset_rows: Vec<AssetDB> = Vec::new();
-        let mut positions_map: HashMap<String, Position> = HashMap::new();
-        let mut total_cost_basis = Decimal::ZERO;
+        // 1. Build AssetSpecs and position data from broker positions
+        let mut asset_specs: Vec<AssetSpec> = Vec::new();
+        // Keyed by (symbol, currency) → index into asset_specs
+        let mut spec_key_to_idx: HashMap<String, usize> = HashMap::new();
+        // Position data: (spec_key, quantity, price, avg_cost)
+        let mut position_data: Vec<(String, Decimal, Decimal, Decimal, String)> = Vec::new();
 
         for pos in &positions {
-            // Extract symbol info
             let symbol_info = pos.symbol.as_ref().and_then(|s| s.symbol.as_ref());
-            let symbol = symbol_info
-                .and_then(|s| s.symbol.clone())
-                .or_else(|| symbol_info.and_then(|s| s.raw_symbol.clone()));
+            let symbol_type_code = symbol_info
+                .and_then(|s| s.symbol_type.as_ref())
+                .and_then(|t| t.code.clone());
+            let is_crypto_asset = mapping::is_broker_crypto(symbol_type_code.as_deref());
 
-            let symbol = match symbol {
-                Some(s) if !s.is_empty() => s,
-                _ => {
+            let raw_symbol = symbol_info
+                .and_then(|s| s.raw_symbol.clone())
+                .filter(|s| !s.trim().is_empty());
+            let api_symbol = symbol_info
+                .and_then(|s| s.symbol.clone())
+                .filter(|s| !s.trim().is_empty());
+
+            let normalized_symbol = Self::normalize_holdings_symbol(
+                raw_symbol.as_deref(),
+                api_symbol.as_deref(),
+                is_crypto_asset,
+            );
+            let (symbol, exchange_mic) = match normalized_symbol {
+                Some(pair) => pair,
+                None if is_crypto_asset => {
+                    debug!("Skipping crypto position without symbol");
+                    continue;
+                }
+                None => {
                     debug!("Skipping position without symbol");
                     continue;
                 }
@@ -1015,57 +605,118 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 continue;
             }
 
-            // Get currency
             let currency = pos
                 .currency
                 .as_ref()
                 .and_then(|c| c.code.clone())
                 .unwrap_or_else(|| account_currency.clone());
 
-            // Determine asset kind from symbol type
-            let symbol_type_code = symbol_info
-                .and_then(|s| s.symbol_type.as_ref())
-                .and_then(|t| t.code.clone());
-            let kind = broker_symbol_type_to_kind(symbol_type_code.as_deref());
-
-            // Generate asset ID
-            let asset_id = canonical_asset_id(&kind, &symbol, None, &currency);
-
-            // Create asset if needed (same fields as activity sync for consistency)
-            let asset_name = symbol_info.and_then(|s| s.name.clone().or(s.description.clone()));
-            let asset = AssetDB {
-                id: asset_id.clone(),
-                kind: asset_kind_to_string(&kind),
-                name: asset_name,
-                symbol: symbol.clone(),
-                exchange_mic: None,
-                currency: currency.clone(),
-                pricing_mode: "MARKET".to_string(),
-                preferred_provider: Some(DataSource::Yahoo.as_str().to_string()),
-                provider_overrides: None,
-                notes: None,
-                metadata: None,
-                is_active: 1,
-                created_at: now.to_rfc3339(),
-                updated_at: now.to_rfc3339(),
+            let instrument_type = if is_crypto_asset {
+                InstrumentType::Crypto
+            } else {
+                InstrumentType::Equity
             };
-            asset_rows.push(asset);
 
-            // Build position
+            let asset_name = symbol_info.and_then(|s| s.name.clone().or(s.description.clone()));
+
+            let spec = AssetSpec {
+                id: None, // Let ensure_assets resolve via instrument_key
+                display_code: Some(symbol.clone()),
+                instrument_symbol: Some(symbol.clone()),
+                instrument_exchange_mic: exchange_mic,
+                instrument_type: Some(instrument_type),
+                quote_ccy: currency.clone(),
+                kind: AssetKind::Investment,
+                quote_mode: None,
+                name: asset_name,
+            };
+
+            let spec_key = spec.instrument_key().unwrap_or_else(|| {
+                format!(
+                    "{}:{}:{}",
+                    symbol.to_uppercase(),
+                    currency.to_uppercase(),
+                    if is_crypto_asset { "CRYPTO" } else { "EQUITY" }
+                )
+            });
+
+            if !spec_key_to_idx.contains_key(&spec_key) {
+                let idx = asset_specs.len();
+                asset_specs.push(spec);
+                spec_key_to_idx.insert(spec_key.clone(), idx);
+            }
+
             let quantity = Decimal::from_f64(units).unwrap_or(Decimal::ZERO);
             let price = Decimal::from_f64(pos.price.unwrap_or(0.0)).unwrap_or(Decimal::ZERO);
             let avg_cost =
                 Decimal::from_f64(pos.average_purchase_price.unwrap_or(0.0)).unwrap_or(price);
-            let position_cost_basis = quantity * avg_cost;
 
+            position_data.push((spec_key, quantity, price, avg_cost, currency));
+        }
+
+        // 2. Ensure assets exist via service layer (dedup by instrument_key)
+        let ensure_result = self
+            .asset_service
+            .ensure_assets(asset_specs.clone(), self.activity_repository.as_ref())
+            .await?;
+
+        let assets_created = ensure_result.created_ids.len();
+        let new_asset_ids = ensure_result.created_ids.clone();
+
+        // Build instrument_key → asset_id lookup
+        let mut key_to_asset_id: HashMap<String, String> = HashMap::new();
+        for asset in ensure_result.assets.values() {
+            if let Some(ref key) = asset.instrument_key {
+                key_to_asset_id.insert(key.clone(), asset.id.clone());
+            }
+        }
+
+        // Also map by direct asset id
+        for id in ensure_result.assets.keys() {
+            key_to_asset_id.insert(id.clone(), id.clone());
+        }
+
+        // 3. Build spec_key → asset_id mapping
+        let mut spec_key_to_asset_id: HashMap<String, String> = HashMap::new();
+        for (spec_key, idx) in &spec_key_to_idx {
+            let spec = &asset_specs[*idx];
+            // Try instrument_key first
+            if let Some(ikey) = spec.instrument_key() {
+                if let Some(asset_id) = key_to_asset_id.get(&ikey) {
+                    spec_key_to_asset_id.insert(spec_key.clone(), asset_id.clone());
+                    continue;
+                }
+            }
+            // Fall back to ID if provided
+            if let Some(ref id) = spec.id {
+                if let Some(asset_id) = key_to_asset_id.get(id) {
+                    spec_key_to_asset_id.insert(spec_key.clone(), asset_id.clone());
+                }
+            }
+        }
+
+        // 4. Build positions_map using resolved asset IDs
+        let mut positions_map: HashMap<String, Position> = HashMap::new();
+        let mut total_cost_basis = Decimal::ZERO;
+
+        for (spec_key, quantity, _price, avg_cost, currency) in &position_data {
+            let asset_id = match spec_key_to_asset_id.get(spec_key) {
+                Some(id) => id.clone(),
+                None => {
+                    warn!("Could not resolve asset for position key '{}'", spec_key);
+                    continue;
+                }
+            };
+
+            let position_cost_basis = *quantity * *avg_cost;
             total_cost_basis += position_cost_basis;
 
             let position = Position {
                 id: format!("{}_{}", account_id, asset_id),
                 account_id: account_id.clone(),
                 asset_id: asset_id.clone(),
-                quantity,
-                average_cost: avg_cost,
+                quantity: *quantity,
+                average_cost: *avg_cost,
                 total_cost_basis: position_cost_basis,
                 currency: currency.clone(),
                 inception_date: now,
@@ -1092,10 +743,10 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             positions: positions_map.clone(),
             cash_balances,
             cost_basis: total_cost_basis,
-            net_contribution: Decimal::ZERO, // Not available from broker
+            net_contribution: Decimal::ZERO,
             net_contribution_base: Decimal::ZERO,
             cash_total_account_currency: cash_total,
-            cash_total_base_currency: Decimal::ZERO, // Would need FX conversion
+            cash_total_base_currency: Decimal::ZERO,
             calculated_at: now.naive_utc(),
             source: SnapshotSource::BrokerImported,
         };
@@ -1114,78 +765,30 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                     "Broker holdings unchanged for account {}, skipping save",
                     account_id
                 );
-                // Still insert assets (they might be new)
-                let writer = self.writer.clone();
-                let _ = writer
-                    .exec(move |conn| {
-                        for asset in asset_rows {
-                            let _ = diesel::insert_into(schema::assets::table)
-                                .values(&asset)
-                                .on_conflict(schema::assets::id)
-                                .do_nothing()
-                                .execute(conn);
-                        }
-                        Ok::<_, wealthfolio_core::errors::Error>(0usize)
-                    })
-                    .await?;
-
                 return Ok((positions_count, 0, vec![]));
             }
         }
 
-        // Collect new asset IDs before the closure moves asset_rows
-        // Filter out cash and unknown placeholders - they don't need enrichment (same as activity sync)
-        let new_asset_ids: Vec<String> = asset_rows
-            .iter()
-            .map(|a| a.id.clone())
-            .filter(|id| !id.starts_with("CASH:") && !id.contains(":UNKNOWN:"))
-            .collect();
-
-        // Insert assets via raw SQL (keep current behavior)
-        let writer = self.writer.clone();
-        let assets_inserted = writer
-            .exec(move |conn| {
-                let mut inserted = 0usize;
-                for asset in asset_rows {
-                    match diesel::insert_into(schema::assets::table)
-                        .values(&asset)
-                        .on_conflict(schema::assets::id)
-                        .do_nothing()
-                        .execute(conn)
-                    {
-                        Ok(count) => inserted += count,
-                        Err(e) => {
-                            warn!("Failed to insert asset {}: {:?}", asset.id, e);
-                        }
-                    }
-                }
-                Ok::<_, wealthfolio_core::errors::Error>(inserted)
-            })
-            .await?;
-
         // Save snapshot via SnapshotService if available (it emits HoldingsChanged internally)
         // Otherwise fall back to raw SQL and emit events manually
         if let Some(ref snapshot_service) = self.snapshot_service {
-            // SnapshotService.save_manual_snapshot handles:
-            // - Content comparison (skips if unchanged)
-            // - Emitting HoldingsChanged event
-            // - Ensuring holdings history
             snapshot_service
                 .save_manual_snapshot(&account_id, snapshot)
                 .await?;
         } else {
-            // Fallback: use raw SQL for snapshot
             let snapshot_db: AccountStateSnapshotDB = snapshot.into();
             let writer = self.writer.clone();
             writer
                 .exec(move |conn| {
+                    use diesel::prelude::*;
                     diesel::insert_into(schema::holdings_snapshots::table)
                         .values(&snapshot_db)
                         .on_conflict(schema::holdings_snapshots::id)
                         .do_update()
                         .set((
                             schema::holdings_snapshots::positions.eq(&snapshot_db.positions),
-                            schema::holdings_snapshots::cash_balances.eq(&snapshot_db.cash_balances),
+                            schema::holdings_snapshots::cash_balances
+                                .eq(&snapshot_db.cash_balances),
                             schema::holdings_snapshots::cost_basis.eq(&snapshot_db.cost_basis),
                             schema::holdings_snapshots::net_contribution
                                 .eq(&snapshot_db.net_contribution),
@@ -1195,7 +798,8 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                                 .eq(&snapshot_db.cash_total_account_currency),
                             schema::holdings_snapshots::cash_total_base_currency
                                 .eq(&snapshot_db.cash_total_base_currency),
-                            schema::holdings_snapshots::calculated_at.eq(&snapshot_db.calculated_at),
+                            schema::holdings_snapshots::calculated_at
+                                .eq(&snapshot_db.calculated_at),
                             schema::holdings_snapshots::source.eq(&snapshot_db.source),
                         ))
                         .execute(conn)
@@ -1204,32 +808,64 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 })
                 .await?;
 
-            // Emit HoldingsChanged event manually since we used raw SQL
             self.event_sink.emit(DomainEvent::HoldingsChanged {
                 account_ids: vec![account_id.clone()],
                 asset_ids: new_asset_ids.clone(),
             });
 
-            // Ensure holdings history has at least 2 snapshots (create synthetic if needed)
             self.ensure_holdings_history(&account_id).await?;
         }
 
         info!(
-            "Saved broker holdings for account {}: {} positions, {} assets inserted, {} new asset IDs",
-            account_id, positions_count, assets_inserted, new_asset_ids.len()
+            "Saved broker holdings for account {}: {} positions, {} assets created, {} new asset IDs",
+            account_id, positions_count, assets_created, new_asset_ids.len()
         );
 
-        // Emit AssetsCreated event for new assets (needed for enrichment)
-        if !new_asset_ids.is_empty() {
-            self.event_sink
-                .emit(DomainEvent::assets_created(new_asset_ids.clone()));
-        }
-
-        Ok((positions_count, assets_inserted, new_asset_ids))
+        Ok((positions_count, assets_created, new_asset_ids))
     }
 }
 
 impl BrokerSyncService {
+    fn normalize_holdings_symbol(
+        raw_symbol: Option<&str>,
+        api_symbol: Option<&str>,
+        is_crypto: bool,
+    ) -> Option<(String, Option<String>)> {
+        let raw_symbol = raw_symbol.map(str::trim).filter(|s| !s.is_empty());
+        let api_symbol = api_symbol.map(str::trim).filter(|s| !s.is_empty());
+
+        if is_crypto {
+            let symbol = raw_symbol.map(str::to_string).or_else(|| {
+                api_symbol.map(|sym| {
+                    parse_crypto_pair_symbol(sym)
+                        .map(|(base, _)| base)
+                        .unwrap_or_else(|| sym.to_string())
+                })
+            })?;
+            return Some((symbol, None));
+        }
+
+        let raw_parsed = raw_symbol.map(|sym| {
+            let (base, mic) = parse_symbol_with_exchange_suffix(sym);
+            (base.to_string(), mic.map(|m| m.to_string()))
+        });
+        let api_parsed = api_symbol.map(|sym| {
+            let (base, mic) = parse_symbol_with_exchange_suffix(sym);
+            (base.to_string(), mic.map(|m| m.to_string()))
+        });
+
+        let symbol = raw_parsed
+            .as_ref()
+            .map(|(base, _)| base.clone())
+            .or_else(|| api_parsed.as_ref().map(|(base, _)| base.clone()))?;
+        let exchange_mic = raw_parsed
+            .as_ref()
+            .and_then(|(_, mic)| mic.clone())
+            .or_else(|| api_parsed.as_ref().and_then(|(_, mic)| mic.clone()));
+
+        Some((symbol, exchange_mic))
+    }
+
     /// Ensures HOLDINGS mode accounts have at least 2 snapshots for proper history.
     /// If only 1 non-calculated snapshot exists, creates a synthetic snapshot 3 months prior.
     async fn ensure_holdings_history(&self, account_id: &str) -> Result<()> {
@@ -1312,152 +948,165 @@ impl BrokerSyncService {
         Ok(())
     }
 
-    /// Find the platform ID for a broker account based on its institution name
+    /// Find the platform ID for a broker account using institution/broker metadata.
     fn find_platform_for_account(&self, broker_account: &BrokerAccount) -> Result<Option<String>> {
-        // First, try to find platform by matching institution name
         let platforms = self.platform_repository.list()?;
-
-        // Get institution name, returning None if not available
-        let institution_name = match &broker_account.institution_name {
-            Some(name) if !name.is_empty() => name,
-            _ => {
-                warn!("No institution name for broker account, cannot find platform");
-                return Ok(None);
+        const MIN_PARTIAL_MATCH_LEN: usize = 6;
+        let is_confident_partial_match = |left: &str, right: &str| -> bool {
+            let (shorter, longer) = if left.len() <= right.len() {
+                (left, right)
+            } else {
+                (right, left)
+            };
+            if shorter.len() < MIN_PARTIAL_MATCH_LEN {
+                return false;
             }
+            if !longer.contains(shorter) {
+                return false;
+            }
+            // Require at least one meaningful token from shorter to be present in longer.
+            shorter
+                .split('_')
+                .filter(|t| t.len() >= 3)
+                .any(|token| longer.contains(token))
         };
 
-        // Normalize institution name for matching
-        let institution_normalized = institution_name
-            .to_uppercase()
-            .replace([' ', '-'], "_");
+        let mut name_candidates: Vec<String> = Vec::new();
+        if let Some(name) = broker_account
+            .institution_name
+            .as_ref()
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
+            name_candidates.push(name.to_string());
+        }
 
-        // Try exact match first
-        for platform in &platforms {
-            if platform.id.to_uppercase() == institution_normalized {
-                return Ok(Some(platform.id.clone()));
+        let mut external_id_candidates: Vec<String> = Vec::new();
+        if let Some(meta) = broker_account.meta.as_ref() {
+            let read_path = |path: &[&str]| -> Option<String> {
+                let mut value = meta;
+                for key in path {
+                    value = value.get(*key)?;
+                }
+                value
+                    .as_str()
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+            };
+
+            for path in [
+                &["institution_name"][..],
+                &["institutionName"][..],
+                &["brokerage_name"][..],
+                &["brokerageName"][..],
+                &["institution", "name"][..],
+                &["brokerage", "name"][..],
+                &["brokerage", "display_name"][..],
+                &["brokerage", "displayName"][..],
+            ] {
+                if let Some(name) = read_path(path) {
+                    name_candidates.push(name);
+                }
+            }
+
+            for path in [
+                &["brokerage_id"][..],
+                &["brokerageId"][..],
+                &["brokerage", "id"][..],
+                &["brokerage", "uuid"][..],
+            ] {
+                if let Some(external_id) = read_path(path) {
+                    external_id_candidates.push(external_id);
+                }
             }
         }
 
-        // Try partial match
-        for platform in &platforms {
-            let platform_normalized = platform.id.to_uppercase();
-            if institution_normalized.contains(&platform_normalized)
-                || platform_normalized.contains(&institution_normalized)
-            {
-                return Ok(Some(platform.id.clone()));
-            }
+        if let Some(auth_id) = broker_account
+            .brokerage_authorization
+            .as_ref()
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
+            external_id_candidates.push(auth_id.to_string());
         }
 
-        // Try matching by platform name
-        for platform in &platforms {
-            if let Some(name) = &platform.name {
-                let name_normalized = name.to_uppercase().replace([' ', '-'], "_");
-                if name_normalized == institution_normalized
-                    || institution_normalized.contains(&name_normalized)
-                    || name_normalized.contains(&institution_normalized)
-                {
+        name_candidates.sort();
+        name_candidates.dedup();
+        external_id_candidates.sort();
+        external_id_candidates.dedup();
+
+        // 1) Match by known external IDs first (most reliable)
+        for candidate in &external_id_candidates {
+            for platform in &platforms {
+                if platform.external_id.as_deref() == Some(candidate.as_str()) {
                     return Ok(Some(platform.id.clone()));
                 }
             }
         }
 
-        // No match found - create a new platform entry
-        // This ensures we always have a platform for the account
+        // 2) Match by normalized institution/broker names
+        for candidate in &name_candidates {
+            let candidate_norm = candidate.to_uppercase().replace([' ', '-'], "_");
+
+            for platform in &platforms {
+                let id_norm = platform.id.to_uppercase();
+                if id_norm == candidate_norm
+                    || is_confident_partial_match(&candidate_norm, &id_norm)
+                {
+                    return Ok(Some(platform.id.clone()));
+                }
+            }
+
+            for platform in &platforms {
+                if let Some(name) = &platform.name {
+                    let name_norm = name.to_uppercase().replace([' ', '-'], "_");
+                    if name_norm == candidate_norm
+                        || is_confident_partial_match(&candidate_norm, &name_norm)
+                    {
+                        return Ok(Some(platform.id.clone()));
+                    }
+                }
+            }
+        }
+
         warn!(
-            "No existing platform found for institution: {}",
-            institution_name
+            "No existing platform found for broker account (institution={:?}, external_ids={:?})",
+            broker_account.institution_name, external_id_candidates
         );
         Ok(None)
     }
 }
 
-/// Map broker symbol type code to AssetKind.
-/// Returns None for unknown types (will default to Security).
-fn broker_symbol_type_to_kind(code: Option<&str>) -> AssetKind {
-    let code = match code {
-        Some(c) => c.to_uppercase(),
-        None => return AssetKind::Security,
-    };
+#[cfg(test)]
+mod tests {
+    use super::BrokerSyncService;
 
-    match code.as_str() {
-        // Crypto
-        "CRYPTOCURRENCY" | "CRYPTO" => AssetKind::Crypto,
-        // Options
-        "EQUITY_OPTION" | "OPTION" | "OPTIONS" => AssetKind::Option,
-        // Commodities
-        "COMMODITY" | "COMMODITIES" => AssetKind::Commodity,
-        // Everything else is a security (stocks, ETFs, bonds, funds, etc.)
-        _ => AssetKind::Security,
-    }
-}
+    #[test]
+    fn normalize_holdings_symbol_uses_api_suffix_when_raw_has_no_suffix() {
+        let normalized =
+            BrokerSyncService::normalize_holdings_symbol(Some("SHOP"), Some("SHOP.TO"), false)
+                .unwrap();
 
-/// Convert AssetKind to database string representation.
-fn asset_kind_to_string(kind: &AssetKind) -> String {
-    kind.as_db_str().to_string()
-}
-
-/// Build asset metadata JSON from broker activity data.
-/// Stores raw_symbol, exchange details, and option information.
-fn build_asset_metadata(activity: &AccountUniversalActivity) -> Option<String> {
-    let mut metadata = serde_json::Map::new();
-
-    // Store raw_symbol if different from symbol
-    if let Some(ref sym) = activity.symbol {
-        if let Some(ref raw) = sym.raw_symbol {
-            if sym.symbol.as_ref() != Some(raw) && !raw.trim().is_empty() {
-                metadata.insert("raw_symbol".to_string(), json!(raw));
-            }
-        }
-
-        // Store exchange details (name is useful for display)
-        if let Some(ref exchange) = sym.exchange {
-            if exchange.name.is_some() {
-                metadata.insert(
-                    "exchange".to_string(),
-                    json!({
-                        "code": exchange.code,
-                        "name": exchange.name
-                    }),
-                );
-            }
-        }
+        assert_eq!(normalized.0, "SHOP");
+        assert_eq!(normalized.1.as_deref(), Some("XTSE"));
     }
 
-    // Store option details if present
-    if let Some(ref opt) = activity.option_symbol {
-        let mut option_data = serde_json::Map::new();
+    #[test]
+    fn normalize_holdings_symbol_parses_suffix_from_raw_symbol() {
+        let normalized =
+            BrokerSyncService::normalize_holdings_symbol(Some("VOD.L"), Some("VOD"), false)
+                .unwrap();
 
-        if let Some(ref t) = opt.option_type {
-            option_data.insert("type".to_string(), json!(t));
-        }
-        if let Some(p) = opt.strike_price {
-            option_data.insert("strike_price".to_string(), json!(p));
-        }
-        if let Some(ref e) = opt.expiration_date {
-            option_data.insert("expiration_date".to_string(), json!(e));
-        }
-        if let Some(m) = opt.is_mini_option {
-            option_data.insert("is_mini_option".to_string(), json!(m));
-        }
-
-        if let Some(ref underlying) = opt.underlying_symbol {
-            option_data.insert(
-                "underlying".to_string(),
-                json!({
-                    "symbol": underlying.symbol,
-                    "description": underlying.description
-                }),
-            );
-        }
-
-        if !option_data.is_empty() {
-            metadata.insert("option".to_string(), json!(option_data));
-        }
+        assert_eq!(normalized.0, "VOD");
+        assert_eq!(normalized.1.as_deref(), Some("XLON"));
     }
 
-    if metadata.is_empty() {
-        None
-    } else {
-        serde_json::to_string(&serde_json::Value::Object(metadata)).ok()
+    #[test]
+    fn normalize_holdings_symbol_normalizes_crypto_pairs() {
+        let normalized =
+            BrokerSyncService::normalize_holdings_symbol(None, Some("BTC-USD"), true).unwrap();
+
+        assert_eq!(normalized.0, "BTC");
+        assert_eq!(normalized.1, None);
     }
 }

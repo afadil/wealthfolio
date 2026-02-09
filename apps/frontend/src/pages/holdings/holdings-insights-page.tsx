@@ -1,12 +1,12 @@
 import { EmptyPlaceholder } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { useMemo, useState, useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { AccountSelector } from "@/components/account-selector";
 import { useHoldings } from "@/hooks/use-holdings";
 import { usePortfolioAllocations } from "@/hooks/use-portfolio-allocations";
-import { PORTFOLIO_ACCOUNT_ID, isAlternativeAssetId } from "@/lib/constants";
+import { PORTFOLIO_ACCOUNT_ID, isAlternativeAssetKind, type AssetKind } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
 import type { Account, TaxonomyAllocation } from "@/lib/types";
 import { useNavigate } from "react-router-dom";
@@ -105,8 +105,8 @@ export const HoldingsInsightsPage = () => {
     const nonCash =
       holdings?.filter((holding) => {
         if (holding.holdingType?.toLowerCase() === "cash") return false;
-        const symbol = holding.instrument?.symbol ?? holding.id;
-        if (isAlternativeAssetId(symbol)) return false;
+        if (holding.assetKind && isAlternativeAssetKind(holding.assetKind as AssetKind))
+          return false;
         return true;
       }) ?? [];
 
@@ -211,22 +211,6 @@ export const HoldingsInsightsPage = () => {
           </div>
 
           <div className="col-span-1 space-y-4">
-            <CompactAllocationStrip
-              title="Security Types"
-              allocation={allocations?.securityTypes}
-              baseCurrency={baseCurrency}
-              isLoading={isLoading}
-              variant="security-types"
-              onSegmentClick={(categoryId, categoryName) =>
-                handleChartSectionClick(
-                  "securityType",
-                  categoryName,
-                  `Type: ${categoryName}`,
-                  categoryId,
-                )
-              }
-            />
-
             {hasRiskAllocations && (
               <CompactAllocationStrip
                 title="Risk Composition"
@@ -244,6 +228,22 @@ export const HoldingsInsightsPage = () => {
                 }
               />
             )}
+
+            <CompactAllocationStrip
+              title="Security Types"
+              allocation={allocations?.securityTypes}
+              baseCurrency={baseCurrency}
+              isLoading={isLoading}
+              variant="security-types"
+              onSegmentClick={(categoryId, categoryName) =>
+                handleChartSectionClick(
+                  "securityType",
+                  categoryName,
+                  `Type: ${categoryName}`,
+                  categoryId,
+                )
+              }
+            />
 
             <SectorsChart
               allocation={allocations?.sectors}

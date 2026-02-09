@@ -8,10 +8,10 @@ use crate::{
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, EnvFilter};
 use wealthfolio_ai::{AiProviderService, AiProviderServiceTrait, ChatConfig, ChatService};
-use wealthfolio_core::addons::{AddonService, AddonServiceTrait};
 use wealthfolio_connect::{
     BrokerSyncService, BrokerSyncServiceTrait, PlatformRepository, DEFAULT_CLOUD_API_URL,
 };
+use wealthfolio_core::addons::{AddonService, AddonServiceTrait};
 use wealthfolio_core::{
     accounts::AccountService,
     activities::{ActivityService as CoreActivityService, ActivityServiceTrait},
@@ -160,12 +160,6 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let base_currency = Arc::new(RwLock::new(settings.base_currency));
 
     let account_repo = Arc::new(AccountRepository::new(pool.clone(), writer.clone()));
-    let account_service = Arc::new(AccountService::new(
-        account_repo.clone(),
-        fx_service.clone(),
-        base_currency.clone(),
-        domain_event_sink.clone(),
-    ));
 
     // Additional repositories/services for web API
     let asset_repository = Arc::new(AssetRepository::new(pool.clone(), writer.clone()));
@@ -174,6 +168,15 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let snapshot_repository = Arc::new(SnapshotRepository::new(pool.clone(), writer.clone()));
     let quote_sync_state_repository =
         Arc::new(QuoteSyncStateRepository::new(pool.clone(), writer.clone()));
+
+    let account_service = Arc::new(AccountService::new(
+        account_repo.clone(),
+        fx_service.clone(),
+        base_currency.clone(),
+        domain_event_sink.clone(),
+        asset_repository.clone(),
+        quote_sync_state_repository.clone(),
+    ));
     let quote_service: Arc<dyn QuoteServiceTrait + Send + Sync> = Arc::new(
         QuoteService::new(
             market_data_repository.clone(),      // QuoteStore
@@ -297,13 +300,14 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         ));
 
     // Alternative asset service (delegates to core service)
-    let alternative_asset_service: Arc<dyn AlternativeAssetServiceTrait + Send + Sync> =
-        Arc::new(AlternativeAssetService::new(
+    let alternative_asset_service: Arc<dyn AlternativeAssetServiceTrait + Send + Sync> = Arc::new(
+        AlternativeAssetService::new(
             alternative_asset_repository.clone(),
             asset_repository.clone(),
             quote_service.clone(),
         )
-        .with_event_sink(domain_event_sink.clone()));
+        .with_event_sink(domain_event_sink.clone()),
+    );
 
     // Connect sync service for broker data synchronization
     let platform_repository = Arc::new(PlatformRepository::new(pool.clone(), writer.clone()));
@@ -311,6 +315,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         BrokerSyncService::new(
             account_service.clone(),
             asset_service.clone(),
+            activity_service.clone(),
             platform_repository,
             pool.clone(),
             writer.clone(),
@@ -377,7 +382,6 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
 
     // Domain event sink - Phase 2: Start the worker now that all services are ready
     domain_event_sink.start_worker(
-        base_currency.clone(),
         asset_service.clone(),
         connect_sync_service.clone(),
         event_bus.clone(),

@@ -139,9 +139,10 @@ impl<E: AiEnvironment + 'static> Tool for GetHoldingsTool<E> {
 
         let original_count = holdings.len();
 
-        // Convert to DTOs and apply limit
+        // Convert to DTOs, filtering out cash positions, and apply limit
         let holdings_dto: Vec<HoldingDto> = holdings
             .into_iter()
+            .filter(|h| h.holding_type != wealthfolio_core::holdings::HoldingType::Cash)
             .take(MAX_HOLDINGS)
             .map(|h| {
                 // Extract symbol and name from instrument

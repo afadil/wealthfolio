@@ -4,12 +4,12 @@ use std::sync::Arc;
 
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::quotes::QuoteServiceTrait;
-use crate::taxonomies::{NewAssetTaxonomyAssignment, TaxonomyServiceTrait};
+use crate::taxonomies::TaxonomyServiceTrait;
 
 use super::assets_model::{
-    Asset, AssetKind, AssetSpec, EnsureAssetsResult, NewAsset, PricingMode, UpdateAssetProfile,
+    Asset, AssetKind, AssetSpec, EnsureAssetsResult, InstrumentType, NewAsset, QuoteMode,
+    UpdateAssetProfile,
 };
-use super::canonical_asset_id;
 use super::assets_traits::{AssetRepositoryTrait, AssetServiceTrait};
 use super::auto_classification::{AutoClassificationService, ClassificationInput};
 use crate::errors::{DatabaseError, Error, Result};
@@ -17,55 +17,18 @@ use crate::errors::{DatabaseError, Error, Result};
 // Import mic_to_currency for resolving exchange trading currencies
 use wealthfolio_market_data::mic_to_currency;
 
-/// Infers asset kind from asset ID.
-///
-/// Design principles:
-/// 1. First try to parse from canonical ID format (e.g., "SEC:AAPL:XNAS", "CASH:USD")
-/// 2. Fall back to legacy system-defined prefixes
-/// 3. Default to Security for unknown patterns
-/// 4. Let async enrichment correct the kind based on provider data
-fn infer_asset_kind(asset_id: &str) -> AssetKind {
-    // First try to parse from canonical ID format (e.g., "SEC:AAPL:XNAS", "CASH:USD")
-    if let Some(kind) = super::kind_from_asset_id(asset_id) {
-        return kind;
-    }
-
-    // Legacy system-defined prefixes (deterministic patterns)
-    match asset_id {
-        s if s.starts_with("$UNKNOWN-") => AssetKind::Security,
-        // Alternative asset prefixes (user-created convention)
-        s if s.starts_with("PROP-") => AssetKind::Property,
-        s if s.starts_with("VEH-") => AssetKind::Vehicle,
-        s if s.starts_with("COLL-") => AssetKind::Collectible,
-        s if s.starts_with("PREC-") => AssetKind::PhysicalPrecious,
-        s if s.starts_with("LIAB-") => AssetKind::Liability,
-        s if s.starts_with("ALT-") => AssetKind::Other,
-        // Default: Security (most common, enrichment will correct if needed)
-        _ => AssetKind::Security,
-    }
-}
-
-/// Converts a provider's asset_type string to our AssetKind enum.
+/// Converts a provider's asset_type string to our InstrumentType enum.
 /// Provider data uses various naming conventions (e.g., "CRYPTOCURRENCY", "ETF", "Equity").
-/// Returns None if the string doesn't map to a known kind (caller decides fallback).
-fn parse_asset_kind_from_provider(asset_type: &str) -> Option<AssetKind> {
-    // Normalize to uppercase for case-insensitive matching
+/// Returns None if the string doesn't map to a known type (caller decides fallback).
+fn parse_instrument_type_from_provider(asset_type: &str) -> Option<InstrumentType> {
     match asset_type.to_uppercase().as_str() {
-        // Crypto variants
-        "CRYPTOCURRENCY" | "CRYPTO" => Some(AssetKind::Crypto),
-        // Equity/Security variants (most providers)
+        "CRYPTOCURRENCY" | "CRYPTO" => Some(InstrumentType::Crypto),
         "EQUITY" | "STOCK" | "ETF" | "MUTUALFUND" | "MUTUAL FUND" | "INDEX" => {
-            Some(AssetKind::Security)
+            Some(InstrumentType::Equity)
         }
-        // Currency/FX
-        "CURRENCY" | "FOREX" | "FX" => Some(AssetKind::FxRate),
-        // Cash (rare from providers, usually internal)
-        "CASH" => Some(AssetKind::Cash),
-        // Commodity
-        "COMMODITY" => Some(AssetKind::Commodity),
-        // Option
-        "OPTION" => Some(AssetKind::Option),
-        // Unknown/unmapped - let caller decide
+        "CURRENCY" | "FOREX" | "FX" => Some(InstrumentType::Fx),
+        "OPTION" => Some(InstrumentType::Option),
+        "COMMODITY" => Some(InstrumentType::Metal),
         _ => None,
     }
 }
@@ -114,148 +77,33 @@ impl AssetService {
         self
     }
 
-    async fn create_cash_asset(&self, currency: &str) -> Result<Asset> {
-        let new_asset = NewAsset::new_cash_asset(currency);
-        let asset = self.asset_repository.create(new_asset).await?;
-
-        // Assign cash to CASH_BANK_DEPOSITS (child of CASH) for proper hierarchy
-        // This enables drill-down: Cash -> Bank Deposits
-        if let Some(ref taxonomy_service) = self.taxonomy_service {
-            // Asset class: CASH_BANK_DEPOSITS (rolls up to CASH)
-            let asset_class_assignment = NewAssetTaxonomyAssignment {
-                id: None,
-                asset_id: asset.id.clone(),
-                taxonomy_id: "asset_classes".to_string(),
-                category_id: "CASH_BANK_DEPOSITS".to_string(),
-                weight: 10000, // 100%
-                source: "AUTO".to_string(),
-            };
-            if let Err(e) = taxonomy_service
-                .assign_asset_to_category(asset_class_assignment)
-                .await
-            {
-                warn!("Failed to assign asset class for cash {}: {}", asset.id, e);
-            }
-
-            // Instrument type: CASH
-            let instrument_type_assignment = NewAssetTaxonomyAssignment {
-                id: None,
-                asset_id: asset.id.clone(),
-                taxonomy_id: "instrument_type".to_string(),
-                category_id: "CASH".to_string(),
-                weight: 10000, // 100%
-                source: "AUTO".to_string(),
-            };
-            if let Err(e) = taxonomy_service
-                .assign_asset_to_category(instrument_type_assignment)
-                .await
-            {
-                warn!(
-                    "Failed to assign instrument type for cash {}: {}",
-                    asset.id, e
-                );
-            }
-        }
-
-        // Emit event for newly created asset
-        self.event_sink
-            .emit(DomainEvent::assets_created(vec![asset.id.clone()]));
-
-        Ok(asset)
-    }
-
     /// Builds a NewAsset from an AssetSpec without any I/O.
     fn new_asset_from_spec(&self, spec: &AssetSpec) -> NewAsset {
-        let pricing_mode = spec.pricing_mode.clone().unwrap_or_else(|| match &spec.kind {
-            AssetKind::Cash => PricingMode::None,
-            AssetKind::Crypto | AssetKind::Security => PricingMode::Market,
-            _ => PricingMode::Manual,
+        let quote_mode = spec.quote_mode.unwrap_or(match &spec.kind {
+            AssetKind::Investment | AssetKind::Fx => QuoteMode::Market,
+            _ => QuoteMode::Manual,
         });
-        let preferred_provider = match pricing_mode {
-            PricingMode::Market => Some("YAHOO".to_string()),
-            PricingMode::Manual => Some("MANUAL".to_string()),
-            PricingMode::None | PricingMode::Derived => None,
+
+        let provider_config = match quote_mode {
+            QuoteMode::Market => Some(serde_json::json!({ "preferred_provider": "YAHOO" })),
+            QuoteMode::Manual => None,
         };
 
-        if spec.kind == AssetKind::Cash {
-            NewAsset::new_cash_asset(&spec.currency)
-        } else {
-            NewAsset {
-                id: Some(spec.id.clone()),
-                kind: spec.kind.clone(),
-                name: spec.name.clone(),
-                symbol: spec.symbol.clone(),
-                exchange_mic: spec.exchange_mic.clone(),
-                currency: spec.currency.clone(),
-                pricing_mode,
-                preferred_provider,
-                is_active: true,
-                ..Default::default()
-            }
+        NewAsset {
+            id: spec.id.clone(),
+            kind: spec.kind.clone(),
+            name: spec.name.clone(),
+            display_code: spec.display_code.clone(),
+            quote_mode,
+            quote_ccy: spec.quote_ccy.clone(),
+            instrument_type: spec.instrument_type.clone(),
+            instrument_symbol: spec.instrument_symbol.clone(),
+            instrument_exchange_mic: spec.instrument_exchange_mic.clone(),
+            provider_config,
+            is_active: true,
+            ..Default::default()
         }
     }
-
-    /// Assigns taxonomy categories for a cash asset (best-effort).
-    async fn assign_cash_taxonomy(&self, asset_id: &str) {
-        if let Some(ref taxonomy_service) = self.taxonomy_service {
-            let asset_class_assignment = NewAssetTaxonomyAssignment {
-                id: None,
-                asset_id: asset_id.to_string(),
-                taxonomy_id: "asset_classes".to_string(),
-                category_id: "CASH_BANK_DEPOSITS".to_string(),
-                weight: 10000,
-                source: "AUTO".to_string(),
-            };
-            if let Err(e) = taxonomy_service
-                .assign_asset_to_category(asset_class_assignment)
-                .await
-            {
-                warn!("Failed to assign asset class for cash {}: {}", asset_id, e);
-            }
-
-            let instrument_type_assignment = NewAssetTaxonomyAssignment {
-                id: None,
-                asset_id: asset_id.to_string(),
-                taxonomy_id: "instrument_type".to_string(),
-                category_id: "CASH".to_string(),
-                weight: 10000,
-                source: "AUTO".to_string(),
-            };
-            if let Err(e) = taxonomy_service
-                .assign_asset_to_category(instrument_type_assignment)
-                .await
-            {
-                warn!(
-                    "Failed to assign instrument type for cash {}: {}",
-                    asset_id, e
-                );
-            }
-        }
-    }
-}
-
-/// Helper: find UNKNOWN variant of a resolved asset ID.
-/// e.g., "SEC:AAPL:XNAS" → Some("SEC:AAPL:UNKNOWN")
-/// Returns None if the asset is not a security or already has UNKNOWN qualifier.
-fn find_unknown_variant(asset_id: &str) -> Option<String> {
-    let parsed = super::parse_canonical_asset_id(asset_id)?;
-
-    // Only securities can have UNKNOWN variants
-    if parsed.kind != Some(AssetKind::Security) {
-        return None;
-    }
-
-    // Skip if already UNKNOWN or empty qualifier
-    if parsed.qualifier.is_empty() || parsed.qualifier == "UNKNOWN" {
-        return None;
-    }
-
-    Some(canonical_asset_id(
-        &AssetKind::Security,
-        &parsed.symbol,
-        Some("UNKNOWN"),
-        &parsed.qualifier,
-    ))
 }
 
 // Implement the service trait
@@ -294,81 +142,6 @@ impl AssetServiceTrait for AssetService {
             .await
     }
 
-    /// Ensures a cash asset exists (and is properly classified). Idempotent.
-    async fn ensure_cash_asset(&self, currency: &str) -> Result<Asset> {
-        let currency_upper = currency.trim().to_uppercase();
-        let asset_id = canonical_asset_id(&AssetKind::Cash, &currency_upper, None, &currency_upper);
-
-        match self.asset_repository.get_by_id(&asset_id) {
-            Ok(existing_asset) => {
-                if let Some(ref taxonomy_service) = self.taxonomy_service {
-                    match taxonomy_service.get_asset_assignments(&existing_asset.id) {
-                        Ok(assignments) => {
-                            let has_asset_class = assignments
-                                .iter()
-                                .any(|a| a.taxonomy_id == "asset_classes");
-                            let has_instrument_type = assignments
-                                .iter()
-                                .any(|a| a.taxonomy_id == "instrument_type");
-
-                            if !has_asset_class {
-                                let asset_class_assignment = NewAssetTaxonomyAssignment {
-                                    id: None,
-                                    asset_id: existing_asset.id.clone(),
-                                    taxonomy_id: "asset_classes".to_string(),
-                                    category_id: "CASH_BANK_DEPOSITS".to_string(),
-                                    weight: 10000, // 100%
-                                    source: "AUTO".to_string(),
-                                };
-                                if let Err(e) = taxonomy_service
-                                    .assign_asset_to_category(asset_class_assignment)
-                                    .await
-                                {
-                                    warn!(
-                                        "Failed to assign asset class for cash {}: {}",
-                                        existing_asset.id, e
-                                    );
-                                }
-                            }
-
-                            if !has_instrument_type {
-                                let instrument_type_assignment = NewAssetTaxonomyAssignment {
-                                    id: None,
-                                    asset_id: existing_asset.id.clone(),
-                                    taxonomy_id: "instrument_type".to_string(),
-                                    category_id: "CASH".to_string(),
-                                    weight: 10000, // 100%
-                                    source: "AUTO".to_string(),
-                                };
-                                if let Err(e) = taxonomy_service
-                                    .assign_asset_to_category(instrument_type_assignment)
-                                    .await
-                                {
-                                    warn!(
-                                        "Failed to assign instrument type for cash {}: {}",
-                                        existing_asset.id, e
-                                    );
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            warn!(
-                                "Failed to load taxonomy assignments for cash {}: {}",
-                                existing_asset.id, e
-                            );
-                        }
-                    }
-                }
-
-                Ok(existing_asset)
-            }
-            Err(Error::Database(DatabaseError::NotFound(_))) => {
-                self.create_cash_asset(&currency_upper).await
-            }
-            Err(e) => Err(e),
-        }
-    }
-
     /// Creates a new asset directly without network lookups.
     async fn create_asset(&self, new_asset: NewAsset) -> Result<Asset> {
         let asset = self.asset_repository.create(new_asset).await?;
@@ -382,20 +155,24 @@ impl AssetServiceTrait for AssetService {
 
     /// Creates a minimal asset without network calls.
     /// Returns the existing asset if found, or creates a new minimal one.
-    /// Accepts optional metadata hints from the caller (e.g., user-provided asset details).
-    /// If `pricing_mode_hint` is provided, it overrides the default pricing mode for the asset kind.
     async fn get_or_create_minimal_asset(
         &self,
         asset_id: &str,
         context_currency: Option<String>,
         metadata: Option<super::assets_model::AssetMetadata>,
-        pricing_mode_hint: Option<String>,
+        quote_mode_hint: Option<String>,
     ) -> Result<Asset> {
         // Try to get existing asset first
         match self.asset_repository.get_by_id(asset_id) {
-            Ok(existing_asset) => return Ok(existing_asset),
+            Ok(existing_asset) => {
+                // Reactivate if previously deactivated (e.g., after account deletion)
+                if !existing_asset.is_active {
+                    info!("Reactivating previously deactivated asset: {}", asset_id);
+                    self.asset_repository.reactivate(asset_id).await?;
+                }
+                return Ok(existing_asset);
+            }
             Err(Error::Database(DatabaseError::NotFound(_))) => {
-                // Continue to create minimal asset
                 debug!(
                     "Asset not found locally, creating minimal asset: {}",
                     asset_id
@@ -407,120 +184,121 @@ impl AssetServiceTrait for AssetService {
             }
         }
 
-        // Use metadata kind if provided, otherwise infer from symbol pattern
-        let kind = metadata
-            .as_ref()
-            .and_then(|m| m.kind.clone())
-            .unwrap_or_else(|| infer_asset_kind(asset_id));
+        // Try to find existing asset by instrument_key before creating a new one
+        let inferred_instrument_type = metadata.as_ref().and_then(|meta| {
+            meta.instrument_symbol
+                .as_ref()
+                .filter(|s| !s.is_empty())
+                .map(|_| {
+                    meta.instrument_type
+                        .clone()
+                        .unwrap_or(InstrumentType::Equity)
+                })
+        });
 
-        if kind == AssetKind::Cash {
-            let cash_currency = super::parse_canonical_asset_id(asset_id)
-                .map(|parsed| parsed.symbol)
-                .filter(|c| !c.is_empty())
-                .or_else(|| context_currency.clone().filter(|c| !c.is_empty()))
-                .unwrap_or_else(|| asset_id.to_string());
-            return self.ensure_cash_asset(&cash_currency).await;
-        }
-
-        // Determine pricing mode: use hint if provided, otherwise default based on kind
-        let pricing_mode = if let Some(ref hint) = pricing_mode_hint {
-            match hint.to_uppercase().as_str() {
-                "MANUAL" => PricingMode::Manual,
-                "MARKET" => PricingMode::Market,
-                "NONE" => PricingMode::None,
-                "DERIVED" => PricingMode::Derived,
-                _ => {
-                    // Fall back to kind-based default if hint is invalid
-                    match &kind {
-                        AssetKind::Cash => PricingMode::None,
-                        AssetKind::Crypto | AssetKind::Security => PricingMode::Market,
-                        _ => PricingMode::Manual,
+        if let Some(ref meta) = metadata {
+            if let Some(ref sym) = meta.instrument_symbol {
+                if !sym.is_empty() {
+                    let instrument_type = inferred_instrument_type
+                        .clone()
+                        .unwrap_or(InstrumentType::Equity);
+                    let spec = AssetSpec {
+                        id: None,
+                        display_code: meta.display_code.clone(),
+                        instrument_symbol: Some(sym.clone()),
+                        instrument_exchange_mic: meta.instrument_exchange_mic.clone(),
+                        instrument_type: Some(instrument_type),
+                        quote_ccy: context_currency
+                            .clone()
+                            .unwrap_or_else(|| "USD".to_string()),
+                        kind: meta.kind.clone().unwrap_or(AssetKind::Investment),
+                        quote_mode: None,
+                        name: meta.name.clone(),
+                    };
+                    if let Some(key) = spec.instrument_key() {
+                        if let Ok(Some(existing)) =
+                            self.asset_repository.find_by_instrument_key(&key)
+                        {
+                            info!(
+                                "Found existing asset by instrument_key '{}': {}",
+                                key, existing.id
+                            );
+                            if !existing.is_active {
+                                self.asset_repository.reactivate(&existing.id).await?;
+                            }
+                            return Ok(existing);
+                        }
                     }
                 }
             }
-        } else {
-            // Default pricing mode based on asset kind
-            match &kind {
-                AssetKind::Cash => PricingMode::None,
-                AssetKind::Crypto | AssetKind::Security => PricingMode::Market,
-                // Alternative assets use manual pricing
-                _ => PricingMode::Manual,
-            }
+        }
+
+        // Use metadata kind if provided, otherwise default to Investment
+        let kind = metadata
+            .as_ref()
+            .and_then(|m| m.kind.clone())
+            .unwrap_or(AssetKind::Investment);
+
+        // Determine quote mode: use hint if provided, otherwise default based on kind
+        let quote_mode = match quote_mode_hint.as_deref() {
+            Some("MANUAL") => QuoteMode::Manual,
+            Some("MARKET") => QuoteMode::Market,
+            _ => match &kind {
+                AssetKind::Investment | AssetKind::Fx => QuoteMode::Market,
+                _ => QuoteMode::Manual,
+            },
         };
 
-        // Extract optional fields from metadata
-        let (name, exchange_mic_from_metadata) = metadata
-            .map(|m| (m.name, m.exchange_mic))
-            .unwrap_or_default();
-
-        // Extract symbol from canonical asset ID format (e.g., "SEC:AAPL:XNAS" -> "AAPL")
-        // Falls back to asset_id if parsing fails (for legacy IDs)
-        let (symbol, exchange_mic_from_id) =
-            if let Some(parsed) = super::parse_canonical_asset_id(asset_id) {
-                let mic = if parsed.qualifier.is_empty()
-                    || parsed.qualifier == "UNKNOWN"
-                    || kind == AssetKind::Cash
-                    || kind == AssetKind::Crypto
-                    || kind == AssetKind::FxRate
-                {
-                    None
-                } else {
-                    Some(parsed.qualifier)
-                };
-                (parsed.symbol, mic)
-            } else if kind == AssetKind::Crypto && asset_id.contains('-') {
-                // Legacy crypto format: "BTC-CAD" -> symbol "BTC"
-                let base = asset_id.split('-').next().unwrap_or(asset_id).to_string();
-                (base, None)
-            } else {
-                // Fallback for legacy IDs
-                (asset_id.to_string(), None)
-            };
-
-        // Prefer metadata exchange_mic over one parsed from ID
-        let exchange_mic = exchange_mic_from_metadata.or(exchange_mic_from_id);
+        // Extract exchange_mic from metadata
+        let exchange_mic = metadata
+            .as_ref()
+            .and_then(|m| m.instrument_exchange_mic.clone());
 
         // Determine currency:
         // 1. For market-priced assets with an exchange MIC, use the exchange's trading currency
         // 2. Fall back to context_currency (account currency) or USD
-        let currency = if pricing_mode == PricingMode::Market {
+        let currency = if quote_mode == QuoteMode::Market {
             exchange_mic
                 .as_ref()
                 .and_then(|mic| mic_to_currency(mic))
                 .map(|c| c.to_string())
-                .or_else(|| context_currency.filter(|c| !c.is_empty()))
+                .or_else(|| context_currency.clone().filter(|c| !c.is_empty()))
                 .unwrap_or_else(|| "USD".to_string())
         } else {
-            // Non-market assets use context currency or USD
             context_currency
                 .filter(|c| !c.is_empty())
                 .unwrap_or_else(|| "USD".to_string())
         };
 
-        // Set preferred provider based on pricing mode
-        let preferred_provider = match pricing_mode {
-            PricingMode::Market => Some("YAHOO".to_string()),
-            PricingMode::Manual => Some("MANUAL".to_string()),
-            PricingMode::None | PricingMode::Derived => None, // Cash/derived assets don't need a provider
+        // Set preferred provider based on quote mode
+        let provider_config = match quote_mode {
+            QuoteMode::Market => Some(serde_json::json!({ "preferred_provider": "YAHOO" })),
+            QuoteMode::Manual => None,
         };
 
-        // Create minimal asset with optional metadata
+        let name = metadata.as_ref().and_then(|m| m.name.clone());
+        let instrument_symbol = metadata.as_ref().and_then(|m| m.instrument_symbol.clone());
+        let instrument_type = inferred_instrument_type;
+        let display_code = metadata.as_ref().and_then(|m| m.display_code.clone());
+
         let new_asset = NewAsset {
             id: Some(asset_id.to_string()),
             kind,
             name,
-            symbol,
-            exchange_mic,
-            currency,
-            pricing_mode,
-            preferred_provider,
+            quote_mode,
+            quote_ccy: currency,
+            instrument_exchange_mic: exchange_mic,
+            instrument_symbol,
+            instrument_type,
+            display_code,
+            provider_config,
             is_active: true,
             ..Default::default()
         };
 
         debug!(
-            "Creating minimal asset: id={}, kind={:?}, pricing_mode={:?}, name={:?}",
-            asset_id, new_asset.kind, new_asset.pricing_mode, new_asset.name
+            "Creating minimal asset: id={}, kind={:?}, quote_mode={:?}, name={:?}",
+            asset_id, new_asset.kind, new_asset.quote_mode, new_asset.name
         );
 
         let asset = self.asset_repository.create(new_asset).await?;
@@ -532,10 +310,10 @@ impl AssetServiceTrait for AssetService {
         Ok(asset)
     }
 
-    /// Updates the pricing mode for an asset (MARKET, MANUAL, DERIVED, NONE)
-    async fn update_pricing_mode(&self, asset_id: &str, pricing_mode: &str) -> Result<Asset> {
+    /// Updates the quote mode for an asset (MARKET, MANUAL)
+    async fn update_quote_mode(&self, asset_id: &str, quote_mode: &str) -> Result<Asset> {
         self.asset_repository
-            .update_pricing_mode(asset_id, pricing_mode)
+            .update_quote_mode(asset_id, quote_mode)
             .await
     }
 
@@ -550,53 +328,44 @@ impl AssetServiceTrait for AssetService {
         let existing_asset = self.asset_repository.get_by_id(asset_id)?;
 
         // Skip enrichment for assets that don't need market data
-        if existing_asset.pricing_mode != super::assets_model::PricingMode::Market {
+        if existing_asset.quote_mode != QuoteMode::Market {
             debug!(
-                "Skipping enrichment for asset {} - pricing mode is {:?}",
-                asset_id, existing_asset.pricing_mode
+                "Skipping enrichment for asset {} - quote mode is {:?}",
+                asset_id, existing_asset.quote_mode
             );
             return Ok(existing_asset);
         }
 
         // Fetch profile from provider using the asset (resolver handles exchange suffix)
         debug!(
-            "Fetching profile for asset {} (symbol: {}, exchange: {:?})",
-            asset_id, existing_asset.symbol, existing_asset.exchange_mic
+            "Fetching profile for asset {} (display_code: {:?}, exchange: {:?})",
+            asset_id, existing_asset.display_code, existing_asset.instrument_exchange_mic
         );
 
         let provider_profile = match self.quote_service.get_asset_profile(&existing_asset).await {
             Ok(profile) => profile,
             Err(e) => {
-                // Return error so caller knows enrichment failed and won't mark as enriched
-                // This allows retry on next sync cycle
                 return Err(Error::MarketData(
                     crate::quotes::MarketDataError::ProviderError(format!(
-                        "Could not fetch profile for asset {} (symbol: {}): {}",
-                        asset_id, existing_asset.symbol, e
+                        "Could not fetch profile for asset {} (display_code: {:?}): {}",
+                        asset_id, existing_asset.display_code, e
                     )),
                 ));
             }
         };
 
-        // Derive kind from provider's asset_type if available
-        // Only update kind if current kind is the default (Security) and provider has data
-        let inferred_kind = provider_profile
-            .asset_type
-            .as_ref()
-            .and_then(|t| parse_asset_kind_from_provider(t));
-
-        // Only override kind if we got a meaningful value from provider
-        // and the current kind is the default inferred value
-        let updated_kind = if existing_asset.kind == AssetKind::Security {
-            inferred_kind
+        // Derive instrument_type from provider's asset_type if not already set
+        let updated_instrument_type = if existing_asset.instrument_type.is_none() {
+            provider_profile
+                .asset_type
+                .as_ref()
+                .and_then(|t| parse_instrument_type_from_provider(t))
         } else {
-            None // Keep existing non-default kind
+            None
         };
 
         // Build provider profile metadata for storage
-        // This captures sector/industry/country/quote_type for display and future auto-classification
         let mut profile_metadata = serde_json::Map::new();
-        // ProviderProfile uses JSON strings for sectors/countries (legacy format)
         if let Some(ref sectors) = provider_profile.sectors {
             profile_metadata.insert(
                 "sectors".to_string(),
@@ -657,7 +426,6 @@ impl AssetServiceTrait for AssetService {
                 },
                 None => serde_json::Map::new(),
             };
-            // Add/update profile data under a "profile" key to avoid conflicts
             merged.insert(
                 "profile".to_string(),
                 serde_json::Value::Object(profile_metadata),
@@ -666,15 +434,16 @@ impl AssetServiceTrait for AssetService {
         };
 
         // Build profile update from provider data
-        // Note: sectors/countries/classifications come from taxonomies, but profile data is stored for reference
         let mut update = UpdateAssetProfile {
-            symbol: existing_asset.symbol.clone(),
+            display_code: existing_asset.display_code.clone(),
             name: provider_profile.name.or(existing_asset.name.clone()),
             notes: existing_asset.notes.clone().unwrap_or_default(),
-            kind: updated_kind,
-            exchange_mic: None, // Keep existing exchange_mic
-            pricing_mode: Some(existing_asset.pricing_mode),
-            provider_overrides: existing_asset.provider_overrides.clone(),
+            kind: None,
+            quote_mode: Some(existing_asset.quote_mode),
+            instrument_type: updated_instrument_type,
+            instrument_symbol: None,
+            instrument_exchange_mic: None,
+            provider_config: existing_asset.provider_config.clone(),
             metadata: updated_metadata,
         };
 
@@ -686,8 +455,8 @@ impl AssetServiceTrait for AssetService {
         }
 
         debug!(
-            "Enriching asset {} with provider profile: kind={:?}, name={:?}, sectors={:?}, industry={:?}, countries={:?}, asset_type={:?}",
-            asset_id, update.kind, update.name, provider_profile.sectors, provider_profile.industry, provider_profile.countries, provider_profile.asset_type
+            "Enriching asset {} with provider profile: instrument_type={:?}, name={:?}, sectors={:?}, industry={:?}, countries={:?}, asset_type={:?}",
+            asset_id, update.instrument_type, update.name, provider_profile.sectors, provider_profile.industry, provider_profile.countries, provider_profile.asset_type
         );
 
         let updated_asset = self
@@ -696,16 +465,14 @@ impl AssetServiceTrait for AssetService {
             .await?;
 
         // Auto-classify asset based on provider profile data
-        // Note: ProviderProfile already has sectors/countries as JSON arrays
-        // (convert_profile converts single sector/country to JSON arrays)
         if let Some(taxonomy_service) = &self.taxonomy_service {
             let classification_input = ClassificationInput::from_provider_profile(
                 provider_profile.asset_type.as_deref(),
-                None,                                  // Single sector (already in sectors JSON)
-                provider_profile.sectors.as_deref(),   // Sector weightings JSON
-                None,                                  // Single country (already in countries JSON)
-                provider_profile.countries.as_deref(), // Country weightings JSON
-                existing_asset.exchange_mic.as_deref(), // Fallback for ETF region (fund domicile)
+                None,
+                provider_profile.sectors.as_deref(),
+                None,
+                provider_profile.countries.as_deref(),
+                existing_asset.instrument_exchange_mic.as_deref(),
             );
 
             let auto_classifier = AutoClassificationService::new(Arc::clone(taxonomy_service));
@@ -720,7 +487,6 @@ impl AssetServiceTrait for AssetService {
                     );
                 }
                 Err(e) => {
-                    // Log but don't fail - auto-classification is best-effort
                     debug!("Auto-classification failed for {}: {}", asset_id, e);
                 }
             }
@@ -730,22 +496,14 @@ impl AssetServiceTrait for AssetService {
     }
 
     /// Enriches multiple assets in batch, with deduplication and sync state tracking.
-    /// This is the shared implementation used by both Tauri and web server.
-    ///
-    /// Automatically filters out assets that shouldn't be enriched (cash, FX, alternative assets)
-    /// and checks sync state to avoid re-enriching already enriched assets.
     async fn enrich_assets(&self, asset_ids: Vec<String>) -> Result<(usize, usize, usize)> {
-        use super::should_enrich_asset;
-        use std::collections::HashSet;
-
         if asset_ids.is_empty() {
             return Ok((0, 0, 0));
         }
 
-        // Deduplicate and filter to only enrichable assets
+        // Deduplicate
         let unique_ids: Vec<String> = asset_ids
             .into_iter()
-            .filter(|id| should_enrich_asset(id))
             .collect::<HashSet<_>>()
             .into_iter()
             .collect();
@@ -763,8 +521,8 @@ impl AssetServiceTrait for AssetService {
             // Check sync state to see if enrichment is needed
             let needs_enrichment = match self.quote_service.get_sync_state(&asset_id) {
                 Ok(Some(state)) => state.needs_profile_enrichment(),
-                Ok(None) => true, // No sync state yet, try enrichment
-                Err(_) => true,   // Error checking state, try enrichment
+                Ok(None) => true,
+                Err(_) => true,
             };
 
             if !needs_enrichment {
@@ -776,7 +534,6 @@ impl AssetServiceTrait for AssetService {
             // Try to enrich the asset profile
             match self.enrich_asset_profile(&asset_id).await {
                 Ok(_) => {
-                    // Mark as enriched in sync state
                     if let Err(e) = self.quote_service.mark_profile_enriched(&asset_id).await {
                         warn!("Failed to mark profile enriched for {}: {}", asset_id, e);
                     }
@@ -863,10 +620,7 @@ impl AssetServiceTrait for AssetService {
 
         // 5. Emit activities_changed to trigger recalculation for affected accounts
         if activities_migrated > 0 {
-            let asset_ids = vec![
-                unknown_asset_id.to_string(),
-                resolved_asset_id.to_string(),
-            ];
+            let asset_ids = vec![unknown_asset_id.to_string(), resolved_asset_id.to_string()];
             self.event_sink.emit(DomainEvent::activities_changed(
                 account_ids,
                 asset_ids,
@@ -885,97 +639,138 @@ impl AssetServiceTrait for AssetService {
     async fn ensure_assets(
         &self,
         specs: Vec<AssetSpec>,
-        activity_repository: &dyn crate::activities::ActivityRepositoryTrait,
+        _activity_repository: &dyn crate::activities::ActivityRepositoryTrait,
     ) -> Result<EnsureAssetsResult> {
         if specs.is_empty() {
             return Ok(EnsureAssetsResult::default());
         }
 
-        // Deduplicate specs by ID
+        // Deduplicate specs by ID (if present) or by instrument_key
         let unique_specs: Vec<AssetSpec> = specs
             .into_iter()
             .fold(HashMap::new(), |mut map, spec| {
-                map.entry(spec.id.clone()).or_insert(spec);
+                let key = spec.id.clone().unwrap_or_else(|| {
+                    spec.instrument_key().unwrap_or_else(|| {
+                        format!(
+                            "{}:{}@{}",
+                            spec.instrument_type
+                                .as_ref()
+                                .map(|t| t.as_db_str())
+                                .unwrap_or("?"),
+                            spec.instrument_symbol.as_deref().unwrap_or(""),
+                            spec.instrument_exchange_mic.as_deref().unwrap_or("")
+                        )
+                    })
+                });
+                map.entry(key).or_insert(spec);
                 map
             })
             .into_values()
             .collect();
 
-        let ids: Vec<String> = unique_specs.iter().map(|s| s.id.clone()).collect();
-
-        // 1. Pre-read existing asset IDs (for merge detection + created_ids tracking)
-        let existing_ids: HashSet<String> = self
-            .asset_repository
-            .list_by_asset_ids(&ids)?
-            .into_iter()
-            .map(|a| a.id)
-            .collect();
-
-        // 2. Check for UNKNOWN merge candidates among missing specs
-        let mut merge_candidates: Vec<(String, String)> = Vec::new();
-        for spec in &unique_specs {
-            if existing_ids.contains(&spec.id) {
-                continue;
-            }
-            if let Some(unknown_id) = find_unknown_variant(&spec.id) {
-                if self.asset_repository.get_by_id(&unknown_id).is_ok() {
-                    merge_candidates.push((spec.id.clone(), unknown_id));
+        // Pre-resolve specs without IDs by looking up via instrument_key
+        let mut resolved_specs: Vec<AssetSpec> = Vec::with_capacity(unique_specs.len());
+        let mut preexisting_keys: HashSet<String> = HashSet::new();
+        for mut spec in unique_specs {
+            if spec.id.is_none() {
+                if let Some(key) = spec.instrument_key() {
+                    if let Ok(Some(existing)) = self.asset_repository.find_by_instrument_key(&key) {
+                        preexisting_keys.insert(key);
+                        spec.id = Some(existing.id);
+                    }
                 }
             }
+            resolved_specs.push(spec);
         }
 
-        // 3. Batch upsert all specs (INSERT OR IGNORE) in a single transaction
-        let new_assets: Vec<NewAsset> = unique_specs
+        // Collect IDs of specs that have them (for existing asset lookup)
+        let ids: Vec<String> = resolved_specs.iter().filter_map(|s| s.id.clone()).collect();
+
+        // 1. Pre-read existing asset IDs
+        let existing_ids: HashSet<String> = if !ids.is_empty() {
+            self.asset_repository
+                .list_by_asset_ids(&ids)?
+                .into_iter()
+                .map(|a| a.id)
+                .collect()
+        } else {
+            HashSet::new()
+        };
+
+        // 2. Batch upsert all specs (INSERT OR IGNORE)
+        let new_assets: Vec<NewAsset> = resolved_specs
             .iter()
             .map(|spec| self.new_asset_from_spec(spec))
             .collect();
 
         self.asset_repository.create_batch(new_assets).await?;
 
-        // Newly created = all spec IDs minus pre-existing
-        let created_ids: Vec<String> = ids
+        // Reactivate any pre-existing assets that were deactivated
+        for asset in self.asset_repository.list_by_asset_ids(&ids)? {
+            if !asset.is_active && existing_ids.contains(&asset.id) {
+                info!("Reactivating previously deactivated asset: {}", asset.id);
+                self.asset_repository.reactivate(&asset.id).await?;
+            }
+        }
+
+        // 3. Fetch all requested assets (by ID + by instrument_key for specs without IDs)
+        let mut assets_map: HashMap<String, Asset> = if !ids.is_empty() {
+            self.asset_repository
+                .list_by_asset_ids(&ids)?
+                .into_iter()
+                .map(|a| (a.id.clone(), a))
+                .collect()
+        } else {
+            HashMap::new()
+        };
+
+        // Also look up assets for specs that didn't have IDs (created with DB-generated UUIDs)
+        for spec in &resolved_specs {
+            if spec.id.is_none() {
+                if let Some(key) = spec.instrument_key() {
+                    if let Ok(Some(asset)) = self.asset_repository.find_by_instrument_key(&key) {
+                        assets_map.insert(asset.id.clone(), asset);
+                    }
+                }
+            }
+        }
+
+        // Newly created (ID-based specs): all spec IDs minus pre-existing IDs
+        let mut created_ids: HashSet<String> = ids
             .iter()
             .filter(|id| !existing_ids.contains(*id))
             .cloned()
             .collect();
 
-        // Assign taxonomy for newly created cash assets (best-effort)
-        for spec in &unique_specs {
-            if spec.kind == AssetKind::Cash && !existing_ids.contains(&spec.id) {
-                self.assign_cash_taxonomy(&spec.id).await;
+        // Newly created (instrument-key specs with DB-generated UUIDs)
+        for spec in &resolved_specs {
+            if spec.id.is_none() {
+                if let Some(key) = spec.instrument_key() {
+                    if preexisting_keys.contains(&key) {
+                        continue;
+                    }
+                    if let Some(asset) = assets_map
+                        .values()
+                        .find(|a| a.instrument_key.as_deref() == Some(&key))
+                    {
+                        created_ids.insert(asset.id.clone());
+                    }
+                }
             }
         }
 
-        // 4. Execute merges
-        for (resolved_id, unknown_id) in &merge_candidates {
-            if let Err(e) = self
-                .merge_unknown_asset(resolved_id, unknown_id, activity_repository)
-                .await
-            {
-                warn!(
-                    "Failed to merge UNKNOWN asset {} into {}: {}",
-                    unknown_id, resolved_id, e
-                );
-            }
-        }
+        let created_ids: Vec<String> = created_ids.into_iter().collect();
 
-        // 5. Emit batch event for created assets
+        // 4. Emit batch event for created assets
         if !created_ids.is_empty() {
             self.event_sink
                 .emit(DomainEvent::assets_created(created_ids.clone()));
         }
 
-        // 6. Fetch all requested assets
-        let all_assets = self.asset_repository.list_by_asset_ids(&ids)?;
-        let assets_map: HashMap<String, Asset> = all_assets
-            .into_iter()
-            .map(|a| (a.id.clone(), a))
-            .collect();
-
         Ok(EnsureAssetsResult {
             assets: assets_map,
             created_ids,
-            merge_candidates,
+            merge_candidates: Vec::new(),
         })
     }
 }

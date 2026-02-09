@@ -1,10 +1,10 @@
-use wealthfolio_core::assets::{canonical_asset_id, AssetKind, PricingMode};
+use wealthfolio_core::assets::{AssetKind, NewAsset};
 use wealthfolio_core::errors::{DatabaseError, ValidationError};
 use wealthfolio_core::fx::{ExchangeRate, FxRepositoryTrait};
 use wealthfolio_core::quotes::{DataSource, Quote};
 use wealthfolio_core::{Error, Result};
 
-use crate::assets::AssetDB;
+use crate::assets::{AssetDB, InsertableAssetDB};
 use crate::db::get_connection;
 use crate::db::WriteHandle;
 use crate::errors::StorageError;
@@ -16,7 +16,6 @@ use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sql_query;
 use diesel::sqlite::SqliteConnection;
-use log::error;
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -40,7 +39,7 @@ impl FxRepository {
             SELECT q.*
             FROM quotes q
             INNER JOIN assets a ON q.asset_id = a.id
-            WHERE a.kind = 'FX_RATE'
+            WHERE a.kind = 'FX'
             ORDER BY q.asset_id, q.timestamp";
 
         let quotes_db: Vec<QuoteDB> = diesel::sql_query(query)
@@ -67,7 +66,7 @@ impl FxRepository {
                 SELECT q.*
                 FROM quotes q
                 INNER JOIN assets a ON q.asset_id = a.id
-                WHERE a.kind = 'FX_RATE'
+                WHERE a.kind = 'FX'
                 AND (q.asset_id, q.timestamp) IN (
                     SELECT asset_id, MAX(timestamp)
                     FROM quotes
@@ -94,22 +93,19 @@ impl FxRepository {
     pub fn get_exchange_rates(&self) -> Result<Vec<ExchangeRate>> {
         let mut conn = get_connection(&self.pool)?;
 
-        // Get all FX assets with their latest quote (if any)
-        // Use asset.symbol as from_currency and asset.currency as to_currency
         let forex_assets = assets::table
-            .filter(assets::kind.eq(AssetKind::FxRate.as_db_str()))
-            .order_by(assets::symbol.asc())
+            .filter(assets::kind.eq(AssetKind::Fx.as_db_str()))
+            .order_by(assets::display_code.asc())
             .load::<AssetDB>(&mut conn)
             .map_err(StorageError::from)?;
 
-        // Get latest quotes for each FX asset
         let latest_quotes = sql_query(
             r#"SELECT
                 q.id, q.asset_id, q.day, q.source, q.open, q.high, q.low, q.close, q.adjclose, q.volume,
                 q.currency, q.notes, q.created_at, q.timestamp
              FROM quotes q
              WHERE q.asset_id IN (
-                 SELECT id FROM assets WHERE kind = 'FX_RATE'
+                 SELECT id FROM assets WHERE kind = 'FX'
              )
              AND (q.asset_id, q.timestamp) IN (
                  SELECT asset_id, MAX(timestamp) as max_timestamp
@@ -121,7 +117,6 @@ impl FxRepository {
         .load::<QuoteDB>(&mut conn)
         .map_err(StorageError::from)?;
 
-        // Build a map of asset_id -> latest quote
         let latest_quotes_by_id: HashMap<String, QuoteDB> = latest_quotes
             .into_iter()
             .map(|q| (q.asset_id.clone(), q))
@@ -130,10 +125,8 @@ impl FxRepository {
         let mut exchange_rates = Vec::with_capacity(forex_assets.len());
 
         for asset in forex_assets {
-            // Use asset.symbol as from_currency, asset.currency as to_currency
-            // This avoids parsing the ID
-            let from_currency = asset.symbol.clone();
-            let to_currency = asset.currency.clone();
+            let from_currency = asset.instrument_symbol.clone().unwrap_or_default();
+            let to_currency = asset.quote_ccy.clone();
 
             if let Some(quote_db) = latest_quotes_by_id.get(&asset.id) {
                 let timestamp = chrono::DateTime::parse_from_rfc3339(&quote_db.timestamp)
@@ -150,19 +143,22 @@ impl FxRepository {
                     timestamp,
                 });
             } else {
-                // No quote found - create placeholder with rate=0
                 let timestamp = chrono::DateTime::parse_from_rfc3339(&asset.updated_at)
                     .map(|dt| dt.with_timezone(&Utc))
                     .unwrap_or_else(|_| Utc::now());
+
+                let preferred_provider = asset
+                    .provider_config
+                    .as_ref()
+                    .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
+                    .and_then(|v| v.get("preferred_provider")?.as_str().map(String::from));
 
                 exchange_rates.push(ExchangeRate {
                     id: asset.id.clone(),
                     from_currency,
                     to_currency,
                     rate: Decimal::ZERO,
-                    source: DataSource::from(
-                        asset.preferred_provider.as_deref().unwrap_or("MANUAL"),
-                    ),
+                    source: DataSource::from(preferred_provider.as_deref().unwrap_or("MANUAL")),
                     timestamp,
                 });
             }
@@ -171,14 +167,12 @@ impl FxRepository {
         Ok(exchange_rates)
     }
 
-    /// Fetches all historical exchange rates (quotes) for FOREX assets.
     pub fn get_all_historical_exchange_rates(&self) -> Result<Vec<ExchangeRate>> {
         let mut conn = get_connection(&self.pool)?;
 
-        // Join quotes with assets to get symbol (from) and currency (to) directly
         let results: Vec<(QuoteDB, AssetDB)> = quotes::table
             .inner_join(assets::table.on(quotes::asset_id.eq(assets::id)))
-            .filter(assets::kind.eq(AssetKind::FxRate.as_db_str()))
+            .filter(assets::kind.eq(AssetKind::Fx.as_db_str()))
             .select((quotes::all_columns, assets::all_columns))
             .order_by((quotes::asset_id.asc(), quotes::timestamp.asc()))
             .load(&mut conn)
@@ -194,8 +188,8 @@ impl FxRepository {
 
                 ExchangeRate {
                     id: asset_db.id,
-                    from_currency: asset_db.symbol, // Use asset.symbol as from
-                    to_currency: asset_db.currency, // Use asset.currency as to
+                    from_currency: asset_db.instrument_symbol.unwrap_or_default(),
+                    to_currency: asset_db.quote_ccy,
                     rate,
                     source: DataSource::from(quote_db.source.as_str()),
                     timestamp,
@@ -207,13 +201,11 @@ impl FxRepository {
     pub fn get_exchange_rate(&self, from: &str, to: &str) -> Result<Option<ExchangeRate>> {
         let mut conn = get_connection(&self.pool)?;
 
-        // Build asset ID using new format: from:to
-        let asset_id = ExchangeRate::make_fx_symbol(from, to);
+        let expected_key = format!("FX:{}/{}", from, to);
 
-        // Join with assets to get from/to currencies directly
         let result: Option<(QuoteDB, AssetDB)> = quotes::table
             .inner_join(assets::table.on(quotes::asset_id.eq(assets::id)))
-            .filter(quotes::asset_id.eq(&asset_id))
+            .filter(assets::instrument_key.eq(&expected_key))
             .order_by(quotes::timestamp.desc())
             .select((quotes::all_columns, assets::all_columns))
             .first(&mut conn)
@@ -228,8 +220,8 @@ impl FxRepository {
 
             ExchangeRate {
                 id: asset_db.id,
-                from_currency: asset_db.symbol,
-                to_currency: asset_db.currency,
+                from_currency: asset_db.instrument_symbol.unwrap_or_default(),
+                to_currency: asset_db.quote_ccy,
                 rate,
                 source: DataSource::from(quote_db.source.as_str()),
                 timestamp,
@@ -240,10 +232,9 @@ impl FxRepository {
     pub fn get_exchange_rate_by_id(&self, id: &str) -> Result<Option<ExchangeRate>> {
         let mut conn = get_connection(&self.pool)?;
 
-        // Join with assets to get from/to currencies directly
         let result: Option<(QuoteDB, AssetDB)> = quotes::table
             .inner_join(assets::table.on(quotes::asset_id.eq(assets::id)))
-            .filter(quotes::asset_id.eq(id))
+            .filter(assets::instrument_key.eq(id).or(quotes::asset_id.eq(id)))
             .order_by(quotes::timestamp.desc())
             .select((quotes::all_columns, assets::all_columns))
             .first(&mut conn)
@@ -258,8 +249,8 @@ impl FxRepository {
 
             ExchangeRate {
                 id: asset_db.id,
-                from_currency: asset_db.symbol,
-                to_currency: asset_db.currency,
+                from_currency: asset_db.instrument_symbol.unwrap_or_default(),
+                to_currency: asset_db.quote_ccy,
                 rate,
                 source: DataSource::from(quote_db.source.as_str()),
                 timestamp,
@@ -278,8 +269,19 @@ impl FxRepository {
         let start_dt_str = Utc.from_utc_datetime(&start_date).to_rfc3339();
         let end_dt_str = Utc.from_utc_datetime(&end_date).to_rfc3339();
 
+        // symbol is an instrument_key (e.g., "FX:EUR/USD") or asset_id
+        let asset_ids: Vec<String> = assets::table
+            .filter(assets::instrument_key.eq(symbol).or(assets::id.eq(symbol)))
+            .select(assets::id)
+            .load(&mut conn)
+            .map_err(StorageError::from)?;
+
+        if asset_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
         let quotes_db = quotes::table
-            .filter(quotes::asset_id.eq(symbol))
+            .filter(quotes::asset_id.eq_any(&asset_ids))
             .filter(quotes::timestamp.ge(start_dt_str))
             .filter(quotes::timestamp.le(end_dt_str))
             .order_by(quotes::timestamp.asc())
@@ -291,7 +293,7 @@ impl FxRepository {
 
     pub async fn add_quote(
         &self,
-        symbol: String,
+        asset_id: String,
         date_str: String,
         rate: Decimal,
         source_str: String,
@@ -314,13 +316,17 @@ impl FxRepository {
                 let timestamp_str = timestamp_utc.to_rfc3339();
                 let created_at_str = Utc::now().to_rfc3339();
 
-                let currency = symbol.split_at(3).0.to_string();
-                // Generate deterministic ID: {asset_id}_{day}_{source}
-                let quote_id = format!("{}_{}_{}", symbol, date_str, source_str);
+                let asset: AssetDB = assets::table
+                    .filter(assets::id.eq(&asset_id))
+                    .first(conn)
+                    .map_err(StorageError::from)?;
+
+                let currency = asset.instrument_symbol.unwrap_or_default();
+                let quote_id = format!("{}_{}_{}", asset_id, date_str, source_str);
 
                 let quote_db = QuoteDB {
                     id: quote_id,
-                    asset_id: symbol.clone(),
+                    asset_id: asset_id.clone(),
                     day: date_str.clone(),
                     source: source_str.clone(),
                     open: Some(rate.to_string()),
@@ -347,7 +353,7 @@ impl FxRepository {
                     .map_err(StorageError::from)?;
 
                 quotes::table
-                    .filter(quotes::asset_id.eq(&symbol))
+                    .filter(quotes::asset_id.eq(&asset_id))
                     .filter(quotes::day.eq(&date_str))
                     .filter(quotes::source.eq(&source_str))
                     .first::<QuoteDB>(conn)
@@ -379,17 +385,8 @@ impl FxRepository {
                     .execute(conn)
                     .map_err(StorageError::from)?;
 
-                quotes::table
-                    .filter(quotes::id.eq(&quote_db.id))
-                    .first::<QuoteDB>(conn)
-                    .map(|q| ExchangeRate::from_quote(&Quote::from(q)))
-                    .map_err(|e| {
-                        error!(
-                            "Failed to fetch upserted exchange rate. Error: {}. Payload: id={}",
-                            e, quote_db.id
-                        );
-                        Error::Database(DatabaseError::QueryFailed(e.to_string()))
-                    })
+                // Return the rate directly — no need to read back
+                Ok(rate)
             })
             .await
     }
@@ -401,16 +398,24 @@ impl FxRepository {
                 let quote = rate_owned.to_quote();
                 let quote_db = QuoteDB::from(&quote);
 
-                diesel::update(quotes::table)
+                let updated = diesel::update(quotes::table)
                     .filter(quotes::asset_id.eq(&quote_db.asset_id))
                     .filter(quotes::day.eq(&quote_db.day))
                     .set((
                         quotes::close.eq(quote_db.close.clone()),
                         quotes::source.eq(&quote_db.source),
                     ))
-                    .get_result::<QuoteDB>(conn)
-                    .map(|q| ExchangeRate::from_quote(&Quote::from(q)))
-                    .map_err(|e| StorageError::from(e).into())
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+
+                if updated == 0 {
+                    return Err(Error::Database(DatabaseError::NotFound(format!(
+                        "Exchange rate quote not found for asset {}",
+                        quote_db.asset_id
+                    ))));
+                }
+
+                Ok(rate_owned)
             })
             .await
     }
@@ -419,12 +424,10 @@ impl FxRepository {
         let rate_id_owned = rate_id.to_string();
         self.writer
             .exec(move |conn| {
-                // Delete all quotes for this exchange rate
                 diesel::delete(quotes::table.filter(quotes::asset_id.eq(&rate_id_owned)))
                     .execute(conn)
                     .map_err(StorageError::from)?;
 
-                // Delete the asset
                 diesel::delete(assets::table.filter(assets::id.eq(&rate_id_owned)))
                     .execute(conn)
                     .map_err(StorageError::from)?;
@@ -435,90 +438,45 @@ impl FxRepository {
     }
 
     /// Creates or updates an FX asset in the database.
-    /// Uses canonical format per spec:
-    /// - `id`: "EUR:USD" format (base:quote)
-    /// - `symbol`: Base currency only (e.g., "EUR")
-    /// - `currency`: Quote currency (e.g., "USD")
-    /// - `provider_overrides`: Contains provider-specific symbol formats
-    pub async fn create_fx_asset(&self, from: &str, to: &str, source: &str) -> Result<()> {
+    /// Returns the asset UUID.
+    pub async fn create_fx_asset(&self, from: &str, to: &str, source: &str) -> Result<String> {
         let from_owned = from.to_string();
         let to_owned = to.to_string();
         let source_owned = source.to_string();
 
         self.writer
             .exec(move |conn| {
-                // Canonical ID format: FX:{base}:{quote} (e.g., FX:EUR:USD)
-                let asset_id = canonical_asset_id(&AssetKind::FxRate, &from_owned, None, &to_owned);
-                let readable_name = format!("{}/{} Exchange Rate", &from_owned, &to_owned);
-                let notes = format!(
-                    "Currency pair for converting from {} to {}",
-                    &from_owned, &to_owned
-                );
-                let now_rfc3339 = chrono::Utc::now().to_rfc3339();
-
-                // Build provider_overrides with provider-specific symbol format
-                let provider_overrides = if source_owned == "YAHOO" {
-                    Some(
-                        serde_json::json!({
-                            "YAHOO": {
-                                "type": "fx_symbol",
-                                "symbol": format!("{}{}=X", &from_owned, &to_owned)
-                            }
-                        })
-                        .to_string(),
-                    )
-                } else if source_owned == "ALPHA_VANTAGE" {
-                    Some(
-                        serde_json::json!({
-                            "ALPHA_VANTAGE": {
-                                "type": "fx_pair",
-                                "from": &from_owned,
-                                "to": &to_owned
-                            }
-                        })
-                        .to_string(),
-                    )
-                } else {
-                    None
-                };
-
-                let asset_db = AssetDB {
-                    id: asset_id,
-                    symbol: from_owned.clone(), // Base currency only (EUR)
-                    name: Some(readable_name),
-                    kind: AssetKind::FxRate.as_db_str().to_string(),
-                    pricing_mode: PricingMode::Market.as_db_str().to_string(),
-                    preferred_provider: Some(source_owned.to_string()),
-                    provider_overrides,
-                    notes: Some(notes),
-                    metadata: None,
-                    currency: to_owned.to_string(), // Quote currency (USD)
-                    is_active: 1,                   // FX assets should be active for quote syncing
-                    created_at: now_rfc3339.clone(),
-                    updated_at: now_rfc3339.clone(),
-                    ..Default::default()
-                };
-
-                diesel::insert_into(assets::table)
-                    .values(&asset_db)
-                    .on_conflict(assets::id)
-                    .do_update()
-                    .set((
-                        assets::name.eq(&asset_db.name),
-                        assets::symbol.eq(&asset_db.symbol),
-                        assets::kind.eq(&asset_db.kind),
-                        assets::pricing_mode.eq(&asset_db.pricing_mode),
-                        assets::preferred_provider.eq(&asset_db.preferred_provider),
-                        assets::provider_overrides.eq(&asset_db.provider_overrides),
-                        assets::metadata.eq(&asset_db.metadata),
-                        assets::notes.eq(&asset_db.notes),
-                        assets::currency.eq(&asset_db.currency),
-                        assets::updated_at.eq(&now_rfc3339),
-                    ))
-                    .execute(conn)
+                let expected_key = format!("FX:{}/{}", &from_owned, &to_owned);
+                let existing: Option<AssetDB> = assets::table
+                    .filter(assets::instrument_key.eq(&expected_key))
+                    .first(conn)
+                    .optional()
                     .map_err(StorageError::from)?;
 
-                Ok(())
+                if let Some(existing_asset) = existing {
+                    diesel::update(assets::table.filter(assets::id.eq(&existing_asset.id)))
+                        .set(assets::updated_at.eq(chrono::Utc::now().to_rfc3339()))
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
+
+                    Ok(existing_asset.id)
+                } else {
+                    let new_asset = NewAsset::new_fx_asset(&from_owned, &to_owned, &source_owned);
+                    let asset_db: InsertableAssetDB = new_asset.into();
+
+                    diesel::insert_into(assets::table)
+                        .values(&asset_db)
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
+
+                    // Read back to get the DB-generated UUID
+                    let inserted: AssetDB = assets::table
+                        .filter(assets::instrument_key.eq(&expected_key))
+                        .first(conn)
+                        .map_err(StorageError::from)?;
+
+                    Ok(inserted.id)
+                }
             })
             .await
     }
@@ -578,7 +536,7 @@ impl FxRepositoryTrait for FxRepository {
         from_currency: &str,
         to_currency: &str,
         source: &str,
-    ) -> Result<()> {
+    ) -> Result<String> {
         self.create_fx_asset(from_currency, to_currency, source)
             .await
     }

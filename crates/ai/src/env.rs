@@ -79,6 +79,7 @@ pub mod test_env {
     use std::collections::{HashMap, HashSet};
     use std::sync::RwLock;
     use wealthfolio_core::{
+        accounts::TrackingMode,
         accounts::{Account, AccountServiceTrait, AccountUpdate, NewAccount},
         activities::{
             Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityDetails,
@@ -89,9 +90,8 @@ pub mod test_env {
         errors::DatabaseError,
         goals::{Goal, GoalServiceTrait, GoalsAllocation, NewGoal},
         holdings::{Holding, HoldingsServiceTrait},
-        accounts::TrackingMode,
         portfolio::allocation::{AllocationHoldings, AllocationServiceTrait, PortfolioAllocations},
-        portfolio::income::{IncomeSummary, IncomeServiceTrait},
+        portfolio::income::{IncomeServiceTrait, IncomeSummary},
         portfolio::performance::{PerformanceMetrics, PerformanceServiceTrait},
         quotes::{
             LatestQuotePair, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait, QuoteSyncState,
@@ -348,6 +348,14 @@ pub mod test_env {
         ) -> CoreResult<wealthfolio_core::activities::ParsedCsvResult> {
             // Delegate to the actual core parser for testing
             wealthfolio_core::activities::parse_csv(content, config)
+        }
+
+        async fn prepare_activities(
+            &self,
+            _activities: Vec<NewActivity>,
+            _account: &Account,
+        ) -> CoreResult<wealthfolio_core::activities::PrepareActivitiesResult> {
+            unimplemented!("MockActivityService::prepare_activities")
         }
 
         async fn upsert_activities_bulk(
@@ -1040,9 +1048,9 @@ pub mod test_env {
                 secret_store: Arc::new(MockSecretStore::default()),
                 chat_repository: Arc::new(MockChatRepository::default()),
                 quote_service: Arc::new(MockQuoteService::default()),
-                allocation_service: Arc::new(MockAllocationService::default()),
-                performance_service: Arc::new(MockPerformanceService::default()),
-                income_service: Arc::new(MockIncomeService::default()),
+                allocation_service: Arc::new(MockAllocationService),
+                performance_service: Arc::new(MockPerformanceService),
+                income_service: Arc::new(MockIncomeService),
             }
         }
 

@@ -28,6 +28,7 @@ import {
 import { CurrencyInput } from "@wealthfolio/ui/components/financial";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useMemo, useState, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { useForm, FormProvider } from "react-hook-form";
 import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
@@ -79,7 +80,7 @@ interface ActivityDraft {
   subtype?: string;
   notes?: string;
   priceSource: string;
-  pricingMode: string;
+  quoteMode: string;
   isCustomAsset: boolean;
   assetKind?: string;
 }
@@ -214,7 +215,12 @@ function normalizeResult(result: unknown, fallbackCurrency: string): RecordActiv
     subtype: (draftRaw.subtype as string) ?? undefined,
     notes: (draftRaw.notes as string) ?? undefined,
     priceSource: (draftRaw.priceSource as string) ?? (draftRaw.price_source as string) ?? "none",
-    pricingMode: (draftRaw.pricingMode as string) ?? (draftRaw.pricing_mode as string) ?? "MARKET",
+    quoteMode:
+      (draftRaw.quoteMode as string) ??
+      (draftRaw.quote_mode as string) ??
+      (draftRaw.pricingMode as string) ??
+      (draftRaw.pricing_mode as string) ??
+      "MARKET",
     isCustomAsset: Boolean(draftRaw.isCustomAsset ?? draftRaw.is_custom_asset ?? false),
     assetKind: (draftRaw.assetKind as string) ?? (draftRaw.asset_kind as string) ?? undefined,
   };
@@ -401,18 +407,11 @@ function SuccessState({ draft, createdActivityId, currency }: SuccessStateProps)
           )}
         </div>
         <div className="pt-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              window.open(
-                createdActivityId ? `/activities?id=${createdActivityId}` : "/activities",
-                "_blank",
-              )
-            }
-          >
-            <Icons.ExternalLink className="mr-2 h-4 w-4" />
-            View in Activities
+          <Button variant="outline" size="sm" asChild>
+            <Link to={createdActivityId ? `/activities?id=${createdActivityId}` : "/activities"}>
+              <Icons.ArrowRight className="mr-2 h-4 w-4" />
+              View in Activities
+            </Link>
           </Button>
         </div>
       </CardContent>
@@ -667,8 +666,8 @@ function DraftForm({
         accountId: formValues.accountId,
         activityType: formValues.activityType,
         activityDate: formValues.activityDate.toISOString(),
-        // Nest asset fields in asset object (required by backend)
-        asset: selectedSymbol
+        // Nest symbol fields in symbol object (required by backend)
+        symbol: selectedSymbol
           ? {
               symbol: selectedSymbol,
               exchangeMic: selectedExchangeMic,

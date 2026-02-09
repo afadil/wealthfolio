@@ -114,10 +114,7 @@ function formatDate(dateString: string): string {
  * Normalizes the result to handle both wrapped and unwrapped formats,
  * as well as snake_case vs camelCase field names.
  */
-function normalizeResult(
-  result: unknown,
-  fallbackCurrency: string,
-): SearchActivitiesOutput | null {
+function normalizeResult(result: unknown, fallbackCurrency: string): SearchActivitiesOutput | null {
   if (!result) {
     return null;
   }

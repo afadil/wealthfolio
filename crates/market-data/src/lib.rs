@@ -69,10 +69,10 @@ pub use models::{
 
 // Re-export resolver types
 pub use resolver::{
-    exchanges_for_currency, mic_to_currency, mic_to_exchange_name, strip_yahoo_suffix,
-    yahoo_exchange_to_mic, yahoo_suffix_to_mic, AssetResolver, ExchangeMap, ExchangeSuffix,
-    ResolutionSource, ResolvedInstrument, Resolver, ResolverChain, RulesResolver, SymbolResolver,
-    YAHOO_EXCHANGE_SUFFIXES,
+    exchanges_for_currency, get_exchange_list, mic_to_currency, mic_to_exchange_name,
+    strip_yahoo_suffix, yahoo_exchange_suffixes, yahoo_exchange_to_mic, yahoo_suffix_to_mic,
+    AssetResolver, ExchangeInfo, ExchangeMap, ExchangeSuffix, ResolutionSource, ResolvedInstrument,
+    Resolver, ResolverChain, RulesResolver, SymbolResolver,
 };
 
 // Re-export provider types

@@ -403,6 +403,7 @@ struct TitleContext<E: AiEnvironment> {
 }
 
 /// Spawn a chat stream with the appropriate provider.
+#[allow(clippy::too_many_arguments)]
 async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     env: Arc<E>,
     tx: mpsc::Sender<AiStreamEvent>,
@@ -680,11 +681,15 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     // The full GenerationConfig struct includes fields (temperature, maxOutputTokens)
     // that may not be accepted by all Gemini API versions/models.
     let gemini_thinking_params: Option<serde_json::Value> = if capabilities.thinking {
-        // Enable thinking with a reasonable budget
+        // Enable thinking with a reasonable budget.
+        // Must be nested inside generationConfig to match rig's AdditionalParameters struct
+        // which deserializes "generationConfig" into GenerationConfig (has thinkingConfig field).
         Some(serde_json::json!({
-            "thinking_config": {
-                "thinking_budget": 8192,
-                "include_thoughts": true
+            "generationConfig": {
+                "thinkingConfig": {
+                    "thinkingBudget": 8192,
+                    "includeThoughts": true
+                }
             }
         }))
     } else {
@@ -697,7 +702,11 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         match provider_id.as_str() {
             "anthropic" => {
                 let client = create_anthropic_client(api_key, &provider_id)?;
-                build_with_tools_and_stream!(client, anthropic_thinking_params.clone(), Some(anthropic_max_tokens))
+                build_with_tools_and_stream!(
+                    client,
+                    anthropic_thinking_params.clone(),
+                    Some(anthropic_max_tokens)
+                )
             }
             "gemini" | "google" => {
                 let client = create_gemini_client(api_key, &provider_id)?;
@@ -729,7 +738,11 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         match provider_id.as_str() {
             "anthropic" => {
                 let client = create_anthropic_client(api_key, &provider_id)?;
-                build_without_tools_and_stream!(client, anthropic_thinking_params.clone(), Some(anthropic_max_tokens))
+                build_without_tools_and_stream!(
+                    client,
+                    anthropic_thinking_params.clone(),
+                    Some(anthropic_max_tokens)
+                )
             }
             "gemini" | "google" => {
                 let client = create_gemini_client(api_key, &provider_id)?;
@@ -907,6 +920,7 @@ impl ThinkTagParser {
 // ============================================================================
 
 /// Stream responses from a rig agent, converting to AiStreamEvent.
+#[allow(clippy::too_many_arguments)]
 async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 'static>(
     agent: Agent<M>,
     prompt: Message,

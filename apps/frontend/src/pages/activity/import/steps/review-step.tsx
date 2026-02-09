@@ -1,29 +1,29 @@
-import { useMemo, useState, useCallback, useEffect } from "react";
-import { Badge } from "@wealthfolio/ui/components/ui/badge";
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { checkActivitiesImport, logger, saveAccountImportMapping } from "@/adapters";
 import {
-  useImportContext,
-  setDraftActivities,
-  setDuplicates,
-  updateDraft,
+  ACTIVITY_SUBTYPES,
+  ActivityType,
+  ImportFormat,
+  SUBTYPES_BY_ACTIVITY_TYPE,
+} from "@/lib/constants";
+import type { ActivityImport, SymbolSearchResult } from "@/lib/types";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { ProgressIndicator } from "@wealthfolio/ui/components/ui/progress-indicator";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ImportAlert } from "../components/import-alert";
+import { ImportReviewGrid, type ImportReviewFilter } from "../components/import-review-grid";
+import { SymbolResolutionPanel } from "../components/symbol-resolution-panel";
+import {
+  bulkSetAccount,
+  bulkSetCurrency,
   bulkSkipDrafts,
   bulkUnskipDrafts,
-  bulkSetCurrency,
-  bulkSetAccount,
+  setDraftActivities,
+  setMapping,
+  updateDraft,
+  useImportContext,
   type DraftActivity,
   type DraftActivityStatus,
 } from "../context";
-import { ImportReviewGrid, type ImportReviewFilter } from "../components/import-review-grid";
-import { ImportAlert } from "../components/import-alert";
-import {
-  ActivityType,
-  ImportFormat,
-  ACTIVITY_SUBTYPES,
-  SUBTYPES_BY_ACTIVITY_TYPE,
-} from "@/lib/constants";
-import { checkActivitiesImport, checkExistingDuplicates, logger } from "@/adapters";
-import type { ActivityImport } from "@/lib/types";
-import { computeIdempotencyKeys, type IdempotencyKeyInput } from "../utils/idempotency";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -139,6 +139,31 @@ function hasNonZeroValue(value: string | number | null | undefined): boolean {
   return parsed !== undefined && parsed !== 0;
 }
 
+function mergeIssueMaps(
+  current: Record<string, string[]>,
+  incoming: Record<string, string[]>,
+): Record<string, string[]> {
+  const merged: Record<string, string[]> = { ...current };
+  for (const [key, messages] of Object.entries(incoming)) {
+    const existing = merged[key] ?? [];
+    const next = [...existing];
+    for (const message of messages) {
+      if (!next.includes(message)) {
+        next.push(message);
+      }
+    }
+    merged[key] = next;
+  }
+  return merged;
+}
+
+function hasDuplicateWarning(draft: DraftActivity): boolean {
+  const hasDuplicateLineNumber = typeof draft.duplicateOfLineNumber === "number";
+  return Boolean(
+    draft.duplicateOfId || hasDuplicateLineNumber || draft.warnings?._duplicate?.length,
+  );
+}
+
 /**
  * Parse a date value, handling various formats
  */
@@ -201,16 +226,19 @@ function mapActivityType(
 }
 
 /**
- * Map a CSV symbol to a resolved symbol
+ * Map a CSV symbol to a resolved symbol, optionally with exchange MIC and name metadata
  */
 function mapSymbol(
   csvSymbol: string | undefined,
   symbolMappings: Record<string, string>,
-): string | undefined {
-  if (!csvSymbol) return undefined;
+  symbolMappingMeta?: Record<string, { exchangeMic?: string; symbolName?: string }>,
+): { symbol: string | undefined; exchangeMic?: string; symbolName?: string } {
+  if (!csvSymbol) return { symbol: undefined };
 
   const trimmed = csvSymbol.trim();
-  return symbolMappings[trimmed] || trimmed;
+  const symbol = symbolMappings[trimmed] || trimmed;
+  const meta = symbolMappingMeta?.[trimmed];
+  return { symbol, exchangeMic: meta?.exchangeMic, symbolName: meta?.symbolName };
 }
 
 /**
@@ -400,6 +428,7 @@ function createDraftActivities(
     activityMappings: Record<string, string[]>;
     symbolMappings: Record<string, string>;
     accountMappings: Record<string, string>;
+    symbolMappingMeta?: Record<string, { exchangeMic?: string; symbolName?: string }>;
   },
   parseConfig: {
     dateFormat: string;
@@ -409,7 +438,8 @@ function createDraftActivities(
   },
   defaultAccountId: string,
 ): DraftActivity[] {
-  const { fieldMappings, activityMappings, symbolMappings, accountMappings } = mapping;
+  const { fieldMappings, activityMappings, symbolMappings, accountMappings, symbolMappingMeta } =
+    mapping;
   const { dateFormat, decimalSeparator, thousandsSeparator, defaultCurrency } = parseConfig;
 
   // Create header index lookup
@@ -445,7 +475,11 @@ function createDraftActivities(
     // Parse and normalize values
     const activityDate = parseDateValue(rawDate, dateFormat);
     const activityType = mapActivityType(rawType, activityMappings);
-    const symbol = mapSymbol(rawSymbol, symbolMappings);
+    const {
+      symbol,
+      exchangeMic: mappedExchangeMic,
+      symbolName: mappedSymbolName,
+    } = mapSymbol(rawSymbol, symbolMappings, symbolMappingMeta);
     const quantity = parseNumericValue(rawQuantity, decimalSeparator, thousandsSeparator);
     const unitPrice = parseNumericValue(rawUnitPrice, decimalSeparator, thousandsSeparator);
     const amount = parseNumericValue(rawAmount, decimalSeparator, thousandsSeparator);
@@ -474,6 +508,8 @@ function createDraftActivities(
       activityDate,
       activityType,
       symbol,
+      exchangeMic: mappedExchangeMic,
+      symbolName: mappedSymbolName,
       quantity,
       unitPrice,
       amount,
@@ -562,6 +598,125 @@ export function ReviewStep() {
   const [selectedRows, setSelectedRows] = useState<number[]>([]);
   const [filter, setFilter] = useState<ImportReviewFilter>("all");
   const [isValidating, setIsValidating] = useState(false);
+  const validationRunRef = useRef(0);
+
+  const validateDraftsWithBackend = useCallback(
+    async (drafts: DraftActivity[]) => {
+      const validationRun = ++validationRunRef.current;
+      setIsValidating(true);
+      try {
+        if (!accountId) {
+          logger.warn("No account selected - skipping backend validation");
+          if (validationRun === validationRunRef.current) {
+            dispatch(setDraftActivities(drafts));
+          }
+          return;
+        }
+
+        const activitiesToValidate = drafts
+          .filter((d) => d.status !== "skipped" && d.activityType)
+          .map(
+            (draft) =>
+              ({
+                accountId,
+                activityType: draft.activityType as ActivityImport["activityType"],
+                date: draft.activityDate || "",
+                symbol: draft.symbol || "",
+                exchangeMic: draft.exchangeMic,
+                quantity: draft.quantity,
+                unitPrice: draft.unitPrice,
+                amount: draft.amount,
+                currency: draft.currency || parseConfig.defaultCurrency,
+                fee: draft.fee,
+                isDraft: true,
+                isValid: draft.status === "valid" || draft.status === "warning",
+                lineNumber: draft.rowIndex + 1,
+                comment: draft.comment,
+                fxRate: draft.fxRate,
+                subtype: draft.subtype,
+              }) satisfies Partial<ActivityImport>,
+          ) as ActivityImport[];
+
+        let updatedDrafts = drafts;
+        if (activitiesToValidate.length > 0) {
+          const validated = await checkActivitiesImport({
+            accountId,
+            activities: activitiesToValidate,
+          });
+          if (validationRun !== validationRunRef.current) {
+            return;
+          }
+
+          updatedDrafts = drafts.map((draft) => {
+            const backendResult = validated.find((v) => v.lineNumber === draft.rowIndex + 1);
+            if (!backendResult) {
+              return {
+                ...draft,
+                accountId,
+                duplicateOfId: undefined,
+                duplicateOfLineNumber: undefined,
+              };
+            }
+
+            const backendErrors: Record<string, string[]> = {};
+            if (backendResult.errors) {
+              for (const [key, value] of Object.entries(backendResult.errors)) {
+                backendErrors[key] = Array.isArray(value) ? value : [String(value)];
+              }
+            }
+            const backendWarnings: Record<string, string[]> = {};
+            if (backendResult.warnings) {
+              for (const [key, value] of Object.entries(backendResult.warnings)) {
+                backendWarnings[key] = Array.isArray(value) ? value : [String(value)];
+              }
+            }
+            if (!backendResult.isValid && Object.keys(backendErrors).length === 0) {
+              backendErrors.general = ["Validation failed"];
+            }
+
+            const mergedErrors = mergeIssueMaps(draft.errors || {}, backendErrors);
+            const retainedWarnings = { ...(draft.warnings || {}) };
+            delete retainedWarnings._duplicate;
+            const mergedWarnings = mergeIssueMaps(retainedWarnings, backendWarnings);
+            const hasErrors = Object.keys(mergedErrors).length > 0;
+            const hasWarnings = Object.keys(mergedWarnings).length > 0;
+
+            return {
+              ...draft,
+              accountId,
+              errors: mergedErrors,
+              warnings: mergedWarnings,
+              duplicateOfId: backendResult.duplicateOfId,
+              duplicateOfLineNumber: backendResult.duplicateOfLineNumber,
+              symbolName: backendResult.symbolName,
+              exchangeMic: backendResult.exchangeMic,
+              status:
+                draft.status === "skipped"
+                  ? draft.status
+                  : hasErrors
+                    ? "error"
+                    : hasWarnings
+                      ? "warning"
+                      : "valid",
+            } as DraftActivity;
+          });
+        }
+        if (validationRun === validationRunRef.current) {
+          dispatch(setDraftActivities(updatedDrafts));
+        }
+      } catch (error) {
+        logger.error(`Backend validation failed: ${error}`);
+        if (validationRun === validationRunRef.current) {
+          dispatch(setDraftActivities(drafts));
+        }
+      } finally {
+        if (validationRun === validationRunRef.current) {
+          setIsValidating(false);
+        }
+      }
+    },
+    [accountId, dispatch, parseConfig.defaultCurrency],
+  );
 
   // Create draft activities and validate with backend when entering this step
   useEffect(() => {
@@ -574,6 +729,7 @@ export function ReviewStep() {
           activityMappings: mapping.activityMappings,
           symbolMappings: mapping.symbolMappings,
           accountMappings: mapping.accountMappings || {},
+          symbolMappingMeta: mapping.symbolMappingMeta || {},
         },
         {
           dateFormat: parseConfig.dateFormat,
@@ -584,218 +740,17 @@ export function ReviewStep() {
         accountId,
       );
 
-      logger.debug(`Created ${drafts.length} draft activities with frontend validation`);
-
-      // Log validation state for debugging
-      const errorCount = drafts.filter((d) => d.status === "error").length;
-      const validCount = drafts.filter((d) => d.status === "valid").length;
-      logger.debug(`Frontend validation: ${validCount} valid, ${errorCount} errors`);
-      if (errorCount > 0) {
-        const firstError = drafts.find((d) => d.status === "error");
-        logger.debug(`First error draft errors: ${JSON.stringify(firstError?.errors)}`);
-      }
-
-      // Run backend validation (dry run) to check symbols, currencies, etc.
-      const validateWithBackend = async () => {
-        setIsValidating(true);
-        try {
-          // Check if we have an account selected
-          if (!accountId) {
-            logger.warn(
-              "No account selected - skipping backend validation. Frontend validation only.",
-            );
-            dispatch(setDraftActivities(drafts));
-            return;
-          }
-
-          // Filter activities that have minimum required data for backend validation
-          // Use state's accountId for all activities (not draft.accountId)
-          const activitiesToValidate = drafts
-            .filter((d) => d.status !== "skipped" && d.activityType)
-            .map(
-              (draft) =>
-                ({
-                  accountId: accountId, // Use the selected account from state
-                  activityType: draft.activityType as ActivityImport["activityType"],
-                  date: draft.activityDate || "",
-                  symbol: draft.symbol || "",
-                  quantity: draft.quantity,
-                  unitPrice: draft.unitPrice,
-                  amount: draft.amount,
-                  currency: draft.currency || parseConfig.defaultCurrency,
-                  fee: draft.fee,
-                  isDraft: true,
-                  isValid: draft.status === "valid" || draft.status === "warning",
-                  lineNumber: draft.rowIndex + 1,
-                  comment: draft.comment,
-                  fxRate: draft.fxRate,
-                  subtype: draft.subtype,
-                }) satisfies Partial<ActivityImport>,
-            ) as ActivityImport[];
-
-          logger.info(
-            `Backend validation: sending ${activitiesToValidate.length} activities to check_activities_import`,
-          );
-
-          if (activitiesToValidate.length > 0) {
-            // Call backend for read-only validation
-            const validated = await checkActivitiesImport({
-              accountId,
-              activities: activitiesToValidate,
-            });
-
-            logger.info(`Backend validation returned ${validated.length} results`);
-
-            // Merge backend validation results back into drafts
-            const updatedDrafts = drafts.map((draft) => {
-              const backendResult = validated.find((v) => v.lineNumber === draft.rowIndex + 1);
-              if (backendResult) {
-                // Ensure errors are properly structured
-                const backendErrors: Record<string, string[]> = {};
-                if (backendResult.errors) {
-                  for (const [key, value] of Object.entries(backendResult.errors)) {
-                    backendErrors[key] = Array.isArray(value) ? value : [String(value)];
-                  }
-                }
-
-                // Check isValid from backend
-                if (!backendResult.isValid && Object.keys(backendErrors).length === 0) {
-                  // Backend marked as invalid but no specific errors - add generic error
-                  backendErrors.general = ["Validation failed"];
-                }
-
-                const mergedErrors = { ...draft.errors, ...backendErrors };
-                const hasErrors = Object.keys(mergedErrors).length > 0;
-                const hasWarnings = Object.keys(draft.warnings || {}).length > 0;
-
-                // Update draft with backend results
-                return {
-                  ...draft,
-                  accountId: accountId, // Ensure accountId is set from state
-                  errors: mergedErrors,
-                  symbolName: backendResult.symbolName,
-                  exchangeMic: backendResult.exchangeMic,
-                  status: hasErrors ? "error" : hasWarnings ? "warning" : "valid",
-                } as DraftActivity;
-              }
-              // No backend result for this draft - keep frontend validation but update accountId
-              return { ...draft, accountId: accountId } as DraftActivity;
-            });
-
-            // Check for duplicates after backend validation
-            const draftsWithDuplicates = await checkForDuplicates(
-              updatedDrafts,
-              accountId,
-              parseConfig.defaultCurrency,
-              dispatch,
-            );
-            dispatch(setDraftActivities(draftsWithDuplicates));
-          } else {
-            logger.warn("No activities to validate with backend");
-            // Still check for duplicates even without backend validation
-            const draftsWithDuplicates = await checkForDuplicates(
-              drafts,
-              accountId,
-              parseConfig.defaultCurrency,
-              dispatch,
-            );
-            dispatch(setDraftActivities(draftsWithDuplicates));
-          }
-        } catch (error) {
-          logger.error(`Backend validation failed: ${error}`);
-          // Still set drafts with frontend validation even if backend validation fails
-          dispatch(setDraftActivities(drafts));
-        } finally {
-          setIsValidating(false);
-        }
-      };
-
-      validateWithBackend();
+      void validateDraftsWithBackend(drafts);
     }
-  }, [parsedRows, headers, mapping, parseConfig, accountId, draftActivities.length, dispatch]);
-
-  /**
-   * Check for existing duplicates in the database
-   */
-  async function checkForDuplicates(
-    drafts: DraftActivity[],
-    accountId: string,
-    defaultCurrency: string,
-    dispatch: ReturnType<typeof useImportContext>["dispatch"],
-  ): Promise<DraftActivity[]> {
-    if (!accountId) {
-      logger.warn("No account selected - skipping duplicate check");
-      return drafts;
-    }
-
-    try {
-      // Build idempotency key inputs from drafts
-      const keyInputs: IdempotencyKeyInput[] = drafts
-        .filter((d) => d.status !== "skipped" && d.activityType)
-        .map((draft) => ({
-          accountId: accountId,
-          activityType: draft.activityType,
-          activityDate: draft.activityDate,
-          assetId: draft.symbol || undefined,
-          quantity: toNumber(draft.quantity),
-          unitPrice: toNumber(draft.unitPrice),
-          amount: toNumber(draft.amount),
-          currency: draft.currency || defaultCurrency,
-          description: draft.comment,
-        }));
-
-      if (keyInputs.length === 0) {
-        return drafts;
-      }
-
-      // Compute idempotency keys
-      logger.info(`Computing idempotency keys for ${keyInputs.length} activities`);
-      const keyMap = await computeIdempotencyKeys(keyInputs);
-
-      // Extract keys as array
-      const idempotencyKeys = Array.from(keyMap.values());
-
-      // Check for existing duplicates in the database
-      logger.info(`Checking ${idempotencyKeys.length} keys for duplicates`);
-      const duplicates = await checkExistingDuplicates(idempotencyKeys);
-      const duplicateCount = Object.keys(duplicates).length;
-      logger.info(`Found ${duplicateCount} duplicate activities`);
-
-      // Store duplicates in context
-      if (duplicateCount > 0) {
-        dispatch(setDuplicates(duplicates));
-      }
-
-      // Build reverse map: rowIndex -> idempotencyKey
-      const rowToKey = new Map<number, string>();
-      let keyIndex = 0;
-      for (const draft of drafts) {
-        if (draft.status !== "skipped" && draft.activityType) {
-          const key = keyMap.get(keyIndex);
-          if (key) {
-            rowToKey.set(draft.rowIndex, key);
-          }
-          keyIndex++;
-        }
-      }
-
-      // Mark drafts as duplicates
-      return drafts.map((draft) => {
-        const key = rowToKey.get(draft.rowIndex);
-        if (key && duplicates[key]) {
-          return {
-            ...draft,
-            status: "duplicate" as DraftActivityStatus,
-            duplicateOfId: duplicates[key],
-          };
-        }
-        return draft;
-      });
-    } catch (error) {
-      logger.error(`Duplicate check failed: ${error}`);
-      return drafts;
-    }
-  }
+  }, [
+    parsedRows,
+    headers,
+    mapping,
+    parseConfig,
+    accountId,
+    draftActivities.length,
+    validateDraftsWithBackend,
+  ]);
 
   // Calculate filter stats
   const filterStats = useMemo<FilterStats>(() => {
@@ -815,8 +770,12 @@ export function ReviewStep() {
           break;
         case "warning":
           stats.warnings++;
+          if (hasDuplicateWarning(draft)) {
+            stats.duplicates++;
+          }
           break;
         case "duplicate":
+          stats.warnings++;
           stats.duplicates++;
           break;
         case "skipped":
@@ -824,6 +783,9 @@ export function ReviewStep() {
           break;
         case "valid":
           stats.valid++;
+          if (hasDuplicateWarning(draft)) {
+            stats.duplicates++;
+          }
           break;
       }
     }
@@ -840,9 +802,8 @@ export function ReviewStep() {
         const mergedDraft = { ...currentDraft, ...updates };
         // Re-validate the merged draft
         const validation = validateDraft(mergedDraft);
-        // Don't override status if it was skipped or duplicate (unless they changed activity type)
-        const shouldRevalidateStatus =
-          currentDraft.status !== "skipped" && currentDraft.status !== "duplicate";
+        // Don't override status if it was explicitly skipped.
+        const shouldRevalidateStatus = currentDraft.status !== "skipped";
         dispatch(
           updateDraft(rowIndex, {
             ...updates,
@@ -851,6 +812,8 @@ export function ReviewStep() {
                   status: validation.status,
                   errors: validation.errors,
                   warnings: validation.warnings,
+                  duplicateOfId: undefined,
+                  duplicateOfLineNumber: undefined,
                 }
               : {}),
           }),
@@ -892,14 +855,86 @@ export function ReviewStep() {
     [dispatch],
   );
 
+  const handleSymbolResolution = useCallback(
+    (mappings: Record<string, SymbolSearchResult>) => {
+      // 1. Update all affected drafts in-memory, then run backend validation+dedupe again.
+      const nextDrafts = draftActivities.map((draft) => {
+        const result = draft.symbol ? mappings[draft.symbol] : undefined;
+        if (!result || !draft.errors.symbol) {
+          return draft;
+        }
+
+        const symbolUpdates: Partial<DraftActivity> = {
+          symbol: result.symbol,
+          exchangeMic: result.exchangeMic,
+          symbolName: result.longName,
+        };
+        const { symbol: _removed, ...otherErrors } = draft.errors;
+        const merged = { ...draft, ...symbolUpdates };
+        const validation = validateDraft(merged);
+        const finalErrors = { ...otherErrors, ...validation.errors };
+        const hasErrors = Object.keys(finalErrors).length > 0;
+        const hasWarnings = Object.keys(validation.warnings).length > 0;
+
+        return {
+          ...merged,
+          errors: finalErrors,
+          warnings: validation.warnings,
+          duplicateOfId: undefined,
+          duplicateOfLineNumber: undefined,
+          status:
+            draft.status === "skipped"
+              ? draft.status
+              : hasErrors
+                ? "error"
+                : hasWarnings
+                  ? "warning"
+                  : "valid",
+        } as DraftActivity;
+      });
+      dispatch(setDraftActivities(nextDrafts));
+      void validateDraftsWithBackend(nextDrafts);
+
+      // 2. Save resolved symbols to mapping profile for future imports
+      if (mapping) {
+        const newSymbolMappings = { ...mapping.symbolMappings };
+        const newSymbolMappingMeta = { ...(mapping.symbolMappingMeta || {}) };
+
+        for (const [csvSymbol, result] of Object.entries(mappings)) {
+          newSymbolMappings[csvSymbol] = result.symbol;
+          newSymbolMappingMeta[csvSymbol] = {
+            exchangeMic: result.exchangeMic,
+            symbolName: result.longName,
+          };
+        }
+
+        const updatedMapping = {
+          ...mapping,
+          symbolMappings: newSymbolMappings,
+          symbolMappingMeta: newSymbolMappingMeta,
+        };
+
+        dispatch(setMapping(updatedMapping));
+
+        // Persist to backend
+        if (accountId) {
+          saveAccountImportMapping({ ...updatedMapping, accountId }).catch((err) =>
+            logger.error(`Failed to save symbol mappings: ${err}`),
+          );
+        }
+      }
+    },
+    [draftActivities, dispatch, mapping, accountId, validateDraftsWithBackend],
+  );
+
   // Show loading state while drafts are being created or validated
   if ((draftActivities.length === 0 && parsedRows.length > 0) || isValidating) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <Icons.Spinner className="text-primary h-8 w-8 animate-spin" />
-        <p className="text-muted-foreground mt-4">
-          {isValidating ? "Validating activities..." : "Processing activities..."}
-        </p>
+        <ProgressIndicator
+          message={isValidating ? "Validating activities..." : "Processing activities..."}
+          className="border-none shadow-none"
+        />
       </div>
     );
   }
@@ -947,6 +982,9 @@ export function ReviewStep() {
           description="Your data is ready for import. You can still review and make adjustments if needed."
         />
       )}
+
+      {/* Symbol resolution for unrecognized symbols */}
+      <SymbolResolutionPanel drafts={draftActivities} onApplyMappings={handleSymbolResolution} />
 
       {/* Stats and filter */}
       <div className="flex flex-col gap-3">

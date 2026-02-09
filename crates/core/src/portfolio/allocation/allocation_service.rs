@@ -56,6 +56,7 @@ impl AllocationService {
     /// Aggregates holdings into a taxonomy allocation.
     /// For hierarchical taxonomies (GICS, Regions), rolls up to top-level categories
     /// and populates children for drill-down.
+    #[allow(clippy::too_many_arguments)]
     fn aggregate_by_taxonomy(
         &self,
         holdings: &[Holding],
@@ -167,17 +168,16 @@ impl AllocationService {
                         Decimal::ZERO
                     };
 
-                    children_map
-                        .entry(top_level_id.clone())
-                        .or_default()
-                        .push(CategoryAllocation {
+                    children_map.entry(top_level_id.clone()).or_default().push(
+                        CategoryAllocation {
                             category_id: cat_id.clone(),
                             category_name: name,
                             color,
                             value: *value,
                             percentage,
                             children: Vec::new(),
-                        });
+                        },
+                    );
                 }
             }
             // Sort children by value descending
@@ -250,6 +250,7 @@ impl AllocationService {
     }
 
     /// Recursively finds the top-level ancestor of a category.
+    #[allow(clippy::only_used_in_recursion)]
     fn find_top_level_ancestor<'a>(
         &self,
         category_id: &'a str,
@@ -443,8 +444,16 @@ impl AllocationServiceTrait for AllocationService {
 
         // Extract taxonomy metadata
         let (taxonomy_name, taxonomy_color, categories) = match &taxonomy_with_cats {
-            Some(twc) => (twc.taxonomy.name.clone(), twc.taxonomy.color.clone(), &twc.categories),
-            None => ("Unknown".to_string(), "#808080".to_string(), &empty_categories),
+            Some(twc) => (
+                twc.taxonomy.name.clone(),
+                twc.taxonomy.color.clone(),
+                &twc.categories,
+            ),
+            None => (
+                "Unknown".to_string(),
+                "#808080".to_string(),
+                &empty_categories,
+            ),
         };
 
         // Look up category metadata
@@ -529,11 +538,7 @@ impl AllocationServiceTrait for AllocationService {
                 let has_assignment = self
                     .taxonomy_service
                     .get_asset_assignments(asset_id)
-                    .map(|assignments| {
-                        assignments
-                            .iter()
-                            .any(|a| a.taxonomy_id == taxonomy_id)
-                    })
+                    .map(|assignments| assignments.iter().any(|a| a.taxonomy_id == taxonomy_id))
                     .unwrap_or(false);
 
                 if !has_assignment {

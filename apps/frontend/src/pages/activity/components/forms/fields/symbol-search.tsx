@@ -1,7 +1,7 @@
 import TickerSearchInput from "@/components/ticker-search";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@wealthfolio/ui";
-import { DataSource, PricingMode } from "@/lib/constants";
+import { DataSource, QuoteMode } from "@/lib/constants";
 import type { SymbolSearchResult } from "@/lib/types";
 import { useFormContext, type FieldPath, type FieldValues } from "react-hook-form";
 import { normalizeCurrency } from "@/lib/utils";
@@ -46,8 +46,8 @@ interface SymbolSearchProps<TFieldValues extends FieldValues = FieldValues> {
   defaultCurrency?: string;
   /** Field name for exchangeMic (optional, for capturing exchange info) */
   exchangeMicName?: FieldPath<TFieldValues>;
-  /** Field name for pricingMode (optional, to set manual pricing for custom assets) */
-  pricingModeName?: FieldPath<TFieldValues>;
+  /** Field name for quoteMode (optional, to set manual pricing for custom assets) */
+  quoteModeName?: FieldPath<TFieldValues>;
   /** Field name for currency (optional, to set currency from search result) */
   currencyName?: FieldPath<TFieldValues>;
   /** Field name for assetMetadata (optional, to capture asset name for custom assets) */
@@ -60,7 +60,7 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
   label = "Symbol",
   defaultCurrency,
   exchangeMicName,
-  pricingModeName,
+  quoteModeName,
   currencyName,
   assetMetadataName,
 }: SymbolSearchProps<TFieldValues>) {
@@ -69,10 +69,10 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
   const handleAssetSelect = (symbol: string, searchResult: SymbolSearchResult | undefined) => {
     const isManualAsset = searchResult?.dataSource === DataSource.MANUAL;
 
-    // Set pricing mode for manual/custom assets
-    if (isManualAsset && pricingModeName) {
+    // Set quote mode for manual/custom assets
+    if (isManualAsset && quoteModeName) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setValue(pricingModeName, PricingMode.MANUAL as any);
+      setValue(quoteModeName, QuoteMode.MANUAL as any);
     }
 
     // Normalize symbol for canonical ID generation:

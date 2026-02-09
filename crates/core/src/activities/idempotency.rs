@@ -22,6 +22,7 @@ use sha2::{Digest, Sha256};
 /// - description/notes
 ///
 /// This allows reliable upsert/dedupe even when provider IDs change.
+#[allow(clippy::too_many_arguments)]
 pub fn compute_idempotency_key(
     account_id: &str,
     activity_type: &str,

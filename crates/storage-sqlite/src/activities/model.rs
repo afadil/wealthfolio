@@ -451,7 +451,7 @@ impl From<NewActivity> for ActivityDB {
             .to_string();
 
         // Extract asset_id before consuming domain fields
-        let asset_id = domain.get_asset_id().map(|s| s.to_string());
+        let asset_id = domain.get_symbol_id().map(|s| s.to_string());
 
         Self {
             id: domain.id.unwrap_or_default(),
@@ -485,7 +485,7 @@ impl From<NewActivity> for ActivityDB {
             source_system: domain.source_system.or(Some("MANUAL".to_string())),
             source_record_id: domain.source_record_id,
             source_group_id: domain.source_group_id,
-            idempotency_key: None,
+            idempotency_key: domain.idempotency_key,
             import_run_id: None,
 
             // Sync flags
@@ -539,7 +539,7 @@ impl From<ActivityUpdate> for ActivityDB {
             .to_string();
 
         // Extract asset_id before consuming domain fields
-        let asset_id = domain.get_asset_id().map(|s| s.to_string());
+        let asset_id = domain.get_symbol_id().map(|s| s.to_string());
 
         Self {
             id: domain.id,

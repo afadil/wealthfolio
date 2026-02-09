@@ -9,9 +9,10 @@ import {
   ImportFormat,
   ImportMappingData,
   ImportRequiredField,
+  type SymbolSearchResult,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { isSymbolRequired } from "@/lib/activity-utils";
+import { isCashSymbol, isSymbolRequired } from "@/lib/activity-utils";
 import {
   Badge,
   SearchableSelect,
@@ -26,6 +27,13 @@ import { useState } from "react";
 import { findMappedActivityType } from "../utils/activity-type-mapping";
 
 const SKIP_FIELD_VALUE = "__skip__";
+
+// Shared style for all mapping popover triggers — matches standard input look at sm size
+const MAPPING_TRIGGER_CLASS = "h-8 rounded-md text-xs font-normal";
+
+// Dashed style for unmapped/empty mapping triggers — orange dashed border to signal action needed
+const MAPPING_TRIGGER_UNMAPPED_CLASS =
+  "h-8 rounded-md text-xs font-normal !border-dashed !border-orange-300 !text-orange-500 !bg-transparent !shadow-none hover:!bg-orange-50 dark:!border-orange-400 dark:!text-orange-400 dark:hover:!bg-orange-950";
 
 export function MappingHeaderCell({
   field,
@@ -63,7 +71,7 @@ export function MappingHeaderCell({
           value={mappedHeader || SKIP_FIELD_VALUE}
           onOpenChange={(open) => !open && setEditingHeader(null)}
         >
-          <SelectTrigger className="text-muted-foreground h-8 w-full py-2 font-normal">
+          <SelectTrigger className={cn(MAPPING_TRIGGER_CLASS, "text-muted-foreground !h-8 w-full")}>
             <SelectValue placeholder={isRequired ? "Select column" : "Optional"} />
           </SelectTrigger>
           <SelectContent className="max-h-[300px] overflow-y-auto">
@@ -114,53 +122,39 @@ function ActivityTypeDisplayCell({
   const displayValue =
     trimmedCsvType.length > 27 ? `${trimmedCsvType.substring(0, 27)}...` : trimmedCsvType;
 
-  if (appType) {
-    return (
-      <div className="flex w-full flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
-        <div title={trimmedCsvType} className="max-w-[180px] truncate font-medium">
-          {displayValue}
-        </div>
-        <div className="flex items-center gap-2 sm:gap-3">
-          <span className="text-muted-foreground">→</span>
-          <Badge variant="secondary" className="text-xs transition-colors">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-auto p-0 text-xs"
-              onClick={() => {
-                handleActivityTypeMapping(trimmedCsvType, "" as ActivityType);
-              }}
-            >
-              {appType}
-            </Button>
-          </Badge>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex w-full items-center gap-2">
-      <Badge
-        variant="destructive"
+    <div className="flex items-center gap-2">
+      <span
         title={trimmedCsvType}
-        className="shrink-0 whitespace-nowrap text-xs"
+        className={cn("shrink-0 truncate text-xs font-medium", !appType && "text-destructive")}
       >
         {displayValue}
-      </Badge>
-      <SearchableSelect
-        options={Object.values(ActivityType).map((type) => ({
-          value: type,
-          label: type,
-        }))}
-        value=""
-        onValueChange={(newType) =>
-          handleActivityTypeMapping(trimmedCsvType, newType as ActivityType)
-        }
-        placeholder="Map to..."
-        className="h-8 w-[140px]"
-      />
+      </span>
+      <span className="text-muted-foreground shrink-0">→</span>
+      <div className="ml-auto">
+        {appType ? (
+          <Badge
+            variant="secondary"
+            className="hover:bg-secondary/80 cursor-pointer text-xs transition-colors"
+            onClick={() => handleActivityTypeMapping(trimmedCsvType, "" as ActivityType)}
+          >
+            {appType}
+          </Badge>
+        ) : (
+          <SearchableSelect
+            options={Object.values(ActivityType).map((type) => ({
+              value: type,
+              label: type,
+            }))}
+            value=""
+            onValueChange={(newType) =>
+              handleActivityTypeMapping(trimmedCsvType, newType as ActivityType)
+            }
+            placeholder="Map type"
+            className={cn(MAPPING_TRIGGER_UNMAPPED_CLASS, "w-[140px]")}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -185,44 +179,43 @@ function AccountIdDisplayCell({
 
   if (mappedAccountId) {
     return (
-      <div className="flex w-full flex-col items-start gap-2 sm:flex-row sm:items-center">
-        <span className="text-muted-foreground max-w-[120px] truncate" title={csvAccountId}>
+      <div className="flex items-center gap-2">
+        <span className="text-muted-foreground shrink-0 truncate text-xs" title={csvAccountId}>
           {csvAccountId}
         </span>
-        <Badge variant="secondary" className="text-xs transition-colors">
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-auto p-0 py-0 text-xs"
-            onClick={() => handleAccountIdMapping(csvAccountId, "")}
-          >
-            {mappedAccountId}
-          </Button>
+        <span className="text-muted-foreground shrink-0">→</span>
+        <Badge
+          variant="secondary"
+          className="hover:bg-secondary/80 ml-auto cursor-pointer text-xs transition-colors"
+          onClick={() => handleAccountIdMapping(csvAccountId, "")}
+        >
+          {mappedAccountId}
         </Badge>
       </div>
     );
   }
 
   return (
-    <div className="flex w-full flex-col items-start gap-2 sm:flex-row sm:items-center">
+    <div className="flex items-center gap-2">
       <span
         className={cn(
-          "max-w-[120px] truncate",
+          "shrink-0 truncate text-xs",
           isInvalid ? "text-destructive" : "text-muted-foreground",
         )}
         title={csvAccountId}
       >
         {csvAccountId}
       </span>
-      <div className="w-full sm:w-auto sm:min-w-[180px]">
+      <span className="text-muted-foreground shrink-0">→</span>
+      <div className="ml-auto min-w-[180px]">
         <AccountSelector
           selectedAccount={selectedAccount}
           setSelectedAccount={(account) => {
             setSelectedAccount(account);
             handleAccountIdMapping(csvAccountId, account.id);
           }}
-          variant="dropdown"
-          buttonText="Select Account"
+          variant="form"
+          className={MAPPING_TRIGGER_UNMAPPED_CLASS}
         />
       </div>
     </div>
@@ -233,7 +226,11 @@ interface SymbolDisplayCellProps {
   csvSymbol: string;
   mappedSymbol: string | undefined;
   isInvalid: boolean;
-  handleSymbolMapping: (csvSymbol: string, newSymbol: string) => void;
+  handleSymbolMapping: (
+    csvSymbol: string,
+    newSymbol: string,
+    searchResult?: SymbolSearchResult,
+  ) => void;
 }
 function SymbolDisplayCell({
   csvSymbol,
@@ -241,58 +238,72 @@ function SymbolDisplayCell({
   isInvalid,
   handleSymbolMapping,
 }: SymbolDisplayCellProps) {
+  const [isEditing, setIsEditing] = useState(false);
+
   // Don't show anything if the symbol is empty/doesn't exist AND it's not invalid
   // We still want to show invalid empty symbols so they can be mapped
   if ((!csvSymbol || csvSymbol.trim() === "") && !isInvalid) {
     return null;
   }
 
-  // Show edit button if symbol is mapped or valid
-  if (mappedSymbol || !isInvalid) {
+  const showSearchInput = isEditing || (isInvalid && !mappedSymbol);
+
+  if (showSearchInput) {
     return (
-      <div className="flex w-full flex-col items-start gap-2 sm:flex-row sm:items-center">
+      <div className="flex items-center gap-2">
         <span
           className={cn(
-            "max-w-[120px] truncate",
-            mappedSymbol
-              ? "text-muted-foreground"
-              : isInvalid
-                ? "text-destructive"
-                : "text-muted-foreground",
+            "shrink-0 truncate text-xs",
+            isInvalid ? "text-destructive" : "text-muted-foreground",
           )}
-          title={csvSymbol}
+          title={csvSymbol || "Empty symbol"}
         >
           {csvSymbol || "-"}
         </span>
-        <Badge variant="secondary" className="text-xs transition-colors">
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-auto p-0 py-0 text-xs"
-            onClick={() => {
-              handleSymbolMapping(csvSymbol, "");
+        <span className="text-muted-foreground shrink-0">→</span>
+        <div className="ml-auto min-w-[180px]">
+          <TickerSearchInput
+            defaultValue={mappedSymbol || ""}
+            placeholder="Map symbol"
+            onSelectResult={(newSymbol, searchResult) => {
+              handleSymbolMapping(csvSymbol, newSymbol, searchResult);
+              setIsEditing(false);
             }}
-          >
-            {mappedSymbol || csvSymbol || "-"}
-          </Button>
+            className={MAPPING_TRIGGER_UNMAPPED_CLASS}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Mapped symbol (source differs from target) — show source → target
+  if (mappedSymbol) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-muted-foreground shrink-0 truncate text-xs" title={csvSymbol}>
+          {csvSymbol}
+        </span>
+        <span className="text-muted-foreground shrink-0">→</span>
+        <Badge
+          variant="secondary"
+          className="hover:bg-secondary/80 ml-auto cursor-pointer text-xs transition-colors"
+          onClick={() => setIsEditing(true)}
+        >
+          {mappedSymbol}
         </Badge>
       </div>
     );
   }
 
-  // Show search input only for invalid symbols without mapping
+  // Valid symbol, no mapping needed — single badge
   return (
-    <div className="flex w-full flex-col items-start gap-2 sm:flex-row sm:items-center">
-      <span className="text-destructive max-w-[120px] truncate" title={csvSymbol || "Empty symbol"}>
-        {csvSymbol || "-"}
-      </span>
-      <div className="w-full sm:w-auto sm:min-w-[180px]">
-        <TickerSearchInput
-          defaultValue={mappedSymbol || ""}
-          onSelectResult={(newSymbol, _searchResult) => handleSymbolMapping(csvSymbol, newSymbol)}
-        />
-      </div>
-    </div>
+    <Badge
+      variant="secondary"
+      className="hover:bg-secondary/80 cursor-pointer text-xs transition-colors"
+      onClick={() => setIsEditing(true)}
+    >
+      {csvSymbol}
+    </Badge>
   );
 }
 
@@ -314,7 +325,11 @@ export function MappingCell({
   accounts: Account[];
   getMappedValue: (row: CsvRowData, field: ImportFormat) => string;
   handleActivityTypeMapping: (csvActivity: string, activityType: ActivityType) => void;
-  handleSymbolMapping: (csvSymbol: string, newSymbol: string) => void;
+  handleSymbolMapping: (
+    csvSymbol: string,
+    newSymbol: string,
+    searchResult?: SymbolSearchResult,
+  ) => void;
   handleAccountIdMapping?: (csvAccountId: string, accountId: string) => void;
   invalidSymbols: string[];
   invalidAccounts: string[];
@@ -348,7 +363,7 @@ export function MappingCell({
     // Skip symbol display when not required (pure cash types, cash symbols)
     const csvType = getMappedValue(row, ImportFormat.ACTIVITY_TYPE)?.trim();
     const appType = csvType ? findMappedActivityType(csvType, mapping.activityMappings) : null;
-    if (appType && !isSymbolRequired(appType, value)) {
+    if (appType && (!isSymbolRequired(appType) || isCashSymbol(value))) {
       return <span className="text-muted-foreground text-xs">-</span>;
     }
 

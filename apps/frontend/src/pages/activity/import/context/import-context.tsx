@@ -53,6 +53,7 @@ export interface DraftActivity {
   warnings: Record<string, string[]>;
   skipReason?: string;
   duplicateOfId?: string;
+  duplicateOfLineNumber?: number;
   isEdited: boolean;
 }
 
@@ -60,6 +61,7 @@ export interface ImportResultStats {
   total: number;
   imported: number;
   skipped: number;
+  duplicates: number;
   errors: number;
 }
 

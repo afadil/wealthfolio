@@ -218,7 +218,7 @@ function formatDateToISO(date: Date): string {
 function formatDisplayDate(isoDate: string): string {
   if (!isoDate) return "N/A";
   try {
-    const date = new Date(isoDate);
+    const date = new Date(isoDate + "T00:00:00");
     return date.toLocaleDateString(undefined, {
       year: "numeric",
       month: "short",

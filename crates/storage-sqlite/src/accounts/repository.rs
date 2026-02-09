@@ -73,6 +73,13 @@ impl AccountRepositoryTrait for AccountRepository {
                 account_db.created_at = existing.created_at;
                 account_db.updated_at = chrono::Utc::now().naive_utc();
 
+                // Preserve broker-managed fields (only set by broker sync, not user form)
+                account_db.provider_account_id = existing.provider_account_id;
+                account_db.platform_id = existing.platform_id;
+                account_db.provider = existing.provider;
+                account_db.account_number = existing.account_number;
+                account_db.meta = existing.meta;
+
                 // Preserve is_archived and tracking_mode if not explicitly provided
                 if !is_archived_provided {
                     account_db.is_archived = existing.is_archived;

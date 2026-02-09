@@ -38,12 +38,18 @@ export function SearchableSelect({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" aria-expanded={open} className={className} disabled={disabled}>
-          {selectedOption ? selectedOption.label : placeholder}
-          <span className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className={cn("w-full justify-between rounded-md font-normal", className)}
+          disabled={disabled}
+        >
+          <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
+          <Icons.ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-full p-0">
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
         <Command>
           <CommandInput placeholder={searchPlaceholder} className="h-9" />
           <CommandEmpty>{emptyMessage}</CommandEmpty>
@@ -51,7 +57,7 @@ export function SearchableSelect({
             {options.map((option) => (
               <CommandItem
                 key={option.value}
-                value={option.value}
+                value={option.label}
                 onSelect={() => {
                   onValueChange(option.value);
                   setOpen(false);

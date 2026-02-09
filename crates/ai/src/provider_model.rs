@@ -53,6 +53,8 @@ pub struct ConnectionField {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProviderDefaultConfig {
     pub enabled: bool,
+    #[serde(default = "default_priority")]
+    pub priority: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
 }
@@ -115,8 +117,12 @@ pub struct ModelCapabilityOverrides {
     pub streaming: Option<bool>,
 }
 
+fn default_priority() -> i32 {
+    100
+}
+
 /// Per-provider user settings (stored in app_settings).
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderUserSettings {
     /// Whether this provider is enabled by the user.
@@ -132,7 +138,7 @@ pub struct ProviderUserSettings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub custom_url: Option<String>,
     /// Priority for sorting (lower = higher priority).
-    #[serde(default)]
+    #[serde(default = "default_priority")]
     pub priority: i32,
     /// Capability overrides keyed by model ID. Only needed for fetched/unknown models.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
@@ -144,6 +150,21 @@ pub struct ProviderUserSettings {
     /// None = all tools enabled (default), Some([]) = no tools, Some([...]) = only specified tools.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tools_allowlist: Option<Vec<String>>,
+}
+
+impl Default for ProviderUserSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            favorite: false,
+            selected_model: None,
+            custom_url: None,
+            priority: default_priority(),
+            model_capability_overrides: HashMap::new(),
+            favorite_models: Vec::new(),
+            tools_allowlist: None,
+        }
+    }
 }
 
 /// The complete AI provider settings blob stored in app_settings.

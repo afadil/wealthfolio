@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { updateAssetProfile, updatePricingMode, logger } from "@/adapters";
+import { updateAssetProfile, updateQuoteMode, logger } from "@/adapters";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { QueryKeys } from "@/lib/query-keys";
 
@@ -35,20 +35,20 @@ export const useAssetProfileMutations = () => {
     },
   });
 
-  const updatePricingModeMutation = useMutation({
-    mutationFn: ({ assetId, pricingMode }: { assetId: string; pricingMode: string }) =>
-      updatePricingMode(assetId, pricingMode),
+  const updateQuoteModeMutation = useMutation({
+    mutationFn: ({ assetId, quoteMode }: { assetId: string; quoteMode: string }) =>
+      updateQuoteMode(assetId, quoteMode),
     onSuccess: (result) => {
-      handleSuccess("Asset pricing mode updated successfully.", result.id);
+      handleSuccess("Asset quote mode updated successfully.", result.id);
     },
     onError: (error) => {
-      logger.error(`Error updating asset pricing mode: ${error}`);
-      handleError("updating the asset pricing mode");
+      logger.error(`Error updating asset quote mode: ${error}`);
+      handleError("updating the asset quote mode");
     },
   });
 
   return {
     updateAssetProfileMutation,
-    updatePricingModeMutation,
+    updateQuoteModeMutation,
   };
 };
