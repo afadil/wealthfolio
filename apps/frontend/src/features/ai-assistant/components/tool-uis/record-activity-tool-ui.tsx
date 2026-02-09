@@ -28,6 +28,7 @@ import {
 import { CurrencyInput } from "@wealthfolio/ui/components/financial";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useMemo, useState, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { useForm, FormProvider } from "react-hook-form";
 import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
@@ -406,18 +407,11 @@ function SuccessState({ draft, createdActivityId, currency }: SuccessStateProps)
           )}
         </div>
         <div className="pt-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              window.open(
-                createdActivityId ? `/activities?id=${createdActivityId}` : "/activities",
-                "_blank",
-              )
-            }
-          >
-            <Icons.ExternalLink className="mr-2 h-4 w-4" />
-            View in Activities
+          <Button variant="outline" size="sm" asChild>
+            <Link to={createdActivityId ? `/activities?id=${createdActivityId}` : "/activities"}>
+              <Icons.ArrowRight className="mr-2 h-4 w-4" />
+              View in Activities
+            </Link>
           </Button>
         </div>
       </CardContent>
