@@ -98,7 +98,7 @@ const kindToApiKind: Record<AlternativeAssetKind, AlternativeAssetKindApi> = {
   [AlternativeAssetKind.PROPERTY]: "property",
   [AlternativeAssetKind.VEHICLE]: "vehicle",
   [AlternativeAssetKind.COLLECTIBLE]: "collectible",
-  [AlternativeAssetKind.PRECIOUS_METAL]: "precious_metal",
+  [AlternativeAssetKind.PRECIOUS_METAL]: "precious",
   [AlternativeAssetKind.LIABILITY]: "liability",
   [AlternativeAssetKind.OTHER]: "other",
 };

@@ -5,7 +5,7 @@ use chrono::{NaiveDate, Utc};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
-use crate::assets::AssetServiceTrait;
+use crate::assets::{AssetMetadata, AssetServiceTrait};
 use crate::errors::Result;
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::fx::FxServiceTrait;
@@ -84,9 +84,21 @@ impl ManualSnapshotService {
                 _ => Uuid::new_v4().to_string(),
             };
 
+            let metadata = AssetMetadata {
+                instrument_symbol: Some(holding.symbol.clone()),
+                instrument_exchange_mic: holding.exchange_mic.clone(),
+                display_code: Some(holding.symbol.clone()),
+                ..Default::default()
+            };
+
             let asset = self
                 .asset_service
-                .get_or_create_minimal_asset(&asset_id, Some(holding.currency.clone()), None, None)
+                .get_or_create_minimal_asset(
+                    &asset_id,
+                    Some(holding.currency.clone()),
+                    Some(metadata),
+                    None,
+                )
                 .await?;
 
             asset_ids.push(asset.id.clone());

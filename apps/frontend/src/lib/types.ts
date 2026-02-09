@@ -926,7 +926,7 @@ export type AlternativeAssetKindApi =
   | "property"
   | "vehicle"
   | "collectible"
-  | "precious_metal"
+  | "precious"
   | "liability"
   | "other";
 

@@ -317,7 +317,13 @@ export const HoldingsEditMode = ({
       onClose();
     } catch (error) {
       console.error("Failed to save holdings:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to save holdings");
+      toast.error(
+        typeof error === "string"
+          ? error
+          : error instanceof Error
+            ? error.message
+            : "Failed to save holdings",
+      );
     } finally {
       setIsSaving(false);
     }

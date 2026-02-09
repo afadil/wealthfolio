@@ -1,7 +1,7 @@
 import { EmptyPlaceholder } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { useMemo, useState, useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { AccountSelector } from "@/components/account-selector";
 import { useHoldings } from "@/hooks/use-holdings";
@@ -211,22 +211,6 @@ export const HoldingsInsightsPage = () => {
           </div>
 
           <div className="col-span-1 space-y-4">
-            <CompactAllocationStrip
-              title="Security Types"
-              allocation={allocations?.securityTypes}
-              baseCurrency={baseCurrency}
-              isLoading={isLoading}
-              variant="security-types"
-              onSegmentClick={(categoryId, categoryName) =>
-                handleChartSectionClick(
-                  "securityType",
-                  categoryName,
-                  `Type: ${categoryName}`,
-                  categoryId,
-                )
-              }
-            />
-
             {hasRiskAllocations && (
               <CompactAllocationStrip
                 title="Risk Composition"
@@ -244,6 +228,22 @@ export const HoldingsInsightsPage = () => {
                 }
               />
             )}
+
+            <CompactAllocationStrip
+              title="Security Types"
+              allocation={allocations?.securityTypes}
+              baseCurrency={baseCurrency}
+              isLoading={isLoading}
+              variant="security-types"
+              onSegmentClick={(categoryId, categoryName) =>
+                handleChartSectionClick(
+                  "securityType",
+                  categoryName,
+                  `Type: ${categoryName}`,
+                  categoryId,
+                )
+              }
+            />
 
             <SectorsChart
               allocation={allocations?.sectors}

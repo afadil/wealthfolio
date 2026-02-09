@@ -8,6 +8,7 @@
       "envKey": "OLLAMA_API_KEY",
       "defaultConfig": {
         "enabled": false,
+        "priority": 10,
         "url": "http://localhost:11434"
       },
       "connectionFields": [
@@ -47,7 +48,8 @@
       "description": "Fast inference cloud API",
       "envKey": "GROQ_API_KEY",
       "defaultConfig": {
-        "enabled": false
+        "enabled": false,
+        "priority": 20
       },
       "connectionFields": [
         {
@@ -81,7 +83,8 @@
       "description": "Google Generative AI models",
       "envKey": "GEMINI_API_KEY",
       "defaultConfig": {
-        "enabled": false
+        "enabled": false,
+        "priority": 30
       },
       "connectionFields": [
         {
@@ -115,7 +118,8 @@
       "description": "Claude AI models from Anthropic",
       "envKey": "ANTHROPIC_API_KEY",
       "defaultConfig": {
-        "enabled": false
+        "enabled": false,
+        "priority": 50
       },
       "connectionFields": [
         {
@@ -149,7 +153,8 @@
       "description": "ChatGPT and GPT models from OpenAI",
       "envKey": "OPENAI_API_KEY",
       "defaultConfig": {
-        "enabled": false
+        "enabled": false,
+        "priority": 40
       },
       "connectionFields": [
         {
@@ -186,7 +191,8 @@
       "description": "Access to multiple AI models via OpenRouter",
       "envKey": "OPENROUTER_API_KEY",
       "defaultConfig": {
-        "enabled": false
+        "enabled": false,
+        "priority": 60
       },
       "connectionFields": [
         {

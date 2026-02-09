@@ -394,7 +394,6 @@ const API_KIND_TO_ENUM: Record<string, AlternativeAssetKind> = {
   property: AlternativeAssetKind.PROPERTY,
   vehicle: AlternativeAssetKind.VEHICLE,
   collectible: AlternativeAssetKind.COLLECTIBLE,
-  precious_metal: AlternativeAssetKind.PRECIOUS_METAL,
   precious: AlternativeAssetKind.PRECIOUS_METAL,
   liability: AlternativeAssetKind.LIABILITY,
   other: AlternativeAssetKind.OTHER,

@@ -184,6 +184,55 @@ impl AssetServiceTrait for AssetService {
             }
         }
 
+        // Try to find existing asset by instrument_key before creating a new one
+        let inferred_instrument_type = metadata.as_ref().and_then(|meta| {
+            meta.instrument_symbol
+                .as_ref()
+                .filter(|s| !s.is_empty())
+                .map(|_| {
+                    meta.instrument_type
+                        .clone()
+                        .unwrap_or(InstrumentType::Equity)
+                })
+        });
+
+        if let Some(ref meta) = metadata {
+            if let Some(ref sym) = meta.instrument_symbol {
+                if !sym.is_empty() {
+                    let instrument_type = inferred_instrument_type
+                        .clone()
+                        .unwrap_or(InstrumentType::Equity);
+                    let spec = AssetSpec {
+                        id: None,
+                        display_code: meta.display_code.clone(),
+                        instrument_symbol: Some(sym.clone()),
+                        instrument_exchange_mic: meta.instrument_exchange_mic.clone(),
+                        instrument_type: Some(instrument_type),
+                        quote_ccy: context_currency
+                            .clone()
+                            .unwrap_or_else(|| "USD".to_string()),
+                        kind: meta.kind.clone().unwrap_or(AssetKind::Investment),
+                        quote_mode: None,
+                        name: meta.name.clone(),
+                    };
+                    if let Some(key) = spec.instrument_key() {
+                        if let Ok(Some(existing)) =
+                            self.asset_repository.find_by_instrument_key(&key)
+                        {
+                            info!(
+                                "Found existing asset by instrument_key '{}': {}",
+                                key, existing.id
+                            );
+                            if !existing.is_active {
+                                self.asset_repository.reactivate(&existing.id).await?;
+                            }
+                            return Ok(existing);
+                        }
+                    }
+                }
+            }
+        }
+
         // Use metadata kind if provided, otherwise default to Investment
         let kind = metadata
             .as_ref()
@@ -229,7 +278,7 @@ impl AssetServiceTrait for AssetService {
 
         let name = metadata.as_ref().and_then(|m| m.name.clone());
         let instrument_symbol = metadata.as_ref().and_then(|m| m.instrument_symbol.clone());
-        let instrument_type = metadata.as_ref().and_then(|m| m.instrument_type.clone());
+        let instrument_type = inferred_instrument_type;
         let display_code = metadata.as_ref().and_then(|m| m.display_code.clone());
 
         let new_asset = NewAsset {

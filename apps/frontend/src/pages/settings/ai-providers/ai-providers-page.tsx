@@ -110,11 +110,7 @@ export default function AiProvidersPage() {
     );
   }
 
-  const sortedProviders = [...providers].sort((a, b) => {
-    // Enabled providers first, then by priority
-    if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
-    return a.priority - b.priority;
-  });
+  const sortedProviders = [...providers].sort((a, b) => a.priority - b.priority);
 
   return (
     <div className="text-foreground space-y-6">

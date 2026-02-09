@@ -746,7 +746,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
              a.activity_type as income_type,
              COALESCE(a.asset_id, 'CASH') as asset_id,
              COALESCE(ast.kind, 'CASH') as asset_kind,
-             COALESCE(ast.symbol, 'CASH') as symbol,
+             COALESCE(ast.display_code, 'CASH') as symbol,
              COALESCE(ast.name, 'Cash') as symbol_name,
              a.currency,
              CASE
