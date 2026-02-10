@@ -1,5 +1,5 @@
 # Global build args
-ARG RUST_IMAGE=rust:1.86-alpine
+ARG RUST_IMAGE=rust:1.91-alpine
 
 # Stage 1: build frontend
 # Use --platform=$BUILDPLATFORM to run on the native runner (fast)
@@ -15,6 +15,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY . .
 ENV CI=1
+ENV BUILD_TARGET=web
 RUN npm install -g pnpm@9.9.0 && pnpm install --frozen-lockfile
 # Build only the main app to avoid building workspace addons in this image
 RUN pnpm build && mv dist /web-dist
@@ -44,6 +45,9 @@ RUN rustup target add $(xx-cargo --print-target-triple)
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
 COPY apps/server ./apps/server
+# Stub out apps/tauri so the workspace resolves (not built in Docker)
+COPY apps/tauri/Cargo.toml apps/tauri/Cargo.toml
+RUN mkdir -p apps/tauri/src && echo "fn main(){}" > apps/tauri/src/main.rs && echo "" > apps/tauri/src/lib.rs
 RUN mkdir -p apps/server/src && \
     echo "fn main(){}" > apps/server/src/main.rs && \
     xx-cargo fetch --manifest-path apps/server/Cargo.toml
