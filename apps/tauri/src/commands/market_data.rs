@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::{
     context::ServiceContext,
-    events::{emit_portfolio_trigger_update, PortfolioRequestPayload},
+    events::{emit_portfolio_trigger_recalculate, emit_portfolio_trigger_update, PortfolioRequestPayload},
 };
 
 use log::{debug, error};
@@ -66,14 +66,15 @@ pub async fn update_quote(
         .map(|_| ())
         .map_err(|e| e.to_string())?;
 
-    // Manual quote update - no market sync needed
+    // Manual quote update - no market sync needed, but force full recalculation
+    // so historical valuations are recomputed with the updated quotes
     let handle = handle.clone();
     tauri::async_runtime::spawn(async move {
         let payload = PortfolioRequestPayload::builder()
             .account_ids(None)
             .market_sync_mode(MarketSyncMode::None)
             .build();
-        emit_portfolio_trigger_update(&handle, payload);
+        emit_portfolio_trigger_recalculate(&handle, payload);
     });
     Ok(())
 }
@@ -91,14 +92,15 @@ pub async fn delete_quote(
         .await
         .map_err(|e| e.to_string())?;
 
-    // Manual quote deletion - no market sync needed
+    // Manual quote deletion - no market sync needed, but force full recalculation
+    // so historical valuations are recomputed without the deleted quotes
     let handle = handle.clone();
     tauri::async_runtime::spawn(async move {
         let payload = PortfolioRequestPayload::builder()
             .account_ids(None)
             .market_sync_mode(MarketSyncMode::None)
             .build();
-        emit_portfolio_trigger_update(&handle, payload);
+        emit_portfolio_trigger_recalculate(&handle, payload);
     });
     Ok(())
 }
@@ -186,12 +188,12 @@ pub async fn import_quotes_csv(
     // Quote import - no market sync needed, just recalculate
     let handle = handle.clone();
     tauri::async_runtime::spawn(async move {
-        debug!("Triggering portfolio update after quote import");
+        debug!("Triggering portfolio recalculation after quote import");
         let payload = PortfolioRequestPayload::builder()
             .account_ids(None)
             .market_sync_mode(MarketSyncMode::None)
             .build();
-        emit_portfolio_trigger_update(&handle, payload);
+        emit_portfolio_trigger_recalculate(&handle, payload);
     });
 
     Ok(result)

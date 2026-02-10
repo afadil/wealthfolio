@@ -83,13 +83,14 @@ async fn update_quote(
     // Ensure asset_id matches path parameter
     quote.asset_id = symbol;
     state.quote_service.update_quote(quote).await?;
-    // Manual quote update - no market sync needed
+    // Manual quote update - no market sync needed, but force full recalculation
+    // so historical valuations are recomputed with the updated quotes
     enqueue_portfolio_job(
         state.clone(),
         PortfolioJobConfig {
             account_ids: None,
             market_sync_mode: MarketSyncMode::None,
-            force_full_recalculation: false,
+            force_full_recalculation: true,
         },
     );
     Ok(StatusCode::NO_CONTENT)
@@ -100,13 +101,14 @@ async fn delete_quote(
     State(state): State<Arc<AppState>>,
 ) -> ApiResult<StatusCode> {
     state.quote_service.delete_quote(&id).await?;
-    // Manual quote deletion - no market sync needed
+    // Manual quote deletion - no market sync needed, but force full recalculation
+    // so historical valuations are recomputed without the deleted quotes
     enqueue_portfolio_job(
         state,
         PortfolioJobConfig {
             account_ids: None,
             market_sync_mode: MarketSyncMode::None,
-            force_full_recalculation: false,
+            force_full_recalculation: true,
         },
     );
     Ok(StatusCode::NO_CONTENT)
@@ -154,13 +156,14 @@ async fn import_quotes_csv(
         .import_quotes(body.quotes, body.overwrite_existing)
         .await?;
 
-    // Quote import - no market sync needed
+    // Quote import - no market sync needed, but force full recalculation
+    // so historical valuations are recomputed with the imported quotes
     enqueue_portfolio_job(
         state,
         PortfolioJobConfig {
             account_ids: None,
             market_sync_mode: MarketSyncMode::None,
-            force_full_recalculation: false,
+            force_full_recalculation: true,
         },
     );
 
