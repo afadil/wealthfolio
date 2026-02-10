@@ -6,8 +6,8 @@ ARG RUST_IMAGE=rust:1.91-alpine
 FROM --platform=$BUILDPLATFORM node:20-alpine AS frontend
 
 # Wealthfolio Connect configuration (baked into JS bundle at build time)
-ARG CONNECT_AUTH_URL=https://liyiikzhilvnivjgidpw.supabase.co
-ARG CONNECT_AUTH_PUBLISHABLE_KEY=sb_publishable_ZSZbXNtWtnh9i2nqJ2UL4A_NV8ZVutd
+ARG CONNECT_AUTH_URL=https://liyiikzhilvnivjgxxx.supabase.co
+ARG CONNECT_AUTH_PUBLISHABLE_KEY=sb_publishable_ZSZbXNtWtnh9i2nqJ2UL4A_NV8ZVxxx
 ENV CONNECT_AUTH_URL=${CONNECT_AUTH_URL}
 ENV CONNECT_AUTH_PUBLISHABLE_KEY=${CONNECT_AUTH_PUBLISHABLE_KEY}
 
