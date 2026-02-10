@@ -188,7 +188,11 @@ export function HistoryChart({
           )}
         />
         <XAxis hide dataKey="date" type="category" />
-        <YAxis hide type="number" domain={["auto", "auto"]} />
+        <YAxis
+          hide
+          type="number"
+          domain={[(dataMin: number) => dataMin - Math.abs(dataMin) * 0.02, "auto"]}
+        />
         <Area
           isAnimationActive={true}
           animationDuration={300}
