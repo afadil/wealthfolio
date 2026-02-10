@@ -18,7 +18,7 @@ ENV CI=1
 ENV BUILD_TARGET=web
 RUN npm install -g pnpm@9.9.0 && pnpm install --frozen-lockfile
 # Build only the main app to avoid building workspace addons in this image
-RUN pnpm --filter @wealthfolio/ui build && pnpm --filter frontend build && mv dist /web-dist
+RUN pnpm --filter frontend... build && mv dist /web-dist
 
 # Stage 2: build server with cross-compilation
 FROM --platform=$BUILDPLATFORM tonistiigi/xx AS xx
