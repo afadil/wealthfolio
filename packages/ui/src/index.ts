@@ -21,10 +21,13 @@ export * from "./components/ui/date-range-picker";
 export * from "./components/ui/dialog";
 export * from "./components/ui/dropdown-menu";
 export * from "./components/ui/empty-placeholder";
+export * from "./components/ui/faceted-filter";
+export * from "./components/ui/faceted-search-input";
 export * from "./components/ui/form";
 export * from "./components/ui/hover-card";
 export * from "./components/ui/icons";
 export * from "./components/ui/input";
+export * from "./components/ui/input-group";
 export * from "./components/ui/label";
 export * from "./components/ui/page";
 export * from "./components/ui/popover";
@@ -49,6 +52,10 @@ export * from "./components/ui/textarea";
 export * from "./components/ui/toggle";
 export * from "./components/ui/toggle-group";
 export * from "./components/ui/tooltip";
+export * from "./components/ui/tree-view";
+
+// Export data grid components
+export * from "./components/data-grid";
 
 // Export utilities
 export * from "./lib/utils";

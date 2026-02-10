@@ -4,7 +4,7 @@ interface SwingfolioIconProps {
   height?: number;
 }
 
-export function SwingfolioIcon({ className = '', width = 20, height = 20 }: SwingfolioIconProps) {
+export function SwingfolioIcon({ className = "", width = 20, height = 20 }: SwingfolioIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

@@ -29,6 +29,9 @@ function loadDotenvFile(file) {
 // Load .env.web if present
 loadDotenvFile(".env.web");
 
+// Set build target for web mode
+process.env.BUILD_TARGET = "web";
+
 const children = new Map();
 let exiting = false;
 
@@ -100,5 +103,5 @@ process.on("SIGTERM", () => shutdownAndExit(143));
 
 // Start backend and Vite
 process.env.WF_ENABLE_VITE_PROXY = "true";
-spawnNamed("server", "cargo", ["run", "--manifest-path", "src-server/Cargo.toml"]);
-spawnNamed("vite", "vite", []);
+spawnNamed("server", "cargo", ["run", "--manifest-path", "apps/server/Cargo.toml"]);
+spawnNamed("vite", "pnpm", ["--filter", "frontend", "dev"]);

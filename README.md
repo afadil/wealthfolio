@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/afadil/wealthfolio">
-    <img src="public/logo.svg" alt="Logo" width="80" height="80">
+    <img src="apps/frontend/public/logo.svg" alt="Logo" width="80" height="80">
   </a>
 
   <h3 align="center">Wealthfolio</h3>
@@ -20,7 +20,7 @@
 </div>
 <div align="center">
 
-[<img src="./public/button-buy-me-a-coffee.png" width="180" alt="Buy me a coffee button"/>](https://www.buymeacoffee.com/afadil)
+[<img src="./apps/frontend/public/button-buy-me-a-coffee.png" width="180" alt="Buy me a coffee button"/>](https://www.buymeacoffee.com/afadil)
 
 </div>
 
@@ -46,7 +46,7 @@ Data Storage. No Subscriptions, No Cloud.
 
 Visit the app website at [Wealthfolio App](https://wealthfolio.app/).
 
-![Screenshot](public/screenshot.webp)
+![Screenshot](apps/frontend/public/screenshot.webp)
 
 ### ✨ Key Features
 
@@ -96,6 +96,11 @@ See [ROADMAP.md](./ROADMAP.md).
 - **[Activity Types](docs/activities/activity-types.md)** - Complete guide to
   all supported activity types and their required fields
 - **[Roadmap](ROADMAP.md)** - Future plans and development roadmap
+
+### Architecture
+
+- **[Adapter System](docs/architecture/adapters.md)** - Compile-time environment
+  detection for Desktop/Web builds
 
 ### Addon Development
 
@@ -278,7 +283,7 @@ All configuration is done via environment variables in `.env.web`.
 Run just the HTTP server without the Vite dev server (from repo root):
 
 ```bash
-cargo run --manifest-path src-server/Cargo.toml
+cargo run --manifest-path apps/server/Cargo.toml
 ```
 
 The server accepts the same `WF_*` environment variables as documented in the
@@ -286,7 +291,7 @@ The server accepts the same `WF_*` environment variables as documented in the
 or via `.env.web`:
 
 ```bash
-WF_LISTEN_ADDR=127.0.0.1:8080 WF_DB_PATH=./db/app.db cargo run --manifest-path src-server/Cargo.toml
+WF_LISTEN_ADDR=127.0.0.1:8080 WF_DB_PATH=./db/app.db cargo run --manifest-path apps/server/Cargo.toml
 ```
 
 See [Web Mode Configuration](#configuration) for a complete list of supported
@@ -581,36 +586,45 @@ Check out the [addons/](addons/) directory for sample addons including:
 
 ```
 wealthfolio/
-├── src/                         # Main source code for the React application
-│   ├── addons/                  # Addon system core functionality
-│   ├── components/              # React components
-│   ├── pages/                   # Application pages and routes
-│   ├── hooks/                   # Custom React hooks
-│   └── lib/                     # Utility libraries and helpers
-├── src-core/                    # Core backend functionality (Rust)
-├── src-tauri/                   # Tauri-specific code for desktop app functionality
-├── addons/                      # Example and sample addons
-│   └── goal-progress-tracker/   # Goal Progress tracker addon example
-├── packages/                    # Shared packages and tools
+├── apps/                        # Application packages
+│   ├── frontend/                # React frontend application
+│   │   ├── src/                 # Source code
+│   │   │   ├── adapters/        # Environment adapters (Tauri/Web)
+│   │   │   ├── addons/          # Addon system runtime
+│   │   │   ├── components/      # React components
+│   │   │   ├── features/        # Feature modules (self-contained)
+│   │   │   ├── pages/           # Application pages and routes
+│   │   │   ├── hooks/           # Custom React hooks
+│   │   │   └── lib/             # Utility libraries and helpers
+│   │   ├── public/              # Static assets
+│   │   ├── index.html           # HTML entry point
+│   │   └── vite.config.ts       # Vite build config
+│   ├── tauri/                   # Tauri desktop/mobile app (Rust IPC commands)
+│   └── server/                  # Axum HTTP server for web mode
+├── crates/                      # Rust crates (shared backend logic)
+│   ├── core/                    # Core business logic, services, models
+│   ├── storage-sqlite/          # SQLite storage layer (Diesel ORM)
+│   ├── market-data/             # Market data providers
+│   ├── connect/                 # External service integrations
+│   └── device-sync/             # Device sync functionality
+├── addons/                      # Example addons
+│   ├── goal-progress-tracker/   # Goal tracking addon
+│   ├── investment-fees-tracker/ # Fees tracking addon
+│   └── swingfolio/              # Trading addon
+├── packages/                    # Shared TypeScript packages
 │   ├── addon-sdk/               # Addon SDK for developers
-│   ├── addon-dev-tools/         # Development tools and CLI
-│   └── ui/                      # Shared UI components library
+│   ├── addon-dev-tools/         # CLI and dev server for addons
+│   └── ui/                      # Shared UI components (@wealthfolio/ui)
 ├── docs/                        # Documentation
-│   ├── addons/                  # Addon development documentation
-│   └── activities/              # Activity types documentation
-├── public/                      # Public assets
-├── db/                          # Database files and migrations
-├── LICENSE                      # License file
-├── README.md                    # Project documentation
-├── ROADMAP.md                   # Future plans and roadmap
-│
-├── packages/ui/components.json  # Shadcn UI generator config (monorepo)
-├── package.json                 # Node.js dependencies and scripts
-├── pnpm-lock.yaml               # Lock file for pnpm
-├── postcss.config.js            # PostCSS configuration
-├── tailwind.config.js           # Tailwind CSS configuration
-├── tsconfig.json                # TypeScript configuration
-└── vite.config.ts               # Vite build tool configuration
+│   ├── addons/                  # Addon development docs
+│   ├── activities/              # Activity types docs
+│   └── architecture/            # Architecture docs
+├── e2e/                         # End-to-end tests
+├── scripts/                     # Build and dev scripts
+├── Cargo.toml                   # Rust workspace config
+├── package.json                 # Node.js dependencies
+├── pnpm-workspace.yaml          # pnpm workspace config
+└── tsconfig.json                # TypeScript config
 ```
 
 ### Security & Data Storage
@@ -659,6 +673,14 @@ Contributions are welcome! Please follow these steps:
 
 This project is licensed under the AGPL-3.0 license. See the `LICENSE` file for
 details.
+
+Brand assets in `assets/brand/` are trademarks; see
+[TRADEMARKS.md](TRADEMARKS.md).
+
+---
+
+Wealthfolio and the Wealthfolio logo are trademarks of Teymz Inc. The code is
+licensed under AGPL-3.0; trademarks are not granted under that license.
 
 ## 🌟 Star History
 

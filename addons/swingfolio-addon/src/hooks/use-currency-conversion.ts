@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import type { AddonContext, ExchangeRate, Settings } from '@wealthfolio/addon-sdk';
+import { useQuery } from "@tanstack/react-query";
+import type { AddonContext, ExchangeRate, Settings } from "@wealthfolio/addon-sdk";
 
 interface UseCurrencyConversionOptions {
   ctx: AddonContext;
@@ -12,10 +12,10 @@ export function useCurrencyConversion({ ctx, enabled = true }: UseCurrencyConver
     isLoading: settingsLoading,
     error: settingsError,
   } = useQuery({
-    queryKey: ['settings'],
+    queryKey: ["settings"],
     queryFn: async (): Promise<Settings> => {
       if (!ctx?.api) {
-        throw new Error('Addon context not available');
+        throw new Error("Addon context not available");
       }
       return ctx.api.settings.get();
     },
@@ -29,10 +29,10 @@ export function useCurrencyConversion({ ctx, enabled = true }: UseCurrencyConver
     isLoading: ratesLoading,
     error: ratesError,
   } = useQuery({
-    queryKey: ['exchange-rates'],
+    queryKey: ["exchange-rates"],
     queryFn: async (): Promise<ExchangeRate[]> => {
       if (!ctx?.api) {
-        throw new Error('Addon context not available');
+        throw new Error("Addon context not available");
       }
       return ctx.api.exchangeRates.getAll();
     },
@@ -41,7 +41,7 @@ export function useCurrencyConversion({ ctx, enabled = true }: UseCurrencyConver
     gcTime: 15 * 60 * 1000, // 15 minutes
   });
 
-  const baseCurrency = settings?.baseCurrency || 'USD';
+  const baseCurrency = settings?.baseCurrency || "USD";
 
   // Create a currency conversion function
   const convertToBaseCurrency = (amount: number, fromCurrency: string, _date?: string): number => {

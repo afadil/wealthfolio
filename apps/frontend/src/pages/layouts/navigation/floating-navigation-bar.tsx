@@ -1,0 +1,290 @@
+import { LiquidGlass } from "@/components/liquid-glass";
+import { useAggregatedSyncStatus } from "@/features/wealthfolio-connect/hooks";
+import { SyncStatusIcon } from "@/features/wealthfolio-connect/components/sync-status-icon";
+import { cn } from "@/lib/utils";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, Icons } from "@wealthfolio/ui";
+import { motion } from "motion/react";
+import React, { useCallback, useId, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { type NavigationProps, isPathActive } from "./app-navigation";
+
+interface FloatingNavigationBarProps {
+  navigation: NavigationProps;
+}
+
+export function FloatingNavigationBar({ navigation }: FloatingNavigationBarProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const [addonsOpen, setAddonsOpen] = useState(false);
+  const uniqueId = useId();
+  const { status: syncStatus } = useAggregatedSyncStatus();
+  const baseButtonClass =
+    "text-foreground relative z-10 flex h-11 w-full items-center justify-center rounded-full transition-colors";
+
+  const handleNavigation = useCallback(
+    (href: string, isActive: boolean) => {
+      if (isActive) return;
+      navigate(href);
+    },
+    [navigate],
+  );
+
+  const renderIcon = useCallback((icon?: React.ReactNode) => {
+    if (!icon) {
+      return <Icons.ArrowRight className="size-6" />;
+    }
+
+    if (React.isValidElement<{ className?: string }>(icon)) {
+      return icon.props.className ? icon : React.cloneElement(icon, { className: "size-6" });
+    }
+
+    if (typeof icon === "function") {
+      const IconComponent = icon as React.ComponentType<{ className?: string }>;
+      return <IconComponent className="size-6" />;
+    }
+
+    return <span className="size-6">{icon}</span>;
+  }, []);
+
+  const primaryItems = navigation?.primary ?? [];
+  const secondaryItems = navigation?.secondary ?? [];
+  const addonItems = navigation?.addons ?? [];
+
+  const baseItems = useMemo(
+    () => [...primaryItems, ...secondaryItems],
+    [primaryItems, secondaryItems],
+  );
+  const launcherColumn = 1;
+  const connectColumn = 1;
+  const visibleCount = 7;
+  const visibleItems = baseItems.slice(0, visibleCount);
+  const overflowItems = baseItems.slice(visibleCount);
+  const hasOverflow = overflowItems.length > 0;
+  const hasAddons = addonItems.length > 0;
+  const columnCount =
+    visibleItems.length +
+    launcherColumn +
+    connectColumn +
+    (hasOverflow ? 1 : 0) +
+    (hasAddons ? 1 : 0);
+
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 hidden md:block">
+      <div className="flex justify-center px-4 pb-[max(var(--mobile-nav-gap),env(safe-area-inset-bottom))]">
+        <LiquidGlass
+          variant="floating"
+          intensity="subtle"
+          className={cn(
+            "pointer-events-auto w-full px-1 py-1.5",
+            "h-[var(--mobile-nav-ui-height)]",
+            "max-w-md",
+          )}
+        >
+          <nav
+            aria-label="Floating navigation"
+            className="grid place-items-center items-center gap-0"
+            style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
+          >
+            {visibleItems.map((item) => {
+              const isActive = isPathActive(location.pathname, item.href);
+              return (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  onClick={() => handleNavigation(item.href, isActive)}
+                  aria-label={item.title}
+                  className={baseButtonClass}
+                  aria-current={isActive ? "page" : undefined}
+                >
+                  {isActive && (
+                    <motion.div
+                      layoutId={`floating-nav-indicator-${uniqueId}`}
+                      className="absolute inset-0 -z-10 rounded-full border border-black/10 bg-black/5 shadow-sm dark:border-white/10 dark:bg-white/10"
+                      initial={false}
+                      transition={{
+                        type: "spring",
+                        stiffness: 400,
+                        damping: 30,
+                      }}
+                    />
+                  )}
+                  <span
+                    className="relative flex size-7 shrink-0 items-center justify-center outline-none"
+                    aria-hidden="true"
+                  >
+                    {renderIcon(item.icon)}
+                  </span>
+                </Link>
+              );
+            })}
+            <button
+              type="button"
+              aria-label="Open launcher"
+              className={baseButtonClass}
+              onClick={() => {
+                // Trigger the launcher by dispatching Cmd/Ctrl+K
+                const event = new KeyboardEvent("keydown", {
+                  key: "k",
+                  code: "KeyK",
+                  keyCode: 75,
+                  which: 75,
+                  metaKey: true,
+                  ctrlKey: true,
+                  bubbles: true,
+                  cancelable: true,
+                });
+                document.dispatchEvent(event);
+              }}
+            >
+              <span
+                className="relative flex size-7 shrink-0 items-center justify-center outline-none"
+                aria-hidden="true"
+              >
+                <Icons.Search2 className="size-6" />
+              </span>
+            </button>
+            {/* Connect with status icon */}
+            <Link
+              to="/connect"
+              onClick={() =>
+                handleNavigation("/connect", isPathActive(location.pathname, "/connect"))
+              }
+              aria-label="Connect"
+              className={baseButtonClass}
+              aria-current={isPathActive(location.pathname, "/connect") ? "page" : undefined}
+            >
+              {isPathActive(location.pathname, "/connect") && (
+                <motion.div
+                  layoutId={`floating-nav-indicator-${uniqueId}`}
+                  className="absolute inset-0 -z-10 rounded-full border border-black/10 bg-black/5 shadow-sm dark:border-white/10 dark:bg-white/10"
+                  initial={false}
+                  transition={{
+                    type: "spring",
+                    stiffness: 400,
+                    damping: 30,
+                  }}
+                />
+              )}
+              <span
+                className="relative flex size-7 shrink-0 items-center justify-center outline-none"
+                aria-hidden="true"
+              >
+                <SyncStatusIcon status={syncStatus} className="size-6" />
+              </span>
+            </Link>
+            {hasOverflow && (
+              <DropdownMenu open={overflowOpen} onOpenChange={setOverflowOpen}>
+                <DropdownMenuTrigger asChild>
+                  <button aria-label="More navigation" className={baseButtonClass}>
+                    {overflowItems.some((item) => isPathActive(location.pathname, item.href)) && (
+                      <motion.div
+                        layoutId={`floating-nav-indicator-${uniqueId}`}
+                        className="absolute inset-0 -z-10 rounded-full border border-black/10 bg-black/5 shadow-sm dark:border-white/10 dark:bg-white/10"
+                        initial={false}
+                        transition={{
+                          type: "spring",
+                          stiffness: 400,
+                          damping: 30,
+                        }}
+                      />
+                    )}
+                    <span
+                      className="relative flex size-7 shrink-0 items-center justify-center outline-none"
+                      aria-hidden="true"
+                    >
+                      <Icons.CirclesFour className="size-6" />
+                    </span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  side="top"
+                  align="end"
+                  sideOffset={16}
+                  className="mb-0 mr-0 flex w-48 flex-col gap-1 border-0 bg-transparent p-0 shadow-none ring-0 ring-offset-0"
+                >
+                  {overflowItems.map((item) => {
+                    const isActive = isPathActive(location.pathname, item.href);
+                    return (
+                      <LiquidGlass key={item.href} variant="floating" intensity="subtle">
+                        <Link
+                          to={item.href}
+                          onClick={() => {
+                            handleNavigation(item.href, isActive);
+                            setOverflowOpen(false);
+                          }}
+                          aria-current={isActive ? "page" : undefined}
+                          className="relative z-10 flex w-full items-center gap-3 rounded-full px-3 py-2 text-sm"
+                        >
+                          <span className="flex size-6 shrink-0 items-center justify-center">
+                            {renderIcon(item.icon)}
+                          </span>
+                          <span className="truncate text-left">{item.title}</span>
+                        </Link>
+                      </LiquidGlass>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            {hasAddons && (
+              <DropdownMenu open={addonsOpen} onOpenChange={setAddonsOpen}>
+                <DropdownMenuTrigger asChild>
+                  <button aria-label="Add-ons" className={baseButtonClass}>
+                    {addonItems.some((item) => isPathActive(location.pathname, item.href)) && (
+                      <motion.div
+                        layoutId={`floating-nav-indicator-${uniqueId}`}
+                        className="absolute inset-0 -z-10 rounded-full border border-black/10 bg-black/5 shadow-sm dark:border-white/10 dark:bg-white/10"
+                        initial={false}
+                        transition={{
+                          type: "spring",
+                          stiffness: 400,
+                          damping: 30,
+                        }}
+                      />
+                    )}
+                    <span
+                      className="relative flex size-7 shrink-0 items-center justify-center outline-none"
+                      aria-hidden="true"
+                    >
+                      <Icons.Addons className="size-5" />
+                    </span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  side="top"
+                  align="end"
+                  sideOffset={16}
+                  className="mb-0 mr-0 flex w-48 flex-col gap-1 border-0 bg-transparent p-0 shadow-none ring-0 ring-offset-0"
+                >
+                  {addonItems.map((item) => {
+                    const isActive = isPathActive(location.pathname, item.href);
+                    return (
+                      <LiquidGlass key={item.href} variant="floating" intensity="subtle">
+                        <Link
+                          to={item.href}
+                          onClick={() => {
+                            handleNavigation(item.href, isActive);
+                            setAddonsOpen(false);
+                          }}
+                          aria-current={isActive ? "page" : undefined}
+                          className="relative z-10 flex w-full items-center gap-3 rounded-full px-3 py-2 text-sm"
+                        >
+                          <span className="flex size-6 shrink-0 items-center justify-center">
+                            {renderIcon(item.icon)}
+                          </span>
+                          <span className="truncate text-left">{item.title}</span>
+                        </Link>
+                      </LiquidGlass>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </nav>
+        </LiquidGlass>
+      </div>
+    </div>
+  );
+}

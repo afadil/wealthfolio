@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "file_path=$(jq -r '.tool_input.file_path // empty' 2>/dev/null); if [[ -n \"$file_path\" && -f \"$file_path\" ]]; then if [[ \"$file_path\" == *.rs ]]; then rustfmt \"$file_path\" 2>/dev/null || true; elif [[ \"$file_path\" =~ \\.(ts|tsx|js|jsx|json)$ ]]; then npx prettier --write \"$file_path\" 2>/dev/null || true; fi; fi"
+          }
+        ]
+      }
+    ]
+  }
+}

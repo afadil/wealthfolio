@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 import useEmblaCarousel, { type UseEmblaCarouselType } from "embla-carousel-react";
 import * as React from "react";
 
@@ -23,6 +23,11 @@ export interface SwipableViewProps {
    * The index to start on. Crucial for syncing with URL on first load.
    */
   initialIndex?: number;
+  /**
+   * Controlled mode: when provided, the component will scroll to this index
+   * whenever it changes. This is the single source of truth for the selected view.
+   */
+  selectedIndex?: number;
 }
 
 export function SwipableView({
@@ -34,6 +39,7 @@ export function SwipableView({
   onViewChange,
   onInit: onInitProp,
   initialIndex = 0,
+  selectedIndex: controlledIndex,
 }: SwipableViewProps) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: false,
@@ -47,7 +53,7 @@ export function SwipableView({
   const [scrollSnaps, setScrollSnaps] = React.useState<number[]>([]);
   const previousIndexRef = React.useRef<number>(initialIndex);
 
-  const scrollTo = React.useCallback((index: number) => emblaApi && emblaApi.scrollTo(index), [emblaApi]);
+  const scrollTo = React.useCallback((index: number) => emblaApi?.scrollTo(index), [emblaApi]);
 
   const onSelect = React.useCallback(
     (api: CarouselApi) => {
@@ -89,6 +95,15 @@ export function SwipableView({
     };
   }, [emblaApi, onInit, onSelect]);
 
+  // Controlled mode: scroll to controlledIndex when it changes
+  React.useEffect(() => {
+    if (controlledIndex === undefined || !emblaApi) return;
+    const currentIndex = emblaApi.selectedScrollSnap();
+    if (currentIndex !== controlledIndex) {
+      emblaApi.scrollTo(controlledIndex, true); // instant scroll for external changes
+    }
+  }, [controlledIndex, emblaApi]);
+
   // MEMORY OPTIMIZATION:
   // Only render the Active Slide and its immediate neighbors (±1).
   // Distant slides are kept as empty divs to maintain scroll width but free up DOM nodes/RAM.
@@ -123,7 +138,7 @@ export function SwipableView({
                   onClick={() => scrollTo(index)}
                   className={cn(
                     "size-2 rounded-full transition-all duration-300",
-                    "focus-visible:ring-ring hover:scale-110 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
+                    "focus-visible:ring-ring hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
                     "bg-foreground/20 hover:bg-foreground/40",
                     dotClassName,
                   )}
@@ -151,7 +166,7 @@ export function SwipableView({
                  2. This ensures the Header stays fixed while content scrolls.
                  3. touch-pan-y allows vertical scrolling while horizontal swipes trigger the carousel.
                */}
-              <div className="h-full w-full overflow-x-hidden overflow-y-auto">
+              <div className="h-full w-full overflow-y-auto overflow-x-hidden">
                 {shouldRender(index) ? (
                   item.content
                 ) : (

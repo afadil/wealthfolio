@@ -1,7 +1,7 @@
-import { ReactNode, useState } from "react";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { Button, type ButtonProps } from "../ui/button";
 import { Icons } from "../ui/icons";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
 interface ActionConfirmProps {
   confirmMessage: string | ReactNode;
@@ -14,6 +14,7 @@ interface ActionConfirmProps {
   confirmButtonVariant?: ButtonProps["variant"];
   cancelButtonText?: string;
   pendingText?: string;
+  side?: "top" | "right" | "bottom" | "left";
 }
 
 export const ActionConfirm = ({
@@ -27,8 +28,18 @@ export const ActionConfirm = ({
   confirmButtonVariant = "destructive",
   cancelButtonText = "Cancel",
   pendingText = "In progress...",
+  side,
 }: ActionConfirmProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  const wasConfirming = useRef(false);
+
+  // Close popover when action completes (isPending goes from true to false)
+  useEffect(() => {
+    if (wasConfirming.current && !isPending) {
+      setIsOpen(false);
+    }
+    wasConfirming.current = isPending;
+  }, [isPending]);
 
   return (
     <Popover open={isOpen} onOpenChange={(open) => setIsOpen(open)}>
@@ -46,10 +57,10 @@ export const ActionConfirm = ({
           </Button>
         )}
       </PopoverTrigger>
-      <PopoverContent className="w-80" align="end">
+      <PopoverContent className="w-80" align="end" side={side}>
         <div className="space-y-4">
           <div className="space-y-2">
-            <h4 className="leading-none font-medium">{confirmTitle}</h4>
+            <h4 className="font-medium leading-none">{confirmTitle}</h4>
             <p className="text-muted-foreground text-sm">{confirmMessage}</p>
           </div>
           <div className="flex justify-end gap-2">

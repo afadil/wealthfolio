@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from "react";
 import {
   Badge,
   Button,
@@ -18,20 +18,20 @@ import {
   SelectTrigger,
   SelectValue,
   Skeleton,
-} from '@wealthfolio/ui';
-import type { AddonContext } from '@wealthfolio/addon-sdk';
-import { useSwingActivities } from '../hooks/use-swing-activities';
-import { useSwingPreferences } from '../hooks/use-swing-preferences';
-import { format } from 'date-fns';
+} from "@wealthfolio/ui";
+import type { AddonContext } from "@wealthfolio/addon-sdk";
+import { useSwingActivities } from "../hooks/use-swing-activities";
+import { useSwingPreferences } from "../hooks/use-swing-preferences";
+import { format } from "date-fns";
 
 interface ActivitySelectorPageProps {
   ctx: AddonContext;
 }
 
 export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedAccount, setSelectedAccount] = useState<string>('all');
-  const [selectedType, setSelectedType] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedAccount, setSelectedAccount] = useState<string>("all");
+  const [selectedType, setSelectedType] = useState<string>("all");
   const [selectedActivities, setSelectedActivities] = useState<Set<string>>(new Set());
 
   const { data: activities, isLoading, error } = useSwingActivities(ctx);
@@ -50,7 +50,7 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
     const uniqueAccounts = Array.from(new Set(activities.map((a) => a.accountName)));
     return uniqueAccounts.map((name) => ({
       name,
-      id: activities.find((a) => a.accountName === name)?.accountId || '',
+      id: activities.find((a) => a.accountName === name)?.accountId || "",
     }));
   }, [activities]);
 
@@ -60,12 +60,12 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
 
     return activities.filter((activity) => {
       const matchesSearch =
-        searchTerm === '' ||
+        searchTerm === "" ||
         activity.assetSymbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (activity.assetName?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
 
-      const matchesAccount = selectedAccount === 'all' || activity.accountName === selectedAccount;
-      const matchesType = selectedType === 'all' || activity.activityType === selectedType;
+      const matchesAccount = selectedAccount === "all" || activity.accountName === selectedAccount;
+      const matchesType = selectedType === "all" || activity.activityType === selectedType;
 
       return matchesSearch && matchesAccount && matchesType;
     });
@@ -100,7 +100,7 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
     updatePreferences({
       selectedActivityIds: Array.from(selectedActivities),
     });
-    ctx.api.navigation.navigate('/addons/swingfolio');
+    ctx.api.navigation.navigate("/addons/swingfolio");
   };
 
   const selectedCount = selectedActivities.size;
@@ -113,7 +113,7 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
   }
 
   const pageDescription =
-    'Choose which trading activities to include in your swing portfolio analysis';
+    "Choose which trading activities to include in your swing portfolio analysis";
 
   if (error || !activities) {
     return (
@@ -124,7 +124,7 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
           actions={
             <Button
               variant="outline"
-              onClick={() => ctx.api.navigation.navigate('/addons/swingfolio')}
+              onClick={() => ctx.api.navigation.navigate("/addons/swingfolio")}
             >
               <Icons.ArrowLeft className="mr-2 h-4 w-4" />
               Back to Dashboard
@@ -137,9 +137,9 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
               <Icons.AlertCircle className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
               <h3 className="mb-2 text-lg font-semibold">Failed to load activities</h3>
               <p className="text-muted-foreground mb-4">
-                {error?.message || 'Unable to load trading activities'}
+                {error?.message || "Unable to load trading activities"}
               </p>
-              <Button onClick={() => ctx.api.navigation.navigate('/addons/swingfolio')}>
+              <Button onClick={() => ctx.api.navigation.navigate("/addons/swingfolio")}>
                 Back to Dashboard
               </Button>
             </div>
@@ -151,7 +151,7 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
 
   const headerActions = (
     <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
-      <Button variant="outline" onClick={() => ctx.api.navigation.navigate('/addons/swingfolio')}>
+      <Button variant="outline" onClick={() => ctx.api.navigation.navigate("/addons/swingfolio")}>
         <Icons.ArrowLeft className="mr-2 h-4 w-4" />
         Back to Dashboard
       </Button>
@@ -289,11 +289,11 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
                           />
                         </td>
                         <td className="p-3 text-sm">
-                          {format(new Date(activity.date), 'MMM dd, yyyy')}
+                          {format(new Date(activity.date), "MMM dd, yyyy")}
                         </td>
                         <td className="p-3">
                           <Badge
-                            variant={activity.activityType === 'BUY' ? 'default' : 'secondary'}
+                            variant={activity.activityType === "BUY" ? "default" : "secondary"}
                           >
                             {activity.activityType}
                           </Badge>
@@ -308,8 +308,8 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
                         </td>
                         <td className="p-3 text-sm">{activity.quantity.toLocaleString()}</td>
                         <td className="p-3 text-sm">
-                          {activity.unitPrice.toLocaleString('en-US', {
-                            style: 'currency',
+                          {activity.unitPrice.toLocaleString("en-US", {
+                            style: "currency",
                             currency: activity.currency,
                           })}
                         </td>

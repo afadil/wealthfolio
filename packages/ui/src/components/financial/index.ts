@@ -7,4 +7,5 @@ export { QuantityDisplay } from "./quantity-display";
 export { MoneyInput } from "./money-input";
 export { QuantityInput } from "./quantity-input";
 export { CurrencyInput } from "./currency-input";
-export { IntervalSelector } from "./interval-selector";
+export { IntervalSelector, getInitialIntervalData } from "./interval-selector";
+export type { TimePeriod } from "./interval-selector";

@@ -23,7 +23,6 @@ out
 # Testing
 coverage
 .nyc_output
-src-core/tests/output/
 
 # Environment files
 .env
@@ -62,9 +61,9 @@ db/*
 # Rust/Cargo
 target/
 **/*.rs.bk
-# Ignore Cargo.lock for library crates only (keep for binaries like src-server and src-tauri)
-src-core/**/Cargo.lock
 
+# Tauri generated
+apps/tauri/gen/
 
 # OS generated files
 .DS_Store
@@ -81,3 +80,10 @@ Thumbs.db
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+/AI-POC-COPY
+# AI tools
+.ralph-tui/
+.kiro/
+.conductor/
+db/
+tasks

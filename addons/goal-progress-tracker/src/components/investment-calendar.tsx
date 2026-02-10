@@ -116,7 +116,7 @@ function Tooltip({
       <div className="bg-popover border-border w-64 rounded-md border p-3 text-sm shadow-md">
         <div className="space-y-3">
           <div className="space-y-1">
-            <h4 className="leading-none font-medium">Step {data.stepIndex + 1}</h4>
+            <h4 className="font-medium leading-none">Step {data.stepIndex + 1}</h4>
             <p className="text-muted-foreground">
               Target: {formatCurrency(data.stepAmount, isBalanceHidden)}
             </p>
@@ -135,7 +135,7 @@ function Tooltip({
           </div>
         </div>
         {/* Tooltip arrow */}
-        <div className="border-t-border absolute top-full left-1/2 h-0 w-0 -translate-x-1/2 transform border-t-4 border-r-4 border-l-4 border-r-transparent border-l-transparent"></div>
+        <div className="border-t-border absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 transform border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent"></div>
       </div>
     </div>
   );

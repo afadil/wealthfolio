@@ -1,0 +1,72 @@
+[workspace]
+resolver = "2"
+members = [
+    "apps/tauri",
+    "apps/server",
+    "crates/*",
+]
+
+[workspace.package]
+version = "3.0.0-beta.1"
+edition = "2021"
+license = "AGPL-3.0"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = "warn"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Database
+diesel = { version = "2.2", features = ["sqlite", "chrono", "r2d2", "numeric", "returning_clauses_for_sqlite_3_35"] }
+diesel_migrations = { version = "2.2", features = ["sqlite"] }
+rusqlite = { version = "0.34", features = ["bundled"] }
+r2d2 = "0.8"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# HTTP
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# Error handling
+thiserror = "1"
+anyhow = "1"
+
+# IDs
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# Numbers
+rust_decimal = { version = "1.39", features = ["maths", "serde-float"] }
+rust_decimal_macros = "1.39"
+num-traits = "0.2"
+
+# Async
+async-trait = "0.1"
+futures = "0.3"
+
+# Logging
+log = "0.4"
+
+# Crypto
+chacha20poly1305 = { version = "0.10", features = ["std"] }
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+hkdf = "0.12"
+sha2 = "0.10"
+rand = "0.8"
+
+# Internal crates
+wealthfolio-market-data = { path = "crates/market-data" }
+wealthfolio-core = { path = "crates/core" }
+wealthfolio-connect = { path = "crates/connect" }
+wealthfolio-storage-sqlite = { path = "crates/storage-sqlite" }
+wealthfolio-device-sync = { path = "crates/device-sync" }
+wealthfolio-ai = { path = "crates/ai" }

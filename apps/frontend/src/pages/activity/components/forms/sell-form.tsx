@@ -1,0 +1,248 @@
+import { useMemo } from "react";
+import { normalizeCurrency } from "@/lib/utils";
+import { useForm, FormProvider, type Resolver } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { ActivityType, QuoteMode } from "@/lib/constants";
+import { useSettings } from "@/hooks/use-settings";
+import { useHoldings } from "@/hooks/use-holdings";
+import {
+  AccountSelect,
+  SymbolSearch,
+  DatePicker,
+  AmountInput,
+  QuantityInput,
+  NotesInput,
+  AdvancedOptionsSection,
+  type AccountSelectOption,
+} from "./fields";
+
+// Asset metadata schema for custom assets
+const assetMetadataSchema = z
+  .object({
+    name: z.string().optional(),
+    kind: z.string().optional(),
+    exchangeMic: z.string().optional(),
+  })
+  .optional();
+
+// Zod schema for SellForm validation
+export const sellFormSchema = z.object({
+  accountId: z.string().min(1, { message: "Please select an account." }),
+  assetId: z.string().min(1, { message: "Please enter a symbol." }),
+  activityDate: z.date({ required_error: "Please select a date." }),
+  quantity: z.coerce
+    .number({
+      required_error: "Please enter a quantity.",
+      invalid_type_error: "Quantity must be a number.",
+    })
+    .positive({ message: "Quantity must be greater than 0." }),
+  unitPrice: z.coerce
+    .number({
+      required_error: "Please enter a price.",
+      invalid_type_error: "Price must be a number.",
+    })
+    .positive({ message: "Price must be greater than 0." }),
+  fee: z.coerce
+    .number({
+      invalid_type_error: "Fee must be a number.",
+    })
+    .min(0, { message: "Fee must be non-negative." })
+    .default(0),
+  comment: z.string().optional().nullable(),
+  // Advanced options
+  currency: z.string().optional(),
+  fxRate: z.coerce
+    .number({
+      invalid_type_error: "FX Rate must be a number.",
+    })
+    .positive({ message: "FX Rate must be positive." })
+    .optional(),
+  // Internal fields
+  quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).default(QuoteMode.MARKET),
+  exchangeMic: z.string().optional(),
+  // Asset metadata for custom assets (name, etc.)
+  assetMetadata: assetMetadataSchema,
+});
+
+export type SellFormValues = z.infer<typeof sellFormSchema>;
+
+interface SellFormProps {
+  accounts: AccountSelectOption[];
+  defaultValues?: Partial<SellFormValues>;
+  onSubmit: (data: SellFormValues) => void | Promise<void>;
+  onCancel?: () => void;
+  isLoading?: boolean;
+  isEditing?: boolean;
+  /** Asset currency (from selected symbol) for advanced options */
+  assetCurrency?: string;
+}
+
+export function SellForm({
+  accounts,
+  defaultValues,
+  onSubmit,
+  onCancel,
+  isLoading = false,
+  isEditing = false,
+  assetCurrency,
+}: SellFormProps) {
+  const { data: settings } = useSettings();
+  const baseCurrency = settings?.baseCurrency;
+
+  // Compute initial account and currency for defaultValues
+  const initialAccountId =
+    defaultValues?.accountId ?? (accounts.length === 1 ? accounts[0].value : "");
+  const initialAccount = accounts.find((a) => a.value === initialAccountId);
+  // Currency priority: provided default > normalized asset currency > account currency
+  const initialCurrency =
+    defaultValues?.currency ?? normalizeCurrency(assetCurrency) ?? initialAccount?.currency;
+
+  const form = useForm<SellFormValues>({
+    resolver: zodResolver(sellFormSchema) as Resolver<SellFormValues>,
+    mode: "onSubmit", // Validate only on submit - works correctly with default values
+    defaultValues: {
+      accountId: initialAccountId,
+      assetId: "",
+      activityDate: (() => {
+        const date = new Date();
+        date.setHours(16, 0, 0, 0); // Market close time
+        return date;
+      })(),
+      quantity: undefined,
+      unitPrice: undefined,
+      fee: 0,
+      comment: null,
+      currency: initialCurrency,
+      fxRate: undefined,
+      quoteMode: QuoteMode.MARKET,
+      exchangeMic: undefined,
+      ...defaultValues,
+    },
+  });
+
+  const { watch } = form;
+  const accountId = watch("accountId");
+  const assetId = watch("assetId");
+  const quantity = watch("quantity");
+  const quoteMode = watch("quoteMode");
+  const isManualAsset = quoteMode === QuoteMode.MANUAL;
+
+  // Get account currency from selected account
+  const selectedAccount = useMemo(
+    () => accounts.find((a) => a.value === accountId),
+    [accounts, accountId],
+  );
+  const accountCurrency = selectedAccount?.currency;
+
+  // Fetch holdings for the selected account to check available quantity
+  const { holdings } = useHoldings(accountId);
+
+  // Find the current holding quantity for the selected symbol
+  const currentHoldingQuantity = useMemo(() => {
+    if (!assetId || !holdings) return 0;
+    const holding = holdings.find((h) => h.instrument?.symbol === assetId || h.id === assetId);
+    return holding?.quantity ?? 0;
+  }, [assetId, holdings]);
+
+  // Check if selling more than current holdings
+  const isSellingMoreThanHoldings = useMemo(() => {
+    if (!quantity || quantity <= 0 || !assetId) return false;
+    return quantity > currentHoldingQuantity;
+  }, [quantity, currentHoldingQuantity, assetId]);
+
+  const handleSubmit = form.handleSubmit(async (data) => {
+    await onSubmit(data);
+  });
+
+  return (
+    <FormProvider {...form}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Card>
+          <CardContent className="space-y-6 pt-4">
+            {/* Account Selection */}
+            <AccountSelect name="accountId" accounts={accounts} />
+
+            {/* Symbol Search */}
+            <SymbolSearch
+              name="assetId"
+              isManualAsset={isManualAsset}
+              exchangeMicName="exchangeMic"
+              quoteModeName="quoteMode"
+              currencyName="currency"
+              assetMetadataName="assetMetadata"
+            />
+            {/* Hidden fields to register assetMetadata for react-hook-form */}
+            <input type="hidden" {...form.register("assetMetadata.name")} />
+            <input type="hidden" {...form.register("assetMetadata.kind")} />
+
+            {/* Date Picker */}
+            <DatePicker name="activityDate" label="Date" enableTime={true} />
+
+            {/* Quantity, Price, Fee Row */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="space-y-2">
+                <QuantityInput name="quantity" label="Quantity" />
+                {currentHoldingQuantity > 0 && (
+                  <p className="text-muted-foreground text-xs">
+                    Available: {currentHoldingQuantity.toLocaleString()}
+                  </p>
+                )}
+              </div>
+              <AmountInput name="unitPrice" label="Price" maxDecimalPlaces={4} />
+              <AmountInput name="fee" label="Fee" />
+            </div>
+
+            {/* Warning for selling more than holdings */}
+            {isSellingMoreThanHoldings && (
+              <Alert variant="default" className="border-warning bg-warning/10">
+                <Icons.AlertTriangle className="text-warning h-4 w-4" />
+                <AlertDescription className="text-warning text-sm">
+                  You are selling more shares ({quantity?.toLocaleString()}) than your current
+                  holdings ({currentHoldingQuantity.toLocaleString()}). This may result in a short
+                  position.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Advanced Options */}
+            <AdvancedOptionsSection
+              currencyName="currency"
+              fxRateName="fxRate"
+              activityType={ActivityType.SELL}
+              assetCurrency={assetCurrency}
+              accountCurrency={accountCurrency}
+              baseCurrency={baseCurrency}
+              showSubtype={false}
+            />
+
+            {/* Notes */}
+            <NotesInput name="comment" label="Notes" placeholder="Add an optional note..." />
+          </CardContent>
+        </Card>
+
+        {/* Action Buttons */}
+        <div className="flex justify-end gap-2">
+          {onCancel && (
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+              Cancel
+            </Button>
+          )}
+          <Button type="submit" disabled={isLoading}>
+            {isLoading && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
+            {isEditing ? (
+              <Icons.Check className="mr-2 h-4 w-4" />
+            ) : (
+              <Icons.Plus className="mr-2 h-4 w-4" />
+            )}
+            {isEditing ? "Update" : "Add Sell"}
+          </Button>
+        </div>
+      </form>
+    </FormProvider>
+  );
+}

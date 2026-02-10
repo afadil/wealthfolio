@@ -1,5 +1,5 @@
-import { TradeMatcher } from './trade-matcher';
-import type { ActivityDetails, ActivityType, DataSource } from '@wealthfolio/addon-sdk';
+import { TradeMatcher } from "./trade-matcher";
+import type { ActivityDetails, ActivityType, DataSource } from "@wealthfolio/addon-sdk";
 
 // Enhanced test data with dividends, fees, and various scenarios
 const jsonActivities = `[
@@ -42,13 +42,13 @@ const activities: ActivityDetails[] = rawActivities.map((a: any) => ({
 }));
 
 export function testTradeMatcher() {
-  console.log('=== COMPREHENSIVE Trade Matcher Test ===');
+  console.log("=== COMPREHENSIVE Trade Matcher Test ===");
   console.log(`Processing ${activities.length} activities...`);
 
   // Test 1: No fees, no dividends (baseline)
-  console.log('\n=== TEST 1: BASELINE (No Fees, No Dividends) ===');
+  console.log("\n=== TEST 1: BASELINE (No Fees, No Dividends) ===");
   const baselineMatcher = new TradeMatcher({
-    lotMethod: 'FIFO',
+    lotMethod: "FIFO",
     includeFees: false,
     includeDividends: false,
   });
@@ -59,9 +59,9 @@ export function testTradeMatcher() {
   );
 
   // Test 2: With fees, no dividends
-  console.log('\n=== TEST 2: WITH FEES (No Dividends) ===');
+  console.log("\n=== TEST 2: WITH FEES (No Dividends) ===");
   const feesMatcher = new TradeMatcher({
-    lotMethod: 'FIFO',
+    lotMethod: "FIFO",
     includeFees: true,
     includeDividends: false,
   });
@@ -74,9 +74,9 @@ export function testTradeMatcher() {
   console.log(`Fee Impact: $${(feesPL - baselinePL).toFixed(2)}`);
 
   // Test 3: No fees, with dividends
-  console.log('\n=== TEST 3: WITH DIVIDENDS (No Fees) ===');
+  console.log("\n=== TEST 3: WITH DIVIDENDS (No Fees) ===");
   const dividendsMatcher = new TradeMatcher({
-    lotMethod: 'FIFO',
+    lotMethod: "FIFO",
     includeFees: false,
     includeDividends: true,
   });
@@ -95,9 +95,9 @@ export function testTradeMatcher() {
   console.log(`Dividend Impact: $${(dividendsPL - baselinePL).toFixed(2)}`);
 
   // Test 4: With both fees and dividends
-  console.log('\n=== TEST 4: FULL CALCULATION (Fees + Dividends) ===');
+  console.log("\n=== TEST 4: FULL CALCULATION (Fees + Dividends) ===");
   const fullMatcher = new TradeMatcher({
-    lotMethod: 'FIFO',
+    lotMethod: "FIFO",
     includeFees: true,
     includeDividends: true,
   });
@@ -113,7 +113,7 @@ export function testTradeMatcher() {
   console.log(`Net Impact: $${(fullPL - baselinePL).toFixed(2)} (should equal dividends - fees)`);
 
   // Test detailed trade breakdown
-  console.log('\n=== DETAILED TRADE BREAKDOWN (FIFO with Fees & Dividends) ===');
+  console.log("\n=== DETAILED TRADE BREAKDOWN (FIFO with Fees & Dividends) ===");
   fullResult.closedTrades.forEach((trade, i) => {
     console.log(`${i + 1}. ${trade.symbol}: ${trade.quantity} shares`);
     console.log(`   Entry: ${trade.entryDate.toISOString().slice(0, 10)} @ $${trade.entryPrice}`);
@@ -127,7 +127,7 @@ export function testTradeMatcher() {
   });
 
   // Test open positions
-  console.log('\n=== OPEN POSITIONS ===');
+  console.log("\n=== OPEN POSITIONS ===");
   fullResult.openPositions.forEach((pos) => {
     console.log(`${pos.symbol}: ${pos.quantity} shares @ avg $${pos.averageCost.toFixed(2)}`);
     console.log(
@@ -136,10 +136,10 @@ export function testTradeMatcher() {
   });
 
   // Test 5: Compare lot methods with full calculations
-  console.log('\n=== LOT METHOD COMPARISON (Full Calculations) ===');
+  console.log("\n=== LOT METHOD COMPARISON (Full Calculations) ===");
 
   const avgMatcher = new TradeMatcher({
-    lotMethod: 'AVERAGE',
+    lotMethod: "AVERAGE",
     includeFees: true,
     includeDividends: true,
   });
@@ -147,7 +147,7 @@ export function testTradeMatcher() {
   const avgPL = avgResult.closedTrades.reduce((sum, trade) => sum + trade.realizedPL, 0);
 
   const lifoMatcher = new TradeMatcher({
-    lotMethod: 'LIFO',
+    lotMethod: "LIFO",
     includeFees: true,
     includeDividends: true,
   });
@@ -159,9 +159,9 @@ export function testTradeMatcher() {
   console.log(`LIFO Total P/L: $${lifoPL.toFixed(2)} (${lifoResult.closedTrades.length} trades)`);
 
   // Test 6: Summary of dividend activities
-  const dividendActivities = activities.filter((a) => a.activityType === 'DIVIDEND');
+  const dividendActivities = activities.filter((a) => a.activityType === "DIVIDEND");
   if (dividendActivities.length > 0) {
-    console.log('\n=== DIVIDEND ACTIVITIES ===');
+    console.log("\n=== DIVIDEND ACTIVITIES ===");
     dividendActivities.forEach((div) => {
       console.log(
         `${div.date.toISOString().slice(0, 10)}: ${div.assetSymbol} - $${div.amount} (${div.comment})`,

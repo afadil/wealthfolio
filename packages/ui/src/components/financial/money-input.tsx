@@ -1,72 +1,108 @@
 import * as React from "react";
+import { NumericFormat } from "react-number-format";
 import { cn } from "../../lib/utils";
 import { Input } from "../ui/input";
 
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  currency?: string;
+export interface MoneyInputProps {
+  /** Current numeric value */
+  value?: number | string | null;
+  /**
+   * Called when value changes with the new numeric value.
+   * Preferred API - receives number directly.
+   */
+  onValueChange?: (value: number | undefined) => void;
+  /**
+   * Legacy onChange handler for backward compatibility.
+   * Receives a synthetic event with value in e.target.value.
+   * @deprecated Use onValueChange instead
+   */
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  /** Maximum decimal places (default: 6) */
   maxDecimalPlaces?: number;
+  /** Use thousand separators (default: false) */
+  thousandSeparator?: boolean;
+  /** Placeholder text */
+  placeholder?: string;
+  /** Additional class names */
+  className?: string;
+  /** Input name for forms */
+  name?: string;
+  /** Disabled state */
+  disabled?: boolean;
+  /** Read-only state */
+  readOnly?: boolean;
+  /** Aria label for accessibility */
+  "aria-label"?: string;
+  /** Test ID for e2e testing */
+  "data-testid"?: string;
+  /** Auto focus on mount */
+  autoFocus?: boolean;
+  /** Key down handler */
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }
 
-const MoneyInput = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, maxDecimalPlaces = 6, value, onChange, ...props }, ref) => {
-    const { placeholder = "0.00" } = props;
-
-    // Ensure value is always a string
-    const controlledValue = value === undefined || value === null ? "" : value.toString();
-
-    const formatCurrency = (value: string): string => {
-      const numericValue = parseFloat(value);
-      return isNaN(numericValue)
-        ? ""
-        : numericValue.toLocaleString(undefined, {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: maxDecimalPlaces,
-          });
-    };
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const cursorPos = e.target.selectionStart;
-      let rawValue = e.target.value.replace(/[^\d.]/g, "");
-
-      // Ensure only one decimal point
-      const decimalIndex = rawValue.indexOf(".");
-      if (decimalIndex !== -1) {
-        rawValue = rawValue.slice(0, decimalIndex + 1) + rawValue.slice(decimalIndex + 1).replace(/\./g, "");
-      }
-
-      const formattedValue = formatCurrency(rawValue);
-
-      // Update the input value with the formatted amount
-      e.target.value = formattedValue;
-
-      // Immediately restore cursor position
-      if (cursorPos !== null) {
-        e.target.setSelectionRange(cursorPos, cursorPos);
-      }
-
-      // Call the original onChange with the numeric value
-      if (onChange) {
-        const numericValue = parseFloat(rawValue);
-        const syntheticEvent = {
-          ...e,
-          target: { ...e.target, value: isNaN(numericValue) ? "" : rawValue },
-        };
-        onChange(syntheticEvent as React.ChangeEvent<HTMLInputElement>);
-      }
-    };
+const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
+  (
+    {
+      value,
+      onValueChange,
+      onChange,
+      maxDecimalPlaces = 6,
+      thousandSeparator = false,
+      placeholder = "0.00",
+      className,
+      name,
+      disabled,
+      readOnly,
+      "aria-label": ariaLabel,
+      "data-testid": testId,
+      autoFocus,
+      onKeyDown,
+    },
+    ref,
+  ) => {
+    // Normalize value to number or empty string
+    const numericValue = value === null || value === undefined || value === "" ? "" : Number(value);
 
     return (
-      <Input
+      <NumericFormat
+        customInput={Input}
+        getInputRef={ref}
+        name={name}
         className={cn("text-right", className)}
-        ref={ref}
-        {...props}
-        value={controlledValue}
-        onChange={handleChange}
         placeholder={placeholder}
+        disabled={disabled}
+        readOnly={readOnly}
+        aria-label={ariaLabel}
+        data-testid={testId}
+        autoFocus={autoFocus}
+        onKeyDown={onKeyDown}
+        allowNegative={false}
+        decimalScale={maxDecimalPlaces}
+        thousandSeparator={thousandSeparator}
+        allowedDecimalSeparators={[".", ","]}
+        valueIsNumericString={false}
+        value={numericValue}
+        onValueChange={(values) => {
+          // Prefer onValueChange if provided
+          if (onValueChange) {
+            onValueChange(values.floatValue);
+          }
+          // Fall back to legacy onChange for backward compatibility
+          // Note: e.target.value will be a number, not a string
+          else if (onChange) {
+            const syntheticEvent = {
+              target: { name, value: values.floatValue },
+            } as unknown as React.ChangeEvent<HTMLInputElement>;
+            onChange(syntheticEvent);
+          }
+        }}
+        inputMode="decimal"
       />
     );
   },
 );
+
 MoneyInput.displayName = "MoneyInput";
 
 export { MoneyInput };

@@ -7,8 +7,8 @@ import type {
   TradeDistribution,
   CalendarMonth,
   CalendarDay,
-} from '../types';
-import { format, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+} from "../types";
+import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 
 /**
  * PerformanceCalculator class for calculating trading performance metrics
@@ -104,7 +104,7 @@ export class PerformanceCalculator {
       cumulativeRealizedPL += convert(trade.realizedPL, trade.currency);
 
       equityPoints.push({
-        date: format(trade.exitDate, 'yyyy-MM-dd'),
+        date: format(trade.exitDate, "yyyy-MM-dd"),
         cumulativeRealizedPL,
         cumulativeTotalPL: cumulativeRealizedPL,
         currency,
@@ -118,7 +118,7 @@ export class PerformanceCalculator {
    * Calculate P/L aggregated by period
    */
   calculatePeriodPL(
-    period: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly',
+    period: "daily" | "weekly" | "monthly" | "quarterly" | "yearly",
     currency: string,
     fxRateMap: Record<string, number> = {},
   ): PeriodPL[] {
@@ -221,7 +221,7 @@ export class PerformanceCalculator {
       this.updateDistributionRecord(bySymbol, trade.symbol, convertedPL, trade.returnPercent);
 
       // By weekday
-      const weekday = format(trade.exitDate, 'EEEE');
+      const weekday = format(trade.exitDate, "EEEE");
       this.updateDistributionRecord(byWeekday, weekday, convertedPL, trade.returnPercent);
 
       // By holding period
@@ -260,7 +260,7 @@ export class PerformanceCalculator {
 
     // Group trades by exit date
     for (const trade of this.closedTrades) {
-      const dateKey = format(trade.exitDate, 'yyyy-MM-dd');
+      const dateKey = format(trade.exitDate, "yyyy-MM-dd");
       const existing = tradeDateMap.get(dateKey) || { pl: 0, count: 0 };
 
       tradeDateMap.set(dateKey, {
@@ -284,7 +284,7 @@ export class PerformanceCalculator {
 
       for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(year, month, day);
-        const dateKey = format(date, 'yyyy-MM-dd');
+        const dateKey = format(date, "yyyy-MM-dd");
         const tradeData = tradeDateMap.get(dateKey) || { pl: 0, count: 0 };
 
         monthlyPL += tradeData.pl;
@@ -295,7 +295,7 @@ export class PerformanceCalculator {
           realizedPL: tradeData.pl,
           returnPercent: 0, // Would need portfolio value for accurate calculation
           tradeCount: tradeData.count,
-          isToday: dateKey === format(today, 'yyyy-MM-dd'),
+          isToday: dateKey === format(today, "yyyy-MM-dd"),
           isCurrentMonth: month === currentMonth && year === currentYear,
         });
       }
@@ -381,21 +381,21 @@ export class PerformanceCalculator {
    */
   private getPeriodKey(
     date: Date,
-    period: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly',
+    period: "daily" | "weekly" | "monthly" | "quarterly" | "yearly",
   ): string {
     switch (period) {
-      case 'daily':
-        return format(date, 'yyyy-MM-dd');
-      case 'weekly':
+      case "daily":
+        return format(date, "yyyy-MM-dd");
+      case "weekly":
         return format(date, "yyyy-'W'II");
-      case 'monthly':
-        return format(date, 'yyyy-MM');
-      case 'quarterly':
+      case "monthly":
+        return format(date, "yyyy-MM");
+      case "quarterly":
         return format(date, "yyyy-'Q'Q");
-      case 'yearly':
-        return format(date, 'yyyy');
+      case "yearly":
+        return format(date, "yyyy");
       default:
-        return format(date, 'yyyy-MM-dd');
+        return format(date, "yyyy-MM-dd");
     }
   }
 
@@ -403,12 +403,12 @@ export class PerformanceCalculator {
    * Categorize holding period into buckets
    */
   private categorizeHoldingPeriod(days: number): string {
-    if (days <= 1) return 'Intraday';
-    if (days <= 7) return '1-7 days';
-    if (days <= 30) return '1-4 weeks';
-    if (days <= 90) return '1-3 months';
-    if (days <= 180) return '3-6 months';
-    if (days <= 365) return '6-12 months';
-    return '1+ years';
+    if (days <= 1) return "Intraday";
+    if (days <= 7) return "1-7 days";
+    if (days <= 30) return "1-4 weeks";
+    if (days <= 90) return "1-3 months";
+    if (days <= 180) return "3-6 months";
+    if (days <= 365) return "6-12 months";
+    return "1+ years";
   }
 }

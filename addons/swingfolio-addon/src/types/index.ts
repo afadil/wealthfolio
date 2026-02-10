@@ -1,11 +1,11 @@
-import type { ActivityDetails } from '@wealthfolio/addon-sdk';
+import type { ActivityDetails } from "@wealthfolio/addon-sdk";
 
 export interface SwingTradePreferences {
   selectedActivityIds: string[];
   includeSwingTag: boolean;
   selectedAccounts: string[];
-  lotMatchingMethod: 'FIFO' | 'LIFO' | 'AVERAGE';
-  defaultDateRange: '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'ALL' | 'CUSTOM';
+  lotMatchingMethod: "FIFO" | "LIFO" | "AVERAGE";
+  defaultDateRange: "1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL" | "CUSTOM";
   includeFees: boolean;
   includeDividends: boolean;
 }
@@ -52,7 +52,7 @@ export interface OpenPosition {
 
 export interface PeriodPL {
   date: string; // YYYY-MM-DD format
-  period: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+  period: "daily" | "weekly" | "monthly" | "quarterly" | "yearly";
   realizedPL: number;
   unrealizedPL: number;
   totalPL: number;

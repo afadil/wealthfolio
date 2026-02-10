@@ -1,4 +1,4 @@
-Here is a draft of my vision to this project. Any ideas are welcome:
+# Wealthfolio Roadmap
 
 ## Vision
 
@@ -15,65 +15,80 @@ easy-to-use tool to track their investments and goals.
 
 ## What We Believe In
 
-1. Your Privacy: Your money info stays on your computer. You retain complete
-   control over your financial information..
-2. Easy to Use: Anyone can track their investments with our simple design.
-3. No Hidden Costs: Free or Pay once to support. Use forever—no surprise fees or
-   subscriptions.
-4. Lots of Features: Track many types of investments and use helpful tools.
-5. Beautiful, Focused, and Boring App: We believe in crafting an app that's
-   visually appealing yet doesn't distract from its core purpose.
+1. **Your Privacy**: Your money info stays on your computer. You retain complete
+   control over your financial information.
+2. **Easy to Use**: Anyone can track their investments with our simple design.
+3. **No Lock-in**: Free or pay once to support. Wealthfolio Connect as optional
+   paid subscription to sync broker data and devices.
+4. **Extensible**: Through the addons system and catalog, users can easily
+   enhance functionality.
+5. **Beautiful and Focused**: We believe in crafting an app that's visually
+   appealing yet doesn't distract from its core purpose.
 
 ## Roadmap
 
-### Step 1: The Basics (Now)
+### Phase 1: Foundation (Completed)
 
-- [x] Track your investments
-- [x] Store data on your computer
-- [x] Simple, easy-to-use design
+- [x] Track investments across multiple accounts
+- [x] Local-first data storage (SQLite)
+- [x] Simple, intuitive design
+- [x] Multi-currency support with exchange rates
+- [x] Performance analytics and historical tracking
 
-### Step 2: More Features (Next 3-6 months)
+### Phase 2: Core Features (Completed)
 
-- [x] Let you export your data (CSV, sqlite file, json)
-- [x] Support another market data API (Bring your own API keys) (example
-      https://www.alphavantage.co)
-- [x] Support Stock Splitting
-- [x] Enhance portfolio History calculation
-- [x] Build install packages for the remaining platforms
-- [x] Advanced CSV import
+- [x] Data export (CSV, SQLite, JSON)
+- [x] Multiple market data providers (Yahoo Finance, Alpha Vantage, MarketData)
+- [x] Stock split handling
+- [x] Enhanced portfolio history calculation
+- [x] Cross-platform builds (Windows, macOS, Linux)
+- [x] Advanced CSV import with field mapping
+- [x] Addons system for extending functionality
 
-### Step 3: Smart Tools (3-6 months)
+### Phase 3: Multi-Platform (Current - v3.0)
 
-- [ ] Add Addons system to extend the app with custom features
-- [ ] Add AI Chat addon with local first LLM(Ollama, LmStudio, etc) or Bring
-      your own API keys (OpenAI, Anthropic, etc)
-- [ ] Let you track liabilities and debts
-- [ ] Let you track more assets like houses, gold, and cars
+- [x] Self-hosted web app with Docker support
+- [x] REST API server (Axum)
+- [x] Mobile app (iOS/Android via Tauri)
+- [ ] Wealthfolio Connect: Device sync with end-to-end encryption (E2EE)
+- [ ] Wealthfolio Connect: broker data sync service
 
-### Step 3: Smart Tools (6-12 months)
+**Wealthfolio Connect** is an optional paid subscription to sustain development:
 
-- [ ] Some portfolio analysis and insights
-- [ ] Add Monte-Carlo projection
-- [ ] Add Retirement Planner
+- Automatic transaction sync from supported brokers
+- Secure device-to-device sync with E2EE
 
-### Step 4: Growing (12-18 months)
+### Phase 4: Wealth Tracking
 
-- [ ] Make a mobile app that works with your phone securely
-- [ ] Add a web app version that can be deployed on your own server
-      (self-hosted)
-- [ ] Connect with some brokers/ plateform to fetch and update activities
-      automatically
+- [ ] Liabilities and debt tracking
+- [ ] Alternative assets (real estate, vehicles, collectibles)
+- [ ] Options trading support
 
-### Step 5: Building a Community (18+ months)
+### Phase 5: Smart Tools
 
-- [ ] Add support for Options trading
+- [ ] AI assistant addon (local LLMs via Ollama/LM Studio, or BYOK for
+      OpenAI/Anthropic)
+- [ ] Portfolio analysis: sector allocation, concentration risk, dividend yield
+- [ ] Monte Carlo projection for portfolio outcomes
+- [ ] Retirement/FIRE planner with withdrawal strategies
+
+### Phase 6: Ecosystem
+
+- [ ] Addons catalog/marketplace for community addons
+- [ ] Addon monetization for developers
 
 ### Always Doing
 
 - Keeping the app safe and up-to-date
-- Making the app faster and better using user feedback
+- Performance improvements based on user feedback
+- Security audits and privacy enhancements
+
+---
 
 We're building Wealthfolio to be a great alternative to online investment
 trackers. Our plan might change based on what users tell us they want, but we'll
 always focus on keeping your data private and helping you manage your money
 better.
+
+Ideas and feedback welcome - open an issue or join our
+[Discord](https://discord.gg/WDMCY6aPWK).

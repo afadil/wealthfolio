@@ -50,8 +50,6 @@ jobs:
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
-        with:
-          workspaces: "./src-tauri -> target"
 
       - name: Sync node version and setup cache
         uses: actions/setup-node@v4
@@ -71,6 +69,10 @@ jobs:
         uses: tauri-apps/tauri-action@v0
 
         env:
+          # Wealthfolio Connect configuration
+          CONNECT_AUTH_URL: https://liyiikzhilvnivjgidpw.supabase.co
+          CONNECT_AUTH_PUBLISHABLE_KEY: sb_publishable_ZSZbXNtWtnh9i2nqJ2UL4A_NV8ZVutd
+          CONNECT_API_URL: https://api.wealthfolio.app
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}

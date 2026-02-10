@@ -1,0 +1,78 @@
+[package]
+name = "wealthfolio-app"
+version.workspace = true
+edition.workspace = true
+description = "Portfolio tracker"
+authors = ["Aziz Fadil"]
+license = "AGPL-3.0"
+repository = ""
+
+[build-dependencies]
+tauri-build = { version = "2.5", features = [] }
+
+[dependencies]
+# Internal crates
+wealthfolio-market-data = { workspace = true }
+wealthfolio-core = { workspace = true }
+wealthfolio-connect = { workspace = true }
+wealthfolio-storage-sqlite = { workspace = true }
+wealthfolio-device-sync = { workspace = true }
+wealthfolio-ai = { workspace = true }
+
+# Tauri
+tauri = { version = "2.9.3", features = [] }
+tauri-plugin-fs = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-log = "2"
+tauri-plugin-deep-link = "2"
+
+# Workspace dependencies
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+log = { workspace = true }
+futures = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true, features = ["time"] }
+uuid = { workspace = true }
+anyhow = { workspace = true }
+diesel = { workspace = true }
+rust_decimal = { workspace = true }
+
+# Additional dependencies
+dotenvy = "0.15.7"
+keyring = "2.0"
+local-ip-address = "0.6"
+hostname = "0.3"
+base64 = "0.22"
+urlencoding = "2.1.3"
+
+# Crypto
+chacha20poly1305 = { workspace = true }
+x25519-dalek = { workspace = true }
+hkdf = { workspace = true }
+sha2 = { workspace = true }
+rand = { workspace = true }
+
+[features]
+# this feature is used for production builds or when `devPath` points to the filesystem
+# DO NOT REMOVE!!
+custom-protocol = ["tauri/custom-protocol"]
+appstore = [] # Feature flag for App Store builds
+
+[lib]
+name = "wealthfolio_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"
+tauri-plugin-window-state = "2"
+
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+tauri-plugin-haptics = "2"
+# Using git version for iOS camera view fix (PR #2440)
+tauri-plugin-barcode-scanner = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v2" }
+
+[target.'cfg(target_os = "ios")'.dependencies]
+tauri-plugin-web-auth = "1"

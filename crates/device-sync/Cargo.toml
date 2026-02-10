@@ -1,0 +1,35 @@
+[package]
+name = "wealthfolio-device-sync"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+# Core (for SecretStore trait)
+wealthfolio-core = { path = "../core" }
+
+# HTTP client
+reqwest = { workspace = true }
+urlencoding = "2"
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+
+# Logging
+log = { workspace = true }
+
+# Crypto
+base64 = "0.22"
+chacha20poly1305 = "0.10"
+hkdf = "0.12"
+sha2 = "0.10"
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+rand = "0.8"
+uuid = { version = "1", features = ["v4"] }

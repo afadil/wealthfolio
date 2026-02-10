@@ -1,15 +1,9 @@
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Icons } from "@/components/ui/icons";
-import { Input } from "@/components/ui/input";
 import { Table } from "@tanstack/react-table";
-
 import { useEffect, useState } from "react";
+import { cn } from "../../../lib/utils";
+import { Button } from "../button";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "../dropdown-menu";
+import { Icons } from "../icons";
 import type { DataTableFacetedFilterProps } from "./data-table-faceted-filter";
 import { DataTableFacetedFilter } from "./data-table-faceted-filter";
 
@@ -43,7 +37,7 @@ export function DataTableToolbar<TData>({
             placeholder="Search ..."
             value={table.getState().globalFilter ?? ""}
             onChange={(value) => table.setGlobalFilter(value)}
-            className="bg-muted/40 border-border/50 h-8 w-[150px] shadow-[inset_0_0.5px_0.5px_rgba(0,0,0,0.06)] lg:w-[250px]"
+            className="w-[150px] lg:w-[250px]"
           />
         )}
         {filters?.map((filter) => (
@@ -107,13 +101,14 @@ export function DataTableToolbar<TData>({
 function SearchInput({
   value: initialValue,
   onChange,
-  _debounceTime = 800,
-  ...props
+  placeholder = "Search ...",
+  className,
 }: {
   value: string | number;
   onChange: (value: string | number) => void;
-  _debounceTime?: number;
-} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange">) {
+  placeholder?: string;
+  className?: string;
+}) {
   const [value, setValue] = useState(initialValue);
 
   useEffect(() => {
@@ -122,21 +117,45 @@ function SearchInput({
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
-      onChange(value); // Invoke onChange with the current value
+      onChange(value);
     }
   };
 
   const handleBlur = () => {
-    onChange(value); // Invoke onChange with the current value
+    onChange(value);
+  };
+
+  const handleClear = () => {
+    setValue("");
+    onChange("");
   };
 
   return (
-    <Input
-      {...props}
-      value={value}
-      onChange={(e) => setValue(e.target.value)}
-      onKeyDown={handleKeyDown}
-      onBlur={handleBlur}
-    />
+    <div className={cn("relative", className)}>
+      <Icons.Search className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2" />
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onBlur={handleBlur}
+        placeholder={placeholder}
+        className={cn(
+          "shadow-inner-xs bg-muted/90 hover:bg-muted/80 h-8 w-full rounded-md pl-8 pr-8 text-sm outline-none transition-colors",
+          "placeholder:text-muted-foreground",
+          "focus:ring-ring/50 focus:ring-2",
+        )}
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={handleClear}
+          className="text-muted-foreground hover:text-foreground absolute right-2 top-1/2 -translate-y-1/2"
+        >
+          <Icons.Close className="h-4 w-4" />
+          <span className="sr-only">Clear search</span>
+        </button>
+      )}
+    </div>
   );
 }

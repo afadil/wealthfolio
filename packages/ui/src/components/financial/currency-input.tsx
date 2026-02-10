@@ -1,5 +1,4 @@
-import { Check, ChevronsUpDown } from "lucide-react";
-import { forwardRef, useRef, useState } from "react";
+import { forwardRef, useCallback, useRef, useState } from "react";
 import { useIsMobile as defaultUseIsMobile } from "../../hooks/use-mobile";
 import { worldCurrencies } from "../../lib/currencies";
 import { cn } from "../../lib/utils";
@@ -17,6 +16,14 @@ interface CurrencyInputCustomProps {
   onChange: (value: string) => void;
   placeholder?: string;
   displayMode?: "auto" | "desktop" | "mobile";
+  /** Controls how the selected value is displayed in the trigger button. */
+  valueDisplay?: "label" | "code" | "code-label";
+  /** When true, focuses the search input when the picker opens. */
+  autoFocusSearch?: boolean;
+  /** Controlled open state (optional). */
+  open?: boolean;
+  /** Controlled open change handler (optional). */
+  onOpenChange?: (open: boolean) => void;
   useIsMobile?: () => boolean;
 }
 
@@ -32,27 +39,60 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
       className,
       placeholder = "Select account currency",
       displayMode = "auto",
+      valueDisplay = "label",
+      autoFocusSearch = false,
+      open: openProp,
+      onOpenChange,
       useIsMobile,
       ...props
     },
     ref,
   ) => {
-    const [open, setOpen] = useState(false);
+    const isControlled = openProp !== undefined;
+    const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+    const open = isControlled ? openProp : uncontrolledOpen;
+    const setOpen = (nextOpen: boolean) => {
+      if (isControlled) {
+        onOpenChange?.(nextOpen);
+      } else {
+        setUncontrolledOpen(nextOpen);
+      }
+    };
     const [searchQuery, setSearchQuery] = useState("");
     const searchInputRef = useRef<HTMLInputElement | null>(null);
+    const desktopCommandInputRef = useRef<HTMLInputElement | null>(null);
 
     const useIsMobileHook = useIsMobile ?? defaultUseIsMobile;
     const isMobileFromHook = useIsMobileHook();
     const isMobile = displayMode === "mobile" || (displayMode === "auto" && isMobileFromHook);
 
     const selectedCurrency = worldCurrencies.find((currency) => currency.value === value);
-    const buttonLabel = selectedCurrency ? selectedCurrency.label : placeholder;
+    const buttonLabel = selectedCurrency
+      ? valueDisplay === "code"
+        ? selectedCurrency.value
+        : valueDisplay === "code-label"
+          ? `${selectedCurrency.value} - ${selectedCurrency.label}`
+          : selectedCurrency.label
+      : placeholder;
 
     const handleSelect = (currencyValue: string) => {
       onChange(currencyValue);
       setOpen(false);
       setSearchQuery("");
     };
+
+    const handleOpenAutoFocus = useCallback(
+      (e: Event) => {
+        if (!autoFocusSearch) return;
+        e.preventDefault();
+        if (isMobile) {
+          searchInputRef.current?.focus();
+        } else {
+          desktopCommandInputRef.current?.focus();
+        }
+      },
+      [autoFocusSearch, isMobile],
+    );
 
     if (isMobile) {
       const filteredCurrencies = worldCurrencies.filter(
@@ -61,7 +101,11 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
           curr.label.toLowerCase().includes(searchQuery.toLowerCase()),
       );
       const mobileDisplayText = selectedCurrency
-        ? `${selectedCurrency.value} - ${selectedCurrency.label}`
+        ? valueDisplay === "code"
+          ? selectedCurrency.value
+          : valueDisplay === "label"
+            ? selectedCurrency.label
+            : `${selectedCurrency.value} - ${selectedCurrency.label}`
         : placeholder;
 
       return (
@@ -73,7 +117,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
             role="combobox"
             aria-expanded={open}
             className={cn(
-              "h-11 w-full justify-between truncate rounded-md font-normal",
+              "h-input-height w-full justify-between truncate rounded-md font-normal",
               !value && "text-muted-foreground",
               className,
             )}
@@ -81,11 +125,15 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
             {...props}
           >
             <span className="truncate">{mobileDisplayText}</span>
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
           <Sheet open={open} onOpenChange={setOpen}>
-            <SheetContent side="bottom" className="mx-1 h-[85vh] rounded-t-4xl p-0">
-              <SheetHeader className="border-border border-b px-6 pt-6 pb-4">
+            <SheetContent
+              side="bottom"
+              className="rounded-t-4xl mx-1 h-[85vh] p-0"
+              onOpenAutoFocus={handleOpenAutoFocus}
+            >
+              <SheetHeader className="border-border border-b px-6 pb-4 pt-6">
                 <SheetTitle>Select Currency</SheetTitle>
                 <SheetDescription>Choose your activity currency</SheetDescription>
               </SheetHeader>
@@ -121,7 +169,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
                 </div>
                 <div className="border-border border-b px-6 py-4">
                   <div className="relative">
-                    <Icons.Search className="text-muted-foreground absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2" />
+                    <Icons.Search className="text-muted-foreground absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2" />
                     <Input
                       ref={searchInputRef}
                       type="text"
@@ -167,7 +215,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
                   ) : (
                     <div className="text-muted-foreground flex h-full flex-col items-center justify-center gap-2 text-center text-sm">
                       <Icons.Search className="h-12 w-12 opacity-20" />
-                      <span>No currencies found for "{searchQuery}".</span>
+                      <span>No currencies found for &quot;{searchQuery}&quot;.</span>
                     </div>
                   )}
                 </ScrollArea>
@@ -187,16 +235,20 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className={cn("h-11 w-full justify-between rounded-md", !value && "text-muted-foreground", className)}
+            className={cn(
+              "h-input-height w-full justify-between rounded-md",
+              !value && "text-muted-foreground",
+              className,
+            )}
             {...props}
           >
-            {buttonLabel}
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <span className="truncate">{buttonLabel}</span>
+            <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-full p-0">
+        <PopoverContent className="w-full p-0" onOpenAutoFocus={handleOpenAutoFocus}>
           <Command>
-            <CommandInput placeholder="Search currency..." className="h-9" />
+            <CommandInput ref={desktopCommandInputRef} placeholder="Search currency..." className="h-9" />
             <CommandList>
               <CommandEmpty>No currency found.</CommandEmpty>
               <CommandGroup>
@@ -210,7 +262,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
                       }}
                     >
                       {currency.label}
-                      <Check
+                      <Icons.Check
                         className={cn("ml-auto h-4 w-4", currency.value === value ? "opacity-100" : "opacity-0")}
                       />
                     </CommandItem>

@@ -1,0 +1,648 @@
+use async_trait::async_trait;
+use chrono::NaiveDate;
+use diesel::prelude::*;
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::sql_query;
+use diesel::sql_types::Text;
+use diesel::sqlite::Sqlite;
+use diesel::sqlite::SqliteConnection;
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use super::model::{MarketDataProviderSettingDB, QuoteDB, UpdateMarketDataProviderSettingDB};
+use crate::db::{get_connection, WriteHandle};
+use crate::errors::{IntoCore, StorageError};
+use crate::schema::market_data_providers::dsl as market_data_providers_dsl;
+use crate::schema::quotes::dsl as quotes_dsl;
+use crate::utils::chunk_for_sqlite;
+use wealthfolio_core::quotes::store::{ProviderSettingsStore, QuoteStore};
+use wealthfolio_core::quotes::types::{AssetId, Day, QuoteSource};
+use wealthfolio_core::quotes::{
+    LatestQuotePair, MarketDataProviderSetting, Quote, UpdateMarketDataProviderSetting,
+};
+use wealthfolio_core::Result;
+
+pub struct MarketDataRepository {
+    pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
+    writer: WriteHandle,
+}
+
+impl MarketDataRepository {
+    pub fn new(pool: Arc<Pool<ConnectionManager<SqliteConnection>>>, writer: WriteHandle) -> Self {
+        Self { pool, writer }
+    }
+}
+
+// =============================================================================
+// QuoteStore Implementation
+// =============================================================================
+
+#[async_trait]
+impl QuoteStore for MarketDataRepository {
+    // =========================================================================
+    // Mutations
+    // =========================================================================
+
+    async fn save_quote(&self, quote: &Quote) -> Result<Quote> {
+        let quote_cloned = quote.clone();
+        let db_row = QuoteDB::from(&quote_cloned);
+
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                diesel::replace_into(quotes_dsl::quotes)
+                    .values(&db_row)
+                    .execute(conn)
+                    .map_err(StorageError::QueryFailed)?;
+                Ok(())
+            })
+            .await?;
+
+        Ok(quote_cloned)
+    }
+
+    async fn delete_quote(&self, quote_id: &str) -> Result<()> {
+        let id_to_delete = quote_id.to_string();
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                diesel::delete(quotes_dsl::quotes.filter(quotes_dsl::id.eq(id_to_delete)))
+                    .execute(conn)
+                    .map_err(StorageError::QueryFailed)?;
+                Ok(())
+            })
+            .await
+    }
+
+    async fn upsert_quotes(&self, input_quotes: &[Quote]) -> Result<usize> {
+        if input_quotes.is_empty() {
+            return Ok(0);
+        }
+
+        let db_rows: Vec<QuoteDB> = input_quotes.iter().map(QuoteDB::from).collect();
+
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
+                let mut total_upserted = 0;
+                for chunk in db_rows.chunks(1_000) {
+                    total_upserted += diesel::replace_into(quotes_dsl::quotes)
+                        .values(chunk)
+                        .execute(conn)
+                        .map_err(StorageError::QueryFailed)?;
+                }
+                Ok(total_upserted)
+            })
+            .await
+    }
+
+    async fn delete_quotes_for_asset(&self, asset_id: &AssetId) -> Result<usize> {
+        let asset_id_str = asset_id.as_str().to_string();
+
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
+                let count = diesel::delete(
+                    quotes_dsl::quotes.filter(quotes_dsl::asset_id.eq(asset_id_str)),
+                )
+                .execute(conn)
+                .map_err(StorageError::QueryFailed)?;
+                Ok(count)
+            })
+            .await
+    }
+
+    // =========================================================================
+    // Single Asset Queries (Strong Types)
+    // =========================================================================
+
+    fn latest(&self, asset_id: &AssetId, source: Option<&QuoteSource>) -> Result<Option<Quote>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let mut query = quotes_dsl::quotes
+            .filter(quotes_dsl::asset_id.eq(asset_id.as_str()))
+            .order(quotes_dsl::day.desc())
+            .into_boxed();
+
+        if let Some(src) = source {
+            query = query.filter(quotes_dsl::source.eq(src.to_storage_string()));
+        }
+
+        let result = query.first::<QuoteDB>(&mut conn).optional().into_core()?;
+
+        Ok(result.map(Quote::from))
+    }
+
+    fn range(
+        &self,
+        asset_id: &AssetId,
+        start: Day,
+        end: Day,
+        source: Option<&QuoteSource>,
+    ) -> Result<Vec<Quote>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let start_str = start.date().format("%Y-%m-%d").to_string();
+        let end_str = end.date().format("%Y-%m-%d").to_string();
+
+        let mut query = quotes_dsl::quotes
+            .filter(quotes_dsl::asset_id.eq(asset_id.as_str()))
+            .filter(quotes_dsl::day.ge(&start_str))
+            .filter(quotes_dsl::day.le(&end_str))
+            .order(quotes_dsl::day.asc())
+            .into_boxed();
+
+        if let Some(src) = source {
+            query = query.filter(quotes_dsl::source.eq(src.to_storage_string()));
+        }
+
+        let results = query.load::<QuoteDB>(&mut conn).into_core()?;
+
+        Ok(results.into_iter().map(Quote::from).collect())
+    }
+
+    // =========================================================================
+    // Batch Queries (Strong Types)
+    // =========================================================================
+
+    fn latest_batch(
+        &self,
+        asset_ids: &[AssetId],
+        source: Option<&QuoteSource>,
+    ) -> Result<HashMap<AssetId, Quote>> {
+        if asset_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let mut conn = get_connection(&self.pool)?;
+        let mut result: HashMap<AssetId, Quote> = HashMap::new();
+
+        // Chunk the asset_ids to avoid SQLite parameter limits
+        for chunk in chunk_for_sqlite(asset_ids) {
+            let symbols: Vec<&str> = chunk.iter().map(|id| id.as_str()).collect();
+            let placeholders = symbols.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+
+            let sql = if source.is_some() {
+                format!(
+                    "WITH RankedQuotes AS ( \
+                        SELECT \
+                            q.*, \
+                            ROW_NUMBER() OVER (PARTITION BY q.asset_id ORDER BY q.day DESC) as rn \
+                        FROM quotes q WHERE q.asset_id IN ({}) AND q.source = ? \
+                    ) \
+                    SELECT * FROM RankedQuotes WHERE rn = 1 \
+                    ORDER BY asset_id",
+                    placeholders
+                )
+            } else {
+                format!(
+                    "WITH RankedQuotes AS ( \
+                        SELECT \
+                            q.*, \
+                            ROW_NUMBER() OVER (PARTITION BY q.asset_id ORDER BY q.day DESC) as rn \
+                        FROM quotes q WHERE q.asset_id IN ({}) \
+                    ) \
+                    SELECT * FROM RankedQuotes WHERE rn = 1 \
+                    ORDER BY asset_id",
+                    placeholders
+                )
+            };
+
+            let mut query_builder = Box::new(sql_query(sql)).into_boxed::<Sqlite>();
+
+            for sym in &symbols {
+                query_builder = query_builder.bind::<Text, _>(*sym);
+            }
+
+            if let Some(src) = source {
+                query_builder = query_builder.bind::<Text, _>(src.to_storage_string());
+            }
+
+            let ranked_quotes_db: Vec<QuoteDB> =
+                query_builder.load::<QuoteDB>(&mut conn).into_core()?;
+
+            for quote_db in ranked_quotes_db {
+                result.insert(AssetId::new(quote_db.asset_id.clone()), quote_db.into());
+            }
+        }
+
+        Ok(result)
+    }
+
+    fn latest_with_previous(
+        &self,
+        asset_ids: &[AssetId],
+    ) -> Result<HashMap<AssetId, LatestQuotePair>> {
+        if asset_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let mut conn = get_connection(&self.pool)?;
+        let mut result_map: HashMap<AssetId, LatestQuotePair> = HashMap::new();
+
+        // Chunk the asset_ids to avoid SQLite parameter limits
+        for chunk in chunk_for_sqlite(asset_ids) {
+            let symbols: Vec<&str> = chunk.iter().map(|id| id.as_str()).collect();
+            let placeholders = symbols.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+            let sql = format!(
+                "WITH RankedQuotes AS ( \
+                    SELECT \
+                        q.*, \
+                        ROW_NUMBER() OVER (PARTITION BY q.asset_id ORDER BY q.day DESC) as rn \
+                    FROM quotes q WHERE q.asset_id IN ({}) \
+                ) \
+                SELECT * \
+                FROM RankedQuotes \
+                WHERE rn <= 2 \
+                ORDER BY asset_id, rn",
+                placeholders
+            );
+
+            let mut query_builder = Box::new(sql_query(sql)).into_boxed::<Sqlite>();
+
+            for sym in &symbols {
+                query_builder = query_builder.bind::<Text, _>(*sym);
+            }
+
+            let ranked_quotes_db: Vec<QuoteDB> =
+                query_builder.load::<QuoteDB>(&mut conn).into_core()?;
+
+            let mut current_asset_quotes: Vec<Quote> = Vec::new();
+
+            for quote_db in ranked_quotes_db {
+                let quote = Quote::from(quote_db);
+
+                if current_asset_quotes.is_empty()
+                    || quote.asset_id == current_asset_quotes[0].asset_id
+                {
+                    current_asset_quotes.push(quote);
+                } else {
+                    if !current_asset_quotes.is_empty() {
+                        let latest_quote = current_asset_quotes.remove(0);
+                        let previous_quote = if !current_asset_quotes.is_empty() {
+                            Some(current_asset_quotes.remove(0))
+                        } else {
+                            None
+                        };
+                        result_map.insert(
+                            AssetId::new(latest_quote.asset_id.clone()),
+                            LatestQuotePair {
+                                latest: latest_quote,
+                                previous: previous_quote,
+                            },
+                        );
+                    }
+                    current_asset_quotes.clear();
+                    current_asset_quotes.push(quote);
+                }
+            }
+
+            // Process final asset from this chunk
+            if !current_asset_quotes.is_empty() {
+                let latest_quote = current_asset_quotes.remove(0);
+                let previous_quote = if !current_asset_quotes.is_empty() {
+                    Some(current_asset_quotes.remove(0))
+                } else {
+                    None
+                };
+                result_map.insert(
+                    AssetId::new(latest_quote.asset_id.clone()),
+                    LatestQuotePair {
+                        latest: latest_quote,
+                        previous: previous_quote,
+                    },
+                );
+            }
+        }
+
+        Ok(result_map)
+    }
+
+    // =========================================================================
+    // Legacy Methods (String-based, for backward compatibility)
+    // =========================================================================
+
+    fn get_latest_quote(&self, symbol: &str) -> Result<Quote> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let query_result = quotes_dsl::quotes
+            .filter(quotes_dsl::asset_id.eq(symbol))
+            .order(quotes_dsl::day.desc())
+            .first::<QuoteDB>(&mut conn)
+            .optional()
+            .into_core()?;
+
+        match query_result {
+            Some(quote_db) => Ok(Quote::from(quote_db)),
+            None => Err(wealthfolio_core::errors::Error::Database(
+                wealthfolio_core::errors::DatabaseError::NotFound(format!(
+                    "No quote found in database for symbol: {}",
+                    symbol
+                )),
+            )),
+        }
+    }
+
+    fn get_latest_quotes(&self, symbols: &[String]) -> Result<HashMap<String, Quote>> {
+        if symbols.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let mut conn = get_connection(&self.pool)?;
+        let mut result: HashMap<String, Quote> = HashMap::new();
+
+        // Chunk the symbols to avoid SQLite parameter limits
+        for chunk in chunk_for_sqlite(symbols) {
+            let placeholders = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+
+            let sql = format!(
+                "WITH RankedQuotes AS ( \
+                    SELECT \
+                        q.*, \
+                        ROW_NUMBER() OVER (PARTITION BY q.asset_id ORDER BY q.day DESC) as rn \
+                    FROM quotes q WHERE q.asset_id IN ({}) \
+                ) \
+                SELECT * FROM RankedQuotes WHERE rn = 1 \
+                ORDER BY asset_id",
+                placeholders
+            );
+
+            let mut query_builder = Box::new(sql_query(sql)).into_boxed::<Sqlite>();
+
+            for symbol_val in chunk {
+                query_builder = query_builder.bind::<Text, _>(symbol_val);
+            }
+
+            let ranked_quotes_db: Vec<QuoteDB> =
+                query_builder.load::<QuoteDB>(&mut conn).into_core()?;
+
+            for quote_db in ranked_quotes_db {
+                result.insert(quote_db.asset_id.clone(), quote_db.into());
+            }
+        }
+
+        Ok(result)
+    }
+
+    fn get_latest_quotes_pair(
+        &self,
+        symbols: &[String],
+    ) -> Result<HashMap<String, LatestQuotePair>> {
+        if symbols.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let mut conn = get_connection(&self.pool)?;
+        let mut result_map: HashMap<String, LatestQuotePair> = HashMap::new();
+
+        // Chunk the symbols to avoid SQLite parameter limits
+        for chunk in chunk_for_sqlite(symbols) {
+            let placeholders = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+            let sql = format!(
+                "WITH RankedQuotes AS ( \
+                    SELECT \
+                        q.*, \
+                        ROW_NUMBER() OVER (PARTITION BY q.asset_id ORDER BY q.day DESC) as rn \
+                    FROM quotes q WHERE q.asset_id IN ({}) \
+                ) \
+                SELECT * \
+                FROM RankedQuotes \
+                WHERE rn <= 2 \
+                ORDER BY asset_id, rn",
+                placeholders
+            );
+
+            let mut query_builder = Box::new(sql_query(sql)).into_boxed::<Sqlite>();
+
+            for symbol_val in chunk {
+                query_builder = query_builder.bind::<Text, _>(symbol_val);
+            }
+
+            let ranked_quotes_db: Vec<QuoteDB> =
+                query_builder.load::<QuoteDB>(&mut conn).into_core()?;
+
+            let mut current_asset_quotes: Vec<Quote> = Vec::new();
+
+            for quote_db in ranked_quotes_db {
+                let quote = Quote::from(quote_db);
+
+                if current_asset_quotes.is_empty()
+                    || quote.asset_id == current_asset_quotes[0].asset_id
+                {
+                    current_asset_quotes.push(quote);
+                } else {
+                    if !current_asset_quotes.is_empty() {
+                        let latest_quote = current_asset_quotes.remove(0);
+                        let previous_quote = if !current_asset_quotes.is_empty() {
+                            Some(current_asset_quotes.remove(0))
+                        } else {
+                            None
+                        };
+                        result_map.insert(
+                            latest_quote.asset_id.clone(),
+                            LatestQuotePair {
+                                latest: latest_quote,
+                                previous: previous_quote,
+                            },
+                        );
+                    }
+                    current_asset_quotes.clear();
+                    current_asset_quotes.push(quote);
+                }
+            }
+
+            // Process final asset from this chunk
+            if !current_asset_quotes.is_empty() {
+                let latest_quote = current_asset_quotes.remove(0);
+                let previous_quote = if !current_asset_quotes.is_empty() {
+                    Some(current_asset_quotes.remove(0))
+                } else {
+                    None
+                };
+                result_map.insert(
+                    latest_quote.asset_id.clone(),
+                    LatestQuotePair {
+                        latest: latest_quote,
+                        previous: previous_quote,
+                    },
+                );
+            }
+        }
+
+        Ok(result_map)
+    }
+
+    fn get_historical_quotes(&self, symbol: &str) -> Result<Vec<Quote>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        // Order by day descending (newest first) - most callers need latest quote first
+        // Frontend charts should sort ascending if needed for chronological display
+        let results = quotes_dsl::quotes
+            .filter(quotes_dsl::asset_id.eq(symbol))
+            .order(quotes_dsl::day.desc())
+            .load::<QuoteDB>(&mut conn)
+            .into_core()?;
+
+        Ok(results.into_iter().map(Quote::from).collect())
+    }
+
+    fn get_all_historical_quotes(&self) -> Result<Vec<Quote>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let results = quotes_dsl::quotes
+            .order(quotes_dsl::day.desc())
+            .load::<QuoteDB>(&mut conn)
+            .into_core()?;
+
+        Ok(results.into_iter().map(Quote::from).collect())
+    }
+
+    fn get_quotes_in_range(
+        &self,
+        symbol: &str,
+        start: NaiveDate,
+        end: NaiveDate,
+    ) -> Result<Vec<Quote>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let start_str = start.format("%Y-%m-%d").to_string();
+        let end_str = end.format("%Y-%m-%d").to_string();
+
+        let results = quotes_dsl::quotes
+            .filter(quotes_dsl::asset_id.eq(symbol))
+            .filter(quotes_dsl::day.ge(&start_str))
+            .filter(quotes_dsl::day.le(&end_str))
+            .order(quotes_dsl::day.asc())
+            .load::<QuoteDB>(&mut conn)
+            .into_core()?;
+
+        Ok(results.into_iter().map(Quote::from).collect())
+    }
+
+    fn find_duplicate_quotes(&self, symbol: &str, date: NaiveDate) -> Result<Vec<Quote>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let date_str = date.format("%Y-%m-%d").to_string();
+
+        let results = quotes_dsl::quotes
+            .filter(quotes_dsl::asset_id.eq(symbol))
+            .filter(quotes_dsl::day.eq(&date_str))
+            .load::<QuoteDB>(&mut conn)
+            .into_core()?;
+
+        Ok(results.into_iter().map(Quote::from).collect())
+    }
+
+    fn get_quote_bounds_for_assets(
+        &self,
+        asset_ids: &[String],
+        source: &str,
+    ) -> Result<HashMap<String, (NaiveDate, NaiveDate)>> {
+        if asset_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let mut conn = get_connection(&self.pool)?;
+        let mut result: HashMap<String, (NaiveDate, NaiveDate)> = HashMap::new();
+
+        #[derive(QueryableByName, Debug)]
+        struct QuoteBoundsRow {
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            asset_id: String,
+            #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+            min_day: Option<String>,
+            #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+            max_day: Option<String>,
+        }
+
+        // Chunk the asset_ids to avoid SQLite parameter limits
+        for chunk in chunk_for_sqlite(asset_ids) {
+            let placeholders = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+
+            let sql = format!(
+                "SELECT asset_id, MIN(day) as min_day, MAX(day) as max_day \
+                 FROM quotes \
+                 WHERE asset_id IN ({}) AND source = ? \
+                 GROUP BY asset_id",
+                placeholders
+            );
+
+            let mut query_builder = Box::new(sql_query(sql)).into_boxed::<Sqlite>();
+
+            for asset_id in chunk {
+                query_builder = query_builder.bind::<Text, _>(asset_id);
+            }
+            query_builder = query_builder.bind::<Text, _>(source);
+
+            let rows: Vec<QuoteBoundsRow> = query_builder
+                .load::<QuoteBoundsRow>(&mut conn)
+                .into_core()?;
+
+            for row in rows {
+                if let (Some(min_str), Some(max_str)) = (row.min_day, row.max_day) {
+                    if let (Ok(min_date), Ok(max_date)) = (
+                        NaiveDate::parse_from_str(&min_str, "%Y-%m-%d"),
+                        NaiveDate::parse_from_str(&max_str, "%Y-%m-%d"),
+                    ) {
+                        result.insert(row.asset_id, (min_date, max_date));
+                    }
+                }
+            }
+        }
+
+        Ok(result)
+    }
+}
+
+// =============================================================================
+// ProviderSettingsStore Implementation
+// =============================================================================
+
+impl ProviderSettingsStore for MarketDataRepository {
+    fn get_all_providers(&self) -> Result<Vec<MarketDataProviderSetting>> {
+        let mut conn = get_connection(&self.pool)?;
+        let db_results = market_data_providers_dsl::market_data_providers
+            .order(market_data_providers_dsl::priority.desc())
+            .select(MarketDataProviderSettingDB::as_select())
+            .load::<MarketDataProviderSettingDB>(&mut conn)
+            .into_core()?;
+
+        Ok(db_results
+            .into_iter()
+            .map(MarketDataProviderSetting::from)
+            .collect())
+    }
+
+    fn get_provider(&self, id: &str) -> Result<MarketDataProviderSetting> {
+        let mut conn = get_connection(&self.pool)?;
+        let db_result = market_data_providers_dsl::market_data_providers
+            .find(id)
+            .select(MarketDataProviderSettingDB::as_select())
+            .first::<MarketDataProviderSettingDB>(&mut conn)
+            .into_core()?;
+
+        Ok(MarketDataProviderSetting::from(db_result))
+    }
+
+    fn update_provider(
+        &self,
+        id: &str,
+        changes: UpdateMarketDataProviderSetting,
+    ) -> Result<MarketDataProviderSetting> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let changes_db = UpdateMarketDataProviderSettingDB {
+            priority: changes.priority,
+            enabled: changes.enabled,
+        };
+
+        diesel::update(market_data_providers_dsl::market_data_providers.find(id))
+            .set(&changes_db)
+            .execute(&mut conn)
+            .into_core()?;
+
+        let db_result = market_data_providers_dsl::market_data_providers
+            .find(id)
+            .select(MarketDataProviderSettingDB::as_select())
+            .first::<MarketDataProviderSettingDB>(&mut conn)
+            .into_core()?;
+
+        Ok(MarketDataProviderSetting::from(db_result))
+    }
+}

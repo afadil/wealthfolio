@@ -1,0 +1,645 @@
+{
+  "exchanges": [
+    {
+      "mic": "XNYS",
+      "name": "NYSE",
+      "long_name": "New York Stock Exchange",
+      "currency": "USD",
+      "timezone": "America/New_York",
+      "close": [16, 0],
+      "yahoo": { "suffix": "", "codes": ["NYQ", "NYS"] },
+      "alpha_vantage": { "suffix": "", "currency": "USD" }
+    },
+    {
+      "mic": "XNAS",
+      "name": "NASDAQ",
+      "long_name": "NASDAQ Stock Market",
+      "currency": "USD",
+      "timezone": "America/New_York",
+      "close": [16, 0],
+      "yahoo": { "suffix": "", "codes": ["NMS", "NGM", "NCM", "NAS"] },
+      "alpha_vantage": { "suffix": "", "currency": "USD" }
+    },
+    {
+      "mic": "XASE",
+      "name": "NYSE American",
+      "long_name": "NYSE American",
+      "currency": "USD",
+      "timezone": "America/New_York",
+      "close": [16, 0],
+      "yahoo": { "suffix": "", "codes": ["PCX", "ASE"] },
+      "alpha_vantage": { "suffix": "", "currency": "USD" }
+    },
+    {
+      "mic": "ARCX",
+      "name": "NYSE Arca",
+      "long_name": "NYSE Arca",
+      "currency": "USD",
+      "timezone": "America/New_York",
+      "close": [16, 0],
+      "yahoo": { "suffix": "", "codes": ["ARC"] }
+    },
+    {
+      "mic": "BATS",
+      "name": "BATS",
+      "long_name": "Cboe BZX Exchange",
+      "currency": "USD",
+      "timezone": "America/New_York",
+      "close": [16, 0],
+      "yahoo": { "suffix": "", "codes": ["BTS"] }
+    },
+    {
+      "mic": "OTCM",
+      "name": "OTC Markets",
+      "long_name": "OTC Markets",
+      "currency": "USD",
+      "timezone": "America/New_York",
+      "close": [16, 0],
+      "yahoo": { "suffix": "", "codes": ["PNK", "OQB", "OQX"] }
+    },
+    {
+      "mic": "XTSE",
+      "name": "TSX",
+      "long_name": "Toronto Stock Exchange",
+      "currency": "CAD",
+      "timezone": "America/Toronto",
+      "close": [16, 0],
+      "yahoo": { "suffix": ".TO", "codes": ["TOR"] },
+      "alpha_vantage": { "suffix": ".TRT", "currency": "CAD" }
+    },
+    {
+      "mic": "XTSX",
+      "name": "TSX-V",
+      "long_name": "TSX Venture Exchange",
+      "currency": "CAD",
+      "timezone": "America/Toronto",
+      "close": [16, 0],
+      "yahoo": { "suffix": ".V", "codes": ["VAN", "CVE"] },
+      "alpha_vantage": { "suffix": ".TRV", "currency": "CAD" }
+    },
+    {
+      "mic": "XCNQ",
+      "name": "CSE",
+      "long_name": "Canadian Securities Exchange",
+      "currency": "CAD",
+      "timezone": "America/Toronto",
+      "close": [16, 0],
+      "yahoo": { "suffix": ".CN", "codes": ["CNQ"] },
+      "alpha_vantage": { "suffix": ".CNQ", "currency": "CAD" }
+    },
+    {
+      "mic": "XNEO",
+      "name": "NEO",
+      "long_name": "NEO Exchange",
+      "currency": "CAD",
+      "timezone": "America/Toronto",
+      "close": [16, 0],
+      "yahoo": { "suffix": ".NE", "codes": ["NEO"] }
+    },
+    {
+      "mic": "XMEX",
+      "name": "BMV",
+      "long_name": "Bolsa Mexicana de Valores",
+      "currency": "MXN",
+      "timezone": "America/Mexico_City",
+      "close": [15, 0],
+      "yahoo": { "suffix": ".MX", "codes": ["MEX"] },
+      "alpha_vantage": { "suffix": ".MEX", "currency": "MXN" }
+    },
+    {
+      "mic": "XLON",
+      "name": "LSE",
+      "long_name": "London Stock Exchange",
+      "currency": "GBp",
+      "timezone": "Europe/London",
+      "close": [16, 30],
+      "yahoo": { "suffix": ".L", "codes": ["LSE", "IOB"] },
+      "alpha_vantage": { "suffix": ".LON", "currency": "GBP" }
+    },
+    {
+      "mic": "XLON_IL",
+      "name": null,
+      "yahoo": { "suffix": ".IL", "currency": "GBp" }
+    },
+    {
+      "mic": "XDUB",
+      "name": "Euronext Dublin",
+      "long_name": "Euronext Dublin",
+      "currency": "EUR",
+      "timezone": "Europe/Dublin",
+      "close": [16, 30],
+      "yahoo": { "suffix": ".IR", "codes": ["ISE"] },
+      "alpha_vantage": { "suffix": ".DUB", "currency": "EUR" }
+    },
+    {
+      "mic": "XETR",
+      "name": "XETRA",
+      "long_name": "XETRA (Deutsche Börse)",
+      "currency": "EUR",
+      "timezone": "Europe/Berlin",
+      "close": [17, 30],
+      "yahoo": { "suffix": ".DE", "codes": ["GER", "XETRA"] },
+      "alpha_vantage": { "suffix": ".DEX", "currency": "EUR" }
+    },
+    {
+      "mic": "XFRA",
+      "name": "Frankfurt",
+      "long_name": "Frankfurt Stock Exchange",
+      "currency": "EUR",
+      "timezone": "Europe/Berlin",
+      "close": [17, 30],
+      "yahoo": { "suffix": ".F", "codes": ["FRA"] },
+      "alpha_vantage": { "suffix": ".FRK", "currency": "EUR" }
+    },
+    {
+      "mic": "XSTU",
+      "name": "Stuttgart",
+      "long_name": "Stuttgart Stock Exchange",
+      "currency": "EUR",
+      "timezone": "Europe/Berlin",
+      "close": [17, 30],
+      "yahoo": { "suffix": ".SG", "codes": ["STU"] },
+      "alpha_vantage": { "suffix": ".STU", "currency": "EUR" }
+    },
+    {
+      "mic": "XHAM",
+      "name": "Hamburg",
+      "long_name": "Hamburg Stock Exchange",
+      "currency": "EUR",
+      "timezone": "Europe/Berlin",
+      "close": [17, 30],
+      "yahoo": { "suffix": ".HM", "codes": ["HAM"] }
+    },
+    {
+      "mic": "XDUS",
+      "name": "Düsseldorf",
+      "long_name": "Düsseldorf Stock Exchange",
+      "currency": "EUR",
+      "timezone": "Europe/Berlin",
+      "close": [17, 30],
+      "yahoo": { "suffix": ".DU", "codes": ["DUS"] }
+    },
+    {
+      "mic": "XMUN",
+      "name": "Munich",
+      "long_name": "Munich Stock Exchange",
+      "currency": "EUR",
+      "timezone": "Europe/Berlin",
+      "close": [17, 30],
+      "yahoo": { "suffix": ".MU", "codes": ["MUN"] }
+    },
+    {
+      "mic": "XBER",
+      "name": "Berlin",
+      "long_name": "Berlin Stock Exchange",
+      "currency": "EUR",
+      "timezone": "Europe/Berlin",
+      "close": [17, 30],
+      "yahoo": { "suffix": ".BE", "codes": ["BER"] }
+    },
+    {
+      "mic": "XHAN",
+      "name": "Hanover",
+      "long_name": "Hanover Stock Exchange",
+      "currency": "EUR",
+      "timezone": "Europe/Berlin",
+      "close": [17, 30],
+      "yahoo": { "suffix": ".HA" }
+    },
+    {
+      "mic": "XPAR",
+      "name": "Euronext Paris",
+      "long_name": "Euronext Paris",
+      "currency": "EUR",
+      "timezone": "Europe/Paris",
+      "close": [17, 30],
+      "yahoo": { "suffix": ".PA", "codes": ["PAR", "ENX"] },
+      "alpha_vantage": { "suffix": ".PAR", "currency": "EUR" }
+    },
+    {
+      "mic": "XAMS",
+      "name": "Euronext Amsterdam",
+      "long_name": "Euronext Amsterdam",
+      "currency": "EUR",
+      "timezone": "Europe/Amsterdam",
+      "close": [17, 30],
+      "yahoo": { "suffix": ".AS", "codes": ["AMS"] },
+      "alpha_vantage": { "suffix": "", "currency": "EUR" }
+    },
+    {
+      "mic": "XBRU",
+      "name": "Euronext Brussels",
+      "long_name": "Euronext Brussels",
+      "currency": "EUR",
+      "timezone": "Europe/Brussels",
+      "close": [17, 30],
+      "yahoo": { "suffix": ".BR", "codes": ["BRU"] },
+      "alpha_vantage": { "suffix": ".BRU", "currency": "EUR" }
+    },
+    {
+      "mic": "XLIS",
+      "name": "Euronext Lisbon",
+      "long_name": "Euronext Lisbon",
+      "currency": "EUR",
+      "timezone": "Europe/Lisbon",
+      "close": [16, 30],
+      "yahoo": { "suffix": ".LS", "codes": ["LIS"] },
+      "alpha_vantage": { "suffix": ".LIS", "currency": "EUR" }
+    },
+    {
+      "mic": "XMIL",
+      "name": "Borsa Italiana",
+      "long_name": "Borsa Italiana (Milan)",
+      "currency": "EUR",
+      "timezone": "Europe/Rome",
+      "close": [17, 30],
+      "yahoo": { "suffix": ".MI", "codes": ["MIL"] },
+      "alpha_vantage": { "suffix": ".MIL", "currency": "EUR" }
+    },
+    {
+      "mic": "XMAD",
+      "name": "BME",
+      "long_name": "Bolsa de Madrid",
+      "currency": "EUR",
+      "timezone": "Europe/Madrid",
+      "close": [17, 30],
+      "yahoo": { "suffix": ".MC", "codes": ["MCE"] },
+      "alpha_vantage": { "suffix": ".MCE", "currency": "EUR" }
+    },
+    {
+      "mic": "XATH",
+      "name": "Athens",
+      "long_name": "Athens Stock Exchange",
+      "currency": "EUR",
+      "timezone": "Europe/Athens",
+      "close": [17, 20],
+      "yahoo": { "suffix": ".AT", "codes": ["ATH"] }
+    },
+    {
+      "mic": "XSTO",
+      "name": "Nasdaq Stockholm",
+      "long_name": "Nasdaq Stockholm",
+      "currency": "SEK",
+      "timezone": "Europe/Stockholm",
+      "close": [17, 30],
+      "yahoo": { "suffix": ".ST", "codes": ["STO"] },
+      "alpha_vantage": { "suffix": ".STO", "currency": "SEK" }
+    },
+    {
+      "mic": "XHEL",
+      "name": "Nasdaq Helsinki",
+      "long_name": "Nasdaq Helsinki",
+      "currency": "EUR",
+      "timezone": "Europe/Helsinki",
+      "close": [18, 30],
+      "yahoo": { "suffix": ".HE", "codes": ["HEL"] },
+      "alpha_vantage": { "suffix": ".HEL", "currency": "EUR" }
+    },
+    {
+      "mic": "XCSE",
+      "name": "Nasdaq Copenhagen",
+      "long_name": "Nasdaq Copenhagen",
+      "currency": "DKK",
+      "timezone": "Europe/Copenhagen",
+      "close": [17, 0],
+      "yahoo": { "suffix": ".CO", "codes": ["CPH"] },
+      "alpha_vantage": { "suffix": ".CPH", "currency": "DKK" }
+    },
+    {
+      "mic": "XOSL",
+      "name": "Oslo Børs",
+      "long_name": "Oslo Stock Exchange",
+      "currency": "NOK",
+      "timezone": "Europe/Oslo",
+      "close": [16, 20],
+      "yahoo": { "suffix": ".OL", "codes": ["OSL"] },
+      "alpha_vantage": { "suffix": ".OSL", "currency": "NOK" }
+    },
+    {
+      "mic": "XICE",
+      "name": "Nasdaq Iceland",
+      "long_name": "Nasdaq Iceland",
+      "currency": "ISK",
+      "timezone": "Atlantic/Reykjavik",
+      "close": [15, 30],
+      "yahoo": { "suffix": ".IC" }
+    },
+    {
+      "mic": "XSWX",
+      "name": "SIX",
+      "long_name": "SIX Swiss Exchange",
+      "currency": "CHF",
+      "timezone": "Europe/Zurich",
+      "close": [17, 30],
+      "yahoo": { "suffix": ".SW", "codes": ["EBS", "SWX"] },
+      "alpha_vantage": { "suffix": ".SWX", "currency": "CHF" }
+    },
+    {
+      "mic": "XWBO",
+      "name": "Vienna",
+      "long_name": "Vienna Stock Exchange",
+      "currency": "EUR",
+      "timezone": "Europe/Vienna",
+      "close": [17, 30],
+      "yahoo": { "suffix": ".VI", "codes": ["VIE"] },
+      "alpha_vantage": { "suffix": ".VIE", "currency": "EUR" }
+    },
+    {
+      "mic": "XWAR",
+      "name": "WSE",
+      "long_name": "Warsaw Stock Exchange",
+      "currency": "PLN",
+      "timezone": "Europe/Warsaw",
+      "close": [17, 0],
+      "yahoo": { "suffix": ".WA", "codes": ["WSE"] }
+    },
+    {
+      "mic": "XPRA",
+      "name": "Prague",
+      "long_name": "Prague Stock Exchange",
+      "currency": "CZK",
+      "timezone": "Europe/Prague",
+      "close": [16, 25],
+      "yahoo": { "suffix": ".PR", "codes": ["PRA"] }
+    },
+    {
+      "mic": "XBUD",
+      "name": "Budapest",
+      "long_name": "Budapest Stock Exchange",
+      "currency": "HUF",
+      "timezone": "Europe/Budapest",
+      "close": [17, 0],
+      "yahoo": { "suffix": ".BD", "codes": ["BUD"] }
+    },
+    {
+      "mic": "XIST",
+      "name": "Borsa Istanbul",
+      "long_name": "Borsa Istanbul",
+      "currency": "TRY",
+      "timezone": "Europe/Istanbul",
+      "close": [18, 0],
+      "yahoo": { "suffix": ".IS", "codes": ["IST"] }
+    },
+    {
+      "mic": "XSHG",
+      "name": "Shanghai",
+      "long_name": "Shanghai Stock Exchange",
+      "currency": "CNY",
+      "timezone": "Asia/Shanghai",
+      "close": [15, 0],
+      "yahoo": { "suffix": ".SS", "codes": ["SHH"] },
+      "alpha_vantage": { "suffix": ".SHH", "currency": "CNY" }
+    },
+    {
+      "mic": "XSHE",
+      "name": "Shenzhen",
+      "long_name": "Shenzhen Stock Exchange",
+      "currency": "CNY",
+      "timezone": "Asia/Shanghai",
+      "close": [15, 0],
+      "yahoo": { "suffix": ".SZ", "codes": ["SHZ"] },
+      "alpha_vantage": { "suffix": ".SHZ", "currency": "CNY" }
+    },
+    {
+      "mic": "XHKG",
+      "name": "HKEX",
+      "long_name": "Hong Kong Stock Exchange",
+      "currency": "HKD",
+      "timezone": "Asia/Hong_Kong",
+      "close": [16, 0],
+      "yahoo": { "suffix": ".HK", "codes": ["HKG"] },
+      "alpha_vantage": { "suffix": ".HKG", "currency": "HKD" }
+    },
+    {
+      "mic": "XTKS",
+      "name": "TSE",
+      "long_name": "Tokyo Stock Exchange",
+      "currency": "JPY",
+      "timezone": "Asia/Tokyo",
+      "close": [15, 0],
+      "yahoo": { "suffix": ".T", "codes": ["TYO", "JPX"] },
+      "alpha_vantage": { "suffix": ".TYO", "currency": "JPY" }
+    },
+    {
+      "mic": "XKRX",
+      "name": "KRX",
+      "long_name": "Korea Exchange",
+      "currency": "KRW",
+      "timezone": "Asia/Seoul",
+      "close": [15, 30],
+      "yahoo": { "suffix": ".KS", "codes": ["KSC", "KRX"] }
+    },
+    {
+      "mic": "XKOS",
+      "name": "KOSDAQ",
+      "long_name": "KOSDAQ",
+      "currency": "KRW",
+      "timezone": "Asia/Seoul",
+      "close": [15, 30],
+      "yahoo": { "suffix": ".KQ", "codes": ["KOE", "KOSDAQ"] }
+    },
+    {
+      "mic": "XSES",
+      "name": "SGX",
+      "long_name": "Singapore Exchange",
+      "currency": "SGD",
+      "timezone": "Asia/Singapore",
+      "close": [17, 0],
+      "yahoo": { "suffix": ".SI", "codes": ["SES", "SGX"] }
+    },
+    {
+      "mic": "XBKK",
+      "name": "SET",
+      "long_name": "Stock Exchange of Thailand",
+      "currency": "THB",
+      "timezone": "Asia/Bangkok",
+      "close": [16, 30],
+      "yahoo": { "suffix": ".BK", "codes": ["BKK", "SET"] }
+    },
+    {
+      "mic": "XIDX",
+      "name": "IDX",
+      "long_name": "Indonesia Stock Exchange",
+      "currency": "IDR",
+      "timezone": "Asia/Jakarta",
+      "close": [16, 0],
+      "yahoo": { "suffix": ".JK", "codes": ["JKT", "IDX"] }
+    },
+    {
+      "mic": "XKLS",
+      "name": "Bursa Malaysia",
+      "long_name": "Bursa Malaysia",
+      "currency": "MYR",
+      "timezone": "Asia/Kuala_Lumpur",
+      "close": [17, 0],
+      "yahoo": { "suffix": ".KL", "codes": ["KLS", "KLSE"] }
+    },
+    {
+      "mic": "XBOM",
+      "name": "BSE",
+      "long_name": "Bombay Stock Exchange",
+      "currency": "INR",
+      "timezone": "Asia/Kolkata",
+      "close": [15, 30],
+      "yahoo": { "suffix": ".BO", "codes": ["BSE", "BOM"] },
+      "alpha_vantage": { "suffix": ".BSE", "currency": "INR" }
+    },
+    {
+      "mic": "XNSE",
+      "name": "NSE",
+      "long_name": "National Stock Exchange of India",
+      "currency": "INR",
+      "timezone": "Asia/Kolkata",
+      "close": [15, 30],
+      "yahoo": { "suffix": ".NS", "codes": ["NSI", "NSE"] },
+      "alpha_vantage": { "suffix": ".NSE", "currency": "INR" }
+    },
+    {
+      "mic": "XTAI",
+      "name": "TWSE",
+      "long_name": "Taiwan Stock Exchange",
+      "currency": "TWD",
+      "timezone": "Asia/Taipei",
+      "close": [13, 30],
+      "yahoo": { "suffix": ".TW", "codes": ["TAI", "TPE"] }
+    },
+    {
+      "mic": "XTAI_OTC",
+      "name": null,
+      "yahoo": { "suffix": ".TWO", "codes": ["TWO"] }
+    },
+    {
+      "mic": "XASX",
+      "name": "ASX",
+      "long_name": "Australian Securities Exchange",
+      "currency": "AUD",
+      "timezone": "Australia/Sydney",
+      "close": [16, 0],
+      "yahoo": { "suffix": ".AX", "codes": ["ASX", "AX"] },
+      "alpha_vantage": { "suffix": ".AX", "currency": "AUD" }
+    },
+    {
+      "mic": "XNZE",
+      "name": "NZX",
+      "long_name": "New Zealand Exchange",
+      "currency": "NZD",
+      "timezone": "Pacific/Auckland",
+      "close": [16, 45],
+      "yahoo": { "suffix": ".NZ", "codes": ["NZE"] }
+    },
+    {
+      "mic": "BVMF",
+      "name": "B3",
+      "long_name": "B3 (Brasil Bolsa Balcão)",
+      "currency": "BRL",
+      "timezone": "America/Sao_Paulo",
+      "close": [17, 0],
+      "yahoo": { "suffix": ".SA", "codes": ["SAO", "BVMF"] }
+    },
+    {
+      "mic": "XBUE",
+      "name": "BCBA",
+      "long_name": "Buenos Aires Stock Exchange",
+      "currency": "ARS",
+      "timezone": "America/Argentina/Buenos_Aires",
+      "close": [17, 0],
+      "yahoo": { "suffix": ".BA", "codes": ["BUE"] }
+    },
+    {
+      "mic": "XSGO",
+      "name": "Santiago",
+      "long_name": "Santiago Stock Exchange",
+      "currency": "CLP",
+      "timezone": "America/Santiago",
+      "close": [16, 0],
+      "yahoo": { "suffix": ".SN", "codes": ["SGO"] }
+    },
+    {
+      "mic": "XTAE",
+      "name": "TASE",
+      "long_name": "Tel Aviv Stock Exchange",
+      "currency": "ILS",
+      "timezone": "Asia/Jerusalem",
+      "close": [17, 25],
+      "yahoo": { "suffix": ".TA", "codes": ["TLV"] }
+    },
+    {
+      "mic": "XSAU",
+      "name": "Tadawul",
+      "long_name": "Saudi Stock Exchange (Tadawul)",
+      "currency": "SAR",
+      "timezone": "Asia/Riyadh",
+      "close": [15, 0],
+      "yahoo": { "suffix": ".SAU", "codes": ["SAU"] }
+    },
+    {
+      "mic": "XDFM",
+      "name": "DFM",
+      "long_name": "Dubai Financial Market",
+      "currency": "AED",
+      "timezone": "Asia/Dubai",
+      "close": [14, 0],
+      "yahoo": { "suffix": ".AE", "codes": ["DFM"] }
+    },
+    {
+      "mic": "XADS",
+      "name": "ADX",
+      "long_name": "Abu Dhabi Securities Exchange",
+      "currency": "AED",
+      "timezone": "Asia/Dubai",
+      "close": [14, 0],
+      "yahoo": { "suffix": ".AE", "codes": ["ADX"] }
+    },
+    {
+      "mic": "DSMD",
+      "name": "QSE",
+      "long_name": "Qatar Stock Exchange",
+      "currency": "QAR",
+      "timezone": "Asia/Qatar",
+      "close": [13, 0],
+      "yahoo": { "suffix": ".QA", "codes": ["DOH"] }
+    },
+    {
+      "mic": "XJSE",
+      "name": "JSE",
+      "long_name": "Johannesburg Stock Exchange",
+      "currency": "ZAR",
+      "timezone": "Africa/Johannesburg",
+      "close": [17, 0],
+      "yahoo": { "suffix": ".JO", "codes": ["JNB", "JSE"] }
+    },
+    {
+      "mic": "XCAI",
+      "name": "EGX",
+      "long_name": "Egyptian Exchange",
+      "currency": "EGP",
+      "timezone": "Africa/Cairo",
+      "close": [14, 30],
+      "yahoo": { "suffix": ".CA", "codes": ["CAI"] }
+    }
+  ],
+  "currency_priority": {
+    "USD": ["XNYS", "XNAS", "ARCX", "BATS", "XASE", "OTCM"],
+    "CAD": ["XTSE", "XTSX", "XCNQ", "XNEO"],
+    "GBP": ["XLON"],
+    "EUR": ["XETR", "XPAR", "XAMS", "XMIL", "XMAD"],
+    "CHF": ["XSWX"],
+    "HKD": ["XHKG"],
+    "JPY": ["XTKS"],
+    "AUD": ["XASX"],
+    "NZD": ["XNZE"],
+    "SGD": ["XSES"],
+    "CNY": ["XSHG", "XSHE"],
+    "KRW": ["XKRX", "XKOS"],
+    "INR": ["XNSE", "XBOM"],
+    "BRL": ["BVMF"],
+    "MXN": ["XMEX"],
+    "SEK": ["XSTO"],
+    "DKK": ["XCSE"],
+    "NOK": ["XOSL"],
+    "PLN": ["XWAR"],
+    "ILS": ["XTAE"],
+    "ZAR": ["XJSE"],
+    "TWD": ["XTAI"]
+  }
+}

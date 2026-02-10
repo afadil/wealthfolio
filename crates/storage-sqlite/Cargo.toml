@@ -1,0 +1,37 @@
+[package]
+name = "wealthfolio-storage-sqlite"
+version.workspace = true
+edition.workspace = true
+description = "SQLite storage implementation for Wealthfolio"
+authors = ["Aziz Fadil"]
+license = "AGPL-3.0"
+
+[features]
+default = []
+
+[dependencies]
+# Internal crates
+wealthfolio-core = { workspace = true }
+wealthfolio-ai = { workspace = true }
+
+# Workspace dependencies
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+uuid = { workspace = true }
+rust_decimal = { workspace = true }
+async-trait = { workspace = true }
+log = { workspace = true }
+num-traits = { workspace = true }
+
+# Database (SQLite/Diesel specific)
+diesel = { workspace = true }
+diesel_migrations = { workspace = true }
+rusqlite = { workspace = true }
+r2d2 = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

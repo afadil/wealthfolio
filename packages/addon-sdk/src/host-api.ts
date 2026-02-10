@@ -21,7 +21,7 @@ import type {
   DepositsCalculation,
   Goal,
   GoalAllocation,
-  QuoteSummary,
+  SymbolSearchResult,
   Asset,
   Quote,
   UpdateAssetProfile,
@@ -209,7 +209,7 @@ export interface MarketDataAPI {
    * @param query Search query
    * @returns Promise resolving to array of quote summaries
    */
-  searchTicker(query: string): Promise<QuoteSummary[]>;
+  searchTicker(query: string): Promise<SymbolSearchResult[]>;
 
   /**
    * Synchronize historical quotes

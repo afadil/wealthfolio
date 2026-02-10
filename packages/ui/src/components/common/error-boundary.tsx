@@ -1,4 +1,4 @@
-import { Component, ErrorInfo, ReactNode } from "react";
+import { Component, ErrorInfo, ReactNode, useState } from "react";
 import { Button } from "../ui/button";
 import { Icons } from "../ui/icons";
 import { ApplicationShell } from "../ui/shell";
@@ -10,6 +10,67 @@ interface Props {
 interface State {
   hasError: boolean;
   error?: Error;
+}
+
+function ErrorFallback({ error }: { error?: Error }) {
+  const [showDetails, setShowDetails] = useState(false);
+
+  return (
+    <ApplicationShell className="flex h-screen w-full items-center justify-center p-6">
+      <div className="flex w-full max-w-md flex-col items-center">
+        {/* Icon with subtle background */}
+        <div className="bg-destructive/10 mb-6 flex h-20 w-20 items-center justify-center rounded-full">
+          <Icons.AlertTriangle className="text-destructive h-10 w-10" strokeWidth={1.5} />
+        </div>
+
+        {/* Content */}
+        <div className="mb-8 space-y-2 text-center">
+          <h1 className="text-foreground text-xl font-semibold tracking-tight">Something went wrong</h1>
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            We hit an unexpected error. Your data is safe — try refreshing to get back on track.
+          </p>
+        </div>
+
+        {/* Actions */}
+        <div className="flex w-full flex-col gap-3">
+          <Button onClick={() => window.location.reload()} className="w-full">
+            <Icons.RefreshCw className="mr-2 h-4 w-4" />
+            Refresh page
+          </Button>
+
+          {error && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowDetails(!showDetails)}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <Icons.ChevronDown className={`mr-1.5 h-4 w-4 transition-transform ${showDetails ? "rotate-180" : ""}`} />
+              {showDetails ? "Hide" : "Show"} error details
+            </Button>
+          )}
+        </div>
+
+        {/* Error details */}
+        {showDetails && error && (
+          <div className="bg-muted/50 mt-4 w-full overflow-hidden rounded-lg border">
+            <div className="border-b px-3 py-2">
+              <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Error details</span>
+            </div>
+            <pre className="text-foreground/80 max-h-40 overflow-auto p-3 font-mono text-xs leading-relaxed">
+              {error.message}
+              {import.meta.env?.DEV && error.stack && (
+                <>
+                  {"\n\n"}
+                  {error.stack}
+                </>
+              )}
+            </pre>
+          </div>
+        )}
+      </div>
+    </ApplicationShell>
+  );
 }
 
 class ErrorBoundary extends Component<Props, State> {
@@ -32,18 +93,7 @@ class ErrorBoundary extends Component<Props, State> {
 
   public render() {
     if (this.state.hasError) {
-      return (
-        <ApplicationShell className="flex h-screen w-full flex-col items-center justify-center p-4">
-          <div className="flex flex-col items-center space-y-4 text-center">
-            <Icons.XCircle className="text-destructive h-16 w-16" />
-            <h2 className="text-foreground text-2xl font-semibold">Something went wrong</h2>
-            <p className="text-muted-foreground">An unexpected error occurred. Please try refreshing the page.</p>
-            <Button variant="default" onClick={() => window.location.reload()} className="mt-4">
-              Refresh Page
-            </Button>
-          </div>
-        </ApplicationShell>
-      );
+      return <ErrorFallback error={this.state.error} />;
     }
 
     return this.props.children;

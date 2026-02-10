@@ -1,9 +1,9 @@
 import { Command as CommandPrimitive } from "cmdk";
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from "react";
-import { CommandGroup, CommandItem, CommandList, CommandInput } from "@/components/ui/command";
-import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
-import { Icons } from "@/components/ui/icons";
+import { CommandGroup, CommandItem, CommandList, CommandInput } from "./command";
+import { Skeleton } from "./skeleton";
+import { cn } from "../../lib/utils";
+import { Icons } from "./icons";
 
 export type Option = Record<"value" | "label", string> & Record<string, string>;
 
@@ -107,7 +107,7 @@ export const AutoComplete = ({
 
   return (
     <CommandPrimitive onKeyDown={handleKeyDown}>
-      <div className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 w-full rounded-md border py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50">
+      <div className="border-input bg-input-bg dark:bg-input/30 ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring h-input-height flex w-full rounded-md border py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
         <CommandInput
           ref={inputRef}
           value={inputValue}
@@ -116,7 +116,7 @@ export const AutoComplete = ({
           //onFocus={() => setOpen(true)}
           placeholder={placeholder}
           disabled={disabled}
-          className="w-full border-0 border-transparent bg-transparent focus:ring-0 focus:ring-transparent focus:outline-none"
+          className="w-full border-0 border-transparent bg-transparent focus:outline-none focus:ring-0 focus:ring-transparent"
         />
       </div>
       <div className="relative mt-1">
@@ -153,7 +153,7 @@ export const AutoComplete = ({
                 </CommandGroup>
               ) : null}
               {!isLoading ? (
-                <CommandPrimitive.Empty className="rounded-sm px-2 py-3 text-center text-sm select-none">
+                <CommandPrimitive.Empty className="select-none rounded-sm px-2 py-3 text-center text-sm">
                   {emptyMessage}
                 </CommandPrimitive.Empty>
               ) : null}

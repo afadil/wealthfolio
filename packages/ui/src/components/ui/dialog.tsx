@@ -1,10 +1,10 @@
 "use client";
 
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
 import * as React from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
+import { Icons } from "./icons";
 import { Sheet, SheetContent } from "./sheet";
 
 // ============================================================================
@@ -135,7 +135,11 @@ const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.C
 
     if (isMobile) {
       return (
-        <SheetContent side={side} className={cn(mobileClassName, "mx-1 !rounded-t-4xl")}>
+        <SheetContent
+          side={side}
+          showCloseButton={showCloseButton}
+          className={cn(mobileClassName, "!rounded-t-4xl mx-1")}
+        >
           {children}
         </SheetContent>
       );
@@ -148,7 +152,7 @@ const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.C
           ref={ref}
           data-slot="dialog-content"
           className={cn(
-            "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200",
+            "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200",
             className,
           )}
           {...props}
@@ -157,9 +161,9 @@ const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.C
           {showCloseButton && (
             <DialogPrimitive.Close
               data-slot="dialog-close"
-              className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+              className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground rounded-xs focus:outline-hidden absolute right-4 top-4 opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 disabled:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0"
             >
-              <X />
+              <Icons.X />
               <span className="sr-only">Close</span>
             </DialogPrimitive.Close>
           )}
@@ -198,7 +202,7 @@ function DialogTitle({ className, ...props }: React.ComponentProps<typeof Dialog
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("text-lg leading-none font-semibold", className)}
+      className={cn("text-lg font-semibold leading-none", className)}
       {...props}
     />
   );

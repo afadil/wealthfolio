@@ -74,7 +74,7 @@ export function FeeHistoryChart({
         <CardTitle className="text-xl">Fee History</CardTitle>
         <CardDescription>{periodDescription}</CardDescription>
       </CardHeader>
-      <CardContent className="flex h-full flex-col px-4 pt-0 pb-6 sm:px-6">
+      <CardContent className="flex h-full flex-col px-4 pb-6 pt-0 sm:px-6">
         {chartData.length === 0 ? (
           <EmptyPlaceholder
             className="mx-auto flex h-[300px] max-w-[420px] items-center justify-center"
@@ -127,7 +127,7 @@ export function FeeHistoryChart({
                       return (
                         <>
                           <div
-                            className="border-border h-2.5 w-2.5 shrink-0 rounded-[2px] bg-(--color-bg)"
+                            className="border-border bg-(--color-bg) h-2.5 w-2.5 shrink-0 rounded-[2px]"
                             style={
                               {
                                 "--color-bg": entry.color,

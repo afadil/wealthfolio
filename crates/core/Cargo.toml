@@ -1,0 +1,52 @@
+[package]
+name = "wealthfolio-core"
+version.workspace = true
+edition.workspace = true
+description = "An Open Source Desktop Portfolio tracker"
+authors = ["Aziz Fadil"]
+license = "AGPL-3.0"
+repository = "https://github.com/afadil/wealthfolio"
+
+[features]
+default = []
+
+[dependencies]
+# Workspace dependencies
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+diesel = { workspace = true }
+diesel_migrations = { workspace = true }
+rusqlite = { workspace = true }
+r2d2 = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+uuid = { workspace = true }
+rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }
+num-traits = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+log = { workspace = true }
+reqwest = { workspace = true, features = ["cookies"] }
+
+# Sibling crates
+wealthfolio-market-data = { path = "../market-data" }
+
+# Additional dependencies not in workspace
+yahoo_finance_api = "4.1"
+regex = "1.10"
+rand = { workspace = true }
+dashmap = "6.1"
+serde_with = "3"
+urlencoding = "2"
+csv = "1.4.0"
+zip = "2.2.0"
+sha2 = "0.10"
+hex = "0.4"
+chrono-tz = "0.10"
+
+[dev-dependencies]
+tempfile = "3"
+proptest = "1.4"

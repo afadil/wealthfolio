@@ -1,6 +1,6 @@
 {
   "name": "goal-progress-tracker-addon",
-  "version": "1.2.0",
+  "version": "3.0.0-beta.1",
   "description": "An addon for tracking investment progress towards target amounts with progress visualization",
   "type": "module",
   "main": "dist/addon.js",
@@ -27,18 +27,23 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@wealthfolio/addon-sdk": "workspace:*",
-    "@wealthfolio/ui": "workspace:*",
     "@tanstack/react-query": "^5.90.5",
-    "react": "^19.1.1"
+    "@wealthfolio/addon-sdk": "workspace:*",
+    "@wealthfolio/ui": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.13",
-    "@wealthfolio/addon-dev-tools": "workspace:*",
     "@types/node": "^20.0.0",
-    "@types/react": "^19.1.1",
-    "@types/react-dom": "^19.1.1",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "@wealthfolio/addon-dev-tools": "workspace:*",
+    "clsx": "^2.1.1",
     "rollup-plugin-external-globals": "^0.13.0",
+    "tailwind-merge": "^3.4.0",
     "tailwindcss": "^4.1.13",
     "typescript": "^5.9.2",
     "vite": "^7.1.5"

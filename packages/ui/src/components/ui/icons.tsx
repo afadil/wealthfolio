@@ -1,68 +1,92 @@
+// Lucide icons - centralized imports for the application
+// Using barrel import with optimizeDeps.include in vite.config.ts for dev performance
 import {
   Activity,
   AlertCircle,
   AlertTriangle,
-  AlignLeft,
   ArrowDown,
+  ArrowDownLeft,
   ArrowLeft,
   ArrowLeftRight,
   ArrowRight,
   ArrowRightLeft,
   ArrowUp,
+  ArrowUpRight,
   BadgeDollarSign,
   BarChart,
+  Baseline,
   Bitcoin,
   Blocks,
+  Brain,
   Briefcase,
+  Building2,
+  Calendar,
   CalendarDays,
-  Camera,
+  Car,
+  CaseSensitive,
   Check,
   CheckCircle2,
+  CheckSquare,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
   ChevronsLeft,
   ChevronsRight,
   ChevronsUpDown,
+  ChevronUp,
   Circle,
   CircleGauge,
   Clock,
+  Cloud,
+  CloudCog,
+  Coins,
   Copy,
   CreditCard,
+  DatabaseBackup,
+  DatabaseZap,
   DollarSign,
+  Dot,
   Download,
+  Ellipsis,
   Eraser,
   ExternalLink,
-  Eye,
-  EyeOff,
+  File,
+  FileArchive,
+  FileAudio,
+  FileImage,
+  FileSpreadsheet,
   FileText,
-  FileUp,
+  FileVideo,
   FileX,
+  Folder,
+  FolderOpen,
   Fullscreen,
-  GaugeCircle,
-  Globe2,
+  Gem,
+  Globe,
   Goal,
   Grid3x3,
   Group,
   HandCoins,
   Hash,
   HelpCircle,
+  History,
   Home,
   Info,
   LayoutDashboard,
   Link,
+  List,
   ListChecks,
   ListCollapse,
   ListFilter,
   Loader,
   Loader2,
-  LucideProps,
-  Menu,
+  Mail,
+  Minus,
   MinusCircle,
   Monitor,
   Moon,
   MoreVertical,
+  OctagonX,
   Package,
   Palette,
   PanelLeft,
@@ -71,47 +95,87 @@ import {
   Pencil,
   Percent,
   PieChart,
+  Pin,
+  PinOff,
   Plus,
   PlusCircle,
+  Presentation,
   QrCode,
   Receipt,
   ReceiptText,
   RectangleEllipsis,
   RefreshCcw,
+  RefreshCw,
   Rows3,
   Save,
-  ScrollText,
+  Scissors,
   Search,
+  Settings2,
   Shield,
+  ShieldAlert,
+  ShieldCheck,
   Smartphone,
   Sparkles,
   Split,
+  Square,
   Star,
   Store,
-  StretchHorizontal,
   Sun,
-  Tag,
+  Target,
   Trash,
+  Trash2,
   TrendingDown,
   TrendingUp,
   Type,
+  Wand2,
   Undo2,
-  Ungroup,
   Upload,
+  User,
   Users,
   Wallet,
-  WalletCards,
-  Wifi,
   X,
   XCircle,
-  type LucideIcon,
 } from "lucide-react";
+import type { ComponentType, CSSProperties } from "react";
 
-export type Icon = LucideIcon;
+// Phosphor icons - deep imports for optimal tree shaking with Vite
+import { GarageIcon } from "@phosphor-icons/react/dist/csr/Garage";
+import { CarProfileIcon } from "@phosphor-icons/react/dist/csr/CarProfile";
+import { ClockCounterClockwiseIcon } from "@phosphor-icons/react/dist/csr/ClockCounterClockwise";
+import { CoinsIcon } from "@phosphor-icons/react/dist/csr/Coins";
+import { CreditCardIcon } from "@phosphor-icons/react/dist/csr/CreditCard";
+import { CubeIcon } from "@phosphor-icons/react/dist/csr/Cube";
+import { DevicesIcon } from "@phosphor-icons/react/dist/csr/Devices";
+import { SketchLogoIcon } from "@phosphor-icons/react/dist/csr/SketchLogo";
+import { DotsThreeOutlineIcon } from "@phosphor-icons/react/dist/csr/DotsThreeOutline";
+import { DotsThreeOutlineVerticalIcon } from "@phosphor-icons/react/dist/csr/DotsThreeOutlineVertical";
+import { EyeIcon } from "@phosphor-icons/react/dist/csr/Eye";
+import { EyeSlashIcon } from "@phosphor-icons/react/dist/csr/EyeSlash";
+import { HouseIcon } from "@phosphor-icons/react/dist/csr/House";
+import { SparkleIcon } from "@phosphor-icons/react/dist/csr/Sparkle";
+import { TagIcon } from "@phosphor-icons/react/dist/csr/Tag";
+import { UploadSimpleIcon } from "@phosphor-icons/react/dist/csr/UploadSimple";
+import { UserSwitchIcon } from "@phosphor-icons/react/dist/csr/UserSwitch";
 
-export const Icons = {
+// Unified icon props that work with both Lucide and Phosphor
+export interface IconProps {
+  size?: number | string;
+  color?: string;
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number | string;
+  className?: string;
+  style?: CSSProperties;
+  weight?: "thin" | "light" | "regular" | "bold" | "fill" | "duotone";
+}
+
+export type Icon = ComponentType<IconProps>;
+
+const IconsInternal = {
   AlertCircle: AlertCircle,
   AlertTriangle: AlertTriangle,
+  DatabaseBackup: DatabaseBackup,
+  DatabaseZap: DatabaseZap,
   Blocks: Blocks,
   BadgeDollarSign: BadgeDollarSign,
   Grid3x3: Grid3x3,
@@ -120,35 +184,47 @@ export const Icons = {
   Check: Check,
   CheckCircle: CheckCircle2,
   Clock: Clock,
+  Cloud: Cloud,
+  CloudSync: CloudCog,
   ListChecks: ListChecks,
   LayoutDashboard: LayoutDashboard,
   HandCoins: HandCoins,
   Home: Home,
   Copy: Copy,
   HelpCircle: HelpCircle,
+  History: History,
   ArrowRight: ArrowRight,
   ArrowLeft: ArrowLeft,
   ArrowDown: ArrowDown,
+  ArrowDownLeft: ArrowDownLeft,
   ArrowUp: ArrowUp,
-  Billing: CreditCard,
+  ArrowUpRight: ArrowUpRight,
   CreditCard: CreditCard,
   Bitcoin: Bitcoin,
+  Brain: Brain,
   Briefcase: Briefcase,
   Search: Search,
   Save: Save,
   Group: Group,
-  Ungroup: Ungroup,
-  Globe: Globe2,
+  Globe: Globe,
   Close: X,
-  Eye: Eye,
+  Eye: ({ size, className, style, color }: IconProps) => (
+    <EyeIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
   Info: Info,
-  EyeOff: EyeOff,
+  EyeOff: ({ size, className, style, color }: IconProps) => (
+    <EyeSlashIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
   Refresh: RefreshCcw,
+  RefreshCw: RefreshCw,
   PanelLeftOpen: PanelLeftOpen,
   Download: Download,
+  Ellipsis: Ellipsis,
+  Dot: Dot,
   Activity2: Activity,
   DollarSign: DollarSign,
   Users: Users,
+  User: User,
   ChevronUp: ChevronUp,
   ChevronDown: ChevronDown,
   ChevronsUpDown: ChevronsUpDown,
@@ -161,12 +237,11 @@ export const Icons = {
   Pencil: Pencil,
   PlusCircle: PlusCircle,
   PanelLeft: PanelLeft,
+  Minus: Minus,
   MinusCircle: MinusCircle,
   PauseCircle: PauseCircle,
   Monitor: Monitor,
   QrCode: QrCode,
-  Camera: Camera,
-  Wifi: Wifi,
   Smartphone: Smartphone,
   PieChart: PieChart,
   BarChart: BarChart,
@@ -175,39 +250,36 @@ export const Icons = {
   MoreVertical: MoreVertical,
   Goal: Goal,
   Trash: Trash,
-  Tag: Tag,
+  Trash2: Trash2,
   Hash: Hash,
   Type: Type,
-  AlignLeft: AlignLeft,
   Wallet: Wallet,
-  WalletCards: WalletCards,
-  StretchHorizontal: StretchHorizontal,
-  Menu: Menu,
   Import: Upload,
   FileText: FileText,
   FileX: FileX,
   XCircle: XCircle,
-  ScrollText: ScrollText,
-  GaugeCircle,
   ListCollapse: ListCollapse,
-  CircleGauge: CircleGauge,
   ArrowRightLeft: ArrowRightLeft,
   ArrowLeftRight: ArrowLeftRight,
   Receipt: Receipt,
   ReceiptText: ReceiptText,
   Percent: Percent,
-  Split: Split,
-  FileUp: FileUp,
   Store: Store,
   Package: Package,
   Star: Star,
   Shield: Shield,
+  ShieldAlert: ShieldAlert,
+  ShieldCheck: ShieldCheck,
   ExternalLink: ExternalLink,
   TrendingUp: TrendingUp,
   TrendingDown: TrendingDown,
+  Wand2: Wand2,
   Link: Link,
+  Building: Building2,
+  Car: Car,
+  Gem: Gem,
+  Coins: Coins,
   Eraser: Eraser,
-  Sparkles: Sparkles,
   Palette: Palette,
   Moon: Moon,
   Sun: Sun,
@@ -215,8 +287,35 @@ export const Icons = {
   Undo: Undo2,
   Fullscreen: Fullscreen,
   RectangleEllipsis: RectangleEllipsis,
-
-  Dashboard: ({ size, ...props }: LucideProps) => (
+  Mail: Mail,
+  OctagonX: OctagonX,
+  Settings2: Settings2,
+  // Additional icons for UI components
+  Baseline: Baseline,
+  CalendarIcon: Calendar,
+  CaseSensitive: CaseSensitive,
+  CheckSquare: CheckSquare,
+  File: File,
+  FileArchive: FileArchive,
+  FileAudio: FileAudio,
+  FileImage: FileImage,
+  FileSpreadsheet: FileSpreadsheet,
+  FileVideo: FileVideo,
+  Folder: Folder,
+  FolderOpen: FolderOpen,
+  List: List,
+  Pin: Pin,
+  PinOff: PinOff,
+  Presentation: Presentation,
+  Scissors: Scissors,
+  Split: Split,
+  Square: Square,
+  Target: Target,
+  SparklesOutline: Sparkles,
+  CircleGauge: CircleGauge,
+  X: X,
+  Upload: Upload,
+  Dashboard: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -233,21 +332,7 @@ export const Icons = {
     </svg>
   ),
 
-  Performance: ({ size, ...props }: LucideProps) => (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width={size ?? 32}
-      height={size ?? 32}
-      fill="currentColor"
-      viewBox="0 0 256 256"
-      {...props}
-    >
-      <path d="M224,56V208H32V48H216A8,8,0,0,1,224,56Z" opacity="0.2"></path>
-      <path d="M232,208a8,8,0,0,1-8,8H32a8,8,0,0,1-8-8V48a8,8,0,0,1,16,0V156.69l50.34-50.35a8,8,0,0,1,11.32,0L128,132.69,180.69,80H160a8,8,0,0,1,0-16h40a8,8,0,0,1,8,8v40a8,8,0,0,1-16,0V91.31l-58.34,58.35a8,8,0,0,1-11.32,0L96,123.31l-56,56V200H224A8,8,0,0,1,232,208Z"></path>
-    </svg>
-  ),
-
-  Goals: ({ size, ...props }: LucideProps) => (
+  Goals: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -261,7 +346,7 @@ export const Icons = {
     </svg>
   ),
 
-  Database: ({ size, ...props }: LucideProps) => (
+  Database: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -275,7 +360,7 @@ export const Icons = {
     </svg>
   ),
 
-  FileCsv: ({ size, ...props }: LucideProps) => (
+  FileCsv: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 24}
@@ -298,7 +383,7 @@ export const Icons = {
     </svg>
   ),
 
-  FileJson: ({ size, ...props }: LucideProps) => (
+  FileJson: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 24}
@@ -319,7 +404,7 @@ export const Icons = {
     </svg>
   ),
 
-  Files: ({ size, ...props }: LucideProps) => (
+  Files: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -333,7 +418,7 @@ export const Icons = {
     </svg>
   ),
 
-  Holdings: ({ size, ...props }: LucideProps) => (
+  Holdings: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -350,7 +435,7 @@ export const Icons = {
     </svg>
   ),
 
-  Activity: ({ size, ...props }: LucideProps) => (
+  Activity: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -364,7 +449,7 @@ export const Icons = {
     </svg>
   ),
 
-  Settings: ({ size, ...props }: LucideProps) => (
+  Settings: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -381,7 +466,7 @@ export const Icons = {
     </svg>
   ),
 
-  Invoice: ({ size, ...props }: LucideProps) => (
+  Invoice: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -395,7 +480,7 @@ export const Icons = {
     </svg>
   ),
 
-  Income: ({ size, ...props }: LucideProps) => (
+  Income: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -412,31 +497,7 @@ export const Icons = {
     </svg>
   ),
 
-  Logo: ({ size, ...props }: LucideProps) => (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width={size ?? 65}
-      height={size ?? 65}
-      fill="none"
-      viewBox="0 0 65 65"
-      {...props}
-    >
-      <path
-        fill="orange"
-        d="M37 5c0 2.21-2.015 4-4.5 4S28 7.21 28 5s2.015-4 4.5-4S37 2.79 37 5zM56 13c0 2.21-2.015 4-4.5 4S47 15.21 47 13s2.015-4 4.5-4 4.5 1.79 4.5 4zM64 32.5a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM56 51.5a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM37 59.5a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18 52a5 5 0 11-10 0 5 5 0 0110 0zM10 32.5a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM17 13a4 4 0 11-8 0 4 4 0 018 0z"
-      ></path>
-      <path
-        fill="#FECC81"
-        d="M48 32.5C48 41.06 41.06 48 32.5 48 23.94 48 17 41.06 17 32.5 17 23.94 23.94 17 32.5 17 41.06 17 48 23.94 48 32.5z"
-      ></path>
-      <path
-        fill="#111"
-        d="M37.566 5.134C37.566 2.303 35.252 0 32.407 0c-2.844 0-5.158 2.303-5.158 5.134 0 2.83 2.314 5.134 5.158 5.134 2.845 0 5.159-2.303 5.159-5.134zm-8.696 0c0-1.938 1.587-3.514 3.537-3.514 1.951 0 3.538 1.576 3.538 3.514 0 1.937-1.587 3.513-3.538 3.513-1.95 0-3.537-1.576-3.537-3.513zM13.147 7.976h-.015a5.138 5.138 0 00-3.64 1.516 5.138 5.138 0 00-1.516 3.64 5.087 5.087 0 001.499 3.637 5.086 5.086 0 003.623 1.499h.014a5.134 5.134 0 003.64-1.516 5.134 5.134 0 001.516-3.64 5.086 5.086 0 00-1.499-3.637 5.086 5.086 0 00-3.622-1.499zm2.46 7.63a3.525 3.525 0 01-2.5 1.042 3.448 3.448 0 01-2.486-1.024 3.479 3.479 0 01-1.025-2.487 3.529 3.529 0 011.042-2.5 3.529 3.529 0 012.499-1.04h.01c.937 0 1.816.363 2.477 1.024a3.478 3.478 0 011.024 2.487 3.525 3.525 0 01-1.042 2.498zM0 32.407c0 2.845 2.303 5.159 5.134 5.159 2.83 0 5.134-2.314 5.134-5.159 0-2.844-2.303-5.158-5.134-5.158C2.303 27.25 0 29.563 0 32.407zm8.647 0c0 1.951-1.576 3.538-3.513 3.538-1.938 0-3.514-1.587-3.514-3.538 0-1.95 1.576-3.537 3.514-3.537 1.937 0 3.513 1.587 3.513 3.537zM13.132 56.839h.015c1.37 0 2.656-.532 3.622-1.5a5.086 5.086 0 001.499-3.636 5.134 5.134 0 00-1.516-3.64 5.134 5.134 0 00-3.64-1.516c-1.34.013-2.667.528-3.637 1.498a5.087 5.087 0 00-1.499 3.638 5.138 5.138 0 001.516 3.64 5.138 5.138 0 003.64 1.516zM10.62 49.19a3.478 3.478 0 012.476-1.024h.01c.943.003 1.83.372 2.5 1.041a3.525 3.525 0 011.04 2.5c.003.94-.36 1.823-1.023 2.486a3.48 3.48 0 01-2.478 1.024h-.01a3.53 3.53 0 01-2.498-1.04 3.529 3.529 0 01-1.042-2.5 3.478 3.478 0 011.025-2.487zM27.25 59.681c0 2.831 2.313 5.134 5.157 5.134 2.845 0 5.159-2.303 5.159-5.134 0-2.83-2.314-5.134-5.159-5.134-2.844 0-5.158 2.303-5.158 5.134zm8.695 0c0 1.937-1.587 3.513-3.538 3.513-1.95 0-3.537-1.576-3.537-3.513 0-1.938 1.587-3.514 3.537-3.514 1.951 0 3.538 1.576 3.538 3.514zM48.063 48.063a5.134 5.134 0 00-1.516 3.64 5.086 5.086 0 001.498 3.637 5.086 5.086 0 003.623 1.499h.015a5.138 5.138 0 003.64-1.516 5.137 5.137 0 001.516-3.64 5.087 5.087 0 00-1.5-3.638 5.024 5.024 0 00-3.636-1.498 5.134 5.134 0 00-3.64 1.516zm3.654.104c.937 0 1.816.363 2.477 1.024a3.478 3.478 0 011.024 2.487 3.53 3.53 0 01-1.04 2.5 3.53 3.53 0 01-2.5 1.04h-.01a3.479 3.479 0 01-2.477-1.024 3.478 3.478 0 01-1.024-2.487 3.525 3.525 0 011.041-2.498 3.524 3.524 0 012.5-1.042h.01zM59.681 27.25c-2.83 0-5.134 2.313-5.134 5.157 0 2.845 2.303 5.159 5.134 5.159 2.831 0 5.134-2.314 5.134-5.159 0-2.844-2.303-5.158-5.134-5.158zm0 8.695c-1.938 0-3.514-1.587-3.514-3.538 0-1.95 1.576-3.537 3.514-3.537 1.937 0 3.513 1.587 3.513 3.537 0 1.951-1.576 3.538-3.513 3.538zM51.683 7.976h-.015c-1.37 0-2.656.532-3.623 1.499a5.086 5.086 0 00-1.498 3.637 5.134 5.134 0 001.516 3.64 5.134 5.134 0 003.64 1.516h.014c1.37 0 2.656-.532 3.623-1.499a5.087 5.087 0 001.499-3.637 5.138 5.138 0 00-1.516-3.64 5.138 5.138 0 00-3.64-1.516zm2.511 7.648a3.479 3.479 0 01-2.477 1.024h-.01a3.525 3.525 0 01-2.498-1.042 3.525 3.525 0 01-1.042-2.498 3.478 3.478 0 011.024-2.487 3.479 3.479 0 012.477-1.025h.01c.943.003 1.83.373 2.5 1.042a3.53 3.53 0 011.04 2.499 3.478 3.478 0 01-1.024 2.487zM45.28 9.28a.81.81 0 10.79-1.415 27.954 27.954 0 00-5.64-2.378.811.811 0 00-.461 1.553 26.35 26.35 0 015.311 2.24zM19.503 9.19c.13 0 .263-.03.385-.097a26.391 26.391 0 015.34-2.171.81.81 0 10-.442-1.559 27.985 27.985 0 00-5.67 2.305.81.81 0 00.387 1.523zM5.588 24.283a.81.81 0 001.553.462 26.35 26.35 0 012.24-5.312.81.81 0 10-1.414-.79 27.95 27.95 0 00-2.38 5.64zM9.194 44.825a26.391 26.391 0 01-2.17-5.34.81.81 0 10-1.56.443 27.989 27.989 0 002.306 5.669.81.81 0 101.425-.772zM19.535 55.332a.81.81 0 10-.79 1.415 27.954 27.954 0 005.639 2.379.807.807 0 001.008-.546.81.81 0 00-.546-1.007 26.35 26.35 0 01-5.311-2.241zM44.926 55.52a26.395 26.395 0 01-5.34 2.17.81.81 0 10.443 1.56 27.98 27.98 0 005.669-2.306.81.81 0 00-.772-1.425zM55.746 46.281a.81.81 0 001.102-.313 27.95 27.95 0 002.379-5.638.81.81 0 10-1.553-.462 26.348 26.348 0 01-2.24 5.31.81.81 0 00.312 1.103zM55.62 19.787a26.395 26.395 0 012.172 5.34.81.81 0 101.558-.442 27.985 27.985 0 00-2.305-5.67.81.81 0 00-1.425.771zM32.407 48.611c8.935 0 16.204-7.269 16.204-16.204 0-8.934-7.269-16.203-16.204-16.203-8.934 0-16.203 7.269-16.203 16.203 0 8.935 7.269 16.204 16.203 16.204zm0-30.787c8.042 0 14.584 6.542 14.584 14.583 0 8.042-6.542 14.584-14.584 14.584-8.04 0-14.583-6.542-14.583-14.584 0-8.04 6.542-14.583 14.583-14.583z"
-      ></path>
-    </svg>
-  ),
-
-  ChartBar: ({ size, ...props }: LucideProps) => (
+  ChartBar: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -450,7 +511,7 @@ export const Icons = {
     </svg>
   ),
 
-  InfoCircle: ({ size, ...props }: LucideProps) => (
+  InfoCircle: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 80}
@@ -463,7 +524,7 @@ export const Icons = {
       <path d="M33.2284 61.377H48.7558C50.5136 61.377 51.9296 60.1074 51.9296 58.3008C51.9296 56.5918 50.5136 55.2734 48.7558 55.2734H44.4589V37.0117C44.4589 34.6191 43.287 33.1055 41.0898 33.1055H33.9609C32.203 33.1055 30.8359 34.4238 30.8359 36.084C30.8359 37.8906 32.203 39.1602 33.9609 39.1602H37.5253V55.2734H33.2284C31.4706 55.2734 30.0546 56.5918 30.0546 58.3008C30.0546 60.1074 31.4706 61.377 33.2284 61.377ZM39.4296 27.0996C42.5058 27.0996 44.8984 24.6582 44.8984 21.582C44.8984 18.5059 42.5058 16.1133 39.4296 16.1133C36.4023 16.1133 33.9609 18.5059 33.9609 21.582C33.9609 24.6582 36.4023 27.0996 39.4296 27.0996Z" />
     </svg>
   ),
-  CirclesFour: ({ size, ...props }: LucideProps) => (
+  CirclesFour: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width={size ?? 32}
@@ -479,24 +540,7 @@ export const Icons = {
       <path d="M80,40a40,40,0,1,0,40,40A40,40,0,0,0,80,40Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,80,104Zm96,16a40,40,0,1,0-40-40A40,40,0,0,0,176,120Zm0-64a24,24,0,1,1-24,24A24,24,0,0,1,176,56ZM80,136a40,40,0,1,0,40,40A40,40,0,0,0,80,136Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,80,200Zm96-64a40,40,0,1,0,40,40A40,40,0,0,0,176,136Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,176,200Z"></path>
     </svg>
   ),
-  Money: ({ size, ...props }: LucideProps) => (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      {...props}
-      width={size ?? 32}
-      height={size ?? 32}
-      fill="currentColor"
-      viewBox="0 0 256 256"
-    >
-      <path
-        d="M160,128a32,32,0,1,1-32-32A32,32,0,0,1,160,128Zm40-64a48.85,48.85,0,0,0,40,40V64Zm0,128h40V152A48.85,48.85,0,0,0,200,192ZM16,152v40H56A48.85,48.85,0,0,0,16,152Zm0-48A48.85,48.85,0,0,0,56,64H16Z"
-        opacity="0.2"
-      ></path>
-      <path d="M128,88a40,40,0,1,0,40,40A40,40,0,0,0,128,88Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,128,152ZM240,56H16a8,8,0,0,0-8,8V192a8,8,0,0,0,8,8H240a8,8,0,0,0,8-8V64A8,8,0,0,0,240,56ZM24,72H45.37A40.81,40.81,0,0,1,24,93.37Zm0,112V162.63A40.81,40.81,0,0,1,45.37,184Zm208,0H210.63A40.81,40.81,0,0,1,232,162.63Zm0-38.35A56.78,56.78,0,0,0,193.65,184H62.35A56.78,56.78,0,0,0,24,145.65v-35.3A56.78,56.78,0,0,0,62.35,72h131.3A56.78,56.78,0,0,0,232,110.35Zm0-52.28A40.81,40.81,0,0,1,210.63,72H232Z"></path>
-    </svg>
-  ),
-
-  Addons: ({ size, ...props }: LucideProps) => (
+  Addons: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       {...props}
@@ -513,7 +557,7 @@ export const Icons = {
     </svg>
   ),
 
-  LogOut: ({ size, ...props }: LucideProps) => (
+  LogOut: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       {...props}
@@ -530,24 +574,7 @@ export const Icons = {
     </svg>
   ),
 
-  Launcher: ({ size, ...props }: LucideProps) => (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      {...props}
-      width={size ?? 32}
-      height={size ?? 32}
-      fill="currentColor"
-      viewBox="0 0 256 256"
-    >
-      <path
-        d="M208,76h0a28,28,0,0,1-28,28H152V76a28,28,0,0,1,28-28h0A28,28,0,0,1,208,76ZM76,48h0A28,28,0,0,0,48,76h0a28,28,0,0,0,28,28h28V76A28,28,0,0,0,76,48ZM180,152H152v28a28,28,0,0,0,28,28h0a28,28,0,0,0,28-28h0A28,28,0,0,0,180,152ZM48,180h0a28,28,0,0,0,28,28h0a28,28,0,0,0,28-28V152H76A28,28,0,0,0,48,180Z"
-        opacity="0.2"
-      ></path>
-      <path d="M180,144H160V112h20a36,36,0,1,0-36-36V96H112V76a36,36,0,1,0-36,36H96v32H76a36,36,0,1,0,36,36V160h32v20a36,36,0,1,0,36-36ZM160,76a20,20,0,1,1,20,20H160ZM56,76a20,20,0,0,1,40,0V96H76A20,20,0,0,1,56,76ZM96,180a20,20,0,1,1-20-20H96Zm16-68h32v32H112Zm68,88a20,20,0,0,1-20-20V160h20a20,20,0,0,1,0,40Z"></path>
-    </svg>
-  ),
-
-  Search2: ({ size, ...props }: LucideProps) => (
+  Search2: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       {...props}
@@ -561,7 +588,7 @@ export const Icons = {
     </svg>
   ),
 
-  Insight: ({ size, ...props }: LucideProps) => (
+  Insight: ({ size, ...props }: IconProps) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       {...props}
@@ -574,4 +601,302 @@ export const Icons = {
       <path d="M232,208a8,8,0,0,1-8,8H32a8,8,0,0,1-8-8V48a8,8,0,0,1,16,0V156.69l50.34-50.35a8,8,0,0,1,11.32,0L128,132.69,180.69,80H160a8,8,0,0,1,0-16h40a8,8,0,0,1,8,8v40a8,8,0,0,1-16,0V91.31l-58.34,58.35a8,8,0,0,1-11.32,0L96,123.31l-56,56V200H224A8,8,0,0,1,232,208Z"></path>
     </svg>
   ),
+
+  Google: ({ size, ...props }: IconProps) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size ?? 24} height={size ?? 24} viewBox="0 0 24 24" {...props}>
+      <path
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+        fill="#4285F4"
+      />
+      <path
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+        fill="#34A853"
+      />
+      <path
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+        fill="#FBBC05"
+      />
+      <path
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+        fill="#EA4335"
+      />
+    </svg>
+  ),
+
+  Apple: ({ size, ...props }: IconProps) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size ?? 24}
+      height={size ?? 24}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      {...props}
+    >
+      <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
+    </svg>
+  ),
+
+  CloudSync2: ({ size, ...props }: IconProps) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+      width={size ?? 92}
+      height={size ?? 92}
+      fill="currentColor"
+      viewBox="0 0 256 256"
+    >
+      <path d="M240,128a80,80,0,0,1-80,80H72A56,56,0,1,1,85.92,97.74l0,.1A80,80,0,0,1,240,128Z" opacity="0.2"></path>
+      <path d="M248,128a87.34,87.34,0,0,1-17.6,52.81,8,8,0,1,1-12.8-9.62A71.34,71.34,0,0,0,232,128a72,72,0,0,0-144,0,8,8,0,0,1-16,0,88,88,0,0,1,3.29-23.88C74.2,104,73.1,104,72,104a48,48,0,0,0,0,96H96a8,8,0,0,1,0,16H72A64,64,0,1,1,81.29,88.68,88,88,0,0,1,248,128Zm-69.66,42.34L160,188.69V128a8,8,0,0,0-16,0v60.69l-18.34-18.35a8,8,0,0,0-11.32,11.32l32,32a8,8,0,0,0,11.32,0l32-32a8,8,0,0,0-11.32-11.32Z"></path>
+    </svg>
+  ),
+
+  CloudOff: ({ size, ...props }: IconProps) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+      width={size ?? 92}
+      height={size ?? 92}
+      fill="currentColor"
+      viewBox="0 0 256 256"
+    >
+      <path d="M240,128a80,80,0,0,1-80,80H72A56,56,0,1,1,85.92,97.74l0,.1A80,80,0,0,1,240,128Z" opacity="0.2"></path>
+      <path d="M53.92,34.62A8,8,0,1,0,42.08,45.38L81.32,88.55l-.06.12A65,65,0,0,0,72,88a64,64,0,0,0,0,128h88a87.34,87.34,0,0,0,31.8-5.93l10.28,11.31a8,8,0,1,0,11.84-10.76ZM160,200H72a48,48,0,0,1,0-96c1.1,0,2.2,0,3.3.12A88.4,88.4,0,0,0,72,128a8,8,0,0,0,16,0,72.25,72.25,0,0,1,5.06-26.54l87,95.7A71.66,71.66,0,0,1,160,200Zm88-72a87.89,87.89,0,0,1-22.35,58.61A8,8,0,0,1,213.71,176,72,72,0,0,0,117.37,70a8,8,0,0,1-9.48-12.89A88,88,0,0,1,248,128Z"></path>
+    </svg>
+  ),
+
+  // Phosphor icons
+  Devices: ({ size, className, style, color }: IconProps) => (
+    <DevicesIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+  UserSwitch: ({ size, className, style, color }: IconProps) => (
+    <UserSwitchIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+  Tag: ({ size, className, style, color }: IconProps) => (
+    <TagIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+
+  DotsThreeVertical: ({ size, className, style, color }: IconProps) => (
+    <DotsThreeOutlineVerticalIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+  DotsThree: ({ size, className, style, color }: IconProps) => (
+    <DotsThreeOutlineIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+  Sparkles: ({ size, className, style, color }: IconProps) => (
+    <SparkleIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+  House: ({ size, className, style, color }: IconProps) => (
+    <HouseIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+  UploadSimple: ({ size, className, style, color }: IconProps) => (
+    <UploadSimpleIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+  ClockCounterClockwise: ({ size, className, style, color }: IconProps) => (
+    <ClockCounterClockwiseIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+
+  // Alternative asset kind icons (duotone)
+  RealEstateDuotone: ({ size, className, style, color }: IconProps) => (
+    <GarageIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+  VehicleDuotone: ({ size, className, style, color }: IconProps) => (
+    <CarProfileIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+  CollectibleDuotone: ({ size, className, style, color }: IconProps) => (
+    <SketchLogoIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+  PreciousDuotone: ({ size, className, style, color }: IconProps) => (
+    <CoinsIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+  LiabilityDuotone: ({ size, className, style, color }: IconProps) => (
+    <CreditCardIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
+  OtherAssetDuotone: ({ size, className, style, color }: IconProps) => (
+    <CubeIcon size={size} weight="duotone" className={className} style={style} color={color} />
+  ),
 };
+
+/**
+ * All available icon names
+ */
+export type IconName =
+  | "AlertCircle"
+  | "AlertTriangle"
+  | "DatabaseBackup"
+  | "DatabaseZap"
+  | "Blocks"
+  | "BadgeDollarSign"
+  | "Grid3x3"
+  | "Rows3"
+  | "Calendar"
+  | "Check"
+  | "CheckCircle"
+  | "Clock"
+  | "Cloud"
+  | "CloudSync"
+  | "ListChecks"
+  | "LayoutDashboard"
+  | "HandCoins"
+  | "Home"
+  | "Copy"
+  | "HelpCircle"
+  | "History"
+  | "ArrowRight"
+  | "ArrowLeft"
+  | "ArrowDown"
+  | "ArrowDownLeft"
+  | "ArrowUp"
+  | "ArrowUpRight"
+  | "CreditCard"
+  | "Bitcoin"
+  | "Brain"
+  | "Briefcase"
+  | "Search"
+  | "Save"
+  | "Group"
+  | "Globe"
+  | "Close"
+  | "Eye"
+  | "Info"
+  | "EyeOff"
+  | "Refresh"
+  | "RefreshCw"
+  | "PanelLeftOpen"
+  | "Download"
+  | "Ellipsis"
+  | "Dot"
+  | "Activity2"
+  | "DollarSign"
+  | "Users"
+  | "User"
+  | "ChevronUp"
+  | "ChevronDown"
+  | "ChevronsUpDown"
+  | "ChevronLeft"
+  | "ChevronRight"
+  | "ChevronsLeft"
+  | "ChevronsRight"
+  | "Circle"
+  | "Plus"
+  | "Pencil"
+  | "PlusCircle"
+  | "PanelLeft"
+  | "Minus"
+  | "MinusCircle"
+  | "PauseCircle"
+  | "Monitor"
+  | "QrCode"
+  | "Smartphone"
+  | "PieChart"
+  | "BarChart"
+  | "Spinner"
+  | "Loader"
+  | "MoreVertical"
+  | "DotsThreeVertical"
+  | "Goal"
+  | "Trash"
+  | "Trash2"
+  | "Tag"
+  | "Hash"
+  | "Type"
+  | "Wallet"
+  | "Import"
+  | "FileText"
+  | "FileX"
+  | "XCircle"
+  | "ListCollapse"
+  | "ArrowRightLeft"
+  | "ArrowLeftRight"
+  | "Receipt"
+  | "ReceiptText"
+  | "Percent"
+  | "Store"
+  | "Package"
+  | "Star"
+  | "Shield"
+  | "ShieldAlert"
+  | "ShieldCheck"
+  | "ExternalLink"
+  | "TrendingUp"
+  | "TrendingDown"
+  | "Wand2"
+  | "Link"
+  | "Building"
+  | "Car"
+  | "Gem"
+  | "Coins"
+  | "Eraser"
+  | "Sparkles"
+  | "Palette"
+  | "Moon"
+  | "Sun"
+  | "ListFilter"
+  | "Undo"
+  | "Fullscreen"
+  | "RectangleEllipsis"
+  | "Mail"
+  | "OctagonX"
+  | "Settings2"
+  | "Dashboard"
+  | "Goals"
+  | "Database"
+  | "FileCsv"
+  | "FileJson"
+  | "Files"
+  | "Holdings"
+  | "Activity"
+  | "Settings"
+  | "Invoice"
+  | "Income"
+  | "ChartBar"
+  | "InfoCircle"
+  | "CirclesFour"
+  | "Addons"
+  | "LogOut"
+  | "Search2"
+  | "Insight"
+  | "Google"
+  | "Apple"
+  | "CloudSync2"
+  | "CloudOff"
+  | "Devices"
+  | "UserSwitch"
+  // Additional icons for UI components
+  | "Baseline"
+  | "CalendarIcon"
+  | "CaseSensitive"
+  | "CheckSquare"
+  | "File"
+  | "FileArchive"
+  | "FileAudio"
+  | "FileImage"
+  | "FileSpreadsheet"
+  | "FileVideo"
+  | "Folder"
+  | "FolderOpen"
+  | "List"
+  | "Pin"
+  | "PinOff"
+  | "Presentation"
+  | "Scissors"
+  | "Split"
+  | "Square"
+  | "Target"
+  | "SparklesOutline"
+  | "CircleGauge"
+  | "X"
+  | "Upload"
+  | "DotsThree"
+  | "House"
+  | "UploadSimple"
+  | "ClockCounterClockwise"
+  | "RealEstateDuotone"
+  | "VehicleDuotone"
+  | "CollectibleDuotone"
+  | "PreciousDuotone"
+  | "LiabilityDuotone"
+  | "OtherAssetDuotone";
+
+/**
+ * Icons object with unified typing - all icons have the same Icon type
+ */
+export const Icons: Record<IconName, Icon> = IconsInternal as Record<IconName, Icon>;
