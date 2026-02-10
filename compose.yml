@@ -1,0 +1,48 @@
+# Wealthfolio - Production Docker Compose
+#
+# Usage: docker compose up -d
+# Dev overlay: docker compose -f compose.yml -f compose.dev.yml up
+#
+# Works with any reverse proxy (Coolify, Nginx, Caddy, Traefik).
+# Uses expose (not ports) — the proxy handles external traffic.
+
+services:
+  wealthfolio:
+    image: afadil/wealthfolio:latest
+    container_name: wealthfolio
+    restart: unless-stopped
+    expose:
+      - "8088"
+    volumes:
+      - wealthfolio-data:/data
+    environment:
+      WF_LISTEN_ADDR: "0.0.0.0:8088"
+      WF_DB_PATH: "/data/wealthfolio.db"
+      # Required — generate with: openssl rand -base64 32
+      WF_SECRET_KEY: "${WF_SECRET_KEY:?Set WF_SECRET_KEY}"
+      # Recommended for internet-facing deployments (Argon2id PHC hash)
+      WF_AUTH_PASSWORD_HASH: "${WF_AUTH_PASSWORD_HASH:-}"
+      WF_AUTH_TOKEN_TTL_MINUTES: "${WF_AUTH_TOKEN_TTL_MINUTES:-60}"
+      WF_CORS_ALLOW_ORIGINS: "${WF_CORS_ALLOW_ORIGINS:-*}"
+      WF_REQUEST_TIMEOUT_MS: "${WF_REQUEST_TIMEOUT_MS:-30000}"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8088/api/v1/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64M
+
+volumes:
+  wealthfolio-data:
+    driver: local
