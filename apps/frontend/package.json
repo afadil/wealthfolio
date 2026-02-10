@@ -44,6 +44,7 @@
     "@tauri-apps/plugin-shell": "~2.3.3",
     "@tauri-apps/plugin-updater": "~2.9.0",
     "@tauri-apps/plugin-window-state": "~2.4.1",
+    "@wealthfolio/addon-sdk": "workspace:*",
     "@wealthfolio/ui": "workspace:*",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

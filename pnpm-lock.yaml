@@ -296,6 +296,9 @@ importers:
       '@tauri-apps/plugin-window-state':
         specifier: ~2.4.1
         version: 2.4.1
+      '@wealthfolio/addon-sdk':
+        specifier: workspace:*
+        version: link:../../packages/addon-sdk
       '@wealthfolio/ui':
         specifier: workspace:*
         version: link:../../packages/ui

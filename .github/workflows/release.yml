@@ -65,6 +65,19 @@ jobs:
         if: matrix.platform == 'windows-latest'
         run: rustup target add aarch64-pc-windows-msvc x86_64-pc-windows-msvc
 
+      - name: Determine Windows bundle targets
+        if: contains(matrix.platform, 'windows')
+        id: win-bundles
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./apps/tauri/tauri.conf.json').version")
+          # If version has a non-numeric pre-release (e.g. beta), skip MSI (WiX requires numeric-only)
+          if echo "$VERSION" | grep -qP '\-.*[a-zA-Z]'; then
+            echo "args=--bundles nsis" >> "$GITHUB_OUTPUT"
+          else
+            echo "args=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
 
@@ -88,4 +101,4 @@ jobs:
           releaseBody: "See the assets to download and install this version."
           releaseDraft: true
           prerelease: false
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }} ${{ steps.win-bundles.outputs.args }}
