@@ -1,0 +1,28 @@
+# Wealthfolio - Development overrides
+#
+# Usage: docker compose -f compose.yml -f compose.dev.yml up
+#
+# Or with .env file:
+#   cp .env.docker.example .env.docker
+#   docker compose -f compose.yml -f compose.dev.yml --env-file .env.docker up
+
+services:
+  wealthfolio:
+    # Build from source instead of pulling from Docker Hub
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Publish port to host for direct browser access
+    ports:
+      - "${WF_PORT:-8088}:8088"
+    expose: !reset []
+    # Relax production hardening for dev
+    read_only: false
+    security_opt: !reset []
+    deploy: !reset {}
+    environment:
+      WF_LISTEN_ADDR: "0.0.0.0:8088"
+      WF_DB_PATH: "/data/wealthfolio.db"
+      WF_SECRET_KEY: "${WF_SECRET_KEY:?Set WF_SECRET_KEY}"
+      WF_CORS_ALLOW_ORIGINS: "http://localhost:1420,http://localhost:3000"
+      WF_AUTH_PASSWORD_HASH: ""
