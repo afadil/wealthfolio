@@ -8,10 +8,10 @@ use wealthfolio_core::secrets::SecretStore;
 use wealthfolio_core::settings::SettingsRepositoryTrait;
 
 use crate::provider_model::{
-    AiProviderCatalog, AiProviderSettings, AiProvidersResponse, FetchedModel, ListModelsResponse,
-    MergedModel, MergedProvider, ModelCapabilities, ModelCapabilityOverrides, ProviderApiError,
-    ProviderConfig, ProviderUserSettings, SetDefaultProviderRequest, UpdateProviderSettingsRequest,
-    AI_PROVIDER_SETTINGS_KEY, AI_PROVIDER_SETTINGS_SCHEMA_VERSION,
+    default_priority, AiProviderCatalog, AiProviderSettings, AiProvidersResponse, FetchedModel,
+    ListModelsResponse, MergedModel, MergedProvider, ModelCapabilities, ModelCapabilityOverrides,
+    ProviderApiError, ProviderConfig, ProviderUserSettings, SetDefaultProviderRequest,
+    UpdateProviderSettingsRequest, AI_PROVIDER_SETTINGS_KEY, AI_PROVIDER_SETTINGS_SCHEMA_VERSION,
 };
 
 /// Service trait for AI provider operations.
@@ -259,8 +259,8 @@ impl AiProviderServiceTrait for AiProviderService {
                     favorite: user.favorite,
                     selected_model: user.selected_model,
                     custom_url: user.custom_url,
-                    // Use catalog priority if user hasn't set one (0 = legacy default)
-                    priority: if user.priority == 0 {
+                    // Use catalog priority if user hasn't explicitly set one
+                    priority: if user.priority == 0 || user.priority == default_priority() {
                         catalog_provider.default_config.priority
                     } else {
                         user.priority

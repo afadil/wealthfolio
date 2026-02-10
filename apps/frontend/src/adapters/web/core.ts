@@ -1159,11 +1159,22 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
   // Connect endpoints return 401 when cloud token isn't configured - that's not an app auth failure
   const connectCommands = [
     "get_subscription_plans",
+    "get_subscription_plans_public",
     "get_user_info",
     "get_connect_portal",
     "sync_broker_connections",
     "sync_broker_accounts",
     "sync_broker_activities",
+    "list_broker_connections",
+    "list_broker_accounts",
+    "get_broker_sync_states",
+    "get_import_runs",
+    "get_synced_accounts",
+    "get_platforms",
+    "sync_broker_data",
+    "store_sync_session",
+    "clear_sync_session",
+    "get_sync_session_status",
   ];
   if (res.status === 401 && !connectCommands.includes(command)) {
     notifyUnauthorized();

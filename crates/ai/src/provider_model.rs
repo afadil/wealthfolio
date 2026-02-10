@@ -117,7 +117,7 @@ pub struct ModelCapabilityOverrides {
     pub streaming: Option<bool>,
 }
 
-fn default_priority() -> i32 {
+pub fn default_priority() -> i32 {
     100
 }
 

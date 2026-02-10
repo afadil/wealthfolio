@@ -327,71 +327,73 @@ export function ProviderSettingsCard({
         <CollapsibleContent>
           <div className="border-t px-4 py-5">
             <div className="space-y-5">
-              {/* API Key Section */}
-              <div className="bg-muted/40 rounded-lg p-4">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor={`apikey-${provider.id}`} className="text-sm font-medium">
-                      API Key
-                    </Label>
-                    {provider.documentationUrl && (
-                      <a
-                        href={provider.documentationUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs transition-colors"
-                      >
-                        Get API key
-                        <Icons.ExternalLink className="h-3 w-3" />
-                      </a>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <Input
-                        id={`apikey-${provider.id}`}
-                        type={showApiKey ? "text" : "password"}
-                        value={
-                          hasLoadedKey || apiKeyValue
-                            ? apiKeyValue
-                            : provider.hasApiKey
-                              ? "••••••••••••••••••••••••"
-                              : ""
-                        }
-                        onChange={(e) => setApiKeyValue(e.target.value)}
-                        placeholder={provider.hasApiKey ? "" : "Enter API key"}
-                        className="bg-background pr-9 font-mono text-sm"
-                        readOnly={!hasLoadedKey && provider.hasApiKey}
-                      />
+              {/* API Key Section (only for API providers) */}
+              {provider.type === "api" && (
+                <div className="bg-muted/40 rounded-lg p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor={`apikey-${provider.id}`} className="text-sm font-medium">
+                        API Key
+                      </Label>
+                      {provider.documentationUrl && (
+                        <a
+                          href={provider.documentationUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs transition-colors"
+                        >
+                          Get API key
+                          <Icons.ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <Input
+                          id={`apikey-${provider.id}`}
+                          type={showApiKey ? "text" : "password"}
+                          value={
+                            hasLoadedKey || apiKeyValue
+                              ? apiKeyValue
+                              : provider.hasApiKey
+                                ? "••••••••••••••••••••••••"
+                                : ""
+                          }
+                          onChange={(e) => setApiKeyValue(e.target.value)}
+                          placeholder={provider.hasApiKey ? "" : "Enter API key"}
+                          className="bg-background pr-9 font-mono text-sm"
+                          readOnly={!hasLoadedKey && provider.hasApiKey}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-full w-9 hover:bg-transparent"
+                          onClick={handleRevealApiKey}
+                          disabled={isLoadingKey}
+                          aria-label={showApiKey ? "Hide API key" : "Show API key"}
+                        >
+                          {isLoadingKey ? (
+                            <Icons.Spinner className="h-4 w-4 animate-spin" />
+                          ) : showApiKey ? (
+                            <Icons.EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Icons.Eye className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                       <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full w-9 hover:bg-transparent"
-                        onClick={handleRevealApiKey}
-                        disabled={isLoadingKey}
-                        aria-label={showApiKey ? "Hide API key" : "Show API key"}
+                        onClick={handleSaveApiKey}
+                        size="default"
+                        className="shrink-0"
+                        disabled={!hasLoadedKey && provider.hasApiKey}
                       >
-                        {isLoadingKey ? (
-                          <Icons.Spinner className="h-4 w-4 animate-spin" />
-                        ) : showApiKey ? (
-                          <Icons.EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Icons.Eye className="h-4 w-4" />
-                        )}
+                        Save
                       </Button>
                     </div>
-                    <Button
-                      onClick={handleSaveApiKey}
-                      size="default"
-                      className="shrink-0"
-                      disabled={!hasLoadedKey && provider.hasApiKey}
-                    >
-                      Save
-                    </Button>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Model Selection Section */}
               {onSetFavoriteModels && (
