@@ -5,33 +5,34 @@
 
 import type { EventCallback, UnlistenFn } from './types';
 import type {
-  Holding,
-  Activity,
   Account,
+  Activity,
   ActivityBulkMutationRequest,
   ActivityBulkMutationResult,
-  ActivityDetails,
   ActivityCreate,
-  ActivityUpdate,
+  ActivityDetails,
   ActivityImport,
   ActivitySearchResponse,
-  ExchangeRate,
+  ActivityUpdate,
+  AccountValuation,
+  ImportActivitiesResult,
+  Asset,
   ContributionLimit,
-  NewContributionLimit,
   DepositsCalculation,
+  ExchangeRate,
   Goal,
   GoalAllocation,
-  SymbolSearchResult,
-  Asset,
-  Quote,
-  UpdateAssetProfile,
-  MarketDataProviderInfo,
-  IncomeSummary,
-  AccountValuation,
-  PerformanceMetrics,
-  SimplePerformanceMetrics,
-  Settings,
+  Holding,
   ImportMappingData,
+  IncomeSummary,
+  MarketDataProviderInfo,
+  NewContributionLimit,
+  PerformanceMetrics,
+  Quote,
+  Settings,
+  SimplePerformanceMetrics,
+  SymbolSearchResult,
+  UpdateAssetProfile,
 } from './data-types';
 
 export interface ActivitySearchFilters {
@@ -173,9 +174,9 @@ export interface ActivitiesAPI {
   /**
    * Import activities from parsed data
    * @param activities Array of activities to import
-   * @returns Promise resolving to imported activities
+   * @returns Promise resolving to import result with activities, run ID, and summary
    */
-  import(activities: ActivityImport[]): Promise<ActivityImport[]>;
+  import(activities: ActivityImport[]): Promise<ImportActivitiesResult>;
 
   /**
    * Check activities before import
@@ -218,12 +219,17 @@ export interface MarketDataAPI {
   syncHistory(): Promise<void>;
 
   /**
-   * Synchronize market data for specific symbols
-   * @param symbols Array of symbols to sync
+   * Synchronize market data for specific assets
+   * @param assetIds Array of asset identifiers to sync
    * @param refetchAll Whether to refetch all data
+   * @param refetchRecentDays Optional number of recent days to refetch
    * @returns Promise that resolves when sync is complete
    */
-  sync(symbols: string[], refetchAll: boolean): Promise<void>;
+  sync(
+    assetIds: string[],
+    refetchAll: boolean,
+    refetchRecentDays?: number,
+  ): Promise<void>;
 
   /**
    * Get market data providers information
@@ -251,12 +257,12 @@ export interface AssetsAPI {
   updateProfile(payload: UpdateAssetProfile): Promise<Asset>;
 
   /**
-   * Update asset data source
-   * @param symbol Asset symbol
-   * @param dataSource New data source
+   * Update asset quote mode (MARKET or MANUAL)
+   * @param assetId Asset identifier
+   * @param quoteMode New quote mode
    * @returns Promise resolving to updated asset
    */
-  updateDataSource(symbol: string, dataSource: string): Promise<Asset>;
+  updateQuoteMode(assetId: string, quoteMode: string): Promise<Asset>;
 }
 
 /**
@@ -265,18 +271,18 @@ export interface AssetsAPI {
 export interface QuotesAPI {
   /**
    * Update quote information
-   * @param symbol Asset symbol
+   * @param assetId Asset identifier
    * @param quote Updated quote data
    * @returns Promise that resolves when update is complete
    */
-  update(symbol: string, quote: Quote): Promise<void>;
+  update(assetId: string, quote: Quote): Promise<void>;
 
   /**
-   * Get quote history for a symbol
-   * @param symbol Asset symbol
+   * Get quote history for an asset
+   * @param assetId Asset identifier
    * @returns Promise resolving to array of quotes
    */
-  getHistory(symbol: string): Promise<Quote[]>;
+  getHistory(assetId: string): Promise<Quote[]>;
 }
 
 /**

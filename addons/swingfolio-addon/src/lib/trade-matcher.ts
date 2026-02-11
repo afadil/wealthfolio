@@ -94,9 +94,11 @@ export class TradeMatcher {
   }
 
   /**
-   * Safely parse a value to number
+   * Safely parse a string | number | null value to number.
+   * Returns `any` so parsed activities can be spread back into ActivityDetails.
    */
-  private parseNumber(value: any): number {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private parseNumber(value: string | number | null | undefined): any {
     if (typeof value === "number") return value;
     if (typeof value === "string") return parseFloat(value) || 0;
     return 0;
