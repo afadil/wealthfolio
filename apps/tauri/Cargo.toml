@@ -20,7 +20,7 @@ wealthfolio-device-sync = { workspace = true }
 wealthfolio-ai = { workspace = true }
 
 # Tauri
-tauri = { version = "2.9.3", features = [] }
+tauri = { version = "2.10", features = [] }
 tauri-plugin-fs = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-shell = "2"
