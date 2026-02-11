@@ -516,10 +516,13 @@ impl AlphaVantageProvider {
     }
 
     fn resolve_currency(&self, context: &QuoteContext) -> String {
-        let chain = ResolverChain::new();
-        chain
-            .get_currency(&PROVIDER_ID.into(), context)
-            .or_else(|| context.currency_hint.clone())
+        context
+            .currency_hint
+            .clone()
+            .or_else(|| {
+                let chain = ResolverChain::new();
+                chain.get_currency(&PROVIDER_ID.into(), context)
+            })
             .map(|c| c.to_string())
             .unwrap_or_else(|| "USD".to_string())
     }

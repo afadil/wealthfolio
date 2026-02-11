@@ -451,6 +451,7 @@ pub struct ActivityDetails {
     pub account_currency: String,
     pub asset_symbol: String,
     pub asset_name: Option<String>,
+    pub exchange_mic: Option<String>,
     pub asset_pricing_mode: String, // MARKET, MANUAL, DERIVED, NONE
     // Sync/source metadata
     pub source_system: Option<String>,

@@ -278,12 +278,15 @@ impl FinnhubProvider {
         }
     }
 
-    /// Get the currency from exchange context or fallback to hint/USD.
+    /// Get the currency: prefer asset's quote_ccy, fall back to exchange metadata.
     fn get_currency(&self, context: &QuoteContext) -> String {
-        let chain = ResolverChain::new();
-        chain
-            .get_currency(&PROVIDER_ID.into(), context)
-            .or_else(|| context.currency_hint.clone())
+        context
+            .currency_hint
+            .clone()
+            .or_else(|| {
+                let chain = ResolverChain::new();
+                chain.get_currency(&PROVIDER_ID.into(), context)
+            })
             .map(|c| c.to_string())
             .unwrap_or_else(|| "USD".to_string())
     }

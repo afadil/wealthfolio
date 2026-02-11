@@ -79,13 +79,15 @@ export type CellOpts =
       accept?: string;
       multiple?: boolean;
     }
-  | {
+    | {
       variant: "symbol";
       onSearch: (query: string) => Promise<SymbolSearchResult[]>;
       /** Called when a symbol is selected. Receives rowIndex, symbol, and full result */
       onSelect?: (rowIndex: number, symbol: string, result?: SymbolSearchResult) => void;
       /** Called when user wants to create a custom asset. Opens a dialog to collect asset metadata. */
       onCreateCustomAsset?: (rowIndex: number, symbol: string) => void;
+      /** Optional display context rendered next to the symbol (e.g., exchange). */
+      getDisplayContext?: (rowData: unknown) => string | undefined;
       /** Function to determine if symbol cell is disabled based on row data */
       isDisabled?: (rowData: unknown) => boolean;
       /** Function to determine if symbol can be cleared (set to empty) based on row data */

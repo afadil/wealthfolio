@@ -113,8 +113,25 @@ SELECT
             substr(replace(symbol, '=X', ''), 1, 3) || '/' || substr(replace(symbol, '=X', ''), 4, 3)
         WHEN asset_type IN ('Forex', 'Currency', 'FOREX') AND length(symbol) = 6 AND symbol NOT LIKE '%.%' THEN
             substr(symbol, 1, 3) || '/' || substr(symbol, 4, 3)
-        WHEN asset_type IN ('Cryptocurrency', 'Crypto', 'CRYPTOCURRENCY', 'CRYPTO') AND symbol LIKE '%-%' THEN
-            substr(symbol, 1, instr(symbol, '-') - 1)
+        WHEN asset_type IN ('Cryptocurrency', 'Crypto', 'CRYPTOCURRENCY', 'CRYPTO')
+             AND (
+                 symbol LIKE '%-%'
+                 OR (symbol_mapping IS NOT NULL AND symbol_mapping != '' AND symbol_mapping LIKE '%-%')
+             ) THEN
+            substr(
+                CASE
+                    WHEN symbol LIKE '%-%' THEN symbol
+                    ELSE symbol_mapping
+                END,
+                1,
+                instr(
+                    CASE
+                        WHEN symbol LIKE '%-%' THEN symbol
+                        ELSE symbol_mapping
+                    END,
+                    '-'
+                ) - 1
+            )
         WHEN symbol LIKE '%.AE' OR symbol LIKE '%.AS' OR symbol LIKE '%.AT'
              OR symbol LIKE '%.AX' OR symbol LIKE '%.BA' OR symbol LIKE '%.BD'
              OR symbol LIKE '%.BE' OR symbol LIKE '%.BK' OR symbol LIKE '%.BO'
@@ -181,6 +198,24 @@ SELECT
             substr(replace(symbol, '=X', ''), 4, 3)
         WHEN asset_type IN ('Forex', 'Currency', 'FOREX') AND length(symbol) = 6 AND symbol NOT LIKE '%.%' THEN
             substr(symbol, 4, 3)
+        WHEN asset_type IN ('Cryptocurrency', 'Crypto', 'CRYPTOCURRENCY', 'CRYPTO')
+             AND (
+                 symbol LIKE '%-%'
+                 OR (symbol_mapping IS NOT NULL AND symbol_mapping != '' AND symbol_mapping LIKE '%-%')
+             ) THEN
+            substr(
+                CASE
+                    WHEN symbol LIKE '%-%' THEN symbol
+                    ELSE symbol_mapping
+                END,
+                instr(
+                    CASE
+                        WHEN symbol LIKE '%-%' THEN symbol
+                        ELSE symbol_mapping
+                    END,
+                    '-'
+                ) + 1
+            )
         ELSE currency
     END,
 
@@ -202,8 +237,25 @@ SELECT
             substr(replace(symbol, '=X', ''), 1, 3)
         WHEN asset_type IN ('Forex', 'Currency', 'FOREX') AND length(symbol) = 6 AND symbol NOT LIKE '%.%' THEN
             substr(symbol, 1, 3)
-        WHEN asset_type IN ('Cryptocurrency', 'Crypto', 'CRYPTOCURRENCY', 'CRYPTO') AND symbol LIKE '%-%' THEN
-            substr(symbol, 1, instr(symbol, '-') - 1)
+        WHEN asset_type IN ('Cryptocurrency', 'Crypto', 'CRYPTOCURRENCY', 'CRYPTO')
+             AND (
+                 symbol LIKE '%-%'
+                 OR (symbol_mapping IS NOT NULL AND symbol_mapping != '' AND symbol_mapping LIKE '%-%')
+             ) THEN
+            substr(
+                CASE
+                    WHEN symbol LIKE '%-%' THEN symbol
+                    ELSE symbol_mapping
+                END,
+                1,
+                instr(
+                    CASE
+                        WHEN symbol LIKE '%-%' THEN symbol
+                        ELSE symbol_mapping
+                    END,
+                    '-'
+                ) - 1
+            )
         WHEN asset_type IN ('Stock', 'Equity', 'ETF', 'Etf', 'Mutual Fund', 'MutualFund',
                            'STOCK', 'EQUITY', 'ETF', 'MUTUALFUND', 'Option', 'Commodity') THEN
             CASE
@@ -316,10 +368,25 @@ SELECT
                 'preferred_provider', COALESCE(data_source, 'YAHOO'),
                 'overrides', json_object('YAHOO', json_object('type', 'fx_symbol', 'symbol', symbol || '=X'))
             )
-        WHEN asset_type IN ('Cryptocurrency', 'Crypto', 'CRYPTOCURRENCY', 'CRYPTO') AND symbol LIKE '%-%' THEN
+        WHEN asset_type IN ('Cryptocurrency', 'Crypto', 'CRYPTOCURRENCY', 'CRYPTO')
+             AND (
+                 symbol LIKE '%-%'
+                 OR (symbol_mapping IS NOT NULL AND symbol_mapping != '' AND symbol_mapping LIKE '%-%')
+             ) THEN
             json_object(
                 'preferred_provider', COALESCE(data_source, 'YAHOO'),
-                'overrides', json_object('YAHOO', json_object('type', 'crypto_symbol', 'symbol', symbol))
+                'overrides', json_object(
+                    'YAHOO',
+                    json_object(
+                        'type',
+                        'crypto_symbol',
+                        'symbol',
+                        CASE
+                            WHEN symbol LIKE '%-%' THEN symbol
+                            ELSE symbol_mapping
+                        END
+                    )
+                )
             )
         WHEN symbol_mapping IS NOT NULL AND symbol_mapping != '' AND symbol_mapping != symbol THEN
             json_object(

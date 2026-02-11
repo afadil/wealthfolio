@@ -9,6 +9,7 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use super::asset_id::{parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix};
 use crate::errors::Result;
 use crate::errors::ValidationError;
 use crate::Error;
@@ -523,16 +524,23 @@ impl From<ProviderProfile> for NewAsset {
             .filter(|isin| !isin.is_empty())
             .map(|isin| serde_json::json!({ "identifiers": { "isin": isin } }));
 
+        let canonical = canonicalize_market_identity(
+            Some(InstrumentType::Equity),
+            Some(profile.symbol.as_str()),
+            None,
+            Some(profile.currency.as_str()),
+        );
+
         Self {
             id: profile.id,
             kind: AssetKind::Investment,
             name: profile.name,
-            display_code: Some(profile.symbol.clone()),
+            display_code: canonical.display_code,
             quote_mode: QuoteMode::Market,
-            quote_ccy: profile.currency,
+            quote_ccy: canonical.quote_ccy.unwrap_or(profile.currency),
             instrument_type: Some(InstrumentType::Equity), // Default; caller can override
-            instrument_symbol: Some(profile.symbol),
-            instrument_exchange_mic: None,
+            instrument_symbol: canonical.instrument_symbol,
+            instrument_exchange_mic: canonical.instrument_exchange_mic,
             provider_config,
             notes: profile.notes,
             metadata,
@@ -569,6 +577,121 @@ pub struct AssetMetadata {
     pub instrument_symbol: Option<String>,
     pub instrument_type: Option<InstrumentType>,
     pub display_code: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CanonicalMarketIdentity {
+    pub instrument_symbol: Option<String>,
+    pub instrument_exchange_mic: Option<String>,
+    pub display_code: Option<String>,
+    pub quote_ccy: Option<String>,
+}
+
+fn normalize_opt(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_uppercase())
+}
+
+fn parse_fx_symbol_parts(symbol: &str) -> Option<(String, String)> {
+    let trimmed = symbol.trim().to_uppercase();
+    let cleaned = trimmed.strip_suffix("=X").unwrap_or(&trimmed);
+
+    if let Some((base, quote)) = cleaned.split_once('/') {
+        if base.len() == 3
+            && quote.len() == 3
+            && base.chars().all(|c| c.is_ascii_alphabetic())
+            && quote.chars().all(|c| c.is_ascii_alphabetic())
+        {
+            return Some((base.to_string(), quote.to_string()));
+        }
+    }
+
+    if cleaned.len() == 6 && cleaned.chars().all(|c| c.is_ascii_alphabetic()) {
+        return Some((cleaned[..3].to_string(), cleaned[3..].to_string()));
+    }
+
+    None
+}
+
+/// Canonicalizes market identity fields for stable storage and display.
+///
+/// Rules:
+/// - EQUITY/OPTION/METAL: strip known Yahoo exchange suffixes from symbol, keep MIC separately.
+/// - CRYPTO: collapse pair symbols (e.g., BTC-USD) to base symbol (BTC), clear MIC.
+/// - FX: normalize to base symbol + quote currency, display as BASE/QUOTE.
+pub fn canonicalize_market_identity(
+    instrument_type: Option<InstrumentType>,
+    symbol: Option<&str>,
+    exchange_mic: Option<&str>,
+    quote_ccy: Option<&str>,
+) -> CanonicalMarketIdentity {
+    let mut instrument_symbol = normalize_opt(symbol);
+    let mut instrument_exchange_mic = normalize_opt(exchange_mic);
+    let mut normalized_quote = normalize_opt(quote_ccy);
+
+    match instrument_type {
+        Some(InstrumentType::Equity)
+        | Some(InstrumentType::Option)
+        | Some(InstrumentType::Metal) => {
+            if let Some(raw) = instrument_symbol.as_deref() {
+                let (base, suffix_mic) = parse_symbol_with_exchange_suffix(raw);
+                instrument_symbol = Some(base.to_uppercase());
+                if instrument_exchange_mic.is_none() {
+                    instrument_exchange_mic = suffix_mic.map(str::to_string);
+                }
+            }
+            CanonicalMarketIdentity {
+                display_code: instrument_symbol.clone(),
+                instrument_symbol,
+                instrument_exchange_mic,
+                quote_ccy: normalized_quote,
+            }
+        }
+        Some(InstrumentType::Crypto) => {
+            if let Some(raw) = instrument_symbol.clone() {
+                if let Some((base, quote)) = parse_crypto_pair_symbol(&raw) {
+                    instrument_symbol = Some(base.to_uppercase());
+                    if normalized_quote.is_none() {
+                        normalized_quote = Some(quote);
+                    }
+                }
+            }
+            CanonicalMarketIdentity {
+                display_code: instrument_symbol.clone(),
+                instrument_symbol,
+                instrument_exchange_mic: None,
+                quote_ccy: normalized_quote,
+            }
+        }
+        Some(InstrumentType::Fx) => {
+            if let Some(raw) = instrument_symbol.clone() {
+                if let Some((base, quote)) = parse_fx_symbol_parts(&raw) {
+                    instrument_symbol = Some(base);
+                    normalized_quote = Some(quote);
+                }
+            }
+
+            let display_code = match (instrument_symbol.as_deref(), normalized_quote.as_deref()) {
+                (Some(base), Some(quote)) => Some(format!("{}/{}", base, quote)),
+                _ => instrument_symbol.clone(),
+            };
+
+            CanonicalMarketIdentity {
+                display_code,
+                instrument_symbol,
+                instrument_exchange_mic: None,
+                quote_ccy: normalized_quote,
+            }
+        }
+        None => CanonicalMarketIdentity {
+            display_code: normalize_opt(symbol),
+            instrument_symbol: normalize_opt(symbol),
+            instrument_exchange_mic,
+            quote_ccy: normalized_quote,
+        },
+    }
 }
 
 impl UpdateAssetProfile {

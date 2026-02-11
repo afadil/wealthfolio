@@ -64,7 +64,10 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
   currencyName,
   assetMetadataName,
 }: SymbolSearchProps<TFieldValues>) {
-  const { control, setValue } = useFormContext<TFieldValues>();
+  const { control, setValue, watch } = useFormContext<TFieldValues>();
+  const selectedExchangeMic = exchangeMicName
+    ? (watch(exchangeMicName as any) as string | undefined)
+    : undefined;
 
   const handleAssetSelect = (symbol: string, searchResult: SymbolSearchResult | undefined) => {
     const isManualAsset = searchResult?.dataSource === DataSource.MANUAL;
@@ -84,9 +87,10 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
       searchResult?.assetKind?.toUpperCase() === "CRYPTO"
         ? stripCryptoQuoteSuffix(withoutExchangeSuffix, searchResult?.currency)
         : withoutExchangeSuffix;
+    const canonicalSymbol = baseSymbol.trim().toUpperCase();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    setValue(name, baseSymbol as any, {
+    setValue(name, canonicalSymbol as any, {
       shouldValidate: true,
       shouldDirty: true,
       shouldTouch: true,
@@ -148,6 +152,7 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
                 onSelectResult={handleAssetSelect}
                 value={field.value}
                 defaultCurrency={defaultCurrency}
+                selectedExchangeMic={selectedExchangeMic}
                 aria-label={label}
                 data-testid="symbol-search"
               />

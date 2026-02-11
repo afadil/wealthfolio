@@ -2,7 +2,9 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::assets::{Asset, AssetKind, InstrumentType, OptionSpec, QuoteMode};
+    use crate::assets::{
+        canonicalize_market_identity, Asset, AssetKind, InstrumentType, OptionSpec, QuoteMode,
+    };
     use chrono::NaiveDateTime;
     use rust_decimal_macros::dec;
     use serde_json::json;
@@ -248,6 +250,51 @@ mod tests {
             let parsed = AssetKind::from_db_str(db_str).unwrap();
             assert_eq!(parsed, kind);
         }
+    }
+
+    #[test]
+    fn test_canonicalize_market_identity_equity_suffix() {
+        let canonical = canonicalize_market_identity(
+            Some(InstrumentType::Equity),
+            Some("SHOP.TO"),
+            None,
+            Some("cad"),
+        );
+
+        assert_eq!(canonical.instrument_symbol.as_deref(), Some("SHOP"));
+        assert_eq!(canonical.display_code.as_deref(), Some("SHOP"));
+        assert_eq!(canonical.instrument_exchange_mic.as_deref(), Some("XTSE"));
+        assert_eq!(canonical.quote_ccy.as_deref(), Some("CAD"));
+    }
+
+    #[test]
+    fn test_canonicalize_market_identity_crypto_pair() {
+        let canonical = canonicalize_market_identity(
+            Some(InstrumentType::Crypto),
+            Some("CRO-USD"),
+            Some("XTSE"),
+            None,
+        );
+
+        assert_eq!(canonical.instrument_symbol.as_deref(), Some("CRO"));
+        assert_eq!(canonical.display_code.as_deref(), Some("CRO"));
+        assert_eq!(canonical.instrument_exchange_mic, None);
+        assert_eq!(canonical.quote_ccy.as_deref(), Some("USD"));
+    }
+
+    #[test]
+    fn test_canonicalize_market_identity_fx_pair() {
+        let canonical = canonicalize_market_identity(
+            Some(InstrumentType::Fx),
+            Some("eurusd=x"),
+            None,
+            Some("usd"),
+        );
+
+        assert_eq!(canonical.instrument_symbol.as_deref(), Some("EUR"));
+        assert_eq!(canonical.display_code.as_deref(), Some("EUR/USD"));
+        assert_eq!(canonical.quote_ccy.as_deref(), Some("USD"));
+        assert_eq!(canonical.instrument_exchange_mic, None);
     }
 
     // Helper function
