@@ -37,6 +37,7 @@ export const worldCurrencies = [
   { label: "Bangladeshi taka (BDT)", value: "BDT" },
   { label: "Barbadian dollar (BBD)", value: "BBD" },
   { label: "Belarusian ruble (BYR)", value: "BYR" },
+  { label: "Belarusian ruble (BYN)", value: "BYN" },
   { label: "Belize dollar (BZD)", value: "BZD" },
   { label: "Bermudian dollar (BMD)", value: "BMD" },
   { label: "Bhutanese ngultrum (BTN)", value: "BTN" },
