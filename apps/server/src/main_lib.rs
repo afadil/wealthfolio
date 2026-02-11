@@ -139,8 +139,9 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         resolved_secret_path.to_string_lossy().to_string(),
     );
 
+    db::run_migrations(&db_path)?;
+
     let pool = db::create_pool(&db_path)?;
-    db::run_migrations(&pool)?;
     let writer = write_actor::spawn_writer((*pool).clone());
 
     // Domain event sink - two-phase initialization to handle circular dependencies

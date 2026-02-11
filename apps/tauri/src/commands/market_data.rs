@@ -3,7 +3,9 @@ use std::sync::Arc;
 
 use crate::{
     context::ServiceContext,
-    events::{emit_portfolio_trigger_recalculate, emit_portfolio_trigger_update, PortfolioRequestPayload},
+    events::{
+        emit_portfolio_trigger_recalculate, emit_portfolio_trigger_update, PortfolioRequestPayload,
+    },
 };
 
 use log::{debug, error};

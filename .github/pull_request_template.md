@@ -4,6 +4,8 @@
 
 ## Checklist
 
-- [ ] I have read and agree to the Contributor License Agreement in `CLA.md`.
+- [ ] I have read and agree to the
+      [Contributor License Agreement](https://github.com/afadil/wealthfolio/blob/main/CLA.md).
 
-By submitting this PR, I agree to the CLA in `CLA.md`.
+By submitting this PR, I agree to the
+[CLA](https://github.com/afadil/wealthfolio/blob/main/CLA.md).

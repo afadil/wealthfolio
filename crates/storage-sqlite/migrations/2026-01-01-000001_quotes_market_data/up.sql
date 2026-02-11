@@ -38,16 +38,26 @@ CREATE TABLE quotes_new (
 
 -- Migrate data with deterministic ID generation
 -- ID format: {asset_id}_{YYYY-MM-DD}_{source}
--- Map old symbol to new asset_id using metadata.legacy.old_id
+-- Map old symbol to new asset_id using metadata.legacy.old_id.
+-- Use a temp map table so join uses a plain indexed text column.
+CREATE TEMP TABLE asset_old_id_map AS
+SELECT
+    json_extract(metadata, '$.legacy.old_id') AS old_id,
+    id AS new_id
+FROM assets
+WHERE json_extract(metadata, '$.legacy.old_id') IS NOT NULL;
+
+CREATE INDEX idx_asset_old_id_map_old_id ON asset_old_id_map(old_id);
+
 INSERT INTO quotes_new (
     id, asset_id, day, source, open, high, low, close, adjclose, volume,
     currency, notes, created_at, timestamp
 )
 SELECT
     -- Use new asset_id in the quote ID
-    COALESCE(a.id, q.symbol) || '_' || substr(q.timestamp, 1, 10) || '_' || q.data_source,
+    COALESCE(m.new_id, q.symbol) || '_' || substr(q.timestamp, 1, 10) || '_' || q.data_source,
     -- Map old symbol to new asset_id
-    COALESCE(a.id, q.symbol) AS asset_id,
+    COALESCE(m.new_id, q.symbol) AS asset_id,
     substr(q.timestamp, 1, 10) AS day,
     q.data_source AS source,
     CASE WHEN q.open = '0' THEN NULL ELSE q.open END,
@@ -69,7 +79,9 @@ SELECT
         ELSE replace(q.timestamp, ' ', 'T') || 'Z'
     END
 FROM quotes q
-LEFT JOIN assets a ON json_extract(a.metadata, '$.legacy.old_id') = q.symbol;
+LEFT JOIN asset_old_id_map m ON m.old_id = q.symbol;
+
+DROP TABLE asset_old_id_map;
 
 DROP TABLE quotes;
 ALTER TABLE quotes_new RENAME TO quotes;

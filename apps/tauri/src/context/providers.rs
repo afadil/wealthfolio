@@ -57,11 +57,10 @@ pub async fn initialize_context(
     app_data_dir: &str,
 ) -> Result<ContextInitResult, Box<dyn std::error::Error>> {
     let db_path = db::init(app_data_dir)?;
+    db::run_migrations(&db_path)?;
+
     let pool = db::create_pool(&db_path)?;
     let writer = write_actor::spawn_writer(pool.as_ref().clone());
-
-    // Run migrations using the pool directly if run_migrations expects a Pool
-    db::run_migrations(&pool)?;
 
     // Instantiate Repositories
     let settings_repository = Arc::new(SettingsRepository::new(pool.clone(), writer.clone()));

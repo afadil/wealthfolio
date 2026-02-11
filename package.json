@@ -1,7 +1,7 @@
 {
   "name": "wealthfolio-app",
   "private": true,
-  "version": "3.0.0-beta.1",
+  "version": "3.0.0-beta.2",
   "type": "module",
   "workspaces": [
     "apps/frontend",
@@ -43,20 +43,20 @@
     "addon:dev": "cd packages/addon-dev-tools && node dev-server.js"
   },
   "devDependencies": {
-    "@eslint/compat": "^1.3.2",
-    "@eslint/js": "^9.35.0",
-    "@playwright/test": "^1.56.1",
-    "@tanstack/eslint-plugin-query": "^5.89.0",
-    "@tauri-apps/cli": "^2.9.4",
-    "eslint": "^9.35.0",
+    "@eslint/compat": "^1.4.1",
+    "@eslint/js": "^9.39.2",
+    "@playwright/test": "^1.58.2",
+    "@tanstack/eslint-plugin-query": "^5.91.4",
+    "@tauri-apps/cli": "^2.10.0",
+    "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
-    "eslint-plugin-react-refresh": "^0.4.20",
-    "globals": "^16.4.0",
-    "prettier": "^3.6.2",
+    "eslint-plugin-react-refresh": "^0.4.26",
+    "globals": "^16.5.0",
+    "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.6.14",
-    "typescript": "^5.9.2",
-    "typescript-eslint": "^8.44.0"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.55.0"
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@wealthfolio/addon-sdk",
-  "version": "3.0.0-beta.1",
+  "version": "3.0.0-beta.2",
   "type": "module",
   "description": "TypeScript SDK for building Wealthfolio addons with enhanced functionality and type safety",
   "main": "dist/index.js",
@@ -58,15 +58,15 @@
     "prepack": "npm run build"
   },
   "peerDependencies": {
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
   },
   "devDependencies": {
     "@tanstack/react-query": "^5.90.20",
-    "@types/react": "^19.1.13",
-    "@types/react-dom": "^19.1.9",
-    "tsup": "^8.5.0",
-    "typescript": "^5.9.2"
+    "@types/react": "^19.2.13",
+    "@types/react-dom": "^19.2.3",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
   },
   "engines": {
     "node": ">=20.0.0"
