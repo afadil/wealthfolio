@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { logger } from "@/adapters";
 import { ActivityType } from "@/lib/constants";
+import { generateId } from "@/lib/id";
 import type { ActivityCreate, ActivityDetails } from "@/lib/types";
 import type { AccountSelectOption } from "../components/forms/fields";
 import type { NewActivityFormValues } from "../components/forms/schemas";
@@ -14,10 +15,7 @@ import { isPureCashActivity } from "../utils/activity-form-utils";
 import { useActivityMutations } from "./use-activity-mutations";
 
 function generateSourceGroupId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return `wf-transfer-${crypto.randomUUID()}`;
-  }
-  return `wf-transfer-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 9)}`;
+  return generateId("wf-transfer");
 }
 
 export interface UseActivityFormParams {

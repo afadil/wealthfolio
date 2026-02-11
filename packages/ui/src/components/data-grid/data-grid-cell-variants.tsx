@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { useBadgeOverflow } from "../../hooks/use-badge-overflow";
 import { useDebouncedCallback } from "../../hooks/use-debounced-callback";
 import { worldCurrencies } from "../../lib/currencies";
+import { generateId } from "../../lib/id";
 import { cn } from "../../lib/utils";
 import { DataGridCellWrapper } from "./data-grid-cell-wrapper";
 import type { DataGridCellProps, FileCellData, SymbolSearchResult } from "./data-grid-types";
@@ -1971,7 +1972,7 @@ export function FileCell<TData>({
       if (filesToValidate.length > 0) {
         if (!skipUpload) {
           const tempFiles = filesToValidate.map((f) => ({
-            id: crypto.randomUUID(),
+            id: generateId(),
             name: f.name,
             size: f.size,
             type: f.type,
@@ -2004,7 +2005,7 @@ export function FileCell<TData>({
             }
           } else {
             uploadedFiles = filesToValidate.map((f, i) => ({
-              id: tempFiles[i]?.id ?? crypto.randomUUID(),
+              id: tempFiles[i]?.id ?? generateId(),
               name: f.name,
               size: f.size,
               type: f.type,
@@ -2026,7 +2027,7 @@ export function FileCell<TData>({
           tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: finalFiles });
         } else {
           const newFilesData: FileCellData[] = filesToValidate.map((f) => ({
-            id: crypto.randomUUID(),
+            id: generateId(),
             name: f.name,
             size: f.size,
             type: f.type,

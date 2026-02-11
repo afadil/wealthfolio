@@ -1,4 +1,5 @@
 import type { ActivityDetails } from "@/lib/types";
+import { generateId } from "@/lib/id";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangesSummary, LocalTransaction, TransactionChangeState } from "./types";
 import { toLocalTransaction } from "./types";
@@ -7,10 +8,7 @@ import { toLocalTransaction } from "./types";
  * Generates a unique temporary ID for new transactions
  */
 export const generateTempActivityId = (): string => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return `temp-${crypto.randomUUID()}`;
-  }
-  return `temp-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 9)}`;
+  return generateId("temp");
 };
 
 /**
