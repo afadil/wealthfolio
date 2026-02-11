@@ -72,7 +72,12 @@ pub fn run_migrations(db_path: &str) -> Result<()> {
 
     let migration_result: Result<Vec<String>> = connection
         .run_pending_migrations(MIGRATIONS)
-        .map(|versions| versions.into_iter().map(|version| version.to_string()).collect())
+        .map(|versions| {
+            versions
+                .into_iter()
+                .map(|version| version.to_string())
+                .collect()
+        })
         .map_err(|e| {
             error!("Database migration failed: {}", e);
             Error::Database(DatabaseError::MigrationFailed(e.to_string()))

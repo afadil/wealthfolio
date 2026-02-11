@@ -66,10 +66,10 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       react:
-        specifier: ^19.1.1
+        specifier: ^19.2.4
         version: 19.2.4
       react-dom:
-        specifier: ^19.1.1
+        specifier: ^19.2.4
         version: 19.2.4(react@19.2.4)
     devDependencies:
       '@tailwindcss/vite':
@@ -118,10 +118,10 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       react:
-        specifier: ^19.1.1
+        specifier: ^19.2.4
         version: 19.2.4
       react-dom:
-        specifier: ^19.1.1
+        specifier: ^19.2.4
         version: 19.2.4(react@19.2.4)
     devDependencies:
       '@tailwindcss/vite':
@@ -179,10 +179,10 @@ importers:
         specifier: ^4.1.0
         version: 4.1.0
       react:
-        specifier: ^19.1.1
+        specifier: ^19.2.4
         version: 19.2.4
       react-dom:
-        specifier: ^19.1.1
+        specifier: ^19.2.4
         version: 19.2.4(react@19.2.4)
     devDependencies:
       '@tailwindcss/vite':
@@ -439,10 +439,10 @@ importers:
   packages/addon-sdk:
     dependencies:
       react:
-        specifier: ^19.1.1
+        specifier: ^19.2.4
         version: 19.2.4
       react-dom:
-        specifier: ^19.1.1
+        specifier: ^19.2.4
         version: 19.2.4(react@19.2.4)
     devDependencies:
       '@tanstack/react-query':
@@ -575,7 +575,7 @@ importers:
         specifier: ^12.34.0
         version: 12.34.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       react:
-        specifier: ^19.1.1
+        specifier: ^19.2.4
         version: 19.2.4
       react-aria-components:
         specifier: ^1.15.1
@@ -584,7 +584,7 @@ importers:
         specifier: ^9.13.2
         version: 9.13.2(react@19.2.4)
       react-dom:
-        specifier: ^19.1.1
+        specifier: ^19.2.4
         version: 19.2.4(react@19.2.4)
       react-dropzone:
         specifier: ^14.4.1
