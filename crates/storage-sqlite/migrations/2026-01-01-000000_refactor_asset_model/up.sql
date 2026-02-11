@@ -115,17 +115,26 @@ SELECT
             substr(symbol, 1, 3) || '/' || substr(symbol, 4, 3)
         WHEN asset_type IN ('Cryptocurrency', 'Crypto', 'CRYPTOCURRENCY', 'CRYPTO') AND symbol LIKE '%-%' THEN
             substr(symbol, 1, instr(symbol, '-') - 1)
-        WHEN symbol LIKE '%.TO' OR symbol LIKE '%.V' OR symbol LIKE '%.CN'
-             OR symbol LIKE '%.L' OR symbol LIKE '%.DE' OR symbol LIKE '%.PA'
-             OR symbol LIKE '%.AS' OR symbol LIKE '%.MI' OR symbol LIKE '%.MC'
-             OR symbol LIKE '%.ST' OR symbol LIKE '%.HE' OR symbol LIKE '%.CO'
-             OR symbol LIKE '%.OL' OR symbol LIKE '%.SW' OR symbol LIKE '%.VI'
-             OR symbol LIKE '%.T' OR symbol LIKE '%.HK' OR symbol LIKE '%.SS'
-             OR symbol LIKE '%.SZ' OR symbol LIKE '%.AX' OR symbol LIKE '%.NZ'
-             OR symbol LIKE '%.SA' OR symbol LIKE '%.NS' OR symbol LIKE '%.BO'
-             OR symbol LIKE '%.TW' OR symbol LIKE '%.SI' OR symbol LIKE '%.KS'
-             OR symbol LIKE '%.KQ' OR symbol LIKE '%.BK' OR symbol LIKE '%.JK'
-             OR symbol LIKE '%.KL' OR symbol LIKE '%.TA' THEN
+        WHEN symbol LIKE '%.AE' OR symbol LIKE '%.AS' OR symbol LIKE '%.AT'
+             OR symbol LIKE '%.AX' OR symbol LIKE '%.BA' OR symbol LIKE '%.BD'
+             OR symbol LIKE '%.BE' OR symbol LIKE '%.BK' OR symbol LIKE '%.BO'
+             OR symbol LIKE '%.BR' OR symbol LIKE '%.CA' OR symbol LIKE '%.CN'
+             OR symbol LIKE '%.CO' OR symbol LIKE '%.DE' OR symbol LIKE '%.DU'
+             OR symbol LIKE '%.F' OR symbol LIKE '%.HA' OR symbol LIKE '%.HE'
+             OR symbol LIKE '%.HK' OR symbol LIKE '%.HM' OR symbol LIKE '%.IC'
+             OR symbol LIKE '%.IL' OR symbol LIKE '%.IR' OR symbol LIKE '%.IS'
+             OR symbol LIKE '%.JK' OR symbol LIKE '%.JO' OR symbol LIKE '%.KL'
+             OR symbol LIKE '%.KQ' OR symbol LIKE '%.KS' OR symbol LIKE '%.L'
+             OR symbol LIKE '%.LS' OR symbol LIKE '%.MC' OR symbol LIKE '%.MI'
+             OR symbol LIKE '%.MU' OR symbol LIKE '%.MX' OR symbol LIKE '%.NE'
+             OR symbol LIKE '%.NS' OR symbol LIKE '%.NZ' OR symbol LIKE '%.OL'
+             OR symbol LIKE '%.PA' OR symbol LIKE '%.PR' OR symbol LIKE '%.QA'
+             OR symbol LIKE '%.SA' OR symbol LIKE '%.SAU' OR symbol LIKE '%.SG'
+             OR symbol LIKE '%.SI' OR symbol LIKE '%.SN' OR symbol LIKE '%.SS'
+             OR symbol LIKE '%.ST' OR symbol LIKE '%.SW' OR symbol LIKE '%.SZ'
+             OR symbol LIKE '%.T' OR symbol LIKE '%.TA' OR symbol LIKE '%.TO'
+             OR symbol LIKE '%.TW' OR symbol LIKE '%.TWO' OR symbol LIKE '%.V'
+             OR symbol LIKE '%.VI' OR symbol LIKE '%.WA' THEN
             substr(symbol, 1, instr(symbol, '.') - 1)
         ELSE symbol
     END,
@@ -198,7 +207,29 @@ SELECT
         WHEN asset_type IN ('Stock', 'Equity', 'ETF', 'Etf', 'Mutual Fund', 'MutualFund',
                            'STOCK', 'EQUITY', 'ETF', 'MUTUALFUND', 'Option', 'Commodity') THEN
             CASE
-                WHEN symbol LIKE '%.%' THEN substr(symbol, 1, instr(symbol, '.') - 1)
+                -- Strip only known Yahoo exchange suffixes (e.g., .TO, .L, .DE).
+                -- Preserve non-exchange dot suffixes like share classes (e.g., BRK.B).
+                WHEN symbol LIKE '%.AE' OR symbol LIKE '%.AS' OR symbol LIKE '%.AT'
+                     OR symbol LIKE '%.AX' OR symbol LIKE '%.BA' OR symbol LIKE '%.BD'
+                     OR symbol LIKE '%.BE' OR symbol LIKE '%.BK' OR symbol LIKE '%.BO'
+                     OR symbol LIKE '%.BR' OR symbol LIKE '%.CA' OR symbol LIKE '%.CN'
+                     OR symbol LIKE '%.CO' OR symbol LIKE '%.DE' OR symbol LIKE '%.DU'
+                     OR symbol LIKE '%.F' OR symbol LIKE '%.HA' OR symbol LIKE '%.HE'
+                     OR symbol LIKE '%.HK' OR symbol LIKE '%.HM' OR symbol LIKE '%.IC'
+                     OR symbol LIKE '%.IL' OR symbol LIKE '%.IR' OR symbol LIKE '%.IS'
+                     OR symbol LIKE '%.JK' OR symbol LIKE '%.JO' OR symbol LIKE '%.KL'
+                     OR symbol LIKE '%.KQ' OR symbol LIKE '%.KS' OR symbol LIKE '%.L'
+                     OR symbol LIKE '%.LS' OR symbol LIKE '%.MC' OR symbol LIKE '%.MI'
+                     OR symbol LIKE '%.MU' OR symbol LIKE '%.MX' OR symbol LIKE '%.NE'
+                     OR symbol LIKE '%.NS' OR symbol LIKE '%.NZ' OR symbol LIKE '%.OL'
+                     OR symbol LIKE '%.PA' OR symbol LIKE '%.PR' OR symbol LIKE '%.QA'
+                     OR symbol LIKE '%.SA' OR symbol LIKE '%.SAU' OR symbol LIKE '%.SG'
+                     OR symbol LIKE '%.SI' OR symbol LIKE '%.SN' OR symbol LIKE '%.SS'
+                     OR symbol LIKE '%.ST' OR symbol LIKE '%.SW' OR symbol LIKE '%.SZ'
+                     OR symbol LIKE '%.T' OR symbol LIKE '%.TA' OR symbol LIKE '%.TO'
+                     OR symbol LIKE '%.TW' OR symbol LIKE '%.TWO' OR symbol LIKE '%.V'
+                     OR symbol LIKE '%.VI' OR symbol LIKE '%.WA' THEN
+                    substr(symbol, 1, instr(symbol, '.') - 1)
                 ELSE symbol
             END
         ELSE NULL
@@ -206,38 +237,67 @@ SELECT
 
     -- instrument_exchange_mic
     CASE
-        WHEN symbol LIKE '%.TO' THEN 'XTSE'
-        WHEN symbol LIKE '%.V' THEN 'XTSX'
-        WHEN symbol LIKE '%.CN' THEN 'XCNQ'
-        WHEN symbol LIKE '%.L' THEN 'XLON'
-        WHEN symbol LIKE '%.DE' THEN 'XETR'
-        WHEN symbol LIKE '%.PA' THEN 'XPAR'
+        -- Note: .AE appears for both XDFM and XADS in exchanges.json.
+        -- Runtime registry resolves to the last entry (currently XADS).
+        WHEN symbol LIKE '%.AE' THEN 'XADS'
         WHEN symbol LIKE '%.AS' THEN 'XAMS'
-        WHEN symbol LIKE '%.MI' THEN 'XMIL'
-        WHEN symbol LIKE '%.MC' THEN 'XMAD'
-        WHEN symbol LIKE '%.ST' THEN 'XSTO'
-        WHEN symbol LIKE '%.HE' THEN 'XHEL'
-        WHEN symbol LIKE '%.CO' THEN 'XCSE'
-        WHEN symbol LIKE '%.OL' THEN 'XOSL'
-        WHEN symbol LIKE '%.SW' THEN 'XSWX'
-        WHEN symbol LIKE '%.VI' THEN 'XWBO'
-        WHEN symbol LIKE '%.T' THEN 'XTKS'
-        WHEN symbol LIKE '%.HK' THEN 'XHKG'
-        WHEN symbol LIKE '%.SS' THEN 'XSHG'
-        WHEN symbol LIKE '%.SZ' THEN 'XSHE'
+        WHEN symbol LIKE '%.AT' THEN 'XATH'
         WHEN symbol LIKE '%.AX' THEN 'XASX'
-        WHEN symbol LIKE '%.NZ' THEN 'XNZE'
-        WHEN symbol LIKE '%.SA' THEN 'BVMF'
-        WHEN symbol LIKE '%.NS' THEN 'XNSE'
-        WHEN symbol LIKE '%.BO' THEN 'XBOM'
-        WHEN symbol LIKE '%.TW' THEN 'XTAI'
-        WHEN symbol LIKE '%.SI' THEN 'XSES'
-        WHEN symbol LIKE '%.KS' THEN 'XKRX'
-        WHEN symbol LIKE '%.KQ' THEN 'XKOS'
+        WHEN symbol LIKE '%.BA' THEN 'XBUE'
+        WHEN symbol LIKE '%.BD' THEN 'XBUD'
+        WHEN symbol LIKE '%.BE' THEN 'XBER'
         WHEN symbol LIKE '%.BK' THEN 'XBKK'
+        WHEN symbol LIKE '%.BO' THEN 'XBOM'
+        WHEN symbol LIKE '%.BR' THEN 'XBRU'
+        WHEN symbol LIKE '%.CA' THEN 'XCAI'
+        WHEN symbol LIKE '%.CN' THEN 'XCNQ'
+        WHEN symbol LIKE '%.CO' THEN 'XCSE'
+        WHEN symbol LIKE '%.DE' THEN 'XETR'
+        WHEN symbol LIKE '%.DU' THEN 'XDUS'
+        WHEN symbol LIKE '%.F' THEN 'XFRA'
+        WHEN symbol LIKE '%.HA' THEN 'XHAN'
+        WHEN symbol LIKE '%.HE' THEN 'XHEL'
+        WHEN symbol LIKE '%.HK' THEN 'XHKG'
+        WHEN symbol LIKE '%.HM' THEN 'XHAM'
+        WHEN symbol LIKE '%.IC' THEN 'XICE'
+        WHEN symbol LIKE '%.IL' THEN 'XLON_IL'
+        WHEN symbol LIKE '%.IR' THEN 'XDUB'
+        WHEN symbol LIKE '%.IS' THEN 'XIST'
         WHEN symbol LIKE '%.JK' THEN 'XIDX'
+        WHEN symbol LIKE '%.JO' THEN 'XJSE'
         WHEN symbol LIKE '%.KL' THEN 'XKLS'
+        WHEN symbol LIKE '%.KQ' THEN 'XKOS'
+        WHEN symbol LIKE '%.KS' THEN 'XKRX'
+        WHEN symbol LIKE '%.L' THEN 'XLON'
+        WHEN symbol LIKE '%.LS' THEN 'XLIS'
+        WHEN symbol LIKE '%.MC' THEN 'XMAD'
+        WHEN symbol LIKE '%.MI' THEN 'XMIL'
+        WHEN symbol LIKE '%.MU' THEN 'XMUN'
+        WHEN symbol LIKE '%.MX' THEN 'XMEX'
+        WHEN symbol LIKE '%.NE' THEN 'XNEO'
+        WHEN symbol LIKE '%.NS' THEN 'XNSE'
+        WHEN symbol LIKE '%.NZ' THEN 'XNZE'
+        WHEN symbol LIKE '%.OL' THEN 'XOSL'
+        WHEN symbol LIKE '%.PA' THEN 'XPAR'
+        WHEN symbol LIKE '%.PR' THEN 'XPRA'
+        WHEN symbol LIKE '%.QA' THEN 'DSMD'
+        WHEN symbol LIKE '%.SA' THEN 'BVMF'
+        WHEN symbol LIKE '%.SAU' THEN 'XSAU'
+        WHEN symbol LIKE '%.SG' THEN 'XSTU'
+        WHEN symbol LIKE '%.SI' THEN 'XSES'
+        WHEN symbol LIKE '%.SN' THEN 'XSGO'
+        WHEN symbol LIKE '%.SS' THEN 'XSHG'
+        WHEN symbol LIKE '%.ST' THEN 'XSTO'
+        WHEN symbol LIKE '%.SW' THEN 'XSWX'
+        WHEN symbol LIKE '%.SZ' THEN 'XSHE'
+        WHEN symbol LIKE '%.T' THEN 'XTKS'
         WHEN symbol LIKE '%.TA' THEN 'XTAE'
+        WHEN symbol LIKE '%.TO' THEN 'XTSE'
+        WHEN symbol LIKE '%.TW' THEN 'XTAI'
+        WHEN symbol LIKE '%.TWO' THEN 'XTAI_OTC'
+        WHEN symbol LIKE '%.V' THEN 'XTSX'
+        WHEN symbol LIKE '%.VI' THEN 'XWBO'
+        WHEN symbol LIKE '%.WA' THEN 'XWAR'
         WHEN asset_type IN ('Stock', 'Equity', 'ETF', 'Etf', 'Mutual Fund', 'MutualFund',
                            'STOCK', 'EQUITY', 'ETF', 'MUTUALFUND')
              AND symbol NOT LIKE '%.%' THEN 'XNAS'
@@ -282,6 +342,63 @@ SELECT
 
 FROM assets_old
 WHERE NOT (asset_type IN ('Cash', 'CASH') OR id LIKE '$CASH-%');
+
+-- Durable mapping table used by follow-up migrations (quotes/activity remap)
+CREATE TABLE legacy_asset_id_map (
+    old_id TEXT PRIMARY KEY NOT NULL,
+    new_id TEXT NOT NULL
+);
+
+INSERT INTO legacy_asset_id_map (old_id, new_id)
+SELECT
+    json_extract(metadata, '$.legacy.old_id') AS old_id,
+    id AS new_id
+FROM assets
+WHERE json_extract(metadata, '$.legacy.old_id') IS NOT NULL;
+
+-- Resolve instrument_key collisions introduced by v1 allowing same symbol across providers.
+-- Keep a single canonical row per instrument_key and remap all legacy old_id values to it.
+CREATE TEMP TABLE asset_dedup_resolution AS
+WITH ranked_assets AS (
+    SELECT
+        id AS duplicate_id,
+        json_extract(metadata, '$.legacy.old_id') AS old_id,
+        first_value(id) OVER (
+            PARTITION BY instrument_key
+            ORDER BY created_at ASC, id ASC
+        ) AS canonical_id,
+        row_number() OVER (
+            PARTITION BY instrument_key
+            ORDER BY created_at ASC, id ASC
+        ) AS row_num
+    FROM assets
+    WHERE instrument_key IS NOT NULL
+)
+SELECT
+    duplicate_id,
+    old_id,
+    canonical_id
+FROM ranked_assets
+WHERE row_num > 1;
+
+UPDATE legacy_asset_id_map
+SET new_id = (
+    SELECT r.canonical_id
+    FROM asset_dedup_resolution r
+    WHERE r.old_id = legacy_asset_id_map.old_id
+)
+WHERE old_id IN (
+    SELECT old_id
+    FROM asset_dedup_resolution
+);
+
+DELETE FROM assets
+WHERE id IN (
+    SELECT duplicate_id
+    FROM asset_dedup_resolution
+);
+
+DROP TABLE asset_dedup_resolution;
 
 DROP TABLE assets_old;
 
@@ -345,13 +462,12 @@ CREATE INDEX ix_brokers_sync_state_provider ON brokers_sync_state(provider);
 -- ============================================================================
 
 -- Build lookup: old bare-symbol ID (e.g. "AAPL") → new UUID
--- Uses metadata.legacy.old_id saved in STEP 3
+-- Uses legacy_asset_id_map populated in STEP 3 (includes dedup remaps)
 CREATE TEMP TABLE asset_id_mapping AS
 SELECT
-    json_extract(metadata, '$.legacy.old_id') AS old_id,
-    id AS new_id
-FROM assets
-WHERE json_extract(metadata, '$.legacy.old_id') IS NOT NULL;
+    old_id,
+    new_id
+FROM legacy_asset_id_map;
 
 CREATE INDEX idx_asset_id_mapping_old ON asset_id_mapping(old_id);
 
