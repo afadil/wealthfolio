@@ -906,9 +906,10 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
         let db_path_str = db_path.to_string_lossy().to_string();
 
+        run_migrations(&db_path_str).expect("Failed to run migrations");
+
         // create_pool returns Arc<DbPool>
         let pool = create_pool(&db_path_str).expect("Failed to create pool");
-        run_migrations(&pool).expect("Failed to run migrations");
 
         // spawn_writer expects DbPool (not Arc<DbPool>), so we need to clone the inner pool
         // Since pool is Arc<DbPool>, we dereference to get DbPool, then clone it
