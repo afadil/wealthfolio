@@ -605,6 +605,7 @@ mod tests {
     use crate::assets::AssetKind;
     use chrono::TimeZone;
     use rust_decimal_macros::dec;
+    use std::sync::Arc;
 
     // =========================================================================
     // Quote Conversion Tests
@@ -743,6 +744,11 @@ mod tests {
         }
     }
 
+    fn create_test_client() -> MarketDataClient {
+        let registry = ProviderRegistry::new(Vec::new(), Arc::new(ResolverChain::new()));
+        MarketDataClient { registry }
+    }
+
     #[test]
     fn test_build_quote_context_equity() {
         let asset = create_test_asset(AssetKind::Investment, "AAPL", "USD");
@@ -817,6 +823,28 @@ mod tests {
                 kind_debug
             );
         }
+    }
+
+    #[test]
+    fn test_build_quote_context_currency_hint_prefers_asset_quote_currency() {
+        let mut asset = create_test_asset(AssetKind::Investment, "SHOP", "TWD");
+        asset.instrument_exchange_mic = Some("XTSE".to_string());
+        let client = create_test_client();
+
+        let context = client.build_quote_context(&asset).unwrap();
+
+        assert_eq!(context.currency_hint.as_deref(), Some("TWD"));
+    }
+
+    #[test]
+    fn test_build_quote_context_currency_hint_falls_back_to_mic_currency() {
+        let mut asset = create_test_asset(AssetKind::Investment, "SHOP", "");
+        asset.instrument_exchange_mic = Some("XTSE".to_string());
+        let client = create_test_client();
+
+        let context = client.build_quote_context(&asset).unwrap();
+
+        assert_eq!(context.currency_hint.as_deref(), Some("CAD"));
     }
 
     // =========================================================================
