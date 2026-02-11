@@ -88,6 +88,8 @@ const assetFormSchema = z.object({
 type AssetFormValues = z.infer<typeof assetFormSchema>;
 type ProviderOverride = z.infer<typeof providerOverrideSchema>;
 
+const normalizeMic = (mic?: string | null): string => mic?.trim().toUpperCase() ?? "";
+
 // Convert asset kind options from constants
 const kindOptions: ResponsiveSelectOption[] = EDITABLE_ASSET_KINDS.map((kind) => ({
   label: ASSET_KIND_DISPLAY_NAMES[kind],
@@ -236,10 +238,23 @@ export function AssetEditSheet({
     staleTime: Infinity,
   });
 
-  const exchangeOptions = useMemo(
-    () => exchanges.map((e) => ({ value: e.mic, label: `${e.longName} (${e.name})` })),
-    [exchanges],
-  );
+  const currentMic = normalizeMic(asset?.instrumentExchangeMic);
+
+  const exchangeOptions = useMemo(() => {
+    const options = exchanges.map((e) => ({
+      value: normalizeMic(e.mic),
+      label: `${e.longName} (${e.name})`,
+    }));
+
+    if (currentMic && !options.some((option) => option.value === currentMic)) {
+      options.unshift({
+        value: currentMic,
+        label: asset?.exchangeName ? `${asset.exchangeName} (${currentMic})` : currentMic,
+      });
+    }
+
+    return options;
+  }, [exchanges, currentMic, asset?.exchangeName]);
 
   // Split taxonomies by selection type
   const { singleSelectTaxonomies, multiSelectTaxonomies } = useMemo(() => {
@@ -256,7 +271,7 @@ export function AssetEditSheet({
       name: asset?.name ?? "",
       notes: asset?.notes ?? "",
       kind: asset?.kind ?? "INVESTMENT",
-      instrumentExchangeMic: asset?.instrumentExchangeMic ?? "",
+      instrumentExchangeMic: normalizeMic(asset?.instrumentExchangeMic),
       quoteMode: asset?.quoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
       providerConfig: parseProviderOverrides(
         asset?.providerConfig as Record<string, unknown> | null,
@@ -280,7 +295,7 @@ export function AssetEditSheet({
         name: asset.name ?? "",
         notes: asset.notes ?? "",
         kind: asset.kind ?? "INVESTMENT",
-        instrumentExchangeMic: asset.instrumentExchangeMic ?? "",
+        instrumentExchangeMic: normalizeMic(asset.instrumentExchangeMic),
         quoteMode: asset.quoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
         providerConfig: parseProviderOverrides(
           asset.providerConfig as Record<string, unknown> | null,
@@ -306,6 +321,7 @@ export function AssetEditSheet({
         values.providerConfig ?? [],
         assetKind,
       );
+      const normalizedMic = normalizeMic(values.instrumentExchangeMic);
 
       try {
         // Update profile with all fields including quote mode
@@ -316,6 +332,7 @@ export function AssetEditSheet({
           notes: values.notes ?? "",
           kind: values.kind as AssetKind | undefined,
           quoteMode: values.quoteMode,
+          instrumentExchangeMic: normalizedMic || null,
           providerConfig: serializedOverrides,
         });
 

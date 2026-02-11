@@ -71,7 +71,7 @@ impl AssetService {
 
     /// Sets the domain event sink for this service.
     ///
-    /// Events are emitted after successful asset creation (not updates).
+    /// Events are emitted after successful asset mutations.
     pub fn with_event_sink(mut self, event_sink: Arc<dyn DomainEventSink>) -> Self {
         self.event_sink = event_sink;
         self
@@ -135,11 +135,30 @@ impl AssetServiceTrait for AssetService {
     async fn update_asset_profile(
         &self,
         asset_id: &str,
-        payload: UpdateAssetProfile,
+        mut payload: UpdateAssetProfile,
     ) -> Result<Asset> {
-        self.asset_repository
+        let existing_asset = self.asset_repository.get_by_id(asset_id)?;
+        let effective_quote_mode = payload.quote_mode.unwrap_or(existing_asset.quote_mode);
+
+        if let Some(raw_mic) = payload.instrument_exchange_mic.as_ref() {
+            let normalized_mic = raw_mic.trim().to_uppercase();
+            if !normalized_mic.is_empty() {
+                payload.instrument_exchange_mic = Some(normalized_mic.clone());
+                if effective_quote_mode == QuoteMode::Market {
+                    payload.quote_ccy = mic_to_currency(&normalized_mic).map(|ccy| ccy.to_string());
+                }
+            }
+        }
+
+        let asset = self
+            .asset_repository
             .update_profile(asset_id, payload)
-            .await
+            .await?;
+
+        self.event_sink
+            .emit(DomainEvent::assets_updated(vec![asset.id.clone()]));
+
+        Ok(asset)
     }
 
     /// Creates a new asset directly without network lookups.
@@ -312,6 +331,19 @@ impl AssetServiceTrait for AssetService {
 
     /// Updates the quote mode for an asset (MARKET, MANUAL)
     async fn update_quote_mode(&self, asset_id: &str, quote_mode: &str) -> Result<Asset> {
+        let asset = self
+            .asset_repository
+            .update_quote_mode(asset_id, quote_mode)
+            .await?;
+
+        self.event_sink
+            .emit(DomainEvent::assets_updated(vec![asset.id.clone()]));
+
+        Ok(asset)
+    }
+
+    /// Updates quote mode without emitting domain events.
+    async fn update_quote_mode_silent(&self, asset_id: &str, quote_mode: &str) -> Result<Asset> {
         self.asset_repository
             .update_quote_mode(asset_id, quote_mode)
             .await
@@ -440,6 +472,7 @@ impl AssetServiceTrait for AssetService {
             notes: existing_asset.notes.clone().unwrap_or_default(),
             kind: None,
             quote_mode: Some(existing_asset.quote_mode),
+            quote_ccy: None,
             instrument_type: updated_instrument_type,
             instrument_symbol: None,
             instrument_exchange_mic: None,

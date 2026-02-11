@@ -1,20 +1,13 @@
 use std::sync::Arc;
 
-use crate::{
-    api::shared::{enqueue_portfolio_job, PortfolioJobConfig},
-    error::ApiResult,
-    main_lib::AppState,
-};
+use crate::{error::ApiResult, main_lib::AppState};
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     routing::{delete, get, put},
     Json, Router,
 };
-use wealthfolio_core::{
-    assets::{Asset as CoreAsset, UpdateAssetProfile},
-    quotes::MarketSyncMode,
-};
+use wealthfolio_core::assets::{Asset as CoreAsset, UpdateAssetProfile};
 
 #[derive(serde::Deserialize)]
 struct AssetQuery {
@@ -44,6 +37,7 @@ async fn update_asset_profile(
         .asset_service
         .update_asset_profile(&id, payload)
         .await?;
+
     Ok(Json(asset))
 }
 
@@ -62,17 +56,6 @@ async fn update_quote_mode(
         .asset_service
         .update_quote_mode(&id, &body.quote_mode)
         .await?;
-    // Quote mode change requires incremental sync for this asset
-    enqueue_portfolio_job(
-        state.clone(),
-        PortfolioJobConfig {
-            account_ids: None,
-            market_sync_mode: MarketSyncMode::Incremental {
-                asset_ids: Some(vec![id]),
-            },
-            force_full_recalculation: true,
-        },
-    );
     Ok(Json(asset))
 }
 

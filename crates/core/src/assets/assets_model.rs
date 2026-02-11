@@ -550,6 +550,7 @@ pub struct UpdateAssetProfile {
     pub notes: String,
     pub kind: Option<AssetKind>,
     pub quote_mode: Option<QuoteMode>,
+    pub quote_ccy: Option<String>,
     pub instrument_type: Option<InstrumentType>,
     pub instrument_symbol: Option<String>,
     pub instrument_exchange_mic: Option<String>,

@@ -213,6 +213,10 @@ impl AssetRepositoryTrait for AssetRepository {
                     } else {
                         existing.instrument_exchange_mic.clone()
                     };
+                let quote_ccy_value = payload_owned
+                    .quote_ccy
+                    .clone()
+                    .unwrap_or_else(|| existing.quote_ccy.clone());
 
                 // Build the update query
                 let result_db = if let Some(kind_value) = kind_str {
@@ -226,6 +230,7 @@ impl AssetRepositoryTrait for AssetRepository {
                             assets::quote_mode.eq(quote_mode_str
                                 .clone()
                                 .unwrap_or_else(|| "MARKET".to_string())),
+                            assets::quote_ccy.eq(&quote_ccy_value),
                             assets::instrument_type.eq(&instrument_type_value),
                             assets::instrument_symbol.eq(&instrument_symbol_value),
                             assets::instrument_exchange_mic.eq(&instrument_exchange_mic_value),
@@ -242,6 +247,7 @@ impl AssetRepositoryTrait for AssetRepository {
                             assets::metadata.eq(&metadata_json),
                             assets::quote_mode
                                 .eq(quote_mode_str.unwrap_or_else(|| "MARKET".to_string())),
+                            assets::quote_ccy.eq(&quote_ccy_value),
                             assets::instrument_type.eq(&instrument_type_value),
                             assets::instrument_symbol.eq(&instrument_symbol_value),
                             assets::instrument_exchange_mic.eq(&instrument_exchange_mic_value),
