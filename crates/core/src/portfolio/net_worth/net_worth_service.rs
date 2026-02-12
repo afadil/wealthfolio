@@ -16,6 +16,7 @@ use crate::accounts::{account_types, AccountRepositoryTrait};
 use crate::assets::{AssetKind, AssetRepositoryTrait};
 use crate::constants::DECIMAL_PRECISION;
 use crate::errors::Result;
+use crate::fx::currency::normalize_amount;
 use crate::fx::FxServiceTrait;
 use crate::portfolio::snapshot::SnapshotRepositoryTrait;
 use crate::portfolio::valuation::ValuationRepositoryTrait;
@@ -87,7 +88,7 @@ impl NetWorthService {
         &self,
         asset_id: &str,
         date: NaiveDate,
-    ) -> Option<(Decimal, NaiveDate)> {
+    ) -> Option<(Decimal, String, NaiveDate)> {
         // Get all quotes for this symbol and find the latest one <= date
         let quotes = self.quote_service.get_historical_quotes(asset_id).ok()?;
 
@@ -95,7 +96,11 @@ impl NetWorthService {
             .iter()
             .filter(|q| q.timestamp.date_naive() <= date)
             .max_by_key(|q| q.timestamp.date_naive())
-            .map(|q| (q.close, q.timestamp.date_naive()))
+            .map(|q| {
+                let (normalized_price, normalized_currency) =
+                    normalize_amount(q.close, &q.currency);
+                (normalized_price, normalized_currency.to_string(), q.timestamp.date_naive())
+            })
     }
 
     /// Calculate market value for a position, converting to base currency.
@@ -164,10 +169,11 @@ impl NetWorthService {
             }
         }
 
-        // Build breakdown items - only include categories with non-zero values
+        // Build breakdown items - include categories with non-zero values
+        // (negative totals kept: e.g. negative cash from margin/overdraft)
         let mut breakdown: Vec<BreakdownItem> = category_totals
             .into_iter()
-            .filter(|(_, value)| *value > Decimal::ZERO)
+            .filter(|(_, value)| !value.is_zero())
             .map(|(category, value)| BreakdownItem {
                 category: Self::category_key(category).to_string(),
                 name: Self::category_display_name(category).to_string(),
@@ -305,29 +311,32 @@ impl NetWorthServiceTrait for NetWorthService {
                 };
 
                 // Get the latest quote for this asset as of the date
-                let (price, valuation_date) = match self.get_latest_quote_as_of(asset_id, date) {
-                    Some((p, d)) => (p, d),
-                    None => {
-                        // No quote found, use cost basis as fallback
-                        if position.quantity > Decimal::ZERO {
-                            let implied_price = position.total_cost_basis / position.quantity;
-                            // Use snapshot date as valuation date
-                            (implied_price, snapshot.snapshot_date)
-                        } else {
-                            warn!(
-                                "No quote found for {} and cannot derive from cost basis",
-                                asset_id
-                            );
-                            continue;
+                let (price, quote_currency, valuation_date) =
+                    match self.get_latest_quote_as_of(asset_id, date) {
+                        Some((p, c, d)) => (p, c, d),
+                        None => {
+                            // No quote found, use cost basis as fallback
+                            if position.quantity > Decimal::ZERO {
+                                let implied_price =
+                                    position.total_cost_basis / position.quantity;
+                                // Use snapshot date as valuation date
+                                (implied_price, position.currency.clone(), snapshot.snapshot_date)
+                            } else {
+                                warn!(
+                                    "No quote found for {} and cannot derive from cost basis",
+                                    asset_id
+                                );
+                                continue;
+                            }
                         }
-                    }
-                };
+                    };
 
                 // Calculate market value in base currency
+                // Use the normalized quote currency for FX conversion (e.g. GBp→GBP)
                 let market_value_base = match self.calculate_market_value(
-                    position.quantity,
+                    position.quantity * position.contract_multiplier,
                     price,
-                    &position.currency,
+                    &quote_currency,
                     &base_currency,
                     date,
                 ) {
@@ -337,7 +346,7 @@ impl NetWorthServiceTrait for NetWorthService {
                             "Failed to calculate market value for {}: {}. Using local value.",
                             asset_id, e
                         );
-                        position.quantity * price
+                        position.quantity * position.contract_multiplier * price
                     }
                 };
 
@@ -404,16 +413,17 @@ impl NetWorthServiceTrait for NetWorthService {
             }
 
             // Get the latest quote for this alternative asset
-            let (price, valuation_date) = match self.get_latest_quote_as_of(&asset.id, date) {
-                Some((p, d)) => (p, d),
-                None => {
-                    debug!(
-                        "No quote found for alternative asset {}, skipping",
-                        asset.id
-                    );
-                    continue;
-                }
-            };
+            let (price, quote_currency, valuation_date) =
+                match self.get_latest_quote_as_of(&asset.id, date) {
+                    Some((p, c, d)) => (p, c, d),
+                    None => {
+                        debug!(
+                            "No quote found for alternative asset {}, skipping",
+                            asset.id
+                        );
+                        continue;
+                    }
+                };
 
             // For alternative assets, quantity is always 1 (value-based model)
             let quantity = Decimal::ONE;
@@ -422,7 +432,7 @@ impl NetWorthServiceTrait for NetWorthService {
             let market_value_base = match self.calculate_market_value(
                 quantity,
                 price,
-                &asset.quote_ccy,
+                &quote_currency,
                 &base_currency,
                 date,
             ) {
@@ -586,14 +596,16 @@ impl NetWorthServiceTrait for NetWorthService {
         let mut initial_asset_values: HashMap<String, Decimal> = HashMap::new();
 
         for asset in &alternative_assets {
-            if let Some((price, _)) = self.get_latest_quote_as_of(&asset.id, start_date) {
-                let value_base = if asset.quote_ccy == base_currency {
+            if let Some((price, quote_currency, _)) =
+                self.get_latest_quote_as_of(&asset.id, start_date)
+            {
+                let value_base = if quote_currency == base_currency {
                     price
                 } else {
                     self.fx_service
                         .convert_currency_for_date(
                             price,
-                            &asset.quote_ccy,
+                            &quote_currency,
                             &base_currency,
                             start_date,
                         )
