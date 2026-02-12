@@ -102,7 +102,7 @@ export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProp
               <FormItem>
                 <FormLabel>Currency</FormLabel>
                 <FormControl>
-                  <Input {...field} disabled className="bg-muted/50 uppercase" />
+                  <Input {...field} disabled className="bg-muted/50" />
                 </FormControl>
                 <FormMessage />
               </FormItem>

@@ -28,6 +28,7 @@ use crate::sync::{
 use crate::Result;
 use log::warn;
 use uuid::Uuid;
+use wealthfolio_market_data::mic_to_currency;
 
 /// Service for managing activities
 pub struct ActivityService {
@@ -583,7 +584,13 @@ impl ActivityService {
             let metadata = crate::assets::AssetMetadata {
                 name: asset_name.clone(),
                 kind: inferred.as_ref().map(|(k, _)| k.clone()),
-                instrument_exchange_mic: exchange_mic.clone(),
+                instrument_exchange_mic: exchange_mic.clone().or_else(|| {
+                    symbol.as_deref().and_then(|s| {
+                        parse_symbol_with_exchange_suffix(s)
+                            .1
+                            .map(|mic| mic.to_string())
+                    })
+                }),
                 instrument_symbol: symbol
                     .as_deref()
                     .map(|s| parse_symbol_with_exchange_suffix(s).0.to_string()),
@@ -810,7 +817,13 @@ impl ActivityService {
             let metadata = crate::assets::AssetMetadata {
                 name: asset_name.clone(),
                 kind: inferred.as_ref().map(|(k, _)| k.clone()),
-                instrument_exchange_mic: exchange_mic.clone(),
+                instrument_exchange_mic: exchange_mic.clone().or_else(|| {
+                    symbol.as_deref().and_then(|s| {
+                        parse_symbol_with_exchange_suffix(s)
+                            .1
+                            .map(|mic| mic.to_string())
+                    })
+                }),
                 instrument_symbol: symbol
                     .as_deref()
                     .map(|s| parse_symbol_with_exchange_suffix(s).0.to_string()),
@@ -986,6 +999,15 @@ impl ActivityService {
             activity.get_kind_hint(),
         );
 
+        // Parse quote mode if provided
+        let quote_mode = activity
+            .get_quote_mode()
+            .and_then(|s| match s.to_uppercase().as_str() {
+                "MARKET" => Some(QuoteMode::Market),
+                "MANUAL" => Some(QuoteMode::Manual),
+                _ => None,
+            });
+
         // Crypto/FX assets don't have exchange MICs — clear any that leaked from frontend/suffix
         let is_crypto = instrument_type.as_ref() == Some(&InstrumentType::Crypto);
         let exchange_mic = if is_crypto { None } else { exchange_mic };
@@ -996,7 +1018,21 @@ impl ActivityService {
                 .map(|(_, quote)| quote)
                 .unwrap_or_else(|| currency.clone())
         } else {
-            currency.clone()
+            let is_market_mode = quote_mode != Some(QuoteMode::Manual);
+            if is_market_mode {
+                match instrument_type.as_ref() {
+                    Some(InstrumentType::Equity)
+                    | Some(InstrumentType::Option)
+                    | Some(InstrumentType::Metal) => exchange_mic
+                        .as_deref()
+                        .and_then(mic_to_currency)
+                        .map(|ccy| ccy.to_string())
+                        .unwrap_or(currency.clone()),
+                    _ => currency.clone(),
+                }
+            } else {
+                currency.clone()
+            }
         };
 
         // For crypto pairs (e.g. BTC-USD), normalize to base symbol (BTC)
@@ -1015,15 +1051,6 @@ impl ActivityService {
             instrument_type.as_ref(),
             Some(&asset_currency),
         );
-
-        // Parse quote mode if provided
-        let quote_mode = activity
-            .get_quote_mode()
-            .and_then(|s| match s.to_uppercase().as_str() {
-                "MARKET" => Some(QuoteMode::Market),
-                "MANUAL" => Some(QuoteMode::Manual),
-                _ => None,
-            });
 
         Ok(Some(AssetSpec {
             id: existing_id,

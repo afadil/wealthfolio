@@ -13,6 +13,7 @@ use super::asset_id::{parse_crypto_pair_symbol, parse_symbol_with_exchange_suffi
 use crate::errors::Result;
 use crate::errors::ValidationError;
 use crate::Error;
+use wealthfolio_market_data::mic_to_currency;
 
 // Re-export InstrumentId from market-data crate for convenience
 pub use wealthfolio_market_data::InstrumentId;
@@ -594,6 +595,23 @@ fn normalize_opt(value: Option<&str>) -> Option<String> {
         .map(|s| s.to_uppercase())
 }
 
+fn normalize_quote_ccy(value: Option<&str>) -> Option<String> {
+    let trimmed = value.map(str::trim).filter(|s| !s.is_empty())?;
+
+    // Preserve canonical minor-unit spellings where case is meaningful.
+    if trimmed == "GBp" {
+        return Some("GBp".to_string());
+    }
+    if trimmed.eq_ignore_ascii_case("GBX") {
+        return Some("GBX".to_string());
+    }
+    if trimmed == "ZAc" || trimmed.eq_ignore_ascii_case("ZAC") {
+        return Some("ZAc".to_string());
+    }
+
+    Some(trimmed.to_uppercase())
+}
+
 fn parse_fx_symbol_parts(symbol: &str) -> Option<(String, String)> {
     let trimmed = symbol.trim().to_uppercase();
     let cleaned = trimmed.strip_suffix("=X").unwrap_or(&trimmed);
@@ -629,7 +647,7 @@ pub fn canonicalize_market_identity(
 ) -> CanonicalMarketIdentity {
     let mut instrument_symbol = normalize_opt(symbol);
     let mut instrument_exchange_mic = normalize_opt(exchange_mic);
-    let mut normalized_quote = normalize_opt(quote_ccy);
+    let mut normalized_quote = normalize_quote_ccy(quote_ccy);
 
     match instrument_type {
         Some(InstrumentType::Equity)
@@ -642,6 +660,14 @@ pub fn canonicalize_market_identity(
                     instrument_exchange_mic = suffix_mic.map(str::to_string);
                 }
             }
+
+            // Exchange MIC is authoritative for market quote currency.
+            if let Some(mic) = instrument_exchange_mic.as_deref() {
+                if let Some(ccy) = mic_to_currency(mic) {
+                    normalized_quote = normalize_quote_ccy(Some(ccy));
+                }
+            }
+
             CanonicalMarketIdentity {
                 display_code: instrument_symbol.clone(),
                 instrument_symbol,
