@@ -16,6 +16,7 @@ use crate::events::PortfolioRequestPayload;
 /// - ActivitiesChanged
 /// - HoldingsChanged
 /// - AccountsChanged
+/// - AssetsUpdated
 ///
 /// Also carries through asset IDs from AssetsCreated when a recalc-triggering
 /// event exists in the same batch.
@@ -55,6 +56,14 @@ pub fn plan_portfolio_job(events: &[DomainEvent]) -> Option<PortfolioRequestPayl
             DomainEvent::ManualSnapshotSaved { account_id } => {
                 has_recalc_events = true;
                 account_ids.insert(account_id.clone());
+            }
+            DomainEvent::AssetsUpdated { asset_ids: ids } => {
+                has_recalc_events = true;
+                for id in ids {
+                    if !id.is_empty() {
+                        asset_ids.insert(id.clone());
+                    }
+                }
             }
             // AssetsCreated: include IDs for sync (e.g., FX assets), but don't trigger recalc alone
             DomainEvent::AssetsCreated { asset_ids: ids } => {
@@ -240,6 +249,24 @@ mod tests {
 
         let result = plan_portfolio_job(&events);
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_plan_portfolio_job_assets_updated_triggers_recalc() {
+        let events = vec![DomainEvent::AssetsUpdated {
+            asset_ids: vec!["asset-1".to_string()],
+        }];
+
+        let result = plan_portfolio_job(&events).unwrap();
+        assert!(result.account_ids.is_none());
+
+        if let wealthfolio_core::quotes::MarketSyncMode::Incremental { asset_ids } =
+            result.market_sync_mode
+        {
+            assert_eq!(asset_ids, Some(vec!["asset-1".to_string()]));
+        } else {
+            panic!("Expected Incremental sync mode");
+        }
     }
 
     #[test]

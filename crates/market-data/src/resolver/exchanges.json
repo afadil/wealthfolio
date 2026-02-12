@@ -505,7 +505,11 @@
     },
     {
       "mic": "XTAI_OTC",
-      "name": null,
+      "name": "TPEx",
+      "long_name": "Taipei Exchange",
+      "currency": "TWD",
+      "timezone": "Asia/Taipei",
+      "close": [13, 30],
       "yahoo": { "suffix": ".TWO", "codes": ["TWO"] }
     },
     {
@@ -640,6 +644,6 @@
     "PLN": ["XWAR"],
     "ILS": ["XTAE"],
     "ZAR": ["XJSE"],
-    "TWD": ["XTAI"]
+    "TWD": ["XTAI", "XTAI_OTC"]
   }
 }

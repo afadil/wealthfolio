@@ -254,6 +254,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 accounts::currency,
                 assets::display_code.nullable(),
                 assets::name.nullable(),
+                assets::instrument_exchange_mic.nullable(),
                 assets::quote_mode.nullable(),
                 activities::metadata,
             ))

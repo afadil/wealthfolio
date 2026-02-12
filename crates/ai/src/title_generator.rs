@@ -79,21 +79,16 @@ impl<E: AiEnvironment> TitleGenerator<E> {
         truncate_to_title(user_message, self.config.fallback_max_chars)
     }
 
-    /// Generate a title using the LLM.
+    /// Generate a title using the LLM with a specific model.
     async fn generate_with_llm(
         &self,
         user_message: &str,
         provider_id: &str,
-        chat_model_id: &str,
+        model_id: &str,
     ) -> Result<String, AiError> {
         let provider_service = ProviderService::new(self.env.clone());
         let api_key = provider_service.get_api_key(provider_id)?;
         let provider_url = provider_service.get_provider_url(provider_id);
-
-        // Use title model from provider config, fallback to chat model
-        let model_id = provider_service
-            .get_title_model(provider_id)
-            .unwrap_or_else(|| chat_model_id.to_string());
 
         debug!(
             "Generating title with provider {} model {}",
@@ -118,7 +113,7 @@ Title:",
                 let client: anthropic::Client<HttpClient> =
                     anthropic::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))?;
                 client
-                    .agent(&model_id)
+                    .agent(model_id)
                     .max_tokens(self.config.max_tokens as u64)
                     .build()
                     .prompt(&prompt)
@@ -130,7 +125,7 @@ Title:",
                 let client: gemini::Client<HttpClient> =
                     gemini::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))?;
                 client
-                    .agent(&model_id)
+                    .agent(model_id)
                     .build()
                     .prompt(&prompt)
                     .await
@@ -141,7 +136,7 @@ Title:",
                 let client: groq::Client<HttpClient> =
                     groq::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))?;
                 client
-                    .agent(&model_id)
+                    .agent(model_id)
                     .build()
                     .prompt(&prompt)
                     .await
@@ -156,7 +151,7 @@ Title:",
                     .build()
                     .map_err(|e| AiError::Provider(e.to_string()))?;
                 client
-                    .agent(&model_id)
+                    .agent(model_id)
                     .build()
                     .prompt(&prompt)
                     .await
@@ -167,7 +162,7 @@ Title:",
                 let client: openrouter::Client<HttpClient> =
                     openrouter::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))?;
                 client
-                    .agent(&model_id)
+                    .agent(model_id)
                     .build()
                     .prompt(&prompt)
                     .await
@@ -179,7 +174,7 @@ Title:",
                 let client: openai::Client<HttpClient> =
                     openai::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))?;
                 client
-                    .agent(&model_id)
+                    .agent(model_id)
                     .build()
                     .prompt(&prompt)
                     .await
@@ -253,17 +248,47 @@ impl<E: AiEnvironment + 'static> TitleGeneratorTrait for TitleGenerator<E> {
         provider_id: &str,
         chat_model_id: &str,
     ) -> String {
-        // Try LLM generation, fall back to truncation on failure
+        let provider_service = ProviderService::new(self.env.clone());
+        let title_model = provider_service
+            .get_title_model(provider_id)
+            .unwrap_or_else(|| chat_model_id.to_string());
+
+        // Try title model first
         match self
-            .generate_with_llm(user_message, provider_id, chat_model_id)
+            .generate_with_llm(user_message, provider_id, &title_model)
             .await
         {
-            Ok(title) => title,
+            Ok(title) => return title,
             Err(e) => {
-                warn!("Title generation failed, using fallback: {}", e);
-                self.generate_fallback(user_message)
+                warn!(
+                    "Title generation failed with title model '{}': {}",
+                    title_model, e
+                );
             }
         }
+
+        // Fall back to chat model if it's different from the title model
+        if title_model != chat_model_id {
+            debug!(
+                "Retrying title generation with chat model '{}'",
+                chat_model_id
+            );
+            match self
+                .generate_with_llm(user_message, provider_id, chat_model_id)
+                .await
+            {
+                Ok(title) => return title,
+                Err(e) => {
+                    warn!(
+                        "Title generation failed with chat model '{}': {}",
+                        chat_model_id, e
+                    );
+                }
+            }
+        }
+
+        // Final fallback: truncate the message
+        self.generate_fallback(user_message)
     }
 }
 

@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { useBadgeOverflow } from "../../hooks/use-badge-overflow";
 import { useDebouncedCallback } from "../../hooks/use-debounced-callback";
 import { worldCurrencies } from "../../lib/currencies";
+import { generateId } from "../../lib/id";
 import { cn } from "../../lib/utils";
 import { DataGridCellWrapper } from "./data-grid-cell-wrapper";
 import type { DataGridCellProps, FileCellData, SymbolSearchResult } from "./data-grid-types";
@@ -1971,7 +1972,7 @@ export function FileCell<TData>({
       if (filesToValidate.length > 0) {
         if (!skipUpload) {
           const tempFiles = filesToValidate.map((f) => ({
-            id: crypto.randomUUID(),
+            id: generateId(),
             name: f.name,
             size: f.size,
             type: f.type,
@@ -2004,7 +2005,7 @@ export function FileCell<TData>({
             }
           } else {
             uploadedFiles = filesToValidate.map((f, i) => ({
-              id: tempFiles[i]?.id ?? crypto.randomUUID(),
+              id: tempFiles[i]?.id ?? generateId(),
               name: f.name,
               size: f.size,
               type: f.type,
@@ -2026,7 +2027,7 @@ export function FileCell<TData>({
           tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: finalFiles });
         } else {
           const newFilesData: FileCellData[] = filesToValidate.map((f) => ({
-            id: crypto.randomUUID(),
+            id: generateId(),
             name: f.name,
             size: f.size,
             type: f.type,
@@ -2527,11 +2528,13 @@ export function SymbolCell<TData>({
   const onSearch = symbolCellOpts?.onSearch;
   const onSelectCallback = symbolCellOpts?.onSelect;
   const onCreateCustomAssetCallback = symbolCellOpts?.onCreateCustomAsset;
+  const getDisplayContextFn = symbolCellOpts?.getDisplayContext;
   const isDisabledFn = symbolCellOpts?.isDisabled;
   const isClearableFn = symbolCellOpts?.isClearable;
   const rowData = cell.row.original;
   const disabled = isDisabledFn ? isDisabledFn(rowData) : false;
   const clearable = isClearableFn ? isClearableFn(rowData) : false;
+  const displayContext = value ? getDisplayContextFn?.(rowData) : undefined;
   const sideOffset = -(containerRef.current?.clientHeight ?? 0);
 
   const prevInitialValueRef = React.useRef(initialValue);
@@ -2707,6 +2710,9 @@ export function SymbolCell<TData>({
         <PopoverAnchor asChild>
           <span data-slot="grid-cell-content" className={cn(!value && "text-muted-foreground")}>
             {disabled ? value || "—" : value || "TICKER"}
+            {value && displayContext ? (
+              <span className="text-muted-foreground ml-1 text-xs">({displayContext})</span>
+            ) : null}
           </span>
         </PopoverAnchor>
         {isEditing && !disabled && (
@@ -2729,23 +2735,35 @@ export function SymbolCell<TData>({
                 {isLoading ? <CommandEmpty>Loading...</CommandEmpty> : null}
                 {!isLoading && !isError && options.length > 0 ? (
                   <CommandGroup>
-                    {options.map((option) => (
-                      <CommandItem
-                        key={getOptionKey(option)}
-                        value={getOptionKey(option)}
-                        onSelect={() => handleSelect(option.symbol, option)}
-                        className="flex items-center justify-between"
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-mono text-xs font-semibold uppercase">{option.symbol}</span>
-                          <span className="text-muted-foreground text-xs">{displayName(option)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground text-xs">{option.exchange}</span>
-                          {value === option.symbol && <Icons.Check className="size-4" />}
-                        </div>
-                      </CommandItem>
-                    ))}
+                    {options.map((option) =>
+                      (() => {
+                        const withoutExchangeSuffix = option.exchangeMic
+                          ? stripYahooExchangeSuffix(option.symbol)
+                          : option.symbol;
+                        const normalizedOptionSymbol =
+                          option.assetKind?.toUpperCase() === "CRYPTO"
+                            ? normalizeCryptoPairSymbol(withoutExchangeSuffix, option.currency)
+                            : withoutExchangeSuffix;
+
+                        return (
+                          <CommandItem
+                            key={getOptionKey(option)}
+                            value={getOptionKey(option)}
+                            onSelect={() => handleSelect(option.symbol, option)}
+                            className="flex items-center justify-between"
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-mono text-xs font-semibold uppercase">{option.symbol}</span>
+                              <span className="text-muted-foreground text-xs">{displayName(option)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground text-xs">{option.exchange}</span>
+                              {value === normalizedOptionSymbol.toUpperCase() && <Icons.Check className="size-4" />}
+                            </div>
+                          </CommandItem>
+                        );
+                      })(),
+                    )}
                   </CommandGroup>
                 ) : null}
                 {/* Always show "Create custom asset" option at the bottom when there's a query */}

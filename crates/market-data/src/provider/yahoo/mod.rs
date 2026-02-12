@@ -195,12 +195,15 @@ impl YahooProvider {
     // Quote Fetching
     // ========================================================================
 
-    /// Get the currency from exchange context or fallback to hint/USD.
+    /// Get the currency: prefer asset's quote_ccy, fall back to exchange metadata.
     fn get_currency(&self, context: &QuoteContext) -> String {
-        let chain = ResolverChain::new();
-        chain
-            .get_currency(&"YAHOO".into(), context)
-            .or_else(|| context.currency_hint.clone())
+        context
+            .currency_hint
+            .clone()
+            .or_else(|| {
+                let chain = ResolverChain::new();
+                chain.get_currency(&"YAHOO".into(), context)
+            })
             .map(|c| c.to_string())
             .unwrap_or_else(|| "USD".to_string())
     }
@@ -892,6 +895,23 @@ mod tests {
         }
     }
 
+    fn create_test_fx_context(
+        currency_hint: Option<&'static str>,
+        quote: &'static str,
+    ) -> QuoteContext {
+        use crate::models::InstrumentId;
+
+        QuoteContext {
+            instrument: InstrumentId::Fx {
+                base: Cow::Borrowed("EUR"),
+                quote: Cow::Borrowed(quote),
+            },
+            overrides: None,
+            currency_hint: currency_hint.map(Cow::Borrowed),
+            preferred_provider: None,
+        }
+    }
+
     #[test]
     fn test_extract_symbol_equity() {
         let instrument = ProviderInstrument::EquitySymbol {
@@ -940,15 +960,29 @@ mod tests {
 
     #[test]
     fn test_get_currency_with_hint() {
+        let provider = YahooProvider {
+            connector: yahoo::YahooConnector::new().expect("Failed to initialize Yahoo connector"),
+        };
         let context = create_test_context();
-        assert_eq!(
-            context
-                .currency_hint
-                .as_ref()
-                .map(|c| c.to_string())
-                .unwrap_or_else(|| "USD".to_string()),
-            "USD"
-        );
+        assert_eq!(provider.get_currency(&context), "USD");
+    }
+
+    #[test]
+    fn test_get_currency_prefers_hint_over_resolver() {
+        let provider = YahooProvider {
+            connector: yahoo::YahooConnector::new().expect("Failed to initialize Yahoo connector"),
+        };
+        let context = create_test_fx_context(Some("TWD"), "CAD");
+        assert_eq!(provider.get_currency(&context), "TWD");
+    }
+
+    #[test]
+    fn test_get_currency_falls_back_to_resolver_when_hint_missing() {
+        let provider = YahooProvider {
+            connector: yahoo::YahooConnector::new().expect("Failed to initialize Yahoo connector"),
+        };
+        let context = create_test_fx_context(None, "CAD");
+        assert_eq!(provider.get_currency(&context), "CAD");
     }
 
     #[test]

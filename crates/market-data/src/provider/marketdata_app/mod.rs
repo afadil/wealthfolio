@@ -143,12 +143,15 @@ impl MarketDataAppProvider {
             })
     }
 
-    /// Get the currency from exchange context or fallback to hint/USD.
+    /// Get the currency: prefer asset's quote_ccy, fall back to exchange metadata.
     fn get_currency(context: &QuoteContext) -> String {
-        let chain = ResolverChain::new();
-        chain
-            .get_currency(&PROVIDER_ID.into(), context)
-            .or_else(|| context.currency_hint.clone())
+        context
+            .currency_hint
+            .clone()
+            .or_else(|| {
+                let chain = ResolverChain::new();
+                chain.get_currency(&PROVIDER_ID.into(), context)
+            })
             .map(|c| c.to_string())
             .unwrap_or_else(|| "USD".to_string())
     }
@@ -365,7 +368,25 @@ impl MarketDataProvider for MarketDataAppProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::borrow::Cow;
     use std::sync::Arc;
+
+    fn create_test_fx_context(
+        currency_hint: Option<&'static str>,
+        quote: &'static str,
+    ) -> QuoteContext {
+        use crate::models::InstrumentId;
+
+        QuoteContext {
+            instrument: InstrumentId::Fx {
+                base: Cow::Borrowed("EUR"),
+                quote: Cow::Borrowed(quote),
+            },
+            overrides: None,
+            currency_hint: currency_hint.map(Cow::Borrowed),
+            preferred_provider: None,
+        }
+    }
 
     #[test]
     fn test_provider_id() {
@@ -399,6 +420,18 @@ mod tests {
         assert_eq!(rate.requests_per_minute, 100);
         assert_eq!(rate.max_concurrency, 10);
         assert_eq!(rate.min_delay, Duration::from_millis(100));
+    }
+
+    #[test]
+    fn test_get_currency_prefers_hint_over_resolver() {
+        let context = create_test_fx_context(Some("TWD"), "CAD");
+        assert_eq!(MarketDataAppProvider::get_currency(&context), "TWD");
+    }
+
+    #[test]
+    fn test_get_currency_falls_back_to_resolver_when_hint_missing() {
+        let context = create_test_fx_context(None, "CAD");
+        assert_eq!(MarketDataAppProvider::get_currency(&context), "CAD");
     }
 
     #[test]

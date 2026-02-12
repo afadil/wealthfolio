@@ -25,7 +25,7 @@ import {
   isIncomeActivity,
   isSplitActivity,
 } from "@/lib/activity-utils";
-import { ActivityType } from "@/lib/constants";
+import { ActivityType, getExchangeDisplayName } from "@/lib/constants";
 import { ActivityDetails } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 import {
@@ -74,6 +74,26 @@ export const ActivityTable = ({
     assetName: false,
     currency: false,
   });
+  const symbolExchangeCountMap = React.useMemo(() => {
+    const exchangesBySymbol = new Map<string, Set<string>>();
+
+    for (const activity of activities) {
+      const symbol = (activity.assetSymbol ?? "").trim().toUpperCase();
+      const exchangeMic = (activity.exchangeMic ?? "").trim().toUpperCase();
+      if (!symbol || !exchangeMic) continue;
+
+      const current = exchangesBySymbol.get(symbol) ?? new Set<string>();
+      current.add(exchangeMic);
+      exchangesBySymbol.set(symbol, current);
+    }
+
+    return new Map(
+      Array.from(exchangesBySymbol.entries()).map(([symbol, exchanges]) => [
+        symbol,
+        exchanges.size,
+      ]),
+    );
+  }, [activities]);
 
   const columns: ColumnDef<ActivityDetails>[] = React.useMemo(
     () => [
@@ -130,9 +150,20 @@ export const ActivityTable = ({
           const symbol = String(row.getValue("assetSymbol"));
           const assetId = row.original.assetId;
           const activityType = String(row.getValue("activityType"));
-          const isCash = isCashActivity(activityType);
+          const isTransferActivity =
+            activityType === ActivityType.TRANSFER_IN || activityType === ActivityType.TRANSFER_OUT;
+          const hasAsset = Boolean(assetId?.trim());
+          const isCash = isTransferActivity
+            ? !hasAsset || isCashTransfer(activityType, symbol)
+            : isCashActivity(activityType);
           const displaySymbol = isCash ? "Cash" : symbol;
           const avatarSymbol = isCash ? "$CASH" : symbol;
+          const normalizedSymbol = symbol.trim().toUpperCase();
+          const shouldShowExchange =
+            !isCash && (symbolExchangeCountMap.get(normalizedSymbol) ?? 0) > 1;
+          const exchangeDisplay = shouldShowExchange
+            ? getExchangeDisplayName(row.original.exchangeMic)
+            : "";
 
           const assetName = row.getValue("assetName");
           const currency = row.getValue("currency");
@@ -141,7 +172,14 @@ export const ActivityTable = ({
             <div className="flex max-w-[200px] items-center gap-2">
               <TickerAvatar symbol={avatarSymbol} className="h-8 w-8 shrink-0" />
               <div className="flex min-w-0 flex-col">
-                <span className="truncate font-medium">{displaySymbol}</span>
+                <span className="flex items-center gap-1 truncate font-medium">
+                  <span className="truncate">{displaySymbol}</span>
+                  {exchangeDisplay ? (
+                    <span className="text-muted-foreground shrink-0 text-xs font-normal">
+                      · {exchangeDisplay}
+                    </span>
+                  ) : null}
+                </span>
                 <span className="text-muted-foreground truncate text-xs font-light">
                   {isCash ? String(currency) : String(assetName ?? currency)}
                 </span>
@@ -149,7 +187,7 @@ export const ActivityTable = ({
             </div>
           );
 
-          if (isCash) {
+          if (isCash || !hasAsset) {
             return content;
           }
           return (
@@ -390,7 +428,7 @@ export const ActivityTable = ({
         enableHiding: false,
       },
     ],
-    [handleEdit, handleDelete, handleDuplicate],
+    [handleEdit, handleDelete, handleDuplicate, symbolExchangeCountMap],
   );
 
   const handleSortingChange = React.useCallback<OnChangeFn<SortingState>>(

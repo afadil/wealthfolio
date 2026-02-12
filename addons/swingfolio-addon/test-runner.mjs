@@ -17,7 +17,7 @@ function parseCSV(csv) {
         obj[header] = value ? parseFloat(value) : 0;
       } else if (["date", "createdAt", "updatedAt"].includes(header)) {
         obj[header] = new Date(value);
-      } else if (["isDraft"].includes(header)) {
+      } else if (["needsReview"].includes(header)) {
         obj[header] = value === "TRUE";
       } else {
         obj[header] = value;

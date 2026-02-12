@@ -17,7 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useComposedRefs } from "@wealthfolio/ui/hooks";
 import { Command as CommandPrimitive } from "cmdk";
 import { debounce } from "lodash";
-import { forwardRef, memo, useCallback, useMemo, useRef, useState } from "react";
+import { forwardRef, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CreateCustomAssetDialog } from "./create-custom-asset-dialog";
 
 interface SearchProps {
@@ -35,6 +35,8 @@ interface SearchProps {
   className?: string;
   /** Default currency to use for custom assets (typically from account) */
   defaultCurrency?: string;
+  /** Optional exchange MIC for display context when value is canonical (e.g., SHOP -> SHOP (TSX)). */
+  selectedExchangeMic?: string;
   /** Test ID for e2e testing */
   "data-testid"?: string;
 }
@@ -190,6 +192,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       autoFocusSearch = false,
       className,
       defaultCurrency,
+      selectedExchangeMic,
       "data-testid": testId,
     },
     ref,
@@ -212,6 +215,10 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
         return defaultValue;
       }
       if (value) {
+        const exchangeDisplay = getExchangeDisplayName(selectedExchangeMic);
+        if (exchangeDisplay) {
+          return `${value} (${exchangeDisplay})`;
+        }
         return value;
       }
       return "";
@@ -257,6 +264,18 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       },
       [onSelectResult, debouncedSearch, isControlled, onOpenChange],
     );
+
+    useEffect(() => {
+      if (selectedResult) return;
+      const current = value ?? defaultValue ?? "";
+      if (!current) {
+        setSelected("");
+        return;
+      }
+      const exchangeDisplay = getExchangeDisplayName(selectedExchangeMic);
+      const next = exchangeDisplay ? `${current} (${exchangeDisplay})` : current;
+      setSelected((prev) => (prev === next ? prev : next));
+    }, [defaultValue, selectedExchangeMic, selectedResult, value]);
 
     // Handle "Create custom asset" click
     const handleCreateCustomAsset = useCallback(() => {

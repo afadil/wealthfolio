@@ -37,7 +37,7 @@
           "capabilities": { "tools": false, "thinking": true, "vision": false }
         }
       },
-      "defaultModel": "deepseek-r1:8b",
+      "defaultModel": "ministral-3",
       "titleModelId": "ministral-3",
       "documentationUrl": "https://ollama.ai/docs"
     },

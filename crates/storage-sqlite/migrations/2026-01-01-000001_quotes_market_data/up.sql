@@ -38,14 +38,14 @@ CREATE TABLE quotes_new (
 
 -- Migrate data with deterministic ID generation
 -- ID format: {asset_id}_{YYYY-MM-DD}_{source}
--- Map old symbol to new asset_id using metadata.legacy.old_id.
+-- Map old symbol to new asset_id using legacy_asset_id_map generated in
+-- 2026-01-01-000000_refactor_asset_model.
 -- Use a temp map table so join uses a plain indexed text column.
 CREATE TEMP TABLE asset_old_id_map AS
 SELECT
-    json_extract(metadata, '$.legacy.old_id') AS old_id,
-    id AS new_id
-FROM assets
-WHERE json_extract(metadata, '$.legacy.old_id') IS NOT NULL;
+    old_id,
+    new_id
+FROM legacy_asset_id_map;
 
 CREATE INDEX idx_asset_old_id_map_old_id ON asset_old_id_map(old_id);
 
@@ -54,34 +54,45 @@ INSERT INTO quotes_new (
     currency, notes, created_at, timestamp
 )
 SELECT
-    -- Use new asset_id in the quote ID
-    COALESCE(m.new_id, q.symbol) || '_' || substr(q.timestamp, 1, 10) || '_' || q.data_source,
-    -- Map old symbol to new asset_id
-    COALESCE(m.new_id, q.symbol) AS asset_id,
-    substr(q.timestamp, 1, 10) AS day,
-    q.data_source AS source,
-    CASE WHEN q.open = '0' THEN NULL ELSE q.open END,
-    CASE WHEN q.high = '0' THEN NULL ELSE q.high END,
-    CASE WHEN q.low = '0' THEN NULL ELSE q.low END,
-    q.close,
-    CASE WHEN q.adjclose = '0' THEN NULL ELSE q.adjclose END,
-    CASE WHEN q.volume = '0' THEN NULL ELSE q.volume END,
-    q.currency,
+    -- Use mapped asset_id in the quote ID
+    rq.mapped_asset_id || '_' || rq.day || '_' || rq.data_source,
+    rq.mapped_asset_id AS asset_id,
+    rq.day,
+    rq.data_source AS source,
+    CASE WHEN rq.open = '0' THEN NULL ELSE rq.open END,
+    CASE WHEN rq.high = '0' THEN NULL ELSE rq.high END,
+    CASE WHEN rq.low = '0' THEN NULL ELSE rq.low END,
+    rq.close,
+    CASE WHEN rq.adjclose = '0' THEN NULL ELSE rq.adjclose END,
+    CASE WHEN rq.volume = '0' THEN NULL ELSE rq.volume END,
+    rq.currency,
     NULL, -- notes (new column)
     -- Convert datetime format
     CASE
-        WHEN q.created_at LIKE '%T%' THEN q.created_at
-        ELSE replace(q.created_at, ' ', 'T') || 'Z'
+        WHEN rq.created_at LIKE '%T%' THEN rq.created_at
+        ELSE replace(rq.created_at, ' ', 'T') || 'Z'
     END,
     -- Convert timestamp format
     CASE
-        WHEN q.timestamp LIKE '%T%' THEN q.timestamp
-        ELSE replace(q.timestamp, ' ', 'T') || 'Z'
+        WHEN rq.timestamp LIKE '%T%' THEN rq.timestamp
+        ELSE replace(rq.timestamp, ' ', 'T') || 'Z'
     END
-FROM quotes q
-LEFT JOIN asset_old_id_map m ON m.old_id = q.symbol;
+FROM (
+    SELECT
+        q.*,
+        COALESCE(m.new_id, q.symbol) AS mapped_asset_id,
+        substr(q.timestamp, 1, 10) AS day,
+        row_number() OVER (
+            PARTITION BY COALESCE(m.new_id, q.symbol), substr(q.timestamp, 1, 10), q.data_source
+            ORDER BY q.timestamp DESC, q.created_at DESC, q.id DESC
+        ) AS row_num
+    FROM quotes q
+    LEFT JOIN asset_old_id_map m ON m.old_id = q.symbol
+) rq
+WHERE rq.row_num = 1;
 
 DROP TABLE asset_old_id_map;
+DROP TABLE legacy_asset_id_map;
 
 DROP TABLE quotes;
 ALTER TABLE quotes_new RENAME TO quotes;

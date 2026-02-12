@@ -236,6 +236,15 @@ impl ActivityService {
             .collect()
     }
 
+    /// Resolve a single symbol to exchange MIC using a currency hint.
+    async fn resolve_symbol_exchange_mic(&self, symbol: &str, currency: &str) -> Option<String> {
+        self.quote_service
+            .search_symbol_with_currency(symbol, Some(currency))
+            .await
+            .ok()
+            .and_then(|results| results.first().and_then(|r| r.exchange_mic.clone()))
+    }
+
     /// Creates a manual quote from activity data when quote_mode is MANUAL.
     /// This ensures the asset has a price point on the activity date.
     async fn create_manual_quote_from_activity(
@@ -488,13 +497,18 @@ impl ActivityService {
             if !sym.is_empty() {
                 // Strip Yahoo suffix (e.g. GOOG.TO → GOOG + XTSE)
                 let (base_symbol, suffix_mic) = parse_symbol_with_exchange_suffix(sym);
-                let effective_mic = if is_crypto {
+                let mut effective_mic = if is_crypto {
                     None
                 } else {
                     exchange_mic
                         .clone()
                         .or_else(|| suffix_mic.map(|s| s.to_string()))
                 };
+                if effective_mic.is_none() {
+                    effective_mic = self
+                        .resolve_symbol_exchange_mic(base_symbol, &asset_currency)
+                        .await;
+                }
 
                 // For crypto pairs (e.g. BTC-USD), normalize to base symbol (BTC)
                 let normalized_symbol = if is_crypto {
@@ -594,7 +608,7 @@ impl ActivityService {
                 let current_mode = asset.quote_mode.as_db_str();
                 if requested_mode != current_mode {
                     self.asset_service
-                        .update_quote_mode(&asset.id, &requested_mode)
+                        .update_quote_mode_silent(&asset.id, &requested_mode)
                         .await?;
                 }
 
@@ -726,9 +740,14 @@ impl ActivityService {
         let resolved_asset_id = if let Some(ref sym) = symbol {
             if !sym.is_empty() {
                 let (base_symbol, suffix_mic) = parse_symbol_with_exchange_suffix(sym);
-                let effective_mic = exchange_mic
+                let mut effective_mic = exchange_mic
                     .clone()
                     .or_else(|| suffix_mic.map(|s| s.to_string()));
+                if !is_crypto && effective_mic.is_none() {
+                    effective_mic = self
+                        .resolve_symbol_exchange_mic(base_symbol, &asset_currency)
+                        .await;
+                }
 
                 let existing_id = self.find_existing_asset_id(
                     base_symbol,
@@ -816,7 +835,7 @@ impl ActivityService {
                 let current_mode = asset.quote_mode.as_db_str();
                 if requested_mode != current_mode {
                     self.asset_service
-                        .update_quote_mode(&asset.id, &requested_mode)
+                        .update_quote_mode_silent(&asset.id, &requested_mode)
                         .await?;
                 }
 

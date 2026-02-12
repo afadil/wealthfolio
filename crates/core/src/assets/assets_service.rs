@@ -7,8 +7,8 @@ use crate::quotes::QuoteServiceTrait;
 use crate::taxonomies::TaxonomyServiceTrait;
 
 use super::assets_model::{
-    Asset, AssetKind, AssetSpec, EnsureAssetsResult, InstrumentType, NewAsset, QuoteMode,
-    UpdateAssetProfile,
+    canonicalize_market_identity, Asset, AssetKind, AssetSpec, EnsureAssetsResult, InstrumentType,
+    NewAsset, QuoteMode, UpdateAssetProfile,
 };
 use super::assets_traits::{AssetRepositoryTrait, AssetServiceTrait};
 use super::auto_classification::{AutoClassificationService, ClassificationInput};
@@ -71,7 +71,7 @@ impl AssetService {
 
     /// Sets the domain event sink for this service.
     ///
-    /// Events are emitted after successful asset creation (not updates).
+    /// Events are emitted after successful asset mutations.
     pub fn with_event_sink(mut self, event_sink: Arc<dyn DomainEventSink>) -> Self {
         self.event_sink = event_sink;
         self
@@ -79,6 +79,15 @@ impl AssetService {
 
     /// Builds a NewAsset from an AssetSpec without any I/O.
     fn new_asset_from_spec(&self, spec: &AssetSpec) -> NewAsset {
+        let canonical = canonicalize_market_identity(
+            spec.instrument_type.clone(),
+            spec.instrument_symbol
+                .as_deref()
+                .or(spec.display_code.as_deref()),
+            spec.instrument_exchange_mic.as_deref(),
+            Some(spec.quote_ccy.as_str()),
+        );
+
         let quote_mode = spec.quote_mode.unwrap_or(match &spec.kind {
             AssetKind::Investment | AssetKind::Fx => QuoteMode::Market,
             _ => QuoteMode::Manual,
@@ -93,12 +102,18 @@ impl AssetService {
             id: spec.id.clone(),
             kind: spec.kind.clone(),
             name: spec.name.clone(),
-            display_code: spec.display_code.clone(),
+            display_code: canonical.display_code.or(spec.display_code.clone()),
             quote_mode,
-            quote_ccy: spec.quote_ccy.clone(),
+            quote_ccy: canonical
+                .quote_ccy
+                .unwrap_or_else(|| spec.quote_ccy.clone()),
             instrument_type: spec.instrument_type.clone(),
-            instrument_symbol: spec.instrument_symbol.clone(),
-            instrument_exchange_mic: spec.instrument_exchange_mic.clone(),
+            instrument_symbol: canonical
+                .instrument_symbol
+                .or(spec.instrument_symbol.clone()),
+            instrument_exchange_mic: canonical
+                .instrument_exchange_mic
+                .or(spec.instrument_exchange_mic.clone()),
             provider_config,
             is_active: true,
             ..Default::default()
@@ -135,11 +150,66 @@ impl AssetServiceTrait for AssetService {
     async fn update_asset_profile(
         &self,
         asset_id: &str,
-        payload: UpdateAssetProfile,
+        mut payload: UpdateAssetProfile,
     ) -> Result<Asset> {
-        self.asset_repository
+        let existing_asset = self.asset_repository.get_by_id(asset_id)?;
+        let effective_quote_mode = payload.quote_mode.unwrap_or(existing_asset.quote_mode);
+
+        if let Some(raw_mic) = payload.instrument_exchange_mic.as_ref() {
+            let normalized_mic = raw_mic.trim().to_uppercase();
+            if !normalized_mic.is_empty() {
+                payload.instrument_exchange_mic = Some(normalized_mic.clone());
+                if effective_quote_mode == QuoteMode::Market {
+                    payload.quote_ccy = mic_to_currency(&normalized_mic).map(|ccy| ccy.to_string());
+                }
+            }
+        }
+
+        let effective_instrument_type = payload
+            .instrument_type
+            .clone()
+            .or(existing_asset.instrument_type.clone());
+
+        if effective_instrument_type.is_some() {
+            let canonical = canonicalize_market_identity(
+                effective_instrument_type.clone(),
+                payload
+                    .instrument_symbol
+                    .as_deref()
+                    .or(payload.display_code.as_deref())
+                    .or(existing_asset.instrument_symbol.as_deref())
+                    .or(existing_asset.display_code.as_deref()),
+                payload
+                    .instrument_exchange_mic
+                    .as_deref()
+                    .or(existing_asset.instrument_exchange_mic.as_deref()),
+                payload
+                    .quote_ccy
+                    .as_deref()
+                    .or(Some(existing_asset.quote_ccy.as_str())),
+            );
+
+            payload.instrument_symbol = canonical
+                .instrument_symbol
+                .or(payload.instrument_symbol.clone());
+            payload.display_code = canonical.display_code.or(payload.display_code.clone());
+            payload.instrument_exchange_mic = canonical
+                .instrument_exchange_mic
+                .or(payload.instrument_exchange_mic.clone());
+            if effective_quote_mode == QuoteMode::Market {
+                payload.quote_ccy = canonical.quote_ccy.or(payload.quote_ccy.clone());
+            }
+        }
+
+        let asset = self
+            .asset_repository
             .update_profile(asset_id, payload)
-            .await
+            .await?;
+
+        self.event_sink
+            .emit(DomainEvent::assets_updated(vec![asset.id.clone()]));
+
+        Ok(asset)
     }
 
     /// Creates a new asset directly without network lookups.
@@ -189,6 +259,7 @@ impl AssetServiceTrait for AssetService {
             meta.instrument_symbol
                 .as_ref()
                 .filter(|s| !s.is_empty())
+                .or(meta.display_code.as_ref().filter(|s| !s.is_empty()))
                 .map(|_| {
                     meta.instrument_type
                         .clone()
@@ -197,20 +268,32 @@ impl AssetServiceTrait for AssetService {
         });
 
         if let Some(ref meta) = metadata {
-            if let Some(ref sym) = meta.instrument_symbol {
+            let canonical = canonicalize_market_identity(
+                inferred_instrument_type.clone(),
+                meta.instrument_symbol
+                    .as_deref()
+                    .or(meta.display_code.as_deref()),
+                meta.instrument_exchange_mic.as_deref(),
+                context_currency.as_deref(),
+            );
+            if let Some(ref sym) = canonical.instrument_symbol {
                 if !sym.is_empty() {
                     let instrument_type = inferred_instrument_type
                         .clone()
                         .unwrap_or(InstrumentType::Equity);
                     let spec = AssetSpec {
                         id: None,
-                        display_code: meta.display_code.clone(),
+                        display_code: canonical.display_code.or(meta.display_code.clone()),
                         instrument_symbol: Some(sym.clone()),
-                        instrument_exchange_mic: meta.instrument_exchange_mic.clone(),
+                        instrument_exchange_mic: canonical
+                            .instrument_exchange_mic
+                            .or(meta.instrument_exchange_mic.clone()),
                         instrument_type: Some(instrument_type),
-                        quote_ccy: context_currency
-                            .clone()
-                            .unwrap_or_else(|| "USD".to_string()),
+                        quote_ccy: canonical.quote_ccy.unwrap_or_else(|| {
+                            context_currency
+                                .clone()
+                                .unwrap_or_else(|| "USD".to_string())
+                        }),
                         kind: meta.kind.clone().unwrap_or(AssetKind::Investment),
                         quote_mode: None,
                         name: meta.name.clone(),
@@ -277,20 +360,28 @@ impl AssetServiceTrait for AssetService {
         };
 
         let name = metadata.as_ref().and_then(|m| m.name.clone());
-        let instrument_symbol = metadata.as_ref().and_then(|m| m.instrument_symbol.clone());
         let instrument_type = inferred_instrument_type;
-        let display_code = metadata.as_ref().and_then(|m| m.display_code.clone());
+        let canonical_identity = canonicalize_market_identity(
+            instrument_type.clone(),
+            metadata
+                .as_ref()
+                .and_then(|m| m.instrument_symbol.as_deref().or(m.display_code.as_deref())),
+            exchange_mic.as_deref(),
+            Some(currency.as_str()),
+        );
 
         let new_asset = NewAsset {
             id: Some(asset_id.to_string()),
             kind,
             name,
             quote_mode,
-            quote_ccy: currency,
-            instrument_exchange_mic: exchange_mic,
-            instrument_symbol,
+            quote_ccy: canonical_identity.quote_ccy.unwrap_or(currency),
+            instrument_exchange_mic: canonical_identity.instrument_exchange_mic.or(exchange_mic),
+            instrument_symbol: canonical_identity.instrument_symbol,
             instrument_type,
-            display_code,
+            display_code: canonical_identity
+                .display_code
+                .or_else(|| metadata.as_ref().and_then(|m| m.display_code.clone())),
             provider_config,
             is_active: true,
             ..Default::default()
@@ -312,6 +403,19 @@ impl AssetServiceTrait for AssetService {
 
     /// Updates the quote mode for an asset (MARKET, MANUAL)
     async fn update_quote_mode(&self, asset_id: &str, quote_mode: &str) -> Result<Asset> {
+        let asset = self
+            .asset_repository
+            .update_quote_mode(asset_id, quote_mode)
+            .await?;
+
+        self.event_sink
+            .emit(DomainEvent::assets_updated(vec![asset.id.clone()]));
+
+        Ok(asset)
+    }
+
+    /// Updates quote mode without emitting domain events.
+    async fn update_quote_mode_silent(&self, asset_id: &str, quote_mode: &str) -> Result<Asset> {
         self.asset_repository
             .update_quote_mode(asset_id, quote_mode)
             .await
@@ -440,6 +544,7 @@ impl AssetServiceTrait for AssetService {
             notes: existing_asset.notes.clone().unwrap_or_default(),
             kind: None,
             quote_mode: Some(existing_asset.quote_mode),
+            quote_ccy: None,
             instrument_type: updated_instrument_type,
             instrument_symbol: None,
             instrument_exchange_mic: None,

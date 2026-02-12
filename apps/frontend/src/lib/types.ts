@@ -807,6 +807,7 @@ export interface UpdateAssetProfile {
   notes?: string | null;
   kind?: AssetKind | null;
   quoteMode?: QuoteMode | null;
+  instrumentExchangeMic?: string | null;
   providerConfig?: Record<string, unknown> | null;
 }
 

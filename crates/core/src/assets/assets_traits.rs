@@ -30,6 +30,13 @@ pub trait AssetServiceTrait: Send + Sync {
         quote_mode_hint: Option<String>,
     ) -> Result<Asset>;
     async fn update_quote_mode(&self, asset_id: &str, quote_mode: &str) -> Result<Asset>;
+    /// Updates quote mode without emitting domain events.
+    ///
+    /// Used by activity preparation flows where the activity mutation itself
+    /// emits the recalculation-triggering event after persistence succeeds.
+    async fn update_quote_mode_silent(&self, asset_id: &str, quote_mode: &str) -> Result<Asset> {
+        self.update_quote_mode(asset_id, quote_mode).await
+    }
     async fn get_assets_by_asset_ids(&self, asset_ids: &[String]) -> Result<Vec<Asset>>;
     /// Enriches an existing asset's profile with data from market data provider.
     /// Updates the profile JSON (sectors, countries, website) and notes fields.

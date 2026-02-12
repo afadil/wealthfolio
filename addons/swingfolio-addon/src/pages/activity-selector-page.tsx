@@ -306,9 +306,11 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
                             </div>
                           )}
                         </td>
-                        <td className="p-3 text-sm">{activity.quantity.toLocaleString()}</td>
                         <td className="p-3 text-sm">
-                          {activity.unitPrice.toLocaleString("en-US", {
+                          {Number(activity.quantity ?? 0).toLocaleString()}
+                        </td>
+                        <td className="p-3 text-sm">
+                          {Number(activity.unitPrice ?? 0).toLocaleString("en-US", {
                             style: "currency",
                             currency: activity.currency,
                           })}

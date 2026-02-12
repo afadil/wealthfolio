@@ -4,6 +4,7 @@ import {
   ActivityStatus,
   ActivityType,
   ActivityTypeNames,
+  getExchangeDisplayName,
   SUBTYPE_DISPLAY_NAMES,
   SUBTYPES_BY_ACTIVITY_TYPE,
 } from "@/lib/constants";
@@ -224,6 +225,14 @@ export function useActivityColumns({
             isDisabled: (rowData: unknown) => {
               const row = rowData as LocalTransaction;
               return isCashActivity(row.activityType ?? "");
+            },
+            getDisplayContext: (rowData: unknown) => {
+              const row = rowData as LocalTransaction;
+              const symbol = (row.assetSymbol ?? "").trim().toUpperCase();
+              if (!symbol || symbol === "CASH" || symbol.startsWith("$CASH")) {
+                return undefined;
+              }
+              return getExchangeDisplayName(row.exchangeMic);
             },
             isClearable: (rowData: unknown) => {
               const row = rowData as LocalTransaction;

@@ -12,8 +12,8 @@ use crate::api::shared::PortfolioJobConfig;
 /// Plans a portfolio job from a batch of domain events.
 ///
 /// Merges account_ids and asset_ids from ActivitiesChanged, HoldingsChanged,
-/// and AccountsChanged events. Also carries through asset IDs from AssetsCreated
-/// when a recalc-triggering event exists in the same batch.
+/// AccountsChanged, and AssetsUpdated events. Also carries through asset IDs
+/// from AssetsCreated when a recalc-triggering event exists in the same batch.
 ///
 /// Returns None if no events require portfolio recalculation.
 pub fn plan_portfolio_job(events: &[DomainEvent]) -> Option<PortfolioJobConfig> {
@@ -71,6 +71,14 @@ pub fn plan_portfolio_job(events: &[DomainEvent]) -> Option<PortfolioJobConfig> 
                 has_recalc_event = true;
                 if !account_id.is_empty() {
                     account_ids.insert(account_id.clone());
+                }
+            }
+            DomainEvent::AssetsUpdated { asset_ids: ids } => {
+                has_recalc_event = true;
+                for id in ids {
+                    if !id.is_empty() {
+                        asset_ids.insert(id.clone());
+                    }
                 }
             }
             // AssetsCreated: include IDs for sync (e.g., FX assets), but don't trigger recalc alone
@@ -258,6 +266,22 @@ mod tests {
 
         let config = plan_portfolio_job(&events);
         assert!(config.is_none());
+    }
+
+    #[test]
+    fn test_plan_portfolio_job_assets_updated_triggers_recalc() {
+        let events = vec![DomainEvent::AssetsUpdated {
+            asset_ids: vec!["asset-1".to_string()],
+        }];
+
+        let config = plan_portfolio_job(&events).unwrap();
+        assert!(config.account_ids.is_none());
+
+        if let MarketSyncMode::Incremental { asset_ids } = config.market_sync_mode {
+            assert_eq!(asset_ids, Some(vec!["asset-1".to_string()]));
+        } else {
+            panic!("Expected Incremental mode");
+        }
     }
 
     #[test]

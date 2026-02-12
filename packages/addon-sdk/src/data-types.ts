@@ -100,21 +100,27 @@ export const ACTIVITY_SUBTYPES = {
 export type ActivitySubtype = (typeof ACTIVITY_SUBTYPES)[keyof typeof ACTIVITY_SUBTYPES];
 
 // Asset kinds for behavior classification
-export const ASSET_KINDS = [
-  'SECURITY',
-  'CRYPTO',
-  'CASH',
-  'FX_RATE',
-  'OPTION',
-  'COMMODITY',
-  'PRIVATE_EQUITY',
-  'PROPERTY',
-  'VEHICLE',
-  'LIABILITY',
-  'OTHER',
-] as const;
+export const AssetKind = {
+  INVESTMENT: 'INVESTMENT',
+  PROPERTY: 'PROPERTY',
+  VEHICLE: 'VEHICLE',
+  COLLECTIBLE: 'COLLECTIBLE',
+  PRECIOUS_METAL: 'PRECIOUS_METAL',
+  PRIVATE_EQUITY: 'PRIVATE_EQUITY',
+  LIABILITY: 'LIABILITY',
+  OTHER: 'OTHER',
+  FX: 'FX',
+} as const;
 
-export type AssetKind = (typeof ASSET_KINDS)[number];
+export type AssetKind = (typeof AssetKind)[keyof typeof AssetKind];
+
+// QuoteMode: How an asset's price is determined
+export const QuoteMode = {
+  MARKET: 'MARKET',
+  MANUAL: 'MANUAL',
+} as const;
+
+export type QuoteMode = (typeof QuoteMode)[keyof typeof QuoteMode];
 
 export const DataSource = {
   YAHOO: 'YAHOO',
@@ -134,6 +140,7 @@ export type AccountType = (typeof AccountType)[keyof typeof AccountType];
 export const HoldingType = {
   CASH: 'cash',
   SECURITY: 'security',
+  ALTERNATIVE_ASSET: 'AlternativeAsset',
 } as const;
 
 export type HoldingType = (typeof HoldingType)[keyof typeof HoldingType];
@@ -150,34 +157,19 @@ export interface Account {
   currency: string;
   isDefault: boolean;
   isActive: boolean;
+  isArchived: boolean;
+  trackingMode: 'TRANSACTIONS' | 'HOLDINGS' | 'NOT_SET';
   createdAt: Date;
   updatedAt: Date;
   platformId?: string;
+  accountNumber?: string;
+  meta?: string;
+  provider?: string;
+  providerAccountId?: string;
 }
 
 /**
- * Activity interface matching the new backend model
- * @deprecated Use the new Activity interface with activityType field
- */
-export interface ActivityLegacy {
-  id: string;
-  type: ActivityType;
-  date: Date | string;
-  quantity: number;
-  unitPrice: number;
-  currency: string;
-  fee: number;
-  isDraft: boolean;
-  comment?: string | null;
-  accountId?: string | null;
-  createdAt: Date | string;
-  symbolProfileId: string;
-  updatedAt: Date | string;
-  assetDataSource?: DataSource;
-}
-
-/**
- * Activity interface matching the new backend model
+ * Activity interface matching the v3 backend model
  */
 export interface Activity {
   // Identity
@@ -243,14 +235,17 @@ export function hasUserOverride(activity: Activity): boolean {
 export interface ActivityDetails {
   id: string;
   activityType: ActivityType;
+  subtype?: string | null;
+  status?: ActivityStatus;
   date: Date;
-  quantity: number;
-  unitPrice: number;
-  amount: number;
-  fee: number;
+  quantity: string | null;
+  unitPrice: string | null;
+  amount: string | null;
+  fee: string | null;
   currency: string;
-  isDraft: boolean;
+  needsReview: boolean;
   comment?: string;
+  fxRate?: string | null;
   createdAt: Date;
   assetId: string;
   updatedAt: Date;
@@ -259,7 +254,15 @@ export interface ActivityDetails {
   accountCurrency: string;
   assetSymbol: string;
   assetName?: string;
-  assetDataSource?: DataSource;
+  assetQuoteMode?: QuoteMode;
+  exchangeMic?: string;
+  // Sync/source metadata
+  sourceSystem?: string;
+  sourceRecordId?: string;
+  idempotencyKey?: string;
+  importRunId?: string;
+  isUserModified?: boolean;
+  metadata?: Record<string, unknown>;
   subRows?: ActivityDetails[];
 }
 
@@ -270,24 +273,49 @@ export interface ActivitySearchResponse {
   };
 }
 
+export interface SymbolInput {
+  id?: string;
+  symbol?: string;
+  exchangeMic?: string;
+  kind?: string;
+  name?: string;
+  quoteMode?: QuoteMode;
+}
+
 export interface ActivityCreate {
   id?: string;
   accountId: string;
   activityType: string;
+  subtype?: string | null;
   activityDate: string | Date;
-  assetId?: string;
-  assetDataSource?: DataSource;
-  quantity?: number;
-  unitPrice?: number;
-  amount?: number;
+  sourceGroupId?: string;
+  symbol?: SymbolInput;
+  quantity?: string | number | null;
+  unitPrice?: string | number | null;
+  amount?: string | number | null;
   currency?: string;
-  fee?: number;
-  isDraft: boolean;
+  fee?: string | number | null;
   comment?: string | null;
+  fxRate?: string | number | null;
+  metadata?: string | Record<string, unknown>;
 }
 
-export interface ActivityUpdate extends ActivityCreate {
+export interface ActivityUpdate {
   id: string;
+  accountId: string;
+  activityType: string;
+  subtype?: string | null;
+  activityDate: string | Date;
+  sourceGroupId?: string;
+  symbol?: SymbolInput;
+  quantity?: string | number | null;
+  unitPrice?: string | number | null;
+  amount?: string | number | null;
+  currency?: string;
+  fee?: string | number | null;
+  comment?: string | null;
+  fxRate?: string | number | null;
+  metadata?: string | Record<string, unknown>;
 }
 
 export interface ActivityBulkMutationRequest {
@@ -320,12 +348,14 @@ export interface ActivityImport {
   accountId: string;
   currency?: string;
   activityType: ActivityType;
+  subtype?: string;
   date?: Date | string;
   symbol: string;
   amount?: number;
   quantity?: number;
   unitPrice?: number;
   fee?: number;
+  fxRate?: number;
   accountName?: string;
   symbolName?: string;
   /** Resolved exchange MIC for the symbol (populated during validation) */
@@ -337,34 +367,27 @@ export interface ActivityImport {
   comment?: string;
 }
 
+export interface ImportActivitiesSummary {
+  total: number;
+  imported: number;
+  skipped: number;
+  duplicates: number;
+  assetsCreated: number;
+  success: boolean;
+}
+
+export interface ImportActivitiesResult {
+  activities: ActivityImport[];
+  importRunId: string;
+  summary: ImportActivitiesSummary;
+}
+
 export interface ImportMappingData {
   accountId: string;
   fieldMappings: Record<string, string>;
   activityMappings: Record<string, string[]>;
   symbolMappings: Record<string, string>;
   accountMappings: Record<string, string>;
-}
-
-export interface AssetProfile {
-  id: string;
-  isin: string | null;
-  name: string | null;
-  assetType: string | null;
-  symbol: string;
-  symbolMapping: string | null;
-  assetClass: string | null;
-  assetSubClass: string | null;
-  notes: string | null;
-  countries: string | null;
-  categories: string | null;
-  classes: string | null;
-  attributes: string | null;
-  createdAt: Date;
-  currency: string;
-  dataSource: string;
-  updatedAt: Date;
-  sectors: string | null;
-  url: string | null;
 }
 
 export interface SymbolSearchResult {
@@ -382,12 +405,12 @@ export interface SymbolSearchResult {
   score: number;
   typeDisplay: string;
   longName: string;
-  sector?: string;
-  industry?: string;
   dataSource?: string;
+  /** Asset kind for custom assets (e.g., "INVESTMENT", "OTHER") */
+  assetKind?: string;
   /** True if this asset already exists in user's database */
   isExisting?: boolean;
-  /** The existing asset ID if found (e.g., "SEC:AAPL:XNAS") */
+  /** The existing asset ID if found */
   existingAssetId?: string;
 }
 
@@ -396,17 +419,6 @@ export interface MarketDataProviderInfo {
   name: string;
   logoFilename: string;
   lastSyncedDate: string | null;
-}
-
-export interface MarketData {
-  createdAt: Date;
-  dataSource: string;
-  date: Date;
-  id: string;
-  marketPrice: number;
-  state: 'CLOSE';
-  symbol: string;
-  symbolProfileId: string;
 }
 
 export interface Tag {
@@ -429,27 +441,48 @@ export type ValidationResult =
   | { status: 'error'; errors: string[] };
 
 // Holding types
-export interface Sector {
-  name: string;
-  weight: number;
-}
-
-export interface Country {
-  name: string;
-  weight: number;
-}
-
 export interface Instrument {
   id: string;
   symbol: string;
   name?: string | null;
   currency: string;
   notes?: string | null;
-  dataSource?: string | null;
-  assetClass?: string | null;
-  assetSubclass?: string | null;
-  countries?: Country[] | null;
-  sectors?: Sector[] | null;
+  quoteMode: QuoteMode;
+  preferredProvider?: string | null;
+  classifications?: AssetClassifications | null;
+}
+
+export interface AssetClassifications {
+  assetType?: TaxonomyCategory | null;
+  riskCategory?: TaxonomyCategory | null;
+  assetClasses: CategoryWithWeight[];
+  sectors: CategoryWithWeight[];
+  regions: CategoryWithWeight[];
+  customGroups: CategoryWithWeight[];
+}
+
+export interface TaxonomyCategory {
+  id: string;
+  taxonomyId: string;
+  parentId?: string | null;
+  name: string;
+  key: string;
+  color: string;
+  description?: string | null;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CategoryRef {
+  id: string;
+  name: string;
+}
+
+export interface CategoryWithWeight {
+  category: TaxonomyCategory;
+  topLevelCategory: CategoryRef;
+  weight: number;
 }
 
 export interface MonetaryValue {
@@ -492,6 +525,7 @@ export interface Holding {
   holdingType: HoldingType;
   accountId: string;
   instrument?: Instrument | null;
+  assetKind?: AssetKind | null;
   quantity: number;
   openDate?: string | Date | null;
   lots?: Lot[] | null;
@@ -514,42 +548,40 @@ export interface Holding {
   asOfDate: string;
 }
 
+/**
+ * Asset interface matching the v3 backend model.
+ * Identity is opaque (UUID). Classification is via `kind` and `instrumentType`.
+ */
 export interface Asset {
   id: string;
-  symbol: string;
+
+  // Core identity
+  kind: AssetKind;
   name?: string | null;
-
-  // Behavior classification
-  kind?: AssetKind;
-
-  // Provider/market taxonomy
-  assetType?: string | null;
-  assetClass?: string | null;
-  assetSubClass?: string | null;
-
-  // Identifiers
-  isin?: string | null;
-  currency: string;
-
-  // Pricing
-  dataSource: string;
-  quoteSymbol?: string | null;
-
-  // Legacy fields for backward compatibility
-  symbolMapping?: string | null;
+  displayCode?: string | null; // User-visible ticker/label
   notes?: string | null;
-  countries?: string | null;
-  categories?: string | null;
-  classes?: string | null;
-  attributes?: string | null;
-  sectors?: string | null;
-  url?: string | null;
+  metadata?: Record<string, unknown>;
 
   // Status
   isActive?: boolean;
 
-  // Extensions
-  metadata?: Record<string, unknown>;
+  // Valuation
+  quoteMode: QuoteMode;
+  quoteCcy: string; // Currency prices/valuations are quoted in
+
+  // Instrument identity (null for non-market assets)
+  instrumentType?: string | null; // EQUITY, CRYPTO, FX, OPTION, METAL
+  instrumentSymbol?: string | null; // Canonical symbol (AAPL, BTC, EUR)
+  instrumentExchangeMic?: string | null; // ISO 10383 MIC (XNAS, XTSE)
+
+  // Computed canonical key (read-only from DB)
+  instrumentKey?: string | null;
+
+  // Provider configuration (single JSON blob)
+  providerConfig?: Record<string, unknown> | null;
+
+  // Derived
+  exchangeName?: string | null; // Friendly exchange name (e.g., "NASDAQ")
 
   // Audit
   createdAt: string;
@@ -561,7 +593,7 @@ export interface Quote {
   createdAt: string;
   dataSource: string;
   timestamp: string;
-  symbol: string;
+  assetId: string;
   open: number;
   high: number;
   low: number;
@@ -569,11 +601,12 @@ export interface Quote {
   close: number;
   adjclose: number;
   currency: string;
+  notes?: string | null;
 }
 
 export interface QuoteUpdate {
   timestamp: string;
-  symbol: string;
+  assetId: string;
   open: number;
   high: number;
   low: number;
@@ -586,17 +619,11 @@ export interface Settings {
   theme: string;
   font: string;
   baseCurrency: string;
+  instanceId: string;
   onboardingCompleted: boolean;
   autoUpdateCheckEnabled: boolean;
-}
-
-export interface SettingsContextType {
-  settings: Settings | null;
-  isLoading: boolean;
-  isError: boolean;
-  updateBaseCurrency: (currency: Settings['baseCurrency']) => Promise<void>;
-  accountsGrouped: boolean;
-  setAccountsGrouped: (value: boolean) => void;
+  menuBarVisible: boolean;
+  syncEnabled: boolean;
 }
 
 export interface Goal {
@@ -623,11 +650,19 @@ export interface GoalProgress {
   currency: string;
 }
 
+export interface IncomeByAsset {
+  assetId: string;
+  kind: AssetKind;
+  symbol: string;
+  name: string;
+  income: number;
+}
+
 export interface IncomeSummary {
   period: string;
   byMonth: Record<string, number>;
   byType: Record<string, number>;
-  bySymbol: Record<string, number>;
+  byAsset: Record<string, IncomeByAsset>;
   byCurrency: Record<string, number>;
   totalIncome: number;
   currency: string;
@@ -768,14 +803,13 @@ export interface PerformanceMetrics {
 }
 
 export interface UpdateAssetProfile {
-  symbol: string;
-  symbolMapping?: string | null;
-  name?: string;
-  sectors: string;
-  countries: string;
-  notes: string;
-  assetClass: string;
-  assetSubClass: string;
+  id: string;
+  displayCode?: string | null;
+  name?: string | null;
+  notes?: string | null;
+  kind?: AssetKind | null;
+  quoteMode?: QuoteMode | null;
+  providerConfig?: Record<string, unknown> | null;
 }
 
 export interface TrackedItem {

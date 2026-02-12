@@ -20,6 +20,7 @@ import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { streamChatResponse, type ChatModelConfig } from "../api";
 import type { AiThread, ChatMessage, ChatThread, ThreadPage } from "../types";
 import { QueryKeys } from "@/lib/query-keys";
+import { generateId } from "@/lib/id";
 import { AI_THREADS_KEY } from "./use-threads";
 import { deleteAiThread, getAiThreadMessages, updateAiThread } from "@/adapters";
 
@@ -212,7 +213,7 @@ const csvAttachmentAdapter: AttachmentAdapter = {
 
   async add({ file }): Promise<PendingAttachment> {
     return {
-      id: crypto.randomUUID(),
+      id: generateId(),
       type: "document",
       name: file.name,
       contentType: file.type || "text/csv",
@@ -484,7 +485,7 @@ export function useChatRuntime(config?: ChatModelConfig) {
 
       // Create user message for UI display
       const userMessage: ExternalMessage = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         role: "user",
         parts:
           userMessageParts.length > 0 ? userMessageParts : [{ type: "text", content: "(empty)" }],
@@ -495,7 +496,7 @@ export function useChatRuntime(config?: ChatModelConfig) {
       setMessages((prev) => [...prev, userMessage]);
 
       // Create placeholder assistant message
-      const assistantMessageId = crypto.randomUUID();
+      const assistantMessageId = generateId();
       const assistantMessage: ExternalMessage = {
         id: assistantMessageId,
         role: "assistant",

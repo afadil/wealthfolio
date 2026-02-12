@@ -516,10 +516,13 @@ impl AlphaVantageProvider {
     }
 
     fn resolve_currency(&self, context: &QuoteContext) -> String {
-        let chain = ResolverChain::new();
-        chain
-            .get_currency(&PROVIDER_ID.into(), context)
-            .or_else(|| context.currency_hint.clone())
+        context
+            .currency_hint
+            .clone()
+            .or_else(|| {
+                let chain = ResolverChain::new();
+                chain.get_currency(&PROVIDER_ID.into(), context)
+            })
             .map(|c| c.to_string())
             .unwrap_or_else(|| "USD".to_string())
     }
@@ -1095,6 +1098,24 @@ impl MarketDataProvider for AlphaVantageProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::borrow::Cow;
+
+    fn create_test_fx_context(
+        currency_hint: Option<&'static str>,
+        quote: &'static str,
+    ) -> QuoteContext {
+        use crate::models::InstrumentId;
+
+        QuoteContext {
+            instrument: InstrumentId::Fx {
+                base: Cow::Borrowed("EUR"),
+                quote: Cow::Borrowed(quote),
+            },
+            overrides: None,
+            currency_hint: currency_hint.map(Cow::Borrowed),
+            preferred_provider: None,
+        }
+    }
 
     #[test]
     fn test_parse_date() {
@@ -1154,6 +1175,20 @@ mod tests {
         assert_eq!(limit.requests_per_minute, 5);
         assert_eq!(limit.max_concurrency, 1);
         assert_eq!(limit.min_delay, Duration::from_secs(12));
+    }
+
+    #[test]
+    fn test_resolve_currency_prefers_hint_over_resolver() {
+        let provider = AlphaVantageProvider::new("test_key".to_string());
+        let context = create_test_fx_context(Some("TWD"), "CAD");
+        assert_eq!(provider.resolve_currency(&context), "TWD");
+    }
+
+    #[test]
+    fn test_resolve_currency_falls_back_to_resolver_when_hint_missing() {
+        let provider = AlphaVantageProvider::new("test_key".to_string());
+        let context = create_test_fx_context(None, "CAD");
+        assert_eq!(provider.resolve_currency(&context), "CAD");
     }
 
     #[test]

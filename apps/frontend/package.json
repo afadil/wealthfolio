@@ -52,6 +52,7 @@
     "lodash": "^4.17.23",
     "lucide-react": "^0.561.0",
     "motion": "^12.34.0",
+    "nanoid": "^5.1.6",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.4",
     "react-day-picker": "^9.13.2",
