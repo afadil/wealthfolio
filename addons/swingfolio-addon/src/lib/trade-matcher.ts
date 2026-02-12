@@ -2,11 +2,19 @@ import type { ActivityDetails } from "@wealthfolio/addon-sdk";
 import { differenceInDays } from "date-fns";
 import type { ClosedTrade, OpenPosition, TradeMatchResult } from "../types";
 
+/** ActivityDetails with numeric fields parsed from string | null */
+type ParsedActivity = Omit<ActivityDetails, "quantity" | "unitPrice" | "fee" | "amount"> & {
+  quantity: number;
+  unitPrice: number;
+  fee: number;
+  amount: number;
+};
+
 interface Lot {
-  activity: ActivityDetails;
+  activity: ParsedActivity;
   remainingQuantity: number;
   originalQuantity: number;
-  dividends: ActivityDetails[];
+  dividends: ParsedActivity[];
 }
 
 interface AverageLot {
@@ -14,9 +22,9 @@ interface AverageLot {
   totalQuantity: number;
   totalCostBasis: number;
   averagePrice: number;
-  activities: ActivityDetails[];
+  activities: ParsedActivity[];
   remainingQuantity: number;
-  dividends: ActivityDetails[];
+  dividends: ParsedActivity[];
 }
 
 export interface TradeMatcherOptions {
@@ -83,22 +91,23 @@ export class TradeMatcher {
   /**
    * Parse activities to ensure numeric fields are numbers
    */
-  private parseActivities(activities: ActivityDetails[]): ActivityDetails[] {
-    return activities.map((a) => ({
-      ...a,
-      quantity: this.parseNumber(a.quantity),
-      unitPrice: this.parseNumber(a.unitPrice),
-      fee: this.parseNumber(a.fee),
-      amount: this.parseNumber(a.amount),
-    }));
+  private parseActivities(activities: ActivityDetails[]): ParsedActivity[] {
+    return activities.map(
+      (a) =>
+        ({
+          ...a,
+          quantity: this.parseNumber(a.quantity),
+          unitPrice: this.parseNumber(a.unitPrice),
+          fee: this.parseNumber(a.fee),
+          amount: this.parseNumber(a.amount),
+        }) as ParsedActivity,
+    );
   }
 
   /**
    * Safely parse a string | number | null value to number.
-   * Returns `any` so parsed activities can be spread back into ActivityDetails.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private parseNumber(value: string | number | null | undefined): any {
+  private parseNumber(value: string | number | null | undefined): number {
     if (typeof value === "number") return value;
     if (typeof value === "string") return parseFloat(value) || 0;
     return 0;
@@ -107,7 +116,7 @@ export class TradeMatcher {
   /**
    * Group activities by symbol
    */
-  private groupBySymbol(activities: ActivityDetails[]): Record<string, ActivityDetails[]> {
+  private groupBySymbol(activities: ParsedActivity[]): Record<string, ParsedActivity[]> {
     return activities.reduce(
       (acc, activity) => {
         const symbol = activity.assetSymbol;
@@ -117,7 +126,7 @@ export class TradeMatcher {
         acc[symbol].push(activity);
         return acc;
       },
-      {} as Record<string, ActivityDetails[]>,
+      {} as Record<string, ParsedActivity[]>,
     );
   }
 
@@ -126,8 +135,8 @@ export class TradeMatcher {
    */
   private matchSymbolTrades(
     symbol: string,
-    activities: ActivityDetails[],
-    dividends: ActivityDetails[] = [],
+    activities: ParsedActivity[],
+    dividends: ParsedActivity[] = [],
   ): TradeMatchResult {
     // Sort activities chronologically
     const sortedActivities = [...activities].sort(
@@ -146,8 +155,8 @@ export class TradeMatcher {
    */
   private matchSymbolTradesAverage(
     symbol: string,
-    activities: ActivityDetails[],
-    dividends: ActivityDetails[] = [],
+    activities: ParsedActivity[],
+    dividends: ParsedActivity[] = [],
   ): TradeMatchResult {
     const closedTrades: ClosedTrade[] = [];
     const openPositions: OpenPosition[] = [];
@@ -183,7 +192,7 @@ export class TradeMatcher {
       } else if (activity.activityType === "SELL") {
         // Process sell against average lot
         if (!averageLot || averageLot.remainingQuantity <= 0) {
-          unmatchedSells.push(activity);
+          unmatchedSells.push(activity as unknown as ActivityDetails);
           continue;
         }
 
@@ -216,7 +225,7 @@ export class TradeMatcher {
           unmatchedSells.push({
             ...activity,
             quantity: sellQuantityRemaining,
-          });
+          } as unknown as ActivityDetails);
         }
       }
     }
@@ -240,7 +249,7 @@ export class TradeMatcher {
   /**
    * Create a new average lot
    */
-  private createNewAverageLot(activity: ActivityDetails, symbol: string): AverageLot {
+  private createNewAverageLot(activity: ParsedActivity, symbol: string): AverageLot {
     return {
       symbol,
       totalQuantity: activity.quantity,
@@ -255,7 +264,7 @@ export class TradeMatcher {
   /**
    * Update existing average lot with new buy activity
    */
-  private updateAverageLot(averageLot: AverageLot, activity: ActivityDetails): void {
+  private updateAverageLot(averageLot: AverageLot, activity: ParsedActivity): void {
     const newTotalQuantity = averageLot.remainingQuantity + activity.quantity;
     const newTotalCostBasis =
       averageLot.averagePrice * averageLot.remainingQuantity +
@@ -273,8 +282,8 @@ export class TradeMatcher {
    */
   private matchSymbolTradesSpecific(
     symbol: string,
-    activities: ActivityDetails[],
-    dividends: ActivityDetails[] = [],
+    activities: ParsedActivity[],
+    dividends: ParsedActivity[] = [],
   ): TradeMatchResult {
     const closedTrades: ClosedTrade[] = [];
     const openPositions: OpenPosition[] = [];
@@ -326,7 +335,7 @@ export class TradeMatcher {
           unmatchedSells.push({
             ...activity,
             quantity: sellQuantityRemaining,
-          });
+          } as unknown as ActivityDetails);
         }
       }
     }
@@ -354,7 +363,7 @@ export class TradeMatcher {
    */
   private createClosedTradeAverage(
     averageLot: AverageLot,
-    sellActivity: ActivityDetails,
+    sellActivity: ParsedActivity,
     quantity: number,
     symbol: string,
   ): ClosedTrade {
@@ -422,7 +431,7 @@ export class TradeMatcher {
 
     // Calculate total dividends for open position
     const totalDividends = this.includeDividends
-      ? averageLot.dividends.reduce((sum, div) => sum + Number(div.amount || 0), 0)
+      ? averageLot.dividends.reduce((sum, div) => sum + div.amount, 0)
       : 0;
 
     // Initial values (will be updated with real market prices)
@@ -458,11 +467,11 @@ export class TradeMatcher {
    * Create a closed trade from specific lot matching
    */
   private createClosedTrade(
-    buyActivity: ActivityDetails,
-    sellActivity: ActivityDetails,
+    buyActivity: ParsedActivity,
+    sellActivity: ParsedActivity,
     quantity: number,
     symbol: string,
-    dividends: ActivityDetails[] = [],
+    dividends: ParsedActivity[] = [],
   ): ClosedTrade {
     const entryDate = new Date(buyActivity.date);
     const exitDate = new Date(sellActivity.date);
@@ -517,7 +526,7 @@ export class TradeMatcher {
 
     // Calculate total dividends for open position
     const totalDividends = this.includeDividends
-      ? lot.dividends.reduce((sum, div) => sum + Number(div.amount || 0), 0)
+      ? lot.dividends.reduce((sum, div) => sum + div.amount, 0)
       : 0;
 
     // Initial values (will be updated with real market prices)
@@ -553,7 +562,7 @@ export class TradeMatcher {
   private calculateTradeDividends(
     entryDate: Date,
     exitDate: Date,
-    dividends: ActivityDetails[],
+    dividends: ParsedActivity[],
   ): number {
     if (!this.includeDividends || dividends.length === 0) return 0;
 

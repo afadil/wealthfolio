@@ -162,7 +162,10 @@ export function testTradeMatcher() {
         `${div.date.toISOString().slice(0, 10)}: ${div.assetSymbol} - $${div.amount} (${div.comment})`,
       );
     });
-    const totalDividendAmount = dividendActivities.reduce((sum, div) => sum + div.amount, 0);
+    const totalDividendAmount = dividendActivities.reduce(
+      (sum, div) => sum + Number(div.amount || 0),
+      0,
+    );
     console.log(`Total Dividend Amount in Data: $${totalDividendAmount.toFixed(2)}`);
   }
 }
