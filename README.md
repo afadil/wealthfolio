@@ -332,6 +332,130 @@ The final image includes:
 - `wealthfolio-server` binary at `/usr/local/bin/wealthfolio-server`
 - Alpine Linux base (small footprint)
 
+### Using Docker Compose
+
+The easiest way to run Wealthfolio locally is using Docker Compose. A `docker-compose.yml` file is provided in the repository root.
+
+#### Quick Start
+
+**Option 1: Use pre-built image** (faster, recommended):
+
+1. **Set the secret key** (required):
+
+```bash
+export WF_SECRET_KEY=$(openssl rand -base64 32)
+```
+
+2. **Start the service**:
+
+```bash
+docker compose up -d
+```
+
+**Option 2: Build from source** (for development or custom builds):
+
+1. **Set the secret key**:
+
+```bash
+export WF_SECRET_KEY=$(openssl rand -base64 32)
+```
+
+2. **Build and start**:
+
+```bash
+docker compose build
+docker compose up -d
+```
+
+Or in a single command:
+
+```bash
+WF_SECRET_KEY=$(openssl rand -base64 32) docker compose up -d --build
+```
+
+3. **Access the application**:
+
+Open your browser at `http://localhost:8088`
+
+#### Development Mode
+
+For development with CORS enabled for local Vite dev server:
+
+**Using pre-built image:**
+
+```bash
+# Generate secret key and start dev service
+export WF_SECRET_KEY=$(openssl rand -base64 32) && docker compose --profile dev up -d wealthfolio-dev
+```
+
+**Building from source:**
+
+```bash
+# Build and start dev service
+export WF_SECRET_KEY=$(openssl rand -base64 32) && docker compose --profile dev build && docker compose --profile dev up -d wealthfolio-dev
+```
+
+Or as a single command:
+
+```bash
+WF_SECRET_KEY=$(openssl rand -base64 32) docker compose --profile dev up -d --build wealthfolio-dev
+```
+
+**Note:** The development profile requires `WF_SECRET_KEY` to be set. The service will not start without a valid base64-encoded 32-byte secret key.
+
+#### Useful Commands
+
+```bash
+# View logs
+docker compose logs -f
+
+# Stop the service
+docker compose down
+
+# Stop and remove volumes (WARNING: deletes all data!)
+docker compose down -v
+
+# Restart the service
+docker compose restart
+
+# Check service status
+docker compose ps
+
+# Rebuild the image (if building from source)
+docker compose build
+
+# Rebuild and restart
+docker compose up -d --build
+```
+
+#### Configuration
+
+You can configure the service using environment variables. Create a `.env` file in the project root:
+
+```bash
+WF_PORT=8088
+WF_SECRET_KEY=your-secret-key-here
+WF_CORS_ALLOW_ORIGINS=*
+```
+
+Or set them inline:
+
+```bash
+WF_SECRET_KEY=$(openssl rand -base64 32) docker compose up -d
+```
+
+#### Volumes
+
+Data is persisted in the `wealthfolio-data` Docker volume:
+- Database: `/data/wealthfolio.db` (inside container)
+- Secrets: `/data/secrets.json` (encrypted with `WF_SECRET_KEY`)
+
+To find the volume location on your host:
+
+```bash
+docker volume inspect wealthfolio_wealthfolio-data
+```
+
 ### Configuration
 
 You can configure the container using either:
