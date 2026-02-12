@@ -618,4 +618,76 @@ mod tests {
         assert!(activity.asset_id.is_none());
         assert_eq!(activity.activity_type, "DEPOSIT");
     }
+
+    #[test]
+    fn test_new_activity_symbol_hint_helpers() {
+        let activity = NewActivity {
+            id: Some("a1".to_string()),
+            account_id: "acc-1".to_string(),
+            symbol: Some(SymbolInput {
+                symbol: Some("AZN".to_string()),
+                exchange_mic: Some("XLON".to_string()),
+                quote_ccy: Some("GBp".to_string()),
+                instrument_type: Some("EQUITY".to_string()),
+                ..Default::default()
+            }),
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(dec!(1)),
+            unit_price: Some(dec!(1)),
+            currency: "GBP".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(1)),
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+        };
+
+        assert_eq!(activity.get_quote_ccy_hint(), Some("GBp"));
+        assert_eq!(activity.get_instrument_type_hint(), Some("EQUITY"));
+    }
+
+    #[test]
+    fn test_activity_import_to_new_activity_preserves_symbol_hints() {
+        let import = ActivityImport {
+            id: Some("imp-1".to_string()),
+            date: "2024-01-15".to_string(),
+            symbol: "AZN".to_string(),
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(10)),
+            unit_price: Some(dec!(120)),
+            currency: "GBP".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(1200)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: Some("AstraZeneca PLC".to_string()),
+            exchange_mic: Some("XLON".to_string()),
+            quote_ccy: Some("GBp".to_string()),
+            instrument_type: Some("EQUITY".to_string()),
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+        };
+
+        let converted = NewActivity::from(import);
+        let symbol = converted.symbol.expect("symbol should be present");
+        assert_eq!(symbol.quote_ccy.as_deref(), Some("GBp"));
+        assert_eq!(symbol.instrument_type.as_deref(), Some("EQUITY"));
+        assert_eq!(symbol.exchange_mic.as_deref(), Some("XLON"));
+    }
 }

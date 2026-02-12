@@ -419,6 +419,8 @@ export function useImportMapping({
                 [csvSymbol.trim()]: {
                   exchangeMic: searchResult.exchangeMic,
                   symbolName: searchResult.longName,
+                  quoteCcy: searchResult.currency,
+                  instrumentType: searchResult.quoteType,
                 },
               }
             : {}),

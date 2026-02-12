@@ -578,6 +578,8 @@ pub struct AssetMetadata {
     pub instrument_symbol: Option<String>,
     pub instrument_type: Option<InstrumentType>,
     pub display_code: Option<String>,
+    /// Explicit quote currency hint provided by caller/search/provider (e.g. "GBp").
+    pub quote_ccy_hint: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -661,10 +663,12 @@ pub fn canonicalize_market_identity(
                 }
             }
 
-            // Exchange MIC is authoritative for market quote currency.
-            if let Some(mic) = instrument_exchange_mic.as_deref() {
-                if let Some(ccy) = mic_to_currency(mic) {
-                    normalized_quote = normalize_quote_ccy(Some(ccy));
+            // Exchange MIC provides a fallback quote currency when no explicit quote is supplied.
+            if normalized_quote.is_none() {
+                if let Some(mic) = instrument_exchange_mic.as_deref() {
+                    if let Some(ccy) = mic_to_currency(mic) {
+                        normalized_quote = normalize_quote_ccy(Some(ccy));
+                    }
                 }
             }
 
@@ -743,6 +747,8 @@ pub struct AssetSpec {
     pub instrument_type: Option<InstrumentType>,
     /// Currency for quotes/valuations
     pub quote_ccy: String,
+    /// Explicit quote currency hint from caller/search/provider (strong evidence for repair).
+    pub quote_ccy_hint: Option<String>,
     /// Asset kind
     pub kind: AssetKind,
     /// Optional quote mode override

@@ -636,12 +636,25 @@ export function MappingStepV2() {
   }, []);
 
   const handleResolveSymbol = useCallback(
-    (csvSymbol: string, resolvedSymbol: string, _searchResult?: SymbolSearchResult) => {
+    (csvSymbol: string, resolvedSymbol: string, searchResult?: SymbolSearchResult) => {
       setLocalMapping((prev) => ({
         ...prev,
         symbolMappings: {
           ...prev.symbolMappings,
           [csvSymbol.trim()]: resolvedSymbol.trim(),
+        },
+        symbolMappingMeta: {
+          ...prev.symbolMappingMeta,
+          ...(searchResult
+            ? {
+                [csvSymbol.trim()]: {
+                  exchangeMic: searchResult.exchangeMic,
+                  symbolName: searchResult.longName,
+                  quoteCcy: searchResult.currency,
+                  instrumentType: searchResult.quoteType,
+                },
+              }
+            : {}),
         },
       }));
     },

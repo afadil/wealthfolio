@@ -182,6 +182,8 @@ export function ActivityDataGrid({
             // Capture asset metadata for custom assets
             pendingAssetName: result.longName,
             pendingAssetKind: result.assetKind,
+            pendingQuoteCcy: result.currency,
+            pendingInstrumentType: (result as { quoteType?: string }).quoteType,
           };
         }
         return updated;
@@ -215,6 +217,8 @@ export function ActivityDataGrid({
             currency,
             pendingAssetName: result.longName,
             pendingAssetKind: result.assetKind,
+            pendingQuoteCcy: result.currency,
+            pendingInstrumentType: (result as { quoteType?: string }).quoteType,
           };
         }
         return updated;

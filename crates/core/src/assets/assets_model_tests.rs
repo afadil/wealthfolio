@@ -312,12 +312,26 @@ mod tests {
     }
 
     #[test]
-    fn test_canonicalize_market_identity_enforces_mic_currency() {
+    fn test_canonicalize_market_identity_preserves_explicit_equity_quote_ccy() {
         let canonical = canonicalize_market_identity(
             Some(InstrumentType::Equity),
             Some("AZN"),
             Some("XLON"),
             Some("GBP"),
+        );
+
+        assert_eq!(canonical.instrument_symbol.as_deref(), Some("AZN"));
+        assert_eq!(canonical.instrument_exchange_mic.as_deref(), Some("XLON"));
+        assert_eq!(canonical.quote_ccy.as_deref(), Some("GBP"));
+    }
+
+    #[test]
+    fn test_canonicalize_market_identity_uses_mic_currency_as_fallback() {
+        let canonical = canonicalize_market_identity(
+            Some(InstrumentType::Equity),
+            Some("AZN"),
+            Some("XLON"),
+            None,
         );
 
         assert_eq!(canonical.instrument_symbol.as_deref(), Some("AZN"));

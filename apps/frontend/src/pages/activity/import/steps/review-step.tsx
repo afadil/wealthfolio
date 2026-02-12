@@ -231,14 +231,29 @@ function mapActivityType(
 function mapSymbol(
   csvSymbol: string | undefined,
   symbolMappings: Record<string, string>,
-  symbolMappingMeta?: Record<string, { exchangeMic?: string; symbolName?: string }>,
-): { symbol: string | undefined; exchangeMic?: string; symbolName?: string } {
+  symbolMappingMeta?: Record<
+    string,
+    { exchangeMic?: string; symbolName?: string; quoteCcy?: string; instrumentType?: string }
+  >,
+): {
+  symbol: string | undefined;
+  exchangeMic?: string;
+  symbolName?: string;
+  quoteCcy?: string;
+  instrumentType?: string;
+} {
   if (!csvSymbol) return { symbol: undefined };
 
   const trimmed = csvSymbol.trim();
   const symbol = symbolMappings[trimmed] || trimmed;
   const meta = symbolMappingMeta?.[trimmed];
-  return { symbol, exchangeMic: meta?.exchangeMic, symbolName: meta?.symbolName };
+  return {
+    symbol,
+    exchangeMic: meta?.exchangeMic,
+    symbolName: meta?.symbolName,
+    quoteCcy: meta?.quoteCcy,
+    instrumentType: meta?.instrumentType,
+  };
 }
 
 /**
@@ -428,7 +443,10 @@ function createDraftActivities(
     activityMappings: Record<string, string[]>;
     symbolMappings: Record<string, string>;
     accountMappings: Record<string, string>;
-    symbolMappingMeta?: Record<string, { exchangeMic?: string; symbolName?: string }>;
+    symbolMappingMeta?: Record<
+      string,
+      { exchangeMic?: string; symbolName?: string; quoteCcy?: string; instrumentType?: string }
+    >;
   },
   parseConfig: {
     dateFormat: string;
@@ -479,6 +497,8 @@ function createDraftActivities(
       symbol,
       exchangeMic: mappedExchangeMic,
       symbolName: mappedSymbolName,
+      quoteCcy: mappedQuoteCcy,
+      instrumentType: mappedInstrumentType,
     } = mapSymbol(rawSymbol, symbolMappings, symbolMappingMeta);
     const quantity = parseNumericValue(rawQuantity, decimalSeparator, thousandsSeparator);
     const unitPrice = parseNumericValue(rawUnitPrice, decimalSeparator, thousandsSeparator);
@@ -510,6 +530,8 @@ function createDraftActivities(
       symbol,
       exchangeMic: mappedExchangeMic,
       symbolName: mappedSymbolName,
+      quoteCcy: mappedQuoteCcy,
+      instrumentType: mappedInstrumentType,
       quantity,
       unitPrice,
       amount,
@@ -623,6 +645,8 @@ export function ReviewStep() {
                 date: draft.activityDate || "",
                 symbol: draft.symbol || "",
                 exchangeMic: draft.exchangeMic,
+                quoteCcy: draft.quoteCcy,
+                instrumentType: draft.instrumentType,
                 quantity: draft.quantity,
                 unitPrice: draft.unitPrice,
                 amount: draft.amount,
@@ -690,6 +714,8 @@ export function ReviewStep() {
               duplicateOfLineNumber: backendResult.duplicateOfLineNumber,
               symbolName: backendResult.symbolName,
               exchangeMic: backendResult.exchangeMic,
+              quoteCcy: backendResult.quoteCcy,
+              instrumentType: backendResult.instrumentType,
               status:
                 draft.status === "skipped"
                   ? draft.status
@@ -868,6 +894,8 @@ export function ReviewStep() {
           symbol: result.symbol,
           exchangeMic: result.exchangeMic,
           symbolName: result.longName,
+          quoteCcy: result.currency,
+          instrumentType: result.quoteType,
         };
         const { symbol: _removed, ...otherErrors } = draft.errors;
         const merged = { ...draft, ...symbolUpdates };
@@ -905,6 +933,8 @@ export function ReviewStep() {
           newSymbolMappingMeta[csvSymbol] = {
             exchangeMic: result.exchangeMic,
             symbolName: result.longName,
+            quoteCcy: result.currency,
+            instrumentType: result.quoteType,
           };
         }
 

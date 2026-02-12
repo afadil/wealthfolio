@@ -26,6 +26,10 @@ export const baseActivitySchema = z.object({
   exchangeMic: z.string().optional(),
   // Asset metadata for custom assets (name, etc.)
   assetMetadata: assetMetadataSchema,
+  // Optional symbol-level quote currency hint from search/provider (e.g., "GBp")
+  symbolQuoteCcy: z.string().optional(),
+  // Optional symbol-level instrument type hint from search/provider (e.g., "EQUITY", "CRYPTO")
+  symbolInstrumentType: z.string().optional(),
 });
 
 // Holdings schema: TRANSFER_IN/OUT with is_external=true represents add/remove holding

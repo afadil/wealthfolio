@@ -626,6 +626,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 instrument_exchange_mic: exchange_mic,
                 instrument_type: Some(instrument_type),
                 quote_ccy: currency.clone(),
+                quote_ccy_hint: Some(currency.clone()),
                 kind: AssetKind::Investment,
                 quote_mode: None,
                 name: asset_name,
