@@ -74,6 +74,9 @@ export {
   validateManifest,
 } from './utils';
 
+// Goal progress calculation
+export { calculateGoalProgress } from './goal-progress';
+
 // -----------------------------------------------------------------------------
 // Framework version contract
 // -----------------------------------------------------------------------------
