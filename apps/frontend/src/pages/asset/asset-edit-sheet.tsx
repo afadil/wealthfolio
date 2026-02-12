@@ -394,7 +394,7 @@ export function AssetEditSheet({
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Currency</label>
-                      <Input value={asset.quoteCcy} disabled className="bg-muted/50 uppercase" />
+                      <Input value={asset.quoteCcy} disabled className="bg-muted/50" />
                     </div>
                   </div>
 

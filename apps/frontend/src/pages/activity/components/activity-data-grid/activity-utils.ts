@@ -435,6 +435,8 @@ export function buildSavePayload(
             kind: transaction.pendingAssetKind,
             name: transaction.pendingAssetName,
             quoteMode: transaction.assetQuoteMode,
+            quoteCcy: transaction.pendingQuoteCcy,
+            instrumentType: transaction.pendingInstrumentType,
           };
         }
       }
@@ -458,12 +460,16 @@ export function buildSavePayload(
             kind: transaction.pendingAssetKind,
             name: transaction.pendingAssetName,
             quoteMode: transaction.assetQuoteMode,
+            quoteCcy: transaction.pendingQuoteCcy,
+            instrumentType: transaction.pendingInstrumentType,
           };
         } else if (transaction._originalAssetId) {
           // Symbol unchanged: send existing asset ID with quoteMode to allow mode updates
           updatePayload.symbol = {
             id: transaction._originalAssetId,
             quoteMode: transaction.assetQuoteMode,
+            quoteCcy: transaction.pendingQuoteCcy,
+            instrumentType: transaction.pendingInstrumentType,
           };
         }
       }

@@ -33,7 +33,7 @@
     "format": "prettier --write . && pnpm -r format",
     "format:check": "prettier --check . && pnpm -r format:check",
     "tsc": "tsc -b",
-    "type-check": "pnpm --filter frontend type-check && pnpm -r type-check",
+    "type-check": "pnpm run build:types && pnpm --filter frontend type-check && pnpm -r type-check",
     "type-check:root": "pnpm --filter frontend type-check",
     "check": "pnpm format:check && pnpm lint:quiet && pnpm type-check",
     "publish:sdk": "cd packages/addon-sdk && npm publish --access public",

@@ -46,6 +46,8 @@ export interface DraftActivity {
   // Enriched by backend check
   exchangeMic?: string;
   symbolName?: string;
+  quoteCcy?: string;
+  instrumentType?: string;
 
   // Validation state
   status: DraftActivityStatus;

@@ -1,4 +1,4 @@
-import { getAssetProfile, getHolding } from "@/adapters";
+import { getHolding } from "@/adapters";
 import { AssetEditSheet } from "./asset-edit-sheet";
 import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
 import { TickerAvatar } from "@/components/ticker-avatar";
@@ -9,6 +9,7 @@ import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Tabs, TabsContent } from "@wealthfolio/ui/components/ui/tabs";
 import { useHapticFeedback } from "@/hooks";
+import { useAssetProfile } from "./hooks/use-asset-profile";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { useQuoteHistory } from "@/hooks/use-quote-history";
 import { useSyncMarketDataMutation } from "@/hooks/use-sync-market-data";
@@ -18,7 +19,7 @@ import { useAssetProfileMutations } from "./hooks/use-asset-profile-mutations";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { useSettingsContext } from "@/lib/settings-provider";
-import { Asset, AssetKind, Holding, Quote } from "@/lib/types";
+import { AssetKind, Holding, Quote } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatedToggleGroup, Page, PageContent, PageHeader, SwipableView } from "@wealthfolio/ui";
 import { useCallback, useMemo, useState } from "react";
@@ -107,11 +108,7 @@ export const AssetProfilePage = () => {
     data: assetProfile,
     isLoading: isAssetProfileLoading,
     isError: isAssetProfileError,
-  } = useQuery<Asset | null, Error>({
-    queryKey: [QueryKeys.ASSET_DATA, assetId],
-    queryFn: () => getAssetProfile(assetId),
-    enabled: !!assetId,
-  });
+  } = useAssetProfile(assetId);
 
   const {
     data: holding,

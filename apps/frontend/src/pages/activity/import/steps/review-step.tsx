@@ -6,6 +6,9 @@ import {
   SUBTYPES_BY_ACTIVITY_TYPE,
 } from "@/lib/constants";
 import type { ActivityImport, SymbolSearchResult } from "@/lib/types";
+import { tryParseDate } from "@/lib/utils";
+import { parse, parseISO, isValid } from "date-fns";
+import { getDateFnsPattern } from "../utils/date-format-options";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { ProgressIndicator } from "@wealthfolio/ui/components/ui/progress-indicator";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -165,37 +168,40 @@ function hasDuplicateWarning(draft: DraftActivity): boolean {
 }
 
 /**
- * Parse a date value, handling various formats
+ * Parse a date value using the configured format (priority) then auto-detection fallback.
+ * Returns a full ISO datetime string preserving any time component from the source.
  */
 function parseDateValue(value: string | undefined, dateFormat: string): string {
   if (!value || value.trim() === "") return "";
 
   const trimmed = value.trim();
 
-  // Try to parse and normalize to YYYY-MM-DD
-  const date = new Date(trimmed);
-  if (!isNaN(date.getTime())) {
-    return date.toISOString().split("T")[0];
-  }
-
-  // Handle specific formats if auto-detect fails
-  if (dateFormat === "DD/MM/YYYY" || dateFormat === "DD-MM-YYYY") {
-    const parts = trimmed.split(/[/-]/);
-    if (parts.length === 3) {
-      const [day, month, year] = parts;
-      return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  // 1. If user specified a format, try it first
+  const pattern = getDateFnsPattern(dateFormat);
+  if (pattern) {
+    try {
+      const parsed = parse(trimmed, pattern, new Date());
+      if (isValid(parsed)) return parsed.toISOString();
+    } catch {
+      // fall through to auto-detection
     }
   }
 
-  if (dateFormat === "MM/DD/YYYY" || dateFormat === "MM-DD-YYYY") {
-    const parts = trimmed.split(/[/-]/);
-    if (parts.length === 3) {
-      const [month, day, year] = parts;
-      return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  // 2. For ISO8601 preset, try parseISO directly
+  if (dateFormat === "ISO8601") {
+    try {
+      const parsed = parseISO(trimmed);
+      if (isValid(parsed)) return parsed.toISOString();
+    } catch {
+      // fall through
     }
   }
 
-  // Return as-is if we can't parse it
+  // 3. Auto-detection fallback (handles 80+ formats)
+  const autoDetected = tryParseDate(trimmed);
+  if (autoDetected) return autoDetected.toISOString();
+
+  // 4. Return as-is if nothing works (will surface as validation error)
   return trimmed;
 }
 
@@ -231,14 +237,29 @@ function mapActivityType(
 function mapSymbol(
   csvSymbol: string | undefined,
   symbolMappings: Record<string, string>,
-  symbolMappingMeta?: Record<string, { exchangeMic?: string; symbolName?: string }>,
-): { symbol: string | undefined; exchangeMic?: string; symbolName?: string } {
+  symbolMappingMeta?: Record<
+    string,
+    { exchangeMic?: string; symbolName?: string; quoteCcy?: string; instrumentType?: string }
+  >,
+): {
+  symbol: string | undefined;
+  exchangeMic?: string;
+  symbolName?: string;
+  quoteCcy?: string;
+  instrumentType?: string;
+} {
   if (!csvSymbol) return { symbol: undefined };
 
   const trimmed = csvSymbol.trim();
   const symbol = symbolMappings[trimmed] || trimmed;
   const meta = symbolMappingMeta?.[trimmed];
-  return { symbol, exchangeMic: meta?.exchangeMic, symbolName: meta?.symbolName };
+  return {
+    symbol,
+    exchangeMic: meta?.exchangeMic,
+    symbolName: meta?.symbolName,
+    quoteCcy: meta?.quoteCcy,
+    instrumentType: meta?.instrumentType,
+  };
 }
 
 /**
@@ -428,7 +449,10 @@ function createDraftActivities(
     activityMappings: Record<string, string[]>;
     symbolMappings: Record<string, string>;
     accountMappings: Record<string, string>;
-    symbolMappingMeta?: Record<string, { exchangeMic?: string; symbolName?: string }>;
+    symbolMappingMeta?: Record<
+      string,
+      { exchangeMic?: string; symbolName?: string; quoteCcy?: string; instrumentType?: string }
+    >;
   },
   parseConfig: {
     dateFormat: string;
@@ -479,6 +503,8 @@ function createDraftActivities(
       symbol,
       exchangeMic: mappedExchangeMic,
       symbolName: mappedSymbolName,
+      quoteCcy: mappedQuoteCcy,
+      instrumentType: mappedInstrumentType,
     } = mapSymbol(rawSymbol, symbolMappings, symbolMappingMeta);
     const quantity = parseNumericValue(rawQuantity, decimalSeparator, thousandsSeparator);
     const unitPrice = parseNumericValue(rawUnitPrice, decimalSeparator, thousandsSeparator);
@@ -510,6 +536,8 @@ function createDraftActivities(
       symbol,
       exchangeMic: mappedExchangeMic,
       symbolName: mappedSymbolName,
+      quoteCcy: mappedQuoteCcy,
+      instrumentType: mappedInstrumentType,
       quantity,
       unitPrice,
       amount,
@@ -623,6 +651,8 @@ export function ReviewStep() {
                 date: draft.activityDate || "",
                 symbol: draft.symbol || "",
                 exchangeMic: draft.exchangeMic,
+                quoteCcy: draft.quoteCcy,
+                instrumentType: draft.instrumentType,
                 quantity: draft.quantity,
                 unitPrice: draft.unitPrice,
                 amount: draft.amount,
@@ -690,6 +720,8 @@ export function ReviewStep() {
               duplicateOfLineNumber: backendResult.duplicateOfLineNumber,
               symbolName: backendResult.symbolName,
               exchangeMic: backendResult.exchangeMic,
+              quoteCcy: backendResult.quoteCcy,
+              instrumentType: backendResult.instrumentType,
               status:
                 draft.status === "skipped"
                   ? draft.status
@@ -868,6 +900,8 @@ export function ReviewStep() {
           symbol: result.symbol,
           exchangeMic: result.exchangeMic,
           symbolName: result.longName,
+          quoteCcy: result.currency,
+          instrumentType: result.quoteType,
         };
         const { symbol: _removed, ...otherErrors } = draft.errors;
         const merged = { ...draft, ...symbolUpdates };
@@ -905,6 +939,8 @@ export function ReviewStep() {
           newSymbolMappingMeta[csvSymbol] = {
             exchangeMic: result.exchangeMic,
             symbolName: result.longName,
+            quoteCcy: result.currency,
+            instrumentType: result.quoteType,
           };
         }
 

@@ -40,6 +40,8 @@ export const dividendFormSchema = z.object({
     .positive({ message: "FX Rate must be positive." })
     .optional(),
   subtype: z.string().optional().nullable(),
+  symbolQuoteCcy: z.string().optional(),
+  symbolInstrumentType: z.string().optional(),
 });
 
 export type DividendFormValues = z.infer<typeof dividendFormSchema>;
@@ -122,7 +124,11 @@ export function DividendForm({
               isManualAsset={isManualSymbol}
               exchangeMicName="exchangeMic"
               currencyName="currency"
+              quoteCcyName="symbolQuoteCcy"
+              instrumentTypeName="symbolInstrumentType"
             />
+            <input type="hidden" {...form.register("symbolQuoteCcy")} />
+            <input type="hidden" {...form.register("symbolInstrumentType")} />
 
             {/* Date Picker */}
             <DatePicker name="activityDate" label="Date" />

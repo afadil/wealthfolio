@@ -50,6 +50,10 @@ interface SymbolSearchProps<TFieldValues extends FieldValues = FieldValues> {
   quoteModeName?: FieldPath<TFieldValues>;
   /** Field name for currency (optional, to set currency from search result) */
   currencyName?: FieldPath<TFieldValues>;
+  /** Field name for symbol quote currency hint (optional, e.g. "GBp") */
+  quoteCcyName?: FieldPath<TFieldValues>;
+  /** Field name for symbol instrument type hint (optional, e.g. "EQUITY") */
+  instrumentTypeName?: FieldPath<TFieldValues>;
   /** Field name for assetMetadata (optional, to capture asset name for custom assets) */
   assetMetadataName?: FieldPath<TFieldValues>;
 }
@@ -62,6 +66,8 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
   exchangeMicName,
   quoteModeName,
   currencyName,
+  quoteCcyName,
+  instrumentTypeName,
   assetMetadataName,
 }: SymbolSearchProps<TFieldValues>) {
   const { control, setValue, watch } = useFormContext<TFieldValues>();
@@ -97,15 +103,28 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
     });
 
     // Capture exchangeMic for canonical asset ID generation
-    if (searchResult?.exchangeMic && exchangeMicName) {
+    if (exchangeMicName) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setValue(exchangeMicName, searchResult.exchangeMic as any);
+      setValue(exchangeMicName, (searchResult?.exchangeMic ?? undefined) as any);
     }
 
     // Set currency from search result (normalized: GBp -> GBP)
-    if (searchResult?.currency && currencyName) {
+    if (currencyName) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setValue(currencyName, normalizeCurrency(searchResult.currency) as any);
+      setValue(
+        currencyName,
+        (searchResult?.currency ? normalizeCurrency(searchResult.currency) : undefined) as any,
+      );
+    }
+
+    if (quoteCcyName) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setValue(quoteCcyName, (searchResult?.currency ?? undefined) as any);
+    }
+
+    if (instrumentTypeName) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setValue(instrumentTypeName, (searchResult?.quoteType ?? undefined) as any);
     }
 
     // Capture asset name and kind for custom assets (backend uses this when creating the asset)

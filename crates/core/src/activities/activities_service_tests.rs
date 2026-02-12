@@ -1776,6 +1776,251 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn test_check_import_sets_quote_ccy_and_instrument_type_from_existing_asset() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "GBP");
+        account_service.add_account(account);
+
+        let asset = create_test_asset_with_instrument(
+            "azn-uuid",
+            "AZN",
+            Some("XLON"),
+            Some(InstrumentType::Equity),
+            "GBp",
+        );
+        asset_service.add_asset(asset);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let import = ActivityImport {
+            id: None,
+            date: "2024-01-15".to_string(),
+            symbol: "AZN".to_string(),
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(10)),
+            unit_price: Some(dec!(120)),
+            currency: "GBP".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(1200)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: None,
+            exchange_mic: Some("XLON".to_string()),
+            quote_ccy: None,
+            instrument_type: None,
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+        };
+
+        let result = activity_service
+            .check_activities_import("acc-1".to_string(), vec![import])
+            .await
+            .expect("import check should succeed");
+
+        assert_eq!(result.len(), 1);
+        let checked = &result[0];
+        assert_eq!(checked.exchange_mic.as_deref(), Some("XLON"));
+        assert_eq!(checked.instrument_type.as_deref(), Some("EQUITY"));
+        assert_eq!(checked.quote_ccy.as_deref(), Some("GBp"));
+    }
+
+    #[tokio::test]
+    async fn test_check_import_uses_mic_currency_as_quote_ccy_fallback() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "CAD");
+        account_service.add_account(account);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let import = ActivityImport {
+            id: None,
+            date: "2024-01-15".to_string(),
+            symbol: "AZN".to_string(),
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(10)),
+            unit_price: Some(dec!(120)),
+            currency: "CAD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(1200)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: None,
+            exchange_mic: Some("XLON".to_string()),
+            quote_ccy: None,
+            instrument_type: None,
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+        };
+
+        let result = activity_service
+            .check_activities_import("acc-1".to_string(), vec![import])
+            .await
+            .expect("import check should succeed");
+
+        assert_eq!(result.len(), 1);
+        let checked = &result[0];
+        assert_eq!(checked.instrument_type.as_deref(), Some("EQUITY"));
+        assert_eq!(checked.quote_ccy.as_deref(), Some("GBp"));
+    }
+
+    #[tokio::test]
+    async fn test_check_import_preserves_explicit_quote_ccy_hint() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "CAD");
+        account_service.add_account(account);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let import = ActivityImport {
+            id: None,
+            date: "2024-01-15".to_string(),
+            symbol: "AZN".to_string(),
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(10)),
+            unit_price: Some(dec!(120)),
+            currency: "CAD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(1200)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: None,
+            exchange_mic: Some("XLON".to_string()),
+            quote_ccy: Some("GBP".to_string()),
+            instrument_type: Some("EQUITY".to_string()),
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+        };
+
+        let result = activity_service
+            .check_activities_import("acc-1".to_string(), vec![import])
+            .await
+            .expect("import check should succeed");
+
+        assert_eq!(result.len(), 1);
+        let checked = &result[0];
+        assert_eq!(checked.instrument_type.as_deref(), Some("EQUITY"));
+        assert_eq!(checked.exchange_mic.as_deref(), Some("XLON"));
+        assert_eq!(checked.quote_ccy.as_deref(), Some("GBP"));
+    }
+
+    #[tokio::test]
+    async fn test_check_import_crypto_hint_clears_mic_and_uses_pair_quote_ccy() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "CAD");
+        account_service.add_account(account);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let import = ActivityImport {
+            id: None,
+            date: "2024-01-15".to_string(),
+            symbol: "BTC-USD".to_string(),
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(1)),
+            unit_price: Some(dec!(65000)),
+            currency: "CAD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(65000)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: None,
+            exchange_mic: Some("XTSE".to_string()),
+            quote_ccy: None,
+            instrument_type: Some("CRYPTO".to_string()),
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+        };
+
+        let result = activity_service
+            .check_activities_import("acc-1".to_string(), vec![import])
+            .await
+            .expect("import check should succeed");
+
+        assert_eq!(result.len(), 1);
+        let checked = &result[0];
+        assert_eq!(checked.symbol, "BTC");
+        assert_eq!(checked.instrument_type.as_deref(), Some("CRYPTO"));
+        assert_eq!(checked.exchange_mic, None);
+        assert_eq!(checked.quote_ccy.as_deref(), Some("USD"));
+    }
+
     // ==========================================================================
     // Currency Normalization Tests (GBp -> GBP, etc.)
     // ==========================================================================

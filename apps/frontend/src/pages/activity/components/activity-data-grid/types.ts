@@ -10,6 +10,10 @@ export interface LocalTransaction extends ActivityDetails {
   pendingAssetName?: string;
   /** Pending asset kind from custom asset dialog (e.g., "SECURITY", "CRYPTO", "OTHER") */
   pendingAssetKind?: string;
+  /** Pending symbol quote currency hint from search/provider (e.g., "GBp") */
+  pendingQuoteCcy?: string;
+  /** Pending symbol instrument type hint from search/provider (e.g., "EQUITY") */
+  pendingInstrumentType?: string;
   /** Whether this transfer is external (from/to outside tracked accounts). Stored in metadata.flow.is_external */
   isExternal?: boolean;
   /** Original asset symbol from server - used to detect symbol changes for updates */
@@ -148,6 +152,10 @@ export interface SymbolInput {
   name?: string;
   /** Quote mode: "MARKET" or "MANUAL" - controls how asset is priced */
   quoteMode?: string;
+  /** Optional quote currency hint from symbol search/provider (e.g., "GBp") */
+  quoteCcy?: string;
+  /** Optional instrument type hint from symbol search/provider (e.g., "EQUITY") */
+  instrumentType?: string;
 }
 
 /**

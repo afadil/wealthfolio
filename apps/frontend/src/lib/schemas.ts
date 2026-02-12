@@ -52,6 +52,8 @@ export const importMappingSchema = z.object({
       z.object({
         exchangeMic: z.string().optional(),
         symbolName: z.string().optional(),
+        quoteCcy: z.string().optional(),
+        instrumentType: z.string().optional(),
       }),
     )
     .optional(),
@@ -152,6 +154,10 @@ export const importActivitySchema = z
     symbolName: z.string().optional(),
     /** Resolved exchange MIC for the symbol (populated during validation) */
     exchangeMic: z.string().optional(),
+    /** Optional resolved quote currency hint for symbol identity (e.g., GBp). */
+    quoteCcy: z.string().optional(),
+    /** Optional resolved instrument type hint (e.g., EQUITY, CRYPTO). */
+    instrumentType: z.string().optional(),
     errors: z.record(z.string(), z.array(z.string())).optional(),
     warnings: z.record(z.string(), z.array(z.string())).optional(),
     duplicateOfId: z.string().optional(),

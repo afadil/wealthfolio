@@ -81,6 +81,8 @@ export const transferFormSchema = z
     // Internal field for manual quote mode
     quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).default(QuoteMode.MARKET),
     exchangeMic: z.string().optional(),
+    symbolQuoteCcy: z.string().optional(),
+    symbolInstrumentType: z.string().optional(),
     // Asset metadata for custom assets (name, etc.)
     assetMetadata: assetMetadataSchema,
   })
@@ -449,11 +451,15 @@ export function TransferForm({
                   exchangeMicName="exchangeMic"
                   quoteModeName="quoteMode"
                   currencyName="currency"
+                  quoteCcyName="symbolQuoteCcy"
+                  instrumentTypeName="symbolInstrumentType"
                   assetMetadataName="assetMetadata"
                 />
                 {/* Hidden fields to register assetMetadata for react-hook-form */}
                 <input type="hidden" {...form.register("assetMetadata.name")} />
                 <input type="hidden" {...form.register("assetMetadata.kind")} />
+                <input type="hidden" {...form.register("symbolQuoteCcy")} />
+                <input type="hidden" {...form.register("symbolInstrumentType")} />
                 <QuantityInput name="quantity" label="Quantity" />
                 {/* Cost basis only needed for external transfer in - backend calculates for transfer out */}
                 {isExternal && direction === "in" && (

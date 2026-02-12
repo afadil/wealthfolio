@@ -78,6 +78,9 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
   // Handle symbol selection with automatic manual pricing for custom assets
   const handleSymbolSelect = (symbol: string, searchResult?: SymbolSearchResult) => {
     setValue("assetId", symbol);
+    setValue("exchangeMic", searchResult?.exchangeMic);
+    setValue("symbolQuoteCcy", searchResult?.currency);
+    setValue("symbolInstrumentType", searchResult?.quoteType);
 
     // Set asset metadata for custom assets
     if (searchResult?.assetKind) {
@@ -85,11 +88,6 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
         name: searchResult.longName,
         kind: searchResult.assetKind,
       });
-    }
-
-    // Set exchange MIC if available
-    if (searchResult?.exchangeMic) {
-      setValue("exchangeMic", searchResult.exchangeMic);
     }
 
     // Auto-set currency from search result

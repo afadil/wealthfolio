@@ -1,5 +1,6 @@
 import { getAccounts } from "@/adapters";
 import { useIsMobileViewport } from "@/hooks/use-platform";
+import { useAssetProfile } from "@/pages/asset/hooks/use-asset-profile";
 import { ActivityType } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, ActivityDetails } from "@/lib/types";
@@ -80,7 +81,10 @@ const ActivityManagerPage = () => {
     return getActivityRestrictionLevel(selectedAccount);
   }, [selectedAccount]);
 
-  // Build initial activity from URL params
+  // Fetch asset profile when assetId is provided (uses react-query cache)
+  const { data: assetProfile } = useAssetProfile(assetIdParam);
+
+  // Build initial activity from URL params + cached asset data
   const initialActivity: Partial<ActivityDetails> = useMemo(() => {
     const activity: Partial<ActivityDetails> = {};
 
@@ -96,8 +100,15 @@ const ActivityManagerPage = () => {
       activity.assetId = assetIdParam;
     }
 
+    if (assetProfile) {
+      activity.assetSymbol = assetProfile.displayCode ?? assetProfile.instrumentSymbol ?? undefined;
+      activity.currency = assetProfile.quoteCcy;
+      activity.exchangeMic = assetProfile.instrumentExchangeMic ?? undefined;
+      activity.assetQuoteMode = assetProfile.quoteMode;
+    }
+
     return activity;
-  }, [typeParam, accountParam, assetIdParam]);
+  }, [typeParam, accountParam, assetIdParam, assetProfile]);
 
   const [selectedType, setSelectedType] = useState<PickerActivityType | undefined>(
     mapActivityTypeToPicker(typeParam),

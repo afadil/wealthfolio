@@ -25,6 +25,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@wealthfolio/ui/components/ui/select";
+import { SearchableSelect } from "@wealthfolio/ui";
+import { DATE_FORMAT_OPTIONS, isPresetFormat } from "../utils/date-format-options";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CSVFileViewer, type CSVLine } from "../components/csv-file-viewer";
 import { FileDropzone } from "../components/file-dropzone";
@@ -172,6 +174,75 @@ function CsvPreviewTabs({
         </CardContent>
       </Card>
     </Tabs>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Date Format Picker (searchable select + custom input)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const dateFormatSelectOptions = DATE_FORMAT_OPTIONS.map((o) => ({
+  value: o.value,
+  label: o.label,
+}));
+
+// Add the "Custom…" sentinel at the end
+const DATE_FORMAT_SELECT_OPTIONS = [
+  ...dateFormatSelectOptions,
+  { value: "__custom__", label: "Custom…" },
+];
+
+function DateFormatPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (config: Partial<ParseConfig>) => void;
+}) {
+  const isCustom = value !== "__custom__" && !isPresetFormat(value) && value !== "";
+  const [showCustom, setShowCustom] = useState(isCustom);
+  const [customValue, setCustomValue] = useState(isCustom ? value : "");
+
+  // Determine what the SearchableSelect should show
+  const selectValue = showCustom ? "__custom__" : value;
+
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-sm">Date format</Label>
+      <SearchableSelect
+        options={DATE_FORMAT_SELECT_OPTIONS}
+        value={selectValue}
+        onValueChange={(v) => {
+          if (v === "__custom__") {
+            setShowCustom(true);
+            // Apply custom value if already typed, otherwise keep current
+            if (customValue) {
+              onChange({ dateFormat: customValue });
+            }
+          } else {
+            setShowCustom(false);
+            onChange({ dateFormat: v });
+          }
+        }}
+        placeholder="Select date format"
+        searchPlaceholder="Search formats…"
+        emptyMessage="No matching format."
+      />
+      {showCustom && (
+        <Input
+          placeholder="e.g. dd/MM/yyyy HH:mm:ss"
+          value={customValue}
+          onChange={(e) => {
+            const v = e.target.value;
+            setCustomValue(v);
+            if (v.trim()) {
+              onChange({ dateFormat: v.trim() });
+            }
+          }}
+          className="h-8 font-mono text-xs"
+        />
+      )}
+    </div>
   );
 }
 
@@ -347,27 +418,7 @@ function ParseSettingsPanel({ config, onChange, hasErrors = false }: ParseSettin
               </div>
 
               {/* Date Format */}
-              <div className="space-y-1.5">
-                <Label htmlFor="dateFormat" className="text-sm">
-                  Date format
-                </Label>
-                <Select
-                  value={config.dateFormat}
-                  onValueChange={(value) => onChange({ dateFormat: value })}
-                >
-                  <SelectTrigger id="dateFormat" className="h-9">
-                    <SelectValue placeholder="Select date format" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="auto">Auto-detect</SelectItem>
-                    <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
-                    <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
-                    <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
-                    <SelectItem value="DD-MM-YYYY">DD-MM-YYYY</SelectItem>
-                    <SelectItem value="MM-DD-YYYY">MM-DD-YYYY</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <DateFormatPicker value={config.dateFormat} onChange={onChange} />
 
               {/* Decimal Separator */}
               <div className="space-y-1.5">

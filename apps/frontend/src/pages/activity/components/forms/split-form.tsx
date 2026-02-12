@@ -34,6 +34,8 @@ export const splitFormSchema = z.object({
   // Advanced options
   currency: z.string().optional(),
   subtype: z.string().optional().nullable(),
+  symbolQuoteCcy: z.string().optional(),
+  symbolInstrumentType: z.string().optional(),
 });
 
 export type SplitFormValues = z.infer<typeof splitFormSchema>;
@@ -115,7 +117,11 @@ export function SplitForm({
               isManualAsset={isManualSymbol}
               exchangeMicName="exchangeMic"
               currencyName="currency"
+              quoteCcyName="symbolQuoteCcy"
+              instrumentTypeName="symbolInstrumentType"
             />
+            <input type="hidden" {...form.register("symbolQuoteCcy")} />
+            <input type="hidden" {...form.register("symbolInstrumentType")} />
 
             {/* Date Picker */}
             <DatePicker name="activityDate" label="Date" />

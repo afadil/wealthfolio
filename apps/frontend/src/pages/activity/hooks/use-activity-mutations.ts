@@ -41,15 +41,26 @@ export function useActivityMutations(
   const addActivityMutation = useMutation({
     mutationFn: async (data: NewActivityFormValues) => {
       // Extract asset-related fields from form data
-      const { assetId, exchangeMic, metadata, assetMetadata, quoteMode, assetKind, ...rest } =
-        data as NewActivityFormValues & {
-          assetId?: string;
-          exchangeMic?: string;
-          metadata?: Record<string, unknown>;
-          assetMetadata?: { name?: string; kind?: string; exchangeMic?: string };
-          quoteMode?: string;
-          assetKind?: string;
-        };
+      const {
+        assetId,
+        exchangeMic,
+        metadata,
+        assetMetadata,
+        quoteMode,
+        assetKind,
+        symbolQuoteCcy,
+        symbolInstrumentType,
+        ...rest
+      } = data as NewActivityFormValues & {
+        assetId?: string;
+        exchangeMic?: string;
+        metadata?: Record<string, unknown>;
+        assetMetadata?: { name?: string; kind?: string; exchangeMic?: string };
+        quoteMode?: string;
+        assetKind?: string;
+        symbolQuoteCcy?: string;
+        symbolInstrumentType?: string;
+      };
       const quantity = "quantity" in rest ? rest.quantity : undefined;
       const unitPrice = "unitPrice" in rest ? rest.unitPrice : undefined;
       const amount = "amount" in rest ? rest.amount : undefined;
@@ -73,6 +84,8 @@ export function useActivityMutations(
           quoteMode: quoteMode as ActivityCreate["symbol"] extends { quoteMode?: infer P }
             ? P
             : never,
+          quoteCcy: symbolQuoteCcy,
+          instrumentType: symbolInstrumentType,
         },
         // Serialize metadata object to JSON string for backend
         metadata: metadata ? JSON.stringify(metadata) : undefined,
@@ -86,16 +99,27 @@ export function useActivityMutations(
   const updateActivityMutation = useMutation({
     mutationFn: async (data: NewActivityFormValues & { id: string }) => {
       // Extract asset-related fields from form data
-      const { assetId, exchangeMic, metadata, assetMetadata, quoteMode, assetKind, ...rest } =
-        data as NewActivityFormValues & {
-          id: string;
-          assetId?: string;
-          exchangeMic?: string;
-          metadata?: Record<string, unknown>;
-          assetMetadata?: { name?: string; kind?: string; exchangeMic?: string };
-          quoteMode?: string;
-          assetKind?: string;
-        };
+      const {
+        assetId,
+        exchangeMic,
+        metadata,
+        assetMetadata,
+        quoteMode,
+        assetKind,
+        symbolQuoteCcy,
+        symbolInstrumentType,
+        ...rest
+      } = data as NewActivityFormValues & {
+        id: string;
+        assetId?: string;
+        exchangeMic?: string;
+        metadata?: Record<string, unknown>;
+        assetMetadata?: { name?: string; kind?: string; exchangeMic?: string };
+        quoteMode?: string;
+        assetKind?: string;
+        symbolQuoteCcy?: string;
+        symbolInstrumentType?: string;
+      };
       const quantity = "quantity" in rest ? rest.quantity : undefined;
       const unitPrice = "unitPrice" in rest ? rest.unitPrice : undefined;
       const amount = "amount" in rest ? rest.amount : undefined;
@@ -120,6 +144,8 @@ export function useActivityMutations(
           quoteMode: quoteMode as ActivityUpdate["symbol"] extends { quoteMode?: infer P }
             ? P
             : never,
+          quoteCcy: symbolQuoteCcy,
+          instrumentType: symbolInstrumentType,
         },
         // Serialize metadata object to JSON string for backend
         metadata: metadata ? JSON.stringify(metadata) : undefined,

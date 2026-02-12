@@ -63,6 +63,8 @@ export const buyFormSchema = z.object({
   // Internal fields
   quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).default(QuoteMode.MARKET),
   exchangeMic: z.string().optional(),
+  symbolQuoteCcy: z.string().optional(),
+  symbolInstrumentType: z.string().optional(),
   // Asset metadata for custom assets (name, etc.)
   assetMetadata: assetMetadataSchema,
 });
@@ -154,11 +156,15 @@ export function BuyForm({
               exchangeMicName="exchangeMic"
               quoteModeName="quoteMode"
               currencyName="currency"
+              quoteCcyName="symbolQuoteCcy"
+              instrumentTypeName="symbolInstrumentType"
               assetMetadataName="assetMetadata"
             />
             {/* Hidden fields to register assetMetadata for react-hook-form */}
             <input type="hidden" {...form.register("assetMetadata.name")} />
             <input type="hidden" {...form.register("assetMetadata.kind")} />
+            <input type="hidden" {...form.register("symbolQuoteCcy")} />
+            <input type="hidden" {...form.register("symbolInstrumentType")} />
 
             {/* Date Picker */}
             <DatePicker name="activityDate" label="Date" enableTime={true} />

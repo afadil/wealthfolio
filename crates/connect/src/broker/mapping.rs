@@ -381,6 +381,14 @@ pub fn map_broker_activity(
                 kind: kind_hint,
                 name: asset_name,
                 quote_mode: None,
+                quote_ccy: symbol_currency.clone(),
+                instrument_type: if is_option_activity {
+                    Some("OPTION".to_string())
+                } else if is_crypto {
+                    Some("CRYPTO".to_string())
+                } else {
+                    None
+                },
             }
         })
     };

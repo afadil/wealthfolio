@@ -117,6 +117,8 @@ function draftToActivityImport(draft: DraftActivity): ActivityImport {
     fxRate: draft.fxRate,
     subtype: draft.subtype,
     exchangeMic: draft.exchangeMic,
+    quoteCcy: draft.quoteCcy,
+    instrumentType: draft.instrumentType,
     errors: draft.errors,
     isValid: draft.status === "valid" || draft.status === "warning",
     lineNumber: draft.rowIndex + 1,
