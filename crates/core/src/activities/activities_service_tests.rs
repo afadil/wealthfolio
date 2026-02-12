@@ -403,7 +403,7 @@ mod tests {
             _query: &str,
             _account_currency: Option<&str>,
         ) -> Result<Vec<SymbolSearchResult>> {
-            unimplemented!()
+            Ok(vec![])
         }
 
         async fn get_asset_profile(&self, _asset: &Asset) -> Result<ProviderProfile> {
