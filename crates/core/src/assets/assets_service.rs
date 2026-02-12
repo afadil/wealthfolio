@@ -42,11 +42,30 @@ pub struct AssetService {
 }
 
 impl AssetService {
+    fn normalize_exchange_mic(value: Option<&str>) -> Option<String> {
+        value
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_uppercase())
+    }
+
     fn default_quote_mode_for_kind(kind: &AssetKind) -> QuoteMode {
         match kind {
             AssetKind::Investment | AssetKind::Fx => QuoteMode::Market,
             _ => QuoteMode::Manual,
         }
+    }
+
+    fn should_refresh_market_quote_ccy_on_mic_change(
+        quote_mode: QuoteMode,
+        payload_quote_ccy: Option<&str>,
+        payload_exchange_mic: Option<&str>,
+        existing_exchange_mic: Option<&str>,
+    ) -> bool {
+        quote_mode == QuoteMode::Market
+            && payload_quote_ccy.is_none()
+            && Self::normalize_exchange_mic(payload_exchange_mic)
+                != Self::normalize_exchange_mic(existing_exchange_mic)
     }
 
     fn expected_market_quote_ccy(
@@ -279,6 +298,13 @@ impl AssetServiceTrait for AssetService {
             .or(existing_asset.instrument_type.clone());
 
         if effective_instrument_type.is_some() {
+            let should_refresh_quote_ccy = Self::should_refresh_market_quote_ccy_on_mic_change(
+                effective_quote_mode,
+                payload.quote_ccy.as_deref(),
+                payload.instrument_exchange_mic.as_deref(),
+                existing_asset.instrument_exchange_mic.as_deref(),
+            );
+
             let canonical = canonicalize_market_identity(
                 effective_instrument_type.clone(),
                 payload
@@ -291,10 +317,14 @@ impl AssetServiceTrait for AssetService {
                     .instrument_exchange_mic
                     .as_deref()
                     .or(existing_asset.instrument_exchange_mic.as_deref()),
-                payload
-                    .quote_ccy
-                    .as_deref()
-                    .or(Some(existing_asset.quote_ccy.as_str())),
+                if should_refresh_quote_ccy {
+                    None
+                } else {
+                    payload
+                        .quote_ccy
+                        .as_deref()
+                        .or(Some(existing_asset.quote_ccy.as_str()))
+                },
             );
 
             payload.instrument_symbol = canonical
@@ -1208,7 +1238,7 @@ impl AssetServiceTrait for AssetService {
 
 #[cfg(test)]
 mod tests {
-    use super::AssetService;
+    use super::{AssetService, QuoteMode};
 
     #[test]
     fn test_explicit_quote_heal_target_for_gbp_minor_units() {
@@ -1232,5 +1262,35 @@ mod tests {
     fn test_explicit_quote_heal_target_ignores_same_currency() {
         let target = AssetService::explicit_quote_heal_target("GBP", Some("GBP"));
         assert!(target.is_none());
+    }
+
+    #[test]
+    fn test_refresh_market_quote_ccy_on_mic_change_when_quote_not_explicit() {
+        assert!(AssetService::should_refresh_market_quote_ccy_on_mic_change(
+            QuoteMode::Market,
+            None,
+            Some("xlon"),
+            Some("XNAS"),
+        ));
+    }
+
+    #[test]
+    fn test_do_not_refresh_market_quote_ccy_without_mic_change() {
+        assert!(!AssetService::should_refresh_market_quote_ccy_on_mic_change(
+            QuoteMode::Market,
+            None,
+            Some(" xnas "),
+            Some("XNAS"),
+        ));
+    }
+
+    #[test]
+    fn test_do_not_refresh_market_quote_ccy_when_quote_explicitly_set() {
+        assert!(!AssetService::should_refresh_market_quote_ccy_on_mic_change(
+            QuoteMode::Market,
+            Some("USD"),
+            Some("XLON"),
+            Some("XNAS"),
+        ));
     }
 }
