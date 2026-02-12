@@ -3,6 +3,7 @@ import type {
   SymbolSearchResult,
   Asset,
   Quote,
+  LatestQuoteSnapshot,
   UpdateAssetProfile,
   MarketDataProviderInfo,
   ExchangeInfo,
@@ -48,9 +49,11 @@ export const getAssets = async (): Promise<Asset[]> => {
   }
 };
 
-export const getLatestQuotes = async (assetIds: string[]): Promise<Record<string, Quote>> => {
+export const getLatestQuotes = async (
+  assetIds: string[],
+): Promise<Record<string, LatestQuoteSnapshot>> => {
   try {
-    return await invoke<Record<string, Quote>>("get_latest_quotes", { assetIds });
+    return await invoke<Record<string, LatestQuoteSnapshot>>("get_latest_quotes", { assetIds });
   } catch (error) {
     logger.error("Error loading latest quotes.");
     throw error;

@@ -81,7 +81,7 @@ export default function AssetsPage() {
 
       <AssetEditSheet
         asset={editingAsset}
-        latestQuote={editingAsset ? latestQuotes[editingAsset.id] : null}
+        latestQuote={editingAsset ? (latestQuotes[editingAsset.id]?.quote ?? null) : null}
         open={!!editingAsset}
         onOpenChange={(open) => {
           if (!open) {

@@ -58,6 +58,16 @@ pub struct ProviderInfo {
     pub unique_errors: Vec<String>,
 }
 
+/// Latest quote payload enriched with backend freshness computation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LatestQuoteSnapshot {
+    pub quote: Quote,
+    pub is_stale: bool,
+    pub effective_market_date: String,
+    pub quote_date: String,
+}
+
 /// Unified trait for all quote operations.
 #[async_trait]
 pub trait QuoteServiceTrait: Send + Sync {
@@ -70,6 +80,12 @@ pub trait QuoteServiceTrait: Send + Sync {
 
     /// Get the latest quotes for multiple symbols.
     fn get_latest_quotes(&self, symbols: &[String]) -> Result<HashMap<String, Quote>>;
+
+    /// Get latest quotes with backend-computed staleness metadata.
+    fn get_latest_quotes_snapshot(
+        &self,
+        asset_ids: &[String],
+    ) -> Result<HashMap<String, LatestQuoteSnapshot>>;
 
     /// Get the latest quote pairs (current + previous) for multiple symbols.
     fn get_latest_quotes_pair(
@@ -492,6 +508,44 @@ where
 
     fn get_latest_quotes(&self, symbols: &[String]) -> Result<HashMap<String, Quote>> {
         self.quote_store.get_latest_quotes(symbols)
+    }
+
+    fn get_latest_quotes_snapshot(
+        &self,
+        asset_ids: &[String],
+    ) -> Result<HashMap<String, LatestQuoteSnapshot>> {
+        let quotes = self.quote_store.get_latest_quotes(asset_ids)?;
+        let assets = self.asset_repo.list_by_asset_ids(asset_ids)?;
+        let assets_by_id: HashMap<String, Asset> = assets
+            .into_iter()
+            .map(|asset| (asset.id.clone(), asset))
+            .collect();
+        let now = Utc::now();
+
+        let snapshots = quotes
+            .into_iter()
+            .map(|(asset_id, quote)| {
+                let asset = assets_by_id.get(&asset_id);
+                let effective_today = time_utils::market_effective_date(
+                    now,
+                    asset.and_then(|a| a.instrument_exchange_mic.as_deref()),
+                );
+                let quote_day = quote.timestamp.date_naive();
+                let is_inactive = asset.map(|a| !a.is_active).unwrap_or(false);
+
+                (
+                    asset_id,
+                    LatestQuoteSnapshot {
+                        quote,
+                        is_stale: is_inactive || quote_day < effective_today,
+                        effective_market_date: effective_today.to_string(),
+                        quote_date: quote_day.to_string(),
+                    },
+                )
+            })
+            .collect();
+
+        Ok(snapshots)
     }
 
     fn get_latest_quotes_pair(

@@ -12,7 +12,7 @@ use axum::{
     Json, Router,
 };
 use wealthfolio_core::quotes::{
-    MarketSyncMode, ProviderInfo, Quote, QuoteImport, SymbolSearchResult,
+    LatestQuoteSnapshot, MarketSyncMode, ProviderInfo, Quote, QuoteImport, SymbolSearchResult,
 };
 use wealthfolio_market_data::ExchangeInfo;
 
@@ -221,8 +221,10 @@ struct LatestQuotesBody {
 async fn get_latest_quotes(
     State(state): State<Arc<AppState>>,
     Json(body): Json<LatestQuotesBody>,
-) -> ApiResult<Json<std::collections::HashMap<String, Quote>>> {
-    let quotes = state.quote_service.get_latest_quotes(&body.asset_ids)?;
+) -> ApiResult<Json<std::collections::HashMap<String, LatestQuoteSnapshot>>> {
+    let quotes = state
+        .quote_service
+        .get_latest_quotes_snapshot(&body.asset_ids)?;
     Ok(Json(quotes))
 }
 

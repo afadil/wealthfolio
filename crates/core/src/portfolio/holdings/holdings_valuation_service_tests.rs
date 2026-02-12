@@ -12,8 +12,8 @@ mod tests {
     };
     use crate::quotes::{DataSource, MarketDataError};
     use crate::quotes::{
-        LatestQuotePair, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait, QuoteSyncState,
-        SymbolSearchResult, SymbolSyncPlan, SyncResult,
+        LatestQuotePair, LatestQuoteSnapshot, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait,
+        QuoteSyncState, SymbolSearchResult, SymbolSyncPlan, SyncResult,
     };
     use crate::utils::time_utils::valuation_date_today;
     use async_trait::async_trait;
@@ -174,6 +174,29 @@ mod tests {
 
         fn get_latest_quotes(&self, _symbols: &[String]) -> Result<HashMap<String, Quote>> {
             unimplemented!()
+        }
+
+        fn get_latest_quotes_snapshot(
+            &self,
+            asset_ids: &[String],
+        ) -> Result<HashMap<String, LatestQuoteSnapshot>> {
+            let today = Utc::now().date_naive();
+            let quotes = self.get_latest_quotes(asset_ids)?;
+            Ok(quotes
+                .into_iter()
+                .map(|(asset_id, quote)| {
+                    let quote_day = quote.timestamp.date_naive();
+                    (
+                        asset_id,
+                        LatestQuoteSnapshot {
+                            quote,
+                            is_stale: quote_day < today,
+                            effective_market_date: today.to_string(),
+                            quote_date: quote_day.to_string(),
+                        },
+                    )
+                })
+                .collect())
         }
 
         fn get_latest_quotes_pair(

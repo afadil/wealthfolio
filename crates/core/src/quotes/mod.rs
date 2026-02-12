@@ -71,7 +71,7 @@ pub use sync::{
 };
 
 // Re-export unified service types
-pub use service::{ProviderInfo, QuoteService, QuoteServiceTrait};
+pub use service::{LatestQuoteSnapshot, ProviderInfo, QuoteService, QuoteServiceTrait};
 
 // Re-export import types
 pub use import::{

@@ -11,7 +11,8 @@ use crate::{
 use log::{debug, error};
 use tauri::{AppHandle, State};
 use wealthfolio_core::quotes::{
-    service::ProviderInfo, MarketSyncMode, Quote, QuoteImport, SymbolSearchResult,
+    service::ProviderInfo, LatestQuoteSnapshot, MarketSyncMode, Quote, QuoteImport,
+    SymbolSearchResult,
 };
 use wealthfolio_market_data::ExchangeInfo;
 
@@ -123,10 +124,10 @@ pub async fn get_quote_history(
 pub async fn get_latest_quotes(
     asset_ids: Vec<String>,
     state: State<'_, Arc<ServiceContext>>,
-) -> Result<HashMap<String, Quote>, String> {
+) -> Result<HashMap<String, LatestQuoteSnapshot>, String> {
     state
         .quote_service()
-        .get_latest_quotes(&asset_ids)
+        .get_latest_quotes_snapshot(&asset_ids)
         .map_err(|e| e.to_string())
 }
 

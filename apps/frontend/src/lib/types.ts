@@ -595,6 +595,13 @@ export interface Quote {
   notes?: string | null;
 }
 
+export interface LatestQuoteSnapshot {
+  quote: Quote;
+  isStale: boolean;
+  effectiveMarketDate: string; // YYYY-MM-DD in market timezone semantics
+  quoteDate: string; // YYYY-MM-DD extracted from quote timestamp
+}
+
 export interface QuoteUpdate {
   timestamp: string;
   assetId: string;

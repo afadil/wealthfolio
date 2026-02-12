@@ -94,8 +94,9 @@ pub mod test_env {
         portfolio::income::{IncomeServiceTrait, IncomeSummary},
         portfolio::performance::{PerformanceMetrics, PerformanceServiceTrait},
         quotes::{
-            LatestQuotePair, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait, QuoteSyncState,
-            SymbolSearchResult, SymbolSyncPlan, SyncMode, SyncResult,
+            LatestQuotePair, LatestQuoteSnapshot, ProviderInfo, Quote, QuoteImport,
+            QuoteServiceTrait, QuoteSyncState, SymbolSearchResult, SymbolSyncPlan, SyncMode,
+            SyncResult,
         },
         secrets::SecretStore,
         settings::{Settings, SettingsServiceTrait, SettingsUpdate},
@@ -702,6 +703,29 @@ pub mod test_env {
 
         fn get_latest_quotes(&self, _symbols: &[String]) -> CoreResult<HashMap<String, Quote>> {
             Ok(HashMap::new())
+        }
+
+        fn get_latest_quotes_snapshot(
+            &self,
+            asset_ids: &[String],
+        ) -> CoreResult<HashMap<String, LatestQuoteSnapshot>> {
+            let today = Utc::now().date_naive();
+            let quotes = self.get_latest_quotes(asset_ids)?;
+            Ok(quotes
+                .into_iter()
+                .map(|(asset_id, quote)| {
+                    let quote_day = quote.timestamp.date_naive();
+                    (
+                        asset_id,
+                        LatestQuoteSnapshot {
+                            quote,
+                            is_stale: quote_day < today,
+                            effective_market_date: today.to_string(),
+                            quote_date: quote_day.to_string(),
+                        },
+                    )
+                })
+                .collect())
         }
 
         fn get_latest_quotes_pair(

@@ -109,3 +109,22 @@ pub fn market_effective_date(now: DateTime<Utc>, mic: Option<&str>) -> NaiveDate
         local_date
     }
 }
+
+/// Returns the market-local trading date for fetch windows.
+///
+/// Unlike `market_effective_date`, this does not wait for market close + grace.
+/// It uses the exchange-local calendar day (weekends roll back to prior trading day).
+pub fn market_calendar_date(now: DateTime<Utc>, mic: Option<&str>) -> NaiveDate {
+    let tz = mic
+        .and_then(exchange_metadata::mic_to_timezone)
+        .and_then(|tz_name| tz_name.parse::<Tz>().ok())
+        .unwrap_or(DEFAULT_VALUATION_TZ);
+
+    let local_date = now.with_timezone(&tz).date_naive();
+    let weekday = local_date.weekday();
+    if weekday == Weekday::Sat || weekday == Weekday::Sun {
+        previous_trading_day(local_date)
+    } else {
+        local_date
+    }
+}
