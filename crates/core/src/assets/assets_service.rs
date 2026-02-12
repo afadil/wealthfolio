@@ -1276,21 +1276,25 @@ mod tests {
 
     #[test]
     fn test_do_not_refresh_market_quote_ccy_without_mic_change() {
-        assert!(!AssetService::should_refresh_market_quote_ccy_on_mic_change(
-            QuoteMode::Market,
-            None,
-            Some(" xnas "),
-            Some("XNAS"),
-        ));
+        assert!(
+            !AssetService::should_refresh_market_quote_ccy_on_mic_change(
+                QuoteMode::Market,
+                None,
+                Some(" xnas "),
+                Some("XNAS"),
+            )
+        );
     }
 
     #[test]
     fn test_do_not_refresh_market_quote_ccy_when_quote_explicitly_set() {
-        assert!(!AssetService::should_refresh_market_quote_ccy_on_mic_change(
-            QuoteMode::Market,
-            Some("USD"),
-            Some("XLON"),
-            Some("XNAS"),
-        ));
+        assert!(
+            !AssetService::should_refresh_market_quote_ccy_on_mic_change(
+                QuoteMode::Market,
+                Some("USD"),
+                Some("XLON"),
+                Some("XNAS"),
+            )
+        );
     }
 }
