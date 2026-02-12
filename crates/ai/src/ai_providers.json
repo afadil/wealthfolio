@@ -38,7 +38,7 @@
         }
       },
       "defaultModel": "ministral-3",
-      "titleModelId": "deepssek-3",
+      "titleModelId": "ministral-3",
       "documentationUrl": "https://ollama.ai/docs"
     },
     "groq": {
