@@ -25,6 +25,7 @@ use wealthfolio_core::{
         net_worth::NetWorthService,
         performance::PerformanceService,
         snapshot::SnapshotService,
+        targets::PortfolioTargetService,
         valuation::ValuationService,
     },
     quotes::{QuoteService, QuoteServiceTrait},
@@ -43,7 +44,10 @@ use wealthfolio_storage_sqlite::{
     health::HealthDismissalRepository,
     limits::ContributionLimitRepository,
     market_data::{MarketDataRepository, QuoteSyncStateRepository},
-    portfolio::{snapshot::SnapshotRepository, valuation::ValuationRepository},
+    portfolio::{
+        snapshot::SnapshotRepository, targets::repository::PortfolioTargetRepository,
+        valuation::ValuationRepository,
+    },
     settings::SettingsRepository,
     sync::{AppSyncRepository, BrokerSyncStateRepository, ImportRunRepository, PlatformRepository},
     taxonomies::TaxonomyRepository,
@@ -219,6 +223,13 @@ pub async fn initialize_context(
         taxonomy_service.clone(),
     ));
 
+    let portfolio_target_repository =
+        Arc::new(PortfolioTargetRepository::new(pool.clone(), writer.clone()));
+    let portfolio_target_service = Arc::new(PortfolioTargetService::new(
+        portfolio_target_repository,
+        allocation_service.clone(),
+    ));
+
     let net_worth_service = Arc::new(NetWorthService::new(
         base_currency.clone(),
         account_repository.clone(),
@@ -331,6 +342,7 @@ pub async fn initialize_context(
             sync_service,
             alternative_asset_service,
             taxonomy_service,
+            portfolio_target_service,
             connect_service,
             ai_provider_service,
             ai_chat_service,

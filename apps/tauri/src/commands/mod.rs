@@ -18,6 +18,7 @@ pub mod limits;
 pub mod market_data;
 pub mod platform;
 pub mod portfolio;
+pub mod portfolio_targets;
 pub mod providers_settings;
 pub mod secrets;
 pub mod settings;

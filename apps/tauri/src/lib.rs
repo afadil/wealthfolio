@@ -356,6 +356,16 @@ pub fn run() {
             // Taxonomy migration commands
             commands::taxonomy::get_migration_status,
             commands::taxonomy::migrate_legacy_classifications,
+            // Portfolio target commands
+            commands::portfolio_targets::get_portfolio_targets,
+            commands::portfolio_targets::get_portfolio_target,
+            commands::portfolio_targets::create_portfolio_target,
+            commands::portfolio_targets::update_portfolio_target,
+            commands::portfolio_targets::delete_portfolio_target,
+            commands::portfolio_targets::get_target_allocations,
+            commands::portfolio_targets::upsert_target_allocation,
+            commands::portfolio_targets::delete_target_allocation,
+            commands::portfolio_targets::get_allocation_deviations,
             // Platform commands
             commands::platform::get_platform,
             commands::platform::is_mobile,

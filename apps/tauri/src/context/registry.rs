@@ -1,6 +1,7 @@
 use std::sync::{Arc, RwLock};
 use wealthfolio_ai::{AiProviderServiceTrait, ChatService};
 use wealthfolio_connect::BrokerSyncServiceTrait;
+use wealthfolio_core::portfolio::targets::PortfolioTargetServiceTrait;
 use wealthfolio_core::{
     self, accounts, activities,
     assets::{self, AlternativeAssetServiceTrait},
@@ -48,6 +49,7 @@ pub struct ServiceContext {
     pub sync_service: Arc<dyn BrokerSyncServiceTrait>,
     pub alternative_asset_service: Arc<dyn AlternativeAssetServiceTrait>,
     pub taxonomy_service: Arc<dyn taxonomies::TaxonomyServiceTrait>,
+    pub portfolio_target_service: Arc<dyn PortfolioTargetServiceTrait>,
     pub connect_service: Arc<ConnectService>,
     pub ai_provider_service: Arc<dyn AiProviderServiceTrait>,
     pub ai_chat_service: Arc<ChatService<TauriAiEnvironment>>,
@@ -143,6 +145,10 @@ impl ServiceContext {
 
     pub fn taxonomy_service(&self) -> Arc<dyn taxonomies::TaxonomyServiceTrait> {
         Arc::clone(&self.taxonomy_service)
+    }
+
+    pub fn portfolio_target_service(&self) -> Arc<dyn PortfolioTargetServiceTrait> {
+        Arc::clone(&self.portfolio_target_service)
     }
 
     pub fn connect_service(&self) -> Arc<ConnectService> {
