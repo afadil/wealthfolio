@@ -51,17 +51,16 @@ export function useActivityMutations(
         symbolQuoteCcy,
         symbolInstrumentType,
         ...rest
-      } =
-        data as NewActivityFormValues & {
-          assetId?: string;
-          exchangeMic?: string;
-          metadata?: Record<string, unknown>;
-          assetMetadata?: { name?: string; kind?: string; exchangeMic?: string };
-          quoteMode?: string;
-          assetKind?: string;
-          symbolQuoteCcy?: string;
-          symbolInstrumentType?: string;
-        };
+      } = data as NewActivityFormValues & {
+        assetId?: string;
+        exchangeMic?: string;
+        metadata?: Record<string, unknown>;
+        assetMetadata?: { name?: string; kind?: string; exchangeMic?: string };
+        quoteMode?: string;
+        assetKind?: string;
+        symbolQuoteCcy?: string;
+        symbolInstrumentType?: string;
+      };
       const quantity = "quantity" in rest ? rest.quantity : undefined;
       const unitPrice = "unitPrice" in rest ? rest.unitPrice : undefined;
       const amount = "amount" in rest ? rest.amount : undefined;
@@ -110,18 +109,17 @@ export function useActivityMutations(
         symbolQuoteCcy,
         symbolInstrumentType,
         ...rest
-      } =
-        data as NewActivityFormValues & {
-          id: string;
-          assetId?: string;
-          exchangeMic?: string;
-          metadata?: Record<string, unknown>;
-          assetMetadata?: { name?: string; kind?: string; exchangeMic?: string };
-          quoteMode?: string;
-          assetKind?: string;
-          symbolQuoteCcy?: string;
-          symbolInstrumentType?: string;
-        };
+      } = data as NewActivityFormValues & {
+        id: string;
+        assetId?: string;
+        exchangeMic?: string;
+        metadata?: Record<string, unknown>;
+        assetMetadata?: { name?: string; kind?: string; exchangeMic?: string };
+        quoteMode?: string;
+        assetKind?: string;
+        symbolQuoteCcy?: string;
+        symbolInstrumentType?: string;
+      };
       const quantity = "quantity" in rest ? rest.quantity : undefined;
       const unitPrice = "unitPrice" in rest ? rest.unitPrice : undefined;
       const amount = "amount" in rest ? rest.amount : undefined;

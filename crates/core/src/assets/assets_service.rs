@@ -410,7 +410,10 @@ impl AssetServiceTrait for AssetService {
                     .as_ref()
                     .and_then(|m| m.quote_ccy_hint.as_deref())
                     .and_then(|hint| {
-                        Self::explicit_quote_heal_target(existing_asset.quote_ccy.as_str(), Some(hint))
+                        Self::explicit_quote_heal_target(
+                            existing_asset.quote_ccy.as_str(),
+                            Some(hint),
+                        )
                     });
                 let expected_quote_ccy = Self::expected_market_quote_ccy(
                     target_instrument_type.as_ref(),
@@ -517,10 +520,8 @@ impl AssetServiceTrait for AssetService {
                                 .instrument_exchange_mic
                                 .clone()
                                 .or(spec.instrument_exchange_mic.clone());
-                            let explicit_quote_heal_target = spec
-                                .quote_ccy_hint
-                                .as_deref()
-                                .and_then(|hint| {
+                            let explicit_quote_heal_target =
+                                spec.quote_ccy_hint.as_deref().and_then(|hint| {
                                     Self::explicit_quote_heal_target(
                                         existing.quote_ccy.as_str(),
                                         Some(hint),
@@ -536,8 +537,8 @@ impl AssetServiceTrait for AssetService {
                                 || explicit_quote_heal_target.is_some();
                             let needs_mic_repair = existing.instrument_exchange_mic.is_none()
                                 && target_exchange_mic.is_some();
-                            let needs_type_repair =
-                                existing.instrument_type.is_none() && target_instrument_type.is_some();
+                            let needs_type_repair = existing.instrument_type.is_none()
+                                && target_instrument_type.is_some();
 
                             if needs_currency_repair || needs_mic_repair || needs_type_repair {
                                 let mut payload = Self::update_payload_from_asset(&existing);
@@ -1085,13 +1086,12 @@ impl AssetServiceTrait for AssetService {
             let expected_quote_ccy = normalized.quote_ccy;
             let expected_mic = normalized.instrument_exchange_mic;
             let expected_instrument_type = normalized.instrument_type;
-            let explicit_quote_heal_target =
-                spec.quote_ccy_hint.as_deref().and_then(|hint| {
-                    Self::explicit_quote_heal_target(existing_asset.quote_ccy.as_str(), Some(hint))
-                });
+            let explicit_quote_heal_target = spec.quote_ccy_hint.as_deref().and_then(|hint| {
+                Self::explicit_quote_heal_target(existing_asset.quote_ccy.as_str(), Some(hint))
+            });
 
-            let needs_currency_repair = existing_asset.quote_ccy.trim().is_empty()
-                || explicit_quote_heal_target.is_some();
+            let needs_currency_repair =
+                existing_asset.quote_ccy.trim().is_empty() || explicit_quote_heal_target.is_some();
             let needs_mic_repair =
                 expected_mic.is_some() && existing_asset.instrument_exchange_mic != expected_mic;
             let needs_type_repair =

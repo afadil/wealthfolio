@@ -515,17 +515,18 @@ impl ActivityService {
             Self::parse_instrument_type_hint(activity.get_instrument_type_hint());
         let asset_name = activity.get_name().map(|s| s.to_string());
         let quote_mode = activity.get_quote_mode().map(|s| s.to_string());
-        let parsed_quote_mode = quote_mode
-            .as_deref()
-            .and_then(|mode| match mode.to_uppercase().as_str() {
-                "MANUAL" => Some(QuoteMode::Manual),
-                "MARKET" => Some(QuoteMode::Market),
-                _ => None,
-            });
+        let parsed_quote_mode =
+            quote_mode
+                .as_deref()
+                .and_then(|mode| match mode.to_uppercase().as_str() {
+                    "MANUAL" => Some(QuoteMode::Manual),
+                    "MARKET" => Some(QuoteMode::Market),
+                    _ => None,
+                });
 
-        let inferred = symbol.as_deref().map(|s| {
-            self.infer_asset_kind(s, exchange_mic.as_deref(), asset_kind_hint.as_deref())
-        });
+        let inferred = symbol
+            .as_deref()
+            .map(|s| self.infer_asset_kind(s, exchange_mic.as_deref(), asset_kind_hint.as_deref()));
         let inferred_instrument_type = inferred.as_ref().and_then(|(_, it)| it.clone());
         let effective_instrument_type = instrument_type_hint
             .clone()
@@ -820,17 +821,18 @@ impl ActivityService {
             Self::parse_instrument_type_hint(activity.get_instrument_type_hint());
         let asset_name = activity.get_name().map(|s| s.to_string());
         let quote_mode = activity.get_quote_mode().map(|s| s.to_string());
-        let parsed_quote_mode = quote_mode
-            .as_deref()
-            .and_then(|mode| match mode.to_uppercase().as_str() {
-                "MANUAL" => Some(QuoteMode::Manual),
-                "MARKET" => Some(QuoteMode::Market),
-                _ => None,
-            });
+        let parsed_quote_mode =
+            quote_mode
+                .as_deref()
+                .and_then(|mode| match mode.to_uppercase().as_str() {
+                    "MANUAL" => Some(QuoteMode::Manual),
+                    "MARKET" => Some(QuoteMode::Market),
+                    _ => None,
+                });
 
-        let inferred = symbol.as_deref().map(|s| {
-            self.infer_asset_kind(s, exchange_mic.as_deref(), asset_kind_hint.as_deref())
-        });
+        let inferred = symbol
+            .as_deref()
+            .map(|s| self.infer_asset_kind(s, exchange_mic.as_deref(), asset_kind_hint.as_deref()));
         let inferred_instrument_type = inferred.as_ref().and_then(|(_, it)| it.clone());
         let effective_instrument_type = instrument_type_hint
             .clone()
@@ -1092,15 +1094,16 @@ impl ActivityService {
                 if let Some(asset_id) = activity.get_symbol_id() {
                     if !asset_id.is_empty() {
                         // asset_id is a UUID; look up the existing asset to build spec
-                        let currency = Self::normalize_quote_ccy_hint(activity.get_quote_ccy_hint())
-                            .or_else(|| {
-                                if !activity.currency.is_empty() {
-                                    Some(activity.currency.clone())
-                                } else {
-                                    None
-                                }
-                            })
-                            .unwrap_or_else(|| account_currency.clone());
+                        let currency =
+                            Self::normalize_quote_ccy_hint(activity.get_quote_ccy_hint())
+                                .or_else(|| {
+                                    if !activity.currency.is_empty() {
+                                        Some(activity.currency.clone())
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .unwrap_or_else(|| account_currency.clone());
 
                         let quote_mode = activity.get_quote_mode().and_then(|s| {
                             match s.to_uppercase().as_str() {
@@ -1178,8 +1181,10 @@ impl ActivityService {
 
         // Crypto/FX assets don't have exchange MICs — clear any that leaked from frontend/suffix
         let is_crypto = instrument_type.as_ref() == Some(&InstrumentType::Crypto);
-        let is_non_security =
-            matches!(instrument_type.as_ref(), Some(InstrumentType::Crypto | InstrumentType::Fx));
+        let is_non_security = matches!(
+            instrument_type.as_ref(),
+            Some(InstrumentType::Crypto | InstrumentType::Fx)
+        );
         let exchange_mic = if is_non_security { None } else { exchange_mic };
 
         // For crypto, use the quote currency from the pair if available
@@ -1752,8 +1757,7 @@ impl ActivityServiceTrait for ActivityService {
                 .unwrap_or(inferred_kind);
 
             // Crypto/FX assets don't have exchange MICs
-            let is_crypto =
-                effective_instrument_type.as_ref() == Some(&InstrumentType::Crypto);
+            let is_crypto = effective_instrument_type.as_ref() == Some(&InstrumentType::Crypto);
             let is_non_security = matches!(
                 effective_instrument_type.as_ref(),
                 Some(InstrumentType::Crypto | InstrumentType::Fx)
@@ -1838,7 +1842,9 @@ impl ActivityServiceTrait for ActivityService {
                 ) {
                     parse_crypto_pair_symbol(base_symbol)
                         .map(|(_, quote)| quote)
-                        .or_else(|| Self::normalize_quote_ccy_hint(Some(activity.currency.as_str())))
+                        .or_else(|| {
+                            Self::normalize_quote_ccy_hint(Some(activity.currency.as_str()))
+                        })
                 } else {
                     asset_currency
                         .clone()
@@ -1848,7 +1854,9 @@ impl ActivityServiceTrait for ActivityService {
                                 .and_then(mic_to_currency)
                                 .map(|ccy| ccy.to_string())
                         })
-                        .or_else(|| Self::normalize_quote_ccy_hint(Some(activity.currency.as_str())))
+                        .or_else(|| {
+                            Self::normalize_quote_ccy_hint(Some(activity.currency.as_str()))
+                        })
                 };
             }
 
