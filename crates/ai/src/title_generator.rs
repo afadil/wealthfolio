@@ -260,7 +260,10 @@ impl<E: AiEnvironment + 'static> TitleGeneratorTrait for TitleGenerator<E> {
         {
             Ok(title) => return title,
             Err(e) => {
-                warn!("Title generation failed with title model '{}': {}", title_model, e);
+                warn!(
+                    "Title generation failed with title model '{}': {}",
+                    title_model, e
+                );
             }
         }
 

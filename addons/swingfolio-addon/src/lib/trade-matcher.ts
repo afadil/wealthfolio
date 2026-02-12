@@ -422,7 +422,7 @@ export class TradeMatcher {
 
     // Calculate total dividends for open position
     const totalDividends = this.includeDividends
-      ? averageLot.dividends.reduce((sum, div) => sum + div.amount, 0)
+      ? averageLot.dividends.reduce((sum, div) => sum + Number(div.amount || 0), 0)
       : 0;
 
     // Initial values (will be updated with real market prices)
@@ -517,7 +517,7 @@ export class TradeMatcher {
 
     // Calculate total dividends for open position
     const totalDividends = this.includeDividends
-      ? lot.dividends.reduce((sum, div) => sum + div.amount, 0)
+      ? lot.dividends.reduce((sum, div) => sum + Number(div.amount || 0), 0)
       : 0;
 
     // Initial values (will be updated with real market prices)

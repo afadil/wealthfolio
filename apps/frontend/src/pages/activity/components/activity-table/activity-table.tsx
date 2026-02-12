@@ -88,7 +88,10 @@ export const ActivityTable = ({
     }
 
     return new Map(
-      Array.from(exchangesBySymbol.entries()).map(([symbol, exchanges]) => [symbol, exchanges.size]),
+      Array.from(exchangesBySymbol.entries()).map(([symbol, exchanges]) => [
+        symbol,
+        exchanges.size,
+      ]),
     );
   }, [activities]);
 

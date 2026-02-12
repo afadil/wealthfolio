@@ -647,7 +647,10 @@ mod tests {
     use std::borrow::Cow;
     use std::sync::Arc;
 
-    fn create_test_fx_context(currency_hint: Option<&'static str>, quote: &'static str) -> QuoteContext {
+    fn create_test_fx_context(
+        currency_hint: Option<&'static str>,
+        quote: &'static str,
+    ) -> QuoteContext {
         use crate::models::InstrumentId;
 
         QuoteContext {

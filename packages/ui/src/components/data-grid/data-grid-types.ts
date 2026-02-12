@@ -79,7 +79,7 @@ export type CellOpts =
       accept?: string;
       multiple?: boolean;
     }
-    | {
+  | {
       variant: "symbol";
       onSearch: (query: string) => Promise<SymbolSearchResult[]>;
       /** Called when a symbol is selected. Receives rowIndex, symbol, and full result */

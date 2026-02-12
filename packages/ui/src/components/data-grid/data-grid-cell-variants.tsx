@@ -2735,7 +2735,7 @@ export function SymbolCell<TData>({
                 {isLoading ? <CommandEmpty>Loading...</CommandEmpty> : null}
                 {!isLoading && !isError && options.length > 0 ? (
                   <CommandGroup>
-                    {options.map((option) => (
+                    {options.map((option) =>
                       (() => {
                         const withoutExchangeSuffix = option.exchangeMic
                           ? stripYahooExchangeSuffix(option.symbol)
@@ -2753,21 +2753,17 @@ export function SymbolCell<TData>({
                             className="flex items-center justify-between"
                           >
                             <div className="flex flex-col">
-                              <span className="font-mono text-xs font-semibold uppercase">
-                                {option.symbol}
-                              </span>
+                              <span className="font-mono text-xs font-semibold uppercase">{option.symbol}</span>
                               <span className="text-muted-foreground text-xs">{displayName(option)}</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <span className="text-muted-foreground text-xs">{option.exchange}</span>
-                              {value === normalizedOptionSymbol.toUpperCase() && (
-                                <Icons.Check className="size-4" />
-                              )}
+                              {value === normalizedOptionSymbol.toUpperCase() && <Icons.Check className="size-4" />}
                             </div>
                           </CommandItem>
                         );
-                      })()
-                    ))}
+                      })(),
+                    )}
                   </CommandGroup>
                 ) : null}
                 {/* Always show "Create custom asset" option at the bottom when there's a query */}
