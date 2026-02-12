@@ -2,6 +2,7 @@
 
 use rig::{completion::ToolDefinition, tool::Tool};
 use rust_decimal::prelude::ToPrimitive;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -113,10 +114,13 @@ impl<E: AiEnvironment + 'static> Tool for GetGoalsTool<E> {
             .get_latest_valuations(&account_ids)
             .unwrap_or_default();
 
-        // Build valuation lookup (convert Decimal to f64)
-        let valuation_map: HashMap<String, f64> = valuations
+        // Build valuation lookup: account_id -> total_value in base currency (Decimal)
+        let valuation_map: HashMap<String, Decimal> = valuations
             .iter()
-            .map(|v| (v.account_id.clone(), v.total_value.to_f64().unwrap_or(0.0)))
+            .map(|v| {
+                let value_in_base = v.total_value * v.fx_rate_to_base;
+                (v.account_id.clone(), value_in_base)
+            })
             .collect();
 
         let original_count = goals.len();
@@ -126,20 +130,21 @@ impl<E: AiEnvironment + 'static> Tool for GetGoalsTool<E> {
             .into_iter()
             .take(MAX_GOALS)
             .map(|g| {
-                // Calculate current amount from allocated accounts
-                let allocated_accounts: Vec<&String> = allocations
+                // Calculate current amount using percent_allocation per account
+                let current_amount_dec: Decimal = allocations
                     .iter()
                     .filter(|a| a.goal_id == g.id)
-                    .map(|a| &a.account_id)
-                    .collect();
-
-                let current_amount: f64 = allocated_accounts
-                    .iter()
-                    .filter_map(|id| valuation_map.get(*id))
+                    .map(|a| {
+                        let account_value =
+                            valuation_map.get(&a.account_id).copied().unwrap_or(Decimal::ZERO);
+                        account_value * Decimal::from(a.percent_allocation) / Decimal::from(100)
+                    })
                     .sum();
 
+                let current_amount = current_amount_dec.to_f64().unwrap_or(0.0);
+
                 let progress_percent = if g.target_amount > 0.0 {
-                    (current_amount / g.target_amount * 100.0).min(100.0)
+                    current_amount / g.target_amount * 100.0
                 } else {
                     0.0
                 };
