@@ -7,15 +7,16 @@ import {
   deleteTargetAllocation,
 } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
+import type { NewTargetAllocation } from "@/lib/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 export const useTargetMutations = () => {
   const queryClient = useQueryClient();
 
-  const handleSuccess = (message: string, invalidateKeys: string[]) => {
-    invalidateKeys.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
-    toast.success(message);
+  const invalidateAllocations = () => {
+    queryClient.invalidateQueries({ queryKey: [QueryKeys.TARGET_ALLOCATIONS] });
+    queryClient.invalidateQueries({ queryKey: [QueryKeys.ALLOCATION_DEVIATIONS] });
   };
 
   const handleError = (action: string) => {
@@ -26,7 +27,10 @@ export const useTargetMutations = () => {
 
   const createTargetMutation = useMutation({
     mutationFn: createPortfolioTarget,
-    onSuccess: () => handleSuccess("Target created successfully.", [QueryKeys.PORTFOLIO_TARGETS]),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.PORTFOLIO_TARGETS] });
+      toast.success("Target created successfully.");
+    },
     onError: (e) => {
       logger.error(`Error creating target: ${e}`);
       handleError("creating this target");
@@ -35,7 +39,10 @@ export const useTargetMutations = () => {
 
   const updateTargetMutation = useMutation({
     mutationFn: updatePortfolioTarget,
-    onSuccess: () => handleSuccess("Target updated successfully.", [QueryKeys.PORTFOLIO_TARGETS]),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.PORTFOLIO_TARGETS] });
+      toast.success("Target updated successfully.");
+    },
     onError: (e) => {
       logger.error(`Error updating target: ${e}`);
       handleError("updating this target");
@@ -44,11 +51,11 @@ export const useTargetMutations = () => {
 
   const deleteTargetMutation = useMutation({
     mutationFn: deletePortfolioTarget,
-    onSuccess: () =>
-      handleSuccess("Target deleted successfully.", [
-        QueryKeys.PORTFOLIO_TARGETS,
-        QueryKeys.TARGET_ALLOCATIONS,
-      ]),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.PORTFOLIO_TARGETS] });
+      invalidateAllocations();
+      toast.success("Target deleted successfully.");
+    },
     onError: (e) => {
       logger.error(`Error deleting target: ${e}`);
       handleError("deleting this target");
@@ -57,24 +64,34 @@ export const useTargetMutations = () => {
 
   const upsertAllocationMutation = useMutation({
     mutationFn: upsertTargetAllocation,
-    onSuccess: () =>
-      handleSuccess("Allocation saved.", [
-        QueryKeys.TARGET_ALLOCATIONS,
-        QueryKeys.ALLOCATION_DEVIATIONS,
-      ]),
+    onSuccess: () => invalidateAllocations(),
     onError: (e) => {
       logger.error(`Error saving allocation: ${e}`);
       handleError("saving the allocation");
     },
   });
 
+  // Batch save: saves multiple allocations in one go with a single toast
+  const batchSaveAllocationsMutation = useMutation({
+    mutationFn: async (allocations: NewTargetAllocation[]) => {
+      return Promise.all(allocations.map(upsertTargetAllocation));
+    },
+    onSuccess: () => {
+      invalidateAllocations();
+      toast.success("Allocations saved.");
+    },
+    onError: (e) => {
+      logger.error(`Error saving allocations: ${e}`);
+      handleError("saving allocations");
+    },
+  });
+
   const deleteAllocationMutation = useMutation({
     mutationFn: deleteTargetAllocation,
-    onSuccess: () =>
-      handleSuccess("Allocation removed.", [
-        QueryKeys.TARGET_ALLOCATIONS,
-        QueryKeys.ALLOCATION_DEVIATIONS,
-      ]),
+    onSuccess: () => {
+      invalidateAllocations();
+      toast.success("Allocation removed.");
+    },
     onError: (e) => {
       logger.error(`Error deleting allocation: ${e}`);
       handleError("deleting the allocation");
@@ -86,6 +103,7 @@ export const useTargetMutations = () => {
     updateTargetMutation,
     deleteTargetMutation,
     upsertAllocationMutation,
+    batchSaveAllocationsMutation,
     deleteAllocationMutation,
   };
 };
