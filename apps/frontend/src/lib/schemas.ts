@@ -302,6 +302,14 @@ export const importActivitySchema = z
     },
   );
 
+export const newPortfolioTargetSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1, { message: "Name is required." }),
+  accountId: z.string(),
+  taxonomyId: z.string(),
+  isActive: z.boolean(),
+});
+
 export const newContributionLimitSchema = z.object({
   id: z.string().optional(),
   groupName: z.string().min(1, "Group name is required"),

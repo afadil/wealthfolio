@@ -36,6 +36,7 @@ import SettingsGoalsPage from "./pages/settings/goals/goals-page";
 import MarketDataImportPage from "./pages/settings/market-data/market-data-import-page";
 import MarketDataSettingsPage from "./pages/settings/market-data/market-data-settings";
 import TaxonomiesPage from "./pages/settings/taxonomies/taxonomies-page";
+import AllocationsPage from "./pages/allocations/allocations-page";
 import ConnectSettingsPage from "./pages/settings/wealthfolio-connect/connect-settings-page";
 
 export function AppRoutes() {
@@ -82,6 +83,7 @@ export function AppRoutes() {
           <Route path="activities/manage" element={<ActivityManagerPage />} />
           <Route path="holdings" element={<HoldingsPage />} />
           <Route path="holdings-insights" element={<HoldingsInsightsPage />} />
+          <Route path="allocations" element={<AllocationsPage />} />
           <Route path="holdings/:assetId" element={<AssetProfilePage />} />
           <Route path="import" element={<ActivityImportPage />} />
           <Route path="accounts/:id" element={<AccountPage />} />

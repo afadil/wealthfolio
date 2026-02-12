@@ -1757,3 +1757,65 @@ export interface CheckHoldingsImportResult {
   /** Validation errors found in the import data */
   validationErrors: string[];
 }
+
+// ============================================================================
+// Portfolio Target Allocation Types
+// ============================================================================
+
+export interface PortfolioTarget {
+  id: string;
+  name: string;
+  accountId: string;
+  taxonomyId: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewPortfolioTarget {
+  id?: string;
+  name: string;
+  accountId: string;
+  taxonomyId: string;
+  isActive: boolean;
+}
+
+export interface TargetAllocation {
+  id: string;
+  targetId: string;
+  categoryId: string;
+  targetPercent: number;
+  isLocked: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewTargetAllocation {
+  id?: string;
+  targetId: string;
+  categoryId: string;
+  targetPercent: number;
+  isLocked: boolean;
+}
+
+export interface AllocationDeviation {
+  categoryId: string;
+  categoryName: string;
+  color: string;
+  targetPercent: number;
+  currentPercent: number;
+  deviationPercent: number;
+  currentValue: number;
+  targetValue: number;
+  valueDelta: number;
+  isLocked: boolean;
+}
+
+export interface DeviationReport {
+  targetId: string;
+  targetName: string;
+  accountId: string;
+  taxonomyId: string;
+  totalValue: number;
+  deviations: AllocationDeviation[];
+}

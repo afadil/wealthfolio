@@ -114,6 +114,11 @@ export const QueryKeys = {
   assetTaxonomyAssignments: (assetId: string) => [QueryKeys.ASSET_TAXONOMY_ASSIGNMENTS, assetId],
   ASSET_CLASSIFICATIONS: "asset-classifications",
 
+  // Portfolio Targets
+  PORTFOLIO_TARGETS: "portfolioTargets",
+  TARGET_ALLOCATIONS: "targetAllocations",
+  ALLOCATION_DEVIATIONS: "allocationDeviations",
+
   // Health Center
   HEALTH_STATUS: "healthStatus",
   HEALTH_CONFIG: "healthConfig",
