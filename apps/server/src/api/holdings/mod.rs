@@ -36,4 +36,8 @@ pub fn router() -> Router<Arc<AppState>> {
             "/snapshots/import",
             post(handlers::import_holdings_csv_handler),
         )
+        .route(
+            "/snapshots/import/check",
+            post(handlers::check_holdings_import_handler),
+        )
 }

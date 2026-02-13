@@ -88,6 +88,13 @@ export function setImportResult(result: ImportResult): ImportAction {
 }
 
 /**
+ * Set whether the holdings check has passed (all symbols resolved, no validation errors).
+ */
+export function setHoldingsCheckPassed(passed: boolean): ImportAction {
+  return { type: "SET_HOLDINGS_CHECK_PASSED", payload: passed };
+}
+
+/**
  * Navigate to a specific step.
  */
 export function setStep(step: ImportStep): ImportAction {

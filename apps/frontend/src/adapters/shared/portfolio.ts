@@ -9,6 +9,7 @@ import type {
   SimplePerformanceMetrics,
   HoldingsSnapshotInput,
   ImportHoldingsCsvResult,
+  CheckHoldingsImportResult,
   SnapshotInfo,
 } from "@/lib/types";
 
@@ -200,6 +201,20 @@ export const saveManualHoldings = async (
  * - Rows with the same date form one snapshot
  * - Multiple dates create multiple snapshots
  */
+/**
+ * Checks holdings import data before committing.
+ * Returns existing snapshot dates (overwrite warnings), symbol lookup results, and validation errors.
+ */
+export const checkHoldingsImport = async (
+  accountId: string,
+  snapshots: HoldingsSnapshotInput[],
+): Promise<CheckHoldingsImportResult> => {
+  return invoke<CheckHoldingsImportResult>("check_holdings_import", {
+    accountId,
+    snapshots,
+  });
+};
+
 export const importHoldingsCsv = async (
   accountId: string,
   snapshots: HoldingsSnapshotInput[],
