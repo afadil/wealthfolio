@@ -4,6 +4,7 @@ import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { useTargetAllocations } from "@/hooks/use-portfolio-targets";
+import { useAllocationValidation } from "../hooks/use-allocation-validation";
 import type { AllocationDeviation, NewTargetAllocation } from "@/lib/types";
 
 interface TargetListProps {
@@ -12,6 +13,8 @@ interface TargetListProps {
   onSave: (allocations: NewTargetAllocation[]) => void;
   onDeleteAllocation: (allocationId: string) => void;
   isSaving: boolean;
+  previewMode?: boolean;
+  onTogglePreview?: () => void;
 }
 
 interface PendingEdit {
@@ -25,11 +28,49 @@ export function TargetList({
   onSave,
   onDeleteAllocation,
   isSaving,
+  previewMode = false,
+  onTogglePreview,
 }: TargetListProps) {
   const { allocations } = useTargetAllocations(targetId);
 
   // Track pending edits (not yet saved)
   const [pendingEdits, setPendingEdits] = useState<Map<string, PendingEdit>>(new Map());
+
+  // Calculate preview distributions when in preview mode
+  const previewDistributions = useMemo(() => {
+    if (!previewMode || deviations.length === 0) return null;
+
+    // For preview mode, we need to calculate auto-distribution
+    // This is a simplified version - in a real implementation, you'd want to
+    // integrate with the actual auto-distribution algorithm
+    const totalUserSet = deviations.reduce((sum, d) => {
+      const pending = pendingEdits.get(d.categoryId);
+      if (pending) return sum + pending.percent;
+      const saved = allocations.find((a) => a.categoryId === d.categoryId);
+      if (saved && saved.isLocked) return sum + saved.targetPercent / 100;
+      return sum;
+    }, 0);
+
+    const remainder = 100 - totalUserSet;
+    const eligibleForAutoDist = deviations.filter((d) => {
+      const pending = pendingEdits.get(d.categoryId);
+      const saved = allocations.find((a) => a.categoryId === d.categoryId);
+      return !pending && (!saved || !saved.isLocked);
+    });
+
+    if (remainder > 0 && eligibleForAutoDist.length > 0) {
+      const totalValue = eligibleForAutoDist.reduce((sum, d) => sum + d.currentValue, 0);
+      return eligibleForAutoDist.map((d) => ({
+        categoryId: d.categoryId,
+        previewPercent:
+          totalValue > 0
+            ? (d.currentValue / totalValue) * remainder
+            : remainder / eligibleForAutoDist.length,
+      }));
+    }
+
+    return null;
+  }, [previewMode, deviations, pendingEdits, allocations]);
   // Track which field is being edited
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -51,11 +92,18 @@ export function TargetList({
     (categoryId: string): number => {
       const pending = pendingEdits.get(categoryId);
       if (pending) return pending.percent;
+
+      // Check for preview distribution
+      if (previewMode && previewDistributions) {
+        const preview = previewDistributions.find((p) => p.categoryId === categoryId);
+        if (preview) return preview.previewPercent;
+      }
+
       const saved = getSavedAllocation(categoryId);
       if (saved) return saved.targetPercent / 100; // basis points to display %
       return 0;
     },
-    [pendingEdits, getSavedAllocation],
+    [pendingEdits, getSavedAllocation, previewMode, previewDistributions],
   );
 
   const getIsLocked = useCallback(
@@ -140,19 +188,31 @@ export function TargetList({
     [getSavedAllocation, onDeleteAllocation],
   );
 
+  // Validation hook
+  const { totalPercentage, remaining, isValid, error, scaledAllocations } = useAllocationValidation(
+    deviations,
+    allocations,
+    pendingEdits,
+  );
+
   const handleSaveAll = useCallback(() => {
+    if (!isValid) {
+      // Don't save if validation fails
+      return;
+    }
+
     const allAllocations: NewTargetAllocation[] = [];
     for (const d of deviations) {
       const pending = pendingEdits.get(d.categoryId);
       const saved = getSavedAllocation(d.categoryId);
 
-      if (pending && Math.round(pending.percent * 100) > 0) {
+      if (pending && Math.round(pending * 100) > 0) {
         allAllocations.push({
           id: saved?.id,
           targetId: targetId ?? "", // Will be replaced by parent if auto-creating
           categoryId: d.categoryId,
-          targetPercent: Math.round(pending.percent * 100),
-          isLocked: pending.isLocked,
+          targetPercent: Math.round(pending * 100),
+          isLocked: getIsLocked(d.categoryId),
         });
       } else if (saved && saved.targetPercent > 0) {
         allAllocations.push({
@@ -169,14 +229,11 @@ export function TargetList({
       onSave(allAllocations);
       setPendingEdits(new Map());
     }
-  }, [deviations, pendingEdits, getSavedAllocation, onSave, targetId]);
+  }, [deviations, pendingEdits, getSavedAllocation, onSave, targetId, isValid]);
 
-  // Calculate effective total target (saved + pending)
-  const effectiveTotalTarget = deviations.reduce(
-    (sum, d) => sum + getDisplayPercent(d.categoryId),
-    0,
-  );
-  const remaining = 100 - effectiveTotalTarget;
+  // Use validation hook values instead
+  const effectiveTotalTarget = totalPercentage;
+  const remainingValue = remaining;
 
   if (deviations.length === 0) {
     return (
@@ -195,9 +252,16 @@ export function TargetList({
       {/* Target Status card */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium uppercase tracking-wider">
-            Target Status
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium uppercase tracking-wider">
+              Target Status
+            </CardTitle>
+            {previewMode && (
+              <span className="text-primary bg-primary/10 rounded-full px-2 py-1 text-xs font-medium">
+                Preview Mode
+              </span>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between">
@@ -217,12 +281,12 @@ export function TargetList({
               <p
                 className={cn(
                   "text-2xl font-bold",
-                  remaining < 0
+                  remainingValue < 0
                     ? "text-red-600 dark:text-red-400"
                     : "text-green-600 dark:text-green-400",
                 )}
               >
-                {remaining.toFixed(1)}%
+                {remainingValue.toFixed(1)}%
               </p>
             </div>
           </div>
@@ -244,9 +308,9 @@ export function TargetList({
             const isEditing = editingCategoryId === d.categoryId;
 
             return (
-              <div key={d.categoryId} className="rounded-lg border p-4">
+              <div key={d.categoryId} className="space-y-3 py-3">
                 {/* Header: name + delete */}
-                <div className="mb-2 flex items-center justify-between">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="h-3 w-3 rounded-full" style={{ backgroundColor: d.color }} />
                     <span className="font-medium">{d.categoryName}</span>
@@ -263,7 +327,7 @@ export function TargetList({
                 </div>
 
                 {/* Stats: Target, Actual, Drift */}
-                <div className="mb-3 grid grid-cols-3 text-sm">
+                <div className="grid grid-cols-3 text-sm">
                   <div>
                     <span className="text-muted-foreground text-xs">Target</span>
                     <p className="font-semibold">{displayPercent.toFixed(0)}%</p>
@@ -324,6 +388,15 @@ export function TargetList({
                         )}
                       >
                         {displayPercent.toFixed(1)}%
+                        {previewMode &&
+                          previewDistributions?.some((p) => p.categoryId === d.categoryId) && (
+                            <span
+                              className="text-muted-foreground ml-1 text-xs"
+                              title="Auto-distributed"
+                            >
+                              ✦
+                            </span>
+                          )}
                       </span>
                     )}
                     {/* Lock toggle */}
@@ -371,10 +444,16 @@ export function TargetList({
 
           {/* Save button */}
           {hasPendingEdits && (
-            <Button className="w-full" onClick={handleSaveAll} disabled={isSaving}>
+            <Button className="w-full" onClick={handleSaveAll} disabled={isSaving || !isValid}>
               <Icons.Check className="mr-2 h-4 w-4" />
               {isSaving ? "Saving..." : "Save All Targets"}
             </Button>
+          )}
+          {/* Validation error message */}
+          {!isValid && error && (
+            <p className="mt-2 text-center text-sm font-medium text-red-600 dark:text-red-400">
+              {error}
+            </p>
           )}
         </CardContent>
       </Card>

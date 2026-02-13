@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { EmptyPlaceholder, formatAmount } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 
@@ -14,6 +15,7 @@ import type { Account, AllocationDeviation, NewTargetAllocation } from "@/lib/ty
 import { TwoRingDonut } from "./two-ring-donut";
 import { TargetList } from "./target-list";
 import { useTargetMutations } from "../use-target-mutations";
+import { calculateAutoDistribution } from "../lib/auto-distribution";
 
 export function AllocationsOverview() {
   const { settings } = useSettingsContext();
@@ -30,6 +32,8 @@ export function AllocationsOverview() {
     createdAt: new Date(),
     updatedAt: new Date(),
   } as Account);
+
+  const [previewMode, setPreviewMode] = useState(false);
 
   const accountId = selectedAccount?.id ?? PORTFOLIO_ACCOUNT_ID;
   const { targets, isLoading: targetsLoading } = usePortfolioTargets(accountId);
@@ -161,24 +165,46 @@ export function AllocationsOverview() {
 
   return (
     <>
-      {/* Account selector */}
+      {/* Account selector and preview toggle */}
       <div className="pointer-events-auto fixed right-2 top-4 z-20 hidden md:block lg:right-4">
-        <AccountSelector
-          selectedAccount={selectedAccount}
-          setSelectedAccount={handleAccountSelect}
-          variant="dropdown"
-          includePortfolio={true}
-          className="h-9"
-        />
+        <div className="flex items-center gap-2">
+          <AccountSelector
+            selectedAccount={selectedAccount}
+            setSelectedAccount={handleAccountSelect}
+            variant="dropdown"
+            includePortfolio={true}
+            className="h-9"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPreviewMode(!previewMode)}
+            className="h-9 gap-1"
+          >
+            <Icons.Eye className="h-4 w-4" />
+            <span>{previewMode ? "Exit Preview" : "Preview"}</span>
+          </Button>
+        </div>
       </div>
       <div className="mb-4 flex justify-end md:hidden">
-        <AccountSelector
-          selectedAccount={selectedAccount}
-          setSelectedAccount={handleAccountSelect}
-          variant="dropdown"
-          includePortfolio={true}
-          className="h-9"
-        />
+        <div className="flex items-center gap-2">
+          <AccountSelector
+            selectedAccount={selectedAccount}
+            setSelectedAccount={handleAccountSelect}
+            variant="dropdown"
+            includePortfolio={true}
+            className="h-9"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPreviewMode(!previewMode)}
+            className="h-9 gap-1"
+          >
+            <Icons.Eye className="h-4 w-4" />
+            <span>{previewMode ? "Exit" : "Preview"}</span>
+          </Button>
+        </div>
       </div>
 
       {currentData.length === 0 && !activeTarget ? (
@@ -190,7 +216,7 @@ export function AllocationsOverview() {
           />
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[3fr_2fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[9fr_11fr]">
           {/* Left: Pie chart — stretches to match right column */}
           <Card className="flex flex-col">
             <CardHeader className="pb-2">
@@ -214,6 +240,7 @@ export function AllocationsOverview() {
               onSave={handleSaveAllocations}
               onDeleteAllocation={handleDeleteAllocation}
               isSaving={batchSaveAllocationsMutation.isPending}
+              previewMode={previewMode}
             />
           </div>
         </div>
