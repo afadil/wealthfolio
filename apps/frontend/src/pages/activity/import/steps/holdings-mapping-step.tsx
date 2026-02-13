@@ -31,7 +31,7 @@ export enum HoldingsFormat {
   DATE = "date",
   SYMBOL = "symbol",
   QUANTITY = "quantity",
-  PRICE = "price",
+  AVG_COST = "avgCost",
   CURRENCY = "currency",
 }
 
@@ -45,7 +45,7 @@ const HOLDINGS_TARGET_FIELDS: { value: HoldingsFormat; label: string; required: 
   { value: HoldingsFormat.DATE, label: "Date", required: true },
   { value: HoldingsFormat.SYMBOL, label: "Symbol", required: true },
   { value: HoldingsFormat.QUANTITY, label: "Quantity", required: true },
-  { value: HoldingsFormat.PRICE, label: "Price", required: false },
+  { value: HoldingsFormat.AVG_COST, label: "Avg Cost", required: false },
   { value: HoldingsFormat.CURRENCY, label: "Currency", required: false },
 ];
 
@@ -53,7 +53,7 @@ const HOLDINGS_FIELD_LABELS: Record<HoldingsFormat, string> = {
   [HoldingsFormat.DATE]: "Date",
   [HoldingsFormat.SYMBOL]: "Symbol",
   [HoldingsFormat.QUANTITY]: "Quantity",
-  [HoldingsFormat.PRICE]: "Price",
+  [HoldingsFormat.AVG_COST]: "Avg Cost",
   [HoldingsFormat.CURRENCY]: "Currency",
 };
 
@@ -89,8 +89,18 @@ function autoDetectHoldingsMapping(headers: string[]): Record<string, string> {
       (lower === "quantity" || lower === "qty" || lower === "shares" || lower === "amount")
     ) {
       mappings[HoldingsFormat.QUANTITY] = header;
-    } else if (!mappings[HoldingsFormat.PRICE] && (lower === "price" || lower.includes("price"))) {
-      mappings[HoldingsFormat.PRICE] = header;
+    } else if (
+      !mappings[HoldingsFormat.AVG_COST] &&
+      (lower === "avgcost" ||
+        lower === "avg_cost" ||
+        lower === "average_cost" ||
+        lower === "cost" ||
+        lower === "price" ||
+        lower.includes("avg") ||
+        lower.includes("cost") ||
+        lower.includes("price"))
+    ) {
+      mappings[HoldingsFormat.AVG_COST] = header;
     } else if (!mappings[HoldingsFormat.CURRENCY] && (lower === "currency" || lower === "ccy")) {
       mappings[HoldingsFormat.CURRENCY] = header;
     }

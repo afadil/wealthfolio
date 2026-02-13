@@ -1693,8 +1693,8 @@ export interface HoldingsPositionInput {
   symbol: string;
   /** Quantity held as string to preserve precision */
   quantity: string;
-  /** Optional price per unit at snapshot date */
-  price?: string;
+  /** Optional average cost per unit */
+  avgCost?: string;
   /** Currency for this position */
   currency: string;
   /** Exchange MIC code (e.g., "XNAS", "XTSE") resolved during check step */

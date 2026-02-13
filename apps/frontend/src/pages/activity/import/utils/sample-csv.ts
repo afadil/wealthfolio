@@ -28,7 +28,7 @@ export function downloadSampleCsv() {
   URL.revokeObjectURL(url);
 }
 
-const SAMPLE_HOLDINGS_CSV_CONTENT = `date,symbol,quantity,price,currency
+const SAMPLE_HOLDINGS_CSV_CONTENT = `date,symbol,quantity,avgCost,currency
 2024-03-31,AAPL,50,171.48,USD
 2024-03-31,MSFT,30,420.72,USD
 2024-03-31,VOO,20,468.50,USD

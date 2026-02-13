@@ -537,11 +537,11 @@ pub async fn check_holdings_import(
                     snapshot.date, pos.quantity, pos.symbol
                 ));
             }
-            if let Some(ref p) = pos.price {
-                if !p.is_empty() && p.parse::<Decimal>().is_err() {
+            if let Some(ref c) = pos.avg_cost {
+                if !c.is_empty() && c.parse::<Decimal>().is_err() {
                     validation_errors.push(format!(
-                        "Date {}: invalid price '{}' for {}",
-                        snapshot.date, p, pos.symbol
+                        "Date {}: invalid avg cost '{}' for {}",
+                        snapshot.date, c, pos.symbol
                     ));
                 }
             }
@@ -618,8 +618,8 @@ pub struct HoldingsPositionInput {
     pub symbol: String,
     /// Quantity held
     pub quantity: String,
-    /// Optional price per unit at snapshot date
-    pub price: Option<String>,
+    /// Optional average cost per unit
+    pub avg_cost: Option<String>,
     /// Currency for this position
     pub currency: String,
     /// Exchange MIC code (e.g., "XNAS", "XTSE") resolved during check step
@@ -771,9 +771,9 @@ async fn import_single_snapshot(
             .parse::<Decimal>()
             .map_err(|e| format!("Invalid quantity for {}: {}", pos_input.symbol, e))?;
 
-        // Parse price from CSV if provided, use for cost basis calculation
-        let price = pos_input
-            .price
+        // Parse average cost from CSV if provided, use for cost basis calculation
+        let average_cost = pos_input
+            .avg_cost
             .as_ref()
             .and_then(|p| p.parse::<Decimal>().ok())
             .unwrap_or(Decimal::ZERO);
@@ -784,7 +784,7 @@ async fn import_single_snapshot(
             exchange_mic: pos_input.exchange_mic.clone(),
             quantity,
             currency: pos_input.currency.clone(),
-            average_cost: price,
+            average_cost,
         });
     }
 
