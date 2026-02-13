@@ -129,6 +129,7 @@ export {
   getHoldingsByAllocation,
   saveManualHoldings,
   importHoldingsCsv,
+  checkHoldingsImport,
   getSnapshots,
   getSnapshotByDate,
   deleteSnapshot,

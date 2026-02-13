@@ -40,6 +40,7 @@ export const COMMANDS: CommandMap = {
   delete_snapshot: { method: "DELETE", path: "/snapshots" },
   save_manual_holdings: { method: "POST", path: "/snapshots" },
   import_holdings_csv: { method: "POST", path: "/snapshots/import" },
+  check_holdings_import: { method: "POST", path: "/snapshots/import/check" },
   update_portfolio: { method: "POST", path: "/portfolio/update" },
   recalculate_portfolio: { method: "POST", path: "/portfolio/recalculate" },
   // Performance
@@ -378,7 +379,8 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       body = JSON.stringify({ accountId, holdings, cashBalances, snapshotDate });
       break;
     }
-    case "import_holdings_csv": {
+    case "import_holdings_csv":
+    case "check_holdings_import": {
       const { accountId, snapshots } = payload as {
         accountId: string;
         snapshots: unknown[];
