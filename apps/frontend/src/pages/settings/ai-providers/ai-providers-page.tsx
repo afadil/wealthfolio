@@ -26,7 +26,7 @@ export default function AiProvidersPage() {
   const providers = useMemo(() => data?.providers ?? [], [data?.providers]);
 
   const handleCustomUrlChange = (providerId: string, customUrl: string) => {
-    updateSettings({ providerId, customUrl: customUrl || undefined });
+    updateSettings({ providerId, customUrl });
   };
 
   const handleSelectModel = (providerId: string, modelId: string) => {

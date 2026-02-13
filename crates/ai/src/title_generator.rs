@@ -110,8 +110,11 @@ Title:",
         let response = match provider_id {
             "anthropic" => {
                 let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-                let client: anthropic::Client<HttpClient> =
-                    anthropic::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))?;
+                let mut builder = anthropic::Client::<HttpClient>::builder().api_key(&key);
+                if let Some(url) = provider_url {
+                    builder = builder.base_url(&url);
+                }
+                let client = builder.build().map_err(|e| AiError::Provider(e.to_string()))?;
                 client
                     .agent(model_id)
                     .max_tokens(self.config.max_tokens as u64)
@@ -122,8 +125,11 @@ Title:",
             }
             "gemini" | "google" => {
                 let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-                let client: gemini::Client<HttpClient> =
-                    gemini::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))?;
+                let mut builder = gemini::Client::<HttpClient>::builder().api_key(&key);
+                if let Some(url) = provider_url {
+                    builder = builder.base_url(&url);
+                }
+                let client = builder.build().map_err(|e| AiError::Provider(e.to_string()))?;
                 client
                     .agent(model_id)
                     .build()
@@ -133,8 +139,11 @@ Title:",
             }
             "groq" => {
                 let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-                let client: groq::Client<HttpClient> =
-                    groq::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))?;
+                let mut builder = groq::Client::<HttpClient>::builder().api_key(&key);
+                if let Some(url) = provider_url {
+                    builder = builder.base_url(&url);
+                }
+                let client = builder.build().map_err(|e| AiError::Provider(e.to_string()))?;
                 client
                     .agent(model_id)
                     .build()
@@ -159,8 +168,11 @@ Title:",
             }
             "openrouter" => {
                 let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-                let client: openrouter::Client<HttpClient> =
-                    openrouter::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))?;
+                let mut builder = openrouter::Client::<HttpClient>::builder().api_key(&key);
+                if let Some(url) = provider_url {
+                    builder = builder.base_url(&url);
+                }
+                let client = builder.build().map_err(|e| AiError::Provider(e.to_string()))?;
                 client
                     .agent(model_id)
                     .build()
@@ -171,8 +183,11 @@ Title:",
             _ => {
                 // Default to OpenAI-compatible
                 let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-                let client: openai::Client<HttpClient> =
-                    openai::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))?;
+                let mut builder = openai::Client::<HttpClient>::builder().api_key(&key);
+                if let Some(url) = provider_url {
+                    builder = builder.base_url(&url);
+                }
+                let client = builder.build().map_err(|e| AiError::Provider(e.to_string()))?;
                 client
                     .agent(model_id)
                     .build()
