@@ -53,48 +53,46 @@ export function TargetList({
       const pending = pendingEdits.get(categoryId);
       if (pending) return pending.percent;
 
-      // Auto-balancing preview: if user is editing any field, show preview for others
-      if (editingCategoryId && pendingEdits.size > 0) {
-        const saved = getSavedAllocation(categoryId);
-        // Only auto-balance if this category doesn't have a pending edit and isn't locked
-        if (!pendingEdits.has(categoryId) && !saved?.isLocked) {
-          // Calculate what this category would get in auto-distribution
-          const totalUserSet = Array.from(pendingEdits.values()).reduce(
-            (sum, p) => sum + p.percent,
-            0,
-          );
-          const lockedAllocations = allocations.filter(
-            (a) => a.isLocked && !pendingEdits.has(a.categoryId),
-          );
-          const lockedTotal = lockedAllocations.reduce((sum, a) => sum + a.targetPercent / 100, 0);
+      // Preview mode: Show auto-distributed values for categories without user-set targets
+      // This matches phase-4 behavior where preview is always active for unset targets
+      const saved = getSavedAllocation(categoryId);
+      if (saved) return saved.targetPercent / 100; // basis points to display %
 
-          const totalSet = totalUserSet + lockedTotal;
-          const remainder = 100 - totalSet;
+      // If no saved target, calculate what this would get in auto-distribution
+      const totalUserSet = deviations.reduce((sum, d) => {
+        const hasPending = pendingEdits.has(d.categoryId);
+        const savedAlloc = getSavedAllocation(d.categoryId);
+        if (hasPending) return sum + (pendingEdits.get(d.categoryId)?.percent || 0);
+        if (savedAlloc) return sum + savedAlloc.targetPercent / 100;
+        return sum;
+      }, 0);
 
-          if (remainder > 0) {
-            // Find all categories eligible for auto-distribution
-            const eligibleCategories = deviations.filter((d) => {
-              const hasPending = pendingEdits.has(d.categoryId);
-              const savedAlloc = allocations.find((a) => a.categoryId === d.categoryId);
-              return !hasPending && (!savedAlloc || !savedAlloc.isLocked);
-            });
+      const lockedAllocations = allocations.filter((a) => a.isLocked);
+      const lockedTotal = lockedAllocations.reduce((sum, a) => sum + a.targetPercent / 100, 0);
 
-            if (eligibleCategories.length > 0) {
-              const totalValue = eligibleCategories.reduce((sum, d) => sum + d.currentValue, 0);
-              const currentCategory = deviations.find((d) => d.categoryId === categoryId);
-              if (currentCategory && totalValue > 0) {
-                return (currentCategory.currentValue / totalValue) * remainder;
-              }
-            }
+      const totalSet = totalUserSet + lockedTotal;
+      const remainder = 100 - totalSet;
+
+      if (remainder > 0) {
+        // Find all categories eligible for auto-distribution (no saved target, not locked)
+        const eligibleCategories = deviations.filter((d) => {
+          const hasPending = pendingEdits.has(d.categoryId);
+          const savedAlloc = getSavedAllocation(d.categoryId);
+          return !hasPending && !savedAlloc;
+        });
+
+        if (eligibleCategories.length > 0) {
+          const totalValue = eligibleCategories.reduce((sum, d) => sum + d.currentValue, 0);
+          const currentCategory = deviations.find((d) => d.categoryId === categoryId);
+          if (currentCategory && totalValue > 0) {
+            return (currentCategory.currentValue / totalValue) * remainder;
           }
         }
       }
 
-      const saved = getSavedAllocation(categoryId);
-      if (saved) return saved.targetPercent / 100; // basis points to display %
       return 0;
     },
-    [pendingEdits, getSavedAllocation, editingCategoryId, allocations, deviations],
+    [pendingEdits, getSavedAllocation, allocations, deviations],
   );
 
   const getIsLocked = useCallback(
@@ -110,21 +108,21 @@ export function TargetList({
   const isAutoBalanced = useCallback(
     (categoryId: string): boolean => {
       // A value is auto-balanced if:
-      // 1. User is currently editing (has pending edits)
-      // 2. This category doesn't have a pending edit
-      // 3. This category isn't locked
-      // 4. This category doesn't have a saved allocation
-      if (!editingCategoryId || pendingEdits.size === 0) return false;
-
+      // 1. This category doesn't have a pending edit
+      // 2. This category isn't locked
+      // 3. This category doesn't have a saved allocation
+      // 4. The display percent is greater than 0 (meaning it's showing a preview value)
       if (pendingEdits.has(categoryId)) return false;
 
       const saved = getSavedAllocation(categoryId);
       if (saved?.isLocked) return false;
       if (saved && saved.targetPercent > 0) return false;
 
-      return true;
+      // Check if this would show a preview value
+      const displayPercent = getDisplayPercent(categoryId);
+      return displayPercent > 0;
     },
-    [editingCategoryId, pendingEdits, getSavedAllocation],
+    [pendingEdits, getSavedAllocation, getDisplayPercent],
   );
 
   const handleStartEdit = useCallback(
