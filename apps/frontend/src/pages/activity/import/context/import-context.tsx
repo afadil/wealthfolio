@@ -85,6 +85,7 @@ export interface ImportState {
   duplicates: Record<string, string>; // idempotencyKey -> existingActivityId
   importResult: ImportResult | null;
   accountId: string;
+  holdingsCheckPassed: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -115,6 +116,7 @@ const INITIAL_STATE: ImportState = {
   duplicates: {},
   importResult: null,
   accountId: "",
+  holdingsCheckPassed: false,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -135,6 +137,7 @@ export type ImportAction =
     }
   | { type: "SET_DUPLICATES"; payload: Record<string, string> }
   | { type: "SET_IMPORT_RESULT"; payload: ImportResult }
+  | { type: "SET_HOLDINGS_CHECK_PASSED"; payload: boolean }
   | { type: "SET_STEP"; payload: ImportStep }
   | { type: "NEXT_STEP" }
   | { type: "PREV_STEP" }
@@ -219,6 +222,9 @@ function importReducer(state: ImportState, action: ImportAction): ImportState {
 
     case "SET_IMPORT_RESULT":
       return { ...state, importResult: action.payload };
+
+    case "SET_HOLDINGS_CHECK_PASSED":
+      return { ...state, holdingsCheckPassed: action.payload };
 
     case "SET_STEP":
       return { ...state, step: action.payload };

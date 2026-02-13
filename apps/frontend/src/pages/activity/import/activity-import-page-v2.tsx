@@ -102,7 +102,27 @@ function useStepValidation(isHoldingsMode: boolean) {
             (field) =>
               mapping.fieldMappings[field] && headers.includes(mapping.fieldMappings[field]),
           );
-          return requiredFieldsMapped;
+          if (!requiredFieldsMapped) return false;
+
+          // Check if all non-$CASH symbols are valid or resolved
+          const symbolCol = mapping.fieldMappings[HoldingsFormat.SYMBOL];
+          if (symbolCol) {
+            const symIndex = headers.indexOf(symbolCol);
+            if (symIndex !== -1) {
+              const uniqueSyms = new Set<string>();
+              for (const row of parsedRows) {
+                const sym = row[symIndex]?.trim().toUpperCase();
+                if (sym && sym !== "$CASH") uniqueSyms.add(sym);
+              }
+              for (const sym of uniqueSyms) {
+                if (!validateTickerSymbol(sym) && !mapping.symbolMappings?.[sym]) {
+                  return false;
+                }
+              }
+            }
+          }
+
+          return true;
         }
 
         // Activity mode: existing validation logic
@@ -173,8 +193,8 @@ function useStepValidation(isHoldingsMode: boolean) {
 
       case "review":
         if (isHoldingsMode) {
-          // Holdings mode: can proceed if we have parsed rows
-          return parsedRows.length > 0;
+          // Holdings mode: can proceed if we have parsed rows and backend check passed
+          return parsedRows.length > 0 && state.holdingsCheckPassed;
         }
         // Activity mode: can proceed if there are activities to review
         return draftActivities.length > 0;
@@ -313,7 +333,7 @@ function ImportWizardContent() {
         onBack={isMobile ? handleCancelClick : undefined}
         actions={
           <div className="flex items-center gap-2">
-            {!isHoldingsMode && <ImportHelpPopover />}
+            <ImportHelpPopover defaultTab={isHoldingsMode ? "holdings" : "activities"} />
             {!isMobile && (
               <Button variant="ghost" size="sm" onClick={handleCancelClick}>
                 <Icons.X className="mr-2 h-4 w-4" />

@@ -1697,6 +1697,8 @@ export interface HoldingsPositionInput {
   price?: string;
   /** Currency for this position */
   currency: string;
+  /** Exchange MIC code (e.g., "XNAS", "XTSE") resolved during check step */
+  exchangeMic?: string;
 }
 
 /**
@@ -1721,4 +1723,28 @@ export interface ImportHoldingsCsvResult {
   snapshotsFailed: number;
   /** Error messages for failed snapshots */
   errors: string[];
+}
+
+/**
+ * Result of checking a single symbol during holdings import
+ */
+export interface SymbolCheckResult {
+  symbol: string;
+  found: boolean;
+  assetName?: string;
+  assetId?: string;
+  currency?: string;
+  exchangeMic?: string;
+}
+
+/**
+ * Result of checking holdings import data before committing
+ */
+export interface CheckHoldingsImportResult {
+  /** Dates that already have snapshots in the DB (will be overwritten) */
+  existingDates: string[];
+  /** Per-unique-symbol lookup results */
+  symbols: SymbolCheckResult[];
+  /** Validation errors found in the import data */
+  validationErrors: string[];
 }

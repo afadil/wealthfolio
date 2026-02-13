@@ -274,6 +274,7 @@ pub fn run() {
             commands::portfolio::calculate_performance_history,
             commands::portfolio::save_manual_holdings,
             commands::portfolio::import_holdings_csv,
+            commands::portfolio::check_holdings_import,
             commands::portfolio::get_snapshots,
             commands::portfolio::get_snapshot_by_date,
             commands::portfolio::delete_snapshot,

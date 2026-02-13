@@ -471,6 +471,142 @@ pub async fn save_manual_holdings(
 }
 
 // ============================================================================
+// Holdings Import Check Types and Command
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SymbolCheckResult {
+    pub symbol: String,
+    pub found: bool,
+    pub asset_name: Option<String>,
+    pub asset_id: Option<String>,
+    pub currency: Option<String>,
+    pub exchange_mic: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CheckHoldingsImportResult {
+    pub existing_dates: Vec<String>,
+    pub symbols: Vec<SymbolCheckResult>,
+    pub validation_errors: Vec<String>,
+}
+
+#[tauri::command]
+pub async fn check_holdings_import(
+    state: State<'_, Arc<ServiceContext>>,
+    account_id: String,
+    snapshots: Vec<HoldingsSnapshotInput>,
+) -> Result<CheckHoldingsImportResult, String> {
+    debug!(
+        "Checking {} holdings snapshots for account {}",
+        snapshots.len(),
+        account_id
+    );
+
+    // Verify account exists
+    state
+        .account_service()
+        .get_account(&account_id)
+        .map_err(|e| format!("Failed to get account: {}", e))?;
+
+    let mut validation_errors: Vec<String> = Vec::new();
+    let mut valid_dates: Vec<NaiveDate> = Vec::new();
+    let mut unique_symbols: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    for snapshot in &snapshots {
+        // Validate date
+        match NaiveDate::parse_from_str(&snapshot.date, "%Y-%m-%d") {
+            Ok(d) => valid_dates.push(d),
+            Err(_) => {
+                validation_errors.push(format!("Invalid date format: '{}'", snapshot.date));
+                continue;
+            }
+        }
+
+        // Validate positions
+        for pos in &snapshot.positions {
+            if pos.symbol.trim().is_empty() {
+                validation_errors
+                    .push(format!("Date {}: empty symbol found", snapshot.date));
+            }
+            if pos.quantity.parse::<Decimal>().is_err() {
+                validation_errors.push(format!(
+                    "Date {}: invalid quantity '{}' for {}",
+                    snapshot.date, pos.quantity, pos.symbol
+                ));
+            }
+            if let Some(ref p) = pos.price {
+                if !p.is_empty() && p.parse::<Decimal>().is_err() {
+                    validation_errors.push(format!(
+                        "Date {}: invalid price '{}' for {}",
+                        snapshot.date, p, pos.symbol
+                    ));
+                }
+            }
+            unique_symbols.insert(pos.symbol.to_uppercase());
+        }
+    }
+
+    // Check existing snapshots
+    let existing_dates = if !valid_dates.is_empty() {
+        let min_date = *valid_dates.iter().min().unwrap();
+        let max_date = *valid_dates.iter().max().unwrap();
+        let existing = state
+            .snapshot_service()
+            .get_holdings_keyframes(&account_id, Some(min_date), Some(max_date))
+            .map_err(|e| format!("Failed to query snapshots: {}", e))?;
+
+        let import_dates: std::collections::HashSet<NaiveDate> =
+            valid_dates.into_iter().collect();
+        existing
+            .into_iter()
+            .filter(|s| import_dates.contains(&s.snapshot_date))
+            .map(|s| s.snapshot_date.format("%Y-%m-%d").to_string())
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    // Symbol lookup: search DB first, then market data providers (like activity import)
+    let mut symbols: Vec<SymbolCheckResult> = Vec::new();
+    for sym in unique_symbols {
+        let results = state
+            .quote_service()
+            .search_symbol_with_currency(&sym, None)
+            .await
+            .unwrap_or_default();
+
+        if let Some(hit) = results.first() {
+            symbols.push(SymbolCheckResult {
+                symbol: sym,
+                found: true,
+                asset_name: Some(hit.long_name.clone()),
+                asset_id: hit.existing_asset_id.clone(),
+                currency: hit.currency.clone(),
+                exchange_mic: hit.exchange_mic.clone(),
+            });
+        } else {
+            symbols.push(SymbolCheckResult {
+                symbol: sym,
+                found: false,
+                asset_name: None,
+                asset_id: None,
+                currency: None,
+                exchange_mic: None,
+            });
+        }
+    }
+
+    Ok(CheckHoldingsImportResult {
+        existing_dates,
+        symbols,
+        validation_errors,
+    })
+}
+
+// ============================================================================
 // Holdings CSV Import Types and Command
 // ============================================================================
 
@@ -486,6 +622,8 @@ pub struct HoldingsPositionInput {
     pub price: Option<String>,
     /// Currency for this position
     pub currency: String,
+    /// Exchange MIC code (e.g., "XNAS", "XTSE") resolved during check step
+    pub exchange_mic: Option<String>,
 }
 
 /// A single snapshot from CSV import (one date's worth of holdings)
@@ -643,7 +781,7 @@ async fn import_single_snapshot(
         positions.push(ManualHoldingInput {
             asset_id: None,
             symbol: pos_input.symbol.clone(),
-            exchange_mic: None,
+            exchange_mic: pos_input.exchange_mic.clone(),
             quantity,
             currency: pos_input.currency.clone(),
             average_cost: price,

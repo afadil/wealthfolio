@@ -108,6 +108,8 @@ pub struct HoldingsPositionInput {
     pub price: Option<String>,
     /// Currency for this position
     pub currency: String,
+    /// Exchange MIC code (e.g., "XNAS", "XTSE") resolved during check step
+    pub exchange_mic: Option<String>,
 }
 
 /// A single snapshot from CSV import (one date's worth of holdings)
@@ -140,4 +142,31 @@ pub struct ImportHoldingsCsvResult {
 pub struct ImportHoldingsCsvRequest {
     pub account_id: String,
     pub snapshots: Vec<HoldingsSnapshotInput>,
+}
+
+/// Request body for checking holdings import
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CheckHoldingsImportRequest {
+    pub account_id: String,
+    pub snapshots: Vec<HoldingsSnapshotInput>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SymbolCheckResult {
+    pub symbol: String,
+    pub found: bool,
+    pub asset_name: Option<String>,
+    pub asset_id: Option<String>,
+    pub currency: Option<String>,
+    pub exchange_mic: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CheckHoldingsImportResult {
+    pub existing_dates: Vec<String>,
+    pub symbols: Vec<SymbolCheckResult>,
+    pub validation_errors: Vec<String>,
 }
