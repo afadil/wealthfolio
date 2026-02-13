@@ -21,7 +21,7 @@ export interface HoldingsRow {
   /** Whether this is a $CASH row */
   isCash: boolean;
   quantity: string;
-  price: string;
+  avgCost: string;
   currency: string;
 }
 
@@ -96,11 +96,11 @@ function useHoldingsColumns({
         enableSorting: false,
         meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },
       },
-      // 5. Price
+      // 5. Avg Cost
       {
-        id: "price",
-        accessorKey: "price",
-        header: "Price",
+        id: "avgCost",
+        accessorKey: "avgCost",
+        header: "Avg Cost",
         size: 120,
         enableSorting: false,
         meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },

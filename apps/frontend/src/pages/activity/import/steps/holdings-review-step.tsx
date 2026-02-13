@@ -184,13 +184,13 @@ export function parseHoldingsSnapshots(
   const dateHeader = mapping[HoldingsFormat.DATE];
   const symbolHeader = mapping[HoldingsFormat.SYMBOL];
   const quantityHeader = mapping[HoldingsFormat.QUANTITY];
-  const priceHeader = mapping[HoldingsFormat.PRICE];
+  const avgCostHeader = mapping[HoldingsFormat.AVG_COST];
   const currencyHeader = mapping[HoldingsFormat.CURRENCY];
 
   const dateIndex = dateHeader ? headers.indexOf(dateHeader) : -1;
   const symbolIndex = symbolHeader ? headers.indexOf(symbolHeader) : -1;
   const quantityIndex = quantityHeader ? headers.indexOf(quantityHeader) : -1;
-  const priceIndex = priceHeader ? headers.indexOf(priceHeader) : -1;
+  const avgCostIndex = avgCostHeader ? headers.indexOf(avgCostHeader) : -1;
   const currencyIndex = currencyHeader ? headers.indexOf(currencyHeader) : -1;
 
   // Group rows by date
@@ -203,7 +203,7 @@ export function parseHoldingsSnapshots(
     const rawDate = dateIndex >= 0 ? row[dateIndex]?.trim() : "";
     const rawSymbol = symbolIndex >= 0 ? row[symbolIndex]?.trim().toUpperCase() : "";
     const rawQuantity = quantityIndex >= 0 ? row[quantityIndex]?.trim() : "";
-    const rawPrice = priceIndex >= 0 ? row[priceIndex]?.trim() : undefined;
+    const rawAvgCost = avgCostIndex >= 0 ? row[avgCostIndex]?.trim() : undefined;
     const currency = currencyIndex >= 0 ? row[currencyIndex]?.trim() : defaultCurrency;
 
     if (!rawDate || !rawSymbol || !rawQuantity) {
@@ -221,7 +221,7 @@ export function parseHoldingsSnapshots(
     if (!quantity) {
       continue; // Skip rows with invalid quantity
     }
-    const price = parseNumericValue(rawPrice, decimalSeparator, thousandsSeparator);
+    const avgCost = parseNumericValue(rawAvgCost, decimalSeparator, thousandsSeparator);
 
     if (!snapshotsByDate.has(normalizedDate)) {
       snapshotsByDate.set(normalizedDate, { positions: [], cashBalances: {} });
@@ -244,7 +244,7 @@ export function parseHoldingsSnapshots(
       snapshot.positions.push({
         symbol,
         quantity,
-        price: price || undefined,
+        avgCost: avgCost || undefined,
         currency: currency || defaultCurrency,
         ...(exchangeMic ? { exchangeMic } : {}),
       });
@@ -288,8 +288,8 @@ function buildHoldingsRows(
   const quantityIndex = fieldMappings[HoldingsFormat.QUANTITY]
     ? headers.indexOf(fieldMappings[HoldingsFormat.QUANTITY])
     : -1;
-  const priceIndex = fieldMappings[HoldingsFormat.PRICE]
-    ? headers.indexOf(fieldMappings[HoldingsFormat.PRICE])
+  const avgCostIndex = fieldMappings[HoldingsFormat.AVG_COST]
+    ? headers.indexOf(fieldMappings[HoldingsFormat.AVG_COST])
     : -1;
   const currencyIndex = fieldMappings[HoldingsFormat.CURRENCY]
     ? headers.indexOf(fieldMappings[HoldingsFormat.CURRENCY])
@@ -302,7 +302,7 @@ function buildHoldingsRows(
     const rawDate = dateIndex >= 0 ? row[dateIndex]?.trim() : "";
     const rawSymbol = symbolIndex >= 0 ? row[symbolIndex]?.trim().toUpperCase() : "";
     const rawQuantity = quantityIndex >= 0 ? row[quantityIndex]?.trim() : "";
-    const rawPrice = priceIndex >= 0 ? row[priceIndex]?.trim() : "";
+    const rawAvgCost = avgCostIndex >= 0 ? row[avgCostIndex]?.trim() : "";
     const rawCurrency = currencyIndex >= 0 ? row[currencyIndex]?.trim() : "";
 
     // Skip rows with missing required fields
@@ -311,7 +311,8 @@ function buildHoldingsRows(
     const normalizedDate = parseDateToYMD(rawDate, dateFormat) ?? rawDate;
     const quantity =
       parseNumericValue(rawQuantity, decimalSeparator, thousandsSeparator) ?? rawQuantity;
-    const price = parseNumericValue(rawPrice, decimalSeparator, thousandsSeparator) ?? rawPrice;
+    const avgCost =
+      parseNumericValue(rawAvgCost, decimalSeparator, thousandsSeparator) ?? rawAvgCost;
     const currency = rawCurrency || defaultCurrency;
     const isCash = rawSymbol === CASH_SYMBOL;
     const resolvedSymbol = isCash ? CASH_SYMBOL : symbolMappings?.[rawSymbol] || rawSymbol;
@@ -323,7 +324,7 @@ function buildHoldingsRows(
       symbol: resolvedSymbol,
       isCash,
       quantity,
-      price,
+      avgCost,
       currency,
     });
   }
@@ -424,7 +425,7 @@ export function HoldingsReviewStep() {
   const newSymbols = checkResult?.symbols.filter((s) => !s.found) ?? [];
   const foundSymbols = checkResult?.symbols.filter((s) => s.found) ?? [];
 
-  // Handle data changes from the grid (quantity, price, currency edits)
+  // Handle data changes from the grid (quantity, avgCost, currency edits)
   const handleDataChange = useCallback(
     (nextRows: HoldingsRow[]) => {
       // Map grid edits back to parsedRows
@@ -433,8 +434,8 @@ export function HoldingsReviewStep() {
       const quantityIndex = fieldMappings[HoldingsFormat.QUANTITY]
         ? headers.indexOf(fieldMappings[HoldingsFormat.QUANTITY])
         : -1;
-      const priceIndex = fieldMappings[HoldingsFormat.PRICE]
-        ? headers.indexOf(fieldMappings[HoldingsFormat.PRICE])
+      const avgCostIndex = fieldMappings[HoldingsFormat.AVG_COST]
+        ? headers.indexOf(fieldMappings[HoldingsFormat.AVG_COST])
         : -1;
       const currencyIndex = fieldMappings[HoldingsFormat.CURRENCY]
         ? headers.indexOf(fieldMappings[HoldingsFormat.CURRENCY])
@@ -443,7 +444,7 @@ export function HoldingsReviewStep() {
       for (const row of nextRows) {
         const origRow = [...(updatedParsedRows[row.rowIndex] || [])];
         if (quantityIndex >= 0) origRow[quantityIndex] = row.quantity;
-        if (priceIndex >= 0) origRow[priceIndex] = row.price;
+        if (avgCostIndex >= 0) origRow[avgCostIndex] = row.avgCost;
         if (currencyIndex >= 0) origRow[currencyIndex] = row.currency;
         updatedParsedRows[row.rowIndex] = origRow;
       }
