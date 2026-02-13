@@ -701,7 +701,7 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     if capabilities.tools {
         match provider_id.as_str() {
             "anthropic" => {
-                let client = create_anthropic_client(api_key, &provider_id)?;
+                let client = create_anthropic_client(api_key, &provider_id, provider_url)?;
                 build_with_tools_and_stream!(
                     client,
                     anthropic_thinking_params.clone(),
@@ -709,11 +709,11 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
                 )
             }
             "gemini" | "google" => {
-                let client = create_gemini_client(api_key, &provider_id)?;
+                let client = create_gemini_client(api_key, &provider_id, provider_url)?;
                 build_with_tools_and_stream!(client, gemini_thinking_params.clone())
             }
             "groq" => {
-                let client = create_groq_client(api_key, &provider_id)?;
+                let client = create_groq_client(api_key, &provider_id, provider_url)?;
                 build_with_tools_and_stream!(client, groq_reasoning_params_with_tools.clone())
             }
             "ollama" => {
@@ -722,22 +722,22 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
             }
             "openai" => {
                 // Don't pass reasoning params with tools - causes multi-turn errors
-                let client = create_openai_client(api_key, &provider_id)?;
+                let client = create_openai_client(api_key, &provider_id, provider_url)?;
                 build_with_tools_and_stream!(client, None::<serde_json::Value>)
             }
             "openrouter" => {
-                let client = create_openrouter_client(api_key, &provider_id)?;
+                let client = create_openrouter_client(api_key, &provider_id, provider_url)?;
                 build_with_tools_and_stream!(client, None::<serde_json::Value>)
             }
             _ => {
-                let client = create_openai_client(api_key, &provider_id)?;
+                let client = create_openai_client(api_key, &provider_id, provider_url)?;
                 build_with_tools_and_stream!(client, None::<serde_json::Value>)
             }
         }
     } else {
         match provider_id.as_str() {
             "anthropic" => {
-                let client = create_anthropic_client(api_key, &provider_id)?;
+                let client = create_anthropic_client(api_key, &provider_id, provider_url)?;
                 build_without_tools_and_stream!(
                     client,
                     anthropic_thinking_params.clone(),
@@ -745,11 +745,11 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
                 )
             }
             "gemini" | "google" => {
-                let client = create_gemini_client(api_key, &provider_id)?;
+                let client = create_gemini_client(api_key, &provider_id, provider_url)?;
                 build_without_tools_and_stream!(client, gemini_thinking_params.clone())
             }
             "groq" => {
-                let client = create_groq_client(api_key, &provider_id)?;
+                let client = create_groq_client(api_key, &provider_id, provider_url)?;
                 build_without_tools_and_stream!(client, groq_reasoning_params_no_tools.clone())
             }
             "ollama" => {
@@ -758,15 +758,15 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
             }
             "openai" => {
                 // Reasoning params OK without tools
-                let client = create_openai_client(api_key, &provider_id)?;
+                let client = create_openai_client(api_key, &provider_id, provider_url)?;
                 build_without_tools_and_stream!(client, openai_thinking_params_no_tools.clone())
             }
             "openrouter" => {
-                let client = create_openrouter_client(api_key, &provider_id)?;
+                let client = create_openrouter_client(api_key, &provider_id, provider_url)?;
                 build_without_tools_and_stream!(client, None::<serde_json::Value>)
             }
             _ => {
-                let client = create_openai_client(api_key, &provider_id)?;
+                let client = create_openai_client(api_key, &provider_id, provider_url)?;
                 build_without_tools_and_stream!(client, None::<serde_json::Value>)
             }
         }
@@ -780,25 +780,40 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
 fn create_anthropic_client(
     api_key: Option<String>,
     provider_id: &str,
+    provider_url: Option<String>,
 ) -> Result<anthropic::Client<HttpClient>, AiError> {
     let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-    anthropic::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))
+    let mut builder = anthropic::Client::builder().api_key(&key);
+    if let Some(url) = provider_url {
+        builder = builder.base_url(&url);
+    }
+    builder.build().map_err(|e| AiError::Provider(e.to_string()))
 }
 
 fn create_gemini_client(
     api_key: Option<String>,
     provider_id: &str,
+    provider_url: Option<String>,
 ) -> Result<gemini::Client<HttpClient>, AiError> {
     let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-    gemini::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))
+    let mut builder = gemini::Client::builder().api_key(&key);
+    if let Some(url) = provider_url {
+        builder = builder.base_url(&url);
+    }
+    builder.build().map_err(|e| AiError::Provider(e.to_string()))
 }
 
 fn create_groq_client(
     api_key: Option<String>,
     provider_id: &str,
+    provider_url: Option<String>,
 ) -> Result<groq::Client<HttpClient>, AiError> {
     let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-    groq::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))
+    let mut builder = groq::Client::builder().api_key(&key);
+    if let Some(url) = provider_url {
+        builder = builder.base_url(&url);
+    }
+    builder.build().map_err(|e| AiError::Provider(e.to_string()))
 }
 
 /// Create OpenAI client using Completions API (not Responses API).
@@ -807,20 +822,27 @@ fn create_groq_client(
 fn create_openai_client(
     api_key: Option<String>,
     provider_id: &str,
+    provider_url: Option<String>,
 ) -> Result<openai::CompletionsClient<HttpClient>, AiError> {
     let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-    openai::CompletionsClient::builder()
-        .api_key(&key)
-        .build()
-        .map_err(|e| AiError::Provider(e.to_string()))
+    let mut builder = openai::CompletionsClient::builder().api_key(&key);
+    if let Some(url) = provider_url {
+        builder = builder.base_url(&url);
+    }
+    builder.build().map_err(|e| AiError::Provider(e.to_string()))
 }
 
 fn create_openrouter_client(
     api_key: Option<String>,
     provider_id: &str,
+    provider_url: Option<String>,
 ) -> Result<openrouter::Client<HttpClient>, AiError> {
     let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-    openrouter::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))
+    let mut builder = openrouter::Client::builder().api_key(&key);
+    if let Some(url) = provider_url {
+        builder = builder.base_url(&url);
+    }
+    builder.build().map_err(|e| AiError::Provider(e.to_string()))
 }
 
 fn create_ollama_client(

@@ -312,7 +312,7 @@ impl AiProviderServiceTrait for AiProviderService {
             provider_settings.selected_model = Some(model);
         }
         if let Some(url) = request.custom_url {
-            provider_settings.custom_url = Some(url);
+            provider_settings.custom_url = if url.trim().is_empty() { None } else { Some(url) };
         }
         if let Some(priority) = request.priority {
             provider_settings.priority = priority;
