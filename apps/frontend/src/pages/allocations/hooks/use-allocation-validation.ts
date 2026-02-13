@@ -16,7 +16,7 @@ export function useAllocationValidation(
     // Calculate effective total target (saved + pending)
     const effectiveTotalTarget = deviations.reduce((sum, d) => {
       const pending = pendingEdits.get(d.categoryId);
-      if (pending) return sum + pending;
+      if (pending !== undefined) return sum + (typeof pending === "number" ? pending : 0);
       const saved = targetAllocations.find((a) => a.categoryId === d.categoryId);
       if (saved) return sum + saved.targetPercent / 100; // Convert from basis points
       return sum;

@@ -13,8 +13,6 @@ interface TargetListProps {
   onSave: (allocations: NewTargetAllocation[]) => void;
   onDeleteAllocation: (allocationId: string) => void;
   isSaving: boolean;
-  previewMode?: boolean;
-  onTogglePreview?: () => void;
 }
 
 interface PendingEdit {
@@ -28,49 +26,11 @@ export function TargetList({
   onSave,
   onDeleteAllocation,
   isSaving,
-  previewMode = false,
-  onTogglePreview,
 }: TargetListProps) {
   const { allocations } = useTargetAllocations(targetId);
 
   // Track pending edits (not yet saved)
   const [pendingEdits, setPendingEdits] = useState<Map<string, PendingEdit>>(new Map());
-
-  // Calculate preview distributions when in preview mode
-  const previewDistributions = useMemo(() => {
-    if (!previewMode || deviations.length === 0) return null;
-
-    // For preview mode, we need to calculate auto-distribution
-    // This is a simplified version - in a real implementation, you'd want to
-    // integrate with the actual auto-distribution algorithm
-    const totalUserSet = deviations.reduce((sum, d) => {
-      const pending = pendingEdits.get(d.categoryId);
-      if (pending) return sum + pending.percent;
-      const saved = allocations.find((a) => a.categoryId === d.categoryId);
-      if (saved && saved.isLocked) return sum + saved.targetPercent / 100;
-      return sum;
-    }, 0);
-
-    const remainder = 100 - totalUserSet;
-    const eligibleForAutoDist = deviations.filter((d) => {
-      const pending = pendingEdits.get(d.categoryId);
-      const saved = allocations.find((a) => a.categoryId === d.categoryId);
-      return !pending && (!saved || !saved.isLocked);
-    });
-
-    if (remainder > 0 && eligibleForAutoDist.length > 0) {
-      const totalValue = eligibleForAutoDist.reduce((sum, d) => sum + d.currentValue, 0);
-      return eligibleForAutoDist.map((d) => ({
-        categoryId: d.categoryId,
-        previewPercent:
-          totalValue > 0
-            ? (d.currentValue / totalValue) * remainder
-            : remainder / eligibleForAutoDist.length,
-      }));
-    }
-
-    return null;
-  }, [previewMode, deviations, pendingEdits, allocations]);
   // Track which field is being edited
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -93,17 +53,48 @@ export function TargetList({
       const pending = pendingEdits.get(categoryId);
       if (pending) return pending.percent;
 
-      // Check for preview distribution
-      if (previewMode && previewDistributions) {
-        const preview = previewDistributions.find((p) => p.categoryId === categoryId);
-        if (preview) return preview.previewPercent;
+      // Auto-balancing preview: if user is editing any field, show preview for others
+      if (editingCategoryId && pendingEdits.size > 0) {
+        const saved = getSavedAllocation(categoryId);
+        // Only auto-balance if this category doesn't have a pending edit and isn't locked
+        if (!pendingEdits.has(categoryId) && !saved?.isLocked) {
+          // Calculate what this category would get in auto-distribution
+          const totalUserSet = Array.from(pendingEdits.values()).reduce(
+            (sum, p) => sum + p.percent,
+            0,
+          );
+          const lockedAllocations = allocations.filter(
+            (a) => a.isLocked && !pendingEdits.has(a.categoryId),
+          );
+          const lockedTotal = lockedAllocations.reduce((sum, a) => sum + a.targetPercent / 100, 0);
+
+          const totalSet = totalUserSet + lockedTotal;
+          const remainder = 100 - totalSet;
+
+          if (remainder > 0) {
+            // Find all categories eligible for auto-distribution
+            const eligibleCategories = deviations.filter((d) => {
+              const hasPending = pendingEdits.has(d.categoryId);
+              const savedAlloc = allocations.find((a) => a.categoryId === d.categoryId);
+              return !hasPending && (!savedAlloc || !savedAlloc.isLocked);
+            });
+
+            if (eligibleCategories.length > 0) {
+              const totalValue = eligibleCategories.reduce((sum, d) => sum + d.currentValue, 0);
+              const currentCategory = deviations.find((d) => d.categoryId === categoryId);
+              if (currentCategory && totalValue > 0) {
+                return (currentCategory.currentValue / totalValue) * remainder;
+              }
+            }
+          }
+        }
       }
 
       const saved = getSavedAllocation(categoryId);
       if (saved) return saved.targetPercent / 100; // basis points to display %
       return 0;
     },
-    [pendingEdits, getSavedAllocation, previewMode, previewDistributions],
+    [pendingEdits, getSavedAllocation, editingCategoryId, allocations, deviations],
   );
 
   const getIsLocked = useCallback(
@@ -114,6 +105,26 @@ export function TargetList({
       return saved?.isLocked ?? false;
     },
     [pendingEdits, getSavedAllocation],
+  );
+
+  const isAutoBalanced = useCallback(
+    (categoryId: string): boolean => {
+      // A value is auto-balanced if:
+      // 1. User is currently editing (has pending edits)
+      // 2. This category doesn't have a pending edit
+      // 3. This category isn't locked
+      // 4. This category doesn't have a saved allocation
+      if (!editingCategoryId || pendingEdits.size === 0) return false;
+
+      if (pendingEdits.has(categoryId)) return false;
+
+      const saved = getSavedAllocation(categoryId);
+      if (saved?.isLocked) return false;
+      if (saved && saved.targetPercent > 0) return false;
+
+      return true;
+    },
+    [editingCategoryId, pendingEdits, getSavedAllocation],
   );
 
   const handleStartEdit = useCallback(
@@ -252,16 +263,9 @@ export function TargetList({
       {/* Target Status card */}
       <Card>
         <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium uppercase tracking-wider">
-              Target Status
-            </CardTitle>
-            {previewMode && (
-              <span className="text-primary bg-primary/10 rounded-full px-2 py-1 text-xs font-medium">
-                Preview Mode
-              </span>
-            )}
-          </div>
+          <CardTitle className="text-sm font-medium uppercase tracking-wider">
+            Target Status
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between">
@@ -385,18 +389,11 @@ export function TargetList({
                           isLocked
                             ? "cursor-not-allowed opacity-50"
                             : "hover:text-primary cursor-pointer",
+                          isAutoBalanced(d.categoryId) &&
+                            "text-muted-foreground font-normal italic",
                         )}
                       >
                         {displayPercent.toFixed(1)}%
-                        {previewMode &&
-                          previewDistributions?.some((p) => p.categoryId === d.categoryId) && (
-                            <span
-                              className="text-muted-foreground ml-1 text-xs"
-                              title="Auto-distributed"
-                            >
-                              ✦
-                            </span>
-                          )}
                       </span>
                     )}
                     {/* Lock toggle */}

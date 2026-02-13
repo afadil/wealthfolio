@@ -33,8 +33,6 @@ export function AllocationsOverview() {
     updatedAt: new Date(),
   } as Account);
 
-  const [previewMode, setPreviewMode] = useState(false);
-
   const accountId = selectedAccount?.id ?? PORTFOLIO_ACCOUNT_ID;
   const { targets, isLoading: targetsLoading } = usePortfolioTargets(accountId);
   const { createTargetMutation, batchSaveAllocationsMutation, deleteAllocationMutation } =
@@ -165,46 +163,24 @@ export function AllocationsOverview() {
 
   return (
     <>
-      {/* Account selector and preview toggle */}
+      {/* Account selector */}
       <div className="pointer-events-auto fixed right-2 top-4 z-20 hidden md:block lg:right-4">
-        <div className="flex items-center gap-2">
-          <AccountSelector
-            selectedAccount={selectedAccount}
-            setSelectedAccount={handleAccountSelect}
-            variant="dropdown"
-            includePortfolio={true}
-            className="h-9"
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPreviewMode(!previewMode)}
-            className="h-9 gap-1"
-          >
-            <Icons.Eye className="h-4 w-4" />
-            <span>{previewMode ? "Exit Preview" : "Preview"}</span>
-          </Button>
-        </div>
+        <AccountSelector
+          selectedAccount={selectedAccount}
+          setSelectedAccount={handleAccountSelect}
+          variant="dropdown"
+          includePortfolio={true}
+          className="h-9"
+        />
       </div>
       <div className="mb-4 flex justify-end md:hidden">
-        <div className="flex items-center gap-2">
-          <AccountSelector
-            selectedAccount={selectedAccount}
-            setSelectedAccount={handleAccountSelect}
-            variant="dropdown"
-            includePortfolio={true}
-            className="h-9"
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPreviewMode(!previewMode)}
-            className="h-9 gap-1"
-          >
-            <Icons.Eye className="h-4 w-4" />
-            <span>{previewMode ? "Exit" : "Preview"}</span>
-          </Button>
-        </div>
+        <AccountSelector
+          selectedAccount={selectedAccount}
+          setSelectedAccount={handleAccountSelect}
+          variant="dropdown"
+          includePortfolio={true}
+          className="h-9"
+        />
       </div>
 
       {currentData.length === 0 && !activeTarget ? (
@@ -240,7 +216,6 @@ export function AllocationsOverview() {
               onSave={handleSaveAllocations}
               onDeleteAllocation={handleDeleteAllocation}
               isSaving={batchSaveAllocationsMutation.isPending}
-              previewMode={previewMode}
             />
           </div>
         </div>
