@@ -104,8 +104,8 @@ pub struct HoldingsPositionInput {
     pub symbol: String,
     /// Quantity held
     pub quantity: String,
-    /// Optional price per unit at snapshot date
-    pub price: Option<String>,
+    /// Optional average cost per unit
+    pub avg_cost: Option<String>,
     /// Currency for this position
     pub currency: String,
     /// Exchange MIC code (e.g., "XNAS", "XTSE") resolved during check step

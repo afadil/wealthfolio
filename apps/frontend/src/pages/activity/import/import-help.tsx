@@ -172,7 +172,7 @@ function HoldingsHelpContent() {
             <li>
               Map CSV columns to fields:
               <span className="text-muted-foreground ml-2 text-xs">
-                date, symbol, quantity, price, currency
+                date, symbol, quantity, avgCost, currency
               </span>
             </li>
             <li>Review grouped snapshots and import</li>
@@ -195,7 +195,7 @@ function HoldingsHelpContent() {
           <p className="mt-3 font-semibold">Optional fields:</p>
           <ul className="mt-2 list-inside list-disc space-y-1 text-sm">
             <li>
-              <strong>price</strong> — price per share at snapshot date
+              <strong>avgCost</strong> — average cost per share
             </li>
             <li>
               <strong>currency</strong> — currency code (defaults to account currency)
@@ -236,7 +236,7 @@ function HoldingsHelpContent() {
           <pre className="bg-muted mt-2 select-all overflow-x-auto p-3 text-xs leading-relaxed">
             <span className="text-muted-foreground"># Holdings snapshot:</span>
             <br />
-            date,symbol,quantity,price,currency
+            date,symbol,quantity,avgCost,currency
             <br />
             2024-03-31,AAPL,50,171.48,USD
             <br />
