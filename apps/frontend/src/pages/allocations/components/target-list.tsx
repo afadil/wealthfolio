@@ -58,6 +58,10 @@ export function TargetList({
       const saved = getSavedAllocation(categoryId);
       if (saved) return saved.targetPercent / 100; // basis points to display %
 
+      // Don't show preview if no targets have been set yet
+      const hasAnyTargets = allocations.length > 0 || pendingEdits.size > 0;
+      if (!hasAnyTargets) return 0;
+
       // If no saved target, calculate what this would get in auto-distribution
       const totalUserSet = deviations.reduce((sum, d) => {
         const hasPending = pendingEdits.has(d.categoryId);
@@ -108,10 +112,16 @@ export function TargetList({
   const isAutoBalanced = useCallback(
     (categoryId: string): boolean => {
       // A value is auto-balanced if:
-      // 1. This category doesn't have a pending edit
-      // 2. This category isn't locked
-      // 3. This category doesn't have a saved allocation
-      // 4. The display percent is greater than 0 (meaning it's showing a preview value)
+      // 1. User has started setting targets (has at least one saved or pending target)
+      // 2. This category doesn't have a pending edit
+      // 3. This category isn't locked
+      // 4. This category doesn't have a saved allocation
+      // 5. The display percent is greater than 0 (meaning it's showing a preview value)
+
+      // Don't show preview if no targets have been set yet
+      const hasAnyTargets = allocations.length > 0 || pendingEdits.size > 0;
+      if (!hasAnyTargets) return false;
+
       if (pendingEdits.has(categoryId)) return false;
 
       const saved = getSavedAllocation(categoryId);
@@ -122,7 +132,7 @@ export function TargetList({
       const displayPercent = getDisplayPercent(categoryId);
       return displayPercent > 0;
     },
-    [pendingEdits, getSavedAllocation, getDisplayPercent],
+    [pendingEdits, getSavedAllocation, getDisplayPercent, allocations],
   );
 
   const handleStartEdit = useCallback(
