@@ -226,18 +226,20 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
     // For existing activities, assetId is preserved from the original data
     updated = { ...updated, assetSymbol: upper };
 
-    // Auto-fill currency: account currency → asset currency → base currency
-    // Account currency takes precedence because users enter prices in their account's currency,
-    // and cash movements must use the account currency (e.g., GBP account uses GBP, not GBp pence)
-    if (updated.accountCurrency) {
-      updated = { ...updated, currency: updated.accountCurrency };
-    } else {
-      const assetKey = upper;
-      const assetCurrency = assetCurrencyLookup.get(assetKey);
-      if (assetCurrency) {
-        updated = { ...updated, currency: assetCurrency };
+    // Auto-fill currency only if not already set (e.g., by handleSymbolSelect
+    // which sets the correct currency from search result / quote resolution).
+    // This avoids overriding minor currencies like GBp with the account's GBP.
+    if (!updated.currency) {
+      if (updated.accountCurrency) {
+        updated = { ...updated, currency: updated.accountCurrency };
       } else {
-        updated = { ...updated, currency: fallbackCurrency };
+        const assetKey = upper;
+        const assetCurrency = assetCurrencyLookup.get(assetKey);
+        if (assetCurrency) {
+          updated = { ...updated, currency: assetCurrency };
+        } else {
+          updated = { ...updated, currency: fallbackCurrency };
+        }
       }
     }
   } else if (field === "activityType") {

@@ -1923,6 +1923,14 @@ mod tests {
         let checked = &result[0];
         assert_eq!(checked.instrument_type.as_deref(), Some("EQUITY"));
         assert_eq!(checked.quote_ccy.as_deref(), Some("GBp"));
+        assert!(
+            checked
+                .warnings
+                .as_ref()
+                .and_then(|w| w.get("_quote_ccy_fallback"))
+                .is_some(),
+            "Expected MIC fallback warning when quote_ccy is inferred from exchange"
+        );
     }
 
     #[tokio::test]

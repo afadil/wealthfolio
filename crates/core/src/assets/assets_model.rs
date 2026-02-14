@@ -590,6 +590,15 @@ pub struct CanonicalMarketIdentity {
     pub quote_ccy: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QuoteCcyResolutionSource {
+    ExplicitHint,
+    ExistingAsset,
+    ProviderQuote,
+    MicFallback,
+    TerminalFallback,
+}
+
 fn normalize_opt(value: Option<&str>) -> Option<String> {
     value
         .map(str::trim)
@@ -612,6 +621,33 @@ fn normalize_quote_ccy(value: Option<&str>) -> Option<String> {
     }
 
     Some(trimmed.to_uppercase())
+}
+
+pub fn normalize_quote_ccy_code(value: Option<&str>) -> Option<String> {
+    normalize_quote_ccy(value)
+}
+
+pub fn resolve_quote_ccy_precedence(
+    explicit_hint: Option<&str>,
+    existing_asset_quote_ccy: Option<&str>,
+    provider_quote_ccy: Option<&str>,
+    mic_fallback_quote_ccy: Option<&str>,
+    terminal_fallback_quote_ccy: Option<&str>,
+) -> Option<(String, QuoteCcyResolutionSource)> {
+    if let Some(ccy) = normalize_quote_ccy(explicit_hint) {
+        return Some((ccy, QuoteCcyResolutionSource::ExplicitHint));
+    }
+    if let Some(ccy) = normalize_quote_ccy(existing_asset_quote_ccy) {
+        return Some((ccy, QuoteCcyResolutionSource::ExistingAsset));
+    }
+    if let Some(ccy) = normalize_quote_ccy(provider_quote_ccy) {
+        return Some((ccy, QuoteCcyResolutionSource::ProviderQuote));
+    }
+    if let Some(ccy) = normalize_quote_ccy(mic_fallback_quote_ccy) {
+        return Some((ccy, QuoteCcyResolutionSource::MicFallback));
+    }
+    normalize_quote_ccy(terminal_fallback_quote_ccy)
+        .map(|ccy| (ccy, QuoteCcyResolutionSource::TerminalFallback))
 }
 
 fn parse_fx_symbol_parts(symbol: &str) -> Option<(String, String)> {

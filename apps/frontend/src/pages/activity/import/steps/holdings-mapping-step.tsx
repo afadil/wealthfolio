@@ -203,7 +203,7 @@ export function HoldingsMappingStep() {
     if (hasAutoInitialized.current) return;
     if (!headers || headers.length === 0) return;
 
-    let merged: Record<string, string> = {};
+    const merged: Record<string, string> = {};
 
     // 1. Apply saved field mappings (only valid HoldingsFormat keys with headers in this CSV)
     if (savedMapping?.fieldMappings) {

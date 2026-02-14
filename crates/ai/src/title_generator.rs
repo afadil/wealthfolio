@@ -114,7 +114,9 @@ Title:",
                 if let Some(url) = provider_url {
                     builder = builder.base_url(&url);
                 }
-                let client = builder.build().map_err(|e| AiError::Provider(e.to_string()))?;
+                let client = builder
+                    .build()
+                    .map_err(|e| AiError::Provider(e.to_string()))?;
                 client
                     .agent(model_id)
                     .max_tokens(self.config.max_tokens as u64)
@@ -129,7 +131,9 @@ Title:",
                 if let Some(url) = provider_url {
                     builder = builder.base_url(&url);
                 }
-                let client = builder.build().map_err(|e| AiError::Provider(e.to_string()))?;
+                let client = builder
+                    .build()
+                    .map_err(|e| AiError::Provider(e.to_string()))?;
                 client
                     .agent(model_id)
                     .build()
@@ -143,7 +147,9 @@ Title:",
                 if let Some(url) = provider_url {
                     builder = builder.base_url(&url);
                 }
-                let client = builder.build().map_err(|e| AiError::Provider(e.to_string()))?;
+                let client = builder
+                    .build()
+                    .map_err(|e| AiError::Provider(e.to_string()))?;
                 client
                     .agent(model_id)
                     .build()
@@ -172,7 +178,9 @@ Title:",
                 if let Some(url) = provider_url {
                     builder = builder.base_url(&url);
                 }
-                let client = builder.build().map_err(|e| AiError::Provider(e.to_string()))?;
+                let client = builder
+                    .build()
+                    .map_err(|e| AiError::Provider(e.to_string()))?;
                 client
                     .agent(model_id)
                     .build()
@@ -187,7 +195,9 @@ Title:",
                 if let Some(url) = provider_url {
                     builder = builder.base_url(&url);
                 }
-                let client = builder.build().map_err(|e| AiError::Provider(e.to_string()))?;
+                let client = builder
+                    .build()
+                    .map_err(|e| AiError::Provider(e.to_string()))?;
                 client
                     .agent(model_id)
                     .build()
