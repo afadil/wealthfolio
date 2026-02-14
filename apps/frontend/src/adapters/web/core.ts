@@ -90,6 +90,7 @@ export const COMMANDS: CommandMap = {
   update_quote_mode: { method: "PUT", path: "/assets/pricing-mode" },
   // Market data
   search_symbol: { method: "GET", path: "/market-data/search" },
+  resolve_symbol_quote: { method: "GET", path: "/market-data/resolve-currency" },
   get_quote_history: { method: "GET", path: "/market-data/quotes/history" },
   get_latest_quotes: { method: "POST", path: "/market-data/quotes/latest" },
   update_quote: { method: "PUT", path: "/market-data/quotes" },
@@ -573,6 +574,19 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       const { query } = payload as { query: string };
       const params = new URLSearchParams();
       params.set("query", query);
+      url += `?${params.toString()}`;
+      break;
+    }
+    case "resolve_symbol_quote": {
+      const { symbol, exchangeMic, instrumentType } = payload as {
+        symbol: string;
+        exchangeMic?: string;
+        instrumentType?: string;
+      };
+      const params = new URLSearchParams();
+      params.set("symbol", symbol);
+      if (exchangeMic) params.set("exchangeMic", exchangeMic);
+      if (instrumentType) params.set("instrumentType", instrumentType);
       url += `?${params.toString()}`;
       break;
     }

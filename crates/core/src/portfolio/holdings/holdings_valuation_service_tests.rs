@@ -776,6 +776,43 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_security_valuation_minor_quote_currency_normalizes_price_to_local_currency() {
+        let (_fx_service, market_data_service, valuation_service) = setup_test_env();
+
+        // Yahoo-style LSE quote values in pence (GBp)
+        let latest_quote = create_quote("2024-01-10", dec!(14906.0), "GBp");
+        let prev_quote = create_quote("2024-01-09", dec!(14818.0), "GBp");
+        market_data_service.add_quote_pair("AZN.L", latest_quote, Some(prev_quote));
+
+        let mut holdings = vec![create_holding(
+            "h_minor",
+            HoldingType::Security,
+            "AZN.L",
+            dec!(17),
+            "GBP",
+            "GBP",
+            Some(dec!(2393.94)),
+            Some("AstraZeneca"),
+        )];
+
+        let result = valuation_service
+            .calculate_holdings_live_valuation(&mut holdings)
+            .await;
+        assert!(result.is_ok());
+        let holding = &holdings[0];
+
+        // 14906 GBp -> 149.06 GBP, then local (GBP) price/value should remain in GBP
+        assert_decimal_approx(holding.price, dec!(149.06), TOLERANCE, "Price (GBP)");
+        assert_monetary_value_approx(
+            Some(&holding.market_value),
+            dec!(2534.02), // 149.06 * 17
+            dec!(2534.02),
+            TOLERANCE,
+            "Market Value (GBP)",
+        );
+    }
+
+    #[tokio::test]
     async fn test_security_valuation_quote_currency_differs_from_local() {
         // Holding is in CAD, Base is CAD, Quote is in USD
         let (fx_service, market_data_service, valuation_service) = setup_test_env();
@@ -806,7 +843,7 @@ mod tests {
         let holding = &holdings[0];
 
         // Expected values
-        let expected_price = dec!(50.0); // USD (from quote)
+        let expected_price = dec!(65.0); // Converted to local currency (CAD)
         let expected_mv_quote_curr = dec!(5000.0); // 100 * 50 USD
         let expected_mv_local = expected_mv_quote_curr * usd_cad_rate; // 5000 * 1.3 = 6500 CAD
         let expected_mv_base = expected_mv_local; // Base is CAD, so same as local = 6500 CAD
@@ -845,7 +882,7 @@ mod tests {
             holding.price,
             expected_price,
             TOLERANCE,
-            "Price (Quote Currency)",
+            "Price (Local Currency)",
         );
         assert_decimal_approx(
             holding.fx_rate,

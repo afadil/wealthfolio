@@ -135,8 +135,10 @@ impl<E: AiEnvironment + 'static> Tool for GetGoalsTool<E> {
                     .iter()
                     .filter(|a| a.goal_id == g.id)
                     .map(|a| {
-                        let account_value =
-                            valuation_map.get(&a.account_id).copied().unwrap_or(Decimal::ZERO);
+                        let account_value = valuation_map
+                            .get(&a.account_id)
+                            .copied()
+                            .unwrap_or(Decimal::ZERO);
                         account_value * Decimal::from(a.percent_allocation) / Decimal::from(100)
                     })
                     .sum();

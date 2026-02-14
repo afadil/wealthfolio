@@ -25,6 +25,8 @@ interface CurrencyInputCustomProps {
   /** Controlled open change handler (optional). */
   onOpenChange?: (open: boolean) => void;
   useIsMobile?: () => boolean;
+  /** When true, allows creating custom currencies not in the list. */
+  allowCustom?: boolean;
 }
 
 type CurrencyInputProps = CurrencyInputCustomProps & Omit<ButtonProps, "onChange" | "value">;
@@ -44,6 +46,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
       open: openProp,
       onOpenChange,
       useIsMobile,
+      allowCustom = true,
       ...props
     },
     ref,
@@ -59,6 +62,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
       }
     };
     const [searchQuery, setSearchQuery] = useState("");
+    const [desktopSearchQuery, setDesktopSearchQuery] = useState("");
     const searchInputRef = useRef<HTMLInputElement | null>(null);
     const desktopCommandInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -73,12 +77,13 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
         : valueDisplay === "code-label"
           ? `${selectedCurrency.value} - ${selectedCurrency.label}`
           : selectedCurrency.label
-      : placeholder;
+      : value || placeholder;
 
     const handleSelect = (currencyValue: string) => {
       onChange(currencyValue);
       setOpen(false);
       setSearchQuery("");
+      setDesktopSearchQuery("");
     };
 
     const handleOpenAutoFocus = useCallback(
@@ -106,7 +111,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
           : valueDisplay === "label"
             ? selectedCurrency.label
             : `${selectedCurrency.value} - ${selectedCurrency.label}`
-        : placeholder;
+        : value || placeholder;
 
       return (
         <>
@@ -216,6 +221,14 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
                     <div className="text-muted-foreground flex h-full flex-col items-center justify-center gap-2 text-center text-sm">
                       <Icons.Search className="h-12 w-12 opacity-20" />
                       <span>No currencies found for &quot;{searchQuery}&quot;.</span>
+                      {allowCustom && searchQuery.trim() && (
+                        <button
+                          onClick={() => handleSelect(searchQuery.trim())}
+                          className="text-primary mt-2 text-sm font-medium hover:underline"
+                        >
+                          Use &quot;{searchQuery.trim()}&quot; as custom currency
+                        </button>
+                      )}
                     </div>
                   )}
                 </ScrollArea>
@@ -248,9 +261,26 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
         </PopoverTrigger>
         <PopoverContent className="w-full p-0" onOpenAutoFocus={handleOpenAutoFocus}>
           <Command>
-            <CommandInput ref={desktopCommandInputRef} placeholder="Search currency..." className="h-9" />
+            <CommandInput
+              ref={desktopCommandInputRef}
+              placeholder="Search currency..."
+              className="h-9"
+              value={desktopSearchQuery}
+              onValueChange={setDesktopSearchQuery}
+            />
             <CommandList>
-              <CommandEmpty>No currency found.</CommandEmpty>
+              <CommandEmpty>
+                {allowCustom && desktopSearchQuery.trim() ? (
+                  <button
+                    className="text-primary w-full py-1 text-sm font-medium hover:underline"
+                    onClick={() => handleSelect(desktopSearchQuery.trim())}
+                  >
+                    Use &quot;{desktopSearchQuery.trim()}&quot; as custom currency
+                  </button>
+                ) : (
+                  "No currency found."
+                )}
+              </CommandEmpty>
               <CommandGroup>
                 <ScrollArea className="max-h-96 overflow-y-auto">
                   {worldCurrencies.map((currency) => (

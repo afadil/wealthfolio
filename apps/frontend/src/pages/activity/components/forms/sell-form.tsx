@@ -55,7 +55,7 @@ export const sellFormSchema = z.object({
     .default(0),
   comment: z.string().optional().nullable(),
   // Advanced options
-  currency: z.string().optional(),
+  currency: z.string().min(1, { message: "Currency is required." }),
   fxRate: z.coerce
     .number({
       invalid_type_error: "FX Rate must be a number.",
@@ -102,7 +102,7 @@ export function SellForm({
   const initialAccount = accounts.find((a) => a.value === initialAccountId);
   // Currency priority: provided default > normalized asset currency > account currency
   const initialCurrency =
-    defaultValues?.currency ?? normalizeCurrency(assetCurrency) ?? initialAccount?.currency;
+    defaultValues?.currency?.trim() || assetCurrency?.trim() || initialAccount?.currency;
 
   const form = useForm<SellFormValues>({
     resolver: zodResolver(sellFormSchema) as Resolver<SellFormValues>,
@@ -119,11 +119,11 @@ export function SellForm({
       unitPrice: undefined,
       fee: 0,
       comment: null,
-      currency: initialCurrency,
       fxRate: undefined,
       quoteMode: QuoteMode.MARKET,
       exchangeMic: undefined,
       ...defaultValues,
+      currency: defaultValues?.currency?.trim() || initialCurrency,
     },
   });
 
@@ -131,7 +131,9 @@ export function SellForm({
   const accountId = watch("accountId");
   const assetId = watch("assetId");
   const quantity = watch("quantity");
+  const currency = watch("currency");
   const quoteMode = watch("quoteMode");
+  const symbolQuoteCcy = watch("symbolQuoteCcy");
   const isManualAsset = quoteMode === QuoteMode.MANUAL;
 
   // Get account currency from selected account
@@ -140,6 +142,7 @@ export function SellForm({
     [accounts, accountId],
   );
   const accountCurrency = selectedAccount?.currency;
+  const assetCurrencyFromSymbol = normalizeCurrency(symbolQuoteCcy)?.toUpperCase();
 
   // Fetch holdings for the selected account to check available quantity
   const { holdings } = useHoldings(accountId);
@@ -167,7 +170,7 @@ export function SellForm({
         <Card>
           <CardContent className="space-y-6 pt-4">
             {/* Account Selection */}
-            <AccountSelect name="accountId" accounts={accounts} />
+            <AccountSelect name="accountId" accounts={accounts} currencyName="currency" />
 
             {/* Symbol Search */}
             <SymbolSearch
@@ -199,8 +202,13 @@ export function SellForm({
                   </p>
                 )}
               </div>
-              <AmountInput name="unitPrice" label="Price" maxDecimalPlaces={4} />
-              <AmountInput name="fee" label="Fee" />
+              <AmountInput
+                name="unitPrice"
+                label="Price"
+                maxDecimalPlaces={4}
+                currency={currency}
+              />
+              <AmountInput name="fee" label="Fee" currency={currency} />
             </div>
 
             {/* Warning for selling more than holdings */}
@@ -220,7 +228,7 @@ export function SellForm({
               currencyName="currency"
               fxRateName="fxRate"
               activityType={ActivityType.SELL}
-              assetCurrency={assetCurrency}
+              assetCurrency={assetCurrencyFromSymbol ?? normalizeCurrency(assetCurrency)}
               accountCurrency={accountCurrency}
               baseCurrency={baseCurrency}
               showSubtype={false}

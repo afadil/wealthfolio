@@ -5,10 +5,12 @@ use std::sync::Arc;
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::quotes::QuoteServiceTrait;
 use crate::taxonomies::TaxonomyServiceTrait;
+use futures::stream::{self, StreamExt};
 
 use super::assets_model::{
-    canonicalize_market_identity, Asset, AssetKind, AssetSpec, EnsureAssetsResult, InstrumentType,
-    NewAsset, QuoteMode, UpdateAssetProfile,
+    canonicalize_market_identity, resolve_quote_ccy_precedence, Asset, AssetKind, AssetSpec,
+    EnsureAssetsResult, InstrumentType, NewAsset, QuoteCcyResolutionSource, QuoteMode,
+    UpdateAssetProfile,
 };
 use super::assets_traits::{AssetRepositoryTrait, AssetServiceTrait};
 use super::auto_classification::{AutoClassificationService, ClassificationInput};
@@ -54,6 +56,46 @@ impl AssetService {
             AssetKind::Investment | AssetKind::Fx => QuoteMode::Market,
             _ => QuoteMode::Manual,
         }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn resolve_quote_ccy(
+        &self,
+        symbol: Option<&str>,
+        exchange_mic: Option<&str>,
+        instrument_type: Option<&InstrumentType>,
+        explicit_hint: Option<&str>,
+        existing_asset_quote_ccy: Option<&str>,
+        terminal_fallback: Option<&str>,
+        allow_provider_lookup: bool,
+    ) -> (String, QuoteCcyResolutionSource) {
+        let provider_quote_ccy = if allow_provider_lookup {
+            if let Some(sym) = symbol.map(str::trim).filter(|s| !s.is_empty()) {
+                self.quote_service
+                    .resolve_symbol_quote(sym, exchange_mic, instrument_type)
+                    .await
+                    .ok()
+                    .and_then(|q| q.currency)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        resolve_quote_ccy_precedence(
+            explicit_hint,
+            existing_asset_quote_ccy,
+            provider_quote_ccy.as_deref(),
+            exchange_mic.and_then(mic_to_currency),
+            terminal_fallback,
+        )
+        .unwrap_or_else(|| {
+            (
+                terminal_fallback.unwrap_or("USD").to_string(),
+                QuoteCcyResolutionSource::TerminalFallback,
+            )
+        })
     }
 
     fn should_refresh_market_quote_ccy_on_mic_change(
@@ -445,11 +487,32 @@ impl AssetServiceTrait for AssetService {
                             Some(hint),
                         )
                     });
-                let expected_quote_ccy = Self::expected_market_quote_ccy(
-                    target_instrument_type.as_ref(),
-                    target_quote_mode,
-                    target_exchange_mic.as_deref(),
-                );
+                let existing_for_resolution = if existing_asset.quote_ccy.trim().is_empty() {
+                    None
+                } else {
+                    Some(existing_asset.quote_ccy.as_str())
+                };
+                let symbol_for_resolution = metadata
+                    .as_ref()
+                    .and_then(|m| m.instrument_symbol.as_deref().or(m.display_code.as_deref()))
+                    .or(existing_asset.instrument_symbol.as_deref())
+                    .or(existing_asset.display_code.as_deref());
+                let (resolved_quote_ccy, _) = self
+                    .resolve_quote_ccy(
+                        symbol_for_resolution,
+                        target_exchange_mic.as_deref(),
+                        target_instrument_type.as_ref(),
+                        metadata.as_ref().and_then(|m| m.quote_ccy_hint.as_deref()),
+                        existing_for_resolution,
+                        context_currency.as_deref().or(Some("USD")),
+                        target_quote_mode == QuoteMode::Market,
+                    )
+                    .await;
+                let expected_quote_ccy = if existing_asset.quote_ccy.trim().is_empty() {
+                    Some(resolved_quote_ccy)
+                } else {
+                    None
+                };
 
                 let needs_currency_repair = (existing_asset.quote_ccy.trim().is_empty()
                     && expected_quote_ccy.is_some())
@@ -557,11 +620,33 @@ impl AssetServiceTrait for AssetService {
                                         Some(hint),
                                     )
                                 });
-                            let expected_quote_ccy = Self::expected_market_quote_ccy(
-                                target_instrument_type.as_ref(),
-                                target_quote_mode,
-                                target_exchange_mic.as_deref(),
-                            );
+                            let existing_for_resolution = if existing.quote_ccy.trim().is_empty() {
+                                None
+                            } else {
+                                Some(existing.quote_ccy.as_str())
+                            };
+                            let symbol_for_resolution = spec
+                                .instrument_symbol
+                                .as_deref()
+                                .or(spec.display_code.as_deref())
+                                .or(existing.instrument_symbol.as_deref())
+                                .or(existing.display_code.as_deref());
+                            let (resolved_quote_ccy, _) = self
+                                .resolve_quote_ccy(
+                                    symbol_for_resolution,
+                                    target_exchange_mic.as_deref(),
+                                    target_instrument_type.as_ref(),
+                                    spec.quote_ccy_hint.as_deref(),
+                                    existing_for_resolution,
+                                    context_currency.as_deref().or(Some("USD")),
+                                    target_quote_mode == QuoteMode::Market,
+                                )
+                                .await;
+                            let expected_quote_ccy = if existing.quote_ccy.trim().is_empty() {
+                                Some(resolved_quote_ccy)
+                            } else {
+                                None
+                            };
                             let needs_currency_repair = (existing.quote_ccy.trim().is_empty()
                                 && expected_quote_ccy.is_some())
                                 || explicit_quote_heal_target.is_some();
@@ -616,26 +701,30 @@ impl AssetServiceTrait for AssetService {
             .as_ref()
             .and_then(|m| m.instrument_exchange_mic.clone());
 
-        // Determine currency:
-        // 1. Prefer explicit context currency when provided (symbol-level/provider hint)
-        // 2. For market-priced assets, fall back to exchange trading currency
-        // 3. Fall back to USD
-        let currency = if quote_mode == QuoteMode::Market {
-            context_currency
-                .clone()
-                .filter(|c| !c.is_empty())
-                .or_else(|| {
-                    exchange_mic
-                        .as_ref()
-                        .and_then(|mic| mic_to_currency(mic))
-                        .map(|c| c.to_string())
-                })
-                .unwrap_or_else(|| "USD".to_string())
-        } else {
-            context_currency
-                .filter(|c| !c.is_empty())
-                .unwrap_or_else(|| "USD".to_string())
-        };
+        let instrument_type = inferred_instrument_type;
+        let allow_provider_lookup = quote_mode == QuoteMode::Market
+            && !matches!(
+                instrument_type.as_ref(),
+                Some(InstrumentType::Crypto | InstrumentType::Fx)
+            );
+        let symbol_for_resolution = metadata
+            .as_ref()
+            .and_then(|m| m.instrument_symbol.as_deref().or(m.display_code.as_deref()));
+        let explicit_quote_hint = metadata.as_ref().and_then(|m| m.quote_ccy_hint.as_deref());
+        let (currency, _) = self
+            .resolve_quote_ccy(
+                symbol_for_resolution,
+                exchange_mic.as_deref(),
+                instrument_type.as_ref(),
+                explicit_quote_hint,
+                None,
+                context_currency
+                    .as_deref()
+                    .filter(|c| !c.trim().is_empty())
+                    .or(Some("USD")),
+                allow_provider_lookup,
+            )
+            .await;
 
         // Set preferred provider based on quote mode
         let provider_config = match quote_mode {
@@ -644,7 +733,6 @@ impl AssetServiceTrait for AssetService {
         };
 
         let name = metadata.as_ref().and_then(|m| m.name.clone());
-        let instrument_type = inferred_instrument_type;
         let canonical_identity = canonicalize_market_identity(
             instrument_type.clone(),
             metadata
@@ -1113,7 +1201,35 @@ impl AssetServiceTrait for AssetService {
             };
 
             let normalized = self.new_asset_from_spec(spec);
-            let expected_quote_ccy = normalized.quote_ccy;
+            let (resolved_quote_ccy, _) = self
+                .resolve_quote_ccy(
+                    normalized
+                        .instrument_symbol
+                        .as_deref()
+                        .or(normalized.display_code.as_deref()),
+                    normalized
+                        .instrument_exchange_mic
+                        .as_deref()
+                        .or(spec.instrument_exchange_mic.as_deref()),
+                    normalized
+                        .instrument_type
+                        .as_ref()
+                        .or(spec.instrument_type.as_ref()),
+                    spec.quote_ccy_hint.as_deref(),
+                    if existing_asset.quote_ccy.trim().is_empty() {
+                        None
+                    } else {
+                        Some(existing_asset.quote_ccy.as_str())
+                    },
+                    Some(spec.quote_ccy.as_str()),
+                    normalized.quote_mode == QuoteMode::Market,
+                )
+                .await;
+            let expected_quote_ccy = if existing_asset.quote_ccy.trim().is_empty() {
+                Some(resolved_quote_ccy)
+            } else {
+                None
+            };
             let expected_mic = normalized.instrument_exchange_mic;
             let expected_instrument_type = normalized.instrument_type;
             let explicit_quote_heal_target = spec.quote_ccy_hint.as_deref().and_then(|hint| {
@@ -1133,11 +1249,11 @@ impl AssetServiceTrait for AssetService {
 
             let mut payload = Self::update_payload_from_asset(&existing_asset);
             if needs_currency_repair {
-                payload.quote_ccy = Some(
-                    explicit_quote_heal_target
-                        .clone()
-                        .unwrap_or(expected_quote_ccy),
-                );
+                if let Some(target_quote_ccy) =
+                    explicit_quote_heal_target.clone().or(expected_quote_ccy)
+                {
+                    payload.quote_ccy = Some(target_quote_ccy);
+                }
             }
             if needs_mic_repair {
                 payload.instrument_exchange_mic = expected_mic;
@@ -1155,9 +1271,118 @@ impl AssetServiceTrait for AssetService {
         }
 
         // 2. Batch upsert all specs (INSERT OR IGNORE)
-        let new_assets: Vec<NewAsset> = resolved_specs
+        // Resolve quote currencies with deduped input keys and bounded parallelism.
+        const QUOTE_RESOLUTION_CONCURRENCY: usize = 8;
+        let build_resolution_key =
+            |symbol: Option<&str>,
+             exchange_mic: Option<&str>,
+             instrument_type: Option<&InstrumentType>,
+             explicit_hint: Option<&str>,
+             terminal_fallback: &str,
+             allow_provider_lookup: bool| {
+                let lookup_flag = if allow_provider_lookup { "1" } else { "0" };
+                format!(
+                    "{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}",
+                    symbol.unwrap_or_default(),
+                    exchange_mic.unwrap_or_default(),
+                    instrument_type.map(|it| it.as_db_str()).unwrap_or_default(),
+                    explicit_hint.unwrap_or_default(),
+                    terminal_fallback,
+                    lookup_flag
+                )
+            };
+
+        type CreateResolutionInput = (
+            Option<String>,
+            Option<String>,
+            Option<InstrumentType>,
+            Option<String>,
+            String,
+            bool,
+        );
+        let mut specs_for_create: Vec<(AssetSpec, String)> =
+            Vec::with_capacity(resolved_specs.len());
+        let mut resolution_inputs_by_key: HashMap<String, CreateResolutionInput> = HashMap::new();
+
+        for spec in &resolved_specs {
+            let resolved_spec = spec.clone();
+            let quote_mode = resolved_spec
+                .quote_mode
+                .unwrap_or_else(|| Self::default_quote_mode_for_kind(&resolved_spec.kind));
+            let allow_provider_lookup = quote_mode == QuoteMode::Market
+                && !matches!(
+                    resolved_spec.instrument_type.as_ref(),
+                    Some(InstrumentType::Crypto | InstrumentType::Fx)
+                );
+            let symbol = resolved_spec
+                .instrument_symbol
+                .as_deref()
+                .or(resolved_spec.display_code.as_deref());
+            let exchange_mic = resolved_spec.instrument_exchange_mic.as_deref();
+            let instrument_type = resolved_spec.instrument_type.as_ref();
+            let explicit_hint = resolved_spec.quote_ccy_hint.as_deref();
+            let terminal_fallback = resolved_spec.quote_ccy.as_str();
+            let resolution_key = build_resolution_key(
+                symbol,
+                exchange_mic,
+                instrument_type,
+                explicit_hint,
+                terminal_fallback,
+                allow_provider_lookup,
+            );
+
+            resolution_inputs_by_key
+                .entry(resolution_key.clone())
+                .or_insert((
+                    symbol.map(|s| s.to_string()),
+                    exchange_mic.map(|mic| mic.to_string()),
+                    instrument_type.cloned(),
+                    explicit_hint.map(|hint| hint.to_string()),
+                    terminal_fallback.to_string(),
+                    allow_provider_lookup,
+                ));
+            specs_for_create.push((resolved_spec, resolution_key));
+        }
+
+        let resolved_quote_ccy_by_key: HashMap<String, String> =
+            stream::iter(resolution_inputs_by_key.into_iter())
+                .map(|(resolution_key, input)| async move {
+                    let (
+                        symbol,
+                        exchange_mic,
+                        instrument_type,
+                        explicit_hint,
+                        terminal_fallback,
+                        allow_provider_lookup,
+                    ) = input;
+                    let (resolved_quote_ccy, _) = self
+                        .resolve_quote_ccy(
+                            symbol.as_deref(),
+                            exchange_mic.as_deref(),
+                            instrument_type.as_ref(),
+                            explicit_hint.as_deref(),
+                            None,
+                            Some(terminal_fallback.as_str()),
+                            allow_provider_lookup,
+                        )
+                        .await;
+                    (resolution_key, resolved_quote_ccy)
+                })
+                .buffer_unordered(QUOTE_RESOLUTION_CONCURRENCY)
+                .collect::<Vec<(String, String)>>()
+                .await
+                .into_iter()
+                .collect();
+
+        for (spec, resolution_key) in &mut specs_for_create {
+            if let Some(resolved_quote_ccy) = resolved_quote_ccy_by_key.get(resolution_key) {
+                spec.quote_ccy = resolved_quote_ccy.clone();
+            }
+        }
+
+        let new_assets: Vec<NewAsset> = specs_for_create
             .iter()
-            .map(|spec| self.new_asset_from_spec(spec))
+            .map(|(spec, _)| self.new_asset_from_spec(spec))
             .collect();
 
         self.asset_repository.create_batch(new_assets).await?;

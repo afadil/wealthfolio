@@ -117,6 +117,11 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
         submitData.currency = submitData.currency ?? account.currency;
       }
 
+      // Submit guard: always persist a non-empty activity currency.
+      if (account && !submitData.currency?.trim()) {
+        submitData.currency = account.currency;
+      }
+
       if (id) {
         await updateActivityMutation.mutateAsync({ id, ...submitData });
       } else {
