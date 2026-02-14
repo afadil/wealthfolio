@@ -787,7 +787,9 @@ fn create_anthropic_client(
     if let Some(url) = provider_url {
         builder = builder.base_url(&url);
     }
-    builder.build().map_err(|e| AiError::Provider(e.to_string()))
+    builder
+        .build()
+        .map_err(|e| AiError::Provider(e.to_string()))
 }
 
 fn create_gemini_client(
@@ -800,7 +802,9 @@ fn create_gemini_client(
     if let Some(url) = provider_url {
         builder = builder.base_url(&url);
     }
-    builder.build().map_err(|e| AiError::Provider(e.to_string()))
+    builder
+        .build()
+        .map_err(|e| AiError::Provider(e.to_string()))
 }
 
 fn create_groq_client(
@@ -813,7 +817,9 @@ fn create_groq_client(
     if let Some(url) = provider_url {
         builder = builder.base_url(&url);
     }
-    builder.build().map_err(|e| AiError::Provider(e.to_string()))
+    builder
+        .build()
+        .map_err(|e| AiError::Provider(e.to_string()))
 }
 
 /// Create OpenAI client using Completions API (not Responses API).
@@ -829,7 +835,9 @@ fn create_openai_client(
     if let Some(url) = provider_url {
         builder = builder.base_url(&url);
     }
-    builder.build().map_err(|e| AiError::Provider(e.to_string()))
+    builder
+        .build()
+        .map_err(|e| AiError::Provider(e.to_string()))
 }
 
 fn create_openrouter_client(
@@ -842,7 +850,9 @@ fn create_openrouter_client(
     if let Some(url) = provider_url {
         builder = builder.base_url(&url);
     }
-    builder.build().map_err(|e| AiError::Provider(e.to_string()))
+    builder
+        .build()
+        .map_err(|e| AiError::Provider(e.to_string()))
 }
 
 fn create_ollama_client(

@@ -528,8 +528,7 @@ pub async fn check_holdings_import(
         // Validate positions
         for pos in &snapshot.positions {
             if pos.symbol.trim().is_empty() {
-                validation_errors
-                    .push(format!("Date {}: empty symbol found", snapshot.date));
+                validation_errors.push(format!("Date {}: empty symbol found", snapshot.date));
             }
             if pos.quantity.parse::<Decimal>().is_err() {
                 validation_errors.push(format!(
@@ -558,8 +557,7 @@ pub async fn check_holdings_import(
             .get_holdings_keyframes(&account_id, Some(min_date), Some(max_date))
             .map_err(|e| format!("Failed to query snapshots: {}", e))?;
 
-        let import_dates: std::collections::HashSet<NaiveDate> =
-            valid_dates.into_iter().collect();
+        let import_dates: std::collections::HashSet<NaiveDate> = valid_dates.into_iter().collect();
         existing
             .into_iter()
             .filter(|s| import_dates.contains(&s.snapshot_date))

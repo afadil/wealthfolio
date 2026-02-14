@@ -342,6 +342,8 @@ export interface SymbolSearchResult {
   exchangeName?: string;
   /** Currency derived from exchange (e.g., "USD", "CAD") */
   currency?: string;
+  /** Provenance: "provider" | "exchange_inferred" */
+  currencySource?: string;
   shortName: string;
   quoteType: string;
   symbol: string;
@@ -356,6 +358,11 @@ export interface SymbolSearchResult {
   isExisting?: boolean;
   /** The existing asset ID if found (e.g., "SEC:AAPL:XNAS") */
   existingAssetId?: string;
+}
+
+export interface ResolvedQuote {
+  currency?: string;
+  price?: number;
 }
 
 export interface ExchangeInfo {
@@ -816,6 +823,7 @@ export interface UpdateAssetProfile {
   notes?: string | null;
   kind?: AssetKind | null;
   quoteMode?: QuoteMode | null;
+  quoteCcy?: string | null;
   instrumentExchangeMic?: string | null;
   providerConfig?: Record<string, unknown> | null;
 }

@@ -7,6 +7,7 @@ import type {
   UpdateAssetProfile,
   MarketDataProviderInfo,
   ExchangeInfo,
+  ResolvedQuote,
 } from "@/lib/types";
 import type { QuoteImport } from "@/lib/types/quote-import";
 import type { MarketDataProviderSetting } from "../types";
@@ -169,6 +170,23 @@ export const checkQuotesImport = async (
   } catch (error) {
     logger.error("Error checking quotes import.");
     throw error;
+  }
+};
+
+export const resolveSymbolQuote = async (
+  symbol: string,
+  exchangeMic?: string,
+  instrumentType?: string,
+): Promise<ResolvedQuote | null> => {
+  try {
+    return await invoke<ResolvedQuote>("resolve_symbol_quote", {
+      symbol,
+      exchangeMic,
+      instrumentType,
+    });
+  } catch (_error) {
+    logger.error("Error resolving symbol quote.");
+    return null;
   }
 };
 

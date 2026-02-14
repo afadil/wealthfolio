@@ -163,6 +163,8 @@ pub struct SymbolSearchResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub currency: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency_source: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub data_source: Option<String>,
     #[serde(default)]
     pub is_existing: bool,
@@ -188,6 +190,16 @@ pub struct SymbolSearchResult {
 pub struct LatestQuotePair {
     pub latest: Quote,
     pub previous: Option<Quote>,
+}
+
+/// Result from resolving a symbol's latest quote (currency + price).
+///
+/// Used during symbol selection to confirm inferred currency and pre-fill price.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ResolvedQuote {
+    pub currency: Option<String>,
+    pub price: Option<Decimal>,
 }
 
 #[cfg(test)]

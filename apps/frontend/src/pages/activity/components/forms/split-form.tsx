@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { normalizeCurrency } from "@/lib/utils";
 import { useForm, FormProvider, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -32,7 +31,7 @@ export const splitFormSchema = z.object({
     .positive({ message: "Split ratio must be greater than 0." }),
   comment: z.string().optional().nullable(),
   // Advanced options
-  currency: z.string().optional(),
+  currency: z.string().min(1, { message: "Currency is required." }),
   subtype: z.string().optional().nullable(),
   symbolQuoteCcy: z.string().optional(),
   symbolInstrumentType: z.string().optional(),
@@ -71,7 +70,7 @@ export function SplitForm({
     defaultValues?.accountId ?? (accounts.length === 1 ? accounts[0].value : "");
   const initialAccount = accounts.find((a) => a.value === initialAccountId);
   const initialCurrency =
-    defaultValues?.currency ?? normalizeCurrency(assetCurrency) ?? initialAccount?.currency;
+    defaultValues?.currency?.trim() || assetCurrency?.trim() || initialAccount?.currency;
 
   const form = useForm<SplitFormValues>({
     resolver: zodResolver(splitFormSchema) as Resolver<SplitFormValues>,
@@ -82,9 +81,9 @@ export function SplitForm({
       activityDate: new Date(),
       splitRatio: undefined,
       comment: null,
-      currency: initialCurrency,
       subtype: null,
       ...defaultValues,
+      currency: defaultValues?.currency?.trim() || initialCurrency,
     },
   });
 
@@ -108,7 +107,7 @@ export function SplitForm({
         <Card>
           <CardContent className="space-y-6 pt-4">
             {/* Account Selection */}
-            <AccountSelect name="accountId" accounts={accounts} />
+            <AccountSelect name="accountId" accounts={accounts} currencyName="currency" />
 
             {/* Symbol Search/Input */}
             <SymbolSearch

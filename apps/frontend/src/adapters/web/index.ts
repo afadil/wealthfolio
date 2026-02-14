@@ -155,6 +155,7 @@ export {
   importManualQuotes,
   checkQuotesImport,
   getExchanges,
+  resolveSymbolQuote,
 } from "../shared/market-data";
 
 // Contribution Limits Commands

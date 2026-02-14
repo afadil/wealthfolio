@@ -309,6 +309,7 @@ pub fn run() {
             commands::alternative_assets::get_alternative_holdings,
             // Market data commands
             commands::market_data::search_symbol,
+            commands::market_data::resolve_symbol_quote,
             commands::market_data::sync_market_data,
             commands::market_data::update_quote,
             commands::market_data::delete_quote,

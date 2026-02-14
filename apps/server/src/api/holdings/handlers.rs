@@ -430,9 +430,11 @@ pub async fn check_holdings_import_handler(
     let existing_dates = if !valid_dates.is_empty() {
         let min_date = *valid_dates.iter().min().unwrap();
         let max_date = *valid_dates.iter().max().unwrap();
-        let existing = state
-            .snapshot_service
-            .get_holdings_keyframes(&req.account_id, Some(min_date), Some(max_date))?;
+        let existing = state.snapshot_service.get_holdings_keyframes(
+            &req.account_id,
+            Some(min_date),
+            Some(max_date),
+        )?;
 
         let import_dates: std::collections::HashSet<NaiveDate> = valid_dates.into_iter().collect();
         existing

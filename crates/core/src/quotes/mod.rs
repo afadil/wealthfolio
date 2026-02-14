@@ -52,7 +52,7 @@ pub mod types;
 mod service_tests;
 
 // Re-export commonly used types for convenience
-pub use model::{DataSource, LatestQuotePair, Quote, SymbolSearchResult};
+pub use model::{DataSource, LatestQuotePair, Quote, ResolvedQuote, SymbolSearchResult};
 pub use store::{ProviderSettingsStore, QuoteStore};
 
 // Re-export strong types
