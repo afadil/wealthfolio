@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { ArrowDown, ArrowUp, Minus } from "lucide-react";
 import { Cell, Pie, PieChart } from "recharts";
 import { ChartContainer } from "@wealthfolio/ui/components/ui/chart";
 import { cn } from "@wealthfolio/ui/lib/utils";
@@ -45,12 +46,35 @@ export function TwoRingDonut({
     () => currentData.reduce((sum, d) => sum + d.value, 0),
     [currentData],
   );
+  const totalTarget = useMemo(() => targetData.reduce((sum, d) => sum + d.value, 0), [targetData]);
+
+  // Calculate drift status for active item
+  const activeStatus = useMemo(() => {
+    if (!activeItem) return null;
+
+    const currentPercent = totalCurrent > 0 ? (activeItem.value / totalCurrent) * 100 : 0;
+    const targetItem = targetData.find((t) => t.id === activeItem.id);
+    const targetPercent =
+      targetItem && totalTarget > 0 ? (targetItem.value / totalTarget) * 100 : 0;
+
+    if (targetPercent === 0) return null; // No target set
+
+    const drift = currentPercent - targetPercent;
+
+    if (drift > 5) {
+      return { label: "Overweight", color: "text-red-600 dark:text-red-400", icon: ArrowUp };
+    }
+    if (drift < -5) {
+      return { label: "Underweight", color: "text-blue-600 dark:text-blue-400", icon: ArrowDown };
+    }
+    return { label: "Aligned", color: "text-green-600 dark:text-green-400", icon: Minus };
+  }, [activeItem, currentData, targetData, totalCurrent, totalTarget]);
 
   const hasData = targetData.length > 0 || currentData.length > 0;
 
   if (!hasData) {
     return (
-      <div className={cn("flex h-[480px] items-center justify-center", className)}>
+      <div className={cn("h-70 flex items-center justify-center", className)}>
         <p className="text-muted-foreground text-sm">No allocation data</p>
       </div>
     );
@@ -124,6 +148,17 @@ export function TwoRingDonut({
               <p className="text-foreground text-sm font-semibold">
                 {totalCurrent > 0 ? ((activeItem.value / totalCurrent) * 100).toFixed(1) : "0.0"}%
               </p>
+              {activeStatus && (
+                <div
+                  className={cn(
+                    "mt-2 flex items-center justify-center gap-1 text-xs font-semibold",
+                    activeStatus.color,
+                  )}
+                >
+                  <activeStatus.icon size={14} />
+                  {activeStatus.label}
+                </div>
+              )}
             </>
           ) : (
             <>
