@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { EmptyPlaceholder, formatAmount } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 
@@ -15,7 +14,6 @@ import type { Account, AllocationDeviation, NewTargetAllocation } from "@/lib/ty
 import { TwoRingDonut } from "./two-ring-donut";
 import { TargetList } from "./target-list";
 import { useTargetMutations } from "../use-target-mutations";
-import { calculateAutoDistribution } from "../lib/auto-distribution";
 
 export function AllocationsOverview() {
   const { settings } = useSettingsContext();
@@ -154,8 +152,8 @@ export function AllocationsOverview() {
     return (
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_3fr]">
-          <Skeleton className="h-[400px]" />
-          <Skeleton className="h-[400px]" />
+          <Skeleton className="h-100" />
+          <Skeleton className="h-100" />
         </div>
       </div>
     );
@@ -207,7 +205,7 @@ export function AllocationsOverview() {
               <TwoRingDonut
                 targetData={targetData}
                 currentData={currentData}
-                className="max-w-[400px]"
+                className="max-w-100"
               />
             </CardContent>
           </Card>

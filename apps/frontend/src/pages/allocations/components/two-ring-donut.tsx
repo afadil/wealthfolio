@@ -50,14 +50,14 @@ export function TwoRingDonut({
 
   if (!hasData) {
     return (
-      <div className={cn("flex h-[280px] items-center justify-center", className)}>
+      <div className={cn("flex h-[480px] items-center justify-center", className)}>
         <p className="text-muted-foreground text-sm">No allocation data</p>
       </div>
     );
   }
 
   return (
-    <div className={cn("relative h-[480px] w-full", className)}>
+    <div className={cn("h-120 relative w-full", className)}>
       <ChartContainer config={{}} className="h-full w-full">
         <PieChart
           onMouseLeave={handleMouseLeave}
