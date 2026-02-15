@@ -108,7 +108,7 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              domain={[-0.12, "auto"]}
+              domain={["auto", "auto"]}
             />
             <ChartTooltip
               cursor={false}
