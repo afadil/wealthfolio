@@ -27,7 +27,7 @@ export const withdrawalFormSchema = z.object({
     .positive({ message: "Amount must be greater than 0." }),
   comment: z.string().optional().nullable(),
   // Advanced options
-  currency: z.string().optional(),
+  currency: z.string().min(1, { message: "Currency is required." }),
   fxRate: z.coerce
     .number({
       invalid_type_error: "FX Rate must be a number.",
@@ -62,7 +62,7 @@ export function WithdrawalForm({
   const initialAccountId =
     defaultValues?.accountId ?? (accounts.length === 1 ? accounts[0].value : "");
   const initialAccount = accounts.find((a) => a.value === initialAccountId);
-  const initialCurrency = defaultValues?.currency ?? initialAccount?.currency;
+  const initialCurrency = defaultValues?.currency?.trim() || initialAccount?.currency;
 
   const form = useForm<WithdrawalFormValues>({
     resolver: zodResolver(withdrawalFormSchema) as Resolver<WithdrawalFormValues>,
@@ -72,14 +72,15 @@ export function WithdrawalForm({
       activityDate: new Date(),
       amount: undefined,
       comment: null,
-      currency: initialCurrency,
       fxRate: undefined,
       ...defaultValues,
+      currency: defaultValues?.currency?.trim() || initialCurrency,
     },
   });
 
   const { watch } = form;
   const accountId = watch("accountId");
+  const currency = watch("currency");
 
   // Get account currency from selected account
   const selectedAccount = useMemo(
@@ -98,13 +99,13 @@ export function WithdrawalForm({
         <Card>
           <CardContent className="space-y-6 pt-4">
             {/* Account Selection */}
-            <AccountSelect name="accountId" accounts={accounts} />
+            <AccountSelect name="accountId" accounts={accounts} currencyName="currency" />
 
             {/* Date Picker */}
             <DatePicker name="activityDate" label="Date" />
 
             {/* Amount */}
-            <AmountInput name="amount" label="Amount" />
+            <AmountInput name="amount" label="Amount" currency={currency} />
 
             {/* Advanced Options - Currency and FX Rate (no subtypes for withdrawals) */}
             <AdvancedOptionsSection

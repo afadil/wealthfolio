@@ -18,6 +18,7 @@ interface AssetDetail {
   totalReturn: number;
   totalReturnPercent: number;
   currency: string;
+  quoteCurrency?: string | null;
   quote?: {
     open: number;
     high: number;
@@ -48,6 +49,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
     totalReturn,
     totalReturnPercent,
     currency,
+    quoteCurrency,
     quote,
   } = assetData;
 
@@ -68,7 +70,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
             value: (
               <>
                 <AmountDisplay
-                  value={todaysReturn * numShares}
+                  value={todaysReturn}
                   currency={currency}
                   isHidden={isBalanceHidden}
                 />{" "}
@@ -131,7 +133,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
                   <div className="text-sm font-medium">
                     <AmountDisplay
                       value={quote.open}
-                      currency={currency}
+                      currency={quoteCurrency ?? currency}
                       isHidden={isBalanceHidden}
                     />
                   </div>
@@ -141,7 +143,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
                   <div className="text-sm font-medium">
                     <AmountDisplay
                       value={quote.close}
-                      currency={currency}
+                      currency={quoteCurrency ?? currency}
                       isHidden={isBalanceHidden}
                     />
                   </div>
@@ -151,7 +153,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
                   <div className="text-success text-sm font-medium">
                     <AmountDisplay
                       value={quote.high}
-                      currency={currency}
+                      currency={quoteCurrency ?? currency}
                       isHidden={isBalanceHidden}
                     />
                   </div>
@@ -161,7 +163,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
                   <div className="text-destructive text-sm font-medium">
                     <AmountDisplay
                       value={quote.low}
-                      currency={currency}
+                      currency={quoteCurrency ?? currency}
                       isHidden={isBalanceHidden}
                     />
                   </div>
@@ -171,7 +173,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
                   <div className="text-sm font-medium">
                     <AmountDisplay
                       value={quote.adjclose}
-                      currency={currency}
+                      currency={quoteCurrency ?? currency}
                       isHidden={isBalanceHidden}
                     />
                   </div>

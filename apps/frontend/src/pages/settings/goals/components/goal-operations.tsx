@@ -58,7 +58,7 @@ export function GoalOperations({ goal, onEdit, onDelete }: GoalOperationsProps) 
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Are you sure you want to delete this goal and related activities?
+              Are you sure you want to delete this goal and its allocations?
             </AlertDialogTitle>
             <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>

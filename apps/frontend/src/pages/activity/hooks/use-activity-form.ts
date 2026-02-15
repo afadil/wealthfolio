@@ -139,6 +139,10 @@ export function useActivityForm({
             currency: account?.currency,
           } as NewActivityFormValues;
 
+          if (!submitData.currency?.trim() && account?.currency) {
+            submitData.currency = account.currency;
+          }
+
           if (isEditing && activity?.id) {
             await updateActivityMutation.mutateAsync({
               id: activity.id,
@@ -165,6 +169,10 @@ export function useActivityForm({
             ? { currency: account.currency }
             : {}),
         } as NewActivityFormValues;
+
+        if (!submitData.currency?.trim() && account?.currency) {
+          submitData.currency = account.currency;
+        }
 
         if (isEditing && activity?.id) {
           await updateActivityMutation.mutateAsync({

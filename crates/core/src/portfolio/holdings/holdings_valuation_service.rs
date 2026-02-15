@@ -226,15 +226,15 @@ impl HoldingsValuationService {
                 &format!("{}: FX Quote->Base", context_msg),
             );
 
-            let market_price_quote_curr = latest_quote.close;
             let market_value_quote_major = normalized_price * quantity;
-            holding.price = Some(market_price_quote_curr);
 
             let fx_rate_quote_to_local = self.get_fx_rate_or_fallback(
                 normalized_quote_currency,
                 pos_currency,
                 &format!("{}: FX Quote->Local", context_msg),
             );
+            let market_price_local = normalized_price * fx_rate_quote_to_local;
+            holding.price = Some(market_price_local);
 
             let market_value_local = market_value_quote_major * fx_rate_quote_to_local;
             let market_value_base = market_value_quote_major * fx_rate_quote_to_base;
@@ -440,12 +440,12 @@ impl HoldingsValuationService {
             // Property: quote.close = total property value, user's share = quantity (fraction) * close
             // PhysicalPrecious: quote.close = price per unit (oz/g/kg)
             // Vehicle/Collectible/Liability/Other: quote.close = unit value, quantity usually 1
-            let market_price_quote_curr = latest_quote.close;
             let market_value_quote_major = normalized_price * quantity;
-            holding.price = Some(market_price_quote_curr);
 
             let market_value_local = market_value_quote_major * fx_rate_quote_to_local;
             let market_value_base = market_value_quote_major * fx_rate_quote_to_base;
+            let market_price_local = normalized_price * fx_rate_quote_to_local;
+            holding.price = Some(market_price_local);
 
             holding.market_value = MonetaryValue {
                 local: market_value_local,
