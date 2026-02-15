@@ -806,6 +806,43 @@ mod tests {
     }
 
     #[test]
+    fn test_issue_586_repro_backfill_start_can_precede_asset_inception() {
+        // Reproduces GH-586:
+        // For newer assets, NEEDS_BACKFILL may request a start date earlier than
+        // the first available market date (asset inception), causing provider errors.
+        let today = NaiveDate::from_ymd_opt(2026, 2, 14).unwrap();
+
+        // Example from issue description shape:
+        // - activity_min near inception (buy happened shortly after listing)
+        // - earliest available quote (quote_min) effectively represents inception
+        let activity_min = NaiveDate::from_ymd_opt(2025, 7, 4).unwrap();
+        let quote_min = NaiveDate::from_ymd_opt(2025, 6, 1).unwrap();
+
+        let inputs = create_inputs(
+            true,
+            None,
+            Some(activity_min),
+            Some(activity_min),
+            Some(quote_min),
+            Some(today),
+        );
+
+        let category = determine_sync_category(&inputs, 30, today);
+        assert_eq!(category, SyncCategory::NeedsBackfill);
+
+        let (start, _end) = calculate_sync_window(&category, &inputs, today).unwrap();
+
+        // Repro detail: planner can request start before quote_min/inception proxy.
+        // Runtime sync layer now handles resulting provider boundary errors as non-fatal.
+        assert!(
+            start < quote_min,
+            "expected start ({}) to be before quote_min/inception ({}) for repro",
+            start,
+            quote_min
+        );
+    }
+
+    #[test]
     fn test_backfill_window_exactly_minimum_size() {
         // Window exactly at MIN_SYNC_LOOKBACK_DAYS should not expand
         let today = Utc::now().date_naive();
