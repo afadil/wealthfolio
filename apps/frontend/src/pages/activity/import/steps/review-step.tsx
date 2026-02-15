@@ -9,6 +9,7 @@ import type { ActivityImport, SymbolSearchResult } from "@/lib/types";
 import { tryParseDate } from "@/lib/utils";
 import { parse, parseISO, isValid } from "date-fns";
 import { getDateFnsPattern } from "../utils/date-format-options";
+import { findMappedActivityType } from "../utils/activity-type-mapping";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { ProgressIndicator } from "@wealthfolio/ui/components/ui/progress-indicator";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -213,22 +214,8 @@ function mapActivityType(
   activityMappings: Record<string, string[]>,
 ): string | undefined {
   if (!csvValue) return undefined;
-
-  const normalized = csvValue.trim().toUpperCase();
-
-  for (const [activityType, csvValues] of Object.entries(activityMappings)) {
-    if (
-      csvValues?.some(
-        (v) =>
-          normalized === v.trim().toUpperCase() || normalized.startsWith(v.trim().toUpperCase()),
-      )
-    ) {
-      return activityType;
-    }
-  }
-
-  // Return the original value if no mapping found
-  return csvValue.trim();
+  // Use the same mapping logic as the mapping step
+  return findMappedActivityType(csvValue, activityMappings) ?? csvValue.trim();
 }
 
 /**
