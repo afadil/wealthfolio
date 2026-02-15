@@ -4,7 +4,6 @@ import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { useTargetAllocations } from "@/hooks/use-portfolio-targets";
-import { useAllocationValidation } from "../hooks/use-allocation-validation";
 import type { AllocationDeviation, NewTargetAllocation } from "@/lib/types";
 
 interface TargetListProps {
@@ -218,17 +217,7 @@ export function TargetList({
     setPendingEdits(new Map());
   }, [allocations, onDeleteAllocation]);
 
-  // Validation hook (kept for reference but not used for save validation)
-  const {
-    totalPercentage,
-    remaining,
-    isValid: validationHookIsValid,
-    error: validationHookError,
-    scaledAllocations,
-  } = useAllocationValidation(deviations, allocations, pendingEdits);
-
-  // Use validation hook values for display
-  // But we need to calculate the actual total from user inputs + pending edits
+  // Calculate actual total from user inputs + pending edits
   const actualTotalTarget = deviations.reduce((sum, d) => {
     const pending = pendingEdits.get(d.categoryId);
     const saved = getSavedAllocation(d.categoryId);
@@ -296,9 +285,9 @@ export function TargetList({
     pendingEdits,
     getSavedAllocation,
     getDisplayPercent,
+    getIsLocked,
     onSave,
     targetId,
-    actualTotalTarget,
     isValid,
   ]);
 
