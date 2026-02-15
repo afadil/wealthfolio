@@ -455,7 +455,12 @@ pub async fn check_holdings_import_handler(
             .await
             .unwrap_or_default();
 
-        if let Some(hit) = results.first() {
+        // Only mark as found if the top result is an exact symbol match
+        let exact_hit = results
+            .first()
+            .filter(|hit| hit.symbol.eq_ignore_ascii_case(&sym));
+
+        if let Some(hit) = exact_hit {
             symbols.push(SymbolCheckResult {
                 symbol: sym,
                 found: true,
