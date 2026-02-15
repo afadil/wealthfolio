@@ -220,9 +220,14 @@ export function ActivityDataGrid({
 
             // Update currency from resolved quote to correct exchange-inferred values
             // (e.g., search returns "GBp" inferred, resolve confirms "GBP")
+            // Only overwrite if user hasn't manually changed it since selection
             if (resolved.currency) {
               const confirmedCurrency = resolved.currency.trim();
-              if (confirmedCurrency && row.currency !== confirmedCurrency) {
+              if (
+                confirmedCurrency &&
+                row.currency !== confirmedCurrency &&
+                row.currency === (provisionalCurrency ?? row.accountCurrency ?? fallbackCurrency)
+              ) {
                 changes.currency = confirmedCurrency;
               }
               changes.pendingQuoteCcy = resolved.currency;
