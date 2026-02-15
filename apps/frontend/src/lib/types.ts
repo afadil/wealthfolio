@@ -1798,6 +1798,24 @@ export interface NewTargetAllocation {
   isLocked: boolean;
 }
 
+export interface HoldingTarget {
+  id: string;
+  allocationId: string;
+  assetId: string;
+  targetPercent: number;
+  isLocked: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewHoldingTarget {
+  id?: string;
+  allocationId: string;
+  assetId: string;
+  targetPercent: number;
+  isLocked: boolean;
+}
+
 export interface AllocationDeviation {
   categoryId: string;
   categoryName: string;

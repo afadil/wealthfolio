@@ -4,6 +4,8 @@ import type {
   NewPortfolioTarget,
   TargetAllocation,
   NewTargetAllocation,
+  HoldingTarget,
+  NewHoldingTarget,
   DeviationReport,
 } from "@/lib/types";
 
@@ -90,6 +92,33 @@ export const getAllocationDeviations = async (targetId: string): Promise<Deviati
     return await invoke<DeviationReport>("get_allocation_deviations", { targetId });
   } catch (error) {
     logger.error("Error fetching allocation deviations.");
+    throw error;
+  }
+};
+
+export const getHoldingTargets = async (allocationId: string): Promise<HoldingTarget[]> => {
+  try {
+    return await invoke<HoldingTarget[]>("get_holding_targets", { allocationId });
+  } catch (error) {
+    logger.error("Error fetching holding targets.");
+    throw error;
+  }
+};
+
+export const upsertHoldingTarget = async (target: NewHoldingTarget): Promise<HoldingTarget> => {
+  try {
+    return await invoke<HoldingTarget>("upsert_holding_target", { target });
+  } catch (error) {
+    logger.error("Error upserting holding target.");
+    throw error;
+  }
+};
+
+export const deleteHoldingTarget = async (id: string): Promise<void> => {
+  try {
+    await invoke<number>("delete_holding_target", { id });
+  } catch (error) {
+    logger.error("Error deleting holding target.");
     throw error;
   }
 };

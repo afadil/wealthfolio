@@ -118,6 +118,7 @@ export const QueryKeys = {
   PORTFOLIO_TARGETS: "portfolioTargets",
   TARGET_ALLOCATIONS: "targetAllocations",
   ALLOCATION_DEVIATIONS: "allocationDeviations",
+  HOLDING_TARGETS: "holdingTargets",
 
   // Health Center
   HEALTH_STATUS: "healthStatus",

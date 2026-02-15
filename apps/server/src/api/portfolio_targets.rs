@@ -8,7 +8,8 @@ use axum::{
     Json, Router,
 };
 use wealthfolio_core::portfolio::targets::{
-    DeviationReport, NewPortfolioTarget, NewTargetAllocation, PortfolioTarget, TargetAllocation,
+    DeviationReport, HoldingTarget, NewHoldingTarget, NewPortfolioTarget, NewTargetAllocation,
+    PortfolioTarget, TargetAllocation,
 };
 
 async fn get_portfolio_targets(
@@ -97,6 +98,38 @@ async fn get_allocation_deviations(
     Ok(Json(report))
 }
 
+async fn get_holding_targets(
+    Path(allocation_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<Vec<HoldingTarget>>> {
+    let targets = state
+        .portfolio_target_service
+        .get_holding_targets_by_allocation(&allocation_id)?;
+    Ok(Json(targets))
+}
+
+async fn upsert_holding_target(
+    State(state): State<Arc<AppState>>,
+    Json(target): Json<NewHoldingTarget>,
+) -> ApiResult<Json<HoldingTarget>> {
+    let result = state
+        .portfolio_target_service
+        .upsert_holding_target(target)
+        .await?;
+    Ok(Json(result))
+}
+
+async fn delete_holding_target(
+    Path(id): Path<String>,
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<StatusCode> {
+    let _ = state
+        .portfolio_target_service
+        .delete_holding_target(&id)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route(
@@ -126,5 +159,14 @@ pub fn router() -> Router<Arc<AppState>> {
         .route(
             "/portfolio-targets/{targetId}/deviations",
             get(get_allocation_deviations),
+        )
+        .route(
+            "/portfolio-targets/allocations/{allocationId}/holdings",
+            get(get_holding_targets),
+        )
+        .route("/portfolio-targets/holdings", post(upsert_holding_target))
+        .route(
+            "/portfolio-targets/holdings/{id}",
+            delete(delete_holding_target),
         )
 }
