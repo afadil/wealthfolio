@@ -99,50 +99,45 @@ const ThreadWelcome: FC = () => {
 
 const ThreadSuggestions: FC = () => {
   return (
-    <div className="aui-thread-welcome-suggestions @md:grid-cols-2 grid w-full gap-2 pb-4">
+    <div className="aui-thread-welcome-suggestions flex flex-wrap items-center justify-center gap-2 pb-4">
       {[
         {
-          title: "How is my portfolio",
-          label: "performing this year?",
-          action: "How is my portfolio performing this year?",
+          icon: "TrendingUp" as const,
+          text: "How is my portfolio performing this year?",
         },
         {
-          title: "What are my top",
-          label: "performing holdings?",
-          action: "What are my top performing holdings?",
+          icon: "BarChart" as const,
+          text: "What are my top performing holdings?",
         },
         {
-          title: "Show my dividend",
-          label: "income summary",
-          action: "Show my dividend income summary",
+          icon: "FileText" as const,
+          text: "Show my dividend income summary",
         },
         {
-          title: "Analyze my portfolio",
-          label: "asset allocation",
-          action: "Analyze my portfolio asset allocation",
+          icon: "PieChart" as const,
+          text: "Analyze my asset allocation",
         },
-      ].map((suggestedAction, index) => (
-        <div
-          key={`suggested-action-${suggestedAction.title}-${index}`}
-          className="aui-thread-welcome-suggestion-display fade-in slide-in-from-bottom-4 animate-in fill-mode-both nth-[n+3]:hidden @md:nth-[n+3]:block duration-300 ease-out"
-          style={{ animationDelay: `${index * 50}ms` }}
-        >
-          <ThreadPrimitive.Suggestion prompt={suggestedAction.action} send asChild>
-            <Button
-              variant="ghost"
-              className="aui-thread-welcome-suggestion dark:hover:bg-accent/60 @md:flex-col h-auto w-full flex-1 flex-wrap items-start justify-start gap-1 rounded-3xl border px-5 py-4 text-left text-sm"
-              aria-label={suggestedAction.action}
-            >
-              <span className="aui-thread-welcome-suggestion-text-1 font-medium">
-                {suggestedAction.title}
-              </span>
-              <span className="aui-thread-welcome-suggestion-text-2 text-muted-foreground">
-                {suggestedAction.label}
-              </span>
-            </Button>
-          </ThreadPrimitive.Suggestion>
-        </div>
-      ))}
+      ].map((suggestion, index) => {
+        const Icon = Icons[suggestion.icon];
+        return (
+          <div
+            key={`suggested-action-${index}`}
+            className="fade-in slide-in-from-bottom-4 animate-in fill-mode-both duration-300 ease-out"
+            style={{ animationDelay: `${index * 50}ms` }}
+          >
+            <ThreadPrimitive.Suggestion prompt={suggestion.text} asChild>
+              <Button
+                variant="ghost"
+                className="text-muted-foreground hover:text-foreground dark:hover:bg-accent/60 h-auto gap-2 rounded-full border px-4 py-2.5 text-sm font-normal"
+                aria-label={suggestion.text}
+              >
+                <Icon className="size-4 shrink-0 opacity-60" />
+                {suggestion.text}
+              </Button>
+            </ThreadPrimitive.Suggestion>
+          </div>
+        );
+      })}
     </div>
   );
 };
@@ -256,7 +251,7 @@ const AssistantMessage: FC = () => {
             Text: MarkdownText,
             Reasoning: Reasoning,
             ReasoningGroup: ReasoningGroup,
-            ToolGroup: ({ children }) => <div className="mb-6">{children}</div>,
+            ToolGroup: ({ children }) => <div className="mb-6 space-y-4">{children}</div>,
             tools: {
               Fallback: ToolFallback,
             },

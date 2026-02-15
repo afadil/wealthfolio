@@ -3,7 +3,8 @@
 #[cfg(test)]
 mod tests {
     use crate::assets::{
-        canonicalize_market_identity, Asset, AssetKind, InstrumentType, OptionSpec, QuoteMode,
+        canonicalize_market_identity, resolve_quote_ccy_precedence, Asset, AssetKind,
+        InstrumentType, OptionSpec, QuoteCcyResolutionSource, QuoteMode,
     };
     use chrono::NaiveDateTime;
     use rust_decimal_macros::dec;
@@ -337,6 +338,33 @@ mod tests {
         assert_eq!(canonical.instrument_symbol.as_deref(), Some("AZN"));
         assert_eq!(canonical.instrument_exchange_mic.as_deref(), Some("XLON"));
         assert_eq!(canonical.quote_ccy.as_deref(), Some("GBp"));
+    }
+
+    #[test]
+    fn test_resolve_quote_ccy_precedence_prefers_explicit_hint() {
+        let resolved = resolve_quote_ccy_precedence(
+            Some("GBp"),
+            Some("GBP"),
+            Some("USD"),
+            Some("CAD"),
+            Some("EUR"),
+        );
+
+        assert_eq!(
+            resolved,
+            Some(("GBp".to_string(), QuoteCcyResolutionSource::ExplicitHint))
+        );
+    }
+
+    #[test]
+    fn test_resolve_quote_ccy_precedence_uses_provider_before_mic() {
+        let resolved =
+            resolve_quote_ccy_precedence(None, None, Some("GBP"), Some("GBp"), Some("USD"));
+
+        assert_eq!(
+            resolved,
+            Some(("GBP".to_string(), QuoteCcyResolutionSource::ProviderQuote))
+        );
     }
 
     // Helper function

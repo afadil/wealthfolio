@@ -41,7 +41,7 @@ fn default_view_mode() -> String {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HoldingDto {
-    pub account_id: String,
+    pub account: String,
     pub symbol: String,
     pub name: Option<String>,
     pub holding_type: String,
@@ -127,6 +127,8 @@ impl<E: AiEnvironment + 'static> Tool for GetHoldingsTool<E> {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
+        use std::collections::HashMap;
+
         let account_id = &args.account_id;
 
         // Fetch holdings
@@ -136,6 +138,15 @@ impl<E: AiEnvironment + 'static> Tool for GetHoldingsTool<E> {
             .get_holdings(account_id, &self.base_currency)
             .await
             .map_err(|e| AiError::ToolExecutionFailed(e.to_string()))?;
+
+        // Build account_id → name lookup
+        let accounts = self
+            .env
+            .account_service()
+            .list_accounts(None, None, None)
+            .map_err(|e| AiError::ToolExecutionFailed(e.to_string()))?;
+        let account_names: HashMap<String, String> =
+            accounts.into_iter().map(|a| (a.id, a.name)).collect();
 
         let original_count = holdings.len();
 
@@ -159,8 +170,13 @@ impl<E: AiEnvironment + 'static> Tool for GetHoldingsTool<E> {
                     wealthfolio_core::holdings::HoldingType::AlternativeAsset => "AlternativeAsset",
                 };
 
+                let account = account_names
+                    .get(&h.account_id)
+                    .cloned()
+                    .unwrap_or_else(|| h.account_id.clone());
+
                 HoldingDto {
-                    account_id: h.account_id.clone(),
+                    account,
                     symbol,
                     name,
                     holding_type: holding_type.to_string(),

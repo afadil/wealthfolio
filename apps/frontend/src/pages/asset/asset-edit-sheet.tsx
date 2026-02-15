@@ -19,6 +19,7 @@ import {
   Label,
   Alert,
   AlertDescription,
+  CurrencyInput,
 } from "@wealthfolio/ui";
 import {
   Form,
@@ -80,6 +81,7 @@ const assetFormSchema = z.object({
   name: z.string().optional(),
   notes: z.string().optional(),
   kind: z.string().optional(),
+  quoteCcy: z.string().min(1, "Currency is required"),
   instrumentExchangeMic: z.string().optional(),
   quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]),
   providerConfig: z.array(providerOverrideSchema).optional(),
@@ -271,6 +273,7 @@ export function AssetEditSheet({
       name: asset?.name ?? "",
       notes: asset?.notes ?? "",
       kind: asset?.kind ?? "INVESTMENT",
+      quoteCcy: asset?.quoteCcy ?? "",
       instrumentExchangeMic: normalizeMic(asset?.instrumentExchangeMic),
       quoteMode: asset?.quoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
       providerConfig: parseProviderOverrides(
@@ -295,6 +298,7 @@ export function AssetEditSheet({
         name: asset.name ?? "",
         notes: asset.notes ?? "",
         kind: asset.kind ?? "INVESTMENT",
+        quoteCcy: asset.quoteCcy ?? "",
         instrumentExchangeMic: normalizeMic(asset.instrumentExchangeMic),
         quoteMode: asset.quoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
         providerConfig: parseProviderOverrides(
@@ -332,6 +336,7 @@ export function AssetEditSheet({
           notes: values.notes ?? "",
           kind: values.kind as AssetKind | undefined,
           quoteMode: values.quoteMode,
+          quoteCcy: values.quoteCcy,
           instrumentExchangeMic: normalizedMic || null,
           providerConfig: serializedOverrides,
         });
@@ -386,16 +391,31 @@ export function AssetEditSheet({
             <TabsContent value="general" className="mt-0 h-full">
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(handleSave)} className="space-y-6">
-                  {/* Read-only fields */}
+                  {/* Symbol (read-only) and Currency */}
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Symbol</label>
                       <Input value={asset.displayCode ?? ""} disabled className="bg-muted/50" />
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Currency</label>
-                      <Input value={asset.quoteCcy} disabled className="bg-muted/50" />
-                    </div>
+                    <FormField
+                      control={form.control}
+                      name="quoteCcy"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Currency</FormLabel>
+                          <FormControl>
+                            <CurrencyInput
+                              value={field.value}
+                              onChange={field.onChange}
+                              placeholder="Select currency"
+                              valueDisplay="code"
+                              allowCustom
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
 
                   {/* Editable fields */}

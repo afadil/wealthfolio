@@ -269,7 +269,13 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
 
   // Empty state
   if (isComplete && categoryCount === 0 && holdingsCount === 0) {
-    return null;
+    return (
+      <Card className="bg-muted/40 border-primary/10 w-full">
+        <CardContent className="py-4">
+          <p className="text-muted-foreground text-sm">No allocation data found.</p>
+        </CardContent>
+      </Card>
+    );
   }
 
   // Drill-down mode: show holdings table

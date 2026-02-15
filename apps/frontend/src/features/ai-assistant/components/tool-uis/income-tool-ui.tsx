@@ -305,11 +305,23 @@ function IncomeContent({ result, status }: IncomeContentProps) {
 
   // Empty state
   if (isComplete && (!parsed || parsed.totalIncome === 0)) {
-    return null;
+    return (
+      <Card className="bg-muted/40 border-primary/10 w-full">
+        <CardContent className="py-4">
+          <p className="text-muted-foreground text-sm">No income data found for this period.</p>
+        </CardContent>
+      </Card>
+    );
   }
 
   if (!parsed) {
-    return null;
+    return (
+      <Card className="bg-muted/40 border-primary/10 w-full">
+        <CardContent className="py-4">
+          <p className="text-muted-foreground text-sm">Income data is unavailable.</p>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (

@@ -93,8 +93,6 @@ export const newGoalSchema = z.object({
       invalid_type_error: "Target amount must be a positive number.",
     })
     .min(0, { message: "Target amount must be a positive number." }),
-  yearlyContribution: z.number().optional(),
-  deadline: z.date().optional(),
   isAchieved: z.boolean().optional(),
 });
 

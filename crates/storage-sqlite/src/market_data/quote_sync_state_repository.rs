@@ -175,7 +175,7 @@ impl SyncStateStore for QuoteSyncStateRepository {
             .filter(
                 qss_dsl::position_closed_date
                     .is_null()
-                    .or(qss_dsl::position_closed_date.gt(&grace_cutoff_str)),
+                    .or(qss_dsl::position_closed_date.ge(&grace_cutoff_str)),
             )
             .order(qss_dsl::sync_priority.desc())
             .load::<QuoteSyncStateDB>(&mut conn)

@@ -101,3 +101,16 @@ export function getActivityRestrictionLevel(
 
   return "none";
 }
+
+/**
+ * Returns true if an account with the given restriction level supports the activity type.
+ */
+export function restrictionAllowsType(
+  restrictionLevel: ActivityRestrictionLevel | undefined,
+  activityType: string,
+): boolean {
+  if (!restrictionLevel || restrictionLevel === "none") return true;
+  if (restrictionLevel === "blocked") return false;
+  // "limited" — only HOLDINGS_MODE_ALLOWED_TYPES
+  return HOLDINGS_MODE_ALLOWED_TYPES.includes(activityType);
+}

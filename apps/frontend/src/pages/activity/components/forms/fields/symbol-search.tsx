@@ -3,8 +3,9 @@ import { Input } from "@wealthfolio/ui/components/ui/input";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@wealthfolio/ui";
 import { DataSource, QuoteMode } from "@/lib/constants";
 import type { SymbolSearchResult } from "@/lib/types";
+import { useRef, useState } from "react";
 import { useFormContext, type FieldPath, type FieldValues } from "react-hook-form";
-import { normalizeCurrency } from "@/lib/utils";
+import { resolveSymbolQuote } from "@/adapters";
 
 /**
  * Strip exchange suffix from symbol (e.g., "VFV.TO" -> "VFV")
@@ -70,12 +71,22 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
   instrumentTypeName,
   assetMetadataName,
 }: SymbolSearchProps<TFieldValues>) {
-  const { control, setValue, watch } = useFormContext<TFieldValues>();
+  const { control, setValue, watch, getValues } = useFormContext<TFieldValues>();
+  const [quoteDisplay, setQuoteDisplay] = useState<{
+    price: number | null;
+    isLoading: boolean;
+  } | null>(null);
+  const latestResolveRequestId = useRef(0);
   const selectedExchangeMic = exchangeMicName
     ? (watch(exchangeMicName as any) as string | undefined)
     : undefined;
+  const displayCurrency = quoteCcyName
+    ? (watch(quoteCcyName as any) as string | undefined)
+    : undefined;
 
   const handleAssetSelect = (symbol: string, searchResult: SymbolSearchResult | undefined) => {
+    latestResolveRequestId.current += 1;
+    const requestId = latestResolveRequestId.current;
     const isManualAsset = searchResult?.dataSource === DataSource.MANUAL;
 
     // Set quote mode for manual/custom assets
@@ -108,18 +119,61 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
       setValue(exchangeMicName, (searchResult?.exchangeMic ?? undefined) as any);
     }
 
-    // Set currency from search result (normalized: GBp -> GBP)
+    // Symbol-based activities should prioritize the selected asset quote currency.
+    // If provider/search result includes currency, set activity currency from symbol.
     if (currencyName) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setValue(
-        currencyName,
-        (searchResult?.currency ? normalizeCurrency(searchResult.currency) : undefined) as any,
-      );
+      const rawCurrency = searchResult?.currency?.trim();
+      if (rawCurrency) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setValue(currencyName, rawCurrency as any, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      }
     }
 
     if (quoteCcyName) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setValue(quoteCcyName, (searchResult?.currency ?? undefined) as any);
+    }
+
+    // Background quote resolution: confirm inferred currency and show display quote
+    const needsCurrencyConfirmation =
+      currencyName && searchResult?.currencySource === "exchange_inferred";
+
+    if (searchResult && !searchResult.isExisting) {
+      setQuoteDisplay({ price: null, isLoading: true });
+      const provisionalCurrency = searchResult.currency?.trim();
+      resolveSymbolQuote(searchResult.symbol, searchResult.exchangeMic, searchResult.quoteType)
+        .then((resolved) => {
+          if (requestId !== latestResolveRequestId.current) return;
+          setQuoteDisplay({ price: resolved?.price ?? null, isLoading: false });
+
+          // Update currency if it was exchange-inferred and user hasn't changed it
+          if (needsCurrencyConfirmation && resolved?.currency) {
+            const confirmedCurrency = resolved.currency?.trim();
+            if (confirmedCurrency) {
+              const current = getValues(currencyName!);
+              if (current === provisionalCurrency) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                setValue(currencyName!, confirmedCurrency as any, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                });
+                if (quoteCcyName) {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  setValue(quoteCcyName, resolved.currency as any);
+                }
+              }
+            }
+          }
+        })
+        .catch(() => {
+          if (requestId !== latestResolveRequestId.current) return;
+          setQuoteDisplay({ price: null, isLoading: false });
+        });
+    } else {
+      setQuoteDisplay(null);
     }
 
     if (instrumentTypeName) {
@@ -149,6 +203,17 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
     }
   };
 
+  const handleClear = () => {
+    latestResolveRequestId.current += 1;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setValue(name, "" as any, { shouldValidate: true, shouldDirty: true });
+    if (exchangeMicName) setValue(exchangeMicName, undefined as any);
+    if (currencyName) setValue(currencyName, "" as any);
+    if (quoteCcyName) setValue(quoteCcyName, undefined as any);
+    if (instrumentTypeName) setValue(instrumentTypeName, undefined as any);
+    setQuoteDisplay(null);
+  };
+
   return (
     <FormField
       control={control}
@@ -172,6 +237,10 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
                 value={field.value}
                 defaultCurrency={defaultCurrency}
                 selectedExchangeMic={selectedExchangeMic}
+                quoteInfo={
+                  quoteDisplay ? { ...quoteDisplay, currency: displayCurrency } : undefined
+                }
+                onClear={handleClear}
                 aria-label={label}
                 data-testid="symbol-search"
               />

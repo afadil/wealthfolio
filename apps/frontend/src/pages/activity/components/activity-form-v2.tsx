@@ -10,7 +10,8 @@ import {
   SheetTitle,
 } from "@wealthfolio/ui/components/ui/sheet";
 import type { ActivityDetails } from "@/lib/types";
-import { useState, useCallback } from "react";
+import { restrictionAllowsType } from "@/lib/activity-restrictions";
+import { useState, useCallback, useMemo } from "react";
 import { ActivityTypePicker } from "./activity-type-picker";
 import { ActivityFormRenderer } from "./activity-form-renderer";
 import type { AccountSelectOption } from "./forms/fields";
@@ -39,9 +40,17 @@ export function ActivityFormV2({ accounts, activity, open, onClose }: ActivityFo
   // For editing, always use the activity's type; for new, use local state
   const effectiveSelectedType = isEditing ? initialType : selectedType;
 
+  // Filter accounts by selected activity type (exclude HOLDINGS accounts for unsupported types)
+  const filteredAccounts = useMemo(() => {
+    if (!effectiveSelectedType) return accounts;
+    return accounts.filter((acc) =>
+      restrictionAllowsType(acc.restrictionLevel, effectiveSelectedType),
+    );
+  }, [accounts, effectiveSelectedType]);
+
   // Use the activity form hook with the effective type
   const { defaultValues, isLoading, isError, error, handleSubmit } = useActivityForm({
-    accounts,
+    accounts: filteredAccounts,
     activity,
     selectedType: effectiveSelectedType,
     onSuccess: onClose,
@@ -98,7 +107,7 @@ export function ActivityFormV2({ accounts, activity, open, onClose }: ActivityFo
           {/* Render the appropriate form */}
           <ActivityFormRenderer
             selectedType={effectiveSelectedType}
-            accounts={accounts}
+            accounts={filteredAccounts}
             defaultValues={defaultValues}
             onSubmit={handleSubmit}
             onCancel={onClose}

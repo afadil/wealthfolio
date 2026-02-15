@@ -1,4 +1,9 @@
 import { searchTicker } from "@/adapters";
+import { getExchangeDisplayName } from "@/lib/constants";
+import { SymbolSearchResult } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { Badge } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Command,
@@ -10,15 +15,17 @@ import {
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { SymbolSearchResult } from "@/lib/types";
-import { getExchangeDisplayName } from "@/lib/constants";
-import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
 import { useComposedRefs } from "@wealthfolio/ui/hooks";
 import { Command as CommandPrimitive } from "cmdk";
 import { debounce } from "lodash";
 import { forwardRef, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CreateCustomAssetDialog } from "./create-custom-asset-dialog";
+
+interface QuoteInfo {
+  price: number | null;
+  currency?: string;
+  isLoading: boolean;
+}
 
 interface SearchProps {
   selectedResult?: SymbolSearchResult;
@@ -37,6 +44,10 @@ interface SearchProps {
   defaultCurrency?: string;
   /** Optional exchange MIC for display context when value is canonical (e.g., SHOP -> SHOP (TSX)). */
   selectedExchangeMic?: string;
+  /** Quote info to display in the trigger after selection */
+  quoteInfo?: QuoteInfo;
+  /** Called when the user clears the selection */
+  onClear?: () => void;
   /** Test ID for e2e testing */
   "data-testid"?: string;
 }
@@ -108,14 +119,19 @@ const SearchResults = memo(
                 key={itemKey}
                 onSelect={() => onSelect(ticker)}
                 value={itemKey}
-                className="flex items-center justify-between py-2"
+                className="flex items-center justify-between rounded-none py-2"
               >
                 <div className="flex flex-col">
                   <span className="font-mono text-xs font-semibold uppercase">{ticker.symbol}</span>
                   <span className="text-muted-foreground line-clamp-1 text-xs">{displayName}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground text-xs">{exchangeDisplay}</span>
+                  <div className="flex flex-col items-end">
+                    <span className="text-muted-foreground text-xs">{exchangeDisplay}</span>
+                    {ticker.currency && (
+                      <span className="text-muted-foreground text-[10px]">{ticker.currency}</span>
+                    )}
+                  </div>
                   {isSelected && <Icons.Check className="size-4" />}
                 </div>
               </CommandItem>
@@ -193,6 +209,8 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       className,
       defaultCurrency,
       selectedExchangeMic,
+      quoteInfo,
+      onClear,
       "data-testid": testId,
     },
     ref,
@@ -203,9 +221,32 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
     const [customAssetDialogOpen, setCustomAssetDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState(defaultValue ?? value ?? "");
     const [debouncedQuery, setDebouncedQuery] = useState("");
+
+    // Structured selection data for the rich trigger display
+    const [selectedTicker, setSelectedTicker] = useState<{
+      symbol: string;
+      name: string;
+      exchangeDisplay: string;
+    } | null>(() => {
+      if (selectedResult) {
+        const exchangeDisplay =
+          selectedResult.exchangeName || getExchangeDisplayName(selectedResult.exchange);
+        return {
+          symbol: selectedResult.symbol,
+          name: selectedResult.longName || selectedResult.shortName || selectedResult.symbol,
+          exchangeDisplay: exchangeDisplay || "",
+        };
+      }
+      if (value) {
+        const exchangeDisplay = getExchangeDisplayName(selectedExchangeMic) || "";
+        return { symbol: value, name: "", exchangeDisplay };
+      }
+      return null;
+    });
+
+    // Keep a simple string for search query comparison
     const [selected, setSelected] = useState(() => {
       if (selectedResult) {
-        // Show symbol - name (exchange) for better context
         const exchangeDisplay =
           selectedResult.exchangeName || getExchangeDisplayName(selectedResult.exchange);
         const exchangeSuffix = exchangeDisplay ? ` (${exchangeDisplay})` : "";
@@ -249,18 +290,22 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
     const handleSelectResult = useCallback(
       (ticker: SymbolSearchResult) => {
         onSelectResult(ticker?.symbol, ticker);
-        // Show symbol - name (exchange) for better context, using friendly exchange name
         const exchangeDisplay = ticker?.exchangeName || getExchangeDisplayName(ticker?.exchange);
         const exchangeSuffix = exchangeDisplay ? ` (${exchangeDisplay})` : "";
         const displayText = ticker ? `${ticker.symbol} - ${ticker.longName}${exchangeSuffix}` : "";
         setSearchQuery(displayText);
         setSelected(displayText);
+        setSelectedTicker({
+          symbol: ticker.symbol,
+          name: ticker.longName || ticker.shortName || ticker.symbol,
+          exchangeDisplay: exchangeDisplay || "",
+        });
         if (isControlled) {
           onOpenChange?.(false);
         } else {
           setUncontrolledOpen(false);
         }
-        debouncedSearch.cancel(); // Cancel pending debounced calls
+        debouncedSearch.cancel();
       },
       [onSelectResult, debouncedSearch, isControlled, onOpenChange],
     );
@@ -270,11 +315,16 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       const current = value ?? defaultValue ?? "";
       if (!current) {
         setSelected("");
+        setSelectedTicker(null);
         return;
       }
+      // Don't overwrite a richer internal selection with a bare value sync
+      if (selectedTicker?.symbol === current && selectedTicker.name) return;
       const exchangeDisplay = getExchangeDisplayName(selectedExchangeMic);
       const next = exchangeDisplay ? `${current} (${exchangeDisplay})` : current;
       setSelected((prev) => (prev === next ? prev : next));
+      setSelectedTicker({ symbol: current, name: "", exchangeDisplay: exchangeDisplay || "" });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [defaultValue, selectedExchangeMic, selectedResult, value]);
 
     // Handle "Create custom asset" click
@@ -312,8 +362,28 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
     // Results are already sorted by backend (existing assets first, then by score)
     const sortedTickers = data;
 
-    // Calculate display name for the button
-    const displayName = selected || placeholder;
+    const clearSelection = useCallback(() => {
+      setSelected("");
+      setSelectedTicker(null);
+      setSearchQuery("");
+      setDebouncedQuery("");
+      debouncedSearch.cancel();
+      onClear?.();
+    }, [debouncedSearch, onClear]);
+
+    const handleClearClick = useCallback(
+      (e: React.MouseEvent<HTMLSpanElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        clearSelection();
+      },
+      [clearSelection],
+    );
+
+    const handleClearMouseDown = useCallback((e: React.MouseEvent<HTMLSpanElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+    }, []);
 
     // Handle popover open
     const handleOpenChange = useCallback(
@@ -375,7 +445,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
               variant="outline"
               role="combobox"
               className={cn(
-                "w-full justify-between truncate rounded-md",
+                "h-auto min-h-10 w-full justify-between rounded-md px-3 py-2",
                 open && "ring-ring ring-2",
                 className,
               )}
@@ -384,8 +454,61 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
               aria-haspopup="listbox"
               data-testid={testId}
             >
-              {displayName}
-              <Icons.Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              {selectedTicker ? (
+                <div className="flex w-full min-w-0 items-center gap-2">
+                  {/* Symbol | Name */}
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Badge className="rounded-sm">{selectedTicker.symbol}</Badge>
+                    {selectedTicker.name && (
+                      <>
+                        <div className="bg-border h-4 w-px shrink-0" />
+                        <span className="text-muted-foreground truncate text-sm">
+                          {selectedTicker.name}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  {/* Right side: exchange badge, currency badge, price, clear */}
+                  <div className="ml-auto flex shrink-0 items-center gap-0.5">
+                    {selectedTicker.exchangeDisplay && (
+                      <span className="bg-muted mr-2 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase">
+                        {selectedTicker.exchangeDisplay}
+                      </span>
+                    )}
+                    {quoteInfo?.isLoading ? (
+                      <Skeleton className="h-4 w-14" />
+                    ) : (
+                      quoteInfo?.price != null && (
+                        <span className="text-sm tabular-nums">
+                          {quoteInfo.price.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 4,
+                          })}
+                        </span>
+                      )
+                    )}
+                    {quoteInfo?.currency && !quoteInfo.isLoading && (
+                      <span className="text-muted-foreground px-0 py-0.5 font-light">
+                        {quoteInfo.currency}
+                      </span>
+                    )}
+                    {onClear && (
+                      <span
+                        onMouseDown={handleClearMouseDown}
+                        onClick={handleClearClick}
+                        className="text-muted-foreground hover:text-foreground ml-0.5 rounded-sm p-0.5"
+                      >
+                        <Icons.Close className="size-3.5" />
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <span className="text-muted-foreground">{placeholder}</span>
+                  <Icons.Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </>
+              )}
             </Button>
           </PopoverTrigger>
 

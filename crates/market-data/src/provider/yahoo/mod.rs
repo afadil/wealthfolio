@@ -18,6 +18,7 @@ use log::{debug, warn};
 use num_traits::FromPrimitive;
 use reqwest::header;
 use rust_decimal::Decimal;
+use serde::Deserialize;
 use time::OffsetDateTime;
 use urlencoding::encode;
 use yahoo_finance_api as yahoo;
@@ -40,6 +41,27 @@ use models::{YahooQuoteSummaryResponse, YahooQuoteSummaryResult};
 struct CrumbData {
     cookie: String,
     crumb: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct YahooSearchResponseRaw {
+    #[serde(default)]
+    quotes: Vec<YahooSearchQuoteRaw>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct YahooSearchQuoteRaw {
+    symbol: String,
+    exchange: Option<String>,
+    quote_type: Option<String>,
+    #[serde(rename = "shortname")]
+    short_name: Option<String>,
+    #[serde(rename = "longname")]
+    long_name: Option<String>,
+    score: Option<f64>,
+    currency: Option<String>,
 }
 
 lazy_static! {
@@ -250,19 +272,103 @@ impl YahooProvider {
         })
     }
 
+    fn map_raw_search_quote(item: YahooSearchQuoteRaw) -> Option<SearchResult> {
+        let symbol = item.symbol.trim();
+        if symbol.is_empty() {
+            return None;
+        }
+
+        let name = item
+            .long_name
+            .filter(|s| !s.trim().is_empty())
+            .or_else(|| item.short_name.filter(|s| !s.trim().is_empty()))
+            .unwrap_or_else(|| symbol.to_string());
+
+        let exchange = item.exchange.unwrap_or_default();
+        let quote_type = item.quote_type.unwrap_or_else(|| "UNKNOWN".to_string());
+
+        let mut result = SearchResult::new(symbol.to_string(), name, exchange, quote_type);
+
+        if let Some(score) = item.score {
+            result = result.with_score(score);
+        }
+
+        if let Some(currency) = item.currency.filter(|c| !c.trim().is_empty()) {
+            result = result.with_currency(currency);
+        }
+
+        Some(result)
+    }
+
+    fn parse_raw_search_payload(payload: &str) -> Result<Vec<SearchResult>, MarketDataError> {
+        let parsed: YahooSearchResponseRaw =
+            serde_json::from_str(payload).map_err(|e| MarketDataError::ProviderError {
+                provider: "YAHOO".to_string(),
+                message: format!("Failed to parse Yahoo search payload: {}", e),
+            })?;
+
+        Ok(parsed
+            .quotes
+            .into_iter()
+            .filter_map(Self::map_raw_search_quote)
+            .collect())
+    }
+
+    async fn search_raw_with_currency(
+        &self,
+        query: &str,
+        encoded_query: &str,
+    ) -> Result<Vec<SearchResult>, MarketDataError> {
+        let url = format!(
+            "https://query2.finance.yahoo.com/v1/finance/search?q={}",
+            encoded_query
+        );
+
+        let payload = reqwest::Client::new()
+            .get(&url)
+            .header(
+                header::USER_AGENT,
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            )
+            .send()
+            .await
+            .map_err(|e| MarketDataError::ProviderError {
+                provider: "YAHOO".to_string(),
+                message: format!("Yahoo raw search request failed: {}", e),
+            })?
+            .text()
+            .await
+            .map_err(|e| MarketDataError::ProviderError {
+                provider: "YAHOO".to_string(),
+                message: format!("Yahoo raw search body read failed: {}", e),
+            })?;
+
+        debug!(
+            "[YAHOO SEARCH RAW PAYLOAD] query='{}' payload={}",
+            query, payload
+        );
+
+        Self::parse_raw_search_payload(&payload)
+    }
+
     /// Fetch latest quote using primary method (library API).
     async fn fetch_latest_quote_primary(
         &self,
         symbol: &str,
         context: &QuoteContext,
     ) -> Result<Quote, MarketDataError> {
-        let currency = self.get_currency(context);
-
         let response = self
             .connector
             .get_latest_quotes(symbol, "1d")
             .await
             .map_err(|e| self.convert_yahoo_error(e, symbol))?;
+
+        // Prefer Yahoo's own currency from response metadata over resolver chain
+        let currency = response
+            .metadata()
+            .ok()
+            .and_then(|m| m.currency)
+            .unwrap_or_else(|| self.get_currency(context));
 
         let yahoo_quote = response.last_quote().map_err(|e| {
             warn!("No quotes returned for {}: {}", symbol, e);
@@ -651,7 +757,6 @@ impl MarketDataProvider for YahooProvider {
         end: DateTime<Utc>,
     ) -> Result<Vec<Quote>, MarketDataError> {
         let symbol = self.extract_symbol(&instrument)?;
-        let currency = self.get_currency(context);
 
         debug!(
             "Fetching historical quotes for {} from {} to {} from Yahoo",
@@ -673,6 +778,13 @@ impl MarketDataProvider for YahooProvider {
             .get_quote_history(&symbol, start_time, end_time)
             .await
             .map_err(|e| self.convert_yahoo_error(e, &symbol))?;
+
+        // Prefer Yahoo's own currency from response metadata over resolver chain
+        let currency = response
+            .metadata()
+            .ok()
+            .and_then(|m| m.currency)
+            .unwrap_or_else(|| self.get_currency(context));
 
         match response.quotes() {
             Ok(yahoo_quotes) => {
@@ -710,6 +822,19 @@ impl MarketDataProvider for YahooProvider {
         let encoded_query = encode(query);
 
         debug!("Searching Yahoo for '{}'", query);
+
+        // First try raw endpoint parsing so we can preserve currency (e.g., GBP vs GBp on LSE ETFs).
+        match self.search_raw_with_currency(query, &encoded_query).await {
+            Ok(results) if !results.is_empty() => return Ok(results),
+            Ok(_) => debug!(
+                "Yahoo raw search returned no quotes for '{}', falling back to connector API",
+                query
+            ),
+            Err(e) => debug!(
+                "Yahoo raw search failed for '{}': {}. Falling back to connector API",
+                query, e
+            ),
+        }
 
         let result = self
             .connector
@@ -1024,5 +1149,45 @@ mod tests {
         assert_eq!(rate_limit.requests_per_minute, 2000);
         assert_eq!(rate_limit.max_concurrency, 10);
         assert_eq!(rate_limit.min_delay, Duration::from_millis(50));
+    }
+
+    #[test]
+    fn test_parse_raw_search_payload_preserves_currency() {
+        let payload = r#"{
+          "quotes": [
+            {
+              "symbol": "VFEG.L",
+              "exchange": "LSE",
+              "quoteType": "ETF",
+              "shortname": "Vanguard FTSE Emerging Markets UCITS ETF USD Accumulation",
+              "longname": "Vanguard FTSE Emerging Markets UCITS ETF USD Accumulation",
+              "score": 20001.0,
+              "currency": "GBP"
+            }
+          ]
+        }"#;
+
+        let results = YahooProvider::parse_raw_search_payload(payload).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].symbol, "VFEG.L");
+        assert_eq!(results[0].currency.as_deref(), Some("GBP"));
+    }
+
+    #[test]
+    fn test_parse_raw_search_payload_uses_symbol_when_names_missing() {
+        let payload = r#"{
+          "quotes": [
+            {
+              "symbol": "BARC.L",
+              "exchange": "LSE",
+              "quoteType": "EQUITY"
+            }
+          ]
+        }"#;
+
+        let results = YahooProvider::parse_raw_search_payload(payload).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "BARC.L");
+        assert_eq!(results[0].currency, None);
     }
 }

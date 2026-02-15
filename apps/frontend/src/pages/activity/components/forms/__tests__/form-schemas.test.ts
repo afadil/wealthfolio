@@ -19,9 +19,9 @@ describe("Form Schemas Validation", () => {
         activityDate: new Date(),
         quantity: 10,
         unitPrice: 150.5,
-        amount: 1505,
         fee: 5,
         comment: "Test purchase",
+        currency: "USD",
       };
 
       const result = buyFormSchema.safeParse(validData);
@@ -35,6 +35,7 @@ describe("Form Schemas Validation", () => {
         activityDate: new Date(),
         quantity: 10,
         unitPrice: 150.5,
+        currency: "USD",
       };
 
       const result = buyFormSchema.safeParse(invalidData);
@@ -51,6 +52,7 @@ describe("Form Schemas Validation", () => {
         activityDate: new Date(),
         quantity: 10,
         unitPrice: 150.5,
+        currency: "USD",
       };
 
       const result = buyFormSchema.safeParse(invalidData);
@@ -67,6 +69,7 @@ describe("Form Schemas Validation", () => {
         activityDate: new Date(),
         quantity: 0,
         unitPrice: 150.5,
+        currency: "USD",
       };
 
       const result = buyFormSchema.safeParse(zeroQuantity);
@@ -91,6 +94,7 @@ describe("Form Schemas Validation", () => {
         activityDate: new Date(),
         quantity: 10,
         unitPrice: 0,
+        currency: "USD",
       };
 
       const result = buyFormSchema.safeParse(zeroPrice);
@@ -108,6 +112,7 @@ describe("Form Schemas Validation", () => {
         quantity: 10,
         unitPrice: 150.5,
         fee: -5,
+        currency: "USD",
       };
 
       const result = buyFormSchema.safeParse(negativeFee);
@@ -125,6 +130,7 @@ describe("Form Schemas Validation", () => {
         quantity: "10" as unknown as number,
         unitPrice: "150.5" as unknown as number,
         fee: "5" as unknown as number,
+        currency: "USD",
       };
 
       const result = buyFormSchema.safeParse(stringNumbers);
@@ -145,9 +151,9 @@ describe("Form Schemas Validation", () => {
         activityDate: new Date(),
         quantity: 10,
         unitPrice: 150.5,
-        amount: 1500,
         fee: 5,
         comment: "Test sale",
+        currency: "USD",
       };
 
       const result = sellFormSchema.safeParse(validData);
@@ -171,6 +177,7 @@ describe("Form Schemas Validation", () => {
         activityDate: new Date(),
         quantity: 0,
         unitPrice: 150.5,
+        currency: "USD",
       };
 
       const result = sellFormSchema.safeParse(invalidQuantity);
@@ -188,6 +195,7 @@ describe("Form Schemas Validation", () => {
         activityDate: new Date(),
         amount: 1000,
         comment: "Monthly deposit",
+        currency: "USD",
       };
 
       const result = depositFormSchema.safeParse(validData);
@@ -199,6 +207,7 @@ describe("Form Schemas Validation", () => {
         accountId: "",
         activityDate: new Date(),
         amount: 1000,
+        currency: "USD",
       };
 
       const result = depositFormSchema.safeParse(invalidData);
@@ -213,6 +222,7 @@ describe("Form Schemas Validation", () => {
         accountId: "acc-123",
         activityDate: new Date(),
         amount: 0,
+        currency: "USD",
       };
 
       const result = depositFormSchema.safeParse(zeroAmount);
@@ -228,6 +238,7 @@ describe("Form Schemas Validation", () => {
         activityDate: new Date(),
         amount: 1000,
         comment: null,
+        currency: "USD",
       };
 
       const result = depositFormSchema.safeParse(withNullComment);
@@ -242,6 +253,7 @@ describe("Form Schemas Validation", () => {
         activityDate: new Date(),
         amount: 500,
         comment: "Emergency withdrawal",
+        currency: "USD",
       };
 
       const result = withdrawalFormSchema.safeParse(validData);
@@ -253,6 +265,7 @@ describe("Form Schemas Validation", () => {
         accountId: "acc-123",
         activityDate: new Date(),
         amount: -100,
+        currency: "USD",
       };
 
       const result = withdrawalFormSchema.safeParse(invalidAmount);
@@ -271,6 +284,7 @@ describe("Form Schemas Validation", () => {
         activityDate: new Date(),
         amount: 25.5,
         comment: "Q1 dividend",
+        currency: "USD",
       };
 
       const result = dividendFormSchema.safeParse(validData);
@@ -283,6 +297,7 @@ describe("Form Schemas Validation", () => {
         symbol: "",
         activityDate: new Date(),
         amount: 25.5,
+        currency: "USD",
       };
 
       const result = dividendFormSchema.safeParse(invalidData);
@@ -298,6 +313,7 @@ describe("Form Schemas Validation", () => {
         symbol: "AAPL",
         activityDate: new Date(),
         amount: 0,
+        currency: "USD",
       };
 
       const result = dividendFormSchema.safeParse(invalidAmount);
@@ -320,6 +336,7 @@ describe("Form Schemas Validation", () => {
           transferMode: "cash",
           amount: 1000,
           comment: "Transfer to savings",
+          currency: "USD",
         };
 
         const result = transferFormSchema.safeParse(validData);
@@ -334,6 +351,7 @@ describe("Form Schemas Validation", () => {
           activityDate: new Date(),
           transferMode: "cash",
           amount: 1000,
+          currency: "USD",
         };
 
         const result = transferFormSchema.safeParse(invalidData);
@@ -354,6 +372,7 @@ describe("Form Schemas Validation", () => {
           activityDate: new Date(),
           transferMode: "cash",
           amount: 1000,
+          currency: "USD",
         };
 
         const result = transferFormSchema.safeParse(invalidData);
@@ -374,6 +393,7 @@ describe("Form Schemas Validation", () => {
           activityDate: new Date(),
           transferMode: "cash",
           amount: 1000,
+          currency: "USD",
         };
 
         const result = transferFormSchema.safeParse(sameAccount);
@@ -394,6 +414,7 @@ describe("Form Schemas Validation", () => {
           activityDate: new Date(),
           transferMode: "cash",
           amount: 0,
+          currency: "USD",
         };
 
         const result = transferFormSchema.safeParse(invalidAmount);
@@ -418,6 +439,7 @@ describe("Form Schemas Validation", () => {
           assetId: "AAPL",
           quantity: 10,
           comment: "Security transfer",
+          currency: "USD",
         };
 
         const result = transferFormSchema.safeParse(validData);
@@ -432,6 +454,7 @@ describe("Form Schemas Validation", () => {
           activityDate: new Date(),
           transferMode: "securities",
           quantity: 10,
+          currency: "USD",
         };
 
         const result = transferFormSchema.safeParse(invalidData);
@@ -452,6 +475,7 @@ describe("Form Schemas Validation", () => {
           activityDate: new Date(),
           transferMode: "securities",
           assetId: "AAPL",
+          currency: "USD",
         };
 
         const result = transferFormSchema.safeParse(invalidData);
@@ -473,6 +497,7 @@ describe("Form Schemas Validation", () => {
           transferMode: "securities",
           assetId: "AAPL",
           quantity: 0,
+          currency: "USD",
         };
 
         const result = transferFormSchema.safeParse(invalidQuantity);
@@ -496,6 +521,7 @@ describe("Form Schemas Validation", () => {
           transferMode: "cash",
           amount: 2000,
           comment: "External transfer in",
+          currency: "USD",
         };
 
         const result = transferFormSchema.safeParse(validData);
@@ -511,6 +537,7 @@ describe("Form Schemas Validation", () => {
           transferMode: "cash",
           amount: 500,
           comment: "External transfer out",
+          currency: "USD",
         };
 
         const result = transferFormSchema.safeParse(validData);
@@ -525,6 +552,7 @@ describe("Form Schemas Validation", () => {
           activityDate: new Date(),
           transferMode: "cash",
           amount: 1000,
+          currency: "USD",
         };
 
         const result = transferFormSchema.safeParse(invalidData);
@@ -548,6 +576,7 @@ describe("Form Schemas Validation", () => {
           quantity: 5,
           unitPrice: 100,
           comment: "External securities transfer in",
+          currency: "USD",
         };
 
         const result = transferFormSchema.safeParse(validData);
@@ -564,6 +593,7 @@ describe("Form Schemas Validation", () => {
         activityDate: new Date(),
         splitRatio: 2,
         comment: "2:1 stock split",
+        currency: "USD",
       };
 
       const result = splitFormSchema.safeParse(validData);
@@ -576,6 +606,7 @@ describe("Form Schemas Validation", () => {
         symbol: "",
         activityDate: new Date(),
         splitRatio: 2,
+        currency: "USD",
       };
 
       const result = splitFormSchema.safeParse(invalidData);
@@ -591,6 +622,7 @@ describe("Form Schemas Validation", () => {
         symbol: "AAPL",
         activityDate: new Date(),
         splitRatio: 0,
+        currency: "USD",
       };
 
       const result = splitFormSchema.safeParse(zeroRatio);
@@ -606,6 +638,7 @@ describe("Form Schemas Validation", () => {
         symbol: "AAPL",
         activityDate: new Date(),
         splitRatio: 0.5, // Reverse split
+        currency: "USD",
       };
 
       const result = splitFormSchema.safeParse(decimalRatio);
@@ -620,6 +653,7 @@ describe("Form Schemas Validation", () => {
         activityDate: new Date(),
         amount: 25,
         comment: "Account maintenance fee",
+        currency: "USD",
       };
 
       const result = feeFormSchema.safeParse(validData);
@@ -631,6 +665,7 @@ describe("Form Schemas Validation", () => {
         accountId: "acc-123",
         activityDate: new Date(),
         amount: 0,
+        currency: "USD",
       };
 
       const result = feeFormSchema.safeParse(invalidAmount);
@@ -648,6 +683,7 @@ describe("Form Schemas Validation", () => {
         activityDate: new Date(),
         amount: 15.5,
         comment: "Monthly interest",
+        currency: "USD",
       };
 
       const result = interestFormSchema.safeParse(validData);
@@ -659,6 +695,7 @@ describe("Form Schemas Validation", () => {
         accountId: "acc-123",
         activityDate: new Date(),
         amount: -5,
+        currency: "USD",
       };
 
       const result = interestFormSchema.safeParse(invalidAmount);
@@ -676,6 +713,7 @@ describe("Form Schemas Validation", () => {
         activityDate: new Date(),
         amount: 100,
         comment: "Withholding tax",
+        currency: "USD",
       };
 
       const result = taxFormSchema.safeParse(validData);
@@ -687,6 +725,7 @@ describe("Form Schemas Validation", () => {
         accountId: "acc-123",
         activityDate: new Date(),
         amount: 0,
+        currency: "USD",
       };
 
       const result = taxFormSchema.safeParse(invalidAmount);
@@ -701,6 +740,7 @@ describe("Form Schemas Validation", () => {
         accountId: "",
         activityDate: new Date(),
         amount: 100,
+        currency: "USD",
       };
 
       const result = taxFormSchema.safeParse(missingAccount);
