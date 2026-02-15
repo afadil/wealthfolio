@@ -375,7 +375,10 @@ export function HoldingsReviewStep() {
   const [checkLoading, setCheckLoading] = useState(false);
 
   useEffect(() => {
-    if (!accountId || snapshots.length === 0) return;
+    if (!accountId || snapshots.length === 0) {
+      dispatch(setHoldingsCheckPassed(false));
+      return;
+    }
 
     let cancelled = false;
     setCheckLoading(true);
