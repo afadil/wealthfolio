@@ -251,7 +251,7 @@ const AssistantMessage: FC = () => {
             Text: MarkdownText,
             Reasoning: Reasoning,
             ReasoningGroup: ReasoningGroup,
-            ToolGroup: ({ children }) => <div className="mb-6">{children}</div>,
+            ToolGroup: ({ children }) => <div className="mb-6 space-y-4">{children}</div>,
             tools: {
               Fallback: ToolFallback,
             },

@@ -30,10 +30,12 @@ pub const DEFAULT_TOOLS_ALLOWLIST: &[&str] = &[
     "get_accounts",
     "get_performance",
     "search_activities",
-    "get_valuations",
+    "get_valuation_history",
     "get_income",
     "get_asset_allocation",
+    "get_goals",
     "record_activity",
+    "import_csv",
 ];
 
 /// Maximum size in bytes for persisted message content (256KB).

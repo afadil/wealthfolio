@@ -121,7 +121,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
     ) -> Result<ActivitySearchResponse> {
         let mut conn = get_connection(&self.pool)?;
 
-        let offset = page * page_size;
+        let offset = (page - 1) * page_size;
 
         // Function to create base query - now using LEFT JOIN for assets since asset_id can be NULL
         let create_base_query = |_conn: &SqliteConnection| {
