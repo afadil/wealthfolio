@@ -5,9 +5,11 @@ import {
   deletePortfolioTarget,
   upsertTargetAllocation,
   deleteTargetAllocation,
+  upsertHoldingTarget,
+  deleteHoldingTarget,
 } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
-import type { NewTargetAllocation } from "@/lib/types";
+import type { NewTargetAllocation, NewHoldingTarget } from "@/lib/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -98,6 +100,44 @@ export const useTargetMutations = () => {
     },
   });
 
+  // Holding targets mutations
+  const upsertHoldingTargetMutation = useMutation({
+    mutationFn: upsertHoldingTarget,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDING_TARGETS] });
+    },
+    onError: (e) => {
+      logger.error(`Error saving holding target: ${e}`);
+      handleError("saving the holding target");
+    },
+  });
+
+  const batchSaveHoldingTargetsMutation = useMutation({
+    mutationFn: async (targets: NewHoldingTarget[]) => {
+      return Promise.all(targets.map(upsertHoldingTarget));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDING_TARGETS] });
+      toast.success("Holding targets saved.");
+    },
+    onError: (e) => {
+      logger.error(`Error saving holding targets: ${e}`);
+      handleError("saving holding targets");
+    },
+  });
+
+  const deleteHoldingTargetMutation = useMutation({
+    mutationFn: deleteHoldingTarget,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDING_TARGETS] });
+      toast.success("Holding target removed.");
+    },
+    onError: (e) => {
+      logger.error(`Error deleting holding target: ${e}`);
+      handleError("deleting the holding target");
+    },
+  });
+
   return {
     createTargetMutation,
     updateTargetMutation,
@@ -105,5 +145,8 @@ export const useTargetMutations = () => {
     upsertAllocationMutation,
     batchSaveAllocationsMutation,
     deleteAllocationMutation,
+    upsertHoldingTargetMutation,
+    batchSaveHoldingTargetsMutation,
+    deleteHoldingTargetMutation,
   };
 };
