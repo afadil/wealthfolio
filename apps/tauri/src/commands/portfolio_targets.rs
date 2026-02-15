@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use tauri::State;
 use wealthfolio_core::portfolio::targets::{
-    DeviationReport, NewPortfolioTarget, NewTargetAllocation, PortfolioTarget, TargetAllocation,
+    DeviationReport, HoldingTarget, NewHoldingTarget, NewPortfolioTarget, NewTargetAllocation,
+    PortfolioTarget, TargetAllocation,
 };
 
 use crate::context::ServiceContext;
@@ -109,6 +110,43 @@ pub async fn get_allocation_deviations(
     state
         .portfolio_target_service()
         .get_deviation_report(&target_id, &base_currency)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// --- Holding Targets ---
+
+#[tauri::command]
+pub async fn get_holding_targets(
+    allocation_id: String,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<HoldingTarget>, String> {
+    state
+        .portfolio_target_service()
+        .get_holding_targets_by_allocation(&allocation_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn upsert_holding_target(
+    target: NewHoldingTarget,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<HoldingTarget, String> {
+    state
+        .portfolio_target_service()
+        .upsert_holding_target(target)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_holding_target(
+    id: String,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<usize, String> {
+    state
+        .portfolio_target_service()
+        .delete_holding_target(&id)
         .await
         .map_err(|e| e.to_string())
 }

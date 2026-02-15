@@ -17,7 +17,7 @@ diesel::table! {
         provider -> Nullable<Text>,
         provider_account_id -> Nullable<Text>,
         tracking_mode -> Text,
-        is_archived -> Integer,
+        is_archived -> Bool,
     }
 }
 
@@ -312,7 +312,7 @@ diesel::table! {
 
 diesel::table! {
     quote_sync_state (asset_id) {
-        asset_id -> Nullable<Text>,
+        asset_id -> Text,
         position_closed_date -> Nullable<Text>,
         last_synced_at -> Nullable<Text>,
         data_source -> Text,

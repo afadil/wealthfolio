@@ -366,6 +366,9 @@ pub fn run() {
             commands::portfolio_targets::upsert_target_allocation,
             commands::portfolio_targets::delete_target_allocation,
             commands::portfolio_targets::get_allocation_deviations,
+            commands::portfolio_targets::get_holding_targets,
+            commands::portfolio_targets::upsert_holding_target,
+            commands::portfolio_targets::delete_holding_target,
             // Platform commands
             commands::platform::get_platform,
             commands::platform::is_mobile,

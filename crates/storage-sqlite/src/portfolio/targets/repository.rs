@@ -219,16 +219,14 @@ impl PortfolioTargetRepositoryTrait for PortfolioTargetRepository {
 
     // --- Holding Targets ---
 
-    fn get_holding_targets_by_allocation(&self, allocation_id: &str) -> Result<Vec<HoldingTarget>> {
+    fn get_holding_targets_by_allocation(&self, alloc_id: &str) -> Result<Vec<HoldingTarget>> {
         use crate::schema::holding_targets::dsl::*;
-        let allocation_id = allocation_id.to_string();
-        self.reader.exec(move |conn: &mut SqliteConnection| {
-            let db_targets: Vec<HoldingTargetDB> = holding_targets
-                .filter(crate::schema::holding_targets::allocation_id.eq(&allocation_id))
-                .load(conn)
-                .map_err(StorageError::from)?;
-            Ok(db_targets.into_iter().map(Into::into).collect())
-        })
+        let mut conn = get_connection(&self.pool)?;
+        let db_targets: Vec<HoldingTargetDB> = holding_targets
+            .filter(allocation_id.eq(alloc_id))
+            .load(&mut conn)
+            .map_err(StorageError::from)?;
+        Ok(db_targets.into_iter().map(Into::into).collect())
     }
 
     async fn upsert_holding_target(&self, target: NewHoldingTarget) -> Result<HoldingTarget> {

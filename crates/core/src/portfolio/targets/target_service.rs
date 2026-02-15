@@ -11,8 +11,9 @@ use crate::errors::{Error, Result};
 use crate::portfolio::allocation::AllocationServiceTrait;
 
 use super::{
-    AllocationDeviation, DeviationReport, NewPortfolioTarget, NewTargetAllocation, PortfolioTarget,
-    PortfolioTargetRepositoryTrait, PortfolioTargetServiceTrait, TargetAllocation,
+    AllocationDeviation, DeviationReport, HoldingTarget, NewHoldingTarget, NewPortfolioTarget,
+    NewTargetAllocation, PortfolioTarget, PortfolioTargetRepositoryTrait,
+    PortfolioTargetServiceTrait, TargetAllocation,
 };
 
 /// Service for portfolio target CRUD and deviation calculation.
@@ -173,5 +174,26 @@ impl PortfolioTargetServiceTrait for PortfolioTargetService {
             total_value,
             deviations,
         })
+    }
+
+    // --- Holding Targets ---
+
+    fn get_holding_targets_by_allocation(&self, allocation_id: &str) -> Result<Vec<HoldingTarget>> {
+        debug!("Fetching holding targets for allocation {}", allocation_id);
+        self.repository
+            .get_holding_targets_by_allocation(allocation_id)
+    }
+
+    async fn upsert_holding_target(&self, target: NewHoldingTarget) -> Result<HoldingTarget> {
+        debug!(
+            "Upserting holding target for allocation {} asset {}",
+            target.allocation_id, target.asset_id
+        );
+        self.repository.upsert_holding_target(target).await
+    }
+
+    async fn delete_holding_target(&self, id: &str) -> Result<usize> {
+        debug!("Deleting holding target {}", id);
+        self.repository.delete_holding_target(id).await
     }
 }
