@@ -16,18 +16,18 @@ export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: Cou
     if (!holdings || holdings.length === 0) return [];
 
     // Assume baseCurrency is consistent across holdings or default to USD
-    const currency = holdings[0]?.baseCurrency || "USD";
+    const currency = holdings[0]?.baseCurrency ?? "USD";
 
     const countryMap = new Map<string, number>();
     holdings.forEach((holding) => {
       const countries = holding.instrument?.countries;
-      const marketValue = Number(holding.marketValue?.base) || 0;
+      const marketValue = Number(holding.marketValue?.base);
 
       if (countries && countries.length > 0 && !isNaN(marketValue)) {
         countries.forEach((country: Country) => {
-          const currentValue = countryMap.get(country.name) || 0;
-          const weight = Number(country.weight) || 0;
-          const weightedValue = marketValue * (weight > 1 ? weight / 100 : weight);
+          const currentValue = countryMap.get(country.name) ?? 0;
+          const weight = Number(country.weight);
+          const weightedValue = (marketValue * weight) / 100;
           countryMap.set(country.name, currentValue + weightedValue);
         });
       }
@@ -35,7 +35,7 @@ export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: Cou
 
     return Array.from(countryMap, ([name, value]) => ({ name, value, currency }))
       .sort((a, b) => b.value - a.value)
-      .slice(0, 10); // Show top 10 countries
+      .slice(0, 9); // Show top 10 countries
   }, [holdings]);
 
   if (isLoading) {

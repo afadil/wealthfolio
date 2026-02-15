@@ -96,8 +96,8 @@ export const DonutChart: React.FC<DonutChartProps> = ({
     cy: "80%",
     innerRadius: "110%",
     outerRadius: "140%",
-    paddingAngle: 4,
-    cornerRadius: 6,
+    paddingAngle: 0.5,
+    cornerRadius: 4,
     dataKey: "value",
     nameKey: "name",
     onMouseEnter: handlePieEnter,
@@ -134,7 +134,7 @@ export const DonutChart: React.FC<DonutChartProps> = ({
               cy="80%"
               innerRadius="143%"
               outerRadius="145%"
-              paddingAngle={6}
+              paddingAngle={0.5}
               cornerRadius={6}
               startAngle={startAngle}
               endAngle={endAngle}
