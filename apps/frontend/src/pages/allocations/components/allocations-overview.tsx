@@ -203,8 +203,12 @@ export function AllocationsOverview() {
                 {formatAmount(totalPortfolioValue, baseCurrency)}
               </p>
             </CardHeader>
-            <CardContent className="flex flex-1 items-center justify-center">
-              <TwoRingDonut targetData={targetData} currentData={currentData} />
+            <CardContent className="flex flex-1 items-center justify-center p-4">
+              <TwoRingDonut
+                targetData={targetData}
+                currentData={currentData}
+                className="max-w-[400px]"
+              />
             </CardContent>
           </Card>
 

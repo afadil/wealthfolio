@@ -86,10 +86,12 @@ export function TargetList({
         });
 
         if (eligibleCategories.length > 0) {
-          const totalValue = eligibleCategories.reduce((sum, d) => sum + d.currentValue, 0);
+          // Calculate total value of ONLY eligible categories (not all categories)
+          const totalEligibleValue = eligibleCategories.reduce((sum, d) => sum + d.currentValue, 0);
           const currentCategory = deviations.find((d) => d.categoryId === categoryId);
-          if (currentCategory && totalValue > 0) {
-            return (currentCategory.currentValue / totalValue) * remainder;
+          if (currentCategory && totalEligibleValue > 0) {
+            // Distribute remainder proportionally based on current values of eligible holdings only
+            return (currentCategory.currentValue / totalEligibleValue) * remainder;
           }
         }
       }
@@ -207,12 +209,40 @@ export function TargetList({
     [getSavedAllocation, onDeleteAllocation],
   );
 
-  // Validation hook
-  const { totalPercentage, remaining, isValid, error, scaledAllocations } = useAllocationValidation(
-    deviations,
-    allocations,
-    pendingEdits,
-  );
+  const handleClearAll = useCallback(() => {
+    // Delete all saved allocations
+    for (const allocation of allocations) {
+      onDeleteAllocation(allocation.id);
+    }
+    // Clear all pending edits
+    setPendingEdits(new Map());
+  }, [allocations, onDeleteAllocation]);
+
+  // Validation hook (kept for reference but not used for save validation)
+  const {
+    totalPercentage,
+    remaining,
+    isValid: validationHookIsValid,
+    error: validationHookError,
+    scaledAllocations,
+  } = useAllocationValidation(deviations, allocations, pendingEdits);
+
+  // Use validation hook values for display
+  // But we need to calculate the actual total from user inputs + pending edits
+  const actualTotalTarget = deviations.reduce((sum, d) => {
+    const pending = pendingEdits.get(d.categoryId);
+    const saved = getSavedAllocation(d.categoryId);
+    if (pending) return sum + pending.percent;
+    if (saved) return sum + saved.targetPercent / 100;
+    return sum;
+  }, 0);
+  const actualRemainingValue = 100 - actualTotalTarget;
+
+  // Our own validation based on actual user inputs
+  const isValid = actualTotalTarget <= 100 && actualTotalTarget >= 0;
+  const error = isValid
+    ? null
+    : `Total must equal 100%. Current total: ${actualTotalTarget.toFixed(1)}%`;
 
   const handleSaveAll = useCallback(() => {
     if (!isValid) {
@@ -224,16 +254,29 @@ export function TargetList({
     for (const d of deviations) {
       const pending = pendingEdits.get(d.categoryId);
       const saved = getSavedAllocation(d.categoryId);
+      const displayPercent = getDisplayPercent(d.categoryId);
 
-      if (pending && Math.round(pending * 100) > 0) {
+      if (pending !== undefined) {
+        // Save pending edits (even if 0%)
         allAllocations.push({
           id: saved?.id,
           targetId: targetId ?? "", // Will be replaced by parent if auto-creating
           categoryId: d.categoryId,
-          targetPercent: Math.round(pending * 100),
+          targetPercent: Math.round(pending.percent * 100),
+          isLocked: pending.isLocked,
+        });
+      } else if (displayPercent > 0) {
+        // Save preview values (auto-distributed values that user accepted)
+        // Only save if there's no pending edit and displayPercent > 0
+        allAllocations.push({
+          id: saved?.id,
+          targetId: targetId ?? "", // Will be replaced by parent if auto-creating
+          categoryId: d.categoryId,
+          targetPercent: Math.round(displayPercent * 100),
           isLocked: getIsLocked(d.categoryId),
         });
       } else if (saved && saved.targetPercent > 0) {
+        // Keep existing saved allocations
         allAllocations.push({
           id: saved.id,
           targetId: targetId ?? "",
@@ -248,11 +291,16 @@ export function TargetList({
       onSave(allAllocations);
       setPendingEdits(new Map());
     }
-  }, [deviations, pendingEdits, getSavedAllocation, onSave, targetId, isValid]);
-
-  // Use validation hook values instead
-  const effectiveTotalTarget = totalPercentage;
-  const remainingValue = remaining;
+  }, [
+    deviations,
+    pendingEdits,
+    getSavedAllocation,
+    getDisplayPercent,
+    onSave,
+    targetId,
+    actualTotalTarget,
+    isValid,
+  ]);
 
   if (deviations.length === 0) {
     return (
@@ -282,10 +330,10 @@ export function TargetList({
               <p
                 className={cn(
                   "text-2xl font-bold",
-                  effectiveTotalTarget > 100 && "text-red-600 dark:text-red-400",
+                  actualTotalTarget > 100 && "text-red-600 dark:text-red-400",
                 )}
               >
-                {effectiveTotalTarget.toFixed(1)}%
+                {actualTotalTarget.toFixed(1)}%
               </p>
             </div>
             <div className="text-right">
@@ -293,12 +341,12 @@ export function TargetList({
               <p
                 className={cn(
                   "text-2xl font-bold",
-                  remainingValue < 0
+                  actualRemainingValue < 0
                     ? "text-red-600 dark:text-red-400"
                     : "text-green-600 dark:text-green-400",
                 )}
               >
-                {remainingValue.toFixed(1)}%
+                {actualRemainingValue.toFixed(1)}%
               </p>
             </div>
           </div>
@@ -308,9 +356,17 @@ export function TargetList({
       {/* Target vs Actual card */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium uppercase tracking-wider">
-            Target vs Actual
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium uppercase tracking-wider">
+              Target vs Actual
+            </CardTitle>
+            {(allocations.length > 0 || hasPendingEdits) && (
+              <Button variant="ghost" size="sm" onClick={handleClearAll} className="h-7 text-xs">
+                <Icons.Trash className="mr-1.5 h-3 w-3" />
+                Clear All
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
           {deviations.map((d) => {
