@@ -125,7 +125,7 @@ const ThreadSuggestions: FC = () => {
             className="fade-in slide-in-from-bottom-4 animate-in fill-mode-both duration-300 ease-out"
             style={{ animationDelay: `${index * 50}ms` }}
           >
-            <ThreadPrimitive.Suggestion prompt={suggestion.text} send asChild>
+            <ThreadPrimitive.Suggestion prompt={suggestion.text} asChild>
               <Button
                 variant="ghost"
                 className="text-muted-foreground hover:text-foreground dark:hover:bg-accent/60 h-auto gap-2 rounded-full border px-4 py-2.5 text-sm font-normal"
