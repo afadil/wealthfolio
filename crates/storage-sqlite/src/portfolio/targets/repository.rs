@@ -8,13 +8,14 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use wealthfolio_core::portfolio::targets::{
-    NewPortfolioTarget, NewTargetAllocation, PortfolioTarget, PortfolioTargetRepositoryTrait,
-    TargetAllocation,
+    HoldingTarget, NewHoldingTarget, NewPortfolioTarget, NewTargetAllocation, PortfolioTarget,
+    PortfolioTargetRepositoryTrait, TargetAllocation,
 };
 use wealthfolio_core::Result;
 
 use super::model::{
-    NewPortfolioTargetDB, NewTargetAllocationDB, PortfolioTargetDB, TargetAllocationDB,
+    HoldingTargetDB, NewHoldingTargetDB, NewPortfolioTargetDB, NewTargetAllocationDB,
+    PortfolioTargetDB, TargetAllocationDB,
 };
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
@@ -208,6 +209,78 @@ impl PortfolioTargetRepositoryTrait for PortfolioTargetRepository {
                 let count = diesel::delete(
                     portfolio_target_allocations::table
                         .filter(portfolio_target_allocations::target_id.eq(&target_id)),
+                )
+                .execute(conn)
+                .map_err(StorageError::from)?;
+                Ok(count)
+            })
+            .await
+    }
+
+    // --- Holding Targets ---
+
+    fn get_holding_targets_by_allocation(&self, allocation_id: &str) -> Result<Vec<HoldingTarget>> {
+        use crate::schema::holding_targets::dsl::*;
+        let allocation_id = allocation_id.to_string();
+        self.reader.exec(move |conn: &mut SqliteConnection| {
+            let db_targets: Vec<HoldingTargetDB> = holding_targets
+                .filter(crate::schema::holding_targets::allocation_id.eq(&allocation_id))
+                .load(conn)
+                .map_err(StorageError::from)?;
+            Ok(db_targets.into_iter().map(Into::into).collect())
+        })
+    }
+
+    async fn upsert_holding_target(&self, target: NewHoldingTarget) -> Result<HoldingTarget> {
+        use crate::schema::holding_targets::dsl::*;
+        self.writer
+            .exec(
+                move |conn: &mut SqliteConnection| -> Result<HoldingTarget> {
+                    let db_target: NewHoldingTargetDB = target.into();
+                    diesel::insert_into(holding_targets)
+                        .values(&db_target)
+                        .on_conflict(crate::schema::holding_targets::id)
+                        .do_update()
+                        .set((
+                            crate::schema::holding_targets::target_percent
+                                .eq(&db_target.target_percent),
+                            crate::schema::holding_targets::is_locked.eq(&db_target.is_locked),
+                            crate::schema::holding_targets::updated_at.eq(&db_target.updated_at),
+                        ))
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
+
+                    let result: HoldingTargetDB = holding_targets
+                        .find(&db_target.id)
+                        .first(conn)
+                        .map_err(StorageError::from)?;
+                    Ok(result.into())
+                },
+            )
+            .await
+    }
+
+    async fn delete_holding_target(&self, target_id: &str) -> Result<usize> {
+        use crate::schema::holding_targets::dsl::*;
+        let target_id = target_id.to_string();
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
+                let count = diesel::delete(holding_targets.find(&target_id))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                Ok(count)
+            })
+            .await
+    }
+
+    async fn delete_holding_targets_by_allocation(&self, alloc_id: &str) -> Result<usize> {
+        use crate::schema::holding_targets::dsl::*;
+        let alloc_id = alloc_id.to_string();
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
+                let count = diesel::delete(
+                    holding_targets
+                        .filter(crate::schema::holding_targets::allocation_id.eq(&alloc_id)),
                 )
                 .execute(conn)
                 .map_err(StorageError::from)?;

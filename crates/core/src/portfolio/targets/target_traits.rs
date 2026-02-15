@@ -5,7 +5,8 @@ use async_trait::async_trait;
 use crate::errors::Result;
 
 use super::{
-    DeviationReport, NewPortfolioTarget, NewTargetAllocation, PortfolioTarget, TargetAllocation,
+    DeviationReport, HoldingTarget, NewHoldingTarget, NewPortfolioTarget, NewTargetAllocation,
+    PortfolioTarget, TargetAllocation,
 };
 
 /// Repository trait for portfolio target persistence.
@@ -21,6 +22,12 @@ pub trait PortfolioTargetRepositoryTrait: Send + Sync {
     async fn upsert_allocation(&self, allocation: NewTargetAllocation) -> Result<TargetAllocation>;
     async fn delete_allocation(&self, id: &str) -> Result<usize>;
     async fn delete_allocations_by_target(&self, target_id: &str) -> Result<usize>;
+
+    // Holding targets
+    fn get_holding_targets_by_allocation(&self, allocation_id: &str) -> Result<Vec<HoldingTarget>>;
+    async fn upsert_holding_target(&self, target: NewHoldingTarget) -> Result<HoldingTarget>;
+    async fn delete_holding_target(&self, id: &str) -> Result<usize>;
+    async fn delete_holding_targets_by_allocation(&self, allocation_id: &str) -> Result<usize>;
 }
 
 /// Service trait for portfolio target business logic.
@@ -41,4 +48,9 @@ pub trait PortfolioTargetServiceTrait: Send + Sync {
         target_id: &str,
         base_currency: &str,
     ) -> Result<DeviationReport>;
+
+    // Holding targets
+    fn get_holding_targets_by_allocation(&self, allocation_id: &str) -> Result<Vec<HoldingTarget>>;
+    async fn upsert_holding_target(&self, target: NewHoldingTarget) -> Result<HoldingTarget>;
+    async fn delete_holding_target(&self, id: &str) -> Result<usize>;
 }

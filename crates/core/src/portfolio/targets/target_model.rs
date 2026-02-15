@@ -92,6 +92,42 @@ pub struct AllocationDeviation {
     pub is_locked: bool,
 }
 
+/// A target percentage for a specific holding within a category allocation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HoldingTarget {
+    pub id: String,
+    pub allocation_id: String,
+    pub asset_id: String,
+    pub target_percent: i32,
+    pub is_locked: bool,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+}
+
+/// Data for creating or updating a holding target.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewHoldingTarget {
+    pub id: Option<String>,
+    pub allocation_id: String,
+    pub asset_id: String,
+    pub target_percent: i32,
+    pub is_locked: bool,
+}
+
+impl Default for NewHoldingTarget {
+    fn default() -> Self {
+        Self {
+            id: None,
+            allocation_id: String::new(),
+            asset_id: String::new(),
+            target_percent: 0,
+            is_locked: false,
+        }
+    }
+}
+
 /// Full deviation report for a portfolio target.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

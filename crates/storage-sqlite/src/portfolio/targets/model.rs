@@ -72,6 +72,35 @@ pub struct NewTargetAllocationDB {
     pub updated_at: String,
 }
 
+// --- HoldingTarget ---
+
+#[derive(
+    Queryable, Identifiable, AsChangeset, Selectable, Debug, Clone, Serialize, Deserialize,
+)]
+#[diesel(table_name = crate::schema::holding_targets)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct HoldingTargetDB {
+    pub id: String,
+    pub allocation_id: String,
+    pub asset_id: String,
+    pub target_percent: i32,
+    pub is_locked: i32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Insertable, Debug, Clone)]
+#[diesel(table_name = crate::schema::holding_targets)]
+pub struct NewHoldingTargetDB {
+    pub id: String,
+    pub allocation_id: String,
+    pub asset_id: String,
+    pub target_percent: i32,
+    pub is_locked: i32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 // --- Conversions: DB -> Domain ---
 
 impl From<PortfolioTargetDB> for wealthfolio_core::portfolio::targets::PortfolioTarget {
@@ -94,6 +123,20 @@ impl From<TargetAllocationDB> for wealthfolio_core::portfolio::targets::TargetAl
             id: db.id,
             target_id: db.target_id,
             category_id: db.category_id,
+            target_percent: db.target_percent,
+            is_locked: db.is_locked != 0,
+            created_at: text_to_datetime(&db.created_at),
+            updated_at: text_to_datetime(&db.updated_at),
+        }
+    }
+}
+
+impl From<HoldingTargetDB> for wealthfolio_core::portfolio::targets::HoldingTarget {
+    fn from(db: HoldingTargetDB) -> Self {
+        Self {
+            id: db.id,
+            allocation_id: db.allocation_id,
+            asset_id: db.asset_id,
             target_percent: db.target_percent,
             is_locked: db.is_locked != 0,
             created_at: text_to_datetime(&db.created_at),
@@ -130,6 +173,23 @@ impl From<wealthfolio_core::portfolio::targets::NewTargetAllocation> for NewTarg
                 .unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
             target_id: domain.target_id,
             category_id: domain.category_id,
+            target_percent: domain.target_percent,
+            is_locked: if domain.is_locked { 1 } else { 0 },
+            created_at: now.clone(),
+            updated_at: now,
+        }
+    }
+}
+
+impl From<wealthfolio_core::portfolio::targets::NewHoldingTarget> for NewHoldingTargetDB {
+    fn from(domain: wealthfolio_core::portfolio::targets::NewHoldingTarget) -> Self {
+        let now = chrono::Utc::now().to_rfc3339();
+        Self {
+            id: domain
+                .id
+                .unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
+            allocation_id: domain.allocation_id,
+            asset_id: domain.asset_id,
             target_percent: domain.target_percent,
             is_locked: if domain.is_locked { 1 } else { 0 },
             created_at: now.clone(),
