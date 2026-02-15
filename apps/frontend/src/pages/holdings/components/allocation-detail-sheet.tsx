@@ -7,22 +7,15 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@wealthfolio/ui/components/ui/sheet";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@wealthfolio/ui/components/ui/table";
 import { AmountDisplay, Skeleton } from "@wealthfolio/ui";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
 import { getHoldingsByAllocation } from "@/adapters";
 import { TickerAvatar } from "@/components/ticker-avatar";
-import type { TaxonomyAllocation, HoldingSummary } from "@/lib/types";
+import type { TaxonomyAllocation, CategoryAllocation, HoldingSummary } from "@/lib/types";
 import { QueryKeys } from "@/lib/query-keys";
 import { CompactAllocationStrip } from "./compact-allocation-strip";
 
@@ -46,23 +39,47 @@ export function AllocationDetailSheet({
   const navigate = useNavigate();
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedCategoryName, setSelectedCategoryName] = useState<string | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
 
   // Set initial category when sheet opens
   useEffect(() => {
     if (isOpen && allocation?.categories?.length) {
       const categoryId = initialCategoryId ?? allocation.categories[0]?.categoryId ?? null;
-      const category = allocation.categories.find((c) => c.categoryId === categoryId);
+      // Try direct match on top-level
+      let category = allocation.categories.find((c) => c.categoryId === categoryId);
+      let childMatch: CategoryAllocation | undefined;
+
+      // If not a top-level, search children to find the parent
+      if (!category && categoryId) {
+        for (const parent of allocation.categories) {
+          childMatch = parent.children?.find((child) => child.categoryId === categoryId);
+          if (childMatch) {
+            category = parent;
+            break;
+          }
+        }
+      }
+
       if (category) {
-        setSelectedCategoryId(category.categoryId);
-        setSelectedCategoryName(category.categoryName);
+        // If we matched a child, select the child and expand the parent
+        if (childMatch) {
+          setExpandedParents(new Set([category.categoryId]));
+          setSelectedCategoryId(childMatch.categoryId);
+          setSelectedCategoryName(childMatch.categoryName);
+          setSelectedColor(childMatch.color);
+        } else {
+          setSelectedCategoryId(category.categoryId);
+          setSelectedCategoryName(category.categoryName);
+          setSelectedColor(category.color);
+          // Auto-expand if it has children
+          if (category.children?.length) {
+            setExpandedParents(new Set([category.categoryId]));
+          }
+        }
       }
     }
   }, [isOpen, initialCategoryId, allocation?.categories]);
-
-  // Find the selected category to get its details
-  const selectedCategory = allocation?.categories?.find(
-    (cat) => cat.categoryId === selectedCategoryId,
-  );
 
   // Fetch holdings for the selected category
   const { data: allocationHoldings, isLoading: holdingsLoading } = useQuery({
@@ -75,27 +92,48 @@ export function AllocationDetailSheet({
     queryFn: () =>
       getHoldingsByAllocation(accountId, allocation?.taxonomyId ?? "", selectedCategoryId ?? ""),
     enabled: !!selectedCategoryId && !!allocation?.taxonomyId,
-    staleTime: 30000, // Cache for 30 seconds
+    staleTime: 30000,
   });
 
-  // Extract holdings array from the response
   const holdings = allocationHoldings?.holdings;
 
-  const handleSegmentClick = useCallback((categoryId: string, categoryName: string) => {
-    setSelectedCategoryId(categoryId);
-    setSelectedCategoryName(categoryName);
-  }, []);
-
-  const handleRowClick = useCallback(
-    (categoryId: string) => {
-      const category = allocation?.categories?.find((cat) => cat.categoryId === categoryId);
-      if (category) {
-        setSelectedCategoryId(categoryId);
-        setSelectedCategoryName(category.categoryName);
-      }
+  const handleSegmentClick = useCallback(
+    (categoryId: string, categoryName: string) => {
+      const category = allocation?.categories?.find((c) => c.categoryId === categoryId);
+      setSelectedCategoryId(categoryId);
+      setSelectedCategoryName(categoryName);
+      setSelectedColor(category?.color ?? null);
     },
     [allocation?.categories],
   );
+
+  const handleParentClick = useCallback((category: CategoryAllocation) => {
+    const hasChildren = category.children && category.children.length > 0;
+
+    if (hasChildren) {
+      // Toggle expand/collapse
+      setExpandedParents((prev) => {
+        const next = new Set(prev);
+        if (next.has(category.categoryId)) {
+          next.delete(category.categoryId);
+        } else {
+          next.add(category.categoryId);
+        }
+        return next;
+      });
+    }
+
+    // Always select the parent
+    setSelectedCategoryId(category.categoryId);
+    setSelectedCategoryName(category.categoryName);
+    setSelectedColor(category.color);
+  }, []);
+
+  const handleChildClick = useCallback((child: CategoryAllocation) => {
+    setSelectedCategoryId(child.categoryId);
+    setSelectedCategoryName(child.categoryName);
+    setSelectedColor(child.color);
+  }, []);
 
   const handleHoldingClick = useCallback(
     (holding: HoldingSummary) => {
@@ -108,14 +146,17 @@ export function AllocationDetailSheet({
   const handleClearSelection = useCallback(() => {
     setSelectedCategoryId(null);
     setSelectedCategoryName(null);
+    setSelectedColor(null);
   }, []);
 
-  // Reset selection when sheet closes
+  // Reset state when sheet closes
   const handleOpenChange = useCallback(
     (open: boolean) => {
       if (!open) {
         setSelectedCategoryId(null);
         setSelectedCategoryName(null);
+        setSelectedColor(null);
+        setExpandedParents(new Set());
       }
       onOpenChange(open);
     },
@@ -149,55 +190,117 @@ export function AllocationDetailSheet({
             />
           )}
 
-          {/* Category Table */}
+          {/* Category List */}
           {hasData && (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Category</TableHead>
-                    <TableHead className="text-right">Value</TableHead>
-                    <TableHead className="text-right">%</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {categories.map((category) => (
-                    <TableRow
-                      key={category.categoryId}
-                      className={`cursor-pointer transition-colors ${
-                        selectedCategoryId === category.categoryId
-                          ? "bg-muted"
-                          : "hover:bg-muted/50"
-                      }`}
-                      onClick={() => handleRowClick(category.categoryId)}
+            <div className="overflow-hidden rounded-lg border">
+              {categories.map((category, idx) => {
+                const hasChildren = category.children && category.children.length > 0;
+                const isExpanded = expandedParents.has(category.categoryId);
+                const isSelected = selectedCategoryId === category.categoryId;
+                const isLast = idx === categories.length - 1;
+
+                return (
+                  <div key={category.categoryId}>
+                    {/* Parent row */}
+                    <div
+                      className={`flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors ${
+                        isSelected ? "bg-muted" : "hover:bg-muted/50"
+                      } ${idx > 0 ? "border-t" : ""}`}
+                      onClick={() => handleParentClick(category)}
                     >
-                      <TableCell className="flex items-center gap-2">
-                        <div
-                          className="h-3 w-3 rounded-full"
-                          style={{ backgroundColor: category.color }}
-                        />
-                        <span className="font-medium">{category.categoryName}</span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <AmountDisplay value={category.value} currency={baseCurrency} />
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-right">
+                      {/* Expand indicator or spacer */}
+                      <div className="flex w-4 shrink-0 items-center justify-center">
+                        {hasChildren ? (
+                          <Icons.ChevronRight
+                            className={`text-muted-foreground h-3.5 w-3.5 transition-transform duration-200 ${
+                              isExpanded ? "rotate-90" : ""
+                            }`}
+                          />
+                        ) : (
+                          <div className="w-3.5" />
+                        )}
+                      </div>
+
+                      {/* Color dot + name */}
+                      <div
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: category.color }}
+                      />
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                        {category.categoryName}
+                      </span>
+
+                      {/* Value + percentage */}
+                      <AmountDisplay
+                        value={category.value}
+                        currency={baseCurrency}
+                        className="shrink-0 text-sm"
+                      />
+                      <span className="text-muted-foreground w-12 shrink-0 text-right text-xs tabular-nums">
                         {category.percentage.toFixed(1)}%
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      </span>
+                    </div>
+
+                    {/* Children rows */}
+                    {hasChildren && (
+                      <div
+                        className={`grid transition-[grid-template-rows] duration-200 ease-in-out ${
+                          isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                        }`}
+                      >
+                        <div className="overflow-hidden">
+                          <div
+                            className={`bg-muted/30 ${!(isLast && isExpanded) ? "border-t" : ""}`}
+                          >
+                            {category.children!.map((child, childIdx) => {
+                              const isChildSelected = selectedCategoryId === child.categoryId;
+
+                              return (
+                                <div
+                                  key={child.categoryId}
+                                  className={`flex cursor-pointer items-center gap-3 py-2.5 pl-11 pr-4 transition-colors ${
+                                    isChildSelected ? "bg-muted" : "hover:bg-muted/50"
+                                  } ${childIdx > 0 ? "border-t border-dashed" : ""}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleChildClick(child);
+                                  }}
+                                >
+                                  <div
+                                    className="h-2 w-2 shrink-0 rounded-full"
+                                    style={{ backgroundColor: child.color }}
+                                  />
+                                  <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
+                                    {child.categoryName}
+                                  </span>
+                                  <AmountDisplay
+                                    value={child.value}
+                                    currency={baseCurrency}
+                                    className="text-muted-foreground shrink-0 text-xs"
+                                  />
+                                  <span className="text-muted-foreground w-12 shrink-0 text-right text-xs tabular-nums">
+                                    {child.percentage.toFixed(1)}%
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
 
-          {/* Holdings List (shown when category selected) */}
+          {/* Holdings List */}
           {selectedCategoryId && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-medium">
                   Holdings in{" "}
-                  <span style={{ color: selectedCategory?.color }}>{selectedCategoryName}</span>
+                  <span style={{ color: selectedColor ?? undefined }}>{selectedCategoryName}</span>
                 </h3>
                 <Button variant="ghost" size="sm" onClick={handleClearSelection}>
                   Clear
