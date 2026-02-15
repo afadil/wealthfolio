@@ -11,12 +11,14 @@ interface TargetListProps {
   targetId: string | undefined;
   onSave: (allocations: NewTargetAllocation[]) => void;
   onDeleteAllocation: (allocationId: string) => void;
+  onToggleLock: (allocation: NewTargetAllocation) => void;
   isSaving: boolean;
 }
 
 interface PendingEdit {
   percent: number;
   isLocked: boolean;
+  userSet?: boolean; // True if user explicitly set this value (not auto-distributed)
 }
 
 export function TargetList({
@@ -24,6 +26,7 @@ export function TargetList({
   targetId,
   onSave,
   onDeleteAllocation,
+  onToggleLock,
   isSaving,
 }: TargetListProps) {
   const { allocations } = useTargetAllocations(targetId);
@@ -52,52 +55,70 @@ export function TargetList({
       const pending = pendingEdits.get(categoryId);
       if (pending) return pending.percent;
 
-      // Preview mode: Show auto-distributed values for categories without user-set targets
-      // This matches phase-4 behavior where preview is always active for unset targets
       const saved = getSavedAllocation(categoryId);
-      if (saved) return saved.targetPercent / 100; // basis points to display %
 
-      // Don't show preview if no targets have been set yet
-      const hasAnyTargets = allocations.length > 0 || pendingEdits.size > 0;
-      if (!hasAnyTargets) return 0;
+      // If no pending edits, just show saved value (no auto-distribution)
+      if (pendingEdits.size === 0) {
+        return saved ? saved.targetPercent / 100 : 0;
+      }
 
-      // If no saved target, calculate what this would get in auto-distribution
+      // If this category is locked, always show saved value (never auto-distribute)
+      if (saved?.isLocked) {
+        return saved.targetPercent / 100;
+      }
+
+      // Auto-distribution mode: user is actively editing
+      // Calculate what this category should get based on user-set pending edits + locked allocations
       const totalUserSet = deviations.reduce((sum, d) => {
-        const hasPending = pendingEdits.has(d.categoryId);
+        const pending = pendingEdits.get(d.categoryId);
+        // Count user-set pending edits
+        if (pending?.userSet) {
+          return sum + pending.percent;
+        }
+        // Count locked allocations as "user-set"
         const savedAlloc = getSavedAllocation(d.categoryId);
-        if (hasPending) return sum + (pendingEdits.get(d.categoryId)?.percent || 0);
-        if (savedAlloc) return sum + savedAlloc.targetPercent / 100;
+        if (savedAlloc?.isLocked) {
+          return sum + savedAlloc.targetPercent / 100;
+        }
         return sum;
       }, 0);
 
-      const lockedAllocations = allocations.filter((a) => a.isLocked);
-      const lockedTotal = lockedAllocations.reduce((sum, a) => sum + a.targetPercent / 100, 0);
-
-      const totalSet = totalUserSet + lockedTotal;
-      const remainder = 100 - totalSet;
+      const remainder = 100 - totalUserSet;
 
       if (remainder > 0) {
-        // Find all categories eligible for auto-distribution (no saved target, not locked)
+        // Find all categories eligible for auto-distribution
+        // Eligible = no user-set pending edit AND not locked
         const eligibleCategories = deviations.filter((d) => {
-          const hasPending = pendingEdits.has(d.categoryId);
+          const pending = pendingEdits.get(d.categoryId);
+          if (pending?.userSet) return false;
           const savedAlloc = getSavedAllocation(d.categoryId);
-          return !hasPending && !savedAlloc;
+          return !savedAlloc?.isLocked;
         });
 
         if (eligibleCategories.length > 0) {
-          // Calculate total value of ONLY eligible categories (not all categories)
-          const totalEligibleValue = eligibleCategories.reduce((sum, d) => sum + d.currentValue, 0);
+          // Calculate total of saved targets for eligible categories
+          const totalEligibleTargets = eligibleCategories.reduce((sum, d) => {
+            const savedAlloc = getSavedAllocation(d.categoryId);
+            return sum + (savedAlloc ? savedAlloc.targetPercent / 100 : 0);
+          }, 0);
+
           const currentCategory = deviations.find((d) => d.categoryId === categoryId);
-          if (currentCategory && totalEligibleValue > 0) {
-            // Distribute remainder proportionally based on current values of eligible holdings only
-            return (currentCategory.currentValue / totalEligibleValue) * remainder;
+
+          if (currentCategory && totalEligibleTargets > 0 && saved) {
+            // Distribute remainder proportionally based on saved targets
+            const savedPercent = saved.targetPercent / 100;
+            return (savedPercent / totalEligibleTargets) * remainder;
+          } else if (currentCategory && totalEligibleTargets === 0) {
+            // If no eligible categories have saved targets, distribute equally
+            return remainder / eligibleCategories.length;
           }
         }
       }
 
-      return 0;
+      // Fallback: return saved value
+      return saved ? saved.targetPercent / 100 : 0;
     },
-    [pendingEdits, getSavedAllocation, allocations, deviations],
+    [pendingEdits, getSavedAllocation, deviations],
   );
 
   const getIsLocked = useCallback(
@@ -112,61 +133,96 @@ export function TargetList({
 
   const isAutoBalanced = useCallback(
     (categoryId: string): boolean => {
-      // A value is auto-balanced if:
-      // 1. User has started setting targets (has at least one saved or pending target)
-      // 2. This category doesn't have a pending edit
+      // A value is auto-balanced (italic) if:
+      // 1. User has at least one pending edit (they're actively editing)
+      // 2. This category doesn't have a user-set pending edit
       // 3. This category isn't locked
-      // 4. This category doesn't have a saved allocation
-      // 5. The display percent is greater than 0 (meaning it's showing a preview value)
+      // The display value comes from auto-distribution, not user input
 
-      // Don't show preview if no targets have been set yet
-      const hasAnyTargets = allocations.length > 0 || pendingEdits.size > 0;
-      if (!hasAnyTargets) return false;
+      // Only show auto-balanced style when user is actively editing
+      if (pendingEdits.size === 0) return false;
 
-      if (pendingEdits.has(categoryId)) return false;
+      // If this category has a user-set pending edit, it's not auto-balanced
+      const pending = pendingEdits.get(categoryId);
+      if (pending?.userSet) return false;
 
+      // If locked, it's user-set (not auto-balanced)
       const saved = getSavedAllocation(categoryId);
       if (saved?.isLocked) return false;
-      if (saved && saved.targetPercent > 0) return false;
 
-      // Check if this would show a preview value
-      const displayPercent = getDisplayPercent(categoryId);
-      return displayPercent > 0;
+      // If we got here: user is editing other categories, this one is not user-set,
+      // and this one is not locked → it's auto-balanced
+      return true;
     },
-    [pendingEdits, getSavedAllocation, getDisplayPercent, allocations],
+    [pendingEdits, getSavedAllocation],
   );
 
   const handleStartEdit = useCallback(
     (categoryId: string) => {
       if (getIsLocked(categoryId)) return;
       setEditingCategoryId(categoryId);
-      setEditValue(getDisplayPercent(categoryId).toFixed(1));
+      setEditValue(getDisplayPercent(categoryId).toFixed(2));
     },
     [getIsLocked, getDisplayPercent],
   );
 
   const handleEditChange = useCallback((value: string) => {
+    // Allow empty string for clearing
+    if (value === "") {
+      setEditValue("");
+      return;
+    }
+
     // Allow only numbers and one decimal point
     const sanitized = value.replace(/[^0-9.]/g, "");
-    const cleaned = sanitized.replace(/^0+(?=\d)/, "");
-    setEditValue(cleaned || "0");
+
+    // Limit to 2 decimal places
+    const parts = sanitized.split(".");
+    let result = sanitized;
+
+    if (parts.length > 2) {
+      // Multiple decimal points, keep only first one
+      result = parts[0] + "." + parts.slice(1).join("");
+    } else if (parts[1] && parts[1].length > 2) {
+      // More than 2 decimals, truncate to 2
+      result = parts[0] + "." + parts[1].substring(0, 2);
+    }
+
+    // Remove leading zeros (except for "0." case)
+    const cleaned = result.replace(/^0+(?=\d)/, "");
+    setEditValue(cleaned);
   }, []);
 
   const handleEditCommit = useCallback(
     (categoryId: string) => {
-      const numValue = parseFloat(editValue) || 0;
+      // If empty, treat as 0
+      const numValue = editValue === "" ? 0 : parseFloat(editValue);
       const clamped = Math.max(0, Math.min(100, numValue));
+      // Round to 2 decimals
+      const rounded = Math.round(clamped * 100) / 100;
+
       setPendingEdits((prev) => {
         const next = new Map(prev);
         next.set(categoryId, {
-          percent: clamped,
+          percent: rounded,
           isLocked: getIsLocked(categoryId),
+          userSet: true, // Mark as explicitly set by user
         });
-        return next;
+
+        // Clean up pending edits that were NOT explicitly set by user
+        // Keep: 1) user-set edits, 2) locked categories
+        const toKeep = new Map<string, PendingEdit>();
+        for (const [catId, edit] of next.entries()) {
+          const saved = getSavedAllocation(catId);
+          if (edit.userSet || saved?.isLocked) {
+            toKeep.set(catId, edit);
+          }
+        }
+        return toKeep;
       });
       setEditingCategoryId(null);
     },
-    [editValue, getIsLocked],
+    [editValue, getIsLocked, getSavedAllocation],
   );
 
   const handleEditKeyDown = useCallback(
@@ -179,18 +235,52 @@ export function TargetList({
 
   const handleToggleLock = useCallback(
     (categoryId: string) => {
+      const pending = pendingEdits.get(categoryId);
+      const saved = getSavedAllocation(categoryId);
       const currentLocked = getIsLocked(categoryId);
-      const currentPercent = getDisplayPercent(categoryId);
-      setPendingEdits((prev) => {
-        const next = new Map(prev);
-        next.set(categoryId, {
-          percent: currentPercent,
-          isLocked: !currentLocked,
+      const displayPercent = getDisplayPercent(categoryId);
+
+      // If there's a pending edit (user has modified this), toggle lock in pending
+      if (pending?.userSet) {
+        setPendingEdits((prev) => {
+          const next = new Map(prev);
+          next.set(categoryId, {
+            ...pending,
+            isLocked: !currentLocked,
+          });
+          return next;
         });
-        return next;
-      });
+        return;
+      }
+
+      // If user is actively editing (auto-distribution is active)
+      // Create a pending edit to lock the auto-distributed value
+      if (pendingEdits.size > 0 && displayPercent > 0) {
+        setPendingEdits((prev) => {
+          const next = new Map(prev);
+          next.set(categoryId, {
+            percent: displayPercent,
+            isLocked: !currentLocked,
+            userSet: true,
+          });
+          return next;
+        });
+        return;
+      }
+
+      // If there's a saved allocation and no active editing, toggle lock via API
+      if (saved) {
+        onToggleLock({
+          id: saved.id,
+          targetId: saved.targetId,
+          categoryId: saved.categoryId,
+          targetPercent: saved.targetPercent,
+          isLocked: !saved.isLocked,
+        });
+        return;
+      }
     },
-    [getIsLocked, getDisplayPercent],
+    [pendingEdits, getSavedAllocation, getIsLocked, getDisplayPercent, onToggleLock],
   );
 
   const handleDelete = useCallback(
@@ -217,13 +307,9 @@ export function TargetList({
     setPendingEdits(new Map());
   }, [allocations, onDeleteAllocation]);
 
-  // Calculate actual total from user inputs + pending edits
+  // Calculate actual total from display values (includes auto-distribution)
   const actualTotalTarget = deviations.reduce((sum, d) => {
-    const pending = pendingEdits.get(d.categoryId);
-    const saved = getSavedAllocation(d.categoryId);
-    if (pending) return sum + pending.percent;
-    if (saved) return sum + saved.targetPercent / 100;
-    return sum;
+    return sum + getDisplayPercent(d.categoryId);
   }, 0);
   const actualRemainingValue = 100 - actualTotalTarget;
 
@@ -387,11 +473,11 @@ export function TargetList({
                 <div className="grid grid-cols-3 text-sm">
                   <div>
                     <span className="text-muted-foreground text-xs">Target</span>
-                    <p className="font-semibold">{displayPercent.toFixed(0)}%</p>
+                    <p className="font-semibold">{displayPercent.toFixed(2)}%</p>
                   </div>
                   <div>
                     <span className="text-muted-foreground text-xs">Actual</span>
-                    <p className="font-semibold">{d.currentPercent.toFixed(0)}%</p>
+                    <p className="font-semibold">{d.currentPercent.toFixed(2)}%</p>
                   </div>
                   <div className="text-right">
                     <span className="text-muted-foreground text-xs">Drift</span>
@@ -446,7 +532,7 @@ export function TargetList({
                             "text-muted-foreground font-normal italic",
                         )}
                       >
-                        {displayPercent.toFixed(1)}%
+                        {displayPercent.toFixed(2)}%
                       </span>
                     )}
                     {/* Lock toggle */}
@@ -483,7 +569,7 @@ export function TargetList({
                         Actual
                       </span>
                     </div>
-                    <span className="w-16 text-right text-sm">{d.currentPercent.toFixed(0)}%</span>
+                    <span className="w-16 text-right text-sm">{d.currentPercent.toFixed(2)}%</span>
                     {/* Spacer to align with lock button */}
                     <div className="w-7 shrink-0" />
                   </div>

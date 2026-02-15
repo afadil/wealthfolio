@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { EmptyPlaceholder, formatAmount } from "@wealthfolio/ui";
+import { EmptyPlaceholder } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
@@ -33,8 +33,12 @@ export function AllocationsOverview() {
 
   const accountId = selectedAccount?.id ?? PORTFOLIO_ACCOUNT_ID;
   const { targets, isLoading: targetsLoading } = usePortfolioTargets(accountId);
-  const { createTargetMutation, batchSaveAllocationsMutation, deleteAllocationMutation } =
-    useTargetMutations();
+  const {
+    createTargetMutation,
+    batchSaveAllocationsMutation,
+    deleteAllocationMutation,
+    upsertAllocationMutation,
+  } = useTargetMutations();
 
   const activeTarget = targets.find((t) => t.isActive) ?? targets[0] ?? null;
 
@@ -79,6 +83,13 @@ export function AllocationsOverview() {
       deleteAllocationMutation.mutate(allocationId);
     },
     [deleteAllocationMutation],
+  );
+
+  const handleToggleLock = useCallback(
+    (allocation: NewTargetAllocation) => {
+      upsertAllocationMutation.mutate(allocation);
+    },
+    [upsertAllocationMutation],
   );
 
   // Build donut + list data
@@ -216,6 +227,7 @@ export function AllocationsOverview() {
               targetId={activeTarget?.id}
               onSave={handleSaveAllocations}
               onDeleteAllocation={handleDeleteAllocation}
+              onToggleLock={handleToggleLock}
               isSaving={batchSaveAllocationsMutation.isPending}
             />
           </div>

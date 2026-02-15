@@ -3,8 +3,11 @@
 **Branch**: `feature/allocation-targets`
 **Base**: `v3.0.0-beta.3`
 **Date**: February 2026
-**Status**: Section 0 complete (backend + placeholder frontend). Sections 1-3
-pending redesign.
+**Status**: 
+- ✅ Section 0: Backend complete
+- ✅ Section 1: Category-level targets + UI complete
+- ⏳ Section 2: Per-holding targets (planned)
+- ⏳ Section 3: Rebalancing advisor (planned)
 
 ---
 
@@ -173,8 +176,30 @@ components need a full redesign per the plan below.
 
 ## Section 1: Category-Level Targets + Overview Tab
 
+**Status**: ✅ COMPLETE
+
 **Goal**: A working, polished allocations page with category-level targets,
-two-ring donut visualization, and deviation tracking.
+single donut visualization, and deviation tracking.
+
+### Implementation Summary
+
+**Completed Features**:
+- ✅ Single donut chart showing current allocation with enhanced hover details
+- ✅ Inline target editing with side-by-side comparison bars
+- ✅ Drift indicators (Underweight/Overweight/Aligned)
+- ✅ Auto-distribution for unlocked categories (preview mode)
+- ✅ Lock mechanism to prevent auto-balancing
+- ✅ Batch save with validation
+- ✅ "Clear All" functionality
+- ✅ 2-decimal precision for all percentages
+- ✅ Empty field support during editing
+
+**Key Behaviors**:
+- Auto-distribution triggers only when user actively edits targets
+- Locked categories maintain their values during auto-distribution
+- User-set edits (marked with `userSet` flag) are preserved
+- Total validation ensures allocations don't exceed 100%
+- Lock works on both saved allocations and pending edits
 
 ### UI Layout
 
@@ -254,14 +279,19 @@ User selects account → check if PortfolioTarget exists for account
 
 ### Verify
 
-- `pnpm type-check` passes
-- `pnpm tauri dev` or `pnpm run dev:web` — page loads, donut renders
-- Can set category target % inline, save all, see deviation update
-- Drift indicators show correctly (underweight/overweight/aligned)
-- Donut hover shows category details with drift status
-- Account switching works, shows different targets per account
-- "All Portfolio" view works
-- "Clear All" button clears all targets
+- ✅ `pnpm type-check` passes
+- ✅ `pnpm tauri dev` or `pnpm run dev:web` — page loads, donut renders
+- ✅ Can set category target % inline, save all, see deviation update
+- ✅ Drift indicators show correctly (underweight/overweight/aligned)
+- ✅ Donut hover shows category details with drift status
+- ✅ Account switching works, shows different targets per account
+- ✅ "All Portfolio" view works
+- ✅ "Clear All" button clears all targets
+- ✅ Auto-distribution works correctly when editing targets
+- ✅ Lock prevents auto-distribution and persists across sessions
+- ✅ Lock works on auto-distributed values (captures current value)
+- ✅ 2-decimal precision throughout UI
+- ✅ Remaining percentage calculates correctly with auto-distribution
 
 ---
 
