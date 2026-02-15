@@ -34,7 +34,7 @@ interface GetHoldingsArgs {
 }
 
 interface HoldingDto {
-  accountId: string;
+  account: string;
   symbol: string;
   name?: string | null;
   holdingType: string;
@@ -95,8 +95,7 @@ function normalizeResult(result: unknown, fallbackCurrency: string): GetHoldings
   const holdings: HoldingDto[] = holdingsRaw
     .map((entry) => entry as Record<string, unknown>)
     .map((entry) => ({
-      accountId:
-        (entry.accountId as string | undefined) ?? (entry.account_id as string | undefined) ?? "",
+      account: (entry.account as string | undefined) ?? "",
       symbol: (entry.symbol as string | undefined) ?? "",
       name: (entry.name as string | undefined) ?? null,
       holdingType:
@@ -466,7 +465,13 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
 
   // Empty state - don't render anything, let LLM explain
   if (isComplete && holdingsCount === 0) {
-    return null;
+    return (
+      <Card className="bg-muted/40 border-primary/10 w-full">
+        <CardContent className="py-4">
+          <p className="text-muted-foreground text-sm">No holdings found for this account.</p>
+        </CardContent>
+      </Card>
+    );
   }
 
   // Determine view mode: use response viewMode, fallback to args, then default to "treemap"
@@ -568,7 +573,7 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
           </TableHeader>
           <TableBody>
             {sortedHoldings.map((holding) => (
-              <TableRow key={`${holding.accountId}-${holding.symbol}`} className="text-xs">
+              <TableRow key={`${holding.account}-${holding.symbol}`} className="text-xs">
                 <TableCell className="py-2 pl-4">
                   <div>
                     <div className="font-medium">{holding.symbol}</div>

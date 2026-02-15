@@ -18,7 +18,7 @@ use crate::utils::time_utils;
 
 use super::client::{MarketDataClient, ProviderConfig};
 use super::import::{ImportValidationStatus, QuoteConverter, QuoteImport, QuoteValidator};
-use super::model::{DataSource, LatestQuotePair, Quote, SymbolSearchResult};
+use super::model::{DataSource, LatestQuotePair, Quote, ResolvedQuote, SymbolSearchResult};
 use super::store::{ProviderSettingsStore, QuoteStore};
 use super::sync::{QuoteSyncService, QuoteSyncServiceTrait, SyncResult};
 use super::sync_state::{QuoteSyncState, SymbolSyncPlan, SyncMode, SyncStateStore};
@@ -28,6 +28,7 @@ use crate::assets::{
     Asset, AssetKind, AssetRepositoryTrait, InstrumentType, ProviderProfile, QuoteMode,
 };
 use crate::errors::Result;
+use crate::fx::currency::{get_normalization_rule, normalize_currency_code};
 use crate::secrets::SecretStore;
 
 use wealthfolio_market_data::{exchanges_for_currency, mic_to_exchange_name};
@@ -58,6 +59,45 @@ pub struct ProviderInfo {
     pub unique_errors: Vec<String>,
 }
 
+fn resolve_effective_quote_currency(asset_quote_ccy: &str, quote_ccy: &str) -> Option<String> {
+    if asset_quote_ccy.is_empty() || quote_ccy.is_empty() || asset_quote_ccy == quote_ccy {
+        return None;
+    }
+
+    if normalize_currency_code(asset_quote_ccy) != normalize_currency_code(quote_ccy) {
+        return None;
+    }
+
+    // Minor-unit codes carry unit scale information that we must preserve.
+    let asset_is_minor = get_normalization_rule(asset_quote_ccy).is_some();
+    let quote_is_minor = get_normalization_rule(quote_ccy).is_some();
+
+    if asset_is_minor && !quote_is_minor {
+        return Some(asset_quote_ccy.to_string());
+    }
+    if quote_is_minor && !asset_is_minor {
+        return Some(quote_ccy.to_string());
+    }
+
+    Some(asset_quote_ccy.to_string())
+}
+
+fn reconcile_quote_currency(quote: &mut Quote, asset: &Asset) {
+    if let Some(effective) = resolve_effective_quote_currency(&asset.quote_ccy, &quote.currency) {
+        quote.currency = effective;
+    }
+}
+
+/// Latest quote payload enriched with backend freshness computation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LatestQuoteSnapshot {
+    pub quote: Quote,
+    pub is_stale: bool,
+    pub effective_market_date: String,
+    pub quote_date: String,
+}
+
 /// Unified trait for all quote operations.
 #[async_trait]
 pub trait QuoteServiceTrait: Send + Sync {
@@ -70,6 +110,12 @@ pub trait QuoteServiceTrait: Send + Sync {
 
     /// Get the latest quotes for multiple symbols.
     fn get_latest_quotes(&self, symbols: &[String]) -> Result<HashMap<String, Quote>>;
+
+    /// Get latest quotes with backend-computed staleness metadata.
+    fn get_latest_quotes_snapshot(
+        &self,
+        asset_ids: &[String],
+    ) -> Result<HashMap<String, LatestQuoteSnapshot>>;
 
     /// Get the latest quote pairs (current + previous) for multiple symbols.
     fn get_latest_quotes_pair(
@@ -160,6 +206,20 @@ pub trait QuoteServiceTrait: Send + Sync {
         query: &str,
         account_currency: Option<&str>,
     ) -> Result<Vec<SymbolSearchResult>>;
+
+    /// Resolve the latest quote for a symbol (currency + price).
+    ///
+    /// Best-effort: returns what the provider can give. Used during symbol selection
+    /// to confirm inferred currency and pre-fill the price field.
+    async fn resolve_symbol_quote(
+        &self,
+        symbol: &str,
+        exchange_mic: Option<&str>,
+        instrument_type: Option<&InstrumentType>,
+    ) -> Result<ResolvedQuote> {
+        let _ = (symbol, exchange_mic, instrument_type);
+        Ok(ResolvedQuote::default())
+    }
 
     /// Get asset profile from provider.
     ///
@@ -462,6 +522,7 @@ where
             quote_type: quote_type.to_string(),
             type_display: quote_type.to_string(),
             currency: Some(asset.quote_ccy.clone()),
+            currency_source: None,
             data_source: asset
                 .preferred_provider()
                 .or_else(|| Some("MANUAL".to_string())),
@@ -487,26 +548,126 @@ where
     // =========================================================================
 
     fn get_latest_quote(&self, symbol: &str) -> Result<Quote> {
-        self.quote_store.get_latest_quote(symbol)
+        let mut quote = self.quote_store.get_latest_quote(symbol)?;
+        if let Ok(asset) = self.asset_repo.get_by_id(symbol) {
+            reconcile_quote_currency(&mut quote, &asset);
+        }
+        Ok(quote)
     }
 
     fn get_latest_quotes(&self, symbols: &[String]) -> Result<HashMap<String, Quote>> {
-        self.quote_store.get_latest_quotes(symbols)
+        let mut quotes = self.quote_store.get_latest_quotes(symbols)?;
+        let assets = self.asset_repo.list_by_asset_ids(symbols)?;
+        let assets_by_id: HashMap<String, Asset> = assets
+            .into_iter()
+            .map(|asset| (asset.id.clone(), asset))
+            .collect();
+
+        for (asset_id, quote) in quotes.iter_mut() {
+            if let Some(asset) = assets_by_id.get(asset_id) {
+                reconcile_quote_currency(quote, asset);
+            }
+        }
+
+        Ok(quotes)
+    }
+
+    fn get_latest_quotes_snapshot(
+        &self,
+        asset_ids: &[String],
+    ) -> Result<HashMap<String, LatestQuoteSnapshot>> {
+        let mut quotes = self.quote_store.get_latest_quotes(asset_ids)?;
+        let assets = self.asset_repo.list_by_asset_ids(asset_ids)?;
+        let assets_by_id: HashMap<String, Asset> = assets
+            .into_iter()
+            .map(|asset| (asset.id.clone(), asset))
+            .collect();
+        let now = Utc::now();
+
+        for (asset_id, quote) in quotes.iter_mut() {
+            if let Some(asset) = assets_by_id.get(asset_id) {
+                reconcile_quote_currency(quote, asset);
+            }
+        }
+
+        let snapshots = quotes
+            .into_iter()
+            .map(|(asset_id, quote)| {
+                let asset = assets_by_id.get(&asset_id);
+                let effective_today = time_utils::market_effective_date(
+                    now,
+                    asset.and_then(|a| a.instrument_exchange_mic.as_deref()),
+                );
+                let quote_day = quote.timestamp.date_naive();
+                let is_inactive = asset.map(|a| !a.is_active).unwrap_or(false);
+
+                (
+                    asset_id,
+                    LatestQuoteSnapshot {
+                        quote,
+                        is_stale: is_inactive || quote_day < effective_today,
+                        effective_market_date: effective_today.to_string(),
+                        quote_date: quote_day.to_string(),
+                    },
+                )
+            })
+            .collect();
+
+        Ok(snapshots)
     }
 
     fn get_latest_quotes_pair(
         &self,
         symbols: &[String],
     ) -> Result<HashMap<String, LatestQuotePair>> {
-        self.quote_store.get_latest_quotes_pair(symbols)
+        let mut pairs = self.quote_store.get_latest_quotes_pair(symbols)?;
+        let assets = self.asset_repo.list_by_asset_ids(symbols)?;
+        let assets_by_id: HashMap<String, Asset> = assets
+            .into_iter()
+            .map(|asset| (asset.id.clone(), asset))
+            .collect();
+
+        for (asset_id, pair) in pairs.iter_mut() {
+            if let Some(asset) = assets_by_id.get(asset_id) {
+                reconcile_quote_currency(&mut pair.latest, asset);
+                if let Some(previous) = pair.previous.as_mut() {
+                    reconcile_quote_currency(previous, asset);
+                }
+            }
+        }
+
+        Ok(pairs)
     }
 
     fn get_historical_quotes(&self, symbol: &str) -> Result<Vec<Quote>> {
-        self.quote_store.get_historical_quotes(symbol)
+        let mut quotes = self.quote_store.get_historical_quotes(symbol)?;
+        if let Ok(asset) = self.asset_repo.get_by_id(symbol) {
+            for quote in quotes.iter_mut() {
+                reconcile_quote_currency(quote, &asset);
+            }
+        }
+        Ok(quotes)
     }
 
     fn get_all_historical_quotes(&self) -> Result<HashMap<String, Vec<(NaiveDate, Quote)>>> {
-        let quotes = self.quote_store.get_all_historical_quotes()?;
+        let mut quotes = self.quote_store.get_all_historical_quotes()?;
+        let asset_ids: Vec<String> = quotes
+            .iter()
+            .map(|quote| quote.asset_id.clone())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+        let assets = self.asset_repo.list_by_asset_ids(&asset_ids)?;
+        let assets_by_id: HashMap<String, Asset> = assets
+            .into_iter()
+            .map(|asset| (asset.id.clone(), asset))
+            .collect();
+
+        for quote in quotes.iter_mut() {
+            if let Some(asset) = assets_by_id.get(&quote.asset_id) {
+                reconcile_quote_currency(quote, asset);
+            }
+        }
 
         let mut grouped: HashMap<String, Vec<(NaiveDate, Quote)>> = HashMap::new();
         for quote in quotes {
@@ -531,9 +692,21 @@ where
         start: NaiveDate,
         end: NaiveDate,
     ) -> Result<Vec<Quote>> {
+        let ids: Vec<String> = symbols.iter().cloned().collect();
+        let assets = self.asset_repo.list_by_asset_ids(&ids)?;
+        let assets_by_id: HashMap<String, Asset> = assets
+            .into_iter()
+            .map(|asset| (asset.id.clone(), asset))
+            .collect();
+
         let mut all_quotes = Vec::new();
         for symbol in symbols {
-            let quotes = self.quote_store.get_quotes_in_range(symbol, start, end)?;
+            let mut quotes = self.quote_store.get_quotes_in_range(symbol, start, end)?;
+            if let Some(asset) = assets_by_id.get(symbol) {
+                for quote in quotes.iter_mut() {
+                    reconcile_quote_currency(quote, asset);
+                }
+            }
             all_quotes.extend(quotes);
         }
         Ok(all_quotes)
@@ -554,11 +727,23 @@ where
 
         // Fetch quotes with lookback period
         let lookback_start = start - Duration::days(QUOTE_LOOKBACK_DAYS);
+        let ids: Vec<String> = symbols.iter().cloned().collect();
+        let assets = self.asset_repo.list_by_asset_ids(&ids)?;
+        let assets_by_id: HashMap<String, Asset> = assets
+            .into_iter()
+            .map(|asset| (asset.id.clone(), asset))
+            .collect();
+
         let mut all_quotes = Vec::new();
         for symbol in symbols {
-            let quotes = self
+            let mut quotes = self
                 .quote_store
                 .get_quotes_in_range(symbol, lookback_start, end)?;
+            if let Some(asset) = assets_by_id.get(symbol) {
+                for quote in quotes.iter_mut() {
+                    reconcile_quote_currency(quote, asset);
+                }
+            }
             all_quotes.extend(quotes);
         }
 
@@ -693,6 +878,79 @@ where
         });
 
         Ok(merged)
+    }
+
+    async fn resolve_symbol_quote(
+        &self,
+        symbol: &str,
+        exchange_mic: Option<&str>,
+        instrument_type: Option<&InstrumentType>,
+    ) -> Result<ResolvedQuote> {
+        let trimmed_symbol = symbol.trim();
+        if trimmed_symbol.is_empty() {
+            return Ok(ResolvedQuote::default());
+        }
+
+        // Strip Yahoo exchange suffix to avoid double-suffixing (e.g. "AZN.L" + MIC "XLON" → "AZN.L.L").
+        // The resolver chain will re-append the correct suffix from the MIC.
+        let clean_symbol = if let Some(mic) = exchange_mic {
+            if let Some(dot_pos) = trimmed_symbol.rfind('.') {
+                let suffix = &trimmed_symbol[dot_pos + 1..];
+                if mic_to_yahoo_suffix(mic).is_some_and(|s| s.eq_ignore_ascii_case(suffix)) {
+                    &trimmed_symbol[..dot_pos]
+                } else {
+                    trimmed_symbol
+                }
+            } else {
+                trimmed_symbol
+            }
+        } else {
+            trimmed_symbol
+        };
+
+        let temp_asset = Asset {
+            id: format!("_QUOTE_RESOLVE_{}", clean_symbol),
+            kind: AssetKind::Investment,
+            quote_mode: QuoteMode::Market,
+            quote_ccy: String::new(),
+            instrument_type: instrument_type.cloned().or(Some(InstrumentType::Equity)),
+            instrument_symbol: Some(clean_symbol.to_string()),
+            display_code: Some(clean_symbol.to_string()),
+            instrument_exchange_mic: exchange_mic.map(str::to_string),
+            ..Default::default()
+        };
+
+        match self
+            .client
+            .read()
+            .await
+            .fetch_latest_quote(&temp_asset)
+            .await
+        {
+            Ok(quote) => {
+                let currency = {
+                    let c = quote.currency.trim();
+                    if c.is_empty() {
+                        None
+                    } else {
+                        Some(c.to_string())
+                    }
+                };
+                let price = if quote.close.is_zero() {
+                    None
+                } else {
+                    Some(quote.close)
+                };
+                Ok(ResolvedQuote { currency, price })
+            }
+            Err(err) => {
+                debug!(
+                    "resolve_symbol_quote: provider lookup failed for symbol='{}' mic={:?}: {}",
+                    clean_symbol, exchange_mic, err
+                );
+                Ok(ResolvedQuote::default())
+            }
+        }
     }
 
     async fn get_asset_profile(&self, asset: &Asset) -> Result<ProviderProfile> {
@@ -1412,4 +1670,59 @@ fn fill_missing_quotes(
     }
 
     all_filled_quotes
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::assets::QuoteMode;
+    use crate::quotes::model::DataSource;
+    use rust_decimal_macros::dec;
+
+    #[test]
+    fn test_resolve_effective_quote_currency_prefers_minor_unit() {
+        assert_eq!(
+            resolve_effective_quote_currency("GBp", "GBP").as_deref(),
+            Some("GBp")
+        );
+        assert_eq!(
+            resolve_effective_quote_currency("GBP", "GBp").as_deref(),
+            Some("GBp")
+        );
+    }
+
+    #[test]
+    fn test_resolve_effective_quote_currency_rejects_unrelated_pairs() {
+        assert_eq!(resolve_effective_quote_currency("GBP", "USD"), None);
+        assert_eq!(resolve_effective_quote_currency("EUR", "GBP"), None);
+    }
+
+    #[test]
+    fn test_reconcile_quote_currency_applies_asset_unit_hint() {
+        let asset = Asset {
+            id: "asset_1".to_string(),
+            quote_ccy: "GBp".to_string(),
+            quote_mode: QuoteMode::Market,
+            ..Default::default()
+        };
+
+        let mut quote = Quote {
+            id: "q_1".to_string(),
+            created_at: Utc::now(),
+            data_source: DataSource::Yahoo,
+            timestamp: Utc::now(),
+            asset_id: asset.id.clone(),
+            open: dec!(465),
+            high: dec!(470),
+            low: dec!(440),
+            close: dec!(445.65),
+            adjclose: dec!(445.65),
+            volume: dec!(1000),
+            currency: "GBP".to_string(),
+            notes: None,
+        };
+
+        reconcile_quote_currency(&mut quote, &asset);
+        assert_eq!(quote.currency, "GBp");
+    }
 }

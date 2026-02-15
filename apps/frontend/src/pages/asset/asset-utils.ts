@@ -1,4 +1,4 @@
-import { Asset } from "@/lib/types";
+import { Asset, LatestQuoteSnapshot } from "@/lib/types";
 
 export interface WeightedBreakdown {
   name: string;
@@ -9,6 +9,14 @@ export interface ParsedAsset extends Asset {
   sectorsList: WeightedBreakdown[];
   countriesList: WeightedBreakdown[];
 }
+
+export const isStaleQuote = (snapshot?: LatestQuoteSnapshot, asset?: ParsedAsset): boolean => {
+  if (!snapshot || asset?.isActive === false) {
+    return true;
+  }
+
+  return snapshot.isStale;
+};
 
 const normalizeWeight = (weight: unknown): number => {
   if (weight === null || weight === undefined) {

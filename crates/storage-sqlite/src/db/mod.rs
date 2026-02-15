@@ -62,6 +62,7 @@ pub fn run_migrations(db_path: &str) -> Result<()> {
         .batch_execute(
             "
             PRAGMA journal_mode = WAL;
+            PRAGMA busy_timeout = 5000;
             PRAGMA foreign_keys = OFF;
             PRAGMA synchronous = OFF;
             PRAGMA cache_size = -64000;
@@ -97,6 +98,12 @@ pub fn run_migrations(db_path: &str) -> Result<()> {
             return Err(Error::Database(DatabaseError::QueryFailed(e.to_string())));
         }
     }
+
+    // Flush WAL to main DB file before pool creation
+    connection
+        .batch_execute("PRAGMA wal_checkpoint(TRUNCATE);")
+        .unwrap_or_else(|e| warn!("WAL checkpoint after migration failed: {}", e));
+    drop(connection);
 
     let result = migration_result?;
 

@@ -118,8 +118,8 @@ test.describe("Onboarding And Main Flow", () => {
         currency: "GBP",
         symbol: "AZN.L",
         shares: 17,
-        price: 140.82, // Price in pounds (not pence) - the app expects account currency
-        priceInPence: false,
+        price: 14082,
+        priceInPence: true,
       },
     ],
   };

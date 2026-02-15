@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { normalizeCurrency, formatAmount } from "@/lib/utils";
+import { formatAmount } from "@/lib/utils";
 import { useForm, FormProvider, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -70,7 +70,7 @@ export const transferFormSchema = z
       .nullable(),
     comment: z.string().optional().nullable(),
     // Advanced options
-    currency: z.string().optional(),
+    currency: z.string().min(1, { message: "Currency is required." }),
     fxRate: z.coerce
       .number({
         invalid_type_error: "FX Rate must be a number.",
@@ -228,7 +228,7 @@ export function TransferForm({
     (a) => a.value === initialFromAccountId || a.value === initialAccountId,
   );
   const initialCurrency =
-    defaultValues?.currency ?? normalizeCurrency(assetCurrency) ?? initialAccount?.currency;
+    defaultValues?.currency?.trim() || assetCurrency?.trim() || initialAccount?.currency;
 
   // Determine initial transfer mode from defaults
   const initialTransferMode: TransferMode =
@@ -254,12 +254,12 @@ export function TransferForm({
       quantity: null,
       unitPrice: null,
       comment: null,
-      currency: initialCurrency,
       fxRate: undefined,
       subtype: null,
       quoteMode: QuoteMode.MARKET,
       exchangeMic: undefined,
       ...defaultValues,
+      currency: defaultValues?.currency?.trim() || initialCurrency,
     },
   });
 
@@ -268,6 +268,7 @@ export function TransferForm({
   const direction = watch("direction");
   const accountId = watch("accountId");
   const fromAccountId = watch("fromAccountId");
+  const currency = watch("currency");
   const quoteMode = watch("quoteMode");
   const transferMode = watch("transferMode");
   const amount = watch("amount");
@@ -416,6 +417,7 @@ export function TransferForm({
               <AccountSelect
                 name="accountId"
                 accounts={accounts}
+                currencyName="currency"
                 label={direction === "in" ? "To Account" : "From Account"}
                 placeholder="Select account..."
               />
@@ -425,6 +427,7 @@ export function TransferForm({
                 <AccountSelect
                   name="fromAccountId"
                   accounts={accounts}
+                  currencyName="currency"
                   label="From Account"
                   placeholder="Select source account..."
                 />
@@ -463,13 +466,18 @@ export function TransferForm({
                 <QuantityInput name="quantity" label="Quantity" />
                 {/* Cost basis only needed for external transfer in - backend calculates for transfer out */}
                 {isExternal && direction === "in" && (
-                  <AmountInput name="unitPrice" label="Cost Basis" maxDecimalPlaces={4} />
+                  <AmountInput
+                    name="unitPrice"
+                    label="Cost Basis"
+                    maxDecimalPlaces={4}
+                    currency={currency}
+                  />
                 )}
               </>
             )}
 
             {/* Cash mode: Amount */}
-            {isCashMode && <AmountInput name="amount" label="Amount" />}
+            {isCashMode && <AmountInput name="amount" label="Amount" currency={currency} />}
 
             {/* Advanced Options */}
             <AdvancedOptionsSection

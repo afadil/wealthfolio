@@ -165,7 +165,7 @@ export function DashboardContent() {
         )}
       </div>
 
-      <div className="from-success/30 via-success/15 to-success/10 bg-linear-to-t grow px-4 pt-4 md:px-6 md:pt-6 lg:px-10 lg:pt-8">
+      <div className="from-success/30 via-success/15 to-success/10 bg-linear-to-t grow px-4 pt-12 md:px-6 md:pt-6 lg:px-10 lg:pt-8">
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:gap-20">
           <div className="lg:col-span-2">
             <AccountsSummary />

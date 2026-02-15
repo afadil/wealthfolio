@@ -27,3 +27,25 @@ export function downloadSampleCsv() {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+const SAMPLE_HOLDINGS_CSV_CONTENT = `date,symbol,quantity,avgCost,currency
+2024-03-31,AAPL,50,171.48,USD
+2024-03-31,MSFT,30,420.72,USD
+2024-03-31,VOO,20,468.50,USD
+2024-03-31,$CASH,5000,,USD
+2024-06-30,AAPL,55,210.62,USD
+2024-06-30,MSFT,30,446.34,USD
+2024-06-30,VOO,25,495.89,USD
+2024-06-30,$CASH,3200,,USD`;
+
+export function downloadSampleHoldingsCsv() {
+  const blob = new Blob([SAMPLE_HOLDINGS_CSV_CONTENT], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "sample-holdings-import.csv";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}

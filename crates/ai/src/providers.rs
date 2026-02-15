@@ -355,12 +355,13 @@ impl<E: AiEnvironment> ProviderService<E> {
         })
     }
 
-    /// Get provider URL (for local providers like Ollama).
-    pub fn get_provider_url(&self, provider_id: &str) -> Option<String> {
-        let stored: StoredAiSettings = self
+    /// Get the tools allowlist for a provider.
+    /// Returns None if all tools are allowed, Some(list) if only specific tools are allowed.
+    pub fn get_tools_allowlist(&self, provider_id: &str) -> Option<Vec<String>> {
+        let stored: AiProviderSettings = self
             .env
             .settings_service()
-            .get_setting_value(AI_SETTINGS_KEY)
+            .get_setting_value(AI_PROVIDER_SETTINGS_KEY)
             .ok()
             .flatten()
             .and_then(|s| serde_json::from_str(&s).ok())
@@ -369,13 +370,33 @@ impl<E: AiEnvironment> ProviderService<E> {
         stored
             .providers
             .get(provider_id)
-            .and_then(|p| p.url.clone())
+            .and_then(|p| p.tools_allowlist.clone())
+    }
+
+    /// Get provider URL (for local providers like Ollama).
+    pub fn get_provider_url(&self, provider_id: &str) -> Option<String> {
+        let stored: AiProviderSettings = self
+            .env
+            .settings_service()
+            .get_setting_value(AI_PROVIDER_SETTINGS_KEY)
+            .ok()
+            .flatten()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default();
+
+        let url = stored
+            .providers
+            .get(provider_id)
+            .and_then(|p| p.custom_url.clone())
             .or_else(|| {
                 PROVIDER_CATALOG
                     .providers
                     .get(provider_id)
                     .and_then(|p| p.default_config.url.clone())
-            })
+            });
+
+        // Validate URL to prevent panics in rig-core's HTTP client
+        url.filter(|u| reqwest::Url::parse(u).is_ok())
     }
 
     /// Update AI settings.

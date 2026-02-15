@@ -26,15 +26,14 @@ import {
 } from "@wealthfolio/ui/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 
-import { ASSET_KIND_DISPLAY_NAMES } from "@/lib/types";
-import { Quote } from "@/lib/types";
+import { ASSET_KIND_DISPLAY_NAMES, LatestQuoteSnapshot } from "@/lib/types";
 import { formatAmount, formatDate } from "@/lib/utils";
 import { useSettingsContext } from "@/lib/settings-provider";
-import { ParsedAsset } from "./asset-utils";
+import { isStaleQuote, ParsedAsset } from "./asset-utils";
 
 interface AssetsTableProps {
   assets: ParsedAsset[];
-  latestQuotes?: Record<string, Quote>;
+  latestQuotes?: Record<string, LatestQuoteSnapshot>;
   isLoading?: boolean;
   onEdit: (asset: ParsedAsset) => void;
   onDelete: (asset: ParsedAsset) => void;
@@ -48,22 +47,6 @@ const PRICE_STALE_OPTIONS = [
   { label: "Up to Date", value: "false" },
   { label: "Stale", value: "true" },
 ];
-
-const isStaleQuote = (quote?: Quote, isActive?: boolean) => {
-  // Inactive assets or missing quotes are considered stale
-  if (!quote || isActive === false) {
-    return true;
-  }
-
-  const quoteDate = new Date(quote.timestamp);
-  const today = new Date();
-
-  return (
-    quoteDate.getFullYear() !== today.getFullYear() ||
-    quoteDate.getMonth() !== today.getMonth() ||
-    quoteDate.getDate() !== today.getDate()
-  );
-};
 
 export function AssetsTable({
   assets,
@@ -187,8 +170,9 @@ export function AssetsTable({
         size: 130,
         cell: ({ row }) => {
           const asset = row.original;
-          const quote = latestQuotes[asset.id];
-          const stale = isStaleQuote(quote, asset.isActive);
+          const snapshot = latestQuotes[asset.id];
+          const quote = snapshot?.quote;
+          const stale = isStaleQuote(snapshot, asset);
 
           if (!quote) {
             return (
@@ -209,10 +193,10 @@ export function AssetsTable({
                     <TooltipTrigger asChild>
                       <Icons.AlertTriangle
                         className="h-3.5 w-3.5 text-amber-500"
-                        aria-label="Quote not updated today"
+                        aria-label="Quote is behind market day"
                       />
                     </TooltipTrigger>
-                    <TooltipContent>Latest quote is not from today</TooltipContent>
+                    <TooltipContent>Latest quote is behind the current market day</TooltipContent>
                   </Tooltip>
                 ) : null}
                 <span className="font-semibold tabular-nums">
@@ -328,7 +312,7 @@ export function AssetsTable({
     () =>
       assets.map((asset) => ({
         ...asset,
-        isStale: isStaleQuote(latestQuotes[asset.id], asset.isActive) ? "true" : "false",
+        isStale: isStaleQuote(latestQuotes[asset.id], asset) ? "true" : "false",
       })),
     [assets, latestQuotes],
   );

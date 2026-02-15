@@ -365,6 +365,12 @@ impl FxServiceTrait for FxService {
             return Ok(());
         }
 
+        // Minor/major aliases (e.g., GBp -> GBP) may normalize to the same code.
+        // Never create synthetic same-currency FX assets.
+        if normalized_from == normalized_to {
+            return Ok(());
+        }
+
         let existing_rate = self
             .load_latest_exchange_rate(normalized_from, normalized_to)
             .ok();
@@ -394,6 +400,12 @@ impl FxServiceTrait for FxService {
             return Ok(());
         }
 
+        // Minor/major aliases (e.g., GBp -> GBP) may normalize to the same code.
+        // Never create synthetic same-currency FX assets.
+        if normalized_from == normalized_to {
+            return Ok(());
+        }
+
         let existing_rate = self
             .load_latest_exchange_rate(normalized_from, normalized_to)
             .ok();
@@ -420,5 +432,128 @@ impl FxServiceTrait for FxService {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::quotes::Quote;
+    use chrono::NaiveDateTime;
+    use rust_decimal::Decimal;
+    use std::sync::Mutex;
+
+    #[derive(Default)]
+    struct MockFxRepository {
+        created_pairs: Mutex<Vec<(String, String, String)>>,
+    }
+
+    #[async_trait]
+    impl FxRepositoryTrait for MockFxRepository {
+        fn get_latest_exchange_rates(&self) -> Result<Vec<ExchangeRate>> {
+            Ok(vec![])
+        }
+
+        fn get_historical_exchange_rates(&self) -> Result<Vec<ExchangeRate>> {
+            Ok(vec![])
+        }
+
+        fn get_latest_exchange_rate(&self, _from: &str, _to: &str) -> Result<Option<ExchangeRate>> {
+            Ok(None)
+        }
+
+        fn get_latest_exchange_rate_by_symbol(
+            &self,
+            _symbol: &str,
+        ) -> Result<Option<ExchangeRate>> {
+            Ok(None)
+        }
+
+        fn get_historical_quotes(
+            &self,
+            _symbol: &str,
+            _start_date: NaiveDateTime,
+            _end_date: NaiveDateTime,
+        ) -> Result<Vec<Quote>> {
+            Ok(vec![])
+        }
+
+        async fn add_quote(
+            &self,
+            _symbol: String,
+            _date: String,
+            _rate: Decimal,
+            _source: String,
+        ) -> Result<Quote> {
+            unimplemented!()
+        }
+
+        async fn save_exchange_rate(&self, rate: ExchangeRate) -> Result<ExchangeRate> {
+            Ok(rate)
+        }
+
+        async fn update_exchange_rate(&self, rate: &ExchangeRate) -> Result<ExchangeRate> {
+            Ok(rate.clone())
+        }
+
+        async fn delete_exchange_rate(&self, _rate_id: &str) -> Result<()> {
+            Ok(())
+        }
+
+        async fn create_fx_asset(
+            &self,
+            from_currency: &str,
+            to_currency: &str,
+            source: &str,
+        ) -> Result<String> {
+            self.created_pairs.lock().unwrap().push((
+                from_currency.to_string(),
+                to_currency.to_string(),
+                source.to_string(),
+            ));
+            Ok(format!("FX:{}{}", from_currency, to_currency))
+        }
+    }
+
+    #[tokio::test]
+    async fn register_currency_pair_skips_minor_major_same_currency_after_normalization() {
+        let repo = Arc::new(MockFxRepository::default());
+        let service = FxService::new(repo.clone());
+
+        service.register_currency_pair("GBp", "GBP").await.unwrap();
+
+        assert!(
+            repo.created_pairs.lock().unwrap().is_empty(),
+            "GBp/GBP should not create an FX asset after normalization"
+        );
+    }
+
+    #[tokio::test]
+    async fn register_currency_pair_manual_skips_minor_major_same_currency_after_normalization() {
+        let repo = Arc::new(MockFxRepository::default());
+        let service = FxService::new(repo.clone());
+
+        service
+            .register_currency_pair_manual("GBp", "GBP")
+            .await
+            .unwrap();
+
+        assert!(
+            repo.created_pairs.lock().unwrap().is_empty(),
+            "GBp/GBP should not create a manual FX asset after normalization"
+        );
+    }
+
+    #[tokio::test]
+    async fn register_currency_pair_creates_asset_for_distinct_currencies() {
+        let repo = Arc::new(MockFxRepository::default());
+        let service = FxService::new(repo.clone());
+
+        service.register_currency_pair("USD", "CAD").await.unwrap();
+
+        let created = repo.created_pairs.lock().unwrap();
+        assert_eq!(created.len(), 1);
+        assert_eq!(created[0].0, "USD");
+        assert_eq!(created[0].1, "CAD");
     }
 }

@@ -3,9 +3,11 @@ import type {
   SymbolSearchResult,
   Asset,
   Quote,
+  LatestQuoteSnapshot,
   UpdateAssetProfile,
   MarketDataProviderInfo,
   ExchangeInfo,
+  ResolvedQuote,
 } from "@/lib/types";
 import type { QuoteImport } from "@/lib/types/quote-import";
 import type { MarketDataProviderSetting } from "../types";
@@ -48,9 +50,11 @@ export const getAssets = async (): Promise<Asset[]> => {
   }
 };
 
-export const getLatestQuotes = async (assetIds: string[]): Promise<Record<string, Quote>> => {
+export const getLatestQuotes = async (
+  assetIds: string[],
+): Promise<Record<string, LatestQuoteSnapshot>> => {
   try {
-    return await invoke<Record<string, Quote>>("get_latest_quotes", { assetIds });
+    return await invoke<Record<string, LatestQuoteSnapshot>>("get_latest_quotes", { assetIds });
   } catch (error) {
     logger.error("Error loading latest quotes.");
     throw error;
@@ -166,6 +170,23 @@ export const checkQuotesImport = async (
   } catch (error) {
     logger.error("Error checking quotes import.");
     throw error;
+  }
+};
+
+export const resolveSymbolQuote = async (
+  symbol: string,
+  exchangeMic?: string,
+  instrumentType?: string,
+): Promise<ResolvedQuote | null> => {
+  try {
+    return await invoke<ResolvedQuote>("resolve_symbol_quote", {
+      symbol,
+      exchangeMic,
+      instrumentType,
+    });
+  } catch (_error) {
+    logger.error("Error resolving symbol quote.");
+    return null;
   }
 };
 

@@ -3,8 +3,8 @@
 //! These limits ensure that tool outputs don't overwhelm the LLM context
 //! while still providing enough data for meaningful analysis.
 
-/// Default number of days for activity searches (when no date range specified).
-pub const DEFAULT_ACTIVITIES_DAYS: i64 = 90;
+/// Default page size for activity searches.
+pub const DEFAULT_PAGE_SIZE: i64 = 50;
 
 /// Maximum number of activity rows returned per tool call.
 pub const MAX_ACTIVITIES_ROWS: usize = 200;

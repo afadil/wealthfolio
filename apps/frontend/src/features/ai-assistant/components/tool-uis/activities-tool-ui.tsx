@@ -158,7 +158,12 @@ function normalizeResult(result: unknown, fallbackCurrency: string): SearchActiv
           : entry.unit_price != null
             ? Number(entry.unit_price)
             : null,
-      amount: entry.amount != null ? Number(entry.amount) : null,
+      amount:
+        entry.amount != null
+          ? Number(entry.amount)
+          : entry.quantity != null && (entry.unitPrice ?? entry.unit_price) != null
+            ? Number(entry.quantity) * Number(entry.unitPrice ?? entry.unit_price)
+            : null,
       fee: entry.fee != null ? Number(entry.fee) : null,
       currency: (entry.currency as string | undefined) ?? fallbackCurrency,
       accountId:
@@ -244,7 +249,10 @@ function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
     [],
   );
 
-  const accountLabel = parsed?.accountScope ?? args?.accountId ?? "all";
+  const accountScope = parsed?.accountScope ?? args?.accountId ?? "all";
+  // Show account name instead of ID when filtering a single account
+  const accountLabel =
+    accountScope !== "all" ? (sortedActivities[0]?.accountName ?? accountScope) : "all";
   const isLoading = status?.type === "running";
   const isComplete = status?.type === "complete" || status?.type === "incomplete";
   const hasError = status?.type === "incomplete" && status.reason === "error";
@@ -287,6 +295,7 @@ function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
                   <TableHead className="text-xs">Type</TableHead>
                   <TableHead className="text-xs">Symbol</TableHead>
                   <TableHead className="text-right text-xs">Qty</TableHead>
+                  <TableHead className="text-right text-xs">Price</TableHead>
                   <TableHead className="pr-4 text-right text-xs">Amount</TableHead>
                 </TableRow>
               </TableHeader>
@@ -304,6 +313,9 @@ function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
                     </TableCell>
                     <TableCell className="py-2 text-right">
                       <Skeleton className="ml-auto h-4 w-10" />
+                    </TableCell>
+                    <TableCell className="py-2 text-right">
+                      <Skeleton className="ml-auto h-4 w-12" />
                     </TableCell>
                     <TableCell className="py-2 pr-4 text-right">
                       <Skeleton className="ml-auto h-4 w-16" />
@@ -331,7 +343,13 @@ function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
 
   // Empty state - don't render anything, let LLM explain
   if (isComplete && activitiesCount === 0) {
-    return null;
+    return (
+      <Card className="bg-muted/40 border-primary/10 w-full">
+        <CardContent className="py-4">
+          <p className="text-muted-foreground text-sm">No activities found for this query.</p>
+        </CardContent>
+      </Card>
+    );
   }
 
   // Complete state with data
@@ -368,6 +386,7 @@ function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
                 <TableHead className="text-xs">Type</TableHead>
                 <TableHead className="text-xs">Symbol</TableHead>
                 <TableHead className="text-right text-xs">Qty</TableHead>
+                <TableHead className="text-right text-xs">Price</TableHead>
                 <TableHead className="pr-4 text-right text-xs">Amount</TableHead>
               </TableRow>
             </TableHeader>
@@ -396,6 +415,9 @@ function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
                     </TableCell>
                     <TableCell className="py-2 text-right tabular-nums">
                       {formatQuantity(activity.quantity)}
+                    </TableCell>
+                    <TableCell className="py-2 text-right tabular-nums">
+                      {formatAmount(activity.unitPrice)}
                     </TableCell>
                     <TableCell className="py-2 pr-4 text-right font-medium tabular-nums">
                       {formatAmount(activity.amount, activity.currency)}

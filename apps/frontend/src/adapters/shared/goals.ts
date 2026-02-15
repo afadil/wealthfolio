@@ -19,8 +19,6 @@ export const getGoals = async (): Promise<Goal[]> => {
 export const createGoal = async (goal: NewGoal): Promise<Goal> => {
   const newGoal = {
     ...goal,
-    yearlyContribution: 0,
-    goalType: "NEEDS",
     isAchieved: false,
   };
   try {

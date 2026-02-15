@@ -53,7 +53,7 @@ export const buyFormSchema = z.object({
     .default(0),
   comment: z.string().optional().nullable(),
   // Advanced options
-  currency: z.string().optional(),
+  currency: z.string().min(1, { message: "Currency is required." }),
   fxRate: z.coerce
     .number({
       invalid_type_error: "FX Rate must be a number.",
@@ -100,7 +100,7 @@ export function BuyForm({
   const initialAccount = accounts.find((a) => a.value === initialAccountId);
   // Currency priority: provided default > normalized asset currency > account currency
   const initialCurrency =
-    defaultValues?.currency ?? normalizeCurrency(assetCurrency) ?? initialAccount?.currency;
+    defaultValues?.currency?.trim() || assetCurrency?.trim() || initialAccount?.currency;
 
   const form = useForm<BuyFormValues>({
     resolver: zodResolver(buyFormSchema) as Resolver<BuyFormValues>,
@@ -117,17 +117,19 @@ export function BuyForm({
       unitPrice: undefined,
       fee: 0,
       comment: null,
-      currency: initialCurrency,
       fxRate: undefined,
       quoteMode: QuoteMode.MARKET,
       exchangeMic: undefined,
       ...defaultValues,
+      currency: defaultValues?.currency?.trim() || initialCurrency,
     },
   });
 
   const { watch } = form;
   const accountId = watch("accountId");
+  const currency = watch("currency");
   const quoteMode = watch("quoteMode");
+  const symbolQuoteCcy = watch("symbolQuoteCcy");
   const isManualAsset = quoteMode === QuoteMode.MANUAL;
 
   // Get account currency from selected account
@@ -136,6 +138,7 @@ export function BuyForm({
     [accounts, accountId],
   );
   const accountCurrency = selectedAccount?.currency;
+  const assetCurrencyFromSymbol = normalizeCurrency(symbolQuoteCcy)?.toUpperCase();
 
   const handleSubmit = form.handleSubmit(async (data) => {
     await onSubmit(data);
@@ -147,7 +150,7 @@ export function BuyForm({
         <Card>
           <CardContent className="space-y-6 pt-4">
             {/* Account Selection */}
-            <AccountSelect name="accountId" accounts={accounts} />
+            <AccountSelect name="accountId" accounts={accounts} currencyName="currency" />
 
             {/* Symbol Search */}
             <SymbolSearch
@@ -172,8 +175,13 @@ export function BuyForm({
             {/* Quantity, Price, Fee Row */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <QuantityInput name="quantity" label="Quantity" />
-              <AmountInput name="unitPrice" label="Price" maxDecimalPlaces={4} />
-              <AmountInput name="fee" label="Fee" />
+              <AmountInput
+                name="unitPrice"
+                label="Price"
+                maxDecimalPlaces={4}
+                currency={currency}
+              />
+              <AmountInput name="fee" label="Fee" currency={currency} />
             </div>
 
             {/* Advanced Options */}
@@ -181,7 +189,7 @@ export function BuyForm({
               currencyName="currency"
               fxRateName="fxRate"
               activityType={ActivityType.BUY}
-              assetCurrency={assetCurrency}
+              assetCurrency={assetCurrencyFromSymbol ?? normalizeCurrency(assetCurrency)}
               accountCurrency={accountCurrency}
               baseCurrency={baseCurrency}
               showSubtype={false}

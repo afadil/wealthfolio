@@ -20,7 +20,6 @@ import {
   type ReasoningMessagePartComponent,
 } from "@assistant-ui/react";
 
-const AUTO_CLOSE_DELAY = 1000;
 const MS_IN_S = 1000;
 
 /**
@@ -59,13 +58,11 @@ const ReasoningImpl: ReasoningMessagePartComponent = () => {
 
 /**
  * Collapsible reasoning group using Radix Collapsible.
- * Auto-opens when streaming starts, auto-closes after streaming ends.
+ * Collapsed by default; user can toggle open/closed manually.
  */
 const ReasoningGroupImpl: ReasoningGroupComponent = ({ children, startIndex, endIndex }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [hasAutoClosed, setHasAutoClosed] = useState(false);
   const [duration, setDuration] = useState<number | undefined>(undefined);
-  const hasEverStreamedRef = useRef(false);
   const startTimeRef = useRef<number | null>(null);
 
   const isStreaming = useAssistantState(({ message }) => {
@@ -80,7 +77,6 @@ const ReasoningGroupImpl: ReasoningGroupComponent = ({ children, startIndex, end
   // Track streaming start/end and compute duration
   useEffect(() => {
     if (isStreaming) {
-      hasEverStreamedRef.current = true;
       if (startTimeRef.current === null) {
         startTimeRef.current = Date.now();
       }
@@ -89,24 +85,6 @@ const ReasoningGroupImpl: ReasoningGroupComponent = ({ children, startIndex, end
       startTimeRef.current = null;
     }
   }, [isStreaming]);
-
-  // Auto-open when streaming starts
-  useEffect(() => {
-    if (isStreaming && !isOpen) {
-      setIsOpen(true);
-    }
-  }, [isStreaming, isOpen]);
-
-  // Auto-close after streaming ends (once only)
-  useEffect(() => {
-    if (hasEverStreamedRef.current && !isStreaming && isOpen && !hasAutoClosed) {
-      const timer = setTimeout(() => {
-        setIsOpen(false);
-        setHasAutoClosed(true);
-      }, AUTO_CLOSE_DELAY);
-      return () => clearTimeout(timer);
-    }
-  }, [isStreaming, isOpen, hasAutoClosed]);
 
   const thinkingMessage = useMemo(() => {
     if (isStreaming || duration === 0) {

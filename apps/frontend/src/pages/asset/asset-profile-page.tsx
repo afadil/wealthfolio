@@ -70,6 +70,7 @@ interface AssetDetailData {
   totalReturn: number;
   totalReturnPercent: number;
   currency: string;
+  quoteCurrency: string | null;
   quote: {
     open: number;
     high: number;
@@ -321,7 +322,7 @@ export const AssetProfilePage = () => {
       currency: instrument?.currency ?? asset?.quoteCcy ?? baseCurrency,
       sectors: JSON.stringify(parseJsonField(legacy?.sectors) ?? []),
       url: null,
-      marketPrice: quote?.close ?? 0,
+      marketPrice: holding?.price ?? quote?.close ?? 0,
       totalGainAmount,
       totalGainPercent,
       calculatedAt,
@@ -338,8 +339,6 @@ export const AssetProfilePage = () => {
 
     const quoteData = quote
       ? {
-          todaysReturn: quote.close - quote.open,
-          todaysReturnPercent: Number((quote.close - quote.open) / quote.open),
           quote: {
             open: quote.open,
             high: quote.high,
@@ -348,8 +347,12 @@ export const AssetProfilePage = () => {
             close: quote.close,
             adjclose: quote.adjclose,
           },
+          quoteCurrency: quote.currency ?? null,
         }
       : null;
+
+    const todaysReturn = holding.dayChange?.local;
+    const todaysReturnPercent = holding.dayChangePct;
 
     return {
       numShares: Number(holding.quantity),
@@ -357,11 +360,12 @@ export const AssetProfilePage = () => {
       costBasis: Number(holding.costBasis?.local ?? 0),
       averagePrice: Number(averageCostPrice),
       portfolioPercent: Number(holding.weight ?? 0),
-      todaysReturn: quoteData?.todaysReturn ?? null,
-      todaysReturnPercent: quoteData?.todaysReturnPercent ?? null,
+      todaysReturn: todaysReturn != null ? Number(todaysReturn) : null,
+      todaysReturnPercent: todaysReturnPercent != null ? Number(todaysReturnPercent) : null,
       totalReturn: Number(holding.totalGain?.local ?? 0),
       totalReturnPercent: Number(holding.totalGainPct ?? 0),
       currency: holding.localCurrency ?? holding.instrument?.currency ?? baseCurrency,
+      quoteCurrency: quoteData?.quoteCurrency ?? null,
       quote: quoteData?.quote ?? null,
     };
   }, [holding, quote]);
@@ -403,8 +407,8 @@ export const AssetProfilePage = () => {
             <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">
               <AssetHistoryCard
                 assetId={profile.id ?? ""}
-                currency={profile.currency ?? baseCurrency}
-                marketPrice={profile.marketPrice}
+                currency={quote?.currency ?? profile.currency ?? baseCurrency}
+                marketPrice={quote?.close ?? profile.marketPrice}
                 totalGainAmount={profile.totalGainAmount}
                 totalGainPercent={profile.totalGainPercent}
                 quoteHistory={quoteHistory ?? []}
@@ -488,8 +492,8 @@ export const AssetProfilePage = () => {
         content: (
           <AssetLotsTable
             lots={holding.lots}
-            currency={profile.currency ?? baseCurrency}
-            marketPrice={profile.marketPrice}
+            currency={symbolHolding?.currency ?? profile.currency ?? baseCurrency}
+            marketPrice={Number(holding.price ?? profile.marketPrice)}
           />
         ),
       });
@@ -512,7 +516,7 @@ export const AssetProfilePage = () => {
         <QuoteHistoryDataGrid
           data={quoteHistory ?? []}
           assetId={assetId}
-          currency={profile?.currency ?? baseCurrency}
+          currency={quote?.currency ?? profile?.currency ?? baseCurrency}
           assetKind={assetProfile?.kind}
           isManualDataSource={isManualPricingMode}
           onSaveQuote={(quote: Quote) => saveQuoteMutation.mutate(quote)}
@@ -795,10 +799,20 @@ export const AssetProfilePage = () => {
             <h1 className="truncate text-base font-semibold leading-tight md:text-lg">
               {assetProfile?.name ?? holding?.instrument?.name ?? assetId ?? "-"}
             </h1>
-            <p className="text-muted-foreground text-xs leading-tight md:text-sm">
-              {isAltAsset && altHolding
-                ? getAlternativeAssetKindLabel(altHolding.kind)
-                : (assetProfile?.displayCode ?? holding?.instrument?.symbol ?? assetId)}
+            <p className="text-muted-foreground flex items-center gap-1.5 text-xs leading-tight md:text-sm">
+              {isAltAsset && altHolding ? (
+                getAlternativeAssetKindLabel(altHolding.kind)
+              ) : (
+                <>
+                  {assetProfile?.displayCode ?? holding?.instrument?.symbol ?? assetId}
+                  {(assetProfile?.quoteCcy ?? profile?.currency) && (
+                    <>
+                      <span className="bg-muted-foreground/40 h-3 w-px rounded-full" />
+                      {assetProfile?.quoteCcy ?? profile?.currency}
+                    </>
+                  )}
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -892,8 +906,8 @@ export const AssetProfilePage = () => {
                 <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">
                   <AssetHistoryCard
                     assetId={profile.id ?? ""}
-                    currency={profile.currency ?? baseCurrency}
-                    marketPrice={profile.marketPrice}
+                    currency={quote?.currency ?? profile.currency ?? baseCurrency}
+                    marketPrice={quote?.close ?? profile.marketPrice}
                     totalGainAmount={profile.totalGainAmount}
                     totalGainPercent={profile.totalGainPercent}
                     quoteHistory={quoteHistory ?? []}
@@ -977,8 +991,8 @@ export const AssetProfilePage = () => {
               <TabsContent value="lots" className="pt-6">
                 <AssetLotsTable
                   lots={holding.lots}
-                  currency={profile.currency ?? baseCurrency}
-                  marketPrice={profile.marketPrice}
+                  currency={symbolHolding?.currency ?? profile.currency ?? baseCurrency}
+                  marketPrice={Number(holding.price ?? profile.marketPrice)}
                 />
               </TabsContent>
             )}
@@ -999,7 +1013,7 @@ export const AssetProfilePage = () => {
                 <QuoteHistoryDataGrid
                   data={quoteHistory ?? []}
                   assetId={assetId}
-                  currency={profile?.currency ?? baseCurrency}
+                  currency={quote?.currency ?? profile?.currency ?? baseCurrency}
                   assetKind={assetProfile?.kind}
                   isManualDataSource={isManualPricingMode}
                   onSaveQuote={(quote: Quote) => saveQuoteMutation.mutate(quote)}

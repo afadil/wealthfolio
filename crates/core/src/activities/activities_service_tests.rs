@@ -10,8 +10,8 @@ mod tests {
     use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
     use crate::quotes::service::ProviderInfo;
     use crate::quotes::{
-        LatestQuotePair, Quote, QuoteImport, QuoteServiceTrait, QuoteSyncState, SymbolSearchResult,
-        SymbolSyncPlan, SyncMode, SyncResult,
+        LatestQuotePair, LatestQuoteSnapshot, Quote, QuoteImport, QuoteServiceTrait,
+        QuoteSyncState, SymbolSearchResult, SymbolSyncPlan, SyncMode, SyncResult,
     };
     use async_trait::async_trait;
     use chrono::{DateTime, NaiveDate, Utc};
@@ -334,6 +334,29 @@ mod tests {
 
         fn get_latest_quotes(&self, _symbols: &[String]) -> Result<HashMap<String, Quote>> {
             unimplemented!()
+        }
+
+        fn get_latest_quotes_snapshot(
+            &self,
+            asset_ids: &[String],
+        ) -> Result<HashMap<String, LatestQuoteSnapshot>> {
+            let today = Utc::now().date_naive();
+            let quotes = self.get_latest_quotes(asset_ids)?;
+            Ok(quotes
+                .into_iter()
+                .map(|(asset_id, quote)| {
+                    let quote_day = quote.timestamp.date_naive();
+                    (
+                        asset_id,
+                        LatestQuoteSnapshot {
+                            quote,
+                            is_stale: quote_day < today,
+                            effective_market_date: today.to_string(),
+                            quote_date: quote_day.to_string(),
+                        },
+                    )
+                })
+                .collect())
         }
 
         fn get_latest_quotes_pair(
@@ -1900,6 +1923,14 @@ mod tests {
         let checked = &result[0];
         assert_eq!(checked.instrument_type.as_deref(), Some("EQUITY"));
         assert_eq!(checked.quote_ccy.as_deref(), Some("GBp"));
+        assert!(
+            checked
+                .warnings
+                .as_ref()
+                .and_then(|w| w.get("_quote_ccy_fallback"))
+                .is_some(),
+            "Expected MIC fallback warning when quote_ccy is inferred from exchange"
+        );
     }
 
     #[tokio::test]

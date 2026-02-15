@@ -484,6 +484,7 @@ impl ProviderRegistry {
             let provider_id: ProviderId = Cow::Borrowed(provider.id());
 
             if !self.circuit_breaker.is_allowed(&provider_id) {
+                warn!("Search: skipping '{}' — circuit breaker open", provider_id);
                 continue;
             }
 
@@ -495,17 +496,19 @@ impl ProviderRegistry {
                     return Ok(results);
                 }
                 Ok(_) => {
-                    // Empty results, try next provider
                     debug!(
                         "Provider '{}' returned no search results for '{}'",
                         provider_id, query
                     );
                 }
                 Err(MarketDataError::NotSupported { .. }) => {
-                    // This provider doesn't support search, skip
                     continue;
                 }
                 Err(e) => {
+                    warn!(
+                        "Search: provider '{}' failed for '{}': {}",
+                        provider_id, query, e
+                    );
                     let retry_class = e.retry_class();
                     if matches!(
                         retry_class,

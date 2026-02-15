@@ -25,9 +25,11 @@ use rig::{
         ollama, openai, openrouter,
     },
     streaming::{StreamedAssistantContent, StreamedUserContent, StreamingChat},
+    tool::ToolDyn,
     OneOrMany,
 };
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
@@ -430,6 +432,12 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     let provider_url = provider_service.get_provider_url(&provider_id);
     let mut capabilities = provider_service.get_model_capabilities(&provider_id, &model_id);
 
+    // Best-effort preflight for Ollama: if we can list models and the selected model
+    // is definitely missing, fail fast with a clear actionable error.
+    if provider_id == "ollama" {
+        validate_ollama_model_if_possible(provider_url.as_deref(), &model_id).await?;
+    }
+
     // Apply thinking override from request if provided
     if let Some(thinking) = thinking_override {
         capabilities.thinking = thinking;
@@ -448,30 +456,12 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     let current_date = chrono::Local::now().format("%Y-%m-%d").to_string();
     let current_datetime = chrono::Local::now().format("%Y-%m-%d %H:%M").to_string();
 
-    // Get accounts for context
-    let accounts = env
-        .account_service()
-        .get_active_accounts()
-        .unwrap_or_default();
-    let account_count = accounts.len();
-    let account_list: String = if accounts.is_empty() {
-        "No accounts configured.".to_string()
-    } else {
-        accounts
-            .iter()
-            .map(|a| format!("- {} ({}): {}", a.name, a.account_type, a.currency))
-            .collect::<Vec<_>>()
-            .join("\n")
-    };
-
     let dynamic_context = format!(
         "\n\n## Current Context\n\
         - Current date: {}\n\
         - Current datetime: {}\n\
-        - Base currency: {}\n\
-        - Number of accounts: {}\n\
-        - Accounts:\n{}",
-        current_date, current_datetime, base_currency, account_count, account_list
+        - Base currency: {}",
+        current_date, current_datetime, base_currency
     );
 
     // Build preamble with capability-specific instructions
@@ -481,11 +471,13 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     if !capabilities.tools {
         preamble.push_str(
             "\n\n## Important Limitation\n\
-            You do not have access to tools or function calling. You cannot retrieve real-time \
-            portfolio data, account information, or transaction history. When users ask about \
-            their specific holdings, accounts, or financial data, politely explain that you \
-            cannot access this information with the current model and suggest they switch to \
-            a model that supports tools (look for the wrench icon in the model picker).",
+            You do not have access to tools or function calling. You cannot retrieve account, \
+            holdings, transaction, income, allocation, or performance data.\n\
+            If the user asks for any of that personal portfolio data, your first sentence MUST \
+            start with: \"I don't have access to your ...\" (for example: \
+            \"I don't have access to your holdings with the current model.\").\n\
+            Then suggest switching to a model that supports tools (look for the wrench icon in \
+            the model picker). Never guess, fabricate, or imply you retrieved that data.",
         );
     }
 
@@ -528,26 +520,78 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     // Clone env for repository access in stream_agent_response
     let repo = env.chat_repository();
 
+    // Get the tools allowlist for this provider (None = all tools allowed)
+    let tools_allowlist = provider_service.get_tools_allowlist(&provider_id);
+
+    // If this provider has a restricted allowlist, clarify the limitation behavior.
+    if capabilities.tools {
+        if let Some(allowlist) = &tools_allowlist {
+            let allowed = allowlist.join(", ");
+            preamble.push_str(&format!(
+                "\n\n## Tool Access Scope\n\
+                You can only use these tools in this thread: {}.\n\
+                If the user asks for portfolio data that requires a tool outside this scope, \
+                your first sentence MUST start with: \"I don't have access to your ...\" \
+                (for example: \"I don't have access to your transactions in this chat \
+                configuration.\"). Then ask whether they want to switch to a model/provider \
+                setup with broader access. Never invent missing data.",
+                allowed
+            ));
+        }
+    }
+
     // Helper macro to build agent WITH tools and stream
     macro_rules! build_with_tools_and_stream {
         ($client:expr, $thinking_params:expr) => {
             build_with_tools_and_stream!($client, $thinking_params, None::<u64>)
         };
         ($client:expr, $thinking_params:expr, $max_tokens:expr) => {{
-            let tools = ToolSet::new(env.clone(), env.base_currency());
+            let tool_set = ToolSet::new(env.clone(), env.base_currency());
+
+            // Build filtered tool list based on provider allowlist
+            let is_allowed = |name: &str| -> bool {
+                match &tools_allowlist {
+                    None => true, // None = all tools allowed
+                    Some(list) => list.iter().any(|t| t == name),
+                }
+            };
+
+            let mut allowed_tools: Vec<Box<dyn ToolDyn>> = Vec::new();
+            if is_allowed("get_holdings") {
+                allowed_tools.push(Box::new(tool_set.holdings));
+            }
+            if is_allowed("get_accounts") {
+                allowed_tools.push(Box::new(tool_set.accounts));
+            }
+            if is_allowed("search_activities") {
+                allowed_tools.push(Box::new(tool_set.activities));
+            }
+            if is_allowed("get_goals") {
+                allowed_tools.push(Box::new(tool_set.goals));
+            }
+            if is_allowed("get_valuation_history") {
+                allowed_tools.push(Box::new(tool_set.valuation));
+            }
+            if is_allowed("get_income") {
+                allowed_tools.push(Box::new(tool_set.income));
+            }
+            if is_allowed("get_asset_allocation") {
+                allowed_tools.push(Box::new(tool_set.allocation));
+            }
+            if is_allowed("get_performance") {
+                allowed_tools.push(Box::new(tool_set.performance));
+            }
+            if is_allowed("record_activity") {
+                allowed_tools.push(Box::new(tool_set.record_activity));
+            }
+            if is_allowed("import_csv") {
+                allowed_tools.push(Box::new(tool_set.import_csv));
+            }
+
             let mut builder = $client
                 .agent(&model_id)
                 .preamble(&preamble)
-                .tool(tools.holdings)
-                .tool(tools.accounts)
-                .tool(tools.activities)
-                .tool(tools.goals)
-                .tool(tools.valuation)
-                .tool(tools.income)
-                .tool(tools.allocation)
-                .tool(tools.performance)
-                .tool(tools.record_activity)
-                .tool(tools.import_csv)
+                .tools(allowed_tools)
                 .tool_choice(ToolChoice::Auto);
 
             // Ollama cannot enforce tool_choice and some local models are brittle at higher
@@ -569,6 +613,7 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
                 agent, prompt, history, tx, repo, thread_id, run_id, message_id, title_ctx,
             )
             .await
+            .map_err(|e| remap_provider_error(&provider_id, &model_id, e))
         }};
     }
 
@@ -593,6 +638,7 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
                 agent, prompt, history, tx, repo, thread_id, run_id, message_id, title_ctx,
             )
             .await
+            .map_err(|e| remap_provider_error(&provider_id, &model_id, e))
         }};
     }
 
@@ -701,7 +747,7 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     if capabilities.tools {
         match provider_id.as_str() {
             "anthropic" => {
-                let client = create_anthropic_client(api_key, &provider_id)?;
+                let client = create_anthropic_client(api_key, &provider_id, provider_url)?;
                 build_with_tools_and_stream!(
                     client,
                     anthropic_thinking_params.clone(),
@@ -709,11 +755,11 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
                 )
             }
             "gemini" | "google" => {
-                let client = create_gemini_client(api_key, &provider_id)?;
+                let client = create_gemini_client(api_key, &provider_id, provider_url)?;
                 build_with_tools_and_stream!(client, gemini_thinking_params.clone())
             }
             "groq" => {
-                let client = create_groq_client(api_key, &provider_id)?;
+                let client = create_groq_client(api_key, &provider_id, provider_url)?;
                 build_with_tools_and_stream!(client, groq_reasoning_params_with_tools.clone())
             }
             "ollama" => {
@@ -722,22 +768,22 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
             }
             "openai" => {
                 // Don't pass reasoning params with tools - causes multi-turn errors
-                let client = create_openai_client(api_key, &provider_id)?;
+                let client = create_openai_client(api_key, &provider_id, provider_url)?;
                 build_with_tools_and_stream!(client, None::<serde_json::Value>)
             }
             "openrouter" => {
-                let client = create_openrouter_client(api_key, &provider_id)?;
+                let client = create_openrouter_client(api_key, &provider_id, provider_url)?;
                 build_with_tools_and_stream!(client, None::<serde_json::Value>)
             }
             _ => {
-                let client = create_openai_client(api_key, &provider_id)?;
+                let client = create_openai_client(api_key, &provider_id, provider_url)?;
                 build_with_tools_and_stream!(client, None::<serde_json::Value>)
             }
         }
     } else {
         match provider_id.as_str() {
             "anthropic" => {
-                let client = create_anthropic_client(api_key, &provider_id)?;
+                let client = create_anthropic_client(api_key, &provider_id, provider_url)?;
                 build_without_tools_and_stream!(
                     client,
                     anthropic_thinking_params.clone(),
@@ -745,11 +791,11 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
                 )
             }
             "gemini" | "google" => {
-                let client = create_gemini_client(api_key, &provider_id)?;
+                let client = create_gemini_client(api_key, &provider_id, provider_url)?;
                 build_without_tools_and_stream!(client, gemini_thinking_params.clone())
             }
             "groq" => {
-                let client = create_groq_client(api_key, &provider_id)?;
+                let client = create_groq_client(api_key, &provider_id, provider_url)?;
                 build_without_tools_and_stream!(client, groq_reasoning_params_no_tools.clone())
             }
             "ollama" => {
@@ -758,15 +804,15 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
             }
             "openai" => {
                 // Reasoning params OK without tools
-                let client = create_openai_client(api_key, &provider_id)?;
+                let client = create_openai_client(api_key, &provider_id, provider_url)?;
                 build_without_tools_and_stream!(client, openai_thinking_params_no_tools.clone())
             }
             "openrouter" => {
-                let client = create_openrouter_client(api_key, &provider_id)?;
+                let client = create_openrouter_client(api_key, &provider_id, provider_url)?;
                 build_without_tools_and_stream!(client, None::<serde_json::Value>)
             }
             _ => {
-                let client = create_openai_client(api_key, &provider_id)?;
+                let client = create_openai_client(api_key, &provider_id, provider_url)?;
                 build_without_tools_and_stream!(client, None::<serde_json::Value>)
             }
         }
@@ -780,25 +826,46 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
 fn create_anthropic_client(
     api_key: Option<String>,
     provider_id: &str,
+    provider_url: Option<String>,
 ) -> Result<anthropic::Client<HttpClient>, AiError> {
     let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-    anthropic::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))
+    let mut builder = anthropic::Client::builder().api_key(&key);
+    if let Some(url) = provider_url {
+        builder = builder.base_url(&url);
+    }
+    builder
+        .build()
+        .map_err(|e| AiError::Provider(e.to_string()))
 }
 
 fn create_gemini_client(
     api_key: Option<String>,
     provider_id: &str,
+    provider_url: Option<String>,
 ) -> Result<gemini::Client<HttpClient>, AiError> {
     let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-    gemini::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))
+    let mut builder = gemini::Client::builder().api_key(&key);
+    if let Some(url) = provider_url {
+        builder = builder.base_url(&url);
+    }
+    builder
+        .build()
+        .map_err(|e| AiError::Provider(e.to_string()))
 }
 
 fn create_groq_client(
     api_key: Option<String>,
     provider_id: &str,
+    provider_url: Option<String>,
 ) -> Result<groq::Client<HttpClient>, AiError> {
     let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-    groq::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))
+    let mut builder = groq::Client::builder().api_key(&key);
+    if let Some(url) = provider_url {
+        builder = builder.base_url(&url);
+    }
+    builder
+        .build()
+        .map_err(|e| AiError::Provider(e.to_string()))
 }
 
 /// Create OpenAI client using Completions API (not Responses API).
@@ -807,10 +874,14 @@ fn create_groq_client(
 fn create_openai_client(
     api_key: Option<String>,
     provider_id: &str,
+    provider_url: Option<String>,
 ) -> Result<openai::CompletionsClient<HttpClient>, AiError> {
     let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-    openai::CompletionsClient::builder()
-        .api_key(&key)
+    let mut builder = openai::CompletionsClient::builder().api_key(&key);
+    if let Some(url) = provider_url {
+        builder = builder.base_url(&url);
+    }
+    builder
         .build()
         .map_err(|e| AiError::Provider(e.to_string()))
 }
@@ -818,9 +889,16 @@ fn create_openai_client(
 fn create_openrouter_client(
     api_key: Option<String>,
     provider_id: &str,
+    provider_url: Option<String>,
 ) -> Result<openrouter::Client<HttpClient>, AiError> {
     let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-    openrouter::Client::new(&key).map_err(|e| AiError::Provider(e.to_string()))
+    let mut builder = openrouter::Client::builder().api_key(&key);
+    if let Some(url) = provider_url {
+        builder = builder.base_url(&url);
+    }
+    builder
+        .build()
+        .map_err(|e| AiError::Provider(e.to_string()))
 }
 
 fn create_ollama_client(
@@ -835,6 +913,120 @@ fn create_ollama_client(
         .map_err(|e| AiError::Provider(e.to_string()))
 }
 
+/// Map low-level provider errors to clearer actionable messages.
+fn remap_provider_error(provider_id: &str, model_id: &str, error: AiError) -> AiError {
+    match error {
+        AiError::Provider(msg)
+            if provider_id == "ollama" && msg.contains("missing field `model`") =>
+        {
+            AiError::Provider(format!(
+                "Ollama returned an error payload for model '{}'. \
+                Common causes: model not installed, context too large, or insufficient memory. \
+                Check `ollama list` and Ollama logs. Original error: {}",
+                model_id, msg
+            ))
+        }
+        other => other,
+    }
+}
+
+fn ollama_model_matches(candidate: &str, selected: &str) -> bool {
+    candidate == selected
+        || candidate.trim_end_matches(":latest") == selected.trim_end_matches(":latest")
+}
+
+/// Validate selected Ollama model when `/api/tags` is reachable.
+///
+/// This is best-effort:
+/// - If tags endpoint is unavailable/unparseable, we skip validation and continue.
+/// - If tags are available and model is missing, we return a clear invalid-input error.
+async fn validate_ollama_model_if_possible(
+    provider_url: Option<&str>,
+    model_id: &str,
+) -> Result<(), AiError> {
+    let base = provider_url.unwrap_or("http://localhost:11434");
+    let normalized = base.trim_end_matches('/');
+    let tags_url = if normalized.ends_with("/v1") {
+        format!("{}/api/tags", normalized.trim_end_matches("/v1"))
+    } else {
+        format!("{}/api/tags", normalized)
+    };
+
+    let client = match reqwest::Client::builder()
+        .timeout(Duration::from_secs(4))
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => {
+            debug!(
+                "Skipping Ollama model preflight (client build failed): {}",
+                e
+            );
+            return Ok(());
+        }
+    };
+
+    let response = match client.get(&tags_url).send().await {
+        Ok(r) => r,
+        Err(e) => {
+            debug!("Skipping Ollama model preflight (tags fetch failed): {}", e);
+            return Ok(());
+        }
+    };
+
+    if !response.status().is_success() {
+        debug!(
+            "Skipping Ollama model preflight (tags status {} at {})",
+            response.status(),
+            tags_url
+        );
+        return Ok(());
+    }
+
+    let payload: serde_json::Value = match response.json().await {
+        Ok(v) => v,
+        Err(e) => {
+            debug!("Skipping Ollama model preflight (invalid tags JSON): {}", e);
+            return Ok(());
+        }
+    };
+
+    let available: Vec<String> = payload
+        .get("models")
+        .and_then(|v| v.as_array())
+        .map(|models| {
+            models
+                .iter()
+                .filter_map(|m| m.get("name").and_then(|v| v.as_str()))
+                .map(ToString::to_string)
+                .collect()
+        })
+        .unwrap_or_default();
+
+    if available.is_empty() {
+        debug!("Skipping Ollama model preflight (no models in tags response)");
+        return Ok(());
+    }
+
+    if available
+        .iter()
+        .any(|candidate| ollama_model_matches(candidate, model_id))
+    {
+        return Ok(());
+    }
+
+    let preview = available
+        .iter()
+        .take(5)
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(", ");
+    Err(AiError::InvalidInput(format!(
+        "Ollama model '{}' is not available. Install it with `ollama pull {}` or select an installed model in AI Providers settings. Available models: {}",
+        model_id, model_id, preview
+    )))
+}
+
 // ============================================================================
 // Think Tag Parser (fallback for models that output <think> tags in text)
 // ============================================================================
@@ -845,26 +1037,32 @@ fn create_ollama_client(
 struct ThinkTagParser {
     buffer: String,
     in_think_block: bool,
-    accumulated_reasoning: String,
+}
+
+enum ParsedThinkSegment {
+    Text(String),
+    Reasoning(String),
 }
 
 impl ThinkTagParser {
-    /// Process text delta, returns (text_to_emit, reasoning_to_emit).
-    fn process(&mut self, delta: &str) -> (String, String) {
+    /// Process text delta, returns ordered segments to emit.
+    fn process(&mut self, delta: &str) -> Vec<ParsedThinkSegment> {
         // Fast path: no potential tags and not in a think block
         if !self.in_think_block && !delta.contains('<') && self.buffer.is_empty() {
-            return (delta.to_string(), String::new());
+            return vec![ParsedThinkSegment::Text(delta.to_string())];
         }
 
         self.buffer.push_str(delta);
-        let mut text_out = String::new();
-        let mut reasoning_out = String::new();
+        let mut segments = Vec::new();
 
         loop {
             if self.in_think_block {
                 if let Some(end_idx) = self.buffer.find("</think>") {
-                    reasoning_out.push_str(&self.buffer[..end_idx]);
-                    self.accumulated_reasoning.push_str(&self.buffer[..end_idx]);
+                    if end_idx > 0 {
+                        segments.push(ParsedThinkSegment::Reasoning(
+                            self.buffer[..end_idx].to_string(),
+                        ));
+                    }
                     self.buffer = self.buffer[end_idx + 8..].to_string();
                     self.in_think_block = false;
                 } else if self.buffer.len() > 8
@@ -873,22 +1071,28 @@ impl ThinkTagParser {
                 {
                     // Safe to emit most of the buffer as reasoning
                     let safe_len = self.buffer.len().saturating_sub(8);
-                    reasoning_out.push_str(&self.buffer[..safe_len]);
-                    self.accumulated_reasoning
-                        .push_str(&self.buffer[..safe_len]);
+                    segments.push(ParsedThinkSegment::Reasoning(
+                        self.buffer[..safe_len].to_string(),
+                    ));
                     self.buffer = self.buffer[safe_len..].to_string();
                     break;
                 } else {
                     break;
                 }
             } else if let Some(start_idx) = self.buffer.find("<think>") {
-                text_out.push_str(&self.buffer[..start_idx]);
+                if start_idx > 0 {
+                    segments.push(ParsedThinkSegment::Text(
+                        self.buffer[..start_idx].to_string(),
+                    ));
+                }
                 self.buffer = self.buffer[start_idx + 7..].to_string();
                 self.in_think_block = true;
             } else if self.buffer.len() > 7 && !self.buffer.ends_with('<') {
                 // Safe to emit most of the buffer as text
                 let safe_len = self.buffer.len().saturating_sub(7);
-                text_out.push_str(&self.buffer[..safe_len]);
+                segments.push(ParsedThinkSegment::Text(
+                    self.buffer[..safe_len].to_string(),
+                ));
                 self.buffer = self.buffer[safe_len..].to_string();
                 break;
             } else {
@@ -896,22 +1100,22 @@ impl ThinkTagParser {
             }
         }
 
-        (text_out, reasoning_out)
+        segments
     }
 
     /// Flush remaining buffer at end of stream.
-    fn flush(&mut self) -> (String, String) {
-        if self.in_think_block {
-            self.accumulated_reasoning.push_str(&self.buffer);
-            (String::new(), std::mem::take(&mut self.buffer))
-        } else {
-            (std::mem::take(&mut self.buffer), String::new())
+    fn flush(&mut self) -> Vec<ParsedThinkSegment> {
+        if self.buffer.is_empty() {
+            return vec![];
         }
-    }
 
-    /// Get total accumulated reasoning.
-    fn reasoning(&self) -> &str {
-        &self.accumulated_reasoning
+        if self.in_think_block {
+            vec![ParsedThinkSegment::Reasoning(std::mem::take(
+                &mut self.buffer,
+            ))]
+        } else {
+            vec![ParsedThinkSegment::Text(std::mem::take(&mut self.buffer))]
+        }
     }
 }
 
@@ -1021,32 +1225,47 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
                 Text { text },
             ))) => {
                 if !text.is_empty() {
-                    // Parse <think> tags and emit reasoning (models should not think if disabled via API)
-                    let (text_out, reasoning_out) = think_parser.process(&text);
-
-                    // Emit reasoning if extracted from <think> tags
-                    if !reasoning_out.is_empty() {
-                        tx.send(AiStreamEvent::reasoning_delta(
-                            &thread_id,
-                            &run_id,
-                            &message_id,
-                            &reasoning_out,
-                        ))
-                        .await
-                        .map_err(|e| AiError::Internal(e.to_string()))?;
-                    }
-
-                    // Emit text content
-                    if !text_out.is_empty() {
-                        accumulated_text.push_str(&text_out);
-                        tx.send(AiStreamEvent::text_delta(
-                            &thread_id,
-                            &run_id,
-                            &message_id,
-                            &text_out,
-                        ))
-                        .await
-                        .map_err(|e| AiError::Internal(e.to_string()))?;
+                    // Parse <think> tags and emit ordered segments (models should not think if disabled via API)
+                    for segment in think_parser.process(&text) {
+                        match segment {
+                            ParsedThinkSegment::Text(text_out) if !text_out.is_empty() => {
+                                // Flush reasoning before text to preserve order
+                                if !accumulated_reasoning.is_empty() {
+                                    content_parts.push(ChatMessagePart::Reasoning {
+                                        content: std::mem::take(&mut accumulated_reasoning),
+                                    });
+                                }
+                                accumulated_text.push_str(&text_out);
+                                tx.send(AiStreamEvent::text_delta(
+                                    &thread_id,
+                                    &run_id,
+                                    &message_id,
+                                    &text_out,
+                                ))
+                                .await
+                                .map_err(|e| AiError::Internal(e.to_string()))?;
+                            }
+                            ParsedThinkSegment::Reasoning(reasoning_out)
+                                if !reasoning_out.is_empty() =>
+                            {
+                                // Flush text before reasoning to preserve order
+                                if !accumulated_text.is_empty() {
+                                    content_parts.push(ChatMessagePart::Text {
+                                        content: std::mem::take(&mut accumulated_text),
+                                    });
+                                }
+                                accumulated_reasoning.push_str(&reasoning_out);
+                                tx.send(AiStreamEvent::reasoning_delta(
+                                    &thread_id,
+                                    &run_id,
+                                    &message_id,
+                                    &reasoning_out,
+                                ))
+                                .await
+                                .map_err(|e| AiError::Internal(e.to_string()))?;
+                            }
+                            _ => {}
+                        }
                     }
                 }
             }
@@ -1057,6 +1276,12 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
             ))) => {
                 if !reasoning.is_empty() {
                     let reasoning_text = reasoning.join(" ");
+                    // Flush text before reasoning to preserve order
+                    if !accumulated_text.is_empty() {
+                        content_parts.push(ChatMessagePart::Text {
+                            content: std::mem::take(&mut accumulated_text),
+                        });
+                    }
                     content_parts.push(ChatMessagePart::Reasoning {
                         content: reasoning_text.clone(),
                     });
@@ -1076,6 +1301,12 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
                 StreamedAssistantContent::ReasoningDelta { reasoning, .. },
             )) => {
                 if !reasoning.is_empty() {
+                    // Flush text before reasoning to preserve order
+                    if !accumulated_text.is_empty() {
+                        content_parts.push(ChatMessagePart::Text {
+                            content: std::mem::take(&mut accumulated_text),
+                        });
+                    }
                     accumulated_reasoning.push_str(&reasoning);
                     tx.send(AiStreamEvent::reasoning_delta(
                         &thread_id,
@@ -1093,7 +1324,12 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
                 tool_call: RigToolCall { id, function, .. },
                 ..
             })) => {
-                // Flush any accumulated text BEFORE the tool call to preserve order
+                // Flush accumulated reasoning and text BEFORE the tool call to preserve order
+                if !accumulated_reasoning.is_empty() {
+                    content_parts.push(ChatMessagePart::Reasoning {
+                        content: std::mem::take(&mut accumulated_reasoning),
+                    });
+                }
                 if !accumulated_text.is_empty() {
                     content_parts.push(ChatMessagePart::Text {
                         content: std::mem::take(&mut accumulated_text),
@@ -1223,40 +1459,47 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
     }
 
     // Flush any remaining buffered content from the think parser
-    let (remaining_text, remaining_reasoning) = think_parser.flush();
-    if !remaining_reasoning.is_empty() {
-        tx.send(AiStreamEvent::reasoning_delta(
-            &thread_id,
-            &run_id,
-            &message_id,
-            &remaining_reasoning,
-        ))
-        .await
-        .map_err(|e| AiError::Internal(e.to_string()))?;
-    }
-    if !remaining_text.is_empty() {
-        accumulated_text.push_str(&remaining_text);
-        tx.send(AiStreamEvent::text_delta(
-            &thread_id,
-            &run_id,
-            &message_id,
-            &remaining_text,
-        ))
-        .await
-        .map_err(|e| AiError::Internal(e.to_string()))?;
+    for segment in think_parser.flush() {
+        match segment {
+            ParsedThinkSegment::Text(remaining_text) if !remaining_text.is_empty() => {
+                if !accumulated_reasoning.is_empty() {
+                    content_parts.push(ChatMessagePart::Reasoning {
+                        content: std::mem::take(&mut accumulated_reasoning),
+                    });
+                }
+                accumulated_text.push_str(&remaining_text);
+                tx.send(AiStreamEvent::text_delta(
+                    &thread_id,
+                    &run_id,
+                    &message_id,
+                    &remaining_text,
+                ))
+                .await
+                .map_err(|e| AiError::Internal(e.to_string()))?;
+            }
+            ParsedThinkSegment::Reasoning(remaining_reasoning)
+                if !remaining_reasoning.is_empty() =>
+            {
+                if !accumulated_text.is_empty() {
+                    content_parts.push(ChatMessagePart::Text {
+                        content: std::mem::take(&mut accumulated_text),
+                    });
+                }
+                accumulated_reasoning.push_str(&remaining_reasoning);
+                tx.send(AiStreamEvent::reasoning_delta(
+                    &thread_id,
+                    &run_id,
+                    &message_id,
+                    &remaining_reasoning,
+                ))
+                .await
+                .map_err(|e| AiError::Internal(e.to_string()))?;
+            }
+            _ => {}
+        }
     }
 
-    // Add reasoning parsed from <think> tags to content parts
-    let parsed_reasoning = think_parser.reasoning();
-    if !parsed_reasoning.is_empty() {
-        content_parts.insert(
-            0,
-            ChatMessagePart::Reasoning {
-                content: parsed_reasoning.to_string(),
-            },
-        );
-    }
-
+    // Flush remaining accumulated content in order (reasoning before text)
     if !accumulated_reasoning.is_empty() {
         content_parts.push(ChatMessagePart::Reasoning {
             content: accumulated_reasoning,
@@ -1433,6 +1676,53 @@ mod tests {
 
         let threads = service.list_threads(10, 0).unwrap();
         assert_eq!(threads.len(), 3);
+    }
+
+    #[test]
+    fn test_think_parser_emits_ordered_segments() {
+        let mut parser = ThinkTagParser::default();
+        let segments = parser.process("hello<think>reason</think>");
+
+        assert_eq!(segments.len(), 2);
+        assert!(matches!(&segments[0], ParsedThinkSegment::Text(text) if text == "hello"));
+        assert!(matches!(&segments[1], ParsedThinkSegment::Reasoning(text) if text == "reason"));
+    }
+
+    #[test]
+    fn test_think_parser_flush_preserves_trailing_text_after_reasoning() {
+        let mut parser = ThinkTagParser::default();
+        let segments = parser.process("hello<think>reason</think>world");
+
+        assert_eq!(segments.len(), 2);
+        assert!(matches!(&segments[0], ParsedThinkSegment::Text(text) if text == "hello"));
+        assert!(matches!(&segments[1], ParsedThinkSegment::Reasoning(text) if text == "reason"));
+
+        let flushed = parser.flush();
+        assert_eq!(flushed.len(), 1);
+        assert!(matches!(&flushed[0], ParsedThinkSegment::Text(text) if text == "world"));
+    }
+
+    #[test]
+    fn test_ollama_model_match_without_latest_suffix() {
+        assert!(ollama_model_matches("ministral-3:latest", "ministral-3"));
+        assert!(ollama_model_matches("ministral-3", "ministral-3:latest"));
+        assert!(!ollama_model_matches("qwen3:8b", "ministral-3"));
+    }
+
+    #[test]
+    fn test_remap_provider_error_for_ollama_json_error() {
+        let input = AiError::Provider(
+            "CompletionError: JsonError: missing field `model` at line 1 column 44".to_string(),
+        );
+        let remapped = remap_provider_error("ollama", "ministral-3", input);
+
+        match remapped {
+            AiError::Provider(msg) => {
+                assert!(msg.contains("Ollama returned an error payload"));
+                assert!(msg.contains("ministral-3"));
+            }
+            _ => panic!("expected provider error"),
+        }
     }
 
     #[test]

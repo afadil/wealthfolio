@@ -342,6 +342,8 @@ export interface SymbolSearchResult {
   exchangeName?: string;
   /** Currency derived from exchange (e.g., "USD", "CAD") */
   currency?: string;
+  /** Provenance: "provider" | "exchange_inferred" */
+  currencySource?: string;
   shortName: string;
   quoteType: string;
   symbol: string;
@@ -356,6 +358,11 @@ export interface SymbolSearchResult {
   isExisting?: boolean;
   /** The existing asset ID if found (e.g., "SEC:AAPL:XNAS") */
   existingAssetId?: string;
+}
+
+export interface ResolvedQuote {
+  currency?: string;
+  price?: number;
 }
 
 export interface ExchangeInfo {
@@ -595,6 +602,13 @@ export interface Quote {
   notes?: string | null;
 }
 
+export interface LatestQuoteSnapshot {
+  quote: Quote;
+  isStale: boolean;
+  effectiveMarketDate: string; // YYYY-MM-DD in market timezone semantics
+  quoteDate: string; // YYYY-MM-DD extracted from quote timestamp
+}
+
 export interface QuoteUpdate {
   timestamp: string;
   assetId: string;
@@ -809,6 +823,7 @@ export interface UpdateAssetProfile {
   notes?: string | null;
   kind?: AssetKind | null;
   quoteMode?: QuoteMode | null;
+  quoteCcy?: string | null;
   instrumentExchangeMic?: string | null;
   providerConfig?: Record<string, unknown> | null;
 }
@@ -1686,10 +1701,12 @@ export interface HoldingsPositionInput {
   symbol: string;
   /** Quantity held as string to preserve precision */
   quantity: string;
-  /** Optional price per unit at snapshot date */
-  price?: string;
+  /** Optional average cost per unit */
+  avgCost?: string;
   /** Currency for this position */
   currency: string;
+  /** Exchange MIC code (e.g., "XNAS", "XTSE") resolved during check step */
+  exchangeMic?: string;
 }
 
 /**
@@ -1714,4 +1731,28 @@ export interface ImportHoldingsCsvResult {
   snapshotsFailed: number;
   /** Error messages for failed snapshots */
   errors: string[];
+}
+
+/**
+ * Result of checking a single symbol during holdings import
+ */
+export interface SymbolCheckResult {
+  symbol: string;
+  found: boolean;
+  assetName?: string;
+  assetId?: string;
+  currency?: string;
+  exchangeMic?: string;
+}
+
+/**
+ * Result of checking holdings import data before committing
+ */
+export interface CheckHoldingsImportResult {
+  /** Dates that already have snapshots in the DB (will be overwritten) */
+  existingDates: string[];
+  /** Per-unique-symbol lookup results */
+  symbols: SymbolCheckResult[];
+  /** Validation errors found in the import data */
+  validationErrors: string[];
 }
