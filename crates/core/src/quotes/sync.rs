@@ -30,6 +30,7 @@ use tokio::sync::RwLock;
 
 use super::client::MarketDataClient;
 use super::constants::*;
+use super::errors::MarketDataError;
 use super::store::QuoteStore;
 use super::sync_state::{
     calculate_sync_window, determine_sync_category, QuoteSyncState, SymbolSyncPlan, SyncCategory,
@@ -38,6 +39,7 @@ use super::sync_state::{
 use super::types::{AssetId, Day, ProviderId};
 use crate::activities::ActivityRepositoryTrait;
 use crate::assets::{Asset, AssetKind, AssetRepositoryTrait, QuoteMode};
+use crate::errors::Error;
 use crate::errors::Result;
 use crate::utils::time_utils;
 
@@ -101,6 +103,19 @@ fn clamp_end_date_for_fetch(
     } else {
         end_date
     }
+}
+
+fn should_treat_backfill_error_as_non_fatal(category: &SyncCategory, error: &Error) -> bool {
+    if !matches!(category, SyncCategory::NeedsBackfill) {
+        return false;
+    }
+
+    matches!(
+        error,
+        Error::MarketData(MarketDataError::NoData)
+            | Error::MarketData(MarketDataError::NotFound(_))
+            | Error::MarketData(MarketDataError::ProviderExhausted(_))
+    )
 }
 
 // Test helpers - expose lock functions for testing
@@ -691,6 +706,28 @@ where
                 }
             }
             Err(e) => {
+                if should_treat_backfill_error_as_non_fatal(&plan.category, &e) {
+                    info!(
+                        "Backfill reached provider data boundary for {} ({}). Treating as complete.",
+                        asset.id, e
+                    );
+
+                    if let Err(state_err) = self.sync_state_store.update_after_sync(&asset.id).await
+                    {
+                        warn!(
+                            "Failed to update sync state for {}: {:?}",
+                            asset.id, state_err
+                        );
+                    }
+
+                    return AssetSyncResult {
+                        asset_id,
+                        quotes_added: 0,
+                        status: SyncStatus::Success,
+                        error: None,
+                    };
+                }
+
                 error!("Failed to fetch quotes for {}: {:?}", asset.id, e);
 
                 // Update sync state with failure
@@ -1356,6 +1393,44 @@ mod tests {
             clamp_end_date_for_fetch(&SyncCategory::NeedsBackfill, base_end, fetch_end),
             base_end
         );
+    }
+
+    #[test]
+    fn test_backfill_no_data_error_is_non_fatal() {
+        let err = Error::MarketData(MarketDataError::NoData);
+        assert!(should_treat_backfill_error_as_non_fatal(
+            &SyncCategory::NeedsBackfill,
+            &err
+        ));
+    }
+
+    #[test]
+    fn test_backfill_not_found_error_is_non_fatal() {
+        let err = Error::MarketData(MarketDataError::NotFound("No data found".to_string()));
+        assert!(should_treat_backfill_error_as_non_fatal(
+            &SyncCategory::NeedsBackfill,
+            &err
+        ));
+    }
+
+    #[test]
+    fn test_backfill_provider_exhausted_error_is_non_fatal() {
+        let err = Error::MarketData(MarketDataError::ProviderExhausted(
+            "All providers failed".to_string(),
+        ));
+        assert!(should_treat_backfill_error_as_non_fatal(
+            &SyncCategory::NeedsBackfill,
+            &err
+        ));
+    }
+
+    #[test]
+    fn test_non_backfill_no_data_error_remains_fatal() {
+        let err = Error::MarketData(MarketDataError::NoData);
+        assert!(!should_treat_backfill_error_as_non_fatal(
+            &SyncCategory::Active,
+            &err
+        ));
     }
 
     // =========================================================================
