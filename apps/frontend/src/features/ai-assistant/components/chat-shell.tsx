@@ -118,7 +118,7 @@ function Header({
   onToggleSidebar: () => void;
 }) {
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+    <header className="pt-safe flex shrink-0 items-center gap-2 border-b px-4">
       <MobileSidebar />
       <ButtonWithTooltip
         variant="ghost"
