@@ -179,7 +179,6 @@ two-ring donut visualization, and deviation tracking.
 ### UI Layout
 
 Two-column layout: donut chart on the left, category list on the right.
-Click a category row → side panel (Sheet) slides in from right.
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
@@ -191,63 +190,53 @@ Click a category row → side panel (Sheet) slides in from right.
 │                                                               │
 │  ┌──────────────────────┬────────────────────────────────────┐│
 │  │                      │                                    ││
-│  │  Two-Ring Donut      │  Category List (click → panel)     ││
+│  │  Single Donut        │  Target List (inline editing)      ││
+│  │  (Current Only)      │                                    ││
+│  │                      │  ● Equity                          ││
+│  │    ╭────────────╮    │    Target  [60]%  Actual 55%      ││
+│  │   ╱              ╲   │    ████████████░░░  Underweight   ││
+│  │  │                │  │                                    ││
+│  │  │  TOTAL         │  │  ● Fixed Income                    ││
+│  │  │  PORTFOLIO     │  │    Target  [30]%  Actual 35%      ││
+│  │  │  $XXX,XXX      │  │    ██████░░░░░░░░░  Overweight    ││
+│  │   ╲              ╱   │                                    ││
+│  │    ╰────────────╯    │  ● Cash                            ││
+│  │                      │    Target  [10]%  Actual 10%      ││
+│  │  Hover: show         │    ███░░░░░░░░░░░░  Aligned       ││
+│  │  category details    │                                    ││
+│  │  + drift status      │  ● Real Estate                     ││
+│  │                      │    Target  [0]%   Actual 0%       ││
+│  │                      │    ░░░░░░░░░░░░░░░  Not Set       ││
 │  │                      │                                    ││
-│  │    ╭────────────╮    │  ● Equity       60%  55%  -5.0%   ││
-│  │  ╱   ╭────────╮  ╲  │    ████████████░░░                 ││
-│  │ │  │  TARGET  │  │  │                                    ││
-│  │ │  │  (inner) │  │  │  ● Fixed Income 30%  35%  +5.0%   ││
-│  │  ╲  ╰────────╯  ╱   │    ██████░░░░░░░░░                ││
-│  │   ╲            ╱    │                                    ││
-│  │    ╰──────────╯     │  ● Cash         10%  10%   0.0%   ││
-│  │     CURRENT          │    ███░░░░░░░░░░░░                ││
-│  │     (outer)          │                                    ││
-│  │                      │  ● Real Estate   0%   0%   0.0%   ││
-│  │  inner = target      │    ░░░░░░░░░░░░░░░                ││
-│  │  outer = current     │                                    ││
-│  │                      │  Total: 100%                       ││
+│  │                      │  [Clear All]                       ││
 │  └──────────────────────┴────────────────────────────────────┘│
-│                                                               │
-│  Side Panel (Sheet, opens on category click):                 │
-│  ┌──────────────────────────────────┐                         │
-│  │ Equity — Target: [60] %    🔒   │                         │
-│  │ ████████████░░░░░ 55% current   │                         │
-│  │                                  │                         │
-│  │ Holdings: (Section 2, later)     │                         │
-│  │ VTI  55% current                │                         │
-│  │ VOO  30% current                │                         │
-│  │ VXUS 15% current                │                         │
-│  │                                  │                         │
-│  │ [Save]                           │                         │
-│  └──────────────────────────────────┘                         │
 └───────────────────────────────────────────────────────────────┘
 ```
 
-Category list columns: color dot, name, target %, current %, deviation %.
-Each row has a read-only progress bar below showing target vs current.
-Click any row → opens the side panel for that category.
+**Layout**: Side-by-side comparison bars for each category (actual vs target).
+Text inputs for inline editing of target percentages.
+Drift indicators show underweight/overweight status when >5% deviation.
 
 ### Components to build/rework
 
 | Component | Action | Description |
 |-----------|--------|-------------|
-| `allocations-page.tsx` | **Rewrite** | Two-tab layout (Overview, Rebalancing), AccountSelector, auto-create target |
-| `two-ring-donut.tsx` | **New** | Full-circle donut with inner (target) + outer (current) rings, recharts |
-| `category-list.tsx` | **New** | Clickable category rows with color dot, name, progress bar, target/current/deviation |
-| `category-side-panel.tsx` | **New** | Sheet with category target editing (text input, lock toggle, progress bar) |
-| `target-form.tsx` | **Remove** | No longer needed (auto-create) |
-| `allocation-editor.tsx` | **Remove** | Replaced by category-list + side panel |
-| `deviation-table.tsx` | **Remove** | Replaced by category-list (deviation shown inline) |
+| `allocations-page.tsx` | **Rewrite** | Two-tab layout (Overview, Rebalancing), AccountSelector |
+| `allocation-donut.tsx` | **New** | Single-ring donut showing current allocation with hover details, recharts |
+| `target-list.tsx` | **New** | Inline editing rows with side-by-side bars, target inputs, drift indicators |
+| `target-form.tsx` | **Remove** | No longer needed (inline editing) |
+| `allocation-editor.tsx` | **Remove** | Replaced by target-list |
+| `deviation-table.tsx` | **Remove** | Replaced by target-list (deviation shown inline) |
 
 ### Data flow
 
 1. Page loads → fetch `portfolio_targets` for selected account
 2. If no target exists → empty state ("Set your first allocation target")
 3. If target exists → fetch taxonomy categories + target allocations + deviation report
-4. Render donut (target ring from allocations, current ring from deviation report)
-5. Render category list from deviation report data
-6. Click category → open side panel, show text input for target %, lock toggle
-7. Edit % → local state update, "Save" button → batch upsert all changed allocations
+4. Render donut (current allocation only) with hover details
+5. Render target list with inline editing (side-by-side bars)
+6. Edit % → local state update
+7. Click "Save All" → batch upsert all changed allocations
 8. On save success → invalidate queries, donut + list refresh
 
 ### Auto-create logic
@@ -267,13 +256,48 @@ User selects account → check if PortfolioTarget exists for account
 
 - `pnpm type-check` passes
 - `pnpm tauri dev` or `pnpm run dev:web` — page loads, donut renders
-- Can set category target %, save, see deviation update
+- Can set category target % inline, save all, see deviation update
+- Drift indicators show correctly (underweight/overweight/aligned)
+- Donut hover shows category details with drift status
 - Account switching works, shows different targets per account
 - "All Portfolio" view works
+- "Clear All" button clears all targets
 
 ---
 
 ## Section 2: Per-Holding Targets
+
+**Status**: ⏳ PLANNED (NOT STARTED)
+
+### Overview
+
+Allows users to drill down into a category (e.g., "Equity") and set granular 
+allocation targets for individual holdings (e.g., VTI, VOO, VXUS) within that category.
+
+### User Flow
+
+1. Click on category row (e.g., "Equity 70%") in target list
+2. Side panel opens showing category target vs actual recap (bars)
+3. List of holdings in that category with editable target percentages
+4. Set targets manually or rely on auto-distribution
+5. Lock specific holdings to prevent auto-adjustment
+6. Click "Save All" to commit changes
+
+### Key Features
+
+- **Auto-Distribution**: Unlocked holdings automatically split remaining percentage proportionally
+- **Lock Mechanism**: Lock specific holdings to preserve targets when category % changes
+- **Visual Feedback**: Italic/muted style for auto-calculated vs user-set values
+- **Validation**: Blocks save if total allocation > 100%
+- **Cascading Display**: Shows both category % and portfolio % (e.g., "50% of Equity = 35% of portfolio")
+
+### Design Decisions (Approved)
+
+- **Schema**: Migration changes `holding_targets.asset_class_id` → `allocation_id` (FK to `portfolio_target_allocations`)
+- **UI**: Simple bars + category recap (no sub-donut)
+- **Mode**: Preview mode only with auto-distribution algorithm
+- **Component**: Sheet slide-in panel (reusing existing pattern)
+- **Save**: Batch save with single "Save All" button
 
 **Goal**: Within each asset class category, set target percentages for
 individual holdings. Cascading: holding % × category % = portfolio %.
@@ -306,26 +330,27 @@ New Tauri commands + Axum routes to match.
 
 ### Frontend additions
 
-Extend the side panel (`category-side-panel.tsx`):
+Side panel (Sheet) for per-holding targets within a category:
 
 ```
 ┌──────────────────────────────────────┐
-│ Equity — Target: [60] %        🔒   │
-│ ████████████░░░░░ 55% current        │
+│ Equity — Target: 60% of Portfolio    │
+│ Current: 55%    Drift: -5% Under     │
 │──────────────────────────────────────│
 │ Holdings Breakdown:                  │
 │                                      │
-│ ┌────────────────────────────┐       │
-│ │  Sub-Pie Chart (recharts)  │       │
-│ │  Shows holding distribution│       │
-│ └────────────────────────────┘       │
-│                                      │
 │ Equity ETF (3 holdings)              │
-│ VTI   Current 55% → Target [50]% 🔒 │
+│                                      │
+│ VTI                            🔒   │
+│ Current 55% → Target [50]%           │
 │ ████████████░░░░░                    │
-│ VOO   Current 30% → Target [30]%    │
+│                                      │
+│ VOO                                  │
+│ Current 30% → Target [30]%           │
 │ ████████░░░░░░░░░                    │
-│ VXUS  Current 15% → Target *20%*    │ ← italic = auto-distributed
+│                                      │
+│ VXUS                                 │
+│ Current 15% → Target *20%*           │ ← italic = auto-distributed
 │ ████░░░░░░░░░░░░░                    │
 │                                      │
 │ Total: 100% ✓                        │
@@ -334,8 +359,8 @@ Extend the side panel (`category-side-panel.tsx`):
 ```
 
 New components:
+- `category-side-panel.tsx` — Sheet component for holding targets (Section 2)
 - `holding-target-row.tsx` — per-holding row with text input, lock, progress bar
-- `sub-pie-chart.tsx` — compact pie showing holding distribution within category
 
 ### Auto-distribution logic (preview mode)
 
@@ -462,24 +487,27 @@ New components:
 
 ```
 Section 1 (category targets + overview):
-  1.1  Two-ring donut chart component          → verify: renders with mock data
-  1.2  Category list component                 → verify: renders from deviation data
-  1.3  Category side panel (Sheet)             → verify: opens, edits, saves
+  1.1  Single donut chart component            → verify: renders with current allocation
+  1.2  Target list component (inline editing)  → verify: renders with side-by-side bars
+  1.3  Drift indicators + hover details        → verify: shows underweight/overweight
   1.4  Rewrite allocations-page.tsx            → verify: full flow works
   1.5  Auto-create target logic                → verify: first-use flow smooth
-  1.6  Batch save fix                          → verify: single toast, all saved
-  1.7  Polish + test                           → verify: pnpm type-check, visual QA
+  1.6  Batch save with "Save All" button       → verify: single toast, all saved
+  1.7  "Clear All" functionality               → verify: clears all targets
+  1.8  Polish + test                           → verify: pnpm type-check, visual QA
 
 Section 2 (per-holding targets):
   2.1  DB migration for holding_targets        → verify: cargo test
   2.2  Backend CRUD + batch save               → verify: cargo test
   2.3  Tauri commands + Axum routes            → verify: cargo build
   2.4  Frontend adapters + hooks               → verify: pnpm type-check
-  2.5  Holding target row component            → verify: renders in side panel
-  2.6  Sub-pie chart component                 → verify: renders in side panel
+  2.5  Category side panel component (Sheet)   → verify: opens when row clicked
+  2.6  Holding target row component            → verify: renders with inline editing
   2.7  Auto-distribution logic                 → verify: unset holdings get remainder
-  2.8  Save All Targets (batch)                → verify: full flow
-  2.9  Polish + test                           → verify: visual QA
+  2.8  Lock mechanism for holdings             → verify: locked targets don't auto-adjust
+  2.9  Cascading % display                     → verify: shows category % and portfolio %
+  2.10 Save All Targets (batch)                → verify: full flow
+  2.11 Polish + test                           → verify: visual QA
 
 Section 3 (rebalancing advisor):
   3.1  Backend rebalancing calculation         → verify: cargo test
@@ -525,11 +553,10 @@ Section 3 (rebalancing advisor):
 
 | File | Section |
 |------|---------|
-| `pages/allocations/components/two-ring-donut.tsx` | 1 |
-| `pages/allocations/components/category-list.tsx` | 1 |
-| `pages/allocations/components/category-side-panel.tsx` | 1 |
+| `pages/allocations/components/allocation-donut.tsx` | 1 |
+| `pages/allocations/components/target-list.tsx` | 1 |
+| `pages/allocations/components/category-side-panel.tsx` | 2 |
 | `pages/allocations/components/holding-target-row.tsx` | 2 |
-| `pages/allocations/components/sub-pie-chart.tsx` | 2 |
 | `pages/allocations/lib/auto-distribution.ts` | 2 |
 | `pages/allocations/components/rebalancing-tab.tsx` | 3 |
 | `pages/allocations/components/trade-recommendations-table.tsx` | 3 |
