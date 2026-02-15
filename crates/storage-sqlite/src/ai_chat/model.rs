@@ -40,12 +40,12 @@ pub const MAX_CONTENT_SIZE_BYTES: usize = 256 * 1024;
 pub struct AiThreadDB {
     pub id: String,
     pub title: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
     /// JSON blob containing per-thread agent configuration snapshot.
     pub config_snapshot: Option<String>,
     /// Whether the thread is pinned to the top of the list.
     pub is_pinned: i32,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 /// Database model for AI chat messages.
