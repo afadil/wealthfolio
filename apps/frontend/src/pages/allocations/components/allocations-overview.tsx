@@ -11,7 +11,7 @@ import { useSettingsContext } from "@/lib/settings-provider";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import type { Account, AllocationDeviation, NewTargetAllocation } from "@/lib/types";
 
-import { TwoRingDonut } from "./two-ring-donut";
+import { AllocationDonut } from "./allocation-donut";
 import { TargetList } from "./target-list";
 import { useTargetMutations } from "../use-target-mutations";
 
@@ -192,20 +192,19 @@ export function AllocationsOverview() {
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[9fr_11fr]">
           {/* Left: Pie chart — stretches to match right column */}
-          <Card className="flex flex-col">
-            <CardHeader className="pb-2">
+          <Card className="flex flex-col overflow-hidden">
+            <CardHeader className="shrink-0 pb-4">
               <CardTitle className="text-sm font-medium uppercase tracking-wider">
                 Current Allocation
               </CardTitle>
-              <p className="text-2xl font-bold">
-                {formatAmount(totalPortfolioValue, baseCurrency)}
-              </p>
             </CardHeader>
-            <CardContent className="flex flex-1 items-center justify-center p-4">
-              <TwoRingDonut
+            <CardContent className="flex min-h-0 flex-1 items-center justify-center p-4">
+              <AllocationDonut
                 targetData={targetData}
                 currentData={currentData}
-                className="max-w-100"
+                totalValue={totalPortfolioValue}
+                currency={baseCurrency}
+                className="h-160 w-160"
               />
             </CardContent>
           </Card>

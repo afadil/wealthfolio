@@ -10,8 +10,8 @@ const LoadingSkeleton = () => (
   <div className="space-y-4 p-4">
     <Skeleton className="h-10 w-48" />
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <Skeleton className="h-[300px]" />
-      <Skeleton className="h-[300px]" />
+      <Skeleton className="h-75" />
+      <Skeleton className="h-75]" />
     </div>
   </div>
 );

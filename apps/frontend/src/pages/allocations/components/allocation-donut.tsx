@@ -2,28 +2,33 @@ import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Minus } from "lucide-react";
 import { Cell, Pie, PieChart } from "recharts";
 import { ChartContainer } from "@wealthfolio/ui/components/ui/chart";
+import { formatAmount } from "@wealthfolio/ui";
 import { cn } from "@wealthfolio/ui/lib/utils";
 
-interface RingDataItem {
+interface AllocationDataItem {
   id: string;
   name: string;
   value: number;
   color: string;
 }
 
-interface TwoRingDonutProps {
-  targetData: RingDataItem[];
-  currentData: RingDataItem[];
+interface AllocationDonutProps {
+  targetData: AllocationDataItem[];
+  currentData: AllocationDataItem[];
+  totalValue?: number;
+  currency?: string;
   onCategoryClick?: (categoryId: string) => void;
   className?: string;
 }
 
-export function TwoRingDonut({
+export function AllocationDonut({
   targetData,
   currentData,
+  totalValue = 0,
+  currency = "USD",
   onCategoryClick,
   className,
-}: TwoRingDonutProps) {
+}: AllocationDonutProps) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   const handleMouseEnter = (_: React.MouseEvent, index: number) => {
@@ -81,13 +86,13 @@ export function TwoRingDonut({
   }
 
   return (
-    <div className={cn("h-120 relative w-full", className)}>
-      <ChartContainer config={{}} className="h-full w-full">
+    <div className={cn("relative max-h-full max-w-full", className)}>
+      <ChartContainer config={{}} className="aspect-square h-full w-full [&>div]:!aspect-square">
         <PieChart
           onMouseLeave={handleMouseLeave}
           margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
         >
-          {/* Inner ring: Current allocation (thicker) */}
+          {/* Single ring: Current allocation */}
           <Pie
             data={currentData}
             dataKey="value"
@@ -112,30 +117,6 @@ export function TwoRingDonut({
               />
             ))}
           </Pie>
-
-          {/* Outer ring: Target allocation (thinner) */}
-          <Pie
-            data={targetData}
-            dataKey="value"
-            cx="50%"
-            cy="50%"
-            innerRadius="80%"
-            outerRadius="87%"
-            paddingAngle={2}
-            cornerRadius={4}
-            startAngle={90}
-            endAngle={-270}
-            isAnimationActive={false}
-          >
-            {targetData.map((item, index) => (
-              <Cell
-                key={`target-${index}`}
-                fill={item.color}
-                opacity={0.5}
-                style={{ cursor: onCategoryClick ? "pointer" : "default" }}
-              />
-            ))}
-          </Pie>
         </PieChart>
       </ChartContainer>
 
@@ -145,13 +126,16 @@ export function TwoRingDonut({
           {activeItem ? (
             <>
               <p className="text-muted-foreground text-xs">{activeItem.name}</p>
-              <p className="text-foreground text-sm font-semibold">
+              <p className="text-foreground text-xl font-bold">
                 {totalCurrent > 0 ? ((activeItem.value / totalCurrent) * 100).toFixed(1) : "0.0"}%
+              </p>
+              <p className="text-muted-foreground text-sm">
+                {formatAmount((activeItem.value / totalCurrent) * totalValue, currency)}
               </p>
               {activeStatus && (
                 <div
                   className={cn(
-                    "mt-2 flex items-center justify-center gap-1 text-xs font-semibold",
+                    "mt-1 flex items-center justify-center gap-1 text-xs font-semibold",
                     activeStatus.color,
                   )}
                 >
@@ -162,8 +146,10 @@ export function TwoRingDonut({
             </>
           ) : (
             <>
-              <p className="text-muted-foreground text-[10px]">inner = current</p>
-              <p className="text-muted-foreground text-[10px]">outer = target</p>
+              <p className="text-muted-foreground text-[10px] uppercase">Total Portfolio</p>
+              <p className="text-foreground text-lg font-bold">
+                {formatAmount(totalValue, currency)}
+              </p>
             </>
           )}
         </div>

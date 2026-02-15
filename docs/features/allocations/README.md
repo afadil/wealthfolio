@@ -62,26 +62,37 @@ The existing `AccountSelector` component handles account switching. Full
 multi-account portfolio grouping (named combos of 2+ accounts) is a separate
 feature — see `docs/features/portfolios/portfolio-grouping-spec.md`.
 
-### D5: Auto-create target on first use
+### D5: Manual target setup (no auto-create)
 
-No separate "create target" dialog. When user first sets a percentage for an
-account, a `PortfolioTarget` is auto-created with name
-`"{Account Name} Allocation"`. Eliminates an unnecessary step.
+**IMPLEMENTED:** Targets start at 0% by default when user first views an account. 
+The strategy switches to "auto-balancing" mode only when the user manually sets 
+the first target percentage. This gives users explicit control over when allocation 
+tracking begins, avoiding confusion from auto-generated targets.
 
-### D6: Side panel for editing (Sheet component)
+### D6: Inline editing (no side panel for Section 1)
 
-Click a category in the overview → Sheet opens from right. Shows category
-target editing, and (in Section 2) per-holding breakdown. Consistent with
-the app's existing pattern (holdings page uses Sheet for detail views).
+**IMPLEMENTED:** Category-level targets are edited directly inline in the overview 
+table with text inputs. Side panel (Sheet component) will be used only in Section 2 
+for per-holding target editing within a category.
 
-### D7: Two-ring donut chart for target vs current
+### D7: Single donut + side-by-side bars (updated design)
 
-Full-circle donut with two concentric rings:
-- Inner ring = target percentages
-- Outer ring = current percentages
-- Same color per category, misalignment shows deviation at a glance
+**IMPLEMENTED:** 
+- **Single donut chart** showing current allocation only (no outer target ring)
+- **Side-by-side bars** showing actual vs target percentages for comparison
+- **Drift indicators**: Badges show "Underweight -X%" / "Overweight +X%" for 
+  categories drifting >5% from target (threshold configurable)
+- **Default center label**: Shows "TOTAL PORTFOLIO" with formatted total value
+- **Hover state**: Donut center dynamically shows:
+  - Category name
+  - **Percentage in bold** (e.g., 95%)
+  - Actual monetary value (calculated from percentage × total)
+  - Drift status (Aligned/Underweight/Overweight) with colored icon
+- **Component**: `AllocationDonut` (renamed from `TwoRingDonut`)
 
-Built with recharts (two `<Pie>` components, different radii).
+The two-ring donut was found to be visually unclear. The simplified design with 
+single donut + comparison bars provides better clarity. Hover interaction makes 
+the chart more informative without visual clutter.
 
 ### D8: Text inputs for editing (no drag sliders)
 
