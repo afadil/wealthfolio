@@ -126,6 +126,33 @@ impl RulesResolver {
         }
     }
 
+    /// Resolve a bond instrument.
+    /// Bonds use ISIN directly — no provider-specific symbol transformation needed.
+    /// Provider-specific ISIN filtering ensures bonds are routed to the correct provider:
+    /// - US_TREASURY_CALC: only US Treasury ISINs (US912*)
+    /// - BOERSE_FRANKFURT and others: all ISINs
+    fn resolve_bond(&self, isin: &Arc<str>, provider: &ProviderId) -> Option<ProviderInstrument> {
+        if provider.as_ref() == "US_TREASURY_CALC" && !isin.starts_with("US912") {
+            return None;
+        }
+        Some(ProviderInstrument::BondIsin { isin: isin.clone() })
+    }
+
+    /// Resolve an option instrument.
+    /// Yahoo Finance accepts OCC symbols directly as equity-like symbols.
+    fn resolve_option(
+        &self,
+        occ_symbol: &Arc<str>,
+        provider: &ProviderId,
+    ) -> Option<ProviderInstrument> {
+        match provider.as_ref() {
+            "YAHOO" => Some(ProviderInstrument::EquitySymbol {
+                symbol: occ_symbol.clone(),
+            }),
+            _ => None,
+        }
+    }
+
     /// Resolve a metal instrument.
     fn resolve_metal(
         &self,
@@ -176,6 +203,10 @@ impl Resolver for RulesResolver {
             InstrumentId::Fx { base, quote } => self.resolve_fx(base, quote, provider)?,
 
             InstrumentId::Metal { code, quote } => self.resolve_metal(code, quote, provider)?,
+
+            InstrumentId::Option { occ_symbol } => self.resolve_option(occ_symbol, provider)?,
+
+            InstrumentId::Bond { isin } => self.resolve_bond(isin, provider)?,
         };
 
         Some(Ok(ResolvedInstrument {
@@ -198,6 +229,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         }
     }
 
@@ -210,6 +242,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         }
     }
 
@@ -222,6 +255,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         }
     }
 
@@ -234,6 +268,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         }
     }
 
@@ -400,6 +435,109 @@ mod tests {
                 assert_eq!(quote.as_ref(), "USD");
             }
             _ => panic!("Expected MetalSymbol"),
+        }
+    }
+
+    fn make_option_context(occ_symbol: &str) -> QuoteContext {
+        QuoteContext {
+            instrument: InstrumentId::Option {
+                occ_symbol: Arc::from(occ_symbol),
+            },
+            overrides: None,
+            currency_hint: None,
+            preferred_provider: None,
+            bond_metadata: None,
+        }
+    }
+
+    #[test]
+    fn test_resolve_option_yahoo() {
+        let resolver = RulesResolver::new();
+        let context = make_option_context("AAPL240119C00195000");
+
+        let result = resolver.resolve(&"YAHOO".into(), &context);
+
+        assert!(result.is_some());
+        let resolved = result.unwrap().unwrap();
+
+        match resolved.instrument {
+            ProviderInstrument::EquitySymbol { symbol } => {
+                assert_eq!(symbol.as_ref(), "AAPL240119C00195000");
+            }
+            _ => panic!("Expected EquitySymbol for OCC option"),
+        }
+    }
+
+    #[test]
+    fn test_resolve_option_unsupported_provider() {
+        let resolver = RulesResolver::new();
+        let context = make_option_context("AAPL240119C00195000");
+
+        let result = resolver.resolve(&"ALPHA_VANTAGE".into(), &context);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_resolve_bond_returns_isin_for_any_provider() {
+        let resolver = RulesResolver::new();
+        let context = QuoteContext {
+            instrument: InstrumentId::Bond {
+                isin: Arc::from("US912810TH12"),
+            },
+            overrides: None,
+            currency_hint: None,
+            preferred_provider: None,
+            bond_metadata: None,
+        };
+
+        // US Treasury ISIN resolves for all providers including US_TREASURY_CALC
+        for provider in &[
+            "YAHOO",
+            "BOERSE_FRANKFURT",
+            "US_TREASURY_CALC",
+            "ALPHA_VANTAGE",
+        ] {
+            let result = resolver.resolve(&(*provider).into(), &context);
+            assert!(
+                result.is_some(),
+                "US Treasury bond should resolve for provider {}",
+                provider
+            );
+            let resolved = result.unwrap().unwrap();
+            match resolved.instrument {
+                ProviderInstrument::BondIsin { isin } => {
+                    assert_eq!(isin.as_ref(), "US912810TH12");
+                }
+                _ => panic!("Expected BondIsin for provider {}", provider),
+            }
+        }
+    }
+
+    #[test]
+    fn test_resolve_bond_non_us_treasury_skips_us_treasury_calc() {
+        let resolver = RulesResolver::new();
+        let context = QuoteContext {
+            instrument: InstrumentId::Bond {
+                isin: Arc::from("XS1948630634"),
+            },
+            overrides: None,
+            currency_hint: None,
+            preferred_provider: None,
+            bond_metadata: None,
+        };
+
+        // Non-US-Treasury ISIN should NOT resolve for US_TREASURY_CALC
+        let result = resolver.resolve(&"US_TREASURY_CALC".into(), &context);
+        assert!(result.is_none(), "Non-US-Treasury bond should not resolve for US_TREASURY_CALC");
+
+        // But should resolve for other providers
+        for provider in &["BOERSE_FRANKFURT", "YAHOO"] {
+            let result = resolver.resolve(&(*provider).into(), &context);
+            assert!(
+                result.is_some(),
+                "Non-US-Treasury bond should resolve for {}",
+                provider
+            );
         }
     }
 

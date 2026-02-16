@@ -40,6 +40,14 @@ pub struct Position {
     /// Alternative assets are excluded from TWR/IRR performance calculations.
     #[serde(default)]
     pub is_alternative: bool,
+    /// Contract multiplier for derivatives (e.g., 100 for equity options).
+    /// Defaults to 1 for non-derivative positions and for snapshots created before this field existed.
+    #[serde(default = "default_multiplier")]
+    pub contract_multiplier: Decimal,
+}
+
+fn default_multiplier() -> Decimal {
+    Decimal::ONE
 }
 
 impl Default for Position {
@@ -57,6 +65,7 @@ impl Default for Position {
             created_at: Utc::now(),
             last_updated: Utc::now(),
             is_alternative: false,
+            contract_multiplier: Decimal::ONE,
         }
     }
 }
@@ -119,6 +128,7 @@ impl Position {
             created_at: date,
             last_updated: date,
             is_alternative: false,
+            contract_multiplier: Decimal::ONE,
         }
     }
 
@@ -129,6 +139,7 @@ impl Position {
         asset_currency: String,
         date: DateTime<Utc>,
         is_alternative: bool,
+        contract_multiplier: Decimal,
     ) -> Self {
         Position {
             id: format!("POS-{}-{}", asset_id, account_id),
@@ -143,6 +154,7 @@ impl Position {
             created_at: date,
             last_updated: date,
             is_alternative,
+            contract_multiplier,
         }
     }
 

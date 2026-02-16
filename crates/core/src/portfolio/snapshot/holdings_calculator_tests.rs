@@ -57,6 +57,36 @@ mod tests {
             };
             self.assets.insert(symbol.to_string(), asset);
         }
+
+        /// Add an option contract asset with a given multiplier.
+        fn add_option_asset(&mut self, symbol: &str, currency: &str, multiplier: Decimal) {
+            use crate::assets::InstrumentType;
+            // Use f64 for strike/multiplier so serde-float Decimal can deserialize them
+            let multiplier_f64 = multiplier.to_string().parse::<f64>().unwrap();
+            let option_metadata = serde_json::json!({
+                "option": {
+                    "underlyingAssetId": "",
+                    "expiration": "2099-01-19",
+                    "right": "CALL",
+                    "strike": 100.0,
+                    "multiplier": multiplier_f64,
+                }
+            });
+            let asset = Asset {
+                id: symbol.to_string(),
+                display_code: Some(symbol.to_string()),
+                quote_ccy: currency.to_string(),
+                name: Some(format!("Mock Option {}", symbol)),
+                kind: AssetKind::Investment,
+                instrument_type: Some(InstrumentType::Option),
+                metadata: Some(option_metadata),
+                quote_mode: QuoteMode::Market,
+                created_at: Utc::now().naive_utc(),
+                updated_at: Utc::now().naive_utc(),
+                ..Default::default()
+            };
+            self.assets.insert(symbol.to_string(), asset);
+        }
     }
 
     #[async_trait::async_trait]
@@ -113,6 +143,14 @@ mod tests {
 
         async fn cleanup_legacy_metadata(&self, _asset_id: &str) -> Result<()> {
             Ok(())
+        }
+
+        async fn update_provider_config(
+            &self,
+            _asset_id: &str,
+            _config: serde_json::Value,
+        ) -> Result<Asset> {
+            unimplemented!()
         }
 
         async fn deactivate(&self, _asset_id: &str) -> Result<()> {
@@ -493,6 +531,14 @@ mod tests {
         HoldingsCalculator::new(fx_service, base_currency, asset_repository)
     }
 
+    fn create_calculator_with_repo(
+        fx_service: Arc<dyn FxServiceTrait>,
+        base_currency: Arc<RwLock<String>>,
+        repo: MockAssetRepository,
+    ) -> HoldingsCalculator {
+        HoldingsCalculator::new(fx_service, base_currency, Arc::new(repo))
+    }
+
     // --- Tests ---
     #[test]
     fn test_buy_activity_updates_holdings_and_cash() {
@@ -599,6 +645,7 @@ mod tests {
             created_at: Utc::now(),
             last_updated: Utc::now(),
             is_alternative: false,
+            contract_multiplier: Decimal::ONE,
         };
         previous_snapshot
             .positions
@@ -2805,6 +2852,7 @@ mod tests {
             created_at: Utc::now(),
             last_updated: Utc::now(),
             is_alternative: false,
+            contract_multiplier: Decimal::ONE,
         };
         previous_snapshot
             .positions
@@ -3615,5 +3663,235 @@ mod tests {
             Some(&expected_usd_cash), // -1505 USD
             "Cash should be booked in activity currency (USD)"
         );
+    }
+
+    // --- Option multiplier tests ---
+
+    #[test]
+    fn test_option_buy_cash_effect_includes_multiplier() {
+        // Buying 2 option contracts at $3.50 premium, multiplier=100, fee=$1.30
+        // Cash effect: -(2 * 3.50 * 100 + 1.30) = -701.30
+        let mock_fx_service = MockFxService::new();
+        let account_currency = "USD";
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+
+        let mut repo = MockAssetRepository::new();
+        repo.add_option_asset("AAPL240119C00195000", "USD", dec!(100));
+
+        let calculator = create_calculator_with_repo(
+            Arc::new(mock_fx_service),
+            base_currency,
+            repo,
+        );
+
+        let target_date_str = "2024-01-02";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+        let previous_snapshot = create_initial_snapshot("acc_opt", account_currency, "2024-01-01");
+
+        let buy = create_activity_with_fx_rate(
+            "opt_buy_1",
+            ActivityType::Buy,
+            "AAPL240119C00195000",
+            dec!(2),    // 2 contracts
+            dec!(3.50), // premium per share
+            dec!(1.30), // fee
+            "USD",
+            target_date_str,
+            None,
+        );
+
+        let result = calculator
+            .calculate_next_holdings(&previous_snapshot, &[buy], target_date)
+            .unwrap();
+        let state = &result.snapshot;
+
+        // Position: 2 contracts
+        let position = state.positions.get("AAPL240119C00195000").unwrap();
+        assert_eq!(position.quantity, dec!(2));
+
+        // Cost basis includes multiplier: 2 * 3.50 * 100 + 1.30 = 701.30
+        assert_eq!(position.total_cost_basis, dec!(701.30));
+
+        // Cash: -(2 * 3.50 * 100 + 1.30) = -701.30
+        let cash = state.cash_balances.get("USD").unwrap();
+        assert_eq!(*cash, dec!(-701.30));
+    }
+
+    #[test]
+    fn test_option_sell_cash_effect_includes_multiplier() {
+        // Sell 2 option contracts at $5.00 premium, multiplier=100, fee=$1.30
+        // Cash effect: +(2 * 5.00 * 100 - 1.30) = +998.70
+        let mock_fx_service = MockFxService::new();
+        let account_currency = "USD";
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+
+        let mut repo = MockAssetRepository::new();
+        repo.add_option_asset("AAPL240119C00195000", "USD", dec!(100));
+
+        let calculator = create_calculator_with_repo(
+            Arc::new(mock_fx_service),
+            base_currency,
+            repo,
+        );
+
+        let target_date_str = "2024-01-02";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+
+        // Set up previous snapshot with an existing option position (2 contracts)
+        let mut previous_snapshot = create_initial_snapshot("acc_opt", account_currency, "2024-01-01");
+        let mut position = Position::new(
+            "acc_opt".to_string(),
+            "AAPL240119C00195000".to_string(),
+            "USD".to_string(),
+            Utc::now(),
+        );
+        position.quantity = dec!(2);
+        position.total_cost_basis = dec!(700); // 2 * (3.50 * 100) = 700
+        position.lots = VecDeque::from(vec![Lot {
+            id: "lot_1".to_string(),
+            position_id: "acc_opt_AAPL240119C00195000".to_string(),
+            quantity: dec!(2),
+            cost_basis: dec!(700),
+            acquisition_price: dec!(350), // 3.50 * 100 multiplier
+            acquisition_fees: dec!(0),
+            acquisition_date: Utc::now(),
+            fx_rate_to_position: None,
+        }]);
+        previous_snapshot.positions.insert("AAPL240119C00195000".to_string(), position);
+
+        let sell = create_activity_with_fx_rate(
+            "opt_sell_1",
+            ActivityType::Sell,
+            "AAPL240119C00195000",
+            dec!(2),    // 2 contracts
+            dec!(5.00), // premium per share
+            dec!(1.30), // fee
+            "USD",
+            target_date_str,
+            None,
+        );
+
+        let result = calculator
+            .calculate_next_holdings(&previous_snapshot, &[sell], target_date)
+            .unwrap();
+        let state = &result.snapshot;
+
+        // Position should be empty after selling all contracts
+        let position = state.positions.get("AAPL240119C00195000").unwrap();
+        assert_eq!(position.quantity, dec!(0));
+
+        // Cash: +(2 * 5.00 * 100 - 1.30) = +998.70
+        let cash = state.cash_balances.get("USD").unwrap();
+        assert_eq!(*cash, dec!(998.70));
+    }
+
+    #[test]
+    fn test_option_expiry_removes_lots_no_cash_effect() {
+        // Option expires worthless: ADJUSTMENT + subtype OPTION_EXPIRY
+        // Should remove lots via FIFO, no cash movement
+        use crate::activities::ACTIVITY_SUBTYPE_OPTION_EXPIRY;
+
+        let mock_fx_service = MockFxService::new();
+        let account_currency = "USD";
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+
+        let mut repo = MockAssetRepository::new();
+        repo.add_option_asset("AAPL240119C00195000", "USD", dec!(100));
+
+        let calculator = create_calculator_with_repo(
+            Arc::new(mock_fx_service),
+            base_currency,
+            repo,
+        );
+
+        let target_date_str = "2024-01-19";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+
+        // Set up previous snapshot with 3 option contracts
+        let mut previous_snapshot = create_initial_snapshot("acc_opt", account_currency, "2024-01-18");
+        let mut position = Position::new(
+            "acc_opt".to_string(),
+            "AAPL240119C00195000".to_string(),
+            "USD".to_string(),
+            Utc::now(),
+        );
+        position.quantity = dec!(3);
+        position.total_cost_basis = dec!(1050); // 3 * (3.50 * 100) = 1050
+        position.lots = VecDeque::from(vec![Lot {
+            id: "lot_1".to_string(),
+            position_id: "acc_opt_AAPL240119C00195000".to_string(),
+            quantity: dec!(3),
+            cost_basis: dec!(1050),
+            acquisition_price: dec!(350), // 3.50 * 100 multiplier
+            acquisition_fees: dec!(0),
+            acquisition_date: Utc::now(),
+            fx_rate_to_position: None,
+        }]);
+        previous_snapshot.positions.insert("AAPL240119C00195000".to_string(), position);
+
+        // Seed initial cash balance to verify no change
+        previous_snapshot.cash_balances.insert("USD".to_string(), dec!(5000));
+
+        let mut expiry = create_activity_with_fx_rate(
+            "opt_expiry_1",
+            ActivityType::from_str("ADJUSTMENT").unwrap(),
+            "AAPL240119C00195000",
+            dec!(3),    // 3 contracts expiring
+            dec!(0),    // no price
+            dec!(0),    // no fee
+            "USD",
+            target_date_str,
+            None,
+        );
+        expiry.subtype = Some(ACTIVITY_SUBTYPE_OPTION_EXPIRY.to_string());
+
+        let result = calculator
+            .calculate_next_holdings(&previous_snapshot, &[expiry], target_date)
+            .unwrap();
+        let state = &result.snapshot;
+
+        // Position: all lots removed
+        let position = state.positions.get("AAPL240119C00195000").unwrap();
+        assert_eq!(position.quantity, dec!(0), "All lots should be removed after expiry");
+        assert!(position.lots.is_empty(), "Lot queue should be empty after expiry");
+
+        // Cash: unchanged (no cash effect for expiry)
+        let cash = state.cash_balances.get("USD").unwrap();
+        assert_eq!(*cash, dec!(5000), "Cash should be unchanged after option expiry");
+    }
+
+    #[test]
+    fn test_non_option_buy_sell_unaffected_by_multiplier() {
+        // Regular stock BUY: multiplier should be 1, so cash = -(qty * price + fee)
+        let mock_fx_service = MockFxService::new();
+        let account_currency = "USD";
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
+
+        let target_date_str = "2024-01-02";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+        let previous_snapshot = create_initial_snapshot("acc_stock", account_currency, "2024-01-01");
+
+        let buy = create_activity_with_fx_rate(
+            "stock_buy_1",
+            ActivityType::Buy,
+            "AAPL",
+            dec!(10),     // 10 shares
+            dec!(150.00), // price per share
+            dec!(5.00),   // fee
+            "USD",
+            target_date_str,
+            None,
+        );
+
+        let result = calculator
+            .calculate_next_holdings(&previous_snapshot, &[buy], target_date)
+            .unwrap();
+        let state = &result.snapshot;
+
+        // Cash: -(10 * 150 * 1 + 5) = -1505  (multiplier=1 for stocks)
+        let cash = state.cash_balances.get("USD").unwrap();
+        assert_eq!(*cash, dec!(-1505), "Stock buy should use multiplier=1");
     }
 }

@@ -477,6 +477,7 @@ pub struct ActivityDetails {
     pub asset_name: Option<String>,
     pub exchange_mic: Option<String>,
     pub asset_pricing_mode: String, // MARKET, MANUAL, DERIVED, NONE
+    pub instrument_type: Option<String>, // EQUITY, BOND, OPTION, etc.
     // Sync/source metadata
     pub source_system: Option<String>,
     pub source_record_id: Option<String>,

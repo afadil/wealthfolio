@@ -29,6 +29,7 @@ export interface ImportRowData {
   subtype?: string;
   isExternal?: boolean;
   symbol?: string;
+  instrumentType?: string;
   assetSymbol?: string;
   quantity?: string | number | null;
   unitPrice?: string | number | null;

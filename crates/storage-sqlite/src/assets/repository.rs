@@ -261,6 +261,24 @@ impl AssetRepositoryTrait for AssetRepository {
             .await
     }
 
+    async fn update_provider_config(
+        &self,
+        asset_id: &str,
+        config: serde_json::Value,
+    ) -> Result<Asset> {
+        let asset_id_owned = asset_id.to_string();
+        let config_str = serde_json::to_string(&config).unwrap_or_default();
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<Asset> {
+                let result_db = diesel::update(assets::table.filter(assets::id.eq(asset_id_owned)))
+                    .set(assets::provider_config.eq(config_str))
+                    .get_result::<AssetDB>(conn)
+                    .map_err(StorageError::from)?;
+                Ok(result_db.into())
+            })
+            .await
+    }
+
     /// Updates the quote mode of an asset (MARKET, MANUAL)
     async fn update_quote_mode(&self, asset_id: &str, quote_mode: &str) -> Result<Asset> {
         let asset_id_owned = asset_id.to_string();

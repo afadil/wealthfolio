@@ -256,6 +256,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 assets::name.nullable(),
                 assets::instrument_exchange_mic.nullable(),
                 assets::quote_mode.nullable(),
+                assets::instrument_type.nullable(),
                 activities::metadata,
             ))
             .limit(page_size)

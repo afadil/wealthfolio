@@ -27,7 +27,7 @@ import {
 } from "@/lib/activity-utils";
 import { ActivityType, getExchangeDisplayName } from "@/lib/constants";
 import { ActivityDetails } from "@/lib/types";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, displayBondPrice } from "@/lib/utils";
 import {
   type OnChangeFn,
   type VisibilityState,
@@ -269,6 +269,10 @@ export const ActivityTable = ({
             return <div className="text-right">{formatAmount(Number(amount), currency)}</div>;
           }
 
+          const isBond = row.original.instrumentType === "BOND";
+          if (isBond) {
+            return <div className="text-right">{displayBondPrice(unitPrice, "BOND").toFixed(3)}%</div>;
+          }
           return <div className="text-right">{formatAmount(unitPrice, currency)}</div>;
         },
       },

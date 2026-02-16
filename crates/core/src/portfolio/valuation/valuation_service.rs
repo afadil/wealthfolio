@@ -1,9 +1,11 @@
 use crate::errors::{CalculatorError, Error as CoreError, Result as CoreResult};
 use crate::fx::currency::normalize_currency_code;
 use crate::fx::FxServiceTrait;
+use crate::portfolio::snapshot::Position;
 use crate::portfolio::snapshot::SnapshotServiceTrait;
 use crate::portfolio::valuation::valuation_calculator::calculate_valuation;
 use crate::portfolio::valuation::valuation_model::DailyAccountValuation;
+use crate::quotes::Quote;
 use crate::portfolio::valuation::ValuationRepositoryTrait;
 use crate::quotes::QuoteServiceTrait;
 use crate::utils::time_utils;
@@ -136,6 +138,25 @@ impl ValuationService {
 
         Ok(fx_rates_by_date)
     }
+
+    /// Builds quote map for valuation on a single day.
+    /// Missing in-day quotes are backfilled with the last known quote per asset.
+    fn effective_quotes_for_day(
+        positions: &HashMap<String, Position>,
+        quotes_for_current_date: &HashMap<String, Quote>,
+        last_known_quotes_by_asset: &HashMap<String, Quote>,
+    ) -> HashMap<String, Quote> {
+        let mut effective = quotes_for_current_date.clone();
+        for asset_id in positions.keys() {
+            if effective.contains_key(asset_id) {
+                continue;
+            }
+            if let Some(prev_quote) = last_known_quotes_by_asset.get(asset_id) {
+                effective.insert(asset_id.clone(), prev_quote.clone());
+            }
+        }
+        effective
+    }
 }
 
 #[async_trait]
@@ -244,12 +265,10 @@ impl ValuationServiceTrait for ValuationService {
             )
             .await?;
 
-        // Build quotes_by_date and track which assets have ANY quotes at all
-        let mut assets_with_quotes: HashSet<String> = HashSet::new();
+        // Build quotes_by_date
         let quotes_by_date = {
             let mut map = HashMap::new();
             for quote in quotes_vec {
-                assets_with_quotes.insert(quote.asset_id.clone());
                 map.entry(quote.timestamp.date_naive())
                     .or_insert_with(HashMap::new)
                     .insert(quote.asset_id.clone(), quote);
@@ -257,88 +276,60 @@ impl ValuationServiceTrait for ValuationService {
             map
         };
 
-        let newly_calculated_valuations: Vec<DailyAccountValuation> = snapshots_to_process
-            .into_iter()
-            .filter_map(|holdings_snapshot| {
-                let current_date = holdings_snapshot.snapshot_date;
-                let account_id_clone = account_id.to_string();
-                let base_curr_clone = base_curr.clone();
+        let mut newly_calculated_valuations: Vec<DailyAccountValuation> = Vec::new();
+        let mut last_known_quotes_by_asset: HashMap<String, Quote> = HashMap::new();
 
-                let quotes_for_current_date =
-                    quotes_by_date.get(&current_date).cloned().unwrap_or_default();
+        for holdings_snapshot in snapshots_to_process {
+            let current_date = holdings_snapshot.snapshot_date;
+            let account_id_clone = account_id.to_string();
+            let base_curr_clone = base_curr.clone();
 
-                let fx_for_current_date = fx_rates_by_date
-                    .get(&current_date)
-                    .cloned()
-                    .unwrap_or_default();
+            let quotes_for_current_date =
+                quotes_by_date.get(&current_date).cloned().unwrap_or_default();
 
-                // Check for assets missing quotes that SHOULD have quotes
-                // (i.e., they have quotes elsewhere, just not for this date - indicates a gap)
-                // Assets with NO quotes at all are skipped - they'll be valued at ZERO
-                // and the health check will detect them
-                let missing_quotes_with_gap: Vec<_> = holdings_snapshot
-                    .positions
-                    .iter()
-                    .filter(|(_, position)| !position.quantity.is_zero())
-                    .map(|(symbol, _)| symbol)
-                    // Only flag as missing if the asset HAS quotes (somewhere) but not for this date
-                    .filter(|symbol| assets_with_quotes.contains(*symbol))
-                    .filter(|symbol| !quotes_for_current_date.contains_key(*symbol))
-                    .cloned()
-                    .collect();
+            for (asset_id, quote) in &quotes_for_current_date {
+                last_known_quotes_by_asset.insert(asset_id.clone(), quote.clone());
+            }
 
-                if !missing_quotes_with_gap.is_empty() {
-                    debug!(
-                        "Quote gap for {:?} on {} (account '{}'). Skipping day.",
-                        missing_quotes_with_gap, current_date, account_id_clone
+            let effective_quotes_for_current_date = Self::effective_quotes_for_day(
+                &holdings_snapshot.positions,
+                &quotes_for_current_date,
+                &last_known_quotes_by_asset,
+            );
+
+            let fx_for_current_date = fx_rates_by_date
+                .get(&current_date)
+                .cloned()
+                .unwrap_or_default();
+
+            let account_curr = &holdings_snapshot.currency;
+            if account_curr != &base_curr_clone
+                && !fx_for_current_date
+                    .contains_key(&(account_curr.clone(), base_curr_clone.clone()))
+            {
+                warn!(
+                    "Base currency FX rate ({}->{}) missing for {} (account '{}'). Skipping day.",
+                    account_curr, base_curr_clone, current_date, account_id_clone
+                );
+                continue;
+            }
+
+            match calculate_valuation(
+                &holdings_snapshot,
+                &effective_quotes_for_current_date,
+                &fx_for_current_date,
+                current_date,
+                &base_curr_clone,
+            ) {
+                Ok(valuation_result) => newly_calculated_valuations.push(valuation_result),
+                Err(e) => {
+                    error!(
+                        "Failed to calculate valuation for account {} on date {}: {}. Skipping this date.",
+                        account_id, current_date, e
                     );
-                    return None;
                 }
-
-                // Check if there are any positions that need quotes
-                // but only consider positions that HAVE quotes somewhere
-                let has_quotable_positions = holdings_snapshot
-                    .positions
-                    .keys()
-                    .any(|symbol| assets_with_quotes.contains(symbol));
-
-                if quotes_for_current_date.is_empty() && has_quotable_positions {
-                    debug!(
-                        "No quotes for date {} (account '{}'). Skipping day.",
-                        current_date, account_id_clone
-                    );
-                    return None;
-                }
-                let account_curr = &holdings_snapshot.currency;
-                if account_curr != &base_curr_clone
-                    && !fx_for_current_date
-                        .contains_key(&(account_curr.clone(), base_curr_clone.clone()))
-                {
-                    warn!(
-                        "Base currency FX rate ({}->{}) missing for {} (account '{}'). Skipping day.",
-                        account_curr, base_curr_clone, current_date, account_id_clone
-                    );
-                    return None;
-                }
-
-                match calculate_valuation(
-                    &holdings_snapshot,
-                    &quotes_for_current_date,
-                    &fx_for_current_date,
-                    current_date,
-                    &base_curr_clone,
-                ) {
-                    Ok(valuation_result) => Some(valuation_result),
-                    Err(e) => {
-                        error!(
-                            "Failed to calculate valuation for account {} on date {}: {}. Skipping this date.",
-                            account_id, current_date, e
-                        );
-                        None
-                    }
-                }
-            })
-            .collect();
+            }
+        }
 
         if !newly_calculated_valuations.is_empty() {
             self.valuation_repository
@@ -391,5 +382,105 @@ impl ValuationServiceTrait for ValuationService {
         );
         self.valuation_repository
             .get_valuations_on_date(account_ids, date)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ValuationService;
+    use crate::portfolio::snapshot::Position;
+    use crate::quotes::{DataSource, Quote};
+    use chrono::{TimeZone, Utc};
+    use rust_decimal_macros::dec;
+    use std::collections::VecDeque;
+    use std::collections::HashMap;
+
+    fn test_quote(asset_id: &str, close: rust_decimal::Decimal, day: (i32, u32, u32)) -> Quote {
+        Quote {
+            id: format!("{}-{}", asset_id, day.2),
+            asset_id: asset_id.to_string(),
+            timestamp: Utc
+                .with_ymd_and_hms(day.0, day.1, day.2, 0, 0, 0)
+                .single()
+                .unwrap(),
+            open: close,
+            high: close,
+            low: close,
+            close,
+            adjclose: close,
+            volume: dec!(0),
+            currency: "USD".to_string(),
+            data_source: DataSource::Manual,
+            created_at: Utc::now(),
+            notes: None,
+        }
+    }
+
+    fn test_position() -> Position {
+        Position {
+            id: "pos".to_string(),
+            account_id: "acc".to_string(),
+            asset_id: "asset".to_string(),
+            quantity: dec!(1),
+            average_cost: dec!(100),
+            total_cost_basis: dec!(100),
+            currency: "USD".to_string(),
+            inception_date: Utc::now(),
+            lots: VecDeque::new(),
+            created_at: Utc::now(),
+            last_updated: Utc::now(),
+            is_alternative: false,
+            contract_multiplier: dec!(1),
+        }
+    }
+
+    #[test]
+    fn effective_quotes_for_day_carries_forward_missing_position_quote() {
+        let mut positions = HashMap::new();
+        positions.insert("AAA".to_string(), test_position());
+        positions.insert("BBB".to_string(), test_position());
+
+        let mut today_quotes = HashMap::new();
+        today_quotes.insert("AAA".to_string(), test_quote("AAA", dec!(101), (2025, 1, 2)));
+
+        let mut last_known = HashMap::new();
+        last_known.insert("BBB".to_string(), test_quote("BBB", dec!(202), (2025, 1, 1)));
+
+        let effective =
+            ValuationService::effective_quotes_for_day(&positions, &today_quotes, &last_known);
+
+        assert_eq!(effective.get("AAA").map(|q| q.close), Some(dec!(101)));
+        assert_eq!(effective.get("BBB").map(|q| q.close), Some(dec!(202)));
+    }
+
+    #[test]
+    fn effective_quotes_for_day_prefers_current_day_quote() {
+        let mut positions = HashMap::new();
+        positions.insert("AAA".to_string(), test_position());
+
+        let mut today_quotes = HashMap::new();
+        today_quotes.insert("AAA".to_string(), test_quote("AAA", dec!(150), (2025, 1, 2)));
+
+        let mut last_known = HashMap::new();
+        last_known.insert("AAA".to_string(), test_quote("AAA", dec!(140), (2025, 1, 1)));
+
+        let effective =
+            ValuationService::effective_quotes_for_day(&positions, &today_quotes, &last_known);
+
+        assert_eq!(effective.get("AAA").map(|q| q.close), Some(dec!(150)));
+    }
+
+    #[test]
+    fn effective_quotes_for_day_leaves_unknown_assets_absent() {
+        let mut positions = HashMap::new();
+        positions.insert("AAA".to_string(), test_position());
+
+        let today_quotes = HashMap::new();
+        let last_known = HashMap::new();
+
+        let effective =
+            ValuationService::effective_quotes_for_day(&positions, &today_quotes, &last_known);
+
+        assert!(!effective.contains_key("AAA"));
     }
 }

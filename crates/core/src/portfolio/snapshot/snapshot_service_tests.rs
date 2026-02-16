@@ -249,6 +249,14 @@ mod tests {
             Ok(())
         }
 
+        async fn update_provider_config(
+            &self,
+            _asset_id: &str,
+            _config: serde_json::Value,
+        ) -> AppResult<Asset> {
+            unimplemented!()
+        }
+
         async fn deactivate(&self, _asset_id: &str) -> AppResult<()> {
             Ok(())
         }
@@ -1019,6 +1027,7 @@ mod tests {
             created_at: Utc::now(),
             last_updated: Utc::now(),
             is_alternative: false,
+            contract_multiplier: Decimal::ONE,
         };
         snap1_cad.positions.insert("TSE.TO".to_string(), pos1_tse);
         snap1_cad.cost_basis = dec!(500);
@@ -1043,6 +1052,7 @@ mod tests {
             created_at: Utc::now(),
             last_updated: Utc::now(),
             is_alternative: false,
+            contract_multiplier: Decimal::ONE,
         };
         snap2_usd.positions.insert("AAPL".to_string(), pos2_aapl);
         snap2_usd.cost_basis = dec!(750);
@@ -1236,6 +1246,7 @@ mod tests {
                 created_at: Utc::now(),
                 last_updated: Utc::now(),
                 is_alternative: false,
+                contract_multiplier: Decimal::ONE,
             },
         );
 
@@ -1255,6 +1266,7 @@ mod tests {
                 created_at: Utc::now(),
                 last_updated: Utc::now(),
                 is_alternative: false,
+                contract_multiplier: Decimal::ONE,
             },
         );
 
@@ -3768,6 +3780,7 @@ mod tests {
             created_at: Utc::now(),
             last_updated: Utc::now(),
             is_alternative: false,
+            contract_multiplier: Decimal::ONE,
         };
         manual_snapshot
             .positions

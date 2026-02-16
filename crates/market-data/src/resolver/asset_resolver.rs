@@ -82,6 +82,7 @@ mod tests {
             overrides: Some(overrides),
             currency_hint: Some("CAD".into()),
             preferred_provider: None,
+            bond_metadata: None,
         };
 
         let result = resolver.resolve(&"YAHOO".into(), &context);
@@ -111,6 +112,7 @@ mod tests {
             overrides: None,
             currency_hint: Some("USD".into()),
             preferred_provider: None,
+            bond_metadata: None,
         };
 
         let result = resolver.resolve(&"YAHOO".into(), &context);
@@ -140,6 +142,7 @@ mod tests {
             overrides: Some(overrides),
             currency_hint: Some("CAD".into()),
             preferred_provider: None,
+            bond_metadata: None,
         };
 
         // Try to resolve for ALPHA_VANTAGE (no override)

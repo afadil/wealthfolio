@@ -10,13 +10,32 @@ import { importActivitySchema } from "@/lib/schemas";
 import { tryParseDate } from "@/lib/utils";
 import { logger } from "@/adapters";
 import { SUBTYPES_BY_ACTIVITY_TYPE, SUBTYPE_DISPLAY_NAMES } from "@/lib/constants";
+import { looksLikeOccSymbol, normalizeOptionSymbol } from "@/lib/occ-symbol";
+import { looksLikeIsin } from "@/lib/isin";
+import {
+  normalizeInstrumentType,
+  splitInstrumentPrefixedSymbol,
+} from "./instrument-type";
 
 // Ticker symbol validation regex
 const tickerRegex = /^(CASH:[A-Z]{3}|[A-Z0-9]{1,10}([.-][A-Z0-9]+){0,2})$/;
 
+// CUSIP: 9 alphanumeric chars ending in a digit
+const cusipRegex = /^[A-Z0-9]{8}\d$/;
+
 // Helper to validate ticker symbol format
 export function validateTickerSymbol(symbol: string): boolean {
-  return tickerRegex.test(symbol.trim());
+  const { symbol: strippedSymbol } = splitInstrumentPrefixedSymbol(symbol);
+  const s = (strippedSymbol || "").trim();
+  const upper = s.toUpperCase();
+  if (!s) return false;
+  return (
+    tickerRegex.test(upper) ||
+    looksLikeOccSymbol(s) ||
+    normalizeOptionSymbol(s) !== null ||
+    looksLikeIsin(s) ||
+    cusipRegex.test(upper)
+  );
 }
 
 // Re-export shared activity type mapping utilities
@@ -416,6 +435,8 @@ function transformRowToActivity(
   const rawDate = getMappedValue(ImportFormat.DATE);
   activity.date = rawDate ? tryParseDate(rawDate)?.toISOString() : undefined;
   activity.symbol = getMappedValue(ImportFormat.SYMBOL);
+  const rawInstrumentType = getMappedValue(ImportFormat.INSTRUMENT_TYPE);
+  activity.instrumentType = normalizeInstrumentType(rawInstrumentType);
   const csvActivityType = getMappedValue(ImportFormat.ACTIVITY_TYPE);
   // Store raw parsed values temporarily before applying logic
   // Use absolute values for numeric fields to handle brokers that use negative values for direction
@@ -444,6 +465,11 @@ function transformRowToActivity(
   if (activity.symbol && mapping.symbolMappings[activity.symbol]) {
     activity.symbol = mapping.symbolMappings[activity.symbol];
   }
+
+  // Support typed symbol format (e.g. bond:US037833DU14)
+  const symbolWithType = splitInstrumentPrefixedSymbol(activity.symbol);
+  activity.symbol = symbolWithType.symbol;
+  activity.instrumentType = activity.instrumentType || symbolWithType.instrumentType;
 
   // 2. Determine Activity Type
   if (csvActivityType) {

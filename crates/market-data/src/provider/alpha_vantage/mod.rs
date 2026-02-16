@@ -979,9 +979,9 @@ impl MarketDataProvider for AlphaVantageProvider {
                     self.fetch_crypto_quotes(symbol, &currency).await?
                 }
             }
-            ProviderInstrument::MetalSymbol { .. } => {
+            ProviderInstrument::MetalSymbol { .. } | ProviderInstrument::BondIsin { .. } => {
                 return Err(MarketDataError::UnsupportedAssetType(
-                    "Alpha Vantage does not support metals".to_string(),
+                    "Alpha Vantage does not support this asset type".to_string(),
                 ));
             }
         };
@@ -1034,9 +1034,9 @@ impl MarketDataProvider for AlphaVantageProvider {
                     self.fetch_crypto_quotes(symbol, &currency).await?
                 }
             }
-            ProviderInstrument::MetalSymbol { .. } => {
+            ProviderInstrument::MetalSymbol { .. } | ProviderInstrument::BondIsin { .. } => {
                 return Err(MarketDataError::UnsupportedAssetType(
-                    "Alpha Vantage does not support metals".to_string(),
+                    "Alpha Vantage does not support this asset type".to_string(),
                 ));
             }
         };
@@ -1112,6 +1112,7 @@ mod tests {
             overrides: None,
             currency_hint: currency_hint.map(Cow::Borrowed),
             preferred_provider: None,
+            bond_metadata: None,
         }
     }
 

@@ -101,6 +101,7 @@ export const ImportFormat = {
   DATE: "date",
   ACTIVITY_TYPE: "activityType",
   SYMBOL: "symbol",
+  INSTRUMENT_TYPE: "instrumentType",
   QUANTITY: "quantity",
   UNIT_PRICE: "unitPrice",
   AMOUNT: "amount",
@@ -118,6 +119,7 @@ export const importFormatSchema = z.enum([
   ImportFormat.DATE,
   ImportFormat.ACTIVITY_TYPE,
   ImportFormat.SYMBOL,
+  ImportFormat.INSTRUMENT_TYPE,
   ImportFormat.QUANTITY,
   ImportFormat.UNIT_PRICE,
   ImportFormat.AMOUNT,
@@ -292,6 +294,10 @@ export const ACTIVITY_SUBTYPES = {
   REBATE: "REBATE",
   // REFUND: internal flow (fee correction/reversal, no net_contribution change)
   REFUND: "REFUND",
+
+  // Option subtypes
+  OPTION_EXERCISE: "OPTION_EXERCISE",
+  OPTION_EXPIRY: "OPTION_EXPIRY",
 } as const;
 
 export type ActivitySubtype = (typeof ACTIVITY_SUBTYPES)[keyof typeof ACTIVITY_SUBTYPES];
@@ -304,6 +310,8 @@ export const SUBTYPE_DISPLAY_NAMES: Record<string, string> = {
   BONUS: "Bonus",
   REBATE: "Trading Rebate",
   REFUND: "Fee Refund",
+  OPTION_EXERCISE: "Option Exercise",
+  OPTION_EXPIRY: "Option Expiry",
 };
 
 // Suggested subtypes per activity type
@@ -413,6 +421,7 @@ export const InstrumentType = {
   CRYPTO: "CRYPTO",
   FX: "FX",
   OPTION: "OPTION",
+  BOND: "BOND",
   METAL: "METAL",
 } as const;
 
@@ -424,6 +433,7 @@ export const INSTRUMENT_TYPE_OPTIONS = [
   { value: InstrumentType.CRYPTO, label: "Crypto" },
   { value: InstrumentType.FX, label: "FX" },
   { value: InstrumentType.OPTION, label: "Option" },
+  { value: InstrumentType.BOND, label: "Bond" },
   { value: InstrumentType.METAL, label: "Metal" },
 ] as const;
 

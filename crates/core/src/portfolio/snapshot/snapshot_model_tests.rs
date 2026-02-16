@@ -240,6 +240,7 @@ mod tests {
                 created_at: now,
                 last_updated: now,
                 is_alternative: false,
+                contract_multiplier: Decimal::ONE,
             },
         );
         snapshot1.positions = positions1;
@@ -261,6 +262,7 @@ mod tests {
                 created_at: now,
                 last_updated: now,
                 is_alternative: false,
+                contract_multiplier: Decimal::ONE,
             },
         );
         snapshot2.positions = positions2;
@@ -294,6 +296,7 @@ mod tests {
                 created_at: now,
                 last_updated: now,
                 is_alternative: false,
+                contract_multiplier: Decimal::ONE,
             },
         );
         snapshot1.positions = positions1;
@@ -315,6 +318,7 @@ mod tests {
                 created_at: Utc::now(), // Different timestamp (should be ignored)
                 last_updated: Utc::now(), // Different timestamp (should be ignored)
                 is_alternative: false,
+                contract_multiplier: Decimal::ONE,
             },
         );
         snapshot2.positions = positions2;
@@ -349,6 +353,7 @@ mod tests {
                 created_at: now,
                 last_updated: now,
                 is_alternative: false,
+                contract_multiplier: Decimal::ONE,
             },
         );
         snapshot1.positions = positions1;

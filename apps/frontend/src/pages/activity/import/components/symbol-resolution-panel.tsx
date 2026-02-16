@@ -45,7 +45,7 @@ export function SymbolResolutionPanel({ drafts, onApplyMappings }: SymbolResolut
         </h3>
       </div>
       <p className="text-muted-foreground mb-3 text-xs">
-        Search and map these symbols to the correct ticker, then apply.
+        Search and map these symbols to the correct ticker, or fix their instrumentType below, then apply.
       </p>
 
       <div className="space-y-2">

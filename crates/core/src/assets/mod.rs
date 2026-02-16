@@ -26,7 +26,7 @@ pub use alternative_assets_traits::{
 };
 pub use asset_id::{parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix};
 pub use assets_model::{
-    canonicalize_market_identity, Asset, AssetKind, AssetMetadata, AssetSpec, Country,
+    canonicalize_market_identity, Asset, AssetKind, AssetMetadata, AssetSpec, BondSpec, Country,
     EnsureAssetsResult, InstrumentId, InstrumentType, NewAsset, OptionSpec, ProviderProfile,
     QuoteMode, Sector, UpdateAssetProfile,
 };

@@ -40,22 +40,24 @@ pub fn plan_portfolio_job(events: &[DomainEvent]) -> Option<PortfolioJobConfig> 
                     }
                 }
             }
-            DomainEvent::HoldingsChanged {
-                account_ids: acc_ids,
-                asset_ids: ast_ids,
-            } => {
-                has_recalc_event = true;
-                for id in acc_ids {
-                    if !id.is_empty() {
-                        account_ids.insert(id.clone());
-                    }
-                }
-                for id in ast_ids {
-                    if !id.is_empty() {
-                        asset_ids.insert(id.clone());
-                    }
-                }
-            }
+            // FIXME: HoldingsChanged triggers a feedback loop — see BUG_FIXES.md
+            // DomainEvent::HoldingsChanged {
+            //     account_ids: acc_ids,
+            //     asset_ids: ast_ids,
+            // } => {
+            //     has_recalc_event = true;
+            //     for id in acc_ids {
+            //         if !id.is_empty() {
+            //             account_ids.insert(id.clone());
+            //         }
+            //     }
+            //     for id in ast_ids {
+            //         if !id.is_empty() {
+            //             asset_ids.insert(id.clone());
+            //         }
+            //     }
+            // }
+            DomainEvent::HoldingsChanged { .. } => {}
             DomainEvent::AccountsChanged {
                 account_ids: acc_ids,
                 ..

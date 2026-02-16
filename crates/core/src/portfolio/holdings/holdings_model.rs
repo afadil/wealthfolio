@@ -30,6 +30,12 @@ pub struct Instrument {
     pub pricing_mode: String,
     pub preferred_provider: Option<String>,
 
+    /// Market instrument type (EQUITY, OPTION, BOND, etc.) for frontend display logic
+    pub instrument_type: Option<String>,
+
+    /// Contract multiplier (e.g., 100 for options). Defaults to 1 for non-options.
+    pub contract_multiplier: Decimal,
+
     // Taxonomy-based classifications
     pub classifications: Option<AssetClassifications>,
 }

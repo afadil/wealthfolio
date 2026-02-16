@@ -101,6 +101,14 @@ pub trait AssetRepositoryTrait: Send + Sync {
     /// Preserves $.identifiers if present.
     async fn cleanup_legacy_metadata(&self, asset_id: &str) -> Result<()>;
 
+    /// Updates only the provider_config JSON column for an asset.
+    /// Used to pin preferred_provider after first successful quote fetch.
+    async fn update_provider_config(
+        &self,
+        asset_id: &str,
+        config: serde_json::Value,
+    ) -> Result<Asset>;
+
     /// Deactivates an asset (sets is_active=0).
     /// Used when merging UNKNOWN assets into resolved ones.
     async fn deactivate(&self, asset_id: &str) -> Result<()>;

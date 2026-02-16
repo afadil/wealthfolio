@@ -401,23 +401,25 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     }
     case "calculate_performance_history": {
-      const { itemType, itemId, startDate, endDate } = payload as {
+      const { itemType, itemId, startDate, endDate, trackingMode } = payload as {
         itemType: string;
         itemId: string;
         startDate?: string;
         endDate?: string;
+        trackingMode?: string;
       };
-      body = JSON.stringify({ itemType, itemId, startDate, endDate });
+      body = JSON.stringify({ itemType, itemId, startDate, endDate, trackingMode });
       break;
     }
     case "calculate_performance_summary": {
-      const { itemType, itemId, startDate, endDate } = payload as {
+      const { itemType, itemId, startDate, endDate, trackingMode } = payload as {
         itemType: string;
         itemId: string;
         startDate?: string;
         endDate?: string;
+        trackingMode?: string;
       };
-      body = JSON.stringify({ itemType, itemId, startDate, endDate });
+      body = JSON.stringify({ itemType, itemId, startDate, endDate, trackingMode });
       break;
     }
     case "check_update": {
@@ -1182,13 +1184,18 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
   if (!res.ok) {
     let msg = res.statusText;
     try {
-      const err = await res.json();
-      msg = (err?.message ?? msg) as string;
+      const txt = await res.text();
+      try {
+        const err = JSON.parse(txt);
+        msg = (err?.message ?? txt) as string;
+      } catch (_jsonErr) {
+        // Non-JSON body — use text directly (e.g., Axum 422 rejection detail)
+        if (txt) msg = txt;
+      }
     } catch (_e) {
-      // ignore JSON parse error from non-JSON error bodies
       void 0;
     }
-    console.error(`[Invoke] Command "${command}" failed: ${msg}`);
+    console.error(`[Invoke] Command "${command}" failed (${res.status}): ${msg}`);
     throw new Error(msg);
   }
   if (command === "backup_database") {

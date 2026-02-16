@@ -167,6 +167,12 @@ pub trait QuoteServiceTrait: Send + Sync {
     /// (e.g., "VFV.TO" for Yahoo when exchange_mic is XTSE).
     async fn get_asset_profile(&self, asset: &Asset) -> Result<ProviderProfile>;
 
+    /// Fetch bond details from TreasuryDirect for US Treasury bonds.
+    async fn fetch_bond_details(
+        &self,
+        isin: &str,
+    ) -> Option<crate::assets::BondSpec>;
+
     /// Fetch historical quotes from provider.
     async fn fetch_quotes_from_provider(
         &self,
@@ -442,6 +448,7 @@ where
             Some(InstrumentType::Crypto) => "CRYPTOCURRENCY",
             Some(InstrumentType::Metal) => "COMMODITY",
             Some(InstrumentType::Option) => "OPTION",
+            Some(InstrumentType::Bond) => "BOND",
             Some(InstrumentType::Fx) => "FOREX",
             None => "OTHER",
         };
@@ -697,6 +704,20 @@ where
 
     async fn get_asset_profile(&self, asset: &Asset) -> Result<ProviderProfile> {
         self.client.read().await.get_profile(asset).await
+    }
+
+    async fn fetch_bond_details(
+        &self,
+        isin: &str,
+    ) -> Option<crate::assets::BondSpec> {
+        let details = self.client.read().await.fetch_bond_details(isin).await?;
+        Some(crate::assets::BondSpec {
+            isin: Some(isin.to_string()),
+            coupon_rate: Some(details.coupon_rate),
+            maturity_date: Some(details.maturity_date),
+            face_value: Some(details.face_value),
+            coupon_frequency: Some(details.coupon_frequency),
+        })
     }
 
     async fn fetch_quotes_from_provider(

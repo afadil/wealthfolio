@@ -630,6 +630,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 kind: AssetKind::Investment,
                 quote_mode: None,
                 name: asset_name,
+                metadata: None,
             };
 
             let spec_key = spec.instrument_key().unwrap_or_else(|| {
@@ -725,6 +726,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 created_at: now,
                 last_updated: now,
                 is_alternative: false,
+                contract_multiplier: Decimal::ONE,
             };
             positions_map.insert(asset_id, position);
         }

@@ -182,6 +182,8 @@ export interface ActivityDetails {
   assetQuoteMode?: QuoteMode;
   /** Canonical exchange MIC code for asset identification */
   exchangeMic?: string;
+  /** Instrument type: EQUITY, BOND, OPTION, etc. */
+  instrumentType?: string | null;
   // Sync/source metadata
   sourceSystem?: string;
   sourceRecordId?: string;
@@ -440,9 +442,28 @@ export interface Instrument {
   notes?: string | null;
   quoteMode: QuoteMode;
   preferredProvider?: string | null;
+  instrumentType?: string | null; // "EQUITY", "OPTION", "BOND", etc.
+  contractMultiplier: number; // 100 for options, 1 for everything else
 
   // Taxonomy-based classifications
   classifications?: AssetClassifications | null;
+}
+
+export interface OptionSpec {
+  underlyingAssetId: string;
+  expiration: string;
+  right: string; // "CALL" | "PUT"
+  strike: number;
+  multiplier: number;
+  occSymbol?: string;
+}
+
+export interface BondSpec {
+  maturityDate?: string;
+  couponRate?: number;
+  faceValue?: number;
+  couponFrequency?: string;
+  isin?: string;
 }
 
 export interface MonetaryValue {

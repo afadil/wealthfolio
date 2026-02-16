@@ -128,7 +128,37 @@ const useGlobalEventListener = () => {
       } else {
         toast.dismiss(TOAST_IDS.portfolioUpdateStart);
       }
-      queryClientRef.current.invalidateQueries();
+      // Scope invalidation to portfolio-affected queries only.
+      // A blanket invalidateQueries() causes settings to briefly return undefined,
+      // which triggers the onboarding redirect guard and causes UI flickering.
+      const qc = queryClientRef.current;
+      const keys = [
+        "holdings",
+        "holding",
+        "accounts",
+        "accounts_summary",
+        "portfolioAllocations",
+        "holdingsByAllocation",
+        "incomeSummary",
+        "portfolioSummary",
+        "performanceSummary",
+        "performanceHistory",
+        "historyValuation",
+        "accountsSimplePerformance",
+        "latest-valuations",
+        "latest_quotes",
+        "netWorth",
+        "netWorthHistory",
+        "alternativeHoldings",
+        "healthStatus",
+        "quoteHistory",
+        "asset_data",
+        "activities",
+        "activity-data",
+      ];
+      for (const key of keys) {
+        qc.invalidateQueries({ queryKey: [key] });
+      }
     };
 
     const handleDatabaseRestored = () => {

@@ -170,6 +170,7 @@ impl HoldingsValuationService {
         let asset_id = &instrument.id; // Use ID for quote lookups
         let symbol = &instrument.symbol; // Use symbol for logging
         let quantity = holding.quantity;
+        let multiplier = instrument.contract_multiplier;
         let pos_currency = &holding.local_currency;
         let normalized_position_currency = normalize_currency_code(pos_currency);
         let context_msg = format!("HoldingValuation [Security {} ({})]", symbol, asset_id);
@@ -227,7 +228,8 @@ impl HoldingsValuationService {
             );
 
             let market_price_quote_curr = latest_quote.close;
-            let market_value_quote_major = normalized_price * quantity;
+            // For options: market_value = price × quantity × multiplier (e.g., 100)
+            let market_value_quote_major = normalized_price * quantity * multiplier;
             holding.price = Some(market_price_quote_curr);
 
             let fx_rate_quote_to_local = self.get_fx_rate_or_fallback(
@@ -277,7 +279,7 @@ impl HoldingsValuationService {
                     normalize_amount(prev_quote.close, &prev_quote.currency);
 
                 if prev_quote_currency_normalized == normalized_quote_currency {
-                    let prev_value_quote_major = prev_price_normalized * quantity;
+                    let prev_value_quote_major = prev_price_normalized * quantity * multiplier;
 
                     let fx_rate_prev_quote_to_local = fx_rate_quote_to_local;
                     let fx_rate_prev_quote_to_base = fx_rate_quote_to_base;

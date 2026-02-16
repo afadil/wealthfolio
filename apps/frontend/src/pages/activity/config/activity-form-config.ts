@@ -11,6 +11,8 @@ import { SplitForm, type SplitFormValues } from "../components/forms/split-form"
 import { FeeForm, type FeeFormValues } from "../components/forms/fee-form";
 import { InterestForm, type InterestFormValues } from "../components/forms/interest-form";
 import { TaxForm, type TaxFormValues } from "../components/forms/tax-form";
+import { ExerciseForm, type ExerciseFormValues } from "../components/forms/exercise-form";
+import { ExpiryForm, type ExpiryFormValues } from "../components/forms/expiry-form";
 import type { AccountSelectOption } from "../components/forms/fields";
 import type { NewActivityFormValues } from "../components/forms/schemas";
 
@@ -25,7 +27,9 @@ export type PickerActivityType =
   | "SPLIT"
   | "FEE"
   | "INTEREST"
-  | "TAX";
+  | "TAX"
+  | "EXERCISE"
+  | "EXPIRY";
 
 // Form values union type
 export type ActivityFormValues =
@@ -38,7 +42,9 @@ export type ActivityFormValues =
   | SplitFormValues
   | FeeFormValues
   | InterestFormValues
-  | TaxFormValues;
+  | TaxFormValues
+  | ExerciseFormValues
+  | ExpiryFormValues;
 
 // Common form props interface
 export interface ActivityFormComponentProps<T> {
@@ -110,7 +116,9 @@ export const ACTIVITY_FORM_CONFIG: Record<
         symbolInstrumentType: d.symbolInstrumentType,
         currency: d.currency,
         fxRate: d.fxRate,
-        assetMetadata: d.assetMetadata,
+        assetMetadata: d.assetKind
+          ? { ...d.assetMetadata, kind: d.assetKind }
+          : d.assetMetadata,
       };
     },
   },
@@ -147,7 +155,9 @@ export const ACTIVITY_FORM_CONFIG: Record<
         symbolInstrumentType: d.symbolInstrumentType,
         currency: d.currency,
         fxRate: d.fxRate,
-        assetMetadata: d.assetMetadata,
+        assetMetadata: d.assetKind
+          ? { ...d.assetMetadata, kind: d.assetKind }
+          : d.assetMetadata,
       };
     },
   },
@@ -380,6 +390,54 @@ export const ACTIVITY_FORM_CONFIG: Record<
         comment: d.comment,
         subtype: d.subtype,
         currency: d.currency,
+      };
+    },
+  },
+
+  EXERCISE: {
+    component: ExerciseForm as ComponentType<ActivityFormComponentProps<ActivityFormValues>>,
+    activityType: ActivityType.SELL,
+    getDefaults: (activity, accounts) => ({
+      ...getBaseDefaults(activity, accounts),
+      assetId: activity?.assetSymbol ?? activity?.assetId ?? "",
+      quantity: activity?.quantity ? Number(activity.quantity) : undefined,
+      currency: activity?.currency,
+    }),
+    toPayload: (data) => {
+      const d = data as ExerciseFormValues;
+      return {
+        accountId: d.accountId,
+        activityDate: d.activityDate,
+        assetId: d.assetId,
+        quantity: d.quantity,
+        comment: d.comment,
+        subtype: "OPTION_EXERCISE",
+        currency: d.currency,
+        exchangeMic: d.exchangeMic,
+      };
+    },
+  },
+
+  EXPIRY: {
+    component: ExpiryForm as ComponentType<ActivityFormComponentProps<ActivityFormValues>>,
+    activityType: ActivityType.ADJUSTMENT,
+    getDefaults: (activity, accounts) => ({
+      ...getBaseDefaults(activity, accounts),
+      assetId: activity?.assetSymbol ?? activity?.assetId ?? "",
+      quantity: activity?.quantity ? Number(activity.quantity) : undefined,
+      currency: activity?.currency,
+    }),
+    toPayload: (data) => {
+      const d = data as ExpiryFormValues;
+      return {
+        accountId: d.accountId,
+        activityDate: d.activityDate,
+        assetId: d.assetId,
+        quantity: d.quantity,
+        comment: d.comment,
+        subtype: "OPTION_EXPIRY",
+        currency: d.currency,
+        exchangeMic: d.exchangeMic,
       };
     },
   },

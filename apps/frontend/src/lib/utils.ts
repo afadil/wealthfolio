@@ -495,6 +495,11 @@ export function toPayloadNumber(value: unknown, precision = 6): number | undefin
  * Normalize decimal string for storage: trim whitespace, remove trailing zeros.
  * Returns null for empty/invalid input. Used for storing numeric values as strings.
  */
+/** Convert stored bond price (decimal) to display percentage. No-op for non-bonds. */
+export function displayBondPrice(price: number, instrumentType?: string | null): number {
+  return instrumentType === "BOND" ? price * 100 : price;
+}
+
 export function normalizeDecimalString(value: unknown): string | null {
   if (value == null || value === "") return null;
   // Only accept string or number primitives

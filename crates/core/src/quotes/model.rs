@@ -18,6 +18,8 @@ pub const DATA_SOURCE_MARKET_DATA_APP: &str = "MARKETDATA_APP";
 pub const DATA_SOURCE_ALPHA_VANTAGE: &str = "ALPHA_VANTAGE";
 pub const DATA_SOURCE_METAL_PRICE_API: &str = "METAL_PRICE_API";
 pub const DATA_SOURCE_FINNHUB: &str = "FINNHUB";
+pub const DATA_SOURCE_BOERSE_FRANKFURT: &str = "BOERSE_FRANKFURT";
+pub const DATA_SOURCE_US_TREASURY_CALC: &str = "US_TREASURY_CALC";
 
 // =============================================================================
 // Data Source
@@ -43,6 +45,10 @@ pub enum DataSource {
     MetalPriceApi,
     /// Finnhub - global stock data with real-time quotes
     Finnhub,
+    /// Boerse Frankfurt (Deutsche Boerse) - EU bond pricing
+    BoerseFrankfurt,
+    /// US Treasury calculated from yield curve
+    UsTreasuryCalc,
     /// Manual entry by user
     #[default]
     Manual,
@@ -57,6 +63,8 @@ impl DataSource {
             DataSource::AlphaVantage => DATA_SOURCE_ALPHA_VANTAGE,
             DataSource::MetalPriceApi => DATA_SOURCE_METAL_PRICE_API,
             DataSource::Finnhub => DATA_SOURCE_FINNHUB,
+            DataSource::BoerseFrankfurt => DATA_SOURCE_BOERSE_FRANKFURT,
+            DataSource::UsTreasuryCalc => DATA_SOURCE_US_TREASURY_CALC,
             DataSource::Manual => DATA_SOURCE_MANUAL,
         }
     }
@@ -76,6 +84,8 @@ impl From<&str> for DataSource {
             DATA_SOURCE_ALPHA_VANTAGE => DataSource::AlphaVantage,
             DATA_SOURCE_METAL_PRICE_API => DataSource::MetalPriceApi,
             DATA_SOURCE_FINNHUB => DataSource::Finnhub,
+            DATA_SOURCE_BOERSE_FRANKFURT => DataSource::BoerseFrankfurt,
+            DATA_SOURCE_US_TREASURY_CALC => DataSource::UsTreasuryCalc,
             _ => DataSource::Manual,
         }
     }
@@ -209,6 +219,14 @@ mod tests {
         );
         assert_eq!(DataSource::from("FINNHUB"), DataSource::Finnhub);
         assert_eq!(DataSource::from("finnhub"), DataSource::Finnhub);
+        assert_eq!(
+            DataSource::from("BOERSE_FRANKFURT"),
+            DataSource::BoerseFrankfurt
+        );
+        assert_eq!(
+            DataSource::from("US_TREASURY_CALC"),
+            DataSource::UsTreasuryCalc
+        );
         assert_eq!(DataSource::from("MANUAL"), DataSource::Manual);
         assert_eq!(DataSource::from("unknown"), DataSource::Manual);
     }
@@ -220,6 +238,8 @@ mod tests {
         assert_eq!(DataSource::AlphaVantage.as_str(), "ALPHA_VANTAGE");
         assert_eq!(DataSource::MetalPriceApi.as_str(), "METAL_PRICE_API");
         assert_eq!(DataSource::Finnhub.as_str(), "FINNHUB");
+        assert_eq!(DataSource::BoerseFrankfurt.as_str(), "BOERSE_FRANKFURT");
+        assert_eq!(DataSource::UsTreasuryCalc.as_str(), "US_TREASURY_CALC");
         assert_eq!(DataSource::Manual.as_str(), "MANUAL");
     }
 

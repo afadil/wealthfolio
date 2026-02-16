@@ -8,6 +8,7 @@
 
 use crate::activities::activities_constants::*;
 use crate::activities::Activity;
+use crate::assets::OptionSpec;
 use crate::Result;
 use rust_decimal::Decimal;
 
@@ -59,6 +60,16 @@ impl ActivityCompiler for DefaultActivityCompiler {
             // Dividend in Kind: Dividend + Add Holding (different asset)
             (ACTIVITY_TYPE_DIVIDEND, Some(ACTIVITY_SUBTYPE_DIVIDEND_IN_KIND)) => {
                 Ok(self.compile_dividend_in_kind(activity))
+            }
+
+            // Option Exercise: SELL option lots + BUY/SELL underlying
+            (ACTIVITY_TYPE_SELL, Some(ACTIVITY_SUBTYPE_OPTION_EXERCISE)) => {
+                Ok(self.compile_option_exercise(activity))
+            }
+
+            // Option Expiry: pass-through (calculator handles lot removal in Phase 4)
+            (ACTIVITY_TYPE_ADJUSTMENT, Some(ACTIVITY_SUBTYPE_OPTION_EXPIRY)) => {
+                Ok(vec![activity.clone()])
             }
 
             // Default: Pass through unchanged
@@ -141,6 +152,54 @@ impl DefaultActivityCompiler {
         buy_leg.fee = Some(Decimal::ZERO);
 
         vec![interest_leg, buy_leg]
+    }
+
+    /// Option Exercise: One stored row → SELL (option) + BUY or SELL (underlying)
+    ///
+    /// Stored:
+    ///   activity_type = SELL, subtype = OPTION_EXERCISE
+    ///   asset_id = option asset (e.g., AAPL240119C00195000)
+    ///   quantity = contracts exercised
+    ///   unit_price = option premium (typically 0 at exercise)
+    ///   metadata.option = OptionSpec { underlying_asset_id, right, strike, multiplier, ... }
+    ///
+    /// Compiled:
+    ///   1. SELL: close option lots (qty @ unit_price)
+    ///   2. BUY (call) or SELL (put): underlying shares at strike
+    ///      quantity = contracts × multiplier, unit_price = strike
+    ///
+    /// If metadata.option is missing, falls back to pass-through.
+    fn compile_option_exercise(&self, activity: &Activity) -> Vec<Activity> {
+        let Some(spec) = activity.get_meta::<OptionSpec>("option") else {
+            return vec![activity.clone()];
+        };
+
+        let contracts = activity.quantity.unwrap_or(Decimal::ONE);
+
+        // Leg 1: SELL (close option lots)
+        let mut sell_leg = activity.clone();
+        sell_leg.id = format!("{}:sell", activity.id);
+        sell_leg.subtype = None;
+        // quantity, unit_price, amount stay as-is
+
+        // Leg 2: BUY (call) or SELL (put) underlying at strike
+        let mut underlying_leg = activity.clone();
+        underlying_leg.id = format!("{}:underlying", activity.id);
+        underlying_leg.activity_type = if spec.right == "CALL" {
+            ACTIVITY_TYPE_BUY.to_string()
+        } else {
+            ACTIVITY_TYPE_SELL.to_string()
+        };
+        underlying_leg.activity_type_override = None;
+        underlying_leg.subtype = None;
+        underlying_leg.asset_id = Some(spec.underlying_asset_id);
+        underlying_leg.quantity = Some(contracts * spec.multiplier);
+        underlying_leg.unit_price = Some(spec.strike);
+        underlying_leg.amount = None;
+        underlying_leg.fee = Some(Decimal::ZERO);
+        underlying_leg.metadata = None;
+
+        vec![sell_leg, underlying_leg]
     }
 
     /// Dividend in Kind: Stock dividend where you receive a different asset
@@ -579,5 +638,144 @@ mod tests {
         // The BUY leg should have its override cleared
         assert_eq!(result[1].activity_type, ACTIVITY_TYPE_BUY);
         assert!(result[1].activity_type_override.is_none());
+    }
+
+    // ── Option Exercise ────────────────────────────────────────────────
+
+    fn create_option_exercise_activity(right: &str) -> Activity {
+        let mut activity = create_test_activity();
+        activity.id = "exercise-1".to_string();
+        activity.activity_type = ACTIVITY_TYPE_SELL.to_string();
+        activity.subtype = Some(ACTIVITY_SUBTYPE_OPTION_EXERCISE.to_string());
+        activity.asset_id = Some("opt-asset-id".to_string());
+        activity.quantity = Some(dec!(2)); // 2 contracts
+        activity.unit_price = Some(dec!(0)); // no premium at exercise
+        activity.amount = Some(dec!(0));
+        activity.metadata = Some(serde_json::json!({
+            "option": {
+                "underlyingAssetId": "AAPL",
+                "expiration": "2024-01-19",
+                "right": right,
+                "strike": "195.00",
+                "multiplier": "100",
+                "occSymbol": "AAPL240119C00195000"
+            }
+        }));
+        activity
+    }
+
+    #[test]
+    fn test_compile_option_exercise_call_produces_two_legs() {
+        let compiler = DefaultActivityCompiler::new();
+        let activity = create_option_exercise_activity("CALL");
+
+        let result = compiler.compile(&activity).unwrap();
+
+        assert_eq!(result.len(), 2);
+
+        // Leg 1: SELL option lots
+        assert_eq!(result[0].id, "exercise-1:sell");
+        assert_eq!(result[0].activity_type, ACTIVITY_TYPE_SELL);
+        assert!(result[0].subtype.is_none());
+        assert_eq!(result[0].asset_id, Some("opt-asset-id".to_string()));
+        assert_eq!(result[0].quantity, Some(dec!(2)));
+
+        // Leg 2: BUY underlying (call exercise = buy shares)
+        assert_eq!(result[1].id, "exercise-1:underlying");
+        assert_eq!(result[1].activity_type, ACTIVITY_TYPE_BUY);
+        assert!(result[1].subtype.is_none());
+        assert_eq!(result[1].asset_id, Some("AAPL".to_string()));
+        assert_eq!(result[1].quantity, Some(dec!(200))); // 2 contracts × 100
+        assert_eq!(result[1].unit_price, Some(dec!(195)));
+        assert!(result[1].amount.is_none());
+        assert_eq!(result[1].fee, Some(dec!(0)));
+        assert!(result[1].metadata.is_none());
+    }
+
+    #[test]
+    fn test_compile_option_exercise_put_sells_underlying() {
+        let compiler = DefaultActivityCompiler::new();
+        let activity = create_option_exercise_activity("PUT");
+
+        let result = compiler.compile(&activity).unwrap();
+
+        assert_eq!(result.len(), 2);
+
+        // Leg 1: SELL option lots (same for puts)
+        assert_eq!(result[0].activity_type, ACTIVITY_TYPE_SELL);
+        assert_eq!(result[0].asset_id, Some("opt-asset-id".to_string()));
+
+        // Leg 2: SELL underlying (put exercise = sell shares)
+        assert_eq!(result[1].activity_type, ACTIVITY_TYPE_SELL);
+        assert_eq!(result[1].asset_id, Some("AAPL".to_string()));
+        assert_eq!(result[1].quantity, Some(dec!(200)));
+        assert_eq!(result[1].unit_price, Some(dec!(195)));
+    }
+
+    #[test]
+    fn test_compile_option_exercise_without_metadata_passes_through() {
+        let compiler = DefaultActivityCompiler::new();
+        let mut activity = create_test_activity();
+        activity.activity_type = ACTIVITY_TYPE_SELL.to_string();
+        activity.subtype = Some(ACTIVITY_SUBTYPE_OPTION_EXERCISE.to_string());
+        activity.metadata = None; // No option spec
+
+        let result = compiler.compile(&activity).unwrap();
+
+        // Falls back to pass-through
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, activity.id);
+    }
+
+    #[test]
+    fn test_compile_option_exercise_clears_override_on_underlying() {
+        let compiler = DefaultActivityCompiler::new();
+        let mut activity = create_option_exercise_activity("CALL");
+        activity.activity_type_override = Some(ACTIVITY_TYPE_SELL.to_string());
+
+        let result = compiler.compile(&activity).unwrap();
+
+        // Underlying leg should have override cleared
+        assert!(result[1].activity_type_override.is_none());
+    }
+
+    #[test]
+    fn test_compile_option_exercise_preserves_account() {
+        let compiler = DefaultActivityCompiler::new();
+        let mut activity = create_option_exercise_activity("CALL");
+        activity.account_id = "my-brokerage".to_string();
+        activity.currency = "USD".to_string();
+
+        let result = compiler.compile(&activity).unwrap();
+
+        for leg in &result {
+            assert_eq!(leg.account_id, "my-brokerage");
+            assert_eq!(leg.currency, "USD");
+        }
+    }
+
+    // ── Option Expiry ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_compile_option_expiry_passes_through() {
+        let compiler = DefaultActivityCompiler::new();
+        let mut activity = create_test_activity();
+        activity.id = "expiry-1".to_string();
+        activity.activity_type = ACTIVITY_TYPE_ADJUSTMENT.to_string();
+        activity.subtype = Some(ACTIVITY_SUBTYPE_OPTION_EXPIRY.to_string());
+        activity.asset_id = Some("opt-asset-id".to_string());
+        activity.quantity = Some(dec!(5));
+
+        let result = compiler.compile(&activity).unwrap();
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, "expiry-1");
+        assert_eq!(result[0].activity_type, ACTIVITY_TYPE_ADJUSTMENT);
+        assert_eq!(
+            result[0].subtype,
+            Some(ACTIVITY_SUBTYPE_OPTION_EXPIRY.to_string())
+        );
+        assert_eq!(result[0].asset_id, Some("opt-asset-id".to_string()));
+        assert_eq!(result[0].quantity, Some(dec!(5)));
     }
 }

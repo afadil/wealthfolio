@@ -61,6 +61,12 @@ impl Coverage {
             InstrumentId::Metal { quote, .. } => self
                 .metal_quote_ccy_allow
                 .is_none_or(|a| slice_contains(a, quote.as_ref())),
+
+            // Options: No coverage filtering (provider capabilities handle this)
+            InstrumentId::Option { .. } => true,
+
+            // Bonds: No coverage filtering
+            InstrumentId::Bond { .. } => true,
         }
     }
 

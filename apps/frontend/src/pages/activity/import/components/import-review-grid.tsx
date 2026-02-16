@@ -124,6 +124,15 @@ const STATUS_DOT_COLOR: Record<DraftActivityStatus, string> = {
   skipped: "bg-gray-400",
 };
 
+const INSTRUMENT_TYPE_OPTIONS = [
+  { value: "EQUITY", label: "Equity" },
+  { value: "BOND", label: "Bond" },
+  { value: "OPTION", label: "Option" },
+  { value: "CRYPTO", label: "Crypto" },
+  { value: "FX", label: "FX" },
+  { value: "METAL", label: "Metal" },
+];
+
 function hasDuplicateWarning(draft: DraftActivity): boolean {
   const hasDuplicateLineNumber = typeof draft.duplicateOfLineNumber === "number";
   return (
@@ -364,9 +373,25 @@ function useImportReviewColumns({
           },
         },
       },
+      // 9. Instrument Type
+      {
+        id: "instrumentType",
+        accessorKey: "instrumentType",
+        header: "Instrument",
+        size: 140,
+        enableSorting: false,
+        meta: {
+          cell: {
+            variant: "select",
+            options: INSTRUMENT_TYPE_OPTIONS,
+            allowEmpty: true,
+            emptyLabel: "Auto",
+          },
+        },
+      },
 
       // === Numbers (grouped, right-aligned) ===
-      // 8. Quantity
+      // 10. Quantity
       {
         id: "quantity",
         accessorKey: "quantity",
@@ -375,7 +400,7 @@ function useImportReviewColumns({
         enableSorting: false,
         meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },
       },
-      // 9. Price
+      // 11. Price
       {
         id: "unitPrice",
         accessorKey: "unitPrice",
@@ -384,7 +409,7 @@ function useImportReviewColumns({
         enableSorting: false,
         meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },
       },
-      // 10. Amount
+      // 12. Amount
       {
         id: "amount",
         accessorKey: "amount",
@@ -393,7 +418,7 @@ function useImportReviewColumns({
         enableSorting: false,
         meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },
       },
-      // 11. Currency
+      // 13. Currency
       {
         id: "currency",
         accessorKey: "currency",
@@ -402,7 +427,7 @@ function useImportReviewColumns({
         enableSorting: false,
         meta: { cell: { variant: "currency" } },
       },
-      // 12. Fee
+      // 14. Fee
       {
         id: "fee",
         accessorKey: "fee",
@@ -411,7 +436,7 @@ function useImportReviewColumns({
         enableSorting: false,
         meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },
       },
-      // 13. FX Rate
+      // 15. FX Rate
       {
         id: "fxRate",
         accessorKey: "fxRate",
@@ -422,7 +447,7 @@ function useImportReviewColumns({
       },
 
       // === Notes ===
-      // 14. Comment
+      // 16. Comment
       {
         id: "comment",
         accessorKey: "comment",
@@ -576,6 +601,7 @@ export function ImportReviewGrid({
       exchange: result.exchange,
       exchangeMic: result.exchangeMic,
       currency: result.currency,
+      quoteType: result.quoteType,
       score: result.score,
       dataSource: result.dataSource,
     }));
@@ -592,10 +618,13 @@ export function ImportReviewGrid({
 
       // Currency fallback: search result → current draft currency → fallback
       const currency = result.currency ?? draft.currency ?? fallbackCurrency;
+      const inferredInstrumentType = (result as SymbolSearchResult & { quoteType?: string })
+        .quoteType;
 
       onDraftUpdate(rowIndex, {
         symbol: result.symbol,
         currency,
+        instrumentType: inferredInstrumentType,
       });
     },
     [drafts, fallbackCurrency, onDraftUpdate],
@@ -617,10 +646,13 @@ export function ImportReviewGrid({
       if (!draft) return;
 
       const currency = result.currency ?? draft.currency ?? fallbackCurrency;
+      const inferredInstrumentType = (result as SymbolSearchResult & { quoteType?: string })
+        .quoteType;
 
       onDraftUpdate(rowIndex, {
         symbol: result.symbol,
         currency,
+        instrumentType: inferredInstrumentType,
       });
 
       setCustomAssetDialog({ open: false, rowIndex: -1, symbol: "" });
@@ -666,6 +698,7 @@ export function ImportReviewGrid({
             "activityDate",
             "activityType",
             "symbol",
+            "instrumentType",
             "quantity",
             "unitPrice",
             "amount",

@@ -7,7 +7,8 @@ use std::sync::Arc;
 use crate::accounts::{Account, AccountServiceTrait};
 use crate::activities::activities_constants::{
     classify_import_activity, is_garbage_symbol, requires_symbol, ImportSymbolDisposition,
-    ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT,
+    ACTIVITY_SUBTYPE_OPTION_EXERCISE, ACTIVITY_TYPE_SELL, ACTIVITY_TYPE_TRANSFER_IN,
+    ACTIVITY_TYPE_TRANSFER_OUT,
 };
 use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
@@ -51,6 +52,7 @@ impl ActivityService {
             "FX" | "FOREX" | "CURRENCY" => Some(InstrumentType::Fx),
             "OPTION" => Some(InstrumentType::Option),
             "METAL" | "COMMODITY" => Some(InstrumentType::Metal),
+            "BOND" | "FIXED_INCOME" | "DEBT" => Some(InstrumentType::Bond),
             _ => None,
         }
     }
@@ -374,6 +376,9 @@ impl ActivityService {
                 "CRYPTO" => return (AssetKind::Investment, Some(InstrumentType::Crypto)),
                 "FX_RATE" | "FX" => return (AssetKind::Fx, Some(InstrumentType::Fx)),
                 "OPTION" | "OPT" => return (AssetKind::Investment, Some(InstrumentType::Option)),
+                "BOND" | "FIXED_INCOME" => {
+                    return (AssetKind::Investment, Some(InstrumentType::Bond))
+                }
                 "COMMODITY" | "CMDTY" | "METAL" => {
                     return (AssetKind::Investment, Some(InstrumentType::Metal))
                 }
@@ -388,7 +393,21 @@ impl ActivityService {
             }
         }
 
-        // 2. Crypto pair pattern (e.g., BTC-USD, ETH-CAD) — checked before
+        // 2. OCC option symbol detection (e.g., AAPL240119C00195000)
+        if crate::utils::occ_symbol::parse_occ_symbol(symbol).is_ok() {
+            return (AssetKind::Investment, Some(InstrumentType::Option));
+        }
+
+        // 3. ISIN detection (e.g., US0378331005) — full Luhn validation
+        //
+        // ISIN is an identifier format, not an instrument type.
+        // It can represent bonds, equities, ETFs, and more. Return no inferred
+        // instrument type so callers can rely on explicit hints or review flows.
+        if crate::utils::isin::parse_isin(symbol).is_ok() {
+            return (AssetKind::Investment, None);
+        }
+
+        // 4. Crypto pair pattern (e.g., BTC-USD, ETH-CAD) — checked before
         //    exchange_mic because brokers may attach their MIC to crypto pairs
         let upper_symbol = symbol.to_uppercase();
         if let Some((_base, quote)) = upper_symbol.rsplit_once('-') {
@@ -403,12 +422,12 @@ impl ActivityService {
             }
         }
 
-        // 3. If exchange MIC is provided, it's an equity
+        // 5. If exchange MIC is provided, it's an equity
         if exchange_mic.is_some() {
             return (AssetKind::Investment, Some(InstrumentType::Equity));
         }
 
-        // 4. Common crypto symbols heuristic (no MIC, bare symbol like BTC, ETH)
+        // 6. Common crypto symbols heuristic (no MIC, bare symbol like BTC, ETH)
         let common_crypto = [
             "BTC", "ETH", "XRP", "LTC", "BCH", "ADA", "DOT", "LINK", "XLM", "DOGE", "UNI", "SOL",
             "AVAX", "MATIC", "ATOM", "ALGO", "VET", "FIL", "TRX", "ETC", "XMR", "AAVE", "MKR",
@@ -418,7 +437,7 @@ impl ActivityService {
             return (AssetKind::Investment, Some(InstrumentType::Crypto));
         }
 
-        // 5. Default to equity (most common case)
+        // 7. Default to equity (most common case)
         (AssetKind::Investment, Some(InstrumentType::Equity))
     }
 
@@ -497,6 +516,119 @@ impl ActivityService {
             }
         }
         None
+    }
+
+    /// Returns true when this activity should carry option exercise metadata.
+    fn is_option_exercise(activity_type: &str, subtype: Option<&str>) -> bool {
+        activity_type == ACTIVITY_TYPE_SELL && subtype == Some(ACTIVITY_SUBTYPE_OPTION_EXERCISE)
+    }
+
+    /// Parses the underlying ticker from an option asset's OCC symbol.
+    fn parse_option_underlying_symbol(&self, option_asset: &crate::assets::Asset) -> Option<String> {
+        let occ_symbol = option_asset
+            .option_spec()
+            .and_then(|spec| spec.occ_symbol)
+            .or_else(|| option_asset.instrument_symbol.clone())?;
+        crate::utils::occ_symbol::parse_occ_symbol(&occ_symbol)
+            .ok()
+            .map(|parsed| parsed.underlying)
+    }
+
+    /// Ensures metadata.option exists and contains a usable underlying_asset_id for OPTION_EXERCISE.
+    ///
+    /// Why this exists:
+    /// - The compiler expands OPTION_EXERCISE using `metadata.option`.
+    /// - UI payloads don't include this metadata today.
+    /// - Option assets created earlier may store OptionSpec with empty `underlying_asset_id`.
+    ///
+    /// This method backfills that metadata from the option asset and creates/resolves the
+    /// underlying equity asset when needed, so exercise compiles into two legs consistently.
+    async fn enrich_option_exercise_metadata(
+        &self,
+        activity_type: &str,
+        subtype: Option<&str>,
+        metadata: &mut Option<String>,
+        option_asset: &crate::assets::Asset,
+    ) -> Result<()> {
+        if !Self::is_option_exercise(activity_type, subtype) {
+            return Ok(());
+        }
+
+        let metadata_value = metadata
+            .as_ref()
+            .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok());
+
+        // Prefer explicit metadata from payload; otherwise backfill from option asset metadata.
+        let mut option_spec = metadata_value
+            .as_ref()
+            .and_then(|m| m.get("option"))
+            .and_then(|v| serde_json::from_value::<crate::assets::OptionSpec>(v.clone()).ok())
+            .or_else(|| option_asset.option_spec());
+
+        let Some(mut spec) = option_spec.take() else {
+            return Ok(());
+        };
+
+        if spec.underlying_asset_id.trim().is_empty() {
+            if let Some(underlying_symbol) = self.parse_option_underlying_symbol(option_asset) {
+                let existing_underlying_id = self.find_existing_asset_id(
+                    &underlying_symbol,
+                    option_asset.instrument_exchange_mic.as_deref(),
+                    Some(&InstrumentType::Equity),
+                    Some(&option_asset.quote_ccy),
+                );
+
+                if let Some(existing_id) = existing_underlying_id {
+                    spec.underlying_asset_id = existing_id;
+                } else {
+                    let new_underlying_id = Uuid::new_v4().to_string();
+                    let underlying_metadata = crate::assets::AssetMetadata {
+                        name: Some(underlying_symbol.clone()),
+                        kind: Some(AssetKind::Investment),
+                        instrument_exchange_mic: option_asset.instrument_exchange_mic.clone(),
+                        instrument_symbol: Some(underlying_symbol.clone()),
+                        instrument_type: Some(InstrumentType::Equity),
+                        display_code: Some(underlying_symbol),
+                        quote_ccy_hint: Some(option_asset.quote_ccy.clone()),
+                    };
+                    let created_underlying = self
+                        .asset_service
+                        .get_or_create_minimal_asset(
+                            &new_underlying_id,
+                            Some(option_asset.quote_ccy.clone()),
+                            Some(underlying_metadata),
+                            Some(QuoteMode::Market.as_db_str().to_string()),
+                        )
+                        .await?;
+                    spec.underlying_asset_id = created_underlying.id;
+                }
+            }
+        }
+
+        if spec.underlying_asset_id.trim().is_empty() {
+            warn!(
+                "OPTION_EXERCISE metadata could not resolve underlying asset for option {}",
+                option_asset.id
+            );
+            return Ok(());
+        }
+
+        let option_value = serde_json::to_value(&spec).map_err(|e| {
+            ActivityError::InvalidData(format!("Failed to serialize option metadata: {}", e))
+        })?;
+
+        let mut merged = metadata_value.unwrap_or_else(|| serde_json::json!({}));
+        if !merged.is_object() {
+            merged = serde_json::json!({});
+        }
+        if let Some(obj) = merged.as_object_mut() {
+            obj.insert("option".to_string(), option_value);
+        }
+        let serialized = serde_json::to_string(&merged).map_err(|e| {
+            ActivityError::InvalidData(format!("Failed to serialize activity metadata: {}", e))
+        })?;
+        *metadata = Some(serialized);
+        Ok(())
     }
 
     async fn prepare_new_activity(&self, mut activity: NewActivity) -> Result<NewActivity> {
@@ -701,6 +833,23 @@ impl ActivityService {
                     quote_mode.clone(),
                 )
                 .await?;
+
+            self.enrich_option_exercise_metadata(
+                &activity.activity_type,
+                activity.subtype.as_deref(),
+                &mut activity.metadata,
+                &asset,
+            )
+            .await?;
+
+            // Bond price normalization: unitPrice enters as % of par (e.g. 53.307),
+            // store as decimal (0.53307) so qty × price = market value.
+            // Amount is already the actual market value — do NOT divide it.
+            if asset.is_bond() {
+                if let Some(ref mut price) = activity.unit_price {
+                    *price /= Decimal::from(100);
+                }
+            }
 
             // Update asset quote mode if specified (for existing assets that need mode change)
             if let Some(ref mode) = quote_mode {
@@ -998,6 +1147,22 @@ impl ActivityService {
                 )
                 .await?;
 
+            self.enrich_option_exercise_metadata(
+                &activity.activity_type,
+                activity.subtype.as_deref(),
+                &mut activity.metadata,
+                &asset,
+            )
+            .await?;
+
+            // Bond price normalization: unitPrice enters as % of par,
+            // store as decimal. Amount is actual market value — do NOT divide.
+            if asset.is_bond() {
+                if let Some(Some(ref mut price)) = activity.unit_price {
+                    *price /= Decimal::from(100);
+                }
+            }
+
             // Update asset quote mode if specified
             if let Some(ref mode) = quote_mode {
                 let requested_mode = mode.to_uppercase();
@@ -1124,6 +1289,7 @@ impl ActivityService {
                             kind: AssetKind::Investment,
                             quote_mode,
                             name: activity.get_name().map(|s| s.to_string()),
+                            metadata: None,
                         }));
                     }
                 }
@@ -1139,7 +1305,20 @@ impl ActivityService {
         };
 
         // Strip Yahoo suffix from symbol (e.g. GOOG.TO → GOOG + XTSE)
-        let (base_symbol, suffix_mic) = parse_symbol_with_exchange_suffix(&symbol);
+        let (raw_base_symbol, suffix_mic) = parse_symbol_with_exchange_suffix(&symbol);
+
+        // Normalize broker-specific symbol formats before inference:
+        // - Fidelity options: -MU270115C600 → MU270115C00600000
+        // - CUSIP bonds: 912810TH1 → US912810TH14 (ISIN)
+        let base_symbol =
+            if let Some(occ) = crate::utils::occ_symbol::normalize_option_symbol(raw_base_symbol) {
+                occ
+            } else if crate::utils::cusip::parse_cusip(raw_base_symbol).is_ok() {
+                crate::utils::cusip::cusip_to_isin(raw_base_symbol, "US")
+            } else {
+                raw_base_symbol.to_string()
+            };
+        let base_symbol = base_symbol.as_str();
 
         // Get exchange MIC: prefer explicit value, then cache, then suffix-derived
         let exchange_mic = activity
@@ -1232,9 +1411,68 @@ impl ActivityService {
             Some(&asset_currency),
         );
 
+        // Parse quote mode if provided
+        let quote_mode = activity
+            .get_quote_mode()
+            .and_then(|s| match s.to_uppercase().as_str() {
+                "MARKET" => Some(QuoteMode::Market),
+                "MANUAL" => Some(QuoteMode::Manual),
+                _ => None,
+            });
+
+        // Build metadata for options (from OCC symbol) and bonds (from ISIN)
+        let (metadata, quote_mode, display_code) =
+            if instrument_type.as_ref() == Some(&InstrumentType::Option) {
+                if let Ok(parsed) =
+                    crate::utils::occ_symbol::parse_occ_symbol(&normalized_symbol)
+                {
+                    let option_spec = crate::assets::OptionSpec {
+                        underlying_asset_id: String::new(),
+                        expiration: parsed.expiration,
+                        right: parsed.option_type.as_str().to_string(),
+                        strike: parsed.strike_price,
+                        multiplier: Decimal::from(100),
+                        occ_symbol: Some(normalized_symbol.clone()),
+                    };
+                    let display = format!(
+                        "{} {} {} {}",
+                        parsed.underlying,
+                        parsed.expiration.format("%Y-%m-%d"),
+                        parsed.option_type.as_str(),
+                        parsed.strike_price,
+                    );
+                    (
+                        Some(serde_json::json!({ "option": option_spec })),
+                        quote_mode,
+                        Some(display),
+                    )
+                } else {
+                    (None, quote_mode, Some(normalized_symbol.clone()))
+                }
+            } else if instrument_type.as_ref() == Some(&InstrumentType::Bond) {
+                let bond_spec = crate::assets::BondSpec {
+                    isin: Some(normalized_symbol.clone()),
+                    maturity_date: None,
+                    coupon_rate: None,
+                    face_value: None,
+                    coupon_frequency: None,
+                };
+                let md = serde_json::json!({
+                    "identifiers": { "isin": &normalized_symbol },
+                    "bond": bond_spec,
+                });
+                (
+                    Some(md),
+                    quote_mode.or(Some(QuoteMode::Market)),
+                    Some(normalized_symbol.clone()),
+                )
+            } else {
+                (None, quote_mode, Some(normalized_symbol.clone()))
+            };
+
         Ok(Some(AssetSpec {
             id: existing_id,
-            display_code: Some(normalized_symbol.clone()),
+            display_code,
             instrument_symbol: Some(normalized_symbol.clone()),
             instrument_exchange_mic: exchange_mic,
             instrument_type,
@@ -1243,6 +1481,7 @@ impl ActivityService {
             kind,
             quote_mode,
             name: activity.get_name().map(|s| s.to_string()),
+            metadata,
         }))
     }
 
@@ -1661,6 +1900,27 @@ impl ActivityServiceTrait for ActivityService {
                 activity.account_id = Some(account_id.clone());
             }
 
+            // Reject unmapped activity types before they reach the DB
+            const VALID_TYPES: &[&str] = &[
+                "BUY", "SELL", "SPLIT", "DIVIDEND", "INTEREST", "DEPOSIT",
+                "WITHDRAWAL", "TRANSFER_IN", "TRANSFER_OUT", "FEE", "TAX",
+                "CREDIT", "ADJUSTMENT", "UNKNOWN",
+            ];
+            if !VALID_TYPES.contains(&activity.activity_type.as_str()) {
+                activity.is_valid = false;
+                let mut errors = std::collections::HashMap::new();
+                errors.insert(
+                    "activityType".to_string(),
+                    vec![format!(
+                        "Unrecognized activity type '{}'. Map it to a known type (BUY, SELL, DIVIDEND, etc.).",
+                        &activity.activity_type
+                    )],
+                );
+                activity.errors = Some(errors);
+                activities_with_status.push(activity);
+                continue;
+            }
+
             let symbol = activity.symbol.trim().to_string();
 
             // Classify the activity based on type, symbol, quantity, and price
@@ -1740,8 +2000,20 @@ impl ActivityServiceTrait for ActivityService {
             });
 
             // Strip Yahoo suffix to get base symbol (e.g. GOOG.TO → GOOG)
-            let (base_symbol, suffix_mic) = parse_symbol_with_exchange_suffix(&symbol);
+            let (raw_base_symbol, suffix_mic) = parse_symbol_with_exchange_suffix(&symbol);
             let resolved_mic = exchange_mic.or_else(|| suffix_mic.map(|s| s.to_string()));
+
+            // Normalize broker-specific symbol formats (same as build_asset_spec)
+            let base_symbol = if let Some(occ) =
+                crate::utils::occ_symbol::normalize_option_symbol(raw_base_symbol)
+            {
+                occ
+            } else if crate::utils::cusip::parse_cusip(raw_base_symbol).is_ok() {
+                crate::utils::cusip::cusip_to_isin(raw_base_symbol, "US")
+            } else {
+                raw_base_symbol.to_string()
+            };
+            let base_symbol = base_symbol.as_str();
 
             // Infer asset kind and instrument type using base symbol and resolved MIC
             let (inferred_kind, inferred_instrument_type) =
@@ -1824,6 +2096,24 @@ impl ActivityServiceTrait for ActivityService {
                 effective_instrument_type.as_ref(),
                 quote_ccy_hint.as_deref(),
             );
+
+            // Ambiguous ISIN rows should be reviewed unless the instrument type is explicit
+            // or we can map to an existing asset.
+            let is_isin_symbol = crate::utils::isin::parse_isin(base_symbol).is_ok();
+            if is_isin_symbol && instrument_type_hint.is_none() && existing_id.is_none() {
+                activity.is_valid = false;
+                let mut errors = std::collections::HashMap::new();
+                errors.insert(
+                    "symbol".to_string(),
+                    vec![format!(
+                        "ISIN '{}' is ambiguous (bond/equity/ETF). Set instrumentType (e.g. BOND) or map to a specific ticker.",
+                        normalized_symbol
+                    )],
+                );
+                activity.errors = Some(errors);
+                activities_with_status.push(activity);
+                continue;
+            }
             if let Some(ref id) = existing_id {
                 if let Ok(asset) = self.asset_service.get_asset_by_id(id) {
                     activity.symbol_name = asset.name;
@@ -2581,6 +2871,18 @@ impl ActivityServiceTrait for ActivityService {
                             id: Some(asset_id.clone()),
                             ..Default::default()
                         });
+                    }
+                }
+            }
+
+            // Bond price normalization: unitPrice enters as % of par,
+            // store as decimal. Amount is actual market value — do NOT divide.
+            if let Some(ref asset_id) = resolved_asset_id {
+                if let Some(asset) = ensure_result.assets.get(asset_id) {
+                    if asset.is_bond() {
+                        if let Some(ref mut price) = activity.unit_price {
+                            *price /= Decimal::from(100);
+                        }
                     }
                 }
             }

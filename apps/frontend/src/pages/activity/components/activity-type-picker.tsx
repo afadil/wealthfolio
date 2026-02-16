@@ -17,7 +17,7 @@ export type PrimaryActivityType =
   | "WITHDRAWAL"
   | "DIVIDEND"
   | "TRANSFER";
-export type SecondaryActivityType = "SPLIT" | "FEE" | "INTEREST" | "TAX";
+export type SecondaryActivityType = "SPLIT" | "FEE" | "INTEREST" | "TAX" | "EXERCISE" | "EXPIRY";
 export type ActivityType = PrimaryActivityType | SecondaryActivityType;
 
 interface ActivityTypeConfig<T extends string> {
@@ -40,6 +40,8 @@ const SECONDARY_ACTIVITY_TYPES: ActivityTypeConfig<SecondaryActivityType>[] = [
   { value: "FEE", label: "Fee", icon: "Receipt" },
   { value: "INTEREST", label: "Interest", icon: "Percent" },
   { value: "TAX", label: "Tax", icon: "ReceiptText" },
+  { value: "EXERCISE", label: "Exercise", icon: "Target" },
+  { value: "EXPIRY", label: "Expiry", icon: "Clock" },
 ];
 
 const ALL_ACTIVITY_TYPES = [...PRIMARY_ACTIVITY_TYPES, ...SECONDARY_ACTIVITY_TYPES];

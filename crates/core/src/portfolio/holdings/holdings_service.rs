@@ -105,6 +105,8 @@ impl HoldingsService {
                             notes: asset.notes.clone(),
                             pricing_mode: asset.quote_mode.as_db_str().to_string(),
                             preferred_provider: asset.preferred_provider(),
+                            instrument_type: asset.instrument_type.as_ref().map(|t| t.as_db_str().to_string()),
+                            contract_multiplier: asset.contract_multiplier(),
                             classifications: None,
                         };
 
@@ -198,6 +200,8 @@ impl HoldingsService {
                 notes: None,
                 pricing_mode: "MANUAL".to_string(),
                 preferred_provider: None,
+                instrument_type: None,
+                contract_multiplier: Decimal::ONE,
                 classifications: None,
             };
 
@@ -552,6 +556,8 @@ impl HoldingsServiceTrait for HoldingsService {
                 notes: asset.notes.clone(),
                 pricing_mode: asset.quote_mode.as_db_str().to_string(),
                 preferred_provider: asset.preferred_provider(),
+                instrument_type: asset.instrument_type.as_ref().map(|t| t.as_db_str().to_string()),
+                contract_multiplier: asset.contract_multiplier(),
                 classifications: None,
             };
 
@@ -666,6 +672,8 @@ mod tests {
                 notes: None,
                 pricing_mode: "MARKET".to_string(),
                 preferred_provider: None,
+                instrument_type: Some("EQUITY".to_string()),
+                contract_multiplier: Decimal::ONE,
                 classifications: None,
             }),
             asset_kind: None,

@@ -31,6 +31,7 @@ use super::traits::{ResolvedInstrument, Resolver, SymbolResolver};
 ///     overrides: None,
 ///     currency_hint: Some("CAD".into()),
 ///     preferred_provider: None,
+///     bond_metadata: None,
 /// };
 ///
 /// let resolved = chain.resolve(&"YAHOO".into(), &context)?;
@@ -108,6 +109,7 @@ impl SymbolResolver for ResolverChain {
             InstrumentId::Fx { quote, .. } => Some(quote.clone()),
             InstrumentId::Crypto { quote, .. } => Some(quote.clone()),
             InstrumentId::Metal { quote, .. } => Some(quote.clone()),
+            InstrumentId::Option { .. } | InstrumentId::Bond { .. } => None,
         }
     }
 }
@@ -141,6 +143,7 @@ mod tests {
             overrides: Some(overrides),
             currency_hint: Some("CAD".into()),
             preferred_provider: None,
+            bond_metadata: None,
         };
 
         let resolved = chain.resolve(&"YAHOO".into(), &context).unwrap();
@@ -168,6 +171,7 @@ mod tests {
             overrides: None,
             currency_hint: Some("CAD".into()),
             preferred_provider: None,
+            bond_metadata: None,
         };
 
         let resolved = chain.resolve(&"YAHOO".into(), &context).unwrap();
@@ -203,6 +207,7 @@ mod tests {
             overrides: Some(overrides),
             currency_hint: Some("CAD".into()),
             preferred_provider: None,
+            bond_metadata: None,
         };
 
         // Resolve for ALPHA_VANTAGE (no override) - should use rules
@@ -229,6 +234,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         };
 
         let resolved = chain.resolve(&"YAHOO".into(), &context).unwrap();
@@ -253,6 +259,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         };
 
         let result = chain.resolve(&"UNKNOWN_PROVIDER".into(), &context);
@@ -278,6 +285,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         };
 
         let currency = chain.get_currency(&"YAHOO".into(), &context);
@@ -296,6 +304,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         };
 
         let currency = chain.get_currency(&"YAHOO".into(), &context);

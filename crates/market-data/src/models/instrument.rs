@@ -12,6 +12,8 @@ pub enum InstrumentKind {
     Crypto, // Cryptocurrencies
     Fx,     // Foreign exchange pairs
     Metal,  // Precious metals
+    Option, // Options contracts (OCC symbols)
+    Bond,   // Fixed-income securities (ISIN)
 }
 
 /// Asset classification
@@ -47,6 +49,12 @@ pub enum InstrumentId {
 
     /// Precious metal
     Metal { code: Arc<str>, quote: Currency },
+
+    /// Options contract (OCC symbol, e.g., "AAPL240119C00195000")
+    Option { occ_symbol: Arc<str> },
+
+    /// Fixed-income security (ISIN, e.g., "US912810TH12")
+    Bond { isin: Arc<str> },
 }
 
 impl InstrumentId {
@@ -57,6 +65,8 @@ impl InstrumentId {
             Self::Crypto { .. } => AssetKind::Crypto,
             Self::Fx { .. } => AssetKind::FxRate,
             Self::Metal { .. } => AssetKind::Commodity,
+            Self::Option { .. } => AssetKind::Option,
+            Self::Bond { .. } => AssetKind::Security,
         }
     }
 
@@ -67,6 +77,8 @@ impl InstrumentId {
             Self::Crypto { .. } => InstrumentKind::Crypto,
             Self::Fx { .. } => InstrumentKind::Fx,
             Self::Metal { .. } => InstrumentKind::Metal,
+            Self::Option { .. } => InstrumentKind::Option,
+            Self::Bond { .. } => InstrumentKind::Bond,
         }
     }
 }
@@ -110,5 +122,23 @@ mod tests {
             quote: Cow::Borrowed("USD"),
         };
         assert_eq!(metal.kind(), AssetKind::Commodity);
+    }
+
+    #[test]
+    fn test_option_kind() {
+        let option = InstrumentId::Option {
+            occ_symbol: Arc::from("AAPL240119C00195000"),
+        };
+        assert_eq!(option.kind(), AssetKind::Option);
+        assert_eq!(option.instrument_kind(), InstrumentKind::Option);
+    }
+
+    #[test]
+    fn test_bond_kind() {
+        let bond = InstrumentId::Bond {
+            isin: Arc::from("US912810TH12"),
+        };
+        assert_eq!(bond.kind(), AssetKind::Security);
+        assert_eq!(bond.instrument_kind(), InstrumentKind::Bond);
     }
 }

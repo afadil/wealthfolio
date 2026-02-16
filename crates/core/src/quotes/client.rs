@@ -38,10 +38,10 @@ use crate::secrets::SecretStore;
 
 use wealthfolio_market_data::{
     mic_to_currency, mic_to_exchange_name, yahoo_exchange_to_mic, yahoo_suffix_to_mic,
-    AlphaVantageProvider, AssetProfile as MarketAssetProfile, FinnhubProvider,
-    MarketDataAppProvider, MetalPriceApiProvider, ProviderId, ProviderRegistry,
-    Quote as MarketQuote, QuoteContext, ResolverChain, SearchResult as MarketSearchResult,
-    YahooProvider,
+    AlphaVantageProvider, AssetProfile as MarketAssetProfile, BoerseFrankfurtProvider,
+    BondQuoteMetadata, FinnhubProvider, MarketDataAppProvider, MetalPriceApiProvider, ProviderId,
+    ProviderRegistry, Quote as MarketQuote, QuoteContext, ResolverChain,
+    SearchResult as MarketSearchResult, UsTreasuryCalcProvider, YahooProvider,
 };
 
 /// Market data error types.
@@ -133,6 +133,10 @@ impl MarketDataClient {
                 }
             }
         }
+
+        // Always register bond providers (no API key needed)
+        providers.push(Arc::new(BoerseFrankfurtProvider::new()));
+        providers.push(Arc::new(UsTreasuryCalcProvider::new()));
 
         if providers.is_empty() {
             warn!(
@@ -303,11 +307,26 @@ impl MarketDataClient {
         // Preferred provider from asset
         let preferred_provider: Option<ProviderId> = asset.preferred_provider().map(Cow::Owned);
 
+        // Bond metadata for yield-curve-based pricing
+        let bond_metadata = asset.bond_spec().and_then(|bs| {
+            let coupon_rate = bs.coupon_rate?;
+            let maturity_date = bs.maturity_date?;
+            let face_value = bs.face_value?;
+            let coupon_frequency = bs.coupon_frequency.unwrap_or_else(|| "SEMI_ANNUAL".to_string());
+            Some(BondQuoteMetadata {
+                coupon_rate,
+                maturity_date,
+                face_value,
+                coupon_frequency,
+            })
+        });
+
         Ok(QuoteContext {
             instrument,
             overrides,
             currency_hint,
             preferred_provider,
+            bond_metadata,
         })
     }
 
@@ -319,6 +338,8 @@ impl MarketDataClient {
             DATA_SOURCE_MARKET_DATA_APP => DataSource::MarketDataApp,
             DATA_SOURCE_METAL_PRICE_API => DataSource::MetalPriceApi,
             DATA_SOURCE_FINNHUB => DataSource::Finnhub,
+            DATA_SOURCE_BOERSE_FRANKFURT => DataSource::BoerseFrankfurt,
+            DATA_SOURCE_US_TREASURY_CALC => DataSource::UsTreasuryCalc,
             DATA_SOURCE_MANUAL => DataSource::Manual,
             _ => DataSource::Yahoo, // Default fallback
         };
@@ -459,6 +480,19 @@ impl MarketDataClient {
 
         let symbol = asset.instrument_symbol.as_deref().unwrap_or_default();
         Ok(Self::convert_profile(profile, symbol))
+    }
+
+    /// Fetch bond details from TreasuryDirect for US Treasury bonds.
+    /// Returns None if not a US Treasury ISIN or if lookup fails.
+    pub async fn fetch_bond_details(
+        &self,
+        isin: &str,
+    ) -> Option<wealthfolio_market_data::provider::us_treasury_calc::TreasuryBondDetails> {
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .ok()?;
+        UsTreasuryCalcProvider::fetch_bond_details(&client, isin).await
     }
 
     /// Convert a market-data SearchResult to core SymbolSearchResult.
@@ -672,6 +706,8 @@ mod tests {
             ("MARKETDATA_APP", DataSource::MarketDataApp),
             ("METAL_PRICE_API", DataSource::MetalPriceApi),
             ("FINNHUB", DataSource::Finnhub),
+            ("BOERSE_FRANKFURT", DataSource::BoerseFrankfurt),
+            ("US_TREASURY_CALC", DataSource::UsTreasuryCalc),
             ("MANUAL", DataSource::Manual),
             ("UNKNOWN_SOURCE", DataSource::Yahoo), // Fallback
         ];

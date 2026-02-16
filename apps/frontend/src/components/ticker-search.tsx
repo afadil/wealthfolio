@@ -223,6 +223,17 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       }
       return "";
     });
+    // Sync display when the value prop changes externally (e.g., OCC symbol parsed to underlying)
+    useEffect(() => {
+      if (!value || !selected) return;
+      // Extract the symbol part from display text like "AAPL - Apple Inc (XNAS)"
+      const displaySymbol = selected.split(" - ")[0]?.trim();
+      if (displaySymbol && displaySymbol !== value) {
+        setSelected(value);
+        setSearchQuery(value);
+      }
+    }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+
     const inputRef = useRef<HTMLInputElement>(null);
     const triggerRef = useRef<HTMLButtonElement>(null);
     const closeFocusIntentRef = useRef<null | "next" | "prev">(null);

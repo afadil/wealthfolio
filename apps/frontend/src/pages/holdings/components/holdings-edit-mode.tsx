@@ -406,7 +406,7 @@ export const HoldingsEditMode = ({
               {/* Table Header */}
               <div className="text-muted-foreground grid grid-cols-12 gap-2 border-b pb-2 text-xs font-medium">
                 <div className="col-span-5">Symbol</div>
-                <div className="col-span-2 text-right">Shares</div>
+                <div className="col-span-2 text-right">Quantity</div>
                 <div className="col-span-2 text-right">Avg Cost</div>
                 <div className="col-span-2 text-right">Total</div>
                 <div className="col-span-1"></div>

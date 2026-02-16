@@ -223,6 +223,16 @@ pub const ACTIVITY_SUBTYPE_REBATE: &str = "REBATE";
 /// Examples: erroneous fee refund, service credit.
 pub const ACTIVITY_SUBTYPE_REFUND: &str = "REFUND";
 
+/// Option Exercise: Convert option position to underlying shares.
+/// Stored as: SELL + subtype OPTION_EXERCISE
+/// Expands to: SELL (close option lots) + BUY (underlying for calls) or SELL (underlying for puts)
+pub const ACTIVITY_SUBTYPE_OPTION_EXERCISE: &str = "OPTION_EXERCISE";
+
+/// Option Expiry: Option expires worthless, removing lots with no cash effect.
+/// Stored as: ADJUSTMENT + subtype OPTION_EXPIRY
+/// Calculator handles lot removal via FIFO.
+pub const ACTIVITY_SUBTYPE_OPTION_EXPIRY: &str = "OPTION_EXPIRY";
+
 #[cfg(test)]
 mod tests {
     use super::*;

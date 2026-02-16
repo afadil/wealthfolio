@@ -10,6 +10,7 @@ import {
   SheetTitle,
 } from "@wealthfolio/ui";
 import { AmountDisplay } from "@wealthfolio/ui/components/financial/amount-display";
+import { displayBondPrice } from "@/lib/utils";
 import { format } from "date-fns";
 
 interface ActivityDetailSheetProps {
@@ -172,9 +173,13 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
             )}
             {Number(activity.unitPrice) !== 0 && (
               <DetailRow
-                label="Unit Price"
+                label={activity.instrumentType === "BOND" ? "Price (% of par)" : "Unit Price"}
                 value={
-                  <AmountDisplay value={Number(activity.unitPrice)} currency={activity.currency} />
+                  activity.instrumentType === "BOND" ? (
+                    <span>{displayBondPrice(Number(activity.unitPrice), "BOND").toFixed(3)}%</span>
+                  ) : (
+                    <AmountDisplay value={Number(activity.unitPrice)} currency={activity.currency} />
+                  )
                 }
               />
             )}

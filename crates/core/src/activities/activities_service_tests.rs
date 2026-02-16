@@ -156,11 +156,36 @@ mod tests {
         async fn get_or_create_minimal_asset(
             &self,
             asset_id: &str,
-            _context_currency: Option<String>,
-            _metadata: Option<crate::assets::AssetMetadata>,
+            context_currency: Option<String>,
+            metadata: Option<crate::assets::AssetMetadata>,
             _pricing_mode_hint: Option<String>,
         ) -> Result<Asset> {
-            self.get_asset_by_id(asset_id)
+            if let Ok(existing) = self.get_asset_by_id(asset_id) {
+                return Ok(existing);
+            }
+
+            // Minimal in-memory creation path for tests that need backend-created underlyings.
+            let mut created = Asset {
+                id: asset_id.to_string(),
+                display_code: metadata.as_ref().and_then(|m| m.display_code.clone()),
+                instrument_symbol: metadata.as_ref().and_then(|m| m.instrument_symbol.clone()),
+                instrument_exchange_mic: metadata
+                    .as_ref()
+                    .and_then(|m| m.instrument_exchange_mic.clone()),
+                instrument_type: metadata.as_ref().and_then(|m| m.instrument_type.clone()),
+                quote_ccy: context_currency.unwrap_or_else(|| "USD".to_string()),
+                kind: metadata
+                    .as_ref()
+                    .and_then(|m| m.kind.clone())
+                    .unwrap_or(AssetKind::Investment),
+                ..Default::default()
+            };
+            if created.display_code.is_none() {
+                created.display_code = created.instrument_symbol.clone();
+            }
+
+            self.assets.lock().unwrap().push(created.clone());
+            Ok(created)
         }
 
         async fn enrich_asset_profile(&self, _asset_id: &str) -> Result<Asset> {
@@ -410,6 +435,13 @@ mod tests {
             unimplemented!()
         }
 
+        async fn fetch_bond_details(
+            &self,
+            _isin: &str,
+        ) -> Option<crate::assets::BondSpec> {
+            None
+        }
+
         async fn fetch_quotes_from_provider(
             &self,
             _asset_id: &str,
@@ -597,7 +629,7 @@ mod tests {
                 activity_type: new_activity.activity_type,
                 activity_type_override: None,
                 source_type: None,
-                subtype: None,
+                subtype: new_activity.subtype,
                 status: new_activity.status.unwrap_or(ActivityStatus::Posted),
                 activity_date: Utc::now(),
                 settlement_date: None,
@@ -608,7 +640,10 @@ mod tests {
                 currency: new_activity.currency,
                 fx_rate: new_activity.fx_rate,
                 notes: new_activity.notes,
-                metadata: None,
+                metadata: new_activity
+                    .metadata
+                    .as_deref()
+                    .and_then(|raw| serde_json::from_str(raw).ok()),
                 source_system: None,
                 source_record_id: None,
                 source_group_id: None,
@@ -2021,6 +2056,134 @@ mod tests {
         assert_eq!(checked.quote_ccy.as_deref(), Some("USD"));
     }
 
+    #[tokio::test]
+    async fn test_check_import_isin_without_hint_requires_review() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let import = ActivityImport {
+            id: None,
+            date: "2024-01-15".to_string(),
+            symbol: "US0378331005".to_string(), // Apple ISIN (equity)
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(10)),
+            unit_price: Some(dec!(150)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(1500)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: None,
+            exchange_mic: None,
+            quote_ccy: None,
+            instrument_type: None, // No explicit type -> should require review
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+        };
+
+        let result = activity_service
+            .check_activities_import("acc-1".to_string(), vec![import])
+            .await
+            .expect("import check should succeed");
+
+        assert_eq!(result.len(), 1);
+        let checked = &result[0];
+        assert!(!checked.is_valid, "Ambiguous ISIN rows should require review");
+        let symbol_errors = checked
+            .errors
+            .as_ref()
+            .and_then(|e| e.get("symbol"))
+            .cloned()
+            .unwrap_or_default();
+        assert!(
+            symbol_errors
+                .iter()
+                .any(|msg| msg.contains("ISIN") && msg.contains("ambiguous")),
+            "Expected an ISIN ambiguity error, got: {:?}",
+            symbol_errors
+        );
+    }
+
+    #[tokio::test]
+    async fn test_check_import_isin_with_bond_hint_is_valid() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let import = ActivityImport {
+            id: None,
+            date: "2024-01-15".to_string(),
+            symbol: "US912810TH12".to_string(), // US Treasury ISIN
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(1000)),
+            unit_price: Some(dec!(95.25)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(952.5)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: None,
+            exchange_mic: None,
+            quote_ccy: None,
+            instrument_type: Some("BOND".to_string()), // Explicit type
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+        };
+
+        let result = activity_service
+            .check_activities_import("acc-1".to_string(), vec![import])
+            .await
+            .expect("import check should succeed");
+
+        assert_eq!(result.len(), 1);
+        let checked = &result[0];
+        assert!(checked.is_valid, "Explicitly typed ISIN rows should pass validation");
+        assert_eq!(checked.instrument_type.as_deref(), Some("BOND"));
+    }
+
     // ==========================================================================
     // Currency Normalization Tests (GBp -> GBP, etc.)
     // ==========================================================================
@@ -2246,6 +2409,233 @@ mod tests {
         assert_eq!(created.fee, Some(dec!(10)), "1000 cents = 10 ZAR");
     }
 
+    // ==========================================================================
+    // Bond Price Normalization Tests
+    // ==========================================================================
+    //
+    // Bond pricing convention:
+    //   - quantity = face value (nominal)
+    //   - unitPrice = percentage of par (e.g. 53.307 means 53.307% of face)
+    //   - amount = actual market value (qty × price / 100)
+    //
+    // On entry, unitPrice is divided by 100 so that qty × stored_price = amount.
+    // Amount is NEVER divided — it is already the real cash value.
+
+    /// Test: Bond BUY — unitPrice divided by 100, amount preserved
+    #[tokio::test]
+    async fn test_bond_buy_unit_price_divided_amount_preserved() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "GBP");
+        account_service.add_account(account);
+
+        // Bond asset
+        let mut asset = create_test_asset("bond-berkshire", "GBP");
+        asset.instrument_type = Some(InstrumentType::Bond);
+        asset_service.add_asset(asset);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let new_activity = NewActivity {
+            id: Some("bond-buy-1".to_string()),
+            account_id: "acc-1".to_string(),
+            symbol: Some(SymbolInput {
+                id: Some("bond-berkshire".to_string()),
+                ..Default::default()
+            }),
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(dec!(1200000)),  // Face value
+            unit_price: Some(dec!(53.307)), // % of par
+            currency: "GBP".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(639684)), // Actual market value (1200000 * 53.307 / 100)
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+        };
+
+        let result = activity_service.create_activity(new_activity).await;
+        assert!(result.is_ok(), "Bond BUY should succeed");
+
+        let created = result.unwrap();
+
+        // unitPrice should be divided by 100: 53.307 -> 0.53307
+        assert_eq!(
+            created.unit_price,
+            Some(dec!(0.53307)),
+            "Bond unitPrice should be divided by 100"
+        );
+
+        // amount should NOT be divided — it's already the real market value
+        assert_eq!(
+            created.amount,
+            Some(dec!(639684)),
+            "Bond amount should NOT be divided (it's actual market value)"
+        );
+
+        // quantity should be unchanged (face value)
+        assert_eq!(
+            created.quantity,
+            Some(dec!(1200000)),
+            "Bond quantity (face value) should be unchanged"
+        );
+    }
+
+    /// Test: Non-bond (equity) BUY — unitPrice NOT divided
+    #[tokio::test]
+    async fn test_equity_buy_unit_price_not_divided() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        let mut asset = create_test_asset("equity-aapl", "USD");
+        asset.instrument_type = Some(InstrumentType::Equity);
+        asset_service.add_asset(asset);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let new_activity = NewActivity {
+            id: Some("equity-buy-1".to_string()),
+            account_id: "acc-1".to_string(),
+            symbol: Some(SymbolInput {
+                id: Some("equity-aapl".to_string()),
+                ..Default::default()
+            }),
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(dec!(100)),
+            unit_price: Some(dec!(150.50)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(15050)),
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+        };
+
+        let result = activity_service.create_activity(new_activity).await;
+        assert!(result.is_ok());
+
+        let created = result.unwrap();
+
+        // Equity price should NOT be divided
+        assert_eq!(
+            created.unit_price,
+            Some(dec!(150.50)),
+            "Equity unitPrice should NOT be divided by 100"
+        );
+
+        assert_eq!(
+            created.amount,
+            Some(dec!(15050)),
+            "Equity amount should be unchanged"
+        );
+    }
+
+    /// Test: Bond TRANSFER_IN — unitPrice divided, amount preserved
+    #[tokio::test]
+    async fn test_bond_transfer_in_unit_price_divided_amount_preserved() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "EUR");
+        account_service.add_account(account);
+
+        let mut asset = create_test_asset("bond-pepsico", "EUR");
+        asset.instrument_type = Some(InstrumentType::Bond);
+        asset_service.add_asset(asset);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let new_activity = NewActivity {
+            id: Some("bond-xfer-1".to_string()),
+            account_id: "acc-1".to_string(),
+            symbol: Some(SymbolInput {
+                id: Some("bond-pepsico".to_string()),
+                ..Default::default()
+            }),
+            activity_type: "TRANSFER_IN".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(dec!(800000)),  // Face value
+            unit_price: Some(dec!(52.598)), // % of par
+            currency: "EUR".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(420784)), // Actual market value (800000 * 52.598 / 100)
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+        };
+
+        let result = activity_service.create_activity(new_activity).await;
+        assert!(result.is_ok());
+
+        let created = result.unwrap();
+
+        assert_eq!(
+            created.unit_price,
+            Some(dec!(0.52598)),
+            "Bond TRANSFER_IN unitPrice should be divided by 100"
+        );
+
+        assert_eq!(
+            created.amount,
+            Some(dec!(420784)),
+            "Bond TRANSFER_IN amount should NOT be divided"
+        );
+    }
+
     /// Test: Activity with regular GBP currency is NOT modified
     #[tokio::test]
     async fn test_regular_gbp_not_modified() {
@@ -2311,5 +2701,106 @@ mod tests {
             "Amount should not change for GBP"
         );
         assert_eq!(created.fee, Some(dec!(5)), "Fee should not change for GBP");
+    }
+
+    /// Test: OPTION_EXERCISE auto-enriches metadata.option with a resolved underlying_asset_id.
+    ///
+    /// This verifies the backend fix that makes exercise compilation work even when
+    /// the frontend sends only subtype + option asset selection.
+    #[tokio::test]
+    async fn test_option_exercise_enriches_metadata_with_underlying_asset_id() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        // Existing underlying equity that should be linked into option metadata.
+        let underlying = create_test_asset_with_instrument(
+            "aapl-underlying-uuid",
+            "AAPL",
+            None,
+            Some(InstrumentType::Equity),
+            "USD",
+        );
+        asset_service.add_asset(underlying);
+
+        // Option asset with empty underlying_asset_id (legacy/missing metadata case).
+        let mut option_asset = create_test_asset_with_instrument(
+            "aapl-option-uuid",
+            "AAPL240119C00195000",
+            None,
+            Some(InstrumentType::Option),
+            "USD",
+        );
+        option_asset.metadata = Some(serde_json::json!({
+            "option": {
+                "underlyingAssetId": "",
+                "expiration": "2024-01-19",
+                "right": "CALL",
+                "strike": "195",
+                "multiplier": "100",
+                "occSymbol": "AAPL240119C00195000"
+            }
+        }));
+        asset_service.add_asset(option_asset);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let new_activity = NewActivity {
+            id: Some("exercise-1".to_string()),
+            account_id: "acc-1".to_string(),
+            symbol: Some(SymbolInput {
+                id: Some("aapl-option-uuid".to_string()),
+                ..Default::default()
+            }),
+            activity_type: "SELL".to_string(),
+            subtype: Some("OPTION_EXERCISE".to_string()),
+            activity_date: "2024-01-19".to_string(),
+            quantity: Some(dec!(1)),
+            unit_price: Some(dec!(0)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(0)),
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+        };
+
+        let result = activity_service.create_activity(new_activity).await;
+        assert!(result.is_ok(), "Exercise activity should be created");
+
+        let created = result.unwrap();
+        assert_eq!(created.subtype.as_deref(), Some("OPTION_EXERCISE"));
+
+        let option_meta = created
+            .metadata
+            .as_ref()
+            .and_then(|m| m.get("option"))
+            .expect("metadata.option should be present for option exercise");
+        let underlying_id = option_meta
+            .get("underlyingAssetId")
+            .and_then(|v| v.as_str())
+            .expect("underlyingAssetId should be present");
+
+        assert_eq!(
+            underlying_id, "aapl-underlying-uuid",
+            "Exercise metadata should resolve underlying asset id"
+        );
     }
 }

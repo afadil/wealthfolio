@@ -174,14 +174,6 @@ impl PerformanceService {
             let prev_point = &window[0];
             let curr_point = &window[1];
 
-            if prev_point.total_value.is_sign_negative()
-                || curr_point.total_value.is_sign_negative()
-            {
-                return Err(errors::Error::Validation(ValidationError::InvalidInput(
-                    "Negative total value found in valuation history records".to_string(),
-                )));
-            }
-
             let prev_total_value = prev_point.total_value;
             let prev_net_contribution = prev_point.net_contribution;
             let current_total_value = curr_point.total_value;
@@ -189,7 +181,14 @@ impl PerformanceService {
 
             let cash_flow = current_net_contribution - prev_net_contribution;
 
-            let twr_period_return = {
+            // When either total value is negative (e.g. short positions, options),
+            // TWR/MWR formulas produce meaningless results — treat as 0% return.
+            let has_negative_value =
+                prev_total_value.is_sign_negative() || current_total_value.is_sign_negative();
+
+            let twr_period_return = if has_negative_value {
+                Decimal::ZERO
+            } else {
                 let denominator = prev_total_value + cash_flow;
                 if denominator.is_zero() {
                     Decimal::ZERO
@@ -198,7 +197,9 @@ impl PerformanceService {
                 }
             };
 
-            let mwr_period_return = {
+            let mwr_period_return = if has_negative_value {
+                Decimal::ZERO
+            } else {
                 let numerator = current_total_value - prev_total_value - cash_flow;
                 let denominator = prev_total_value + (cash_flow / two);
                 if denominator.is_zero() {

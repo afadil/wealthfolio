@@ -839,6 +839,8 @@ pub async fn get_snapshot_by_date(
             notes: asset.notes.clone(),
             pricing_mode: asset.quote_mode.as_db_str().to_string(),
             preferred_provider: asset.preferred_provider(),
+            instrument_type: asset.instrument_type.as_ref().map(|t| t.as_db_str().to_string()),
+            contract_multiplier: asset.contract_multiplier(),
             classifications: None,
         };
 

@@ -45,11 +45,12 @@ pub enum AssetKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum InstrumentType {
-    Equity, // Stocks, ETFs, bonds, funds, commodity ETFs
+    Equity, // Stocks, ETFs, funds, commodity ETFs
     Crypto, // Cryptocurrencies
     Fx,     // Currency exchange rates
     Option, // Options contracts
     Metal,  // Precious metal spot prices (XAU, XAG)
+    Bond,   // Fixed-income securities (government, corporate bonds)
 }
 
 /// How the asset is priced/quoted
@@ -80,6 +81,7 @@ impl InstrumentType {
             InstrumentType::Fx => "FX",
             InstrumentType::Option => "OPTION",
             InstrumentType::Metal => "METAL",
+            InstrumentType::Bond => "BOND",
         }
     }
 
@@ -91,6 +93,7 @@ impl InstrumentType {
             "FX" => Some(InstrumentType::Fx),
             "OPTION" => Some(InstrumentType::Option),
             "METAL" => Some(InstrumentType::Metal),
+            "BOND" => Some(InstrumentType::Bond),
             _ => None,
         }
     }
@@ -106,6 +109,22 @@ pub struct OptionSpec {
     pub strike: Decimal,
     pub multiplier: Decimal,
     pub occ_symbol: Option<String>,
+}
+
+/// Bond specification stored in Asset.metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BondSpec {
+    /// Maturity date of the bond
+    pub maturity_date: Option<chrono::NaiveDate>,
+    /// Annual coupon rate as a decimal (e.g., 0.05 for 5%)
+    pub coupon_rate: Option<Decimal>,
+    /// Face/par value of the bond (typically 1000)
+    pub face_value: Option<Decimal>,
+    /// Coupon payment frequency (e.g., "SEMI_ANNUAL", "ANNUAL", "QUARTERLY")
+    pub coupon_frequency: Option<String>,
+    /// ISIN identifier
+    pub isin: Option<String>,
 }
 
 /// Domain model representing an asset in the system.
@@ -276,6 +295,36 @@ impl Asset {
             .and_then(|v| serde_json::from_value(v.clone()).ok())
     }
 
+    /// Get bond metadata if this is a bond (instrument_type = BOND)
+    pub fn bond_spec(&self) -> Option<BondSpec> {
+        if self.instrument_type.as_ref() != Some(&InstrumentType::Bond) {
+            return None;
+        }
+        self.metadata
+            .as_ref()
+            .and_then(|m| m.get("bond"))
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+    }
+
+    /// Returns the contract multiplier for this asset.
+    /// Options typically have a multiplier of 100 (each contract = 100 shares).
+    /// All other asset types return 1.
+    pub fn contract_multiplier(&self) -> Decimal {
+        self.option_spec()
+            .map(|spec| spec.multiplier)
+            .unwrap_or(Decimal::ONE)
+    }
+
+    /// Check if this asset is an options contract
+    pub fn is_option(&self) -> bool {
+        self.instrument_type.as_ref() == Some(&InstrumentType::Option)
+    }
+
+    /// Check if this asset is a bond
+    pub fn is_bond(&self) -> bool {
+        self.instrument_type.as_ref() == Some(&InstrumentType::Bond)
+    }
+
     /// Convert to canonical instrument for market data resolution.
     /// Returns None for asset kinds that are not resolvable to market data.
     pub fn to_instrument_id(&self) -> Option<InstrumentId> {
@@ -302,7 +351,12 @@ impl Asset {
                 code: Arc::from(symbol.as_str()),
                 quote: Cow::Owned(self.quote_ccy.clone()),
             }),
-            InstrumentType::Option => None, // Options not resolvable to market data yet
+            InstrumentType::Option => Some(InstrumentId::Option {
+                occ_symbol: Arc::from(symbol.as_str()),
+            }),
+            InstrumentType::Bond => Some(InstrumentId::Bond {
+                isin: Arc::from(symbol.as_str()),
+            }),
         }
     }
 
@@ -476,6 +530,106 @@ impl NewAsset {
             instrument_exchange_mic: None,
             provider_config,
             notes: None,
+            is_active: true,
+            ..Default::default()
+        }
+    }
+
+    /// Creates a new option contract asset from OCC symbol components.
+    ///
+    /// - `kind`: Investment
+    /// - `instrument_type`: Option
+    /// - `instrument_symbol`: compact OCC symbol (e.g., "AAPL240119C00195000")
+    /// - `quote_mode`: Market (Yahoo Finance supports OCC symbols)
+    /// - Stores `OptionSpec` in `metadata.option`
+    pub fn new_option_contract(
+        occ_symbol: &str,
+        underlying: &str,
+        expiration: chrono::NaiveDate,
+        right: &str,
+        strike: Decimal,
+        multiplier: Decimal,
+        currency: &str,
+    ) -> Self {
+        let display = format!(
+            "{} {} {} {}",
+            underlying,
+            expiration.format("%Y-%m-%d"),
+            right,
+            strike
+        );
+
+        let option_spec = OptionSpec {
+            underlying_asset_id: String::new(), // Resolved later if needed
+            expiration,
+            right: right.to_uppercase(),
+            strike,
+            multiplier,
+            occ_symbol: Some(occ_symbol.to_string()),
+        };
+
+        let metadata = serde_json::json!({
+            "option": option_spec,
+        });
+
+        Self {
+            id: None,
+            kind: AssetKind::Investment,
+            name: Some(display.clone()),
+            display_code: Some(occ_symbol.to_string()),
+            quote_mode: QuoteMode::Market,
+            quote_ccy: currency.to_uppercase(),
+            instrument_type: Some(InstrumentType::Option),
+            instrument_symbol: Some(occ_symbol.to_string()),
+            instrument_exchange_mic: None,
+            metadata: Some(metadata),
+            is_active: true,
+            ..Default::default()
+        }
+    }
+
+    /// Creates a new bond asset from ISIN and optional metadata.
+    ///
+    /// - `kind`: Investment
+    /// - `instrument_type`: Bond
+    /// - `instrument_symbol`: ISIN code
+    /// - `quote_mode`: Manual (no automated bond pricing yet)
+    /// - Stores `BondSpec` in `metadata.bond` and ISIN in `metadata.identifiers.isin`
+    pub fn new_bond(
+        isin: &str,
+        name: Option<&str>,
+        currency: &str,
+        bond_spec: Option<BondSpec>,
+    ) -> Self {
+        let isin_upper = isin.to_uppercase();
+        let display_name = name
+            .map(String::from)
+            .unwrap_or_else(|| format!("Bond {}", isin_upper));
+
+        let mut metadata = serde_json::json!({
+            "identifiers": { "isin": isin_upper },
+        });
+
+        if let Some(spec) = bond_spec {
+            if let Ok(spec_val) = serde_json::to_value(&spec) {
+                metadata
+                    .as_object_mut()
+                    .unwrap()
+                    .insert("bond".to_string(), spec_val);
+            }
+        }
+
+        Self {
+            id: None,
+            kind: AssetKind::Investment,
+            name: Some(display_name),
+            display_code: Some(isin_upper.clone()),
+            quote_mode: QuoteMode::Market,
+            quote_ccy: currency.to_uppercase(),
+            instrument_type: Some(InstrumentType::Bond),
+            instrument_symbol: Some(isin_upper),
+            instrument_exchange_mic: None,
+            metadata: Some(metadata),
             is_active: true,
             ..Default::default()
         }
@@ -715,7 +869,7 @@ pub fn canonicalize_market_identity(
                 quote_ccy: normalized_quote,
             }
         }
-        None => CanonicalMarketIdentity {
+        Some(InstrumentType::Bond) | None => CanonicalMarketIdentity {
             display_code: normalize_opt(symbol),
             instrument_symbol: normalize_opt(symbol),
             instrument_exchange_mic,
@@ -755,6 +909,8 @@ pub struct AssetSpec {
     pub quote_mode: Option<QuoteMode>,
     /// User-provided name
     pub name: Option<String>,
+    /// Optional metadata (e.g., OptionSpec, BondSpec) to pass through to asset creation
+    pub metadata: Option<Value>,
 }
 
 impl AssetSpec {

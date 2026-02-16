@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@wealthfolio/ui/components/ui/dropdown-menu";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { safeDivide } from "@/lib/utils";
+import { safeDivide, displayBondPrice } from "@/lib/utils";
 import type { ColumnDef } from "@tanstack/react-table";
 import { GainPercent, Badge } from "@wealthfolio/ui";
 
@@ -250,10 +250,10 @@ const getColumns = (
     accessorKey: "quantity",
     enableHiding: true,
     header: ({ column }) => (
-      <DataTableColumnHeader className="justify-end text-right" column={column} title="Shares" />
+      <DataTableColumnHeader className="justify-end text-right" column={column} title="Quantity" />
     ),
     meta: {
-      label: "Shares",
+      label: "Quantity",
     },
     cell: ({ row }) => (
       <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
@@ -280,11 +280,16 @@ const getColumns = (
     },
     cell: ({ row }) => {
       const holding = row.original;
-      const price = holding.price ?? 0;
+      const isBond = holding.instrument?.instrumentType === "BOND";
+      const price = displayBondPrice(holding.price ?? 0, holding.instrument?.instrumentType);
       const currency = holding.localCurrency;
       return (
         <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
-          <AmountDisplay value={price} currency={currency} />
+          {isBond ? (
+            <span>{price.toFixed(3)}%</span>
+          ) : (
+            <AmountDisplay value={price} currency={currency} />
+          )}
           <GainPercent className="text-xs" value={holding.dayChangePct || 0} />
         </div>
       );

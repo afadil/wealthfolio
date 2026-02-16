@@ -577,6 +577,28 @@ where
                         Ok(_) => {
                             debug!("Saved {} quotes for {}", quotes_count, asset.id);
 
+                            // Pin bond to winning provider on first success
+                            if asset.is_bond() && asset.preferred_provider().is_none() {
+                                if let Some(q) = quotes.first() {
+                                    let source = q.data_source.as_str();
+                                    let new_config = match &asset.provider_config {
+                                        Some(existing) => {
+                                            let mut c = existing.clone();
+                                            c["preferred_provider"] =
+                                                serde_json::json!(source);
+                                            c
+                                        }
+                                        None => {
+                                            serde_json::json!({ "preferred_provider": source })
+                                        }
+                                    };
+                                    let _ = self
+                                        .asset_repo
+                                        .update_provider_config(&asset.id, new_config)
+                                        .await;
+                                }
+                            }
+
                             // Update sync state - just mark as synced
                             if let Err(e) = self.sync_state_store.update_after_sync(&asset.id).await
                             {
@@ -611,6 +633,51 @@ where
                 }
             }
             Err(e) => {
+                // For options: historical chart data is often unavailable on Yahoo,
+                // but the latest quote works fine. Fall back to fetch_latest_quote.
+                if asset.is_option() {
+                    debug!(
+                        "Historical fetch failed for option {}, falling back to latest quote: {}",
+                        asset.id, e
+                    );
+                    match client.fetch_latest_quote(asset).await {
+                        Ok(quote) => {
+                            let quotes = vec![quote];
+                            match self.quote_store.upsert_quotes(&quotes).await {
+                                Ok(_) => {
+                                    debug!("Saved latest quote for option {}", asset.id);
+                                    if let Err(e) =
+                                        self.sync_state_store.update_after_sync(&asset.id).await
+                                    {
+                                        warn!(
+                                            "Failed to update sync state for {}: {:?}",
+                                            asset.id, e
+                                        );
+                                    }
+                                    return AssetSyncResult {
+                                        asset_id,
+                                        quotes_added: 1,
+                                        status: SyncStatus::Success,
+                                        error: None,
+                                    };
+                                }
+                                Err(store_err) => {
+                                    error!(
+                                        "Failed to save latest quote for option {}: {:?}",
+                                        asset.id, store_err
+                                    );
+                                }
+                            }
+                        }
+                        Err(latest_err) => {
+                            warn!(
+                                "Latest quote fallback also failed for option {}: {}",
+                                asset.id, latest_err
+                            );
+                        }
+                    }
+                }
+
                 error!("Failed to fetch quotes for {}: {:?}", asset.id, e);
 
                 // Update sync state with failure

@@ -42,6 +42,8 @@ interface SymbolSearchProps<TFieldValues extends FieldValues = FieldValues> {
   isManualAsset?: boolean;
   /** Label for the field */
   label?: string;
+  /** Placeholder text for manual input */
+  placeholder?: string;
   /** Default currency for creating custom assets */
   defaultCurrency?: string;
   /** Field name for exchangeMic (optional, for capturing exchange info) */
@@ -62,6 +64,7 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
   name,
   isManualAsset = false,
   label = "Symbol",
+  placeholder = "Enter symbol",
   defaultCurrency,
   exchangeMicName,
   quoteModeName,
@@ -159,7 +162,7 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
           <FormControl>
             {isManualAsset ? (
               <Input
-                placeholder="Enter symbol"
+                placeholder={placeholder}
                 className="h-10"
                 {...field}
                 onChange={(e) => field.onChange(e.target.value.toUpperCase())}
