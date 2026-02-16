@@ -988,6 +988,18 @@ export function ReviewStep() {
     [draftActivities, dispatch, mapping, accountId, validateDraftsWithBackend],
   );
 
+  const unresolvedSymbols = useMemo<UnresolvedSymbol[]>(() => {
+    const symbolMap = new Map<string, number>();
+    for (const draft of draftActivities) {
+      if (draft.errors.symbol && draft.symbol) {
+        symbolMap.set(draft.symbol, (symbolMap.get(draft.symbol) || 0) + 1);
+      }
+    }
+    return Array.from(symbolMap.entries())
+      .map(([csvSymbol, count]) => ({ csvSymbol, affectedCount: count }))
+      .sort((a, b) => (b.affectedCount ?? 0) - (a.affectedCount ?? 0));
+  }, [draftActivities]);
+
   // Show loading state while drafts are being created or validated
   if ((draftActivities.length === 0 && parsedRows.length > 0) || isValidating) {
     return (
@@ -1026,18 +1038,6 @@ export function ReviewStep() {
   const hasErrors = filterStats.errors > 0;
   const hasWarnings = filterStats.warnings > 0;
   const hasIssues = hasErrors || hasWarnings;
-
-  const unresolvedSymbols = useMemo<UnresolvedSymbol[]>(() => {
-    const symbolMap = new Map<string, number>();
-    for (const draft of draftActivities) {
-      if (draft.errors.symbol && draft.symbol) {
-        symbolMap.set(draft.symbol, (symbolMap.get(draft.symbol) || 0) + 1);
-      }
-    }
-    return Array.from(symbolMap.entries())
-      .map(([csvSymbol, count]) => ({ csvSymbol, affectedCount: count }))
-      .sort((a, b) => (b.affectedCount ?? 0) - (a.affectedCount ?? 0));
-  }, [draftActivities]);
 
   return (
     <div className="flex flex-col gap-4">
