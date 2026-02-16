@@ -278,15 +278,12 @@ impl FinnhubProvider {
         }
     }
 
-    /// Get the currency: prefer asset's quote_ccy, fall back to exchange metadata.
+    /// Get the currency: prefer exchange metadata, fall back to asset's quote_ccy.
     fn get_currency(&self, context: &QuoteContext) -> String {
-        context
-            .currency_hint
-            .clone()
-            .or_else(|| {
-                let chain = ResolverChain::new();
-                chain.get_currency(&PROVIDER_ID.into(), context)
-            })
+        let chain = ResolverChain::new();
+        chain
+            .get_currency(&PROVIDER_ID.into(), context)
+            .or_else(|| context.currency_hint.clone())
             .map(|c| c.to_string())
             .unwrap_or_else(|| "USD".to_string())
     }
@@ -697,10 +694,11 @@ mod tests {
     }
 
     #[test]
-    fn test_get_currency_prefers_hint_over_resolver() {
+    fn test_get_currency_prefers_resolver_over_hint() {
         let provider = FinnhubProvider::new("test_key".to_string());
+        // FX resolver returns the quote currency ("CAD"), which takes priority over hint
         let context = create_test_fx_context(Some("TWD"), "CAD");
-        assert_eq!(provider.get_currency(&context), "TWD");
+        assert_eq!(provider.get_currency(&context), "CAD");
     }
 
     #[test]

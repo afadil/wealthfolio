@@ -195,15 +195,12 @@ impl YahooProvider {
     // Quote Fetching
     // ========================================================================
 
-    /// Get the currency: prefer asset's quote_ccy, fall back to exchange metadata.
+    /// Get the currency: prefer exchange metadata, fall back to asset's quote_ccy.
     fn get_currency(&self, context: &QuoteContext) -> String {
-        context
-            .currency_hint
-            .clone()
-            .or_else(|| {
-                let chain = ResolverChain::new();
-                chain.get_currency(&"YAHOO".into(), context)
-            })
+        let chain = ResolverChain::new();
+        chain
+            .get_currency(&"YAHOO".into(), context)
+            .or_else(|| context.currency_hint.clone())
             .map(|c| c.to_string())
             .unwrap_or_else(|| "USD".to_string())
     }
@@ -968,21 +965,43 @@ mod tests {
     }
 
     #[test]
-    fn test_get_currency_prefers_hint_over_resolver() {
+    fn test_get_currency_prefers_resolver_over_hint() {
         let provider = YahooProvider {
             connector: yahoo::YahooConnector::new().expect("Failed to initialize Yahoo connector"),
         };
+        // FX resolver returns the quote currency ("CAD"), which takes priority over hint
         let context = create_test_fx_context(Some("TWD"), "CAD");
-        assert_eq!(provider.get_currency(&context), "TWD");
+        assert_eq!(provider.get_currency(&context), "CAD");
     }
 
     #[test]
-    fn test_get_currency_falls_back_to_resolver_when_hint_missing() {
+    fn test_get_currency_falls_back_to_hint_when_resolver_empty() {
         let provider = YahooProvider {
             connector: yahoo::YahooConnector::new().expect("Failed to initialize Yahoo connector"),
         };
-        let context = create_test_fx_context(None, "CAD");
-        assert_eq!(provider.get_currency(&context), "CAD");
+        // No MIC → resolver returns None for equities, so hint wins
+        let context = create_test_context();
+        assert_eq!(provider.get_currency(&context), "USD");
+    }
+
+    #[test]
+    fn test_get_currency_xlon_prefers_exchange_metadata() {
+        use crate::models::InstrumentId;
+        // BATS@XLON: asset has quote_ccy="GBP" but Yahoo prices are in pence.
+        // get_currency() must return "GBp" from exchange metadata, not "GBP" from hint.
+        let provider = YahooProvider {
+            connector: yahoo::YahooConnector::new().expect("Failed to initialize Yahoo connector"),
+        };
+        let context = QuoteContext {
+            instrument: InstrumentId::Equity {
+                ticker: Arc::from("BATS"),
+                mic: Some("XLON".into()),
+            },
+            currency_hint: Some(Cow::Borrowed("GBP")),
+            overrides: None,
+            preferred_provider: None,
+        };
+        assert_eq!(provider.get_currency(&context), "GBp");
     }
 
     #[test]

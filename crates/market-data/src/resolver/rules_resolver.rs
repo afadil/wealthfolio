@@ -441,4 +441,18 @@ mod tests {
         let currency = resolver.get_equity_currency(&None, &"YAHOO".into());
         assert!(currency.is_none());
     }
+
+    #[test]
+    fn test_get_equity_currency_ignores_wrong_hint() {
+        // Simulates BATS@XLON: asset.quote_ccy="GBP" but Yahoo returns pence.
+        // The resolver should return "GBp" based on exchange metadata,
+        // regardless of what currency_hint says.
+        let resolver = RulesResolver::new();
+        let currency = resolver.get_equity_currency(&Some("XLON".into()), &"YAHOO".into());
+        assert_eq!(currency.as_deref(), Some("GBp"));
+
+        // Alpha Vantage correctly returns GBP (not pence) for XLON
+        let currency = resolver.get_equity_currency(&Some("XLON".into()), &"ALPHA_VANTAGE".into());
+        assert_eq!(currency.as_deref(), Some("GBP"));
+    }
 }
