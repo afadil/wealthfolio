@@ -23,6 +23,7 @@
 
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, NaiveDate, TimeZone, Utc};
+use futures::stream::{self, StreamExt};
 use log::{debug, error, info, warn};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, LazyLock, Mutex};
@@ -836,67 +837,84 @@ where
     }
 
     /// Execute sync for a list of plans.
-    async fn execute_sync_plans(&self, plans: Vec<SymbolSyncPlan>) -> SyncResult {
-        if plans.is_empty() {
-            return SyncResult::default();
-        }
+    ///
+    /// Returns a boxed future to provide an explicit `Send` boundary, which is
+    /// required because `buffer_unordered` produces an opaque type that
+    /// `async_trait` cannot prove `Send` for all lifetimes.
+    fn execute_sync_plans(
+        &self,
+        plans: Vec<SymbolSyncPlan>,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = SyncResult> + Send + '_>> {
+        Box::pin(async move {
+            if plans.is_empty() {
+                return SyncResult::default();
+            }
 
-        debug!("Executing sync for {} assets", plans.len());
+            debug!("Executing sync for {} assets", plans.len());
 
-        // Get all assets for the plans
-        let asset_ids: Vec<String> = plans.iter().map(|p| p.asset_id.clone()).collect();
-        let assets = match self.asset_repo.list_by_asset_ids(&asset_ids) {
-            Ok(a) => a,
-            Err(e) => {
-                error!("Failed to get assets for sync: {:?}", e);
-                let mut result = SyncResult::default();
-                for plan in &plans {
-                    result.failures.push((plan.asset_id.clone(), e.to_string()));
-                    result.failed += 1;
+            // Get all assets for the plans
+            let asset_ids: Vec<String> = plans.iter().map(|p| p.asset_id.clone()).collect();
+            let assets = match self.asset_repo.list_by_asset_ids(&asset_ids) {
+                Ok(a) => a,
+                Err(e) => {
+                    error!("Failed to get assets for sync: {:?}", e);
+                    let mut result = SyncResult::default();
+                    for plan in &plans {
+                        result.failures.push((plan.asset_id.clone(), e.to_string()));
+                        result.failed += 1;
+                    }
+                    return result;
                 }
-                return result;
-            }
-        };
+            };
 
-        let asset_map: HashMap<String, Asset> =
-            assets.into_iter().map(|a| (a.id.clone(), a)).collect();
+            let asset_map: HashMap<String, Asset> =
+                assets.into_iter().map(|a| (a.id.clone(), a)).collect();
 
-        let mut result = SyncResult::default();
+            let asset_results: Vec<AssetSyncResult> = stream::iter(plans.into_iter().map(|plan| {
+                let asset = asset_map.get(&plan.asset_id).cloned();
+                Box::pin(async move {
+                    if let Some(asset) = asset {
+                        self.sync_asset(&asset, &plan).await
+                    } else {
+                        warn!("Asset not found for asset_id: {}", plan.asset_id);
+                        AssetSyncResult {
+                            asset_id: AssetId::new(&plan.asset_id),
+                            quotes_added: 0,
+                            status: SyncStatus::Failed,
+                            error: Some("Asset not found".to_string()),
+                        }
+                    }
+                })
+            }))
+            .buffer_unordered(SYNC_CONCURRENCY)
+            .collect()
+            .await;
 
-        for plan in &plans {
-            if let Some(asset) = asset_map.get(&plan.asset_id) {
-                let asset_result = self.sync_asset(asset, plan).await;
+            let mut result = SyncResult::default();
+            for asset_result in asset_results {
                 result.add_result(asset_result);
-            } else {
-                warn!("Asset not found for asset_id: {}", plan.asset_id);
-                result.add_result(AssetSyncResult {
-                    asset_id: AssetId::new(&plan.asset_id),
-                    quotes_added: 0,
-                    status: SyncStatus::Failed,
-                    error: Some("Asset not found".to_string()),
-                });
             }
-        }
 
-        // Replace asset IDs with display codes in failures for human-readable messages
-        result.failures = result
-            .failures
-            .into_iter()
-            .map(|(id, err)| {
-                let display = asset_map
-                    .get(&id)
-                    .and_then(|a| a.display_code.clone())
-                    .unwrap_or(id);
-                (display, err)
-            })
-            .collect();
+            // Replace asset IDs with display codes in failures for human-readable messages
+            result.failures = result
+                .failures
+                .into_iter()
+                .map(|(id, err)| {
+                    let display = asset_map
+                        .get(&id)
+                        .and_then(|a| a.display_code.clone())
+                        .unwrap_or(id);
+                    (display, err)
+                })
+                .collect();
 
-        debug!(
-            "Sync complete: {} synced, {} failed, {} skipped, {} quotes total",
-            result.synced, result.failed, result.skipped, result.quotes_synced
-        );
+            debug!(
+                "Sync complete: {} synced, {} failed, {} skipped, {} quotes total",
+                result.synced, result.failed, result.skipped, result.quotes_synced
+            );
 
-        result
+            result
+        })
     }
 
     /// Generate sync plan based on current sync states.

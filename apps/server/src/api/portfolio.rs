@@ -1,7 +1,7 @@
 use std::{convert::Infallible, sync::Arc, time::Duration};
 
 use crate::{
-    api::shared::{process_portfolio_job, PortfolioRequestBody},
+    api::shared::{enqueue_portfolio_job, PortfolioRequestBody},
     error::ApiResult,
     main_lib::AppState,
 };
@@ -27,8 +27,8 @@ async fn update_portfolio(
         request.market_sync_mode = MarketSyncMode::Incremental { asset_ids: None };
     }
     let cfg = request.into_config(false);
-    process_portfolio_job(state, cfg).await?;
-    Ok(StatusCode::NO_CONTENT)
+    enqueue_portfolio_job(state, cfg);
+    Ok(StatusCode::ACCEPTED)
 }
 
 async fn recalculate_portfolio(
@@ -45,8 +45,8 @@ async fn recalculate_portfolio(
         };
     }
     let cfg = request.into_config(true);
-    process_portfolio_job(state, cfg).await?;
-    Ok(StatusCode::NO_CONTENT)
+    enqueue_portfolio_job(state, cfg);
+    Ok(StatusCode::ACCEPTED)
 }
 
 async fn stream_events(

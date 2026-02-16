@@ -152,6 +152,10 @@ export const listenMarketSyncComplete = <T>(handler: EventCallback<T>): Promise<
   return portfolioEventBridge.listen("market:sync-complete", handler);
 };
 
+export const listenMarketSyncError = <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
+  return portfolioEventBridge.listen("market:sync-error", handler);
+};
+
 // Desktop-only features - no-op in web
 const noopUnlisten: UnlistenFn = () => Promise.resolve();
 

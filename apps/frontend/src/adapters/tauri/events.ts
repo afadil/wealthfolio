@@ -70,6 +70,11 @@ export async function listenMarketSyncStart<T>(handler: EventCallback<T>): Promi
   return adaptUnlisten(unlisten);
 }
 
+export async function listenMarketSyncError<T>(handler: EventCallback<T>): Promise<UnlistenFn> {
+  const unlisten = await listen<T>("market:sync-error", adaptCallback(handler));
+  return adaptUnlisten(unlisten);
+}
+
 export async function listenBrokerSyncStart<T>(handler: EventCallback<T>): Promise<UnlistenFn> {
   const unlisten = await listen<T>("broker:sync-start", adaptCallback(handler));
   return adaptUnlisten(unlisten);

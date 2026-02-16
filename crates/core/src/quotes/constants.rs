@@ -54,3 +54,8 @@ pub const OVERLAP_DAYS: i64 = 5;
 /// After this threshold, the asset won't be synced until the user manually
 /// triggers a resync or the error count is reset.
 pub const MAX_SYNC_ERRORS: i32 = 10;
+
+/// Number of concurrent asset syncs in `execute_sync_plans`.
+/// The per-provider rate limiter already enforces its own concurrency/delay,
+/// so this just controls how many assets we dispatch at once.
+pub const SYNC_CONCURRENCY: usize = 10;
