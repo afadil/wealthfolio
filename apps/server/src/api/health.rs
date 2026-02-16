@@ -106,6 +106,24 @@ async fn execute_health_fix(
         return Ok(());
     }
 
+    // Handle sync_prices / retry_sync by triggering an actual market data sync
+    if action.id == "sync_prices" || action.id == "retry_sync" {
+        let asset_ids: Vec<String> = serde_json::from_value(action.payload.clone())
+            .map_err(|e| anyhow::anyhow!("Invalid payload for {}: {}", action.id, e))?;
+
+        state
+            .quote_service
+            .sync(
+                wealthfolio_core::quotes::SyncMode::Incremental,
+                Some(asset_ids),
+            )
+            .await
+            .map_err(|e| anyhow::anyhow!("Market data sync failed: {}", e))?;
+
+        state.health_service.clear_cache().await;
+        return Ok(());
+    }
+
     state.health_service.execute_fix(&action).await?;
     Ok(())
 }
