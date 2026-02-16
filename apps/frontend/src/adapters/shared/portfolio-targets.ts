@@ -7,6 +7,8 @@ import type {
   HoldingTarget,
   NewHoldingTarget,
   DeviationReport,
+  RebalancingInput,
+  RebalancingPlan,
 } from "@/lib/types";
 
 import { invoke, logger } from "./platform";
@@ -119,6 +121,21 @@ export const deleteHoldingTarget = async (id: string): Promise<void> => {
     await invoke<number>("delete_holding_target", { id });
   } catch (error) {
     logger.error("Error deleting holding target.");
+    throw error;
+  }
+};
+
+// Rebalancing
+export const calculateRebalancingPlan = async (
+  input: RebalancingInput,
+): Promise<RebalancingPlan> => {
+  try {
+    return await invoke<RebalancingPlan>("calculate_rebalancing_plan", {
+      targetId: input.targetId,
+      availableCash: input.availableCash,
+    });
+  } catch (error) {
+    logger.error("Error calculating rebalancing plan.");
     throw error;
   }
 };

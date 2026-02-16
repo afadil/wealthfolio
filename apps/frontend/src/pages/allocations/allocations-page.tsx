@@ -1,10 +1,15 @@
-import { Suspense, useMemo } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { EmptyPlaceholder } from "@wealthfolio/ui";
 
 import { SwipablePage, type SwipablePageView } from "@/components/page";
 import { AllocationsOverview } from "./components/allocations-overview";
+import { RebalancingTab } from "./components/rebalancing-tab";
+import { useSettingsContext } from "@/lib/settings-provider";
+import { usePortfolioTargets, useAllocationDeviations } from "./hooks";
+import type { Account } from "@/lib/types";
+import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 
 const LoadingSkeleton = () => (
   <div className="space-y-4 p-4">
@@ -17,6 +22,26 @@ const LoadingSkeleton = () => (
 );
 
 const AllocationsPage = () => {
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
+
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>({
+    id: PORTFOLIO_ACCOUNT_ID,
+    name: "All Portfolio",
+    accountType: "PORTFOLIO" as unknown as Account["accountType"],
+    balance: 0,
+    currency: baseCurrency,
+    isDefault: false,
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as Account);
+
+  const accountId = selectedAccount?.id ?? PORTFOLIO_ACCOUNT_ID;
+  const { targets } = usePortfolioTargets(accountId);
+  const activeTarget = targets.find((t) => t.isActive) ?? targets[0] ?? null;
+  const { deviationReport } = useAllocationDeviations(activeTarget?.id);
+
   const views: SwipablePageView[] = useMemo(
     () => [
       {
@@ -34,17 +59,18 @@ const AllocationsPage = () => {
         label: "Rebalancing",
         icon: Icons.ArrowLeftRight,
         content: (
-          <div className="flex items-center justify-center py-16">
-            <EmptyPlaceholder
-              icon={<Icons.ArrowLeftRight className="text-muted-foreground h-10 w-10" />}
-              title="Rebalancing Advisor"
-              description="Coming soon. This will suggest trades to align your portfolio with your target allocations."
+          <Suspense fallback={<LoadingSkeleton />}>
+            <RebalancingTab
+              selectedAccount={selectedAccount}
+              activeTarget={activeTarget}
+              deviationReport={deviationReport}
+              baseCurrency={baseCurrency}
             />
-          </div>
+          </Suspense>
         ),
       },
     ],
-    [],
+    [selectedAccount, activeTarget, deviationReport, baseCurrency],
   );
 
   return <SwipablePage views={views} defaultView="overview" withPadding={true} />;

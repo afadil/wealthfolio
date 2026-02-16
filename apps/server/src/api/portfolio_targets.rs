@@ -7,6 +7,9 @@ use axum::{
     routing::{delete, get, post},
     Json, Router,
 };
+use rust_decimal::Decimal;
+use serde::Deserialize;
+use wealthfolio_core::portfolio::rebalancing::{RebalancingInput, RebalancingPlan};
 use wealthfolio_core::portfolio::targets::{
     DeviationReport, HoldingTarget, NewHoldingTarget, NewPortfolioTarget, NewTargetAllocation,
     PortfolioTarget, TargetAllocation,
@@ -130,6 +133,33 @@ async fn delete_holding_target(
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CalculateRebalancingRequest {
+    target_id: String,
+    available_cash: f64,
+    base_currency: String,
+}
+
+async fn calculate_rebalancing_plan(
+    State(state): State<Arc<AppState>>,
+    Json(request): Json<CalculateRebalancingRequest>,
+) -> ApiResult<Json<RebalancingPlan>> {
+    let input = RebalancingInput {
+        target_id: request.target_id,
+        available_cash: Decimal::from_f64_retain(request.available_cash)
+            .ok_or_else(|| crate::error::ApiError::BadRequest("Invalid cash amount".to_string()))?,
+        base_currency: request.base_currency,
+    };
+
+    let plan = state
+        .rebalancing_service
+        .calculate_rebalancing_plan(input)
+        .await?;
+
+    Ok(Json(plan))
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route(
@@ -168,5 +198,9 @@ pub fn router() -> Router<Arc<AppState>> {
         .route(
             "/portfolio-targets/holdings/{id}",
             delete(delete_holding_target),
+        )
+        .route(
+            "/portfolio-targets/rebalancing/calculate",
+            post(calculate_rebalancing_plan),
         )
 }

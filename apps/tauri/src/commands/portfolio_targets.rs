@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
+use rust_decimal::Decimal;
 use tauri::State;
+use wealthfolio_core::portfolio::rebalancing::{RebalancingInput, RebalancingPlan};
 use wealthfolio_core::portfolio::targets::{
     DeviationReport, HoldingTarget, NewHoldingTarget, NewPortfolioTarget, NewTargetAllocation,
     PortfolioTarget, TargetAllocation,
@@ -147,6 +149,30 @@ pub async fn delete_holding_target(
     state
         .portfolio_target_service()
         .delete_holding_target(&id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// --- Rebalancing ---
+
+#[tauri::command]
+pub async fn calculate_rebalancing_plan(
+    target_id: String,
+    available_cash: f64,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<RebalancingPlan, String> {
+    let base_currency = state.get_base_currency();
+
+    let input = RebalancingInput {
+        target_id,
+        available_cash: Decimal::from_f64_retain(available_cash)
+            .ok_or_else(|| "Invalid cash amount".to_string())?,
+        base_currency,
+    };
+
+    state
+        .rebalancing_service()
+        .calculate_rebalancing_plan(input)
         .await
         .map_err(|e| e.to_string())
 }

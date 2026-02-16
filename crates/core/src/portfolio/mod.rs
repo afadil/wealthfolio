@@ -3,6 +3,7 @@ pub mod holdings;
 pub mod income;
 pub mod net_worth;
 pub mod performance;
+pub mod rebalancing;
 pub mod snapshot;
 pub mod targets;
 pub mod valuation;

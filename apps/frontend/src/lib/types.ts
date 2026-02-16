@@ -1838,3 +1838,35 @@ export interface DeviationReport {
   totalValue: number;
   deviations: AllocationDeviation[];
 }
+
+// Rebalancing types
+export interface RebalancingInput {
+  targetId: string;
+  availableCash: number;
+  baseCurrency: string;
+}
+
+export interface TradeRecommendation {
+  assetId: string;
+  symbol: string;
+  name: string | null;
+  categoryId: string;
+  categoryName: string;
+  action: string; // "BUY"
+  shares: number;
+  pricePerShare: number;
+  totalAmount: number;
+  impactPercent: number;
+}
+
+export interface RebalancingPlan {
+  targetId: string;
+  targetName: string;
+  accountId: string;
+  taxonomyId: string;
+  availableCash: number;
+  totalAllocated: number;
+  remainingCash: number;
+  additionalCashNeeded: number;
+  recommendations: TradeRecommendation[];
+}

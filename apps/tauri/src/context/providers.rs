@@ -24,6 +24,7 @@ use wealthfolio_core::{
         income::IncomeService,
         net_worth::NetWorthService,
         performance::PerformanceService,
+        rebalancing::RebalancingServiceImpl,
         snapshot::SnapshotService,
         targets::PortfolioTargetService,
         valuation::ValuationService,
@@ -230,6 +231,11 @@ pub async fn initialize_context(
         allocation_service.clone(),
     ));
 
+    let rebalancing_service = Arc::new(RebalancingServiceImpl::new(
+        portfolio_target_service.clone(),
+        allocation_service.clone(),
+    ));
+
     let net_worth_service = Arc::new(NetWorthService::new(
         base_currency.clone(),
         account_repository.clone(),
@@ -343,6 +349,7 @@ pub async fn initialize_context(
             alternative_asset_service,
             taxonomy_service,
             portfolio_target_service,
+            rebalancing_service,
             connect_service,
             ai_provider_service,
             ai_chat_service,

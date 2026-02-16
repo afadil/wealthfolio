@@ -429,64 +429,199 @@ Deviation:
 **Goal**: Cash-first rebalancing tab. User enters available cash, system
 suggests what to buy to align with targets.
 
+**Status**: Ready to implement. Adapting proven UI from `allocations/phase-4`
+branch, moving calculation logic from frontend to Rust backend.
+
+### Context
+
+An earlier implementation existed in `allocations/phase-4` with working UI and
+frontend-only calculations. Key adaptations needed:
+- **Old**: Free-text `asset_class` labels → **New**: Taxonomy-based `category_id`
+- **Old**: Three-table hierarchy → **New**: Two-table (portfolio_targets →
+  target_allocations → holding_targets)
+- **Old**: Frontend calculations → **New**: Rust backend for testability
+
 ### UI (second tab)
 
+Tab structure (already wired in `allocations-page.tsx`):
+```typescript
+<Tabs value={activeTab}>
+  <TabsList>
+    <TabsTrigger value="overview">Overview</TabsTrigger>
+    <TabsTrigger value="rebalancing">Rebalancing</TabsTrigger>  // ← Section 3
+  </TabsList>
+</Tabs>
+```
+
+Layout:
 ```
 ┌──────────────────────────────────────────────────────┐
 │  REBALANCING SUGGESTIONS                             │
 │                                                      │
+│  Current Portfolio Value: $125,430                   │
+│                                                      │
 │  Available Cash: [$_________]  [Calculate]           │
 │                                                      │
-│  ┌────────────────────────────────────────────────┐  │
-│  │ Suggested Trades                               │  │
-│  │                                                │  │
-│  │ BUY  VTI   12 shares × $245  =  $2,940  (+3%) │  │
-│  │ BUY  BND    8 shares × $72   =  $576    (+1%) │  │
-│  │ BUY  VXUS   5 shares × $58   =  $290    (+1%) │  │
-│  │                                                │  │
-│  │ Total allocated: $3,806 of $5,000               │  │
-│  │ Remaining cash: $1,194                          │  │
-│  │                                                │  │
-│  │ [Copy to Clipboard]  [Export CSV]               │  │
-│  └────────────────────────────────────────────────┘  │
+│  [Overview] [Detailed]  ☐ Show zero-share holdings   │
 │                                                      │
-│  Additional cash needed to fully rebalance: $12,400  │
+│  ┌─ Overview Mode ───────────────────────────────┐  │
+│  │ EQUITY                    Target 60% | Actual 45%│
+│  │ Suggested Buy: $12,500    New: 55%              │
+│  │                                                  │
+│  │ FIXED_INCOME              Target 40% | Actual 55%│
+│  │ Suggested Buy: $0         New: 45%              │
+│  └──────────────────────────────────────────────────┘
+│                                                      │
+│  ┌─ Detailed Mode ─────────────────────────────────┐
+│  │ ▼ EQUITY                                         │
+│  │   VTI   12 shares × $245 = $2,940  (20%→24%)   │
+│  │   VOO    8 shares × $420 = $3,360  (15%→18%)   │
+│  │                                                  │
+│  │ ▼ FIXED_INCOME                                   │
+│  │   BND    0 shares × $72  = $0      (40%→40%)   │
+│  └──────────────────────────────────────────────────┘
+│                                                      │
+│  Total Allocated: $6,300 of $10,000                  │
+│  Remaining: $3,700                                   │
+│  Additional Cash Needed: $24,100                     │
+│                                                      │
+│  [Copy as Text]  [Download CSV]                      │
 └──────────────────────────────────────────────────────┘
 ```
 
+Key UI elements:
+- **Cash input**: Number input with validation
+- **Calculate button**: Triggers backend calculation
+- **View toggle**: Overview (category-level) vs Detailed (per-holding)
+- **Category cards** (Overview): Show target/current/projected, color-coded bars
+- **Holdings table** (Detailed): Grouped accordion by category
+- **Summary row**: Total allocated, remaining, additional needed
+- **Export actions**: Copy to clipboard, download CSV
+- **Zero-share toggle**: Show/hide holdings with 0 shares recommended
+
 ### Algorithm (cash-first, buy-only)
 
-1. New portfolio total = current + available cash
-2. For each target (category or holding-level if set):
-   - Target value = new total × cascaded target %
-   - Current value = actual holdings value
-   - Shortfall = max(0, target value - current value)
-3. If total shortfall > cash: scale all proportionally
-4. Convert to whole shares: floor(allocation / share price)
-5. Show: symbol, shares, price, total, impact on allocation %
-6. Never suggest sells (tax-efficient, long-term investing)
+Implemented in Rust backend (`RebalancingService`):
 
-### Backend
-
-Add to `target_service.rs`:
-- `calculate_rebalancing(target_id, available_cash, base_currency)` →
-  RebalancingPlan with Vec<TradeRecommendation>
-
-New model:
+**Step 1: Category-level shortfall calculation**
 ```rust
+new_portfolio_total = current_total + available_cash
+
+for each category in target_allocations:
+    target_value = (category.target_percent / 100) * new_portfolio_total
+    current_value = (deviation.current_percent / 100) * current_total
+    shortfall = max(0, target_value - current_value)  // buy-only
+```
+
+**Step 2: Cash scaling (if insufficient)**
+```rust
+total_shortfall = sum(all shortfalls)
+
+scale_factor = if total_shortfall > available_cash {
+    available_cash / total_shortfall
+} else {
+    1.0
+}
+
+category_budgets = shortfalls * scale_factor
+```
+
+**Step 3: Per-holding allocation within category**
+```rust
+for each category with budget > 0:
+    holdings = get_holdings_by_allocation(account, taxonomy, category)
+    holding_targets = get_holding_targets(category.allocation_id)
+    
+    for each holding_target:
+        // Cascading calculation
+        target_portfolio_pct = (category.target_pct * holding.target_pct) / 100
+        target_value = (target_portfolio_pct / 100) * new_portfolio_total
+        current_value = holding.market_value
+        holding_shortfall = max(0, target_value - current_value)
+    
+    // Fractional shares
+    fractional_shares = holding_shortfall / current_price
+    
+    // Scale to fit category budget
+    holding_scaled_shortfall = holding_shortfall * (category_budget / sum(holding_shortfalls))
+```
+
+**Step 4: Whole-share optimization (greedy)**
+```rust
+// Initialize with floored shares
+shares_to_buy = floor(fractional_shares)
+remaining_budget = category_budget - sum(shares_to_buy * prices)
+
+// Greedy loop: maximize improvement per dollar
+while remaining_budget > 0:
+    best_holding = None
+    best_improvement_per_dollar = 0
+    
+    for each holding in category:
+        if holding.price > remaining_budget:
+            continue  // can't afford
+        
+        // Calculate impact of buying 1 more share
+        new_pct = calculate_new_percentage(holding, shares_to_buy[holding] + 1)
+        deviation_reduction = abs(new_pct - target_pct) - abs(current_pct - target_pct)
+        improvement_per_dollar = deviation_reduction / holding.price
+        
+        if improvement_per_dollar > best_improvement_per_dollar:
+            best_holding = holding
+            best_improvement_per_dollar = improvement_per_dollar
+    
+    if best_holding is None:
+        break  // no affordable holdings
+    
+    shares_to_buy[best_holding] += 1
+    remaining_budget -= best_holding.price
+
+return TradeRecommendation[] with final share counts
+```
+
+**Properties**:
+- Buy-only (never suggests sells)
+- Whole shares only (no fractional)
+- Respects category budgets (scaled if cash insufficient)
+- Optimizes improvement per dollar within each category
+- Locked holdings excluded (future enhancement)
+
+### Backend Implementation
+
+**New module**: `crates/core/src/portfolio/rebalancing/`
+
+Files:
+- `mod.rs` — module exports
+- `rebalancing_model.rs` — data structures
+- `rebalancing_service.rs` — algorithm implementation
+- `rebalancing_service_tests.rs` — unit tests
+
+**Data structures** (`rebalancing_model.rs`):
+```rust
+pub struct RebalancingInput {
+    pub target_id: String,
+    pub available_cash: Decimal,
+    pub base_currency: String,
+}
+
 pub struct TradeRecommendation {
     pub asset_id: String,
     pub symbol: String,
-    pub name: String,
-    pub action: String,         // "BUY"
-    pub shares: i32,
+    pub name: Option<String>,
+    pub category_id: String,
+    pub category_name: String,
+    pub action: String,          // Always "BUY"
+    pub shares: Decimal,         // Whole shares
     pub price_per_share: Decimal,
-    pub total_amount: Decimal,
-    pub impact_percent: Decimal, // how much this moves allocation
+    pub total_amount: Decimal,   // shares * price
+    pub impact_percent: Decimal, // Deviation reduction in % points
 }
 
 pub struct RebalancingPlan {
     pub target_id: String,
+    pub target_name: String,
+    pub account_id: String,
+    pub taxonomy_id: String,
     pub available_cash: Decimal,
     pub total_allocated: Decimal,
     pub remaining_cash: Decimal,
@@ -495,21 +630,192 @@ pub struct RebalancingPlan {
 }
 ```
 
-### Frontend
+**Service trait** (`rebalancing_service.rs`):
+```rust
+pub trait RebalancingService: Send + Sync {
+    fn calculate_rebalancing_plan(&self, input: RebalancingInput) -> Result<RebalancingPlan>;
+}
 
-New components:
-- `rebalancing-tab.tsx` — cash input + calculate button + results
-- `trade-recommendations-table.tsx` — table of suggested buys
-- Copy/export actions
+pub struct RebalancingServiceImpl {
+    target_service: Arc<dyn TargetService>,
+    allocation_service: Arc<dyn AllocationService>,
+    holdings_service: Arc<dyn HoldingsService>,
+}
+```
+
+**Key methods**:
+- `calculate_rebalancing_plan()` — main entry point
+- `calculate_category_shortfalls()` — step 1
+- `calculate_holding_shortfalls()` — step 3
+- `optimize_whole_shares()` — step 4 greedy algorithm
+
+**Tauri IPC command** (`apps/tauri/src/commands/portfolio_targets.rs`):
+```rust
+#[tauri::command]
+pub async fn calculate_rebalancing_plan(
+    target_id: String,
+    available_cash: f64,
+    base_currency: String,
+    state: tauri::State<'_, ServiceContainer>,
+) -> Result<RebalancingPlan, String>
+```
+
+**Web endpoint** (`apps/server/src/api/portfolio_targets.rs`):
+```
+POST /api/v1/portfolio/rebalancing/calculate
+Body: { targetId, availableCash, baseCurrency }
+Response: RebalancingPlan (JSON)
+```
+
+### Frontend Implementation
+
+**New files**:
+- `apps/frontend/src/pages/allocations/components/rebalancing-tab.tsx` — main
+  component
+- `apps/frontend/src/pages/allocations/components/overview-view.tsx` —
+  category-level cards
+- `apps/frontend/src/pages/allocations/components/detailed-view.tsx` — holdings
+  accordion
+
+**Modified files**:
+- `apps/frontend/src/pages/allocations/allocations-page.tsx` — replace
+  placeholder
+- `apps/frontend/src/lib/types.ts` — add rebalancing types
+- `apps/frontend/src/commands/portfolio-targets.ts` — add
+  `calculateRebalancingPlan()`
+- `apps/frontend/src/adapters/shared/portfolio-targets.ts` — add adapter
+
+**TypeScript types** (`types.ts`):
+```typescript
+interface RebalancingInput {
+  targetId: string;
+  availableCash: number;
+  baseCurrency: string;
+}
+
+interface TradeRecommendation {
+  assetId: string;
+  symbol: string;
+  name: string | null;
+  categoryId: string;
+  categoryName: string;
+  action: string;
+  shares: number;
+  pricePerShare: number;
+  totalAmount: number;
+  impactPercent: number;
+}
+
+interface RebalancingPlan {
+  targetId: string;
+  targetName: string;
+  accountId: string;
+  taxonomyId: string;
+  availableCash: number;
+  totalAllocated: number;
+  remainingCash: number;
+  additionalCashNeeded: number;
+  recommendations: TradeRecommendation[];
+}
+```
+
+**Component structure** (`rebalancing-tab.tsx`):
+```typescript
+export function RebalancingTab({ 
+  activeTarget,
+  deviationReport, 
+  baseCurrency 
+}: RebalancingTabProps) {
+  const [availableCash, setAvailableCash] = useState<string>("");
+  const [plan, setPlan] = useState<RebalancingPlan | null>(null);
+  const [viewMode, setViewMode] = useState<"overview" | "detailed">("overview");
+  const [showZeroShares, setShowZeroShares] = useState(false);
+  
+  const handleCalculate = async () => {
+    const result = await calculateRebalancingPlan({
+      targetId: activeTarget.id,
+      availableCash: parseFloat(availableCash),
+      baseCurrency
+    });
+    setPlan(result);
+  };
+  
+  return (
+    <Card>
+      {/* Input section */}
+      <Input value={availableCash} onChange={...} />
+      <Button onClick={handleCalculate}>Calculate</Button>
+      
+      {/* Results */}
+      {plan && (
+        <>
+          <Tabs value={viewMode} onValueChange={setViewMode}>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="detailed">Detailed</TabsTrigger>
+          </Tabs>
+          
+          {viewMode === "overview" && <OverviewView plan={plan} />}
+          {viewMode === "detailed" && <DetailedView plan={plan} />}
+          
+          {/* Summary */}
+          <div>
+            Total: {plan.totalAllocated} | Remaining: {plan.remainingCash}
+            {plan.additionalCashNeeded > 0 && <div>Need: {plan.additionalCashNeeded}</div>}
+          </div>
+          
+          {/* Export */}
+          <Button onClick={() => copyAsText(plan)}>Copy</Button>
+          <Button onClick={() => downloadCsv(plan)}>CSV</Button>
+        </>
+      )}
+    </Card>
+  );
+}
+```
+
+**Overview view**:
+- Category cards with color bars
+- Target % | Current % | Suggested Buy
+- Projected new % after purchases
+
+**Detailed view**:
+- Grouped accordion by category
+- Table: Symbol | Name | Shares | Price | Current%→Target% | Amount
+- Filter toggle for zero-share holdings
+
+**Export formats**:
+- Text: `"BUY 12 shares of VTI at $245.00 = $2,940.00"`
+- CSV: Headers `Symbol,Name,Action,Shares,Price,Amount`
 
 ### Verify
 
-- Enter cash amount → see suggestions
-- Suggestions are buy-only
-- Whole-share optimization
-- Proportional scaling when cash is insufficient
-- Copy/export work
-- No suggestions when no targets set (helpful empty state)
+**Backend tests** (`rebalancing_service_tests.rs`):
+1. Single category underweight, sufficient cash → correct BUY recommendations
+2. Insufficient cash → proportional scaling
+3. Multiple categories → distributes by shortfall ratio
+4. Whole-share optimization → greedy picks best improvement/dollar
+5. Zero shortfall → empty recommendations
+6. Edge: very large cash → all targets reached
+
+**Frontend manual testing**:
+1. Create portfolio target (60% EQUITY, 40% FIXED_INCOME)
+2. Navigate to Rebalancing tab
+3. Enter $10,000 cash
+4. Click Calculate
+5. Verify Overview shows category buys
+6. Verify Detailed shows per-holding trades
+7. Verify Summary: allocated + remaining + needed
+8. Test edge cases: zero cash, very large cash, insufficient cash
+9. Test export: Copy and CSV download
+
+**End-to-end**:
+```bash
+pnpm tauri dev
+# Navigate to Allocations → select account → activate target
+# Switch to Rebalancing tab → enter cash → verify recommendations
+```
+
+---
 
 ---
 
