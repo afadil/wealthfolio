@@ -5,7 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/compon
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 
 import { AccountSelector } from "@/components/account-selector";
-import { usePortfolioTargets, useAllocationDeviations } from "@/hooks/use-portfolio-targets";
+import {
+  usePortfolioTargets,
+  useAllocationDeviations,
+  useTargetAllocations,
+} from "@/hooks/use-portfolio-targets";
 import { usePortfolioAllocations } from "@/hooks/use-portfolio-allocations";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
@@ -13,6 +17,7 @@ import type { Account, AllocationDeviation, NewTargetAllocation } from "@/lib/ty
 
 import { AllocationDonut } from "./allocation-donut";
 import { TargetList } from "./target-list";
+import { CategorySidePanel } from "./category-side-panel";
 import { useTargetMutations } from "../use-target-mutations";
 
 export function AllocationsOverview() {
@@ -49,9 +54,45 @@ export function AllocationsOverview() {
   const { allocations: portfolioAllocations, isLoading: allocationsLoading } =
     usePortfolioAllocations(accountId);
 
+  // Get target allocations to find the real allocation IDs
+  const { allocations: targetAllocations } = useTargetAllocations(activeTarget?.id);
+
+  // Side panel state
+  const [sidePanelOpen, setSidePanelOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<{
+    categoryId: string;
+    categoryName: string;
+    categoryColor: string;
+    categoryPercent: number;
+    actualPercent: number;
+    allocationId?: string;
+  } | null>(null);
+
   const handleAccountSelect = (account: Account) => {
     setSelectedAccount(account);
   };
+
+  const handleCategoryClick = useCallback(
+    (
+      categoryId: string,
+      categoryName: string,
+      categoryColor: string,
+      categoryPercent: number,
+      actualPercent: number,
+      allocationId?: string,
+    ) => {
+      setSelectedCategory({
+        categoryId,
+        categoryName,
+        categoryColor,
+        categoryPercent,
+        actualPercent,
+        allocationId,
+      });
+      setSidePanelOpen(true);
+    },
+    [],
+  );
 
   const totalPortfolioValue = useMemo(() => {
     if (deviationReport?.totalValue) return deviationReport.totalValue;
@@ -115,10 +156,15 @@ export function AllocationsOverview() {
           color: d.color,
         }));
 
+      // Sort deviations by current percentage (descending)
+      const sortedDeviations = [...deviationReport.deviations].sort(
+        (a, b) => b.currentPercent - a.currentPercent,
+      );
+
       return {
         targetData: target,
         currentData: current,
-        deviations: deviationReport.deviations,
+        deviations: sortedDeviations,
       };
     }
 
@@ -156,6 +202,28 @@ export function AllocationsOverview() {
 
     return { targetData: [], currentData: [], deviations: [] };
   }, [deviationReport, portfolioAllocations]);
+
+  // Handle click from donut chart (only receives categoryId)
+  const handleDonutClick = useCallback(
+    (categoryId: string) => {
+      // Find the deviation for this category
+      const deviation = deviations.find((d) => d.categoryId === categoryId);
+      if (!deviation) return;
+
+      // Find the saved allocation to get the real allocation ID
+      const savedAllocation = targetAllocations.find((a) => a.categoryId === categoryId);
+
+      handleCategoryClick(
+        categoryId,
+        deviation.categoryName,
+        deviation.color,
+        deviation.targetPercent ?? 0,
+        deviation.currentPercent ?? 0,
+        savedAllocation?.id, // Pass the real allocation ID
+      );
+    },
+    [deviations, targetAllocations, handleCategoryClick],
+  );
 
   const isLoading = targetsLoading || deviationsLoading || allocationsLoading;
 
@@ -215,6 +283,7 @@ export function AllocationsOverview() {
                 currentData={currentData}
                 totalValue={totalPortfolioValue}
                 currency={baseCurrency}
+                onCategoryClick={handleDonutClick}
                 className="h-160 w-160"
               />
             </CardContent>
@@ -229,10 +298,26 @@ export function AllocationsOverview() {
               onDeleteAllocation={handleDeleteAllocation}
               onToggleLock={handleToggleLock}
               isSaving={batchSaveAllocationsMutation.isPending}
+              onCategoryClick={handleCategoryClick}
             />
           </div>
         </div>
       )}
+
+      {/* Category Side Panel for Holdings */}
+      <CategorySidePanel
+        isOpen={sidePanelOpen}
+        onOpenChange={setSidePanelOpen}
+        categoryId={selectedCategory?.categoryId ?? ""}
+        allocationId={selectedCategory?.allocationId}
+        categoryName={selectedCategory?.categoryName}
+        categoryColor={selectedCategory?.categoryColor}
+        categoryPercent={selectedCategory?.categoryPercent ?? 0}
+        actualPercent={selectedCategory?.actualPercent ?? 0}
+        accountId={accountId}
+        taxonomyId={activeTarget?.taxonomyId ?? ""}
+        baseCurrency={baseCurrency}
+      />
     </>
   );
 }

@@ -63,6 +63,8 @@ pub struct HoldingSummary {
     pub market_value: Decimal,
     pub currency: String,
     pub weight_in_category: Decimal,
+    /// Instrument type taxonomy category name (e.g., "Stock", "ETF", "Cryptocurrency")
+    pub instrument_type_category: Option<String>,
 }
 
 /// Position view model for frontend display with daily and total performance

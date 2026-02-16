@@ -593,6 +593,44 @@ impl AllocationServiceTrait for AllocationService {
             })
             .sum();
 
+        // Get instrument_type taxonomy for grouping holdings by type
+        let instrument_type_taxonomy = self
+            .taxonomy_service
+            .get_taxonomy("instrument_type")
+            .ok()
+            .flatten();
+
+        // Build a map of asset_id -> instrument_type category name
+        let mut instrument_type_map: HashMap<String, String> = HashMap::new();
+        if let Some(tax_with_cats) = &instrument_type_taxonomy {
+            let category_by_id: HashMap<&str, &Category> = tax_with_cats
+                .categories
+                .iter()
+                .map(|c| (c.id.as_str(), c))
+                .collect();
+
+            for (holding, _) in &matched_holdings {
+                if let Some(instrument) = &holding.instrument {
+                    if let Ok(assignments) =
+                        self.taxonomy_service.get_asset_assignments(&instrument.id)
+                    {
+                        // Find the instrument_type assignment
+                        if let Some(assignment) = assignments
+                            .iter()
+                            .find(|a| a.taxonomy_id == "instrument_type")
+                        {
+                            if let Some(category) =
+                                category_by_id.get(assignment.category_id.as_str())
+                            {
+                                instrument_type_map
+                                    .insert(instrument.id.clone(), category.name.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Build summaries
         let mut summaries: Vec<HoldingSummary> = matched_holdings
             .into_iter()
@@ -605,13 +643,17 @@ impl AllocationServiceTrait for AllocationService {
                     Decimal::ZERO
                 };
 
+                let asset_id = holding
+                    .instrument
+                    .as_ref()
+                    .map(|i| i.id.clone())
+                    .unwrap_or_else(|| holding.id.clone());
+
+                let instrument_type_category = instrument_type_map.get(&asset_id).cloned();
+
                 HoldingSummary {
                     // Use instrument.id (the asset ID) for navigation, not holding.id (composite ID)
-                    id: holding
-                        .instrument
-                        .as_ref()
-                        .map(|i| i.id.clone())
-                        .unwrap_or_else(|| holding.id.clone()),
+                    id: asset_id,
                     symbol: holding
                         .instrument
                         .as_ref()
@@ -623,6 +665,7 @@ impl AllocationServiceTrait for AllocationService {
                     market_value: weighted_value,
                     currency: holding.base_currency.clone(),
                     weight_in_category,
+                    instrument_type_category,
                 }
             })
             .collect();

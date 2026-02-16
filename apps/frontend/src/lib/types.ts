@@ -529,6 +529,7 @@ export interface HoldingSummary {
   marketValue: number; // Base currency value
   currency: string;
   weightInCategory: number; // Percentage weight within the category (0-100)
+  instrumentTypeCategory?: string | null; // Instrument type taxonomy category (e.g., "Stock", "ETF")
 }
 
 /**

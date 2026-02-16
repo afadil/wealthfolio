@@ -13,6 +13,14 @@ interface TargetListProps {
   onDeleteAllocation: (allocationId: string) => void;
   onToggleLock: (allocation: NewTargetAllocation) => void;
   isSaving: boolean;
+  onCategoryClick?: (
+    categoryId: string,
+    categoryName: string,
+    categoryColor: string,
+    categoryPercent: number,
+    actualPercent: number,
+    allocationId?: string,
+  ) => void;
 }
 
 interface PendingEdit {
@@ -28,6 +36,7 @@ export function TargetList({
   onDeleteAllocation,
   onToggleLock,
   isSaving,
+  onCategoryClick,
 }: TargetListProps) {
   const { allocations } = useTargetAllocations(targetId);
 
@@ -452,11 +461,33 @@ export function TargetList({
 
             return (
               <div key={d.categoryId} className="space-y-3 py-3">
-                {/* Header: name + delete */}
+                {/* Header: name + holdings button + delete */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="h-3 w-3 rounded-full" style={{ backgroundColor: d.color }} />
                     <span className="font-medium">{d.categoryName}</span>
+                    {onCategoryClick && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs"
+                        onClick={() => {
+                          const savedAllocation = getSavedAllocation(d.categoryId);
+                          onCategoryClick(
+                            d.categoryId,
+                            d.categoryName,
+                            d.color,
+                            displayPercent,
+                            d.currentPercent,
+                            savedAllocation?.id,
+                          );
+                        }}
+                        title="View and edit holdings"
+                      >
+                        <Icons.ChevronRight className="h-3 w-3" />
+                        Holdings
+                      </Button>
+                    )}
                   </div>
                   <Button
                     variant="ghost"
