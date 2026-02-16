@@ -6,11 +6,10 @@ import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { EmptyPlaceholder } from "@wealthfolio/ui";
+import { EmptyPlaceholder, formatAmount } from "@wealthfolio/ui";
 
 import type { Account, PortfolioTarget, DeviationReport, RebalancingPlan } from "@/lib/types";
 import { calculateRebalancingPlan } from "@/adapters";
-import { formatCurrency } from "@/lib/utils";
 
 interface RebalancingTabProps {
   selectedAccount: Account;
@@ -142,7 +141,7 @@ export function RebalancingTab({
           <CardTitle>Rebalancing Calculator</CardTitle>
           {deviationReport && (
             <p className="text-muted-foreground text-sm">
-              Current Portfolio Value: {formatCurrency(deviationReport.totalValue, baseCurrency)}
+              Current Portfolio Value: {formatAmount(deviationReport.totalValue, baseCurrency)}
             </p>
           )}
         </CardHeader>
@@ -223,7 +222,7 @@ export function RebalancingTab({
                         <div>
                           <p className="text-muted-foreground">Suggested Buy</p>
                           <p className="font-medium">
-                            {formatCurrency(summary.suggestedBuy, baseCurrency)}
+                            {formatAmount(summary.suggestedBuy, baseCurrency)}
                           </p>
                         </div>
                         <div>
@@ -260,10 +259,10 @@ export function RebalancingTab({
                           <div className="text-right">
                             <p className="font-medium">
                               {rec.shares.toFixed(0)} shares ×{" "}
-                              {formatCurrency(rec.pricePerShare, baseCurrency)}
+                              {formatAmount(rec.pricePerShare, baseCurrency)}
                             </p>
                             <p className="text-muted-foreground text-sm">
-                              = {formatCurrency(rec.totalAmount, baseCurrency)}
+                              = {formatAmount(rec.totalAmount, baseCurrency)}
                             </p>
                           </div>
                         </div>
@@ -282,20 +281,20 @@ export function RebalancingTab({
                 <div>
                   <p className="text-muted-foreground text-sm">Total Allocated</p>
                   <p className="text-lg font-semibold">
-                    {formatCurrency(plan.totalAllocated, baseCurrency)}
+                    {formatAmount(plan.totalAllocated, baseCurrency)}
                   </p>
                 </div>
                 <div>
                   <p className="text-muted-foreground text-sm">Remaining Cash</p>
                   <p className="text-lg font-semibold text-orange-600">
-                    {formatCurrency(plan.remainingCash, baseCurrency)}
+                    {formatAmount(plan.remainingCash, baseCurrency)}
                   </p>
                 </div>
                 {plan.additionalCashNeeded > 0 && (
                   <div className="col-span-2">
                     <p className="text-muted-foreground text-sm">Additional Cash Needed</p>
                     <p className="text-lg font-semibold text-yellow-600">
-                      {formatCurrency(plan.additionalCashNeeded, baseCurrency)}
+                      {formatAmount(plan.additionalCashNeeded, baseCurrency)}
                     </p>
                   </div>
                 )}
