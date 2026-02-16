@@ -9,7 +9,7 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { EmptyPlaceholder } from "@wealthfolio/ui";
 
 import type { Account, PortfolioTarget, DeviationReport, RebalancingPlan } from "@/lib/types";
-import { calculateRebalancingPlan } from "@/adapters/shared/portfolio-targets";
+import { calculateRebalancingPlan } from "@/adapters";
 import { formatCurrency } from "@/lib/utils";
 
 interface RebalancingTabProps {
@@ -69,7 +69,7 @@ export function RebalancingTab({
       categoryName: recommendations[0]?.categoryName || categoryId,
       recommendations: showZeroShares
         ? recommendations
-        : recommendations.filter(r => r.shares > 0),
+        : recommendations.filter((r) => r.shares > 0),
     }));
   }, [plan, showZeroShares]);
 
@@ -77,14 +77,17 @@ export function RebalancingTab({
   const categorySummaries = useMemo(() => {
     if (!plan || !deviationReport) return [];
 
-    const summaries = new Map<string, {
-      categoryId: string;
-      categoryName: string;
-      targetPercent: number;
-      currentPercent: number;
-      suggestedBuy: number;
-      newPercent: number;
-    }>();
+    const summaries = new Map<
+      string,
+      {
+        categoryId: string;
+        categoryName: string;
+        targetPercent: number;
+        currentPercent: number;
+        suggestedBuy: number;
+        newPercent: number;
+      }
+    >();
 
     // Initialize from deviation report
     for (const deviation of deviationReport.deviations) {
@@ -109,7 +112,7 @@ export function RebalancingTab({
     // Calculate new percentages
     const newTotalValue = deviationReport.totalValue + plan.totalAllocated;
     for (const summary of summaries.values()) {
-      const deviation = deviationReport.deviations.find(d => d.categoryId === summary.categoryId);
+      const deviation = deviationReport.deviations.find((d) => d.categoryId === summary.categoryId);
       if (deviation) {
         const newValue = deviation.currentValue + summary.suggestedBuy;
         summary.newPercent = newTotalValue > 0 ? (newValue / newTotalValue) * 100 : 0;
@@ -219,7 +222,9 @@ export function RebalancingTab({
                         </div>
                         <div>
                           <p className="text-muted-foreground">Suggested Buy</p>
-                          <p className="font-medium">{formatCurrency(summary.suggestedBuy, baseCurrency)}</p>
+                          <p className="font-medium">
+                            {formatCurrency(summary.suggestedBuy, baseCurrency)}
+                          </p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">New</p>
@@ -254,7 +259,8 @@ export function RebalancingTab({
                           </div>
                           <div className="text-right">
                             <p className="font-medium">
-                              {rec.shares.toFixed(0)} shares × {formatCurrency(rec.pricePerShare, baseCurrency)}
+                              {rec.shares.toFixed(0)} shares ×{" "}
+                              {formatCurrency(rec.pricePerShare, baseCurrency)}
                             </p>
                             <p className="text-muted-foreground text-sm">
                               = {formatCurrency(rec.totalAmount, baseCurrency)}
@@ -299,17 +305,23 @@ export function RebalancingTab({
 
           {/* Export Actions */}
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => {
-              // TODO: Implement copy to clipboard
-              console.log("Copy to clipboard");
-            }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                // TODO: Implement copy to clipboard
+                console.log("Copy to clipboard");
+              }}
+            >
               <Icons.Copy className="mr-2 h-4 w-4" />
               Copy as Text
             </Button>
-            <Button variant="outline" onClick={() => {
-              // TODO: Implement CSV download
-              console.log("Download CSV");
-            }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                // TODO: Implement CSV download
+                console.log("Download CSV");
+              }}
+            >
               <Icons.Download className="mr-2 h-4 w-4" />
               Download CSV
             </Button>

@@ -7,7 +7,7 @@ import { SwipablePage, type SwipablePageView } from "@/components/page";
 import { AllocationsOverview } from "./components/allocations-overview";
 import { RebalancingTab } from "./components/rebalancing-tab";
 import { useSettingsContext } from "@/lib/settings-provider";
-import { usePortfolioTargets, useAllocationDeviations } from "./hooks";
+import { usePortfolioTargets, useAllocationDeviations } from "@/hooks/use-portfolio-targets";
 import type { Account } from "@/lib/types";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 
