@@ -478,6 +478,45 @@ where
             score: 100.0, // High score for existing assets
         }
     }
+
+    /// Returns a synthetic search result if the query matches a precious metal symbol.
+    /// Recognized patterns: XAU, XAG, XPT, XPD with optional size suffixes (-1KG, -500G, etc.)
+    fn try_build_metal_search_result(query: &str) -> Option<SymbolSearchResult> {
+        let upper = query.trim().to_uppercase();
+        let base = upper.split('-').next()?;
+        let name = match base {
+            "XAU" => "Gold",
+            "XAG" => "Silver",
+            "XPT" => "Platinum",
+            "XPD" => "Palladium",
+            _ => return None,
+        };
+
+        // Build display name including weight suffix
+        let long_name = if upper.contains('-') {
+            let suffix = upper.split('-').nth(1).unwrap_or("");
+            format!("{} ({})", name, suffix)
+        } else {
+            format!("{} (Troy Oz)", name)
+        };
+
+        Some(SymbolSearchResult {
+            symbol: upper.clone(),
+            short_name: upper.clone(),
+            long_name,
+            exchange: "Commodity".to_string(),
+            exchange_mic: None,
+            exchange_name: Some("Commodity".to_string()),
+            quote_type: "COMMODITY".to_string(),
+            type_display: "Metal".to_string(),
+            currency: Some("USD".to_string()),
+            data_source: Some("YAHOO".to_string()),
+            is_existing: false,
+            existing_asset_id: None,
+            index: String::new(),
+            score: 90.0,
+        })
+    }
 }
 
 #[async_trait]
@@ -656,9 +695,20 @@ where
             })
             .collect();
 
-        // 6. Merge existing assets first, then provider results
-        let mut merged = Vec::with_capacity(existing_summaries.len() + new_provider_results.len());
+        // 5b. Inject synthetic metal result if query matches a metal symbol pattern
+        let metal_result = Self::try_build_metal_search_result(query);
+
+        // 6. Merge existing assets first, then synthetic metals, then provider results
+        let mut merged = Vec::with_capacity(
+            existing_summaries.len() + new_provider_results.len() + metal_result.is_some() as usize,
+        );
         merged.extend(existing_summaries);
+        if let Some(metal) = metal_result {
+            // Only add if not already in existing assets
+            if !existing_keys.contains(&(metal.symbol.clone(), metal.exchange_mic.clone())) {
+                merged.push(metal);
+            }
+        }
         merged.extend(new_provider_results);
 
         // 7. Sort results: existing first, then by exchange relevance (if currency), then by score

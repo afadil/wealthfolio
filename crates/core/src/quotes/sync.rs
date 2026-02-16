@@ -560,11 +560,28 @@ where
 
         // Fetch quotes via MarketDataClient
         let client = self.client.read().await;
+        let metal_weight = if asset.is_metal() {
+            asset.metal_weight_oz()
+        } else {
+            rust_decimal::Decimal::ONE
+        };
+
         match client
             .fetch_historical_quotes(asset, start_dt, end_dt)
             .await
         {
             Ok(mut quotes) => {
+                // Scale metal quotes by bar weight (e.g., 1kg gold = spot × 32.1507)
+                if metal_weight != rust_decimal::Decimal::ONE {
+                    for q in &mut quotes {
+                        q.close *= metal_weight;
+                        q.open *= metal_weight;
+                        q.high *= metal_weight;
+                        q.low *= metal_weight;
+                        q.adjclose *= metal_weight;
+                    }
+                }
+
                 // Sort quotes by timestamp to ensure correct ordering
                 // This is important because we use first()/last() to determine date ranges
                 quotes.sort_by_key(|q| q.timestamp);

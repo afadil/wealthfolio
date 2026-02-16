@@ -393,12 +393,21 @@ impl ActivityService {
             }
         }
 
-        // 2. OCC option symbol detection (e.g., AAPL240119C00195000)
+        // 2. Precious metal symbol detection (e.g., XAU, XAU-1KG, XAG-500G)
+        {
+            let upper = symbol.to_uppercase();
+            let base = upper.split('-').next().unwrap_or(&upper);
+            if matches!(base, "XAU" | "XAG" | "XPT" | "XPD") {
+                return (AssetKind::Investment, Some(InstrumentType::Metal));
+            }
+        }
+
+        // 3. OCC option symbol detection (e.g., AAPL240119C00195000)
         if crate::utils::occ_symbol::parse_occ_symbol(symbol).is_ok() {
             return (AssetKind::Investment, Some(InstrumentType::Option));
         }
 
-        // 3. ISIN detection (e.g., US0378331005) — full Luhn validation
+        // 4. ISIN detection (e.g., US0378331005) — full Luhn validation
         //
         // ISIN is an identifier format, not an instrument type.
         // It can represent bonds, equities, ETFs, and more. Return no inferred
@@ -407,7 +416,7 @@ impl ActivityService {
             return (AssetKind::Investment, None);
         }
 
-        // 4. Crypto pair pattern (e.g., BTC-USD, ETH-CAD) — checked before
+        // 5. Crypto pair pattern (e.g., BTC-USD, ETH-CAD) — checked before
         //    exchange_mic because brokers may attach their MIC to crypto pairs
         let upper_symbol = symbol.to_uppercase();
         if let Some((_base, quote)) = upper_symbol.rsplit_once('-') {
@@ -422,12 +431,12 @@ impl ActivityService {
             }
         }
 
-        // 5. If exchange MIC is provided, it's an equity
+        // 6. If exchange MIC is provided, it's an equity
         if exchange_mic.is_some() {
             return (AssetKind::Investment, Some(InstrumentType::Equity));
         }
 
-        // 6. Common crypto symbols heuristic (no MIC, bare symbol like BTC, ETH)
+        // 7. Common crypto symbols heuristic (no MIC, bare symbol like BTC, ETH)
         let common_crypto = [
             "BTC", "ETH", "XRP", "LTC", "BCH", "ADA", "DOT", "LINK", "XLM", "DOGE", "UNI", "SOL",
             "AVAX", "MATIC", "ATOM", "ALGO", "VET", "FIL", "TRX", "ETC", "XMR", "AAVE", "MKR",
@@ -437,7 +446,7 @@ impl ActivityService {
             return (AssetKind::Investment, Some(InstrumentType::Crypto));
         }
 
-        // 7. Default to equity (most common case)
+        // 8. Default to equity (most common case)
         (AssetKind::Investment, Some(InstrumentType::Equity))
     }
 
@@ -681,6 +690,7 @@ impl ActivityService {
         };
 
         // Use asset currency for crypto pairs (e.g., BTC-USD -> USD) instead of activity currency.
+        let is_metal = effective_instrument_type.as_ref() == Some(&InstrumentType::Metal);
         let asset_currency = if is_crypto {
             symbol
                 .as_deref()
@@ -688,13 +698,14 @@ impl ActivityService {
                 .map(|(_, quote)| quote)
                 .or_else(|| quote_ccy_hint.clone())
                 .unwrap_or_else(|| currency.clone())
+        } else if is_metal {
+            // Spot metals are USD-denominated (GC=F, SI=F); FX handles conversion
+            "USD".to_string()
         } else if parsed_quote_mode == Some(QuoteMode::Manual) {
             quote_ccy_hint.clone().unwrap_or(currency.clone())
         } else {
             match effective_instrument_type.as_ref() {
-                Some(InstrumentType::Equity)
-                | Some(InstrumentType::Option)
-                | Some(InstrumentType::Metal) => quote_ccy_hint
+                Some(InstrumentType::Equity) | Some(InstrumentType::Option) => quote_ccy_hint
                     .clone()
                     .or_else(|| {
                         exchange_mic
@@ -1367,18 +1378,20 @@ impl ActivityService {
         let exchange_mic = if is_non_security { None } else { exchange_mic };
 
         // For crypto, use the quote currency from the pair if available
+        let is_metal = instrument_type.as_ref() == Some(&InstrumentType::Metal);
         let asset_currency = if is_crypto {
             parse_crypto_pair_symbol(base_symbol)
                 .map(|(_, quote)| quote)
                 .or_else(|| quote_ccy_hint.clone())
                 .unwrap_or_else(|| currency.clone())
+        } else if is_metal {
+            // Spot metals are USD-denominated (GC=F, SI=F); FX handles conversion
+            "USD".to_string()
         } else {
             let is_market_mode = quote_mode != Some(QuoteMode::Manual);
             if is_market_mode {
                 match instrument_type.as_ref() {
-                    Some(InstrumentType::Equity)
-                    | Some(InstrumentType::Option)
-                    | Some(InstrumentType::Metal) => quote_ccy_hint
+                    Some(InstrumentType::Equity) | Some(InstrumentType::Option) => quote_ccy_hint
                         .clone()
                         .or_else(|| {
                             exchange_mic
@@ -2126,7 +2139,12 @@ impl ActivityServiceTrait for ActivityService {
             }
 
             if activity.quote_ccy.is_none() {
-                activity.quote_ccy = if matches!(
+                let is_metal = effective_instrument_type.as_ref()
+                    == Some(&InstrumentType::Metal);
+                activity.quote_ccy = if is_metal {
+                    // Spot metals are USD-denominated (GC=F, SI=F)
+                    Some("USD".to_string())
+                } else if matches!(
                     effective_instrument_type,
                     Some(InstrumentType::Crypto | InstrumentType::Fx)
                 ) {

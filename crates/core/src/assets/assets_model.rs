@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use chrono::NaiveDateTime;
 use rust_decimal::Decimal;
+use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -325,6 +326,17 @@ impl Asset {
         self.instrument_type.as_ref() == Some(&InstrumentType::Bond)
     }
 
+    /// Check if this asset is a precious metal
+    pub fn is_metal(&self) -> bool {
+        self.instrument_type.as_ref() == Some(&InstrumentType::Metal)
+    }
+
+    /// Returns the weight in troy ounces for a metal asset based on its symbol suffix.
+    /// E.g., "XAU-1KG" → 32.1507, "XAU" → 1.0
+    pub fn metal_weight_oz(&self) -> Decimal {
+        parse_metal_weight_oz(self.instrument_symbol.as_deref().unwrap_or(""))
+    }
+
     /// Convert to canonical instrument for market data resolution.
     /// Returns None for asset kinds that are not resolvable to market data.
     pub fn to_instrument_id(&self) -> Option<InstrumentId> {
@@ -347,10 +359,14 @@ impl Asset {
                 base: Cow::Owned(symbol.clone()),
                 quote: Cow::Owned(self.quote_ccy.clone()),
             }),
-            InstrumentType::Metal => Some(InstrumentId::Metal {
-                code: Arc::from(symbol.as_str()),
-                quote: Cow::Owned(self.quote_ccy.clone()),
-            }),
+            InstrumentType::Metal => {
+                // Strip size suffix (e.g., "XAU-1KG" → "XAU") for price fetching
+                let code = symbol.split('-').next().unwrap_or(symbol);
+                Some(InstrumentId::Metal {
+                    code: Arc::from(code),
+                    quote: Cow::Owned(self.quote_ccy.clone()),
+                })
+            }
             InstrumentType::Option => Some(InstrumentId::Option {
                 occ_symbol: Arc::from(symbol.as_str()),
             }),
@@ -633,6 +649,52 @@ impl NewAsset {
             is_active: true,
             ..Default::default()
         }
+    }
+
+    /// Creates a new precious metal asset.
+    ///
+    /// - `kind`: Investment
+    /// - `instrument_type`: Metal
+    /// - `instrument_symbol`: metal symbol with optional size suffix (e.g., "XAU-1KG", "XAG")
+    /// - `quote_mode`: Market (Yahoo commodity futures)
+    /// - `quote_ccy`: provided currency (spot metals are typically USD)
+    pub fn new_metal(symbol: &str, name: Option<&str>, currency: &str) -> Self {
+        let symbol_upper = symbol.to_uppercase();
+        let display_name = name
+            .map(String::from)
+            .unwrap_or_else(|| symbol_upper.clone());
+
+        Self {
+            id: None,
+            kind: AssetKind::Investment,
+            name: Some(display_name),
+            display_code: Some(symbol_upper.clone()),
+            quote_mode: QuoteMode::Market,
+            quote_ccy: currency.to_uppercase(),
+            instrument_type: Some(InstrumentType::Metal),
+            instrument_symbol: Some(symbol_upper),
+            instrument_exchange_mic: None,
+            metadata: None,
+            is_active: true,
+            ..Default::default()
+        }
+    }
+}
+
+/// Parses the troy-ounce weight factor from a metal symbol suffix.
+/// E.g., "XAU-1KG" → 32.1507, "XAU-500G" → 16.0754, "XAU" → 1.0
+pub fn parse_metal_weight_oz(symbol: &str) -> Decimal {
+    let suffix = symbol
+        .split_once('-')
+        .map(|(_, s)| s.to_uppercase())
+        .unwrap_or_default();
+    match suffix.as_str() {
+        "1KG" => Decimal::from_str("32.1507").unwrap(),
+        "500G" => Decimal::from_str("16.0754").unwrap(),
+        "250G" => Decimal::from_str("8.03768").unwrap(),
+        "100G" => Decimal::from_str("3.21507").unwrap(),
+        "1OZ" | "" => Decimal::ONE,
+        _ => Decimal::ONE,
     }
 }
 
@@ -962,4 +1024,99 @@ pub struct EnsureAssetsResult {
     pub created_ids: Vec<String>,
     /// Merge candidates: (resolved_id, unknown_id) pairs where UNKNOWN was merged into resolved
     pub merge_candidates: Vec<(String, String)>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_metal_weight_oz_suffixes() {
+        assert_eq!(parse_metal_weight_oz("XAU"), Decimal::ONE);
+        assert_eq!(parse_metal_weight_oz("XAU-1OZ"), Decimal::ONE);
+        assert_eq!(
+            parse_metal_weight_oz("XAU-1KG"),
+            Decimal::from_str("32.1507").unwrap()
+        );
+        assert_eq!(
+            parse_metal_weight_oz("XAU-500G"),
+            Decimal::from_str("16.0754").unwrap()
+        );
+        assert_eq!(
+            parse_metal_weight_oz("XAU-250G"),
+            Decimal::from_str("8.03768").unwrap()
+        );
+        assert_eq!(
+            parse_metal_weight_oz("XAU-100G"),
+            Decimal::from_str("3.21507").unwrap()
+        );
+        // Case insensitive suffix
+        assert_eq!(
+            parse_metal_weight_oz("XAG-1kg"),
+            Decimal::from_str("32.1507").unwrap()
+        );
+        // Unknown suffix defaults to 1
+        assert_eq!(parse_metal_weight_oz("XAU-2KG"), Decimal::ONE);
+    }
+
+    #[test]
+    fn test_to_instrument_id_strips_metal_suffix() {
+        let asset = Asset {
+            instrument_type: Some(InstrumentType::Metal),
+            instrument_symbol: Some("XAU-1KG".to_string()),
+            quote_ccy: "USD".to_string(),
+            ..Default::default()
+        };
+        let id = asset.to_instrument_id().unwrap();
+        match id {
+            InstrumentId::Metal { code, quote } => {
+                assert_eq!(code.as_ref(), "XAU");
+                assert_eq!(quote.as_ref(), "USD");
+            }
+            _ => panic!("Expected Metal variant"),
+        }
+    }
+
+    #[test]
+    fn test_to_instrument_id_bare_metal_symbol() {
+        let asset = Asset {
+            instrument_type: Some(InstrumentType::Metal),
+            instrument_symbol: Some("XAG".to_string()),
+            quote_ccy: "USD".to_string(),
+            ..Default::default()
+        };
+        let id = asset.to_instrument_id().unwrap();
+        match id {
+            InstrumentId::Metal { code, .. } => {
+                assert_eq!(code.as_ref(), "XAG");
+            }
+            _ => panic!("Expected Metal variant"),
+        }
+    }
+
+    #[test]
+    fn test_is_metal() {
+        let metal_asset = Asset {
+            instrument_type: Some(InstrumentType::Metal),
+            ..Default::default()
+        };
+        assert!(metal_asset.is_metal());
+
+        let equity_asset = Asset {
+            instrument_type: Some(InstrumentType::Equity),
+            ..Default::default()
+        };
+        assert!(!equity_asset.is_metal());
+    }
+
+    #[test]
+    fn test_new_metal_factory() {
+        let asset = NewAsset::new_metal("XAU-1KG", Some("Gold 1kg Bar"), "CHF");
+        assert_eq!(asset.kind, AssetKind::Investment);
+        assert_eq!(asset.instrument_type, Some(InstrumentType::Metal));
+        assert_eq!(asset.instrument_symbol.as_deref(), Some("XAU-1KG"));
+        assert_eq!(asset.quote_ccy, "CHF");
+        assert_eq!(asset.quote_mode, QuoteMode::Market);
+        assert_eq!(asset.name.as_deref(), Some("Gold 1kg Bar"));
+    }
 }
