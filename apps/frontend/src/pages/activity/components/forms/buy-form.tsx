@@ -150,6 +150,7 @@ export function BuyForm({
   const currency = watch("currency");
   const quoteMode = watch("quoteMode");
 
+
   // Set currency from account when account changes and currency is not yet set
   useEffect(() => {
     if (!currency && accountId) {

@@ -409,6 +409,7 @@ export function AssetEditSheet({
                               onChange={field.onChange}
                               placeholder="Select currency"
                               valueDisplay="code"
+                              allowCustom
                             />
                           </FormControl>
                           <FormMessage />

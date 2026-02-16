@@ -227,10 +227,8 @@ impl HoldingsValuationService {
                 &format!("{}: FX Quote->Base", context_msg),
             );
 
-            let market_price_quote_curr = latest_quote.close;
             // For options: market_value = price × quantity × multiplier (e.g., 100)
             let market_value_quote_major = normalized_price * quantity * multiplier;
-            holding.price = Some(market_price_quote_curr);
 
             let fx_rate_quote_to_local = self.get_fx_rate_or_fallback(
                 normalized_quote_currency,
