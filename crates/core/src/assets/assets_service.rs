@@ -270,8 +270,10 @@ impl AssetService {
         };
 
         let provider_config = match quote_mode {
-            QuoteMode::Market => Some(serde_json::json!({ "preferred_provider": "YAHOO" })),
-            QuoteMode::Manual => None,
+            QuoteMode::Market if spec.instrument_type.as_ref() != Some(&InstrumentType::Bond) => {
+                Some(serde_json::json!({ "preferred_provider": "YAHOO" }))
+            }
+            _ => None,
         };
 
         NewAsset {
@@ -729,9 +731,12 @@ impl AssetServiceTrait for AssetService {
             .await;
 
         // Set preferred provider based on quote mode
+        // Bonds skip this so the rules engine can auto-discover the right provider
         let provider_config = match quote_mode {
-            QuoteMode::Market => Some(serde_json::json!({ "preferred_provider": "YAHOO" })),
-            QuoteMode::Manual => None,
+            QuoteMode::Market if instrument_type.as_ref() != Some(&InstrumentType::Bond) => {
+                Some(serde_json::json!({ "preferred_provider": "YAHOO" }))
+            }
+            _ => None,
         };
 
         let name = metadata.as_ref().and_then(|m| m.name.clone());
