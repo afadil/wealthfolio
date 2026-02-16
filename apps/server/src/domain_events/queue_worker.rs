@@ -304,11 +304,14 @@ async fn run_portfolio_job(
         }
     }
 
-    if let Err(err) = deps
-        .snapshot_service
-        .calculate_total_portfolio_snapshots()
-        .await
-    {
+    let total_result = if config.force_full_recalculation {
+        deps.snapshot_service
+            .force_recalculate_total_portfolio_snapshots()
+            .await
+    } else {
+        deps.snapshot_service.calculate_total_portfolio_snapshots().await
+    };
+    if let Err(err) = total_result {
         let err_msg = format!("Failed to calculate TOTAL portfolio snapshot: {}", err);
         tracing::error!("{}", err_msg);
         event_bus.publish(ServerEvent::with_payload(
