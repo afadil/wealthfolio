@@ -2,6 +2,10 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { useQuery } from "@tanstack/react-query";
+import { getAccounts } from "@/adapters";
+import { QueryKeys } from "@/lib/query-keys";
+import type { Account } from "@/lib/types";
 import { useImportContext, reset, setStep } from "../context";
 import { ImportAlert } from "../components/import-alert";
 
@@ -94,11 +98,18 @@ export function ContextResultStep() {
 
   const { importResult, accountId } = state;
 
-  const handleViewActivities = () => {
-    if (accountId) {
-      navigate(`/activities?account=${accountId}`);
+  const { data: accounts } = useQuery<Account[], Error>({
+    queryKey: [QueryKeys.ACCOUNTS],
+    queryFn: () => getAccounts(),
+  });
+
+  const isHoldingsMode = accounts?.find((a) => a.id === accountId)?.trackingMode === "HOLDINGS";
+
+  const handleViewResult = () => {
+    if (isHoldingsMode) {
+      navigate(accountId ? `/holdings?account=${accountId}` : "/holdings");
     } else {
-      navigate("/activities");
+      navigate(accountId ? `/activities?account=${accountId}` : "/activities");
     }
   };
 
@@ -177,7 +188,9 @@ export function ContextResultStep() {
       <motion.div className="mb-10 text-center" variants={itemVariants}>
         <h2 className="text-2xl font-semibold tracking-tight">Import Complete</h2>
         <p className="text-muted-foreground mt-2 max-w-sm">
-          Your activities have been successfully added to your portfolio.
+          {isHoldingsMode
+            ? "Your holdings have been successfully imported."
+            : "Your activities have been successfully added to your portfolio."}
         </p>
       </motion.div>
 
@@ -219,8 +232,8 @@ export function ContextResultStep() {
           Import Another
         </Button>
 
-        <Button size="lg" onClick={handleViewActivities}>
-          View Activities
+        <Button size="lg" onClick={handleViewResult}>
+          {isHoldingsMode ? "View Holdings" : "View Activities"}
           <Icons.ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </motion.div>

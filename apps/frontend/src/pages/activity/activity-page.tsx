@@ -10,6 +10,7 @@ import { Button, Icons, Page, PageContent, PageHeader } from "@wealthfolio/ui";
 import { debounce } from "lodash";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { getActivityRestrictionLevel } from "@/lib/activity-restrictions";
 import { ActivityDeleteModal } from "./components/activity-delete-modal";
 import { ActivityDataGrid } from "./components/activity-data-grid/activity-data-grid";
 import { ActivityFormV2 as ActivityForm } from "./components/activity-form-v2";
@@ -317,6 +318,7 @@ const ActivityPage = () => {
                   value: account.id,
                   label: account.name,
                   currency: account.currency,
+                  restrictionLevel: getActivityRestrictionLevel(account),
                 })) ?? []
             }
             activity={selectedActivity}
@@ -332,6 +334,7 @@ const ActivityPage = () => {
                   value: account.id,
                   label: account.name,
                   currency: account.currency,
+                  restrictionLevel: getActivityRestrictionLevel(account),
                 })) || []
             }
             activity={selectedActivity}

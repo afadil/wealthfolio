@@ -11,7 +11,8 @@ use crate::{
 use log::{debug, error};
 use tauri::{AppHandle, State};
 use wealthfolio_core::quotes::{
-    service::ProviderInfo, MarketSyncMode, Quote, QuoteImport, SymbolSearchResult,
+    service::ProviderInfo, LatestQuoteSnapshot, MarketSyncMode, Quote, QuoteImport,
+    SymbolSearchResult,
 };
 use wealthfolio_market_data::ExchangeInfo;
 
@@ -123,10 +124,10 @@ pub async fn get_quote_history(
 pub async fn get_latest_quotes(
     asset_ids: Vec<String>,
     state: State<'_, Arc<ServiceContext>>,
-) -> Result<HashMap<String, Quote>, String> {
+) -> Result<HashMap<String, LatestQuoteSnapshot>, String> {
     state
         .quote_service()
-        .get_latest_quotes(&asset_ids)
+        .get_latest_quotes_snapshot(&asset_ids)
         .map_err(|e| e.to_string())
 }
 
@@ -199,6 +200,23 @@ pub async fn import_quotes_csv(
     });
 
     Ok(result)
+}
+
+#[tauri::command]
+pub async fn resolve_symbol_quote(
+    symbol: String,
+    exchange_mic: Option<String>,
+    instrument_type: Option<String>,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<wealthfolio_core::quotes::ResolvedQuote, String> {
+    let inst_type = instrument_type
+        .as_deref()
+        .and_then(wealthfolio_core::assets::InstrumentType::from_db_str);
+    state
+        .quote_service()
+        .resolve_symbol_quote(&symbol, exchange_mic.as_deref(), inst_type.as_ref())
+        .await
+        .map_err(|e| format!("Failed to resolve symbol quote: {}", e))
 }
 
 #[tauri::command]

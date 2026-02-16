@@ -38,11 +38,17 @@ export function ActivityFormRenderer({
 
   const config = ACTIVITY_FORM_CONFIG[selectedType];
   const FormComponent = config.component;
+  const defaultAccountId = (defaultValues as { accountId?: string } | undefined)?.accountId ?? "";
+  const defaultCurrency = (defaultValues as { currency?: string } | undefined)?.currency ?? "";
+  const accountSignature = accounts
+    .map((account) => `${account.value}:${account.currency}`)
+    .join("|");
+  const formKey = `${selectedType}:${defaultAccountId}:${defaultCurrency}:${accountSignature}`;
 
-  // Key forces re-mount when type changes, ensuring clean form state
+  // Key forces re-mount when form identity changes (type/account defaults/accounts list).
   return (
     <FormComponent
-      key={selectedType}
+      key={formKey}
       accounts={accounts}
       defaultValues={defaultValues}
       onSubmit={onSubmit}

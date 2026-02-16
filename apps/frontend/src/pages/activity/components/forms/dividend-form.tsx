@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { normalizeCurrency } from "@/lib/utils";
 import { useForm, FormProvider, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -32,7 +31,7 @@ export const dividendFormSchema = z.object({
     .positive({ message: "Amount must be greater than 0." }),
   comment: z.string().optional().nullable(),
   // Advanced options
-  currency: z.string().optional(),
+  currency: z.string().min(1, { message: "Currency is required." }),
   fxRate: z.coerce
     .number({
       invalid_type_error: "FX Rate must be a number.",
@@ -77,7 +76,7 @@ export function DividendForm({
     defaultValues?.accountId ?? (accounts.length === 1 ? accounts[0].value : "");
   const initialAccount = accounts.find((a) => a.value === initialAccountId);
   const initialCurrency =
-    defaultValues?.currency ?? normalizeCurrency(assetCurrency) ?? initialAccount?.currency;
+    defaultValues?.currency?.trim() || assetCurrency?.trim() || initialAccount?.currency;
 
   const form = useForm<DividendFormValues>({
     resolver: zodResolver(dividendFormSchema) as Resolver<DividendFormValues>,
@@ -88,15 +87,16 @@ export function DividendForm({
       activityDate: new Date(),
       amount: undefined,
       comment: null,
-      currency: initialCurrency,
       fxRate: undefined,
       subtype: null,
       ...defaultValues,
+      currency: defaultValues?.currency?.trim() || initialCurrency,
     },
   });
 
   const { watch } = form;
   const accountId = watch("accountId");
+  const currency = watch("currency");
 
   // Get account currency from selected account
   const selectedAccount = useMemo(
@@ -115,7 +115,7 @@ export function DividendForm({
         <Card>
           <CardContent className="space-y-6 pt-4">
             {/* Account Selection */}
-            <AccountSelect name="accountId" accounts={accounts} />
+            <AccountSelect name="accountId" accounts={accounts} currencyName="currency" />
 
             {/* Symbol Search/Input */}
             <SymbolSearch
@@ -134,7 +134,7 @@ export function DividendForm({
             <DatePicker name="activityDate" label="Date" />
 
             {/* Amount */}
-            <AmountInput name="amount" label="Amount" />
+            <AmountInput name="amount" label="Amount" currency={currency} />
 
             {/* Advanced Options */}
             <AdvancedOptionsSection

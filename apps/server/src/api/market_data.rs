@@ -12,7 +12,7 @@ use axum::{
     Json, Router,
 };
 use wealthfolio_core::quotes::{
-    MarketSyncMode, ProviderInfo, Quote, QuoteImport, SymbolSearchResult,
+    LatestQuoteSnapshot, MarketSyncMode, ProviderInfo, Quote, QuoteImport, SymbolSearchResult,
 };
 use wealthfolio_market_data::ExchangeInfo;
 
@@ -221,9 +221,34 @@ struct LatestQuotesBody {
 async fn get_latest_quotes(
     State(state): State<Arc<AppState>>,
     Json(body): Json<LatestQuotesBody>,
-) -> ApiResult<Json<std::collections::HashMap<String, Quote>>> {
-    let quotes = state.quote_service.get_latest_quotes(&body.asset_ids)?;
+) -> ApiResult<Json<std::collections::HashMap<String, LatestQuoteSnapshot>>> {
+    let quotes = state
+        .quote_service
+        .get_latest_quotes_snapshot(&body.asset_ids)?;
     Ok(Json(quotes))
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ResolveSymbolQuoteQuery {
+    symbol: String,
+    exchange_mic: Option<String>,
+    instrument_type: Option<String>,
+}
+
+async fn resolve_symbol_quote(
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<ResolveSymbolQuoteQuery>,
+) -> ApiResult<Json<wealthfolio_core::quotes::ResolvedQuote>> {
+    let inst_type = q
+        .instrument_type
+        .as_deref()
+        .and_then(wealthfolio_core::assets::InstrumentType::from_db_str);
+    let res = state
+        .quote_service
+        .resolve_symbol_quote(&q.symbol, q.exchange_mic.as_deref(), inst_type.as_ref())
+        .await?;
+    Ok(Json(res))
 }
 
 async fn get_exchanges() -> Json<Vec<ExchangeInfo>> {
@@ -239,6 +264,7 @@ pub fn router() -> Router<Arc<AppState>> {
             get(get_market_data_provider_settings).put(update_market_data_provider_settings),
         )
         .route("/market-data/search", get(search_symbol))
+        .route("/market-data/resolve-currency", get(resolve_symbol_quote))
         .route("/market-data/quotes/history", get(get_quote_history))
         .route("/market-data/quotes/latest", post(get_latest_quotes))
         .route("/market-data/quotes/{symbol}", put(update_quote))

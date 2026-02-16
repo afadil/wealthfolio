@@ -61,7 +61,7 @@ export const sellFormSchema = z.object({
     .default(0),
   comment: z.string().optional().nullable(),
   // Advanced options
-  currency: z.string().optional(),
+  currency: z.string().min(1, { message: "Currency is required." }),
   fxRate: z.coerce
     .number({
       invalid_type_error: "FX Rate must be a number.",
@@ -114,7 +114,7 @@ export function SellForm({
   const initialAccount = accounts.find((a) => a.value === initialAccountId);
   // Currency priority: provided default > normalized asset currency > account currency
   const initialCurrency =
-    defaultValues?.currency ?? normalizeCurrency(assetCurrency) ?? initialAccount?.currency;
+    defaultValues?.currency?.trim() || assetCurrency?.trim() || initialAccount?.currency;
 
   const form = useForm<SellFormValues>({
     resolver: zodResolver(sellFormSchema) as Resolver<SellFormValues>,
@@ -133,7 +133,6 @@ export function SellForm({
       unitPrice: undefined,
       fee: 0,
       comment: null,
-      currency: initialCurrency,
       fxRate: undefined,
       quoteMode: QuoteMode.MARKET,
       exchangeMic: undefined,
@@ -144,6 +143,7 @@ export function SellForm({
       optionType: "CALL",
       contractMultiplier: 100,
       ...defaultValues,
+      currency: defaultValues?.currency?.trim() || initialCurrency,
     },
   });
 
@@ -162,6 +162,7 @@ export function SellForm({
     }
   }, [accountId]); // eslint-disable-line react-hooks/exhaustive-deps
   const assetType = watch("assetType") ?? "stock";
+  const symbolQuoteCcy = watch("symbolQuoteCcy");
   const isManualAsset = quoteMode === QuoteMode.MANUAL;
   const isOption = assetType === "option";
 
@@ -206,6 +207,7 @@ export function SellForm({
     [accounts, accountId],
   );
   const accountCurrency = selectedAccount?.currency;
+  const assetCurrencyFromSymbol = normalizeCurrency(symbolQuoteCcy)?.toUpperCase();
 
   // Fetch holdings for the selected account to check available quantity
   const { holdings } = useHoldings(accountId);
@@ -226,7 +228,13 @@ export function SellForm({
   const handleSubmit = form.handleSubmit(async (data) => {
     // Ensure currency is set (required by backend) — fall back to account currency
     if (!data.currency && accountId) {
-      data.currency = accounts.find((a) => a.value === accountId)?.currency;
+      const accountCurrencyFallback =
+        accounts.find((a) => a.value === accountId)?.currency ??
+        selectedAccount?.currency ??
+        baseCurrency;
+      if (accountCurrencyFallback) {
+        data.currency = accountCurrencyFallback;
+      }
     }
     // For options: build OCC symbol from structured fields
     if (data.assetType === "option" && data.underlyingSymbol && data.strikePrice && data.expirationDate && data.optionType) {
@@ -247,7 +255,7 @@ export function SellForm({
         <Card>
           <CardContent className="space-y-6 pt-4">
             {/* Account Selection */}
-            <AccountSelect name="accountId" accounts={accounts} />
+            <AccountSelect name="accountId" accounts={accounts} currencyName="currency" />
 
             {/* Asset Type Selector */}
             {!isEditing && (
@@ -306,8 +314,13 @@ export function SellForm({
                   </p>
                 )}
               </div>
-              <AmountInput name="unitPrice" label={priceLabel} maxDecimalPlaces={4} />
-              <AmountInput name="fee" label="Fee" />
+              <AmountInput
+                name="unitPrice"
+                label={priceLabel}
+                maxDecimalPlaces={4}
+                currency={currency}
+              />
+              <AmountInput name="fee" label="Fee" currency={currency} />
             </div>
 
             {/* Option Total Premium */}
@@ -341,7 +354,7 @@ export function SellForm({
               currencyName="currency"
               fxRateName="fxRate"
               activityType={ActivityType.SELL}
-              assetCurrency={assetCurrency}
+              assetCurrency={assetCurrencyFromSymbol ?? normalizeCurrency(assetCurrency)}
               accountCurrency={accountCurrency}
               baseCurrency={baseCurrency}
               showSubtype={false}

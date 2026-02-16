@@ -103,6 +103,30 @@ impl AllocationService {
 
             let market_value = holding.market_value.base;
 
+            // Cash holdings have synthetic IDs (no DB record / no taxonomy assignments).
+            // Assign them directly to CASH_BANK_DEPOSITS for the asset_classes taxonomy.
+            if holding.holding_type == HoldingType::Cash && taxonomy_id == "asset_classes" {
+                let cash_category = "CASH_BANK_DEPOSITS";
+                let top_level_id = if rollup_to_top_level {
+                    top_level_map
+                        .get(cash_category)
+                        .copied()
+                        .unwrap_or(cash_category)
+                } else {
+                    cash_category
+                };
+
+                let entry = original_values
+                    .entry(cash_category.to_string())
+                    .or_insert((Decimal::ZERO, top_level_id.to_string()));
+                entry.0 += market_value;
+
+                *rolled_up_values
+                    .entry(top_level_id.to_string())
+                    .or_insert(Decimal::ZERO) += market_value;
+                continue;
+            }
+
             // Get assignments for this asset and taxonomy
             if let Some(asset_assignments) = assignments_by_asset.get(asset_id) {
                 let taxonomy_assignments: Vec<_> = asset_assignments
@@ -531,6 +555,17 @@ impl AllocationServiceTrait for AllocationService {
                 Some(instrument) => &instrument.id,
                 None => continue,
             };
+
+            // Cash holdings: match if drilling into CASH or CASH_BANK_DEPOSITS
+            if holding.holding_type == HoldingType::Cash
+                && taxonomy_id == "asset_classes"
+                && matching_category_ids
+                    .iter()
+                    .any(|id| *id == "CASH" || *id == "CASH_BANK_DEPOSITS")
+            {
+                matched_holdings.push((holding, 10000)); // 100% weight
+                continue;
+            }
 
             // Check if this holding matches the category
             if category_id == "__UNKNOWN__" {

@@ -5,7 +5,8 @@ import type { Account, ActivityDetails } from "@/lib/types";
 import { useAssets } from "@/pages/asset/hooks/use-assets";
 import type { SortingState, Updater, VisibilityState } from "@tanstack/react-table";
 import { DataGrid, useDataGrid, type SymbolSearchResult } from "@wealthfolio/ui";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { resolveSymbolQuote } from "@/adapters";
 import { CreateCustomAssetDialog } from "@/components/create-custom-asset-dialog";
 import { ActivityDataGridPagination } from "./activity-data-grid-pagination";
 import { ActivityDataGridToolbar } from "./activity-data-grid-toolbar";
@@ -158,6 +159,9 @@ export function ActivityDataGrid({
     [markForDeletion],
   );
 
+  // Race condition guard for async quote resolution
+  const latestResolveRequestId = useRef(0);
+
   // Custom asset dialog state
   const [customAssetDialog, setCustomAssetDialog] = useState<{
     open: boolean;
@@ -168,12 +172,17 @@ export function ActivityDataGrid({
   // Handle symbol selection to capture exchangeMic, currency, and asset metadata from search result
   const handleSymbolSelect = useCallback(
     (rowIndex: number, result: SymbolSearchResult) => {
+      latestResolveRequestId.current += 1;
+      const requestId = latestResolveRequestId.current;
+
+      // Currency fallback: search result (from exchange) → account → base
+      const provisionalCurrency = result.currency;
+
       setLocalTransactions((prev) => {
         const updated = [...prev];
         if (updated[rowIndex]) {
           const row = updated[rowIndex];
-          // Currency fallback: search result (from exchange) → account → base
-          const currency = result.currency ?? row.accountCurrency ?? fallbackCurrency;
+          const currency = provisionalCurrency ?? row.accountCurrency ?? fallbackCurrency;
           updated[rowIndex] = {
             ...row,
             exchangeMic: result.exchangeMic,
@@ -188,8 +197,62 @@ export function ActivityDataGrid({
         }
         return updated;
       });
+
+      // Resolve quote to confirm currency and get latest price
+      if (result.dataSource !== "MANUAL") {
+        resolveSymbolQuote(
+          result.symbol,
+          result.exchangeMic,
+          (result as { quoteType?: string }).quoteType,
+        ).then((resolved) => {
+          if (requestId !== latestResolveRequestId.current) return;
+          if (!resolved) return;
+
+          let didUpdate = false;
+          let updatedRowId: string | undefined;
+
+          setLocalTransactions((prev) => {
+            const updated = [...prev];
+            if (!updated[rowIndex]) return prev;
+            const row = updated[rowIndex];
+
+            const changes: Partial<LocalTransaction> = {};
+
+            // Update currency from resolved quote to correct exchange-inferred values
+            // (e.g., search returns "GBp" inferred, resolve confirms "GBP")
+            // Only overwrite if user hasn't manually changed it since selection
+            if (resolved.currency) {
+              const confirmedCurrency = resolved.currency.trim();
+              if (
+                confirmedCurrency &&
+                row.currency !== confirmedCurrency &&
+                row.currency === (provisionalCurrency ?? row.accountCurrency ?? fallbackCurrency)
+              ) {
+                changes.currency = confirmedCurrency;
+              }
+              changes.pendingQuoteCcy = resolved.currency;
+            }
+
+            // Set unit price from resolved quote
+            if (resolved.price != null) {
+              changes.unitPrice = String(resolved.price);
+            }
+
+            if (Object.keys(changes).length === 0) return prev;
+
+            didUpdate = true;
+            updatedRowId = row.id;
+            updated[rowIndex] = { ...row, ...changes };
+            return updated;
+          });
+
+          if (didUpdate && updatedRowId) {
+            markDirtyBatch([updatedRowId]);
+          }
+        });
+      }
     },
-    [setLocalTransactions, fallbackCurrency],
+    [setLocalTransactions, fallbackCurrency, markDirtyBatch],
   );
 
   // Handle request to create a custom asset - opens the dialog

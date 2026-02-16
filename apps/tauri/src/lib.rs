@@ -274,6 +274,7 @@ pub fn run() {
             commands::portfolio::calculate_performance_history,
             commands::portfolio::save_manual_holdings,
             commands::portfolio::import_holdings_csv,
+            commands::portfolio::check_holdings_import,
             commands::portfolio::get_snapshots,
             commands::portfolio::get_snapshot_by_date,
             commands::portfolio::delete_snapshot,
@@ -308,6 +309,7 @@ pub fn run() {
             commands::alternative_assets::get_alternative_holdings,
             // Market data commands
             commands::market_data::search_symbol,
+            commands::market_data::resolve_symbol_quote,
             commands::market_data::sync_market_data,
             commands::market_data::update_quote,
             commands::market_data::delete_quote,

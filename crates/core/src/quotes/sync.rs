@@ -30,6 +30,7 @@ use tokio::sync::RwLock;
 
 use super::client::MarketDataClient;
 use super::constants::*;
+use super::errors::MarketDataError;
 use super::store::QuoteStore;
 use super::sync_state::{
     calculate_sync_window, determine_sync_category, QuoteSyncState, SymbolSyncPlan, SyncCategory,
@@ -38,6 +39,7 @@ use super::sync_state::{
 use super::types::{AssetId, Day, ProviderId};
 use crate::activities::ActivityRepositoryTrait;
 use crate::assets::{Asset, AssetKind, AssetRepositoryTrait, QuoteMode};
+use crate::errors::Error;
 use crate::errors::Result;
 use crate::utils::time_utils;
 
@@ -78,6 +80,42 @@ impl Drop for SyncLockGuard {
 
 fn effective_market_today(now: DateTime<Utc>, exchange_mic: Option<&str>) -> NaiveDate {
     time_utils::market_effective_date(now, exchange_mic)
+}
+
+fn market_fetch_end_date(now: DateTime<Utc>, exchange_mic: Option<&str>) -> NaiveDate {
+    time_utils::market_calendar_date(now, exchange_mic)
+}
+
+fn extends_to_fetch_end(category: &SyncCategory) -> bool {
+    matches!(
+        category,
+        SyncCategory::Active | SyncCategory::RecentlyClosed | SyncCategory::New
+    )
+}
+
+fn clamp_end_date_for_fetch(
+    category: &SyncCategory,
+    end_date: NaiveDate,
+    fetch_end_date: NaiveDate,
+) -> NaiveDate {
+    if extends_to_fetch_end(category) {
+        end_date.max(fetch_end_date)
+    } else {
+        end_date
+    }
+}
+
+fn should_treat_backfill_error_as_non_fatal(category: &SyncCategory, error: &Error) -> bool {
+    if !matches!(category, SyncCategory::NeedsBackfill) {
+        return false;
+    }
+
+    matches!(
+        error,
+        Error::MarketData(MarketDataError::NoData)
+            | Error::MarketData(MarketDataError::NotFound(_))
+            | Error::MarketData(MarketDataError::ProviderExhausted(_))
+    )
 }
 
 // Test helpers - expose lock functions for testing
@@ -338,6 +376,10 @@ where
     pub fn build_sync_plan(&self, assets: &[Asset]) -> Vec<SymbolSyncPlan> {
         let now = Utc::now();
         let asset_ids: Vec<String> = assets.iter().map(|asset| asset.id.clone()).collect();
+        let existing_states = self
+            .sync_state_store
+            .get_by_asset_ids(&asset_ids)
+            .unwrap_or_default();
         let activity_bounds = self
             .activity_repo
             .get_activity_bounds_for_assets(&asset_ids)
@@ -348,8 +390,10 @@ where
         let mut quote_bounds: HashMap<String, (NaiveDate, NaiveDate)> = HashMap::new();
         let mut assets_by_provider: HashMap<String, Vec<String>> = HashMap::new();
         for asset in assets.iter().filter(|a| self.should_sync_asset(a)) {
-            let provider = asset
-                .preferred_provider()
+            let provider = existing_states
+                .get(&asset.id)
+                .map(|s| s.data_source.clone())
+                .or_else(|| asset.preferred_provider())
                 .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string());
             assets_by_provider
                 .entry(provider)
@@ -401,6 +445,7 @@ where
         quote_bounds: &HashMap<String, (NaiveDate, NaiveDate)>,
     ) -> Option<SymbolSyncPlan> {
         let effective_today = effective_market_today(now, asset.instrument_exchange_mic.as_deref());
+        let fetch_end_date = market_fetch_end_date(now, asset.instrument_exchange_mic.as_deref());
         // Get existing sync state
         let state = self
             .sync_state_store
@@ -438,6 +483,7 @@ where
 
         // Use the new calculate_sync_window function
         let (start_date, end_date) = calculate_sync_window(&category, &inputs, effective_today)?;
+        let end_date = clamp_end_date_for_fetch(&category, end_date, fetch_end_date);
 
         // Validate date range
         if start_date > end_date {
@@ -479,23 +525,35 @@ where
         &self,
         inputs: &SyncPlanningInputs,
         mode: SyncMode,
-        today: NaiveDate,
+        planning_today: NaiveDate,
+        fetch_end_date: NaiveDate,
         asset: &Asset,
     ) -> (NaiveDate, NaiveDate) {
         match mode {
             SyncMode::Incremental => {
                 // Use category-based calculation for incremental mode
-                let category =
-                    determine_sync_category(inputs, CLOSED_POSITION_GRACE_PERIOD_DAYS, today);
-                calculate_sync_window(&category, inputs, today)
-                    .unwrap_or((today - Duration::days(QUOTE_HISTORY_BUFFER_DAYS), today))
+                let category = determine_sync_category(
+                    inputs,
+                    CLOSED_POSITION_GRACE_PERIOD_DAYS,
+                    planning_today,
+                );
+                let (start, end) = calculate_sync_window(&category, inputs, planning_today)
+                    .unwrap_or((
+                        fetch_end_date - Duration::days(QUOTE_HISTORY_BUFFER_DAYS),
+                        fetch_end_date,
+                    ));
+
+                (
+                    start,
+                    clamp_end_date_for_fetch(&category, end, fetch_end_date),
+                )
             }
             SyncMode::RefetchRecent { days } => {
                 // Simply fetch the last N days, ignoring existing quotes
-                let start = today - Duration::days(days);
-                (start, today)
+                let start = fetch_end_date - Duration::days(days);
+                (start, fetch_end_date)
             }
-            SyncMode::BackfillHistory { days: _days } => {
+            SyncMode::BackfillHistory { days } => {
                 // For FX assets in BackfillHistory mode, use global earliest activity date
                 // FX assets have no activities, so activity_min is always NULL
                 if asset.kind == AssetKind::Fx {
@@ -507,19 +565,19 @@ where
 
                     let start = global_earliest
                         .map(|d| d - Duration::days(QUOTE_HISTORY_BUFFER_DAYS))
-                        .unwrap_or_else(|| today - Duration::days(QUOTE_HISTORY_BUFFER_DAYS));
+                        .unwrap_or_else(|| fetch_end_date - Duration::days(days));
 
                     debug!(
                         "FX asset {} BackfillHistory: global_earliest={:?}, start={}",
                         asset.id, global_earliest, start
                     );
-                    (start, today)
+                    (start, fetch_end_date)
                 } else {
                     let start = inputs
                         .activity_min
                         .map(|d| d - Duration::days(QUOTE_HISTORY_BUFFER_DAYS))
-                        .unwrap_or_else(|| today - Duration::days(QUOTE_HISTORY_BUFFER_DAYS));
-                    (start, today)
+                        .unwrap_or_else(|| fetch_end_date - Duration::days(days));
+                    (start, fetch_end_date)
                 }
             }
         }
@@ -615,11 +673,34 @@ where
                                         .await;
                                 }
                             }
-
-                            // Update sync state - just mark as synced
+                            // Update sync state after a successful sync attempt.
                             if let Err(e) = self.sync_state_store.update_after_sync(&asset.id).await
                             {
                                 warn!("Failed to update sync state for {}: {:?}", asset.id, e);
+                            }
+
+                            // Persist the actual provider used so future planning reads correct quote bounds.
+                            if let Some(actual_source) =
+                                quotes.first().map(|q| q.data_source.as_str().to_string())
+                            {
+                                match self.sync_state_store.get_by_asset_id(&asset.id) {
+                                    Ok(Some(mut state)) if state.data_source != actual_source => {
+                                        state.data_source = actual_source;
+                                        if let Err(e) = self.sync_state_store.upsert(&state).await {
+                                            warn!(
+                                                "Failed to persist actual source for {}: {:?}",
+                                                asset.id, e
+                                            );
+                                        }
+                                    }
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        warn!(
+                                            "Failed to load sync state for {}: {:?}",
+                                            asset.id, e
+                                        );
+                                    }
+                                }
                             }
 
                             AssetSyncResult {
@@ -631,6 +712,16 @@ where
                         }
                         Err(e) => {
                             error!("Failed to save quotes for {}: {:?}", asset.id, e);
+                            if let Err(state_err) = self
+                                .sync_state_store
+                                .update_after_failure(&asset.id, &format!("Storage error: {}", e))
+                                .await
+                            {
+                                warn!(
+                                    "Failed to update sync state for {}: {:?}",
+                                    asset.id, state_err
+                                );
+                            }
                             AssetSyncResult {
                                 asset_id,
                                 quotes_added: 0,
@@ -641,6 +732,9 @@ where
                     }
                 } else {
                     debug!("No quotes returned for {}", asset.id);
+                    if let Err(e) = self.sync_state_store.update_after_sync(&asset.id).await {
+                        warn!("Failed to update sync state for {}: {:?}", asset.id, e);
+                    }
                     AssetSyncResult {
                         asset_id,
                         quotes_added: 0,
@@ -693,6 +787,28 @@ where
                             );
                         }
                     }
+                }
+
+                if should_treat_backfill_error_as_non_fatal(&plan.category, &e) {
+                    info!(
+                        "Backfill reached provider data boundary for {} ({}). Treating as complete.",
+                        asset.id, e
+                    );
+
+                    if let Err(state_err) = self.sync_state_store.update_after_sync(&asset.id).await
+                    {
+                        warn!(
+                            "Failed to update sync state for {}: {:?}",
+                            asset.id, state_err
+                        );
+                    }
+
+                    return AssetSyncResult {
+                        asset_id,
+                        quotes_added: 0,
+                        status: SyncStatus::Success,
+                        error: None,
+                    };
                 }
 
                 error!("Failed to fetch quotes for {}: {:?}", asset.id, e);
@@ -797,6 +913,10 @@ where
 
         // Fetch actual assets to check pricing_mode - filter out non-market-priced assets
         let assets = self.asset_repo.list_by_asset_ids(&asset_ids)?;
+        let assets_by_id: HashMap<String, &Asset> = assets
+            .iter()
+            .map(|asset| (asset.id.clone(), asset))
+            .collect();
         let syncable_asset_ids: std::collections::HashSet<String> = assets
             .iter()
             .filter(|a| self.should_sync_asset(a))
@@ -847,6 +967,10 @@ where
         let mut plans = Vec::new();
 
         for state in states {
+            let Some(asset) = assets_by_id.get(&state.asset_id).copied() else {
+                continue;
+            };
+
             // Build SyncPlanningInputs from computed bounds
             let (activity_min, activity_max) = activity_bounds
                 .get(&state.asset_id)
@@ -868,7 +992,10 @@ where
                 quote_max,
             };
 
-            let effective_today = effective_market_today(now, None);
+            let effective_today =
+                effective_market_today(now, asset.instrument_exchange_mic.as_deref());
+            let fetch_end_date =
+                market_fetch_end_date(now, asset.instrument_exchange_mic.as_deref());
             let category = determine_sync_category(
                 &inputs,
                 CLOSED_POSITION_GRACE_PERIOD_DAYS,
@@ -892,7 +1019,7 @@ where
                             priority: state.sync_priority,
                             data_source: state.data_source.clone(),
                             quote_symbol: None,
-                            currency: "USD".to_string(), // Will be updated from asset
+                            currency: asset.quote_ccy.clone(),
                         });
                     }
                 }
@@ -906,6 +1033,8 @@ where
                     } else {
                         start_date
                     };
+                    let end_date =
+                        clamp_end_date_for_fetch(&recent_category, end_date, fetch_end_date);
 
                     if start_date <= end_date {
                         plans.push(SymbolSyncPlan {
@@ -916,7 +1045,7 @@ where
                             priority: SyncCategory::Active.default_priority(),
                             data_source: state.data_source.clone(),
                             quote_symbol: None,
-                            currency: "USD".to_string(), // Will be updated from asset
+                            currency: asset.quote_ccy.clone(),
                         });
                     }
                 }
@@ -937,6 +1066,7 @@ where
             } else {
                 start_date
             };
+            let end_date = clamp_end_date_for_fetch(&category, end_date, fetch_end_date);
 
             if start_date > end_date {
                 continue;
@@ -950,7 +1080,7 @@ where
                 priority: state.sync_priority,
                 data_source: state.data_source.clone(),
                 quote_symbol: None,
-                currency: "USD".to_string(), // Will be updated from asset
+                currency: asset.quote_ccy.clone(),
             });
         }
 
@@ -1039,8 +1169,9 @@ where
             return Ok(result);
         }
 
-        let today = Utc::now().date_naive();
+        let now = Utc::now();
         let syncable_ids: Vec<String> = syncable.iter().map(|asset| asset.id.clone()).collect();
+        let existing_states = self.sync_state_store.get_by_asset_ids(&syncable_ids)?;
         let activity_bounds = self
             .activity_repo
             .get_activity_bounds_for_assets(&syncable_ids)?;
@@ -1049,8 +1180,10 @@ where
         let mut quote_bounds: HashMap<String, (NaiveDate, NaiveDate)> = HashMap::new();
         let mut assets_by_provider: HashMap<String, Vec<String>> = HashMap::new();
         for asset in &syncable {
-            let provider = asset
-                .preferred_provider()
+            let provider = existing_states
+                .get(&asset.id)
+                .map(|s| s.data_source.clone())
+                .or_else(|| asset.preferred_provider())
                 .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string());
             assets_by_provider
                 .entry(provider)
@@ -1066,11 +1199,16 @@ where
         // Build plans using the mode-specific date range calculation
         let mut plans: Vec<SymbolSyncPlan> = Vec::new();
         for asset in &syncable {
-            let state = self
-                .sync_state_store
-                .get_by_asset_id(&asset.id)
-                .ok()
-                .flatten();
+            let state = existing_states.get(&asset.id).cloned();
+            let data_source = state
+                .as_ref()
+                .map(|s| s.data_source.clone())
+                .or_else(|| asset.preferred_provider())
+                .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string());
+            let effective_today =
+                effective_market_today(now, asset.instrument_exchange_mic.as_deref());
+            let fetch_end_date =
+                market_fetch_end_date(now, asset.instrument_exchange_mic.as_deref());
 
             // Skip assets with too many consecutive errors (unless full resync)
             if !matches!(mode, SyncMode::BackfillHistory { .. }) {
@@ -1107,8 +1245,11 @@ where
             };
 
             // Determine category for priority
-            let category =
-                determine_sync_category(&inputs, CLOSED_POSITION_GRACE_PERIOD_DAYS, today);
+            let category = determine_sync_category(
+                &inputs,
+                CLOSED_POSITION_GRACE_PERIOD_DAYS,
+                effective_today,
+            );
 
             if matches!(mode, SyncMode::Incremental)
                 && matches!(category, SyncCategory::NeedsBackfill)
@@ -1116,18 +1257,20 @@ where
             {
                 let recent_category = SyncCategory::Active;
                 if let Some((start_date, end_date)) =
-                    calculate_sync_window(&recent_category, &inputs, today)
+                    calculate_sync_window(&recent_category, &inputs, effective_today)
                 {
                     if start_date <= end_date {
                         plans.push(SymbolSyncPlan {
                             asset_id: asset.id.clone(),
-                            category: recent_category,
+                            category: recent_category.clone(),
                             start_date,
-                            end_date,
+                            end_date: clamp_end_date_for_fetch(
+                                &recent_category,
+                                end_date,
+                                fetch_end_date,
+                            ),
                             priority: SyncCategory::Active.default_priority(),
-                            data_source: asset
-                                .preferred_provider()
-                                .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string()),
+                            data_source: data_source.clone(),
                             quote_symbol: None,
                             currency: asset.quote_ccy.clone(),
                         });
@@ -1135,7 +1278,7 @@ where
                 }
 
                 if let Some((start_date, end_date)) =
-                    calculate_sync_window(&category, &inputs, today)
+                    calculate_sync_window(&category, &inputs, effective_today)
                 {
                     if start_date <= end_date {
                         plans.push(SymbolSyncPlan {
@@ -1144,9 +1287,7 @@ where
                             start_date,
                             end_date,
                             priority: category.default_priority(),
-                            data_source: asset
-                                .preferred_provider()
-                                .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string()),
+                            data_source: data_source.clone(),
                             quote_symbol: None,
                             currency: asset.quote_ccy.clone(),
                         });
@@ -1155,8 +1296,13 @@ where
                 continue;
             }
 
-            let (start_date, end_date) =
-                self.calculate_date_range_for_mode(&inputs, mode, today, asset);
+            let (start_date, end_date) = self.calculate_date_range_for_mode(
+                &inputs,
+                mode,
+                effective_today,
+                fetch_end_date,
+                asset,
+            );
 
             plans.push(SymbolSyncPlan {
                 asset_id: asset.id.clone(),
@@ -1164,9 +1310,7 @@ where
                 start_date,
                 end_date,
                 priority: category.default_priority(),
-                data_source: asset
-                    .preferred_provider()
-                    .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string()),
+                data_source,
                 quote_symbol: None,
                 currency: asset.quote_ccy.clone(),
             });
@@ -1311,6 +1455,66 @@ where
 mod tests {
     use super::*;
     use crate::quotes::sync_state::MarketSyncMode;
+
+    #[test]
+    fn test_clamp_end_date_for_fetch_extends_active_category() {
+        let base_end = NaiveDate::from_ymd_opt(2026, 2, 11).unwrap();
+        let fetch_end = NaiveDate::from_ymd_opt(2026, 2, 12).unwrap();
+
+        assert_eq!(
+            clamp_end_date_for_fetch(&SyncCategory::Active, base_end, fetch_end),
+            fetch_end
+        );
+    }
+
+    #[test]
+    fn test_clamp_end_date_for_fetch_keeps_non_extending_category() {
+        let base_end = NaiveDate::from_ymd_opt(2026, 2, 11).unwrap();
+        let fetch_end = NaiveDate::from_ymd_opt(2026, 2, 12).unwrap();
+
+        assert_eq!(
+            clamp_end_date_for_fetch(&SyncCategory::NeedsBackfill, base_end, fetch_end),
+            base_end
+        );
+    }
+
+    #[test]
+    fn test_backfill_no_data_error_is_non_fatal() {
+        let err = Error::MarketData(MarketDataError::NoData);
+        assert!(should_treat_backfill_error_as_non_fatal(
+            &SyncCategory::NeedsBackfill,
+            &err
+        ));
+    }
+
+    #[test]
+    fn test_backfill_not_found_error_is_non_fatal() {
+        let err = Error::MarketData(MarketDataError::NotFound("No data found".to_string()));
+        assert!(should_treat_backfill_error_as_non_fatal(
+            &SyncCategory::NeedsBackfill,
+            &err
+        ));
+    }
+
+    #[test]
+    fn test_backfill_provider_exhausted_error_is_non_fatal() {
+        let err = Error::MarketData(MarketDataError::ProviderExhausted(
+            "All providers failed".to_string(),
+        ));
+        assert!(should_treat_backfill_error_as_non_fatal(
+            &SyncCategory::NeedsBackfill,
+            &err
+        ));
+    }
+
+    #[test]
+    fn test_non_backfill_no_data_error_remains_fatal() {
+        let err = Error::MarketData(MarketDataError::NoData);
+        assert!(!should_treat_backfill_error_as_non_fatal(
+            &SyncCategory::Active,
+            &err
+        ));
+    }
 
     // =========================================================================
     // SyncMode Tests

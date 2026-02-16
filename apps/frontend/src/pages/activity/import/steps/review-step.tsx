@@ -19,7 +19,10 @@ import { ProgressIndicator } from "@wealthfolio/ui/components/ui/progress-indica
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ImportAlert } from "../components/import-alert";
 import { ImportReviewGrid, type ImportReviewFilter } from "../components/import-review-grid";
-import { SymbolResolutionPanel } from "../components/symbol-resolution-panel";
+import {
+  SymbolResolutionPanel,
+  type UnresolvedSymbol,
+} from "../components/symbol-resolution-panel";
 import {
   bulkSetAccount,
   bulkSetCurrency,
@@ -1024,6 +1027,18 @@ export function ReviewStep() {
   const hasWarnings = filterStats.warnings > 0;
   const hasIssues = hasErrors || hasWarnings;
 
+  const unresolvedSymbols = useMemo<UnresolvedSymbol[]>(() => {
+    const symbolMap = new Map<string, number>();
+    for (const draft of draftActivities) {
+      if (draft.errors.symbol && draft.symbol) {
+        symbolMap.set(draft.symbol, (symbolMap.get(draft.symbol) || 0) + 1);
+      }
+    }
+    return Array.from(symbolMap.entries())
+      .map(([csvSymbol, count]) => ({ csvSymbol, affectedCount: count }))
+      .sort((a, b) => (b.affectedCount ?? 0) - (a.affectedCount ?? 0));
+  }, [draftActivities]);
+
   return (
     <div className="flex flex-col gap-4">
       {/* Summary alert */}
@@ -1042,7 +1057,10 @@ export function ReviewStep() {
       )}
 
       {/* Symbol resolution for unrecognized symbols */}
-      <SymbolResolutionPanel drafts={draftActivities} onApplyMappings={handleSymbolResolution} />
+      <SymbolResolutionPanel
+        unresolvedSymbols={unresolvedSymbols}
+        onApplyMappings={handleSymbolResolution}
+      />
 
       {/* Stats and filter */}
       <div className="flex flex-col gap-3">

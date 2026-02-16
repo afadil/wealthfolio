@@ -61,7 +61,7 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
       return sortedQuotes.map((quote) => ({
         timestamp: quote.timestamp,
         totalValue: quote.close,
-        currency: currency,
+        currency: quote.currency || currency,
       }));
     }
 
@@ -75,14 +75,25 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
       .map((quote) => ({
         timestamp: quote.timestamp,
         totalValue: quote.close,
-        currency: currency,
+        currency: quote.currency || currency,
       }));
   }, [dateRange, quoteHistory, currency, selectedIntervalCode]);
 
   const { ganAmount, percentage, calculatedAt } = useMemo(() => {
     const lastFilteredDate = filteredData.at(-1)?.timestamp;
+    const startValue = filteredData[0]?.totalValue;
+    const endValue = filteredData.at(-1)?.totalValue;
+    const isValidStartValue = typeof startValue === "number" && startValue !== 0;
 
     if (selectedIntervalCode === "ALL") {
+      if (typeof startValue === "number" && typeof endValue === "number") {
+        return {
+          ganAmount: endValue - startValue,
+          percentage: isValidStartValue ? (endValue - startValue) / startValue : 0,
+          calculatedAt: lastFilteredDate,
+        };
+      }
+
       const lastQuoteDate =
         quoteHistory.length > 0 ? quoteHistory[quoteHistory.length - 1].timestamp : undefined;
       return {
@@ -91,10 +102,6 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
         calculatedAt: lastQuoteDate,
       };
     }
-
-    const startValue = filteredData[0]?.totalValue;
-    const endValue = filteredData.at(-1)?.totalValue;
-    const isValidStartValue = typeof startValue === "number" && startValue !== 0;
 
     return {
       ganAmount:

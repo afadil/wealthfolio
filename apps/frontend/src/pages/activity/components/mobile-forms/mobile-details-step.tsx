@@ -1,11 +1,9 @@
-import { SymbolSelectorMobile } from "@/components/symbol-selector-mobile";
-import { Input } from "@wealthfolio/ui/components/ui/input";
 import { ScrollArea } from "@wealthfolio/ui/components/ui/scroll-area";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
 import { QuoteMode, type ActivityType } from "@/lib/constants";
-import type { SymbolSearchResult } from "@/lib/types";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { AdvancedOptionsSection } from "../forms/fields/advanced-options-section";
+import { SymbolSearch } from "../forms/fields/symbol-search";
 import {
   Button,
   DatePickerInput,
@@ -23,8 +21,9 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@wealthfolio/ui";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useFormContext } from "react-hook-form";
+import { restrictionAllowsType } from "@/lib/activity-restrictions";
 import type { AccountSelectOption } from "../forms/fields";
 import type { NewActivityFormValues } from "../forms/schemas";
 
@@ -34,13 +33,19 @@ interface MobileDetailsStepProps {
 }
 
 export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepProps) {
-  const { control, watch, setValue } = useFormContext<NewActivityFormValues>();
+  const { control, getFieldState, getValues, watch, setValue } =
+    useFormContext<NewActivityFormValues>();
   const { settings } = useSettingsContext();
   const isManualAsset = watch("quoteMode") === QuoteMode.MANUAL;
   const accountId = watch("accountId");
+
+  // Filter accounts by activity type (exclude HOLDINGS accounts for unsupported types)
+  const filteredAccounts = useMemo(
+    () => accounts.filter((acc) => restrictionAllowsType(acc.restrictionLevel, activityType)),
+    [accounts, activityType],
+  );
   const assetCurrency = watch("currency");
   const [accountSheetOpen, setAccountSheetOpen] = useState(false);
-  const [symbolSheetOpen, setSymbolSheetOpen] = useState(false);
 
   const isFeeActivity = activityType === "FEE";
   const isTaxActivity = activityType === "TAX";
@@ -68,40 +73,12 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
 
   const needsSplitRatio = activityType === "SPLIT";
 
-  const selectedAccount = accounts.find((acc) => acc.value === accountId);
+  const selectedAccount = filteredAccounts.find((acc) => acc.value === accountId);
   const accountCurrency = selectedAccount?.currency;
   const baseCurrency = settings?.baseCurrency;
   const displayAccountText = selectedAccount
     ? `${selectedAccount.label} (${selectedAccount.currency})`
     : "Select an account";
-
-  // Handle symbol selection with automatic manual pricing for custom assets
-  const handleSymbolSelect = (symbol: string, searchResult?: SymbolSearchResult) => {
-    setValue("assetId", symbol);
-    setValue("exchangeMic", searchResult?.exchangeMic);
-    setValue("symbolQuoteCcy", searchResult?.currency);
-    setValue("symbolInstrumentType", searchResult?.quoteType);
-
-    // Set asset metadata for custom assets
-    if (searchResult?.assetKind) {
-      setValue("assetMetadata", {
-        name: searchResult.longName,
-        kind: searchResult.assetKind,
-      });
-    }
-
-    // Auto-set currency from search result
-    if (searchResult?.currency) {
-      setValue("currency", searchResult.currency);
-    }
-
-    // Auto-set manual pricing for custom assets
-    if (searchResult?.dataSource === "MANUAL") {
-      setValue("quoteMode", QuoteMode.MANUAL);
-    }
-
-    setSymbolSheetOpen(false);
-  };
 
   return (
     <div className="flex h-full flex-col">
@@ -154,32 +131,17 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
           />
           {/* Asset Symbol */}
           {needsAssetSymbol && (
-            <FormField
-              control={control}
+            <SymbolSearch
               name="assetId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-base font-medium">Symbol</FormLabel>
-                  <FormControl>
-                    {isManualAsset ? (
-                      <Input
-                        placeholder="Enter symbol"
-                        {...field}
-                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                      />
-                    ) : (
-                      <SymbolSelectorMobile
-                        onSelect={handleSymbolSelect}
-                        value={field.value}
-                        open={symbolSheetOpen}
-                        onOpenChange={setSymbolSheetOpen}
-                        defaultCurrency={accountCurrency}
-                      />
-                    )}
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+              label="Symbol"
+              isManualAsset={isManualAsset}
+              exchangeMicName="exchangeMic"
+              quoteModeName="quoteMode"
+              currencyName="currency"
+              quoteCcyName="symbolQuoteCcy"
+              instrumentTypeName="symbolInstrumentType"
+              assetMetadataName="assetMetadata"
+              defaultCurrency={accountCurrency}
             />
           )}
 
@@ -329,11 +291,20 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
       {/* Hidden Account Sheet - Rendered outside scrollable area */}
       <div className="hidden">
         <MobileAccountSheet
-          accounts={accounts}
+          accounts={filteredAccounts}
           open={accountSheetOpen}
           onOpenChange={setAccountSheetOpen}
           onSelect={(accountValue) => {
             setValue("accountId", accountValue);
+            const selected = filteredAccounts.find((account) => account.value === accountValue);
+            const currentCurrency = getValues("currency")?.trim();
+            const shouldAutoSetCurrency = !getFieldState("currency").isDirty || !currentCurrency;
+            if (selected && shouldAutoSetCurrency) {
+              setValue("currency", selected.currency, {
+                shouldDirty: false,
+                shouldValidate: true,
+              });
+            }
             setAccountSheetOpen(false);
           }}
         />

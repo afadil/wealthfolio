@@ -23,15 +23,15 @@ import {
 } from "@wealthfolio/ui/components/ui/sheet";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
-import { ASSET_KIND_DISPLAY_NAMES, Quote } from "@/lib/types";
+import { ASSET_KIND_DISPLAY_NAMES, LatestQuoteSnapshot } from "@/lib/types";
 import { cn, formatAmount, formatDate } from "@/lib/utils";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { ScrollArea, Separator } from "@wealthfolio/ui";
-import { ParsedAsset } from "./asset-utils";
+import { isStaleQuote, ParsedAsset } from "./asset-utils";
 
 interface AssetsTableMobileProps {
   assets: ParsedAsset[];
-  latestQuotes?: Record<string, Quote>;
+  latestQuotes?: Record<string, LatestQuoteSnapshot>;
   isLoading?: boolean;
   onEdit: (asset: ParsedAsset) => void;
   onDelete: (asset: ParsedAsset) => void;
@@ -62,21 +62,6 @@ export function AssetsTableMobile({
   const [selectedAssetKinds, setSelectedAssetKinds] = useState<string[]>([]);
   const [selectedPriceStatus, setSelectedPriceStatus] = useState<string[]>([]);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
-
-  const isStaleQuote = (quote?: Quote) => {
-    if (!quote) {
-      return false;
-    }
-
-    const quoteDate = new Date(quote.timestamp);
-    const today = new Date();
-
-    return (
-      quoteDate.getFullYear() !== today.getFullYear() ||
-      quoteDate.getMonth() !== today.getMonth() ||
-      quoteDate.getDate() !== today.getDate()
-    );
-  };
 
   // Get unique quote modes
   const quoteModeOptions = useMemo(() => {
@@ -116,8 +101,8 @@ export function AssetsTableMobile({
     // Filter by price status
     if (selectedPriceStatus.length > 0) {
       filtered = filtered.filter((asset) => {
-        const quote = latestQuotes[asset.id];
-        const isStale = isStaleQuote(quote);
+        const snapshot = latestQuotes[asset.id];
+        const isStale = isStaleQuote(snapshot, asset);
         return selectedPriceStatus.includes(isStale ? "true" : "false");
       });
     }
@@ -225,27 +210,29 @@ export function AssetsTableMobile({
 
               <div className="flex flex-shrink-0 items-center gap-2">
                 <div className="text-right text-sm">
-                  {latestQuotes[asset.id] ? (
+                  {latestQuotes[asset.id]?.quote ? (
                     <>
                       <div className="flex items-center justify-end gap-1 font-semibold">
                         {formatAmount(
-                          latestQuotes[asset.id].close,
-                          latestQuotes[asset.id].currency ?? asset.quoteCcy ?? baseCurrency,
+                          latestQuotes[asset.id].quote.close,
+                          latestQuotes[asset.id].quote.currency ?? asset.quoteCcy ?? baseCurrency,
                         )}
-                        {isStaleQuote(latestQuotes[asset.id]) ? (
+                        {isStaleQuote(latestQuotes[asset.id], asset) ? (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Icons.AlertTriangle
                                 className="text-destructive h-3.5 w-3.5"
-                                aria-label="Quote not updated today"
+                                aria-label="Quote is behind market day"
                               />
                             </TooltipTrigger>
-                            <TooltipContent>Latest close is not from today</TooltipContent>
+                            <TooltipContent>
+                              Latest quote is behind the current market day
+                            </TooltipContent>
                           </Tooltip>
                         ) : null}
                       </div>
                       <p className="text-muted-foreground text-xs">
-                        {formatDate(latestQuotes[asset.id].timestamp)}
+                        {formatDate(latestQuotes[asset.id].quote.timestamp)}
                       </p>
                     </>
                   ) : (
@@ -452,8 +439,8 @@ export function AssetsTableMobile({
                   ].map((option) => {
                     const isSelected = selectedPriceStatus.includes(option.value);
                     const count = assets.filter((a) => {
-                      const quote = latestQuotes[a.id];
-                      const isStale = isStaleQuote(quote);
+                      const snapshot = latestQuotes[a.id];
+                      const isStale = isStaleQuote(snapshot, a);
                       return (isStale ? "true" : "false") === option.value;
                     }).length;
                     return (

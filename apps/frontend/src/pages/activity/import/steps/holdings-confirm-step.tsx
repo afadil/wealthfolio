@@ -7,7 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/
 import { useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { importHoldingsCsv } from "@/adapters";
+import { importHoldingsCsv, saveAccountImportMapping, logger } from "@/adapters";
 import { useImportContext } from "../context";
 import { setImportResult, nextStep } from "../context/import-actions";
 import { parseHoldingsSnapshots } from "./holdings-review-step";
@@ -25,15 +25,47 @@ export function HoldingsConfirmStep() {
   // Parse snapshots from CSV data
   const snapshots = useMemo(() => {
     const fieldMappings = mapping?.fieldMappings || {};
-    return parseHoldingsSnapshots(headers, parsedRows, fieldMappings, parseConfig.defaultCurrency);
-  }, [headers, parsedRows, mapping?.fieldMappings, parseConfig.defaultCurrency]);
+    return parseHoldingsSnapshots(
+      headers,
+      parsedRows,
+      fieldMappings,
+      {
+        dateFormat: parseConfig.dateFormat,
+        decimalSeparator: parseConfig.decimalSeparator,
+        thousandsSeparator: parseConfig.thousandsSeparator,
+        defaultCurrency: parseConfig.defaultCurrency,
+      },
+      mapping?.symbolMappings,
+      mapping?.symbolMappingMeta,
+    );
+  }, [
+    headers,
+    parsedRows,
+    mapping?.fieldMappings,
+    mapping?.symbolMappings,
+    mapping?.symbolMappingMeta,
+    parseConfig,
+  ]);
 
   // Import mutation
   const importMutation = useMutation({
     mutationFn: async () => {
       return await importHoldingsCsv(accountId, snapshots);
     },
-    onSuccess: (result: ImportHoldingsCsvResult) => {
+    onSuccess: async (result: ImportHoldingsCsvResult) => {
+      // Save the mapping profile for future imports
+      if (mapping && accountId) {
+        try {
+          await saveAccountImportMapping({
+            ...mapping,
+            accountId,
+            parseConfig: parseConfig,
+          });
+        } catch (error) {
+          logger.error(`Error saving holdings import mapping: ${error}`);
+        }
+      }
+
       // Set result in context
       dispatch(
         setImportResult({
