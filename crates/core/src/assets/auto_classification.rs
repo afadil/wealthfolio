@@ -30,9 +30,10 @@ fn map_quote_type_to_instrument_type(quote_type: &str) -> Option<&'static str> {
         "INDEX" => Some("ETF"), // Index funds are typically ETFs
         "CRYPTOCURRENCY" | "CRYPTO" => Some("CRYPTO_NATIVE"),
         "OPTION" => Some("OPTION"),
-        "BOND" => Some("BOND_CORPORATE"), // Default to corporate, can be refined manually
+        "BOND" => Some("DEBT_SECURITY"), // Parent category; user can refine to BOND_CORPORATE/GOVERNMENT/etc.
         "MONEYMARKET" => Some("MONEY_MARKET_DEBT"),
         "FUTURE" | "FUTURES" => Some("FUTURE"),
+        "METAL" => Some("PHYSICAL_METAL"),
         // ECNQUOTE: Used by Yahoo for some Canadian/international ETFs and securities
         // Since we can't determine if it's a stock or ETF, skip classification
         // Users can manually classify these
@@ -58,7 +59,7 @@ fn map_quote_type_to_asset_class(quote_type: &str) -> Option<&'static str> {
         // Cryptocurrency - classify as Digital Assets
         "CRYPTOCURRENCY" | "CRYPTO" => Some("DIGITAL_ASSETS"),
         // Commodities class
-        "COMMODITY" | "FUTURE" | "FUTURES" => Some("COMMODITIES"),
+        "COMMODITY" | "FUTURE" | "FUTURES" | "METAL" => Some("COMMODITIES"),
         // ECNQUOTE: Unknown type (Canadian/international securities) - skip
         // NONE: Delisted - skip
         "ECNQUOTE" | "NONE" => None,
@@ -480,7 +481,7 @@ mod tests {
         );
         assert_eq!(
             map_quote_type_to_instrument_type("BOND"),
-            Some("BOND_CORPORATE")
+            Some("DEBT_SECURITY")
         );
         assert_eq!(
             map_quote_type_to_instrument_type("MONEYMARKET"),
@@ -489,6 +490,10 @@ mod tests {
         assert_eq!(map_quote_type_to_instrument_type("FUTURE"), Some("FUTURE"));
         assert_eq!(map_quote_type_to_instrument_type("FUTURES"), Some("FUTURE"));
         assert_eq!(map_quote_type_to_instrument_type("OPTION"), Some("OPTION"));
+        assert_eq!(
+            map_quote_type_to_instrument_type("METAL"),
+            Some("PHYSICAL_METAL")
+        );
         assert_eq!(map_quote_type_to_instrument_type("unknown"), None);
     }
 
@@ -514,6 +519,7 @@ mod tests {
             map_quote_type_to_asset_class("COMMODITY"),
             Some("COMMODITIES")
         );
+        assert_eq!(map_quote_type_to_asset_class("METAL"), Some("COMMODITIES"));
         // Unknown
         assert_eq!(map_quote_type_to_asset_class("unknown"), None);
     }

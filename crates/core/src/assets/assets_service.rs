@@ -797,6 +797,22 @@ impl AssetServiceTrait for AssetService {
 
         let asset = self.asset_repository.create(new_asset).await?;
 
+        // Auto-classify based on known instrument_type at creation time.
+        // This ensures bonds, options, and metals get classified even if
+        // provider enrichment later fails or returns no quote_type.
+        if let (Some(taxonomy_service), Some(ref itype)) =
+            (&self.taxonomy_service, &asset.instrument_type)
+        {
+            let input = ClassificationInput {
+                quote_type: Some(itype.as_db_str().to_string()),
+                ..Default::default()
+            };
+            let classifier = AutoClassificationService::new(Arc::clone(taxonomy_service));
+            if let Err(e) = classifier.classify_asset(&asset.id, &input).await {
+                debug!("Auto-classification at creation failed for {}: {}", asset.id, e);
+            }
+        }
+
         // Emit event for newly created asset
         self.event_sink
             .emit(DomainEvent::assets_created(vec![asset.id.clone()]));
@@ -1049,8 +1065,23 @@ impl AssetServiceTrait for AssetService {
 
         // Auto-classify asset based on provider profile data
         if let Some(taxonomy_service) = &self.taxonomy_service {
+            // For bonds and metals, prefer the asset's own instrument_type over the
+            // provider's quote_type. Bond providers (Boerse Frankfurt / OpenFIGI)
+            // return no quote_type, and Yahoo misreports metals as "FUTURE".
+            // For equities, the provider's quote_type is more granular (ETF vs
+            // EQUITY vs MUTUALFUND) so we keep it.
+            let provider_quote_type = match existing_asset.instrument_type {
+                Some(InstrumentType::Bond) | Some(InstrumentType::Metal) => existing_asset
+                    .instrument_type
+                    .as_ref()
+                    .map(|t| t.as_db_str()),
+                _ => provider_profile
+                    .asset_type
+                    .as_deref()
+                    .or(existing_asset.instrument_type.as_ref().map(|t| t.as_db_str())),
+            };
             let classification_input = ClassificationInput::from_provider_profile(
-                provider_profile.asset_type.as_deref(),
+                provider_quote_type,
                 None,
                 provider_profile.sectors.as_deref(),
                 None,
