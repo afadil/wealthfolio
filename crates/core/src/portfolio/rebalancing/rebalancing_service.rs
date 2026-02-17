@@ -289,8 +289,81 @@ impl RebalancingServiceImpl {
         // ============================================================
         // PHASE 2: Efficient Rebalancing - Use Remaining Budget
         // Buy shares that don't exceed category ceiling
-        // TODO: Implement in next step
         // ============================================================
+        if remaining_budget > Decimal::ZERO {
+            loop {
+                let mut best_asset: Option<String> = None;
+                let mut best_distance_from_ceiling = Decimal::ZERO;
+
+                // Calculate current category total value (including Phase 1 purchases)
+                let category_current_value: Decimal = holdings
+                    .iter()
+                    .map(|h| {
+                        let shares_bought =
+                            shares_to_buy.get(&h.id).copied().unwrap_or(Decimal::ZERO);
+                        let price = shortfalls
+                            .iter()
+                            .find(|s| s.asset_id == h.id)
+                            .map(|s| s.price_per_share)
+                            .unwrap_or(Decimal::ZERO);
+                        h.market_value + (shares_bought * price)
+                    })
+                    .sum();
+
+                let category_current_percent = if new_total_value > Decimal::ZERO {
+                    (category_current_value / new_total_value) * dec!(100)
+                } else {
+                    Decimal::ZERO
+                };
+
+                // Try each affordable holding
+                for shortfall in &shortfalls {
+                    if shortfall.price_per_share > remaining_budget {
+                        continue; // Can't afford
+                    }
+
+                    // Calculate new category % if we buy 1 more share of this holding
+                    let new_category_value = category_current_value + shortfall.price_per_share;
+                    let new_category_percent = if new_total_value > Decimal::ZERO {
+                        (new_category_value / new_total_value) * dec!(100)
+                    } else {
+                        Decimal::ZERO
+                    };
+
+                    // Only buy if it doesn't exceed the category ceiling
+                    if new_category_percent <= category_target_percent {
+                        // Score by distance from ceiling (prefer furthest below)
+                        let distance = category_target_percent - new_category_percent;
+                        if distance > best_distance_from_ceiling {
+                            best_distance_from_ceiling = distance;
+                            best_asset = Some(shortfall.asset_id.clone());
+                        }
+                    }
+                }
+
+                // If we found a purchase that respects the ceiling, make it
+                if let Some(asset_id) = best_asset {
+                    let price = shortfalls
+                        .iter()
+                        .find(|s| s.asset_id == asset_id)
+                        .map(|s| s.price_per_share)
+                        .unwrap();
+                    let current = shares_to_buy
+                        .get(&asset_id)
+                        .copied()
+                        .unwrap_or(Decimal::ZERO);
+                    shares_to_buy.insert(asset_id.clone(), current + Decimal::ONE);
+                    remaining_budget -= price;
+                } else {
+                    // Phase 2 complete: All purchases would exceed category ceiling
+                    break;
+                }
+
+                if remaining_budget <= Decimal::ZERO {
+                    break;
+                }
+            }
+        }
 
         // Build recommendations from final share counts
         // Include ALL holdings (even with 0 shares) so frontend can show/hide them
