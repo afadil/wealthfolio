@@ -41,6 +41,22 @@ pub struct TradeRecommendation {
     pub total_amount: Decimal,
     /// How much this reduces deviation (percentage points)
     pub impact_percent: Decimal,
+    /// Current percentage of this holding within its category (e.g., "9.3% of Equity")
+    pub current_percent_of_class: Decimal,
+    /// Target percentage of this holding within its category (e.g., "15.0% of Equity")
+    pub target_percent_of_class: Decimal,
+    /// Cash that couldn't be used to buy whole shares for this holding
+    pub residual_amount: Decimal,
+}
+
+/// Budget allocated to a category
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CategoryBudget {
+    /// Category ID
+    pub category_id: String,
+    /// Budget allocated to this category (shortfall * scale_factor)
+    pub budget: Decimal,
 }
 
 /// Complete rebalancing plan with recommendations.
@@ -63,6 +79,8 @@ pub struct RebalancingPlan {
     pub remaining_cash: Decimal,
     /// Additional cash needed to fully reach targets (if positive)
     pub additional_cash_needed: Decimal,
+    /// Budgets allocated to each category
+    pub category_budgets: Vec<CategoryBudget>,
     /// List of trade recommendations
     pub recommendations: Vec<TradeRecommendation>,
 }
@@ -85,8 +103,17 @@ impl RebalancingPlan {
             total_allocated: Decimal::ZERO,
             remaining_cash: available_cash,
             additional_cash_needed: Decimal::ZERO,
+            category_budgets: Vec::new(),
             recommendations: Vec::new(),
         }
+    }
+
+    /// Adds a category budget to the plan.
+    pub fn add_category_budget(&mut self, category_id: String, budget: Decimal) {
+        self.category_budgets.push(CategoryBudget {
+            category_id,
+            budget,
+        });
     }
 
     /// Adds a recommendation and updates totals.
@@ -145,6 +172,9 @@ mod tests {
             price_per_share: dec!(150),
             total_amount: dec!(1500),
             impact_percent: dec!(2.5),
+            current_percent_of_class: dec!(9.3),
+            target_percent_of_class: dec!(15.0),
+            residual_amount: dec!(0),
         };
 
         plan.add_recommendation(recommendation);
@@ -175,6 +205,9 @@ mod tests {
             price_per_share: dec!(150),
             total_amount: dec!(1500),
             impact_percent: dec!(2.5),
+            current_percent_of_class: dec!(9.3),
+            target_percent_of_class: dec!(15.0),
+            residual_amount: dec!(0),
         });
 
         plan.add_recommendation(TradeRecommendation {
@@ -188,6 +221,9 @@ mod tests {
             price_per_share: dec!(300),
             total_amount: dec!(1500),
             impact_percent: dec!(2.5),
+            current_percent_of_class: dec!(12.0),
+            target_percent_of_class: dec!(20.0),
+            residual_amount: dec!(0),
         });
 
         assert_eq!(plan.total_allocated, dec!(3000));

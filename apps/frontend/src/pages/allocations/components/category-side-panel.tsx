@@ -72,7 +72,7 @@ export function CategorySidePanel({
     staleTime: 30000,
   });
 
-  const holdings = holdingsData?.holdings ?? [];
+  const holdings = useMemo(() => holdingsData?.holdings ?? [], [holdingsData?.holdings]);
   const totalValue = holdingsData?.totalValue ?? 0;
 
   // Reset state when panel is closed
@@ -93,7 +93,7 @@ export function CategorySidePanel({
       return savedTargets.find((t) => {
         // For now, we need to find the matching holding to get its asset info
         const matchingHolding = holdings.find((h) => h.symbol === symbol);
-        return matchingHolding && t.assetId === matchingHolding.id;
+        return matchingHolding?.id === t.assetId;
       });
     },
     [savedTargets, holdings],
@@ -664,9 +664,9 @@ function HoldingTargetRow({
   isLocked,
   isAutoDistributed,
   categoryColor,
-  categoryPercent,
+  categoryPercent: _categoryPercent,
   baseCurrency,
-  totalValue,
+  totalValue: _totalValue,
   onEditChange,
   onToggleLock,
   onDelete,
@@ -761,7 +761,7 @@ function HoldingTargetRow({
               onKeyDown={handleKeyDown}
               onBlur={handleSave}
               disabled={isLocked}
-              className="h-6 w-16 rounded border px-2 text-right text-xs disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-6 w-16 rounded border px-2 text-right text-xs [appearance:textfield] disabled:cursor-not-allowed disabled:opacity-50 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               autoFocus
             />
             <span className="text-xs">%</span>

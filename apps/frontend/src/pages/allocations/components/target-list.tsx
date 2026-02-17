@@ -543,13 +543,16 @@ export function TargetList({
                     {/* Click-to-edit target value */}
                     {isEditing ? (
                       <input
-                        type="text"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
                         value={editValue}
                         onChange={(e) => handleEditChange(e.target.value)}
                         onBlur={() => handleEditCommit(d.categoryId)}
                         onKeyDown={(e) => handleEditKeyDown(e, d.categoryId)}
                         autoFocus
-                        className="border-primary bg-background text-foreground h-7 w-16 rounded border px-2 text-right text-sm font-semibold"
+                        className="border-primary bg-background text-foreground h-7 w-16 rounded border px-2 text-right text-sm font-semibold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                       />
                     ) : (
                       <span

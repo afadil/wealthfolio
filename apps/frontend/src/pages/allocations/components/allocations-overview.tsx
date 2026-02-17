@@ -20,21 +20,17 @@ import { TargetList } from "./target-list";
 import { CategorySidePanel } from "./category-side-panel";
 import { useTargetMutations } from "../use-target-mutations";
 
-export function AllocationsOverview() {
+interface AllocationsOverviewProps {
+  selectedAccount: Account | null;
+  onAccountChange: (account: Account) => void;
+}
+
+export function AllocationsOverview({
+  selectedAccount,
+  onAccountChange,
+}: AllocationsOverviewProps) {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
-
-  const [selectedAccount, setSelectedAccount] = useState<Account | null>({
-    id: PORTFOLIO_ACCOUNT_ID,
-    name: "All Portfolio",
-    accountType: "PORTFOLIO" as unknown as Account["accountType"],
-    balance: 0,
-    currency: baseCurrency,
-    isDefault: false,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  } as Account);
 
   const accountId = selectedAccount?.id ?? PORTFOLIO_ACCOUNT_ID;
   const { targets, isLoading: targetsLoading } = usePortfolioTargets(accountId);
@@ -69,7 +65,7 @@ export function AllocationsOverview() {
   } | null>(null);
 
   const handleAccountSelect = (account: Account) => {
-    setSelectedAccount(account);
+    onAccountChange(account);
   };
 
   const handleCategoryClick = useCallback(

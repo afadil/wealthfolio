@@ -501,90 +501,188 @@ Key UI elements:
 
 ### Algorithm (cash-first, buy-only)
 
-Implemented in Rust backend (`RebalancingService`):
+Implemented in Rust backend (`RebalancingService`). Complete 4-step process:
 
-**Step 1: Category-level shortfall calculation**
+**Step 1: Calculate category-level shortfalls**
 ```rust
 new_portfolio_total = current_total + available_cash
 
 for each category in target_allocations:
     target_value = (category.target_percent / 100) * new_portfolio_total
     current_value = (deviation.current_percent / 100) * current_total
-    shortfall = max(0, target_value - current_value)  // buy-only
+    shortfall = max(0, target_value - current_value)  // buy-only, never sell
 ```
 
-**Step 2: Cash scaling (if insufficient)**
+**Step 2: Scale budgets if cash insufficient**
 ```rust
-total_shortfall = sum(all shortfalls)
+total_shortfall = sum(all category shortfalls)
 
 scale_factor = if total_shortfall > available_cash {
-    available_cash / total_shortfall
+    available_cash / total_shortfall  // proportional scaling
 } else {
-    1.0
+    1.0  // enough cash for all shortfalls
 }
 
-category_budgets = shortfalls * scale_factor
+category_budgets = HashMap<category_id, shortfall * scale_factor>
 ```
 
-**Step 3: Per-holding allocation within category**
+**Important**: `category_budgets` are stored in `RebalancingPlan.category_budgets` 
+and returned to frontend. This enables accurate residual calculation:
+```rust
+residual_per_category = category_budget - sum(actual_spending_in_category)
+```
+
+**Step 3: Per-holding shortfall calculation with percentage tracking**
 ```rust
 for each category with budget > 0:
     holdings = get_holdings_by_allocation(account, taxonomy, category)
     holding_targets = get_holding_targets(category.allocation_id)
     
+    // SPECIAL CASE: Categories without holding targets (e.g., Cash)
+    if holding_targets.is_empty():
+        // Still allocate budget, create category-level recommendation
+        recommendations.push(TradeRecommendation {
+            asset_id: category_id,
+            symbol: category_id,
+            name: category_name,
+            shares: 0,  // No specific holding to buy
+            total_amount: category_budget,  // Show allocated amount
+            // ... other fields zero/default
+        })
+        continue  // Skip to next category
+    
+    // Calculate total category current value for percentage calculations
+    category_current_value = sum(holdings.map(|h| h.market_value))
+    
     for each holding_target:
-        // Cascading calculation
-        target_portfolio_pct = (category.target_pct * holding.target_pct) / 100
-        target_value = (target_portfolio_pct / 100) * new_portfolio_total
+        holding = find_holding_by_id(holdings, holding_target.asset_id)
+        
+        // Skip if no price available
+        if holding.quantity == 0 or holding.market_value == 0:
+            continue
+        
+        current_price = holding.market_value / holding.quantity
+        
+        // Percentage calculations
+        target_percent_of_class = holding_target.target_percent / 100.0  // basis points → %
+        current_percent_of_class = (holding.market_value / category_current_value) * 100.0
+        
+        // Cascading calculation: holding% × category% = portfolio%
+        target_portfolio_pct = (category.target_percent * target_percent_of_class) / 100.0
+        target_value = (target_portfolio_pct / 100.0) * new_portfolio_total
+        
         current_value = holding.market_value
         holding_shortfall = max(0, target_value - current_value)
-    
-    // Fractional shares
-    fractional_shares = holding_shortfall / current_price
-    
-    // Scale to fit category budget
-    holding_scaled_shortfall = holding_shortfall * (category_budget / sum(holding_shortfalls))
+        
+        // Store in HoldingShortfall struct (includes percentages for later use)
+        holding_shortfalls.push(HoldingShortfall {
+            asset_id,
+            shortfall_amount: holding_shortfall,
+            price_per_share: current_price,
+            current_percent_of_class,
+            target_percent_of_class,
+        })
 ```
 
-**Step 4: Whole-share optimization (greedy)**
-```rust
-// Initialize with floored shares
-shares_to_buy = floor(fractional_shares)
-remaining_budget = category_budget - sum(shares_to_buy * prices)
+**Key point**: We include ALL holdings with targets (even those with 0 shortfall) 
+so frontend can show them when user toggles "show zero-share holdings".
 
-// Greedy loop: maximize improvement per dollar
+**Step 4: Whole-share optimization with greedy algorithm**
+```rust
+// Initialize: floor fractional shares to whole shares
+total_holding_shortfall = sum(holding_shortfalls.map(|h| h.shortfall_amount))
+
+for each holding_shortfall:
+    // Skip if 0 shortfall (at or above target)
+    if holding_shortfall.shortfall_amount == 0:
+        continue
+    
+    // Scale to fit category budget proportionally
+    scaled_shortfall = if total_holding_shortfall > 0 {
+        holding_shortfall.shortfall_amount * (category_budget / total_holding_shortfall)
+    } else {
+        holding_shortfall.shortfall_amount
+    }
+    
+    // Floor to whole shares
+    fractional_shares = scaled_shortfall / holding_shortfall.price_per_share
+    whole_shares = floor(fractional_shares)
+    
+    shares_to_buy[asset_id] = whole_shares
+    remaining_budget -= whole_shares * price_per_share
+
+// Greedy optimization: spend remaining budget optimally
 while remaining_budget > 0:
     best_holding = None
     best_improvement_per_dollar = 0
     
-    for each holding in category:
-        if holding.price > remaining_budget:
-            continue  // can't afford
+    for each holding_shortfall where price <= remaining_budget:
+        current_shares = shares_to_buy[holding.asset_id]
+        new_shares = current_shares + 1
         
-        // Calculate impact of buying 1 more share
-        new_pct = calculate_new_percentage(holding, shares_to_buy[holding] + 1)
-        deviation_reduction = abs(new_pct - target_pct) - abs(current_pct - target_pct)
-        improvement_per_dollar = deviation_reduction / holding.price
+        // Calculate CURRENT value INCLUDING shares already bought
+        current_value_before = holding.market_value + (current_shares * price_per_share)
+        current_pct_before = (current_value_before / new_portfolio_total) * 100.0
+        
+        // Calculate value AFTER buying 1 more share
+        current_value_after = holding.market_value + (new_shares * price_per_share)
+        current_pct_after = (current_value_after / new_portfolio_total) * 100.0
+        
+        // Improvement = reduction in deviation from target
+        target_pct = (category.target_percent * holding.target_percent_of_class) / 100.0
+        deviation_before = abs(current_pct_before - target_pct)
+        deviation_after = abs(current_pct_after - target_pct)
+        improvement = deviation_before - deviation_after
+        
+        improvement_per_dollar = improvement / price_per_share
         
         if improvement_per_dollar > best_improvement_per_dollar:
             best_holding = holding
             best_improvement_per_dollar = improvement_per_dollar
     
     if best_holding is None:
-        break  // no affordable holdings
+        break  // no more affordable improvements
     
-    shares_to_buy[best_holding] += 1
-    remaining_budget -= best_holding.price
+    shares_to_buy[best_holding.asset_id] += 1
+    remaining_budget -= best_holding.price_per_share
 
-return TradeRecommendation[] with final share counts
+// Build recommendations with all calculated data
+for each holding_shortfall:
+    shares = shares_to_buy[asset_id] || 0
+    total_amount = shares * price_per_share
+    
+    // Note: residual_amount is 0 (calculated per-category in frontend)
+    recommendations.push(TradeRecommendation {
+        asset_id,
+        symbol,
+        name,
+        category_id,
+        category_name,
+        action: "BUY",
+        shares,
+        price_per_share,
+        total_amount,
+        impact_percent,
+        current_percent_of_class,
+        target_percent_of_class,
+        residual_amount: 0,  // Frontend calculates per-category residual
+    })
 ```
+
+**Critical bug fix (2024-02-16)**: Original implementation incorrectly calculated 
+`current_pct_before` as just `holding.market_value / new_portfolio_total`, ignoring 
+shares already purchased in previous iterations. This caused the optimizer to stop 
+too early, leaving excessive remaining cash. The fix includes `current_shares * price` 
+in the calculation.
 
 **Properties**:
 - Buy-only (never suggests sells)
 - Whole shares only (no fractional)
-- Respects category budgets (scaled if cash insufficient)
-- Optimizes improvement per dollar within each category
-- Locked holdings excluded (future enhancement)
+- Respects category budgets (no cross-category spending)
+- Greedy optimization within each category independently
+- Returns ALL holdings (including 0-share) for UI toggle
+- Percentages tracked for display ("9.3% → 15.0% of Equity")
+- Category budgets returned for frontend residual calculation
 
 ### Backend Implementation
 
@@ -604,17 +702,25 @@ pub struct RebalancingInput {
     pub base_currency: String,
 }
 
+pub struct CategoryBudget {
+    pub category_id: String,
+    pub budget: Decimal,         // Allocated budget for this category
+}
+
 pub struct TradeRecommendation {
     pub asset_id: String,
     pub symbol: String,
     pub name: Option<String>,
     pub category_id: String,
     pub category_name: String,
-    pub action: String,          // Always "BUY"
-    pub shares: Decimal,         // Whole shares
-    pub price_per_share: Decimal,
-    pub total_amount: Decimal,   // shares * price
-    pub impact_percent: Decimal, // Deviation reduction in % points
+    pub action: String,                    // Always "BUY"
+    pub shares: Decimal,                   // Whole shares to buy
+    pub price_per_share: Decimal,          // Current market price
+    pub total_amount: Decimal,             // shares * price
+    pub impact_percent: Decimal,           // Deviation reduction in % points
+    pub current_percent_of_class: Decimal, // e.g., 9.3% of Equity (current)
+    pub target_percent_of_class: Decimal,  // e.g., 15.0% of Equity (target)
+    pub residual_amount: Decimal,          // 0 (calculated per-category in frontend)
 }
 
 pub struct RebalancingPlan {
@@ -624,8 +730,9 @@ pub struct RebalancingPlan {
     pub taxonomy_id: String,
     pub available_cash: Decimal,
     pub total_allocated: Decimal,
-    pub remaining_cash: Decimal,
-    pub additional_cash_needed: Decimal,
+    pub remaining_cash: Decimal,              // available - allocated
+    pub additional_cash_needed: Decimal,      // if shortfalls > available
+    pub category_budgets: Vec<CategoryBudget>, // **NEW** (2024-02-16)
     pub recommendations: Vec<TradeRecommendation>,
 }
 ```
@@ -693,6 +800,11 @@ interface RebalancingInput {
   baseCurrency: string;
 }
 
+interface CategoryBudget {
+  categoryId: string;
+  budget: number;
+}
+
 interface TradeRecommendation {
   assetId: string;
   symbol: string;
@@ -704,6 +816,9 @@ interface TradeRecommendation {
   pricePerShare: number;
   totalAmount: number;
   impactPercent: number;
+  currentPercentOfClass: number;  // NEW: current % within category
+  targetPercentOfClass: number;   // NEW: target % within category
+  residualAmount: number;         // Always 0 from backend
 }
 
 interface RebalancingPlan {
@@ -715,30 +830,175 @@ interface RebalancingPlan {
   totalAllocated: number;
   remainingCash: number;
   additionalCashNeeded: number;
+  categoryBudgets: CategoryBudget[];  // NEW: for residual calculation
   recommendations: TradeRecommendation[];
 }
 ```
 
+**Frontend residual calculation**:
+
+Per-category residual is calculated in the frontend using the backend-provided budgets:
+```typescript
+// In groupedRecommendations useMemo
+const categoryBudget = categorySummaries.find(
+  s => s.categoryId === categoryId
+)?.budget || 0;
+
+const totalSpent = recommendations.reduce((sum, r) => sum + r.totalAmount, 0);
+const residualAmount = Math.max(0, categoryBudget - totalSpent);
+```
+
+**Why not calculate residual in backend?**
+- Backend calculates per-holding, but residual is conceptually per-category
+- Frontend already has category grouping logic
+- Avoids sending redundant data (residual = budget - sum(amounts))
+- Single source of truth: `categoryBudgets` from backend
+
+**Relationship: remaining vs residuals**
+```
+remaining_cash = available_cash - total_allocated
+total_allocated = sum(all recommendations.totalAmount)
+
+residual_per_category = category_budget - sum(category_recommendations.totalAmount)
+sum(all residuals) ≈ remaining_cash  // (within rounding errors)
+```
+
 **Component structure** (`rebalancing-tab.tsx`):
 ```typescript
-export function RebalancingTab({ 
+function RebalancingTab({
+  selectedAccount,
+  onAccountChange,
   activeTarget,
-  deviationReport, 
-  baseCurrency 
+  deviationReport,
+  baseCurrency,
 }: RebalancingTabProps) {
   const [availableCash, setAvailableCash] = useState<string>("");
   const [plan, setPlan] = useState<RebalancingPlan | null>(null);
-  const [viewMode, setViewMode] = useState<"overview" | "detailed">("overview");
+  const [viewMode, setViewMode] = useState<"overview" | "detailed">("detailed");
   const [showZeroShares, setShowZeroShares] = useState(false);
-  
-  const handleCalculate = async () => {
-    const result = await calculateRebalancingPlan({
-      targetId: activeTarget.id,
-      availableCash: parseFloat(availableCash),
-      baseCurrency
+
+  // Calculate category summaries with budgets from backend
+  const categorySummaries = useMemo(() => {
+    if (!plan || !deviationReport) return [];
+    
+    // Initialize from deviation report
+    const summaries = new Map();
+    for (const deviation of deviationReport.deviations) {
+      summaries.set(deviation.categoryId, {
+        categoryId: deviation.categoryId,
+        categoryName: deviation.categoryName,
+        targetPercent: deviation.targetPercent,
+        currentPercent: deviation.currentPercent,
+        suggestedBuy: 0,
+        newPercent: deviation.currentPercent,
+        budget: 0,
+      });
+    }
+    
+    // Add budgets from backend
+    for (const categoryBudget of plan.categoryBudgets) {
+      const summary = summaries.get(categoryBudget.categoryId);
+      if (summary) {
+        summary.budget = categoryBudget.budget;
+      }
+    }
+    
+    // Add actual spending
+    for (const rec of plan.recommendations) {
+      const summary = summaries.get(rec.categoryId);
+      if (summary) {
+        summary.suggestedBuy += rec.totalAmount;
+      }
+    }
+    
+    // Calculate new percentages
+    const newTotalValue = deviationReport.totalValue + plan.totalAllocated;
+    for (const summary of summaries.values()) {
+      const deviation = deviationReport.deviations.find(
+        d => d.categoryId === summary.categoryId
+      );
+      if (deviation) {
+        const newValue = deviation.currentValue + summary.suggestedBuy;
+        summary.newPercent = newTotalValue > 0 
+          ? (newValue / newTotalValue) * 100 
+          : 0;
+      }
+    }
+    
+    return Array.from(summaries.values());
+  }, [plan, deviationReport]);
+
+  // Group recommendations with residual calculation
+  const groupedRecommendations = useMemo(() => {
+    if (!plan) return [];
+    
+    const groups = new Map();
+    for (const rec of plan.recommendations) {
+      if (!groups.has(rec.categoryId)) {
+        groups.set(rec.categoryId, []);
+      }
+      groups.get(rec.categoryId).push(rec);
+    }
+    
+    return Array.from(groups.entries()).map(([categoryId, recommendations]) => {
+      const totalAmount = recommendations.reduce((sum, r) => sum + r.totalAmount, 0);
+      
+      // Get budget from backend
+      const categoryBudget = categorySummaries.find(
+        s => s.categoryId === categoryId
+      )?.budget || 0;
+      
+      // Calculate residual
+      const residualAmount = Math.max(0, categoryBudget - totalAmount);
+      
+      return {
+        categoryId,
+        categoryName: recommendations[0]?.categoryName || categoryId,
+        recommendations, // ALL recommendations (including 0-share)
+        totalAmount,
+        residualAmount,
+      };
     });
-    setPlan(result);
+  }, [plan, categorySummaries]);
+
+  const handleCalculate = async () => {
+    if (!activeTarget || !availableCash || parseFloat(availableCash) <= 0) {
+      return;
+    }
+
+    setIsCalculating(true);
+    try {
+      const result = await calculateRebalancingPlan({
+        targetId: activeTarget.id,
+        availableCash: parseFloat(availableCash),
+        baseCurrency,
+      });
+      setPlan(result);
+    } catch (error) {
+      console.error("Failed to calculate rebalancing plan:", error);
+    } finally {
+      setIsCalculating(false);
+    }
   };
+
+  // Render logic with filtering and sorting
+  // Holdings sorted by totalAmount descending (largest first)
+  // Zero-share holdings filtered unless showZeroShares === true
+  return (
+    <>
+      {/* Input section */}
+      {/* Asset class cards (always visible) */}
+      {/* Detailed holdings (if viewMode === "detailed") */}
+      {/*   - Filtered by showZeroShares */}
+      {/*   - Sorted by totalAmount descending */}
+      {/*   - Grouped by category with Collapsible */}
+      {/*   - Shows: name, target%, before→after%, shares, amount */}
+      {/*   - Category residual at end if > 0.01 */}
+      {/* Summary section */}
+      {/* Export buttons */}
+    </>
+  );
+}
   
   return (
     <Card>
@@ -780,12 +1040,119 @@ export function RebalancingTab({
 
 **Detailed view**:
 - Grouped accordion by category
+- Holdings sorted by amount (descending)
+- Per-holding display:
+  - Name (clickable to holdings page)
+  - "Target: 15.0% of Equity"
+  - "9.3% → 15.0% of Equity" (before → after)
+  - "Shares: 5 × €33.49"
+  - Amount in green
+- Category residual at end: "Residual (can't buy whole shares): €5.84"
+- Eye toggle to show/hide zero-share holdings
+
+### Design Decisions (2024-02-16)
+
+**D1: Category budgets returned from backend**
+- Problem: Frontend needs category budget to calculate residual
+- Solution: Add `category_budgets: Vec<CategoryBudget>` to `RebalancingPlan`
+- Backend already calculates these, just needed to return them
+- Enables: `residual = budget - sum(spending)` in frontend
+- Alternative rejected: Recalculate shortfall + scaling in frontend (duplication)
+
+**D2: Zero-share holdings included in recommendations**
+- Problem: Holdings at/above target have 0 shares but should appear when toggled
+- Solution: Backend returns ALL holdings (even with shortfall = 0)
+- Frontend filters based on `showZeroShares` toggle
+- Example: "Indépendance AM Europe Small I (C)" at 16.4% (target 10%) → 0 shares
+
+**D3: Residual calculated per-category, not per-holding**
+- Problem: Residual represents unspent cash within category budget
+- Backend sets `residual_amount = 0` in `TradeRecommendation`
+- Frontend calculates: `residual = category_budget - sum(category_recs.totalAmount)`
+- Displayed once per category after all holdings
+- Conceptually correct: residual is leftover budget, not per-holding
+
+**D4: Greedy optimizer includes shares already bought**
+- Critical bug fix: Original code calculated improvement from initial holding value
+- Correct: Include shares purchased in previous iterations
+- Formula: `current_value_before = market_value + (current_shares * price)`
+- Impact: Fixes optimizer stopping too early, leaving 10-20% cash unallocated
+
+**D5: Holdings sorted by amount descending**
+- User sees largest recommendations first
+- Matches investment priority (biggest impact holdings)
+- Consistent with phase-4 UX
+
+**D6: Default view is "detailed"**
+- Power users want per-holding breakdown
+- Overview mode available but not default
+- Matches phase-4 behavior
 - Table: Symbol | Name | Shares | Price | Current%→Target% | Amount
 - Filter toggle for zero-share holdings
 
-**Export formats**:
-- Text: `"BUY 12 shares of VTI at $245.00 = $2,940.00"`
-- CSV: Headers `Symbol,Name,Action,Shares,Price,Amount`
+**D7: Categories without holdings get budget allocation**
+- Problem: Asset classes like Cash with no holding targets were skipped entirely
+- Solution: Backend creates category-level recommendation with `shares: 0`
+- Shows budget allocated to category even without specific holdings to buy
+- Example: Cash (5.0% target) → "Allocate €48.08 to Cash"
+- Ensures: `remaining ≈ sum(all category residuals)`
+
+**D8: Taxonomy colors for visual consistency**
+- Applied colored left border (4px) to category cards/collapsibles
+- Colors from `deviationReport.deviations[].color`
+- Matches Overview tab and Side Panel design
+- Helps users quickly identify categories across tabs
+
+**D9: UI polish and accessibility**
+- Holdings display as "Name (SYMBOL)" - e.g., "iShares Core S&P 500 UCITS ETF (CSP5.PA)"
+- Holding names are clickable links to `/holdings/{symbol}`
+- Added vertical spacing in cash input section
+- Rebalancing plan resets when account changes (prevents showing stale data)
+
+**D10: Export functionality with user feedback**
+- **Copy to clipboard**: Formatted plain text with category grouping
+  - Format: `BUY {shares} shares of {name} ({symbol}) at {price} = {amount}`
+  - Includes summary section with totals and remaining cash
+  - Fallback for older browsers using `execCommand('copy')`
+  - Toast notification confirms successful copy or shows error
+- **CSV download**: Spreadsheet export for detailed analysis
+  - Columns: Category | Symbol | Name | Action | Shares | Price | Amount
+  - Proper CSV escaping (quotes, commas, newlines)
+  - Filename format: `YYYY-MM-DD-rebalancing-suggestions.csv` (date-first for sorting)
+  - Toast notification confirms download
+- Both features respect `showZeroShares` toggle and category grouping
+- Disabled when no plan exists
+
+**D11: State persistence and navigation**
+- **SessionStorage for rebalancing state**: Plan and cash input persist per account
+  - Survives navigation to holdings and back (React Router Link)
+  - Survives page refresh
+  - Cleared when browser closes
+  - Account switching properly resets to new account's state
+- **SessionStorage for selected account**: Account selection persists across tab switches
+  - Remembered when navigating between Overview and Rebalancing tabs
+  - Remembered when navigating to other pages (Insights) and back
+  - Cleared when browser closes
+- **Client-side navigation**: Holdings links use React Router `<Link>` for instant navigation
+  - No full page reload
+  - Smooth user experience matching other pages
+
+**D12: UI polish and validation**
+- **Number input cleanup**: Removed spinner arrows from percentage inputs
+  - CSS: `[appearance:textfield]` + webkit pseudo-element hiding
+  - Applies to Overview tab target inputs and Side panel holding target inputs
+- **Empty state validation**: Shows "No allocation targets set" when:
+  - No PortfolioTarget exists, OR
+  - PortfolioTarget exists but has zero asset class allocations
+  - Prevents UI showing with invalid/orphaned target data
+- **Navigation order**: Allocations moved after Insights in main menu
+  - Order: Dashboard → Holdings → Insights → Allocations → Activities → Assistant
+- **Missing holding targets warning**: In Allocation Plan cards
+  - Shows amber info message when category has budget but no holding targets configured
+  - Detection: Category has budget > 0 but only category-level recommendation (no specific holdings)
+  - Message: "Configure holding targets in Overview tab for detailed suggestions"
+  - Does NOT show for categories with no holdings (like Cash) - only for categories with holdings but missing targets
+  - Helps users discover incomplete configuration
 
 ### Verify
 
@@ -802,11 +1169,31 @@ export function RebalancingTab({
 2. Navigate to Rebalancing tab
 3. Enter $10,000 cash
 4. Click Calculate
-5. Verify Overview shows category buys
-6. Verify Detailed shows per-holding trades
-7. Verify Summary: allocated + remaining + needed
-8. Test edge cases: zero cash, very large cash, insufficient cash
-9. Test export: Copy and CSV download
+5. Verify Overview shows category buys with colored borders
+6. Verify Detailed shows per-holding trades with colored category borders
+7. Verify holding names show as "Name (SYMBOL)" and are clickable
+8. Verify Summary: allocated + remaining + needed
+9. Test zero-share holdings toggle (Eye icon)
+10. Test state persistence:
+    - Click holding name → navigate to holding page → back arrow → verify plan still intact
+    - Refresh page (F5) → verify plan and account selection persist
+    - Switch accounts → verify resets to blank for new account
+    - Close browser → reopen → verify resets to "All Portfolio"
+11. Test account switching:
+    - Switch from Account A to "All Portfolio" → verify plan resets
+    - Switch back to Account A → verify blank (no persisted plan from before)
+12. Test export features:
+    - Click "Copy Text" → verify toast notification → paste and verify format
+    - Click "Export CSV" → verify toast notification → verify file downloads as `YYYY-MM-DD-rebalancing-suggestions.csv`
+    - Open CSV and verify columns: Category | Symbol | Name | Action | Shares | Price | Amount
+13. Test edge cases: zero cash, very large cash, insufficient cash, categories without holdings (Cash)
+14. Test empty states: Account with no targets shows "No allocation targets set" message
+15. Test number inputs: Verify no spinner arrows on percentage inputs in Overview and Side panel
+16. Test missing holding targets warning:
+    - Create category target (e.g., Bonds 10%) but don't configure holding targets
+    - Calculate rebalancing with available cash
+    - Verify amber warning shows in Allocation Plan card: "Configure holding targets in Overview tab for detailed suggestions"
+    - Verify Cash (no holdings) does NOT show the warning
 
 **End-to-end**:
 ```bash

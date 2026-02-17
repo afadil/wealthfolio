@@ -1857,6 +1857,14 @@ export interface TradeRecommendation {
   pricePerShare: number;
   totalAmount: number;
   impactPercent: number;
+  currentPercentOfClass: number;
+  targetPercentOfClass: number;
+  residualAmount: number;
+}
+
+export interface CategoryBudget {
+  categoryId: string;
+  budget: number;
 }
 
 export interface RebalancingPlan {
@@ -1868,5 +1876,6 @@ export interface RebalancingPlan {
   totalAllocated: number;
   remainingCash: number;
   additionalCashNeeded: number;
+  categoryBudgets: CategoryBudget[];
   recommendations: TradeRecommendation[];
 }

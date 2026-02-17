@@ -1,7 +1,6 @@
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useMemo, useState, useEffect } from "react";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { EmptyPlaceholder } from "@wealthfolio/ui";
 
 import { SwipablePage, type SwipablePageView } from "@/components/page";
 import { AllocationsOverview } from "./components/allocations-overview";
@@ -25,22 +24,44 @@ const AllocationsPage = () => {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
 
-  const [selectedAccount, setSelectedAccount] = useState<Account | null>({
-    id: PORTFOLIO_ACCOUNT_ID,
-    name: "All Portfolio",
-    accountType: "PORTFOLIO" as unknown as Account["accountType"],
-    balance: 0,
-    currency: baseCurrency,
-    isDefault: false,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  } as Account);
+  // Persist selected account in sessionStorage
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(() => {
+    const stored = sessionStorage.getItem("allocations-selected-account");
+    if (stored) {
+      try {
+        return JSON.parse(stored) as Account;
+      } catch {
+        // If parsing fails, return default
+      }
+    }
+    return {
+      id: PORTFOLIO_ACCOUNT_ID,
+      name: "All Portfolio",
+      accountType: "PORTFOLIO" as unknown as Account["accountType"],
+      balance: 0,
+      currency: baseCurrency,
+      isDefault: false,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as Account;
+  });
+
+  // Persist account selection to sessionStorage
+  useEffect(() => {
+    if (selectedAccount) {
+      sessionStorage.setItem("allocations-selected-account", JSON.stringify(selectedAccount));
+    }
+  }, [selectedAccount]);
 
   const accountId = selectedAccount?.id ?? PORTFOLIO_ACCOUNT_ID;
   const { targets } = usePortfolioTargets(accountId);
   const activeTarget = targets.find((t) => t.isActive) ?? targets[0] ?? null;
   const { deviationReport } = useAllocationDeviations(activeTarget?.id);
+
+  const handleAccountSelect = (account: Account) => {
+    setSelectedAccount(account);
+  };
 
   const views: SwipablePageView[] = useMemo(
     () => [
@@ -50,7 +71,10 @@ const AllocationsPage = () => {
         icon: Icons.PieChart,
         content: (
           <Suspense fallback={<LoadingSkeleton />}>
-            <AllocationsOverview />
+            <AllocationsOverview
+              selectedAccount={selectedAccount}
+              onAccountChange={handleAccountSelect}
+            />
           </Suspense>
         ),
       },
@@ -60,12 +84,15 @@ const AllocationsPage = () => {
         icon: Icons.ArrowLeftRight,
         content: (
           <Suspense fallback={<LoadingSkeleton />}>
-            <RebalancingTab
-              selectedAccount={selectedAccount}
-              activeTarget={activeTarget}
-              deviationReport={deviationReport}
-              baseCurrency={baseCurrency}
-            />
+            {selectedAccount && (
+              <RebalancingTab
+                selectedAccount={selectedAccount}
+                onAccountChange={handleAccountSelect}
+                activeTarget={activeTarget}
+                deviationReport={deviationReport ?? null}
+                baseCurrency={baseCurrency}
+              />
+            )}
           </Suspense>
         ),
       },
