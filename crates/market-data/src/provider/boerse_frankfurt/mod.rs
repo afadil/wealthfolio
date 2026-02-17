@@ -19,12 +19,14 @@ use tokio::sync::RwLock;
 use tracing::warn;
 
 use crate::errors::MarketDataError;
-use crate::models::{Coverage, InstrumentKind, ProviderInstrument, Quote, QuoteContext};
+use crate::models::{AssetProfile, Coverage, InstrumentKind, ProviderInstrument, Quote, QuoteContext};
 use crate::provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
 
 const PROVIDER_ID: &str = "BOERSE_FRANKFURT";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const BASE_URL: &str = "https://api.live.deutsche-boerse.com/v1/data/price_history";
+const INSTRUMENT_INFO_URL: &str =
+    "https://api.live.deutsche-boerse.com/v1/data/instrument_information";
 const MAIN_JS_URL: &str = "https://live.deutsche-boerse.com";
 
 /// A single data point from the BF price history response.
@@ -54,6 +56,20 @@ struct PriceHistoryResponse {
     total_count: Option<u32>,
     #[allow(dead_code)]
     traded_in_percent: Option<bool>,
+}
+
+/// Response from the instrument_information endpoint.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct InstrumentInfoResponse {
+    instrument_name: Option<InstrumentName>,
+}
+
+/// Nested name object within instrument_information response.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct InstrumentName {
+    original_value: Option<String>,
 }
 
 /// Boerse Frankfurt provider for bond market data.
@@ -186,6 +202,55 @@ impl BoerseFrankfurtProvider {
         );
 
         headers
+    }
+
+    /// Fetch the instrument name for a bond ISIN.
+    async fn fetch_instrument_name(&self, isin: &str) -> Result<String, MarketDataError> {
+        let salt = self.get_salt().await?;
+
+        let url = format!("{}?isin={}&mic=XFRA", INSTRUMENT_INFO_URL, isin);
+
+        let timestamp = Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
+        let headers = Self::build_headers(&timestamp, &url, &salt);
+
+        let resp = self
+            .client
+            .get(&url)
+            .headers(headers)
+            .send()
+            .await
+            .map_err(|e| MarketDataError::ProviderError {
+                provider: PROVIDER_ID.to_string(),
+                message: format!("HTTP request failed: {}", e),
+            })?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            if status.as_u16() == 401 || status.as_u16() == 403 {
+                let mut w = self.salt.write().await;
+                *w = None;
+            }
+            return Err(MarketDataError::ProviderError {
+                provider: PROVIDER_ID.to_string(),
+                message: format!("HTTP {}", status),
+            });
+        }
+
+        let body: InstrumentInfoResponse =
+            resp.json()
+                .await
+                .map_err(|e| MarketDataError::ProviderError {
+                    provider: PROVIDER_ID.to_string(),
+                    message: format!("JSON parse error: {}", e),
+                })?;
+
+        body.instrument_name
+            .and_then(|n| n.original_value)
+            .filter(|n| !n.is_empty())
+            .ok_or_else(|| MarketDataError::ProviderError {
+                provider: PROVIDER_ID.to_string(),
+                message: format!("No instrument name found for {}", isin),
+            })
     }
 
     /// Fetch price history for a bond ISIN.
@@ -343,7 +408,7 @@ impl MarketDataProvider for BoerseFrankfurtProvider {
             supports_latest: true,
             supports_historical: true,
             supports_search: false,
-            supports_profile: false,
+            supports_profile: true,
         }
     }
 
@@ -412,6 +477,11 @@ impl MarketDataProvider for BoerseFrankfurtProvider {
         self.fetch_price_history(&isin, &min_date, &max_date, currency_hint)
             .await
     }
+
+    async fn get_profile(&self, symbol: &str) -> Result<AssetProfile, MarketDataError> {
+        let name = self.fetch_instrument_name(symbol).await?;
+        Ok(AssetProfile::with_name(name))
+    }
 }
 
 #[cfg(test)]
@@ -438,7 +508,7 @@ mod tests {
         assert!(caps.supports_latest);
         assert!(caps.supports_historical);
         assert!(!caps.supports_search);
-        assert!(!caps.supports_profile);
+        assert!(caps.supports_profile);
     }
 
     #[test]

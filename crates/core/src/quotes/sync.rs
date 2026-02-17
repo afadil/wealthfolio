@@ -674,6 +674,27 @@ where
                                         .await;
                                 }
                             }
+
+                            // Enrich bond name if it's still a placeholder (name == ISIN)
+                            if asset.is_bond() {
+                                let is_placeholder = asset
+                                    .name
+                                    .as_ref()
+                                    .zip(asset.instrument_symbol.as_ref())
+                                    .map(|(n, s)| n == s)
+                                    .unwrap_or(false);
+                                if is_placeholder {
+                                    if let Ok(profile) = client.get_profile(&asset).await {
+                                        if let Some(name) = profile.name {
+                                            let _ = self
+                                                .asset_repo
+                                                .update_name(&asset.id, &name)
+                                                .await;
+                                        }
+                                    }
+                                }
+                            }
+
                             // Update sync state after a successful sync attempt.
                             if let Err(e) = self.sync_state_store.update_after_sync(&asset.id).await
                             {

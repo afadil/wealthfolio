@@ -39,8 +39,8 @@ use crate::secrets::SecretStore;
 use wealthfolio_market_data::{
     mic_to_currency, mic_to_exchange_name, yahoo_exchange_to_mic, yahoo_suffix_to_mic,
     AlphaVantageProvider, AssetProfile as MarketAssetProfile, BoerseFrankfurtProvider,
-    BondQuoteMetadata, FinnhubProvider, MarketDataAppProvider, MetalPriceApiProvider, ProviderId,
-    ProviderRegistry, Quote as MarketQuote, QuoteContext, ResolverChain,
+    BondQuoteMetadata, FinnhubProvider, MarketDataAppProvider, MetalPriceApiProvider, OpenFigiProvider,
+    ProviderId, ProviderRegistry, Quote as MarketQuote, QuoteContext, ResolverChain,
     SearchResult as MarketSearchResult, UsTreasuryCalcProvider, YahooProvider,
 };
 
@@ -135,8 +135,12 @@ impl MarketDataClient {
         }
 
         // Always register bond providers (no API key needed)
-        providers.push(Arc::new(BoerseFrankfurtProvider::new()));
+        // UST Calc first (pricing priority for treasuries; no profile support)
+        // BF second (European bond pricing + profile names)
+        // OpenFIGI last (profile-only fallback for US bonds BF can't resolve)
         providers.push(Arc::new(UsTreasuryCalcProvider::new()));
+        providers.push(Arc::new(BoerseFrankfurtProvider::new()));
+        providers.push(Arc::new(OpenFigiProvider::new()));
 
         if providers.is_empty() {
             warn!(

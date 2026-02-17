@@ -391,6 +391,20 @@ impl AssetRepositoryTrait for AssetRepository {
             .await
     }
 
+    async fn update_name(&self, asset_id: &str, name: &str) -> Result<()> {
+        let asset_id_owned = asset_id.to_string();
+        let name_owned = name.to_string();
+        self.writer
+            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+                diesel::update(assets::table.filter(assets::id.eq(asset_id_owned)))
+                    .set(assets::name.eq(name_owned))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                Ok(())
+            })
+            .await
+    }
+
     async fn deactivate(&self, asset_id: &str) -> Result<()> {
         let asset_id_owned = asset_id.to_string();
         self.writer

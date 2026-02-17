@@ -154,6 +154,10 @@ impl AssetRepositoryTrait for MockAssetRepository {
         unimplemented!()
     }
 
+    async fn update_name(&self, _asset_id: &str, _name: &str) -> Result<()> {
+        unimplemented!()
+    }
+
     async fn deactivate(&self, _asset_id: &str) -> Result<()> {
         Ok(())
     }

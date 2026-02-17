@@ -109,6 +109,9 @@ pub trait AssetRepositoryTrait: Send + Sync {
         config: serde_json::Value,
     ) -> Result<Asset>;
 
+    /// Updates only the name column for an asset.
+    async fn update_name(&self, asset_id: &str, name: &str) -> Result<()>;
+
     /// Deactivates an asset (sets is_active=0).
     /// Used when merging UNKNOWN assets into resolved ones.
     async fn deactivate(&self, asset_id: &str) -> Result<()>;
