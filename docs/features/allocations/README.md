@@ -1167,12 +1167,12 @@ function RebalancingTab({
 
 ---
 
-### Algorithm Improvement Plan (To Be Implemented)
+### Algorithm Improvement: Efficient Rebalancing (To Be Implemented)
 
 **Current Issue: Conservative algorithm leaves cash unallocated**
 
 **Problem:**
-The greedy optimization algorithm stops when buying another share would overshoot the target, even if budget remains. This leaves significant cash unallocated.
+The current "greedy" optimization algorithm stops when buying another share would overshoot the target, even if budget remains. This leaves significant cash unallocated.
 
 Example:
 ```
@@ -1197,9 +1197,9 @@ if improvement_per_dollar > best_improvement_per_dollar {
 
 When ALL holdings would overshoot their targets, `improvement_per_dollar <= 0` for all, so `best_asset` stays `None` and loop breaks, leaving cash unused.
 
-**Proposed Solution: Buy until category ceiling**
+**Proposed Solution: "Efficient Rebalancing" Algorithm**
 
-Three-phase approach:
+Three-phase approach to maximize cash deployment while respecting category targets:
 
 1. **Phase 1: Reduce deviation** (current behavior)
    - Buy shares that move holdings closer to their targets
