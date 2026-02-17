@@ -89,6 +89,21 @@ impl ProviderCapabilities {
                     "Profiles".to_string(),
                 ],
             }),
+            "BOERSE_FRANKFURT" => Some(Self {
+                instruments: "Bonds".to_string(),
+                coverage: "European".to_string(),
+                features: vec!["Historical".to_string(), "Profiles".to_string()],
+            }),
+            "US_TREASURY_CALC" => Some(Self {
+                instruments: "US Treasury Bonds".to_string(),
+                coverage: "US only".to_string(),
+                features: vec!["Historical".to_string()],
+            }),
+            "OPENFIGI" => Some(Self {
+                instruments: "Bonds".to_string(),
+                coverage: "US & European".to_string(),
+                features: vec!["Profiles".to_string()],
+            }),
             _ => None,
         }
     }

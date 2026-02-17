@@ -40,6 +40,17 @@ use super::sync_state::{
 use super::types::{AssetId, Day, ProviderId};
 use crate::activities::ActivityRepositoryTrait;
 use crate::assets::{Asset, AssetKind, AssetRepositoryTrait, QuoteMode};
+
+/// Default provider for an asset when no preferred provider is set.
+/// Bonds default to Boerse Frankfurt (the most general bond provider);
+/// everything else defaults to Yahoo.
+fn default_provider_for(asset: &Asset) -> String {
+    if asset.is_bond() {
+        DATA_SOURCE_BOERSE_FRANKFURT.to_string()
+    } else {
+        DATA_SOURCE_YAHOO.to_string()
+    }
+}
 use crate::errors::Error;
 use crate::errors::Result;
 use crate::utils::time_utils;
@@ -395,7 +406,7 @@ where
                 .get(&asset.id)
                 .map(|s| s.data_source.clone())
                 .or_else(|| asset.preferred_provider())
-                .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string());
+                .unwrap_or_else(|| default_provider_for(asset));
             assets_by_provider
                 .entry(provider)
                 .or_default()
@@ -502,7 +513,7 @@ where
                 .unwrap_or_else(|| SyncCategory::New.default_priority()),
             data_source: asset
                 .preferred_provider()
-                .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string()),
+                .unwrap_or_else(|| default_provider_for(asset)),
             quote_symbol: None, // Derived from asset during fetch
             currency: asset.quote_ccy.clone(),
         })
@@ -1141,7 +1152,7 @@ where
                     asset.id.clone(),
                     asset
                         .preferred_provider()
-                        .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string()),
+                        .unwrap_or_else(|| default_provider_for(asset)),
                 );
                 // is_active is derived from position_closed_date (None = active)
                 // QuoteSyncState::new() already sets position_closed_date = None
@@ -1223,7 +1234,7 @@ where
                 .get(&asset.id)
                 .map(|s| s.data_source.clone())
                 .or_else(|| asset.preferred_provider())
-                .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string());
+                .unwrap_or_else(|| default_provider_for(asset));
             assets_by_provider
                 .entry(provider)
                 .or_default()
@@ -1243,7 +1254,7 @@ where
                 .as_ref()
                 .map(|s| s.data_source.clone())
                 .or_else(|| asset.preferred_provider())
-                .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string());
+                .unwrap_or_else(|| default_provider_for(asset));
             let effective_today =
                 effective_market_today(now, asset.instrument_exchange_mic.as_deref());
             let fetch_end_date =
@@ -1447,7 +1458,7 @@ where
                     symbol.to_string(),
                     asset
                         .preferred_provider()
-                        .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string()),
+                        .unwrap_or_else(|| default_provider_for(&asset)),
                 );
                 // is_active is derived from position_closed_date (None = active)
                 // QuoteSyncState::new() already sets position_closed_date = None

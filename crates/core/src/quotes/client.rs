@@ -134,14 +134,6 @@ impl MarketDataClient {
             }
         }
 
-        // Always register bond providers (no API key needed)
-        // UST Calc first (pricing priority for treasuries; no profile support)
-        // BF second (European bond pricing + profile names)
-        // OpenFIGI last (profile-only fallback for US bonds BF can't resolve)
-        providers.push(Arc::new(UsTreasuryCalcProvider::new()));
-        providers.push(Arc::new(BoerseFrankfurtProvider::new()));
-        providers.push(Arc::new(OpenFigiProvider::new()));
-
         if providers.is_empty() {
             warn!(
                 "No market data providers initialized! Enabled: {:?}, Errors: {:?}",
@@ -212,6 +204,15 @@ impl MarketDataClient {
                     }
                 }
                 Ok(None)
+            }
+            DATA_SOURCE_BOERSE_FRANKFURT => {
+                Ok(Some(Arc::new(BoerseFrankfurtProvider::new())))
+            }
+            DATA_SOURCE_US_TREASURY_CALC => {
+                Ok(Some(Arc::new(UsTreasuryCalcProvider::new())))
+            }
+            DATA_SOURCE_OPENFIGI => {
+                Ok(Some(Arc::new(OpenFigiProvider::new())))
             }
             _ => {
                 warn!("Unknown provider ID: {}", provider_id);
