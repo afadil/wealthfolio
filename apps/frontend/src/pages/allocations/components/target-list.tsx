@@ -530,7 +530,7 @@ export function TargetList({
                   <div className="flex items-center gap-2">
                     <div className="bg-muted relative h-7 flex-1 overflow-hidden rounded">
                       <div
-                        className="absolute inset-y-0 left-0 rounded opacity-60"
+                        className="absolute inset-y-0 left-0 rounded opacity-50 dark:opacity-70"
                         style={{
                           width: `${Math.min(displayPercent, 100)}%`,
                           backgroundColor: d.color,

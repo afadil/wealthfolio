@@ -471,7 +471,7 @@ export function CategorySidePanel({
                   style={{ backgroundColor: `${categoryColor}20` }}
                 >
                   <div
-                    className="absolute inset-y-0 left-0 rounded"
+                    className="absolute inset-y-0 left-0 rounded opacity-50 dark:opacity-70"
                     style={{
                       width: `${Math.min(categoryPercent, 100)}%`,
                       backgroundColor: categoryColor,
@@ -493,7 +493,7 @@ export function CategorySidePanel({
                   style={{ backgroundColor: `${categoryColor}20` }}
                 >
                   <div
-                    className="absolute inset-y-0 left-0 rounded opacity-80"
+                    className="absolute inset-y-0 left-0 rounded"
                     style={{
                       width: `${Math.min(actualPercent, 100)}%`,
                       backgroundColor: categoryColor,

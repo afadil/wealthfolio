@@ -73,7 +73,7 @@ export function AllocationDonut({
       return { label: "Underweight", color: "text-blue-600 dark:text-blue-400", icon: ArrowDown };
     }
     return { label: "Aligned", color: "text-green-600 dark:text-green-400", icon: Minus };
-  }, [activeItem, currentData, targetData, totalCurrent, totalTarget]);
+  }, [activeItem, totalCurrent, targetData, totalTarget]);
 
   const hasData = targetData.length > 0 || currentData.length > 0;
 
@@ -87,7 +87,7 @@ export function AllocationDonut({
 
   return (
     <div className={cn("relative max-h-full max-w-full", className)}>
-      <ChartContainer config={{}} className="aspect-square h-full w-full [&>div]:!aspect-square">
+      <ChartContainer config={{}} className="aspect-square h-full w-full [&>div]:aspect-square">
         <PieChart
           onMouseLeave={handleMouseLeave}
           margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
