@@ -999,9 +999,26 @@ impl AssetServiceTrait for AssetService {
             .unwrap_or_else(|| existing_asset.quote_ccy.clone());
 
         // Build profile update from provider data
+        let mut enriched_name = provider_profile.name.or(existing_asset.name.clone());
+
+        // Append weight suffix for metals (e.g., "Gold" → "Gold - 1kg")
+        if existing_asset.is_metal() {
+            if let Some(suffix) = existing_asset
+                .instrument_symbol
+                .as_deref()
+                .and_then(|s| s.split_once('-'))
+                .map(|(_, s)| s.to_lowercase())
+                .filter(|s| s != "1oz")
+            {
+                if let Some(ref name) = enriched_name {
+                    enriched_name = Some(format!("{} - {}", name, suffix));
+                }
+            }
+        }
+
         let mut update = UpdateAssetProfile {
             display_code: existing_asset.display_code.clone(),
-            name: provider_profile.name.or(existing_asset.name.clone()),
+            name: enriched_name,
             notes: existing_asset.notes.clone().unwrap_or_default(),
             kind: None,
             quote_mode: Some(existing_asset.quote_mode),
