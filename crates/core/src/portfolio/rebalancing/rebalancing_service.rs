@@ -150,7 +150,9 @@ impl RebalancingServiceImpl {
     }
 
     /// Optimize whole-share purchases within a category budget (Step 4).
-    /// Uses greedy algorithm to maximize improvement per dollar spent.
+    /// Uses "Efficient Rebalancing" algorithm:
+    /// - Phase 1: Buy shares that reduce deviation (improve targets)
+    /// - Phase 2: Use remaining budget without exceeding category ceiling
     fn optimize_whole_shares(
         &self,
         holdings: &[HoldingSummary],
@@ -200,7 +202,11 @@ impl RebalancingServiceImpl {
             }
         }
 
-        // Greedy optimization: iteratively buy 1 more share where it helps most
+        // ============================================================
+        // PHASE 1: Efficient Rebalancing - Reduce Deviation
+        // Buy shares that move holdings closer to their targets
+        // Continue while improvement_per_dollar > 0
+        // ============================================================
         loop {
             let mut best_asset: Option<String> = None;
             let mut best_improvement_per_dollar = Decimal::ZERO;
@@ -271,7 +277,7 @@ impl RebalancingServiceImpl {
                 shares_to_buy.insert(asset_id.clone(), current + Decimal::ONE);
                 remaining_budget -= price;
             } else {
-                // No more beneficial purchases possible
+                // Phase 1 complete: No more purchases that reduce deviation
                 break;
             }
 
@@ -279,6 +285,12 @@ impl RebalancingServiceImpl {
                 break;
             }
         }
+
+        // ============================================================
+        // PHASE 2: Efficient Rebalancing - Use Remaining Budget
+        // Buy shares that don't exceed category ceiling
+        // TODO: Implement in next step
+        // ============================================================
 
         // Build recommendations from final share counts
         // Include ALL holdings (even with 0 shares) so frontend can show/hide them
