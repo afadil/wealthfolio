@@ -310,12 +310,6 @@ impl RebalancingServiceImpl {
                     })
                     .sum();
 
-                let category_current_percent = if new_total_value > Decimal::ZERO {
-                    (category_current_value / new_total_value) * dec!(100)
-                } else {
-                    Decimal::ZERO
-                };
-
                 // Try each affordable holding
                 for shortfall in &shortfalls {
                     if shortfall.price_per_share > remaining_budget {
