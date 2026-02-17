@@ -141,6 +141,11 @@ export function RebalancingTab({
     // Group by category
     groupedRecommendations
       .filter((group) => {
+        // Exclude Cash categories
+        const isCashCategory =
+          group.categoryId === "CASH" || group.categoryId === "CASH_BANK_DEPOSITS";
+        if (isCashCategory) return false;
+
         const totalShares = group.recommendations.reduce((sum, r) => sum + r.shares, 0);
         return showZeroShares || totalShares > 0;
       })
@@ -224,6 +229,11 @@ export function RebalancingTab({
     // Data rows
     groupedRecommendations
       .filter((group) => {
+        // Exclude Cash categories
+        const isCashCategory =
+          group.categoryId === "CASH" || group.categoryId === "CASH_BANK_DEPOSITS";
+        if (isCashCategory) return false;
+
         const totalShares = group.recommendations.reduce((sum, r) => sum + r.shares, 0);
         return showZeroShares || totalShares > 0;
       })
@@ -546,6 +556,7 @@ export function RebalancingTab({
                 const categoryColor = deviation?.color || "#888888";
 
                 // Check if category has holdings but no targets configured
+                // Exclude Cash categories since they don't support holding-level targets
                 const categoryGroup = groupedRecommendations.find(
                   (g) => g.categoryId === summary.categoryId,
                 );
@@ -553,7 +564,10 @@ export function RebalancingTab({
                   categoryGroup?.recommendations.length === 1 &&
                   categoryGroup.recommendations[0].assetId === summary.categoryId &&
                   categoryGroup.recommendations[0].shares === 0;
-                const hasHoldingsWithoutTargets = summary.budget > 0 && isCategoryLevelOnly;
+                const isCashCategory =
+                  summary.categoryId === "CASH" || summary.categoryId === "CASH_BANK_DEPOSITS";
+                const hasHoldingsWithoutTargets =
+                  summary.budget > 0 && isCategoryLevelOnly && !isCashCategory;
 
                 return (
                   <div
@@ -659,6 +673,11 @@ export function RebalancingTab({
 
                   {groupedRecommendations
                     .filter((group) => {
+                      // Exclude Cash categories - they don't support holding-level targets
+                      const isCashCategory =
+                        group.categoryId === "CASH" || group.categoryId === "CASH_BANK_DEPOSITS";
+                      if (isCashCategory) return false;
+
                       // Filter out asset classes with 0 total shares unless toggle is on
                       const totalShares = group.recommendations.reduce(
                         (sum, r) => sum + r.shares,

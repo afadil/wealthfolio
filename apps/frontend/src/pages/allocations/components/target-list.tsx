@@ -466,28 +466,30 @@ export function TargetList({
                   <div className="flex items-center gap-2">
                     <div className="h-3 w-3 rounded-full" style={{ backgroundColor: d.color }} />
                     <span className="font-medium">{d.categoryName}</span>
-                    {onCategoryClick && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 text-xs"
-                        onClick={() => {
-                          const savedAllocation = getSavedAllocation(d.categoryId);
-                          onCategoryClick(
-                            d.categoryId,
-                            d.categoryName,
-                            d.color,
-                            displayPercent,
-                            d.currentPercent,
-                            savedAllocation?.id,
-                          );
-                        }}
-                        title="View and edit holdings"
-                      >
-                        <Icons.ChevronRight className="h-3 w-3" />
-                        Holdings
-                      </Button>
-                    )}
+                    {onCategoryClick &&
+                      d.categoryId !== "CASH" &&
+                      d.categoryId !== "CASH_BANK_DEPOSITS" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs"
+                          onClick={() => {
+                            const savedAllocation = getSavedAllocation(d.categoryId);
+                            onCategoryClick(
+                              d.categoryId,
+                              d.categoryName,
+                              d.color,
+                              displayPercent,
+                              d.currentPercent,
+                              savedAllocation?.id,
+                            );
+                          }}
+                          title="View and edit holdings"
+                        >
+                          <Icons.ChevronRight className="h-3 w-3" />
+                          Holdings
+                        </Button>
+                      )}
                   </div>
                   <Button
                     variant="ghost"

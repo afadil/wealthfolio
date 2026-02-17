@@ -1154,6 +1154,134 @@ function RebalancingTab({
   - Does NOT show for categories with no holdings (like Cash) - only for categories with holdings but missing targets
   - Helps users discover incomplete configuration
 
+**D10: Cash category handling (2024-02-17)**
+- Problem: Cash holdings (EUR, USD, etc.) are synthetic IDs without real asset records
+- Cannot create `holding_targets` for Cash (requires asset_id foreign key)
+- Solution: Block Cash from holding-level targeting entirely
+  - Hide "Holdings" button for CASH/CASH_BANK_DEPOSITS categories in target list
+  - Prevent donut chart clicks from opening side panel for Cash
+  - Exclude Cash from detailed rebalancing view
+  - Hide "Configure holding targets" warning for Cash
+- Rationale: Cash is fungible, category-level allocation (e.g., 5%) is sufficient
+- Alternative assets (personal assets) DO have real asset IDs and support holding targets
+
+---
+
+### Algorithm Improvement Plan (To Be Implemented)
+
+**Current Issue: Conservative algorithm leaves cash unallocated**
+
+**Problem:**
+The greedy optimization algorithm stops when buying another share would overshoot the target, even if budget remains. This leaves significant cash unallocated.
+
+Example:
+```
+Available cash: €1000
+Equity target: 70% (shortfall €397.61)
+Commodities target: 25% (shortfall €161.28)
+Cash target: 5% (shortfall €47.63)
+Total needed: €606.52
+
+Algorithm allocates: €606.52
+Remaining unused: €393.48 ❌
+```
+
+**Root Cause:**
+In `optimize_whole_shares()` (line 253 in `rebalancing_service.rs`):
+```rust
+if improvement_per_dollar > best_improvement_per_dollar {
+    best_improvement_per_dollar = improvement_per_dollar;
+    best_asset = Some(shortfall.asset_id.clone());
+}
+```
+
+When ALL holdings would overshoot their targets, `improvement_per_dollar <= 0` for all, so `best_asset` stays `None` and loop breaks, leaving cash unused.
+
+**Proposed Solution: Buy until category ceiling**
+
+Three-phase approach:
+
+1. **Phase 1: Reduce deviation** (current behavior)
+   - Buy shares that move holdings closer to their targets
+   - Continue while `improvement_per_dollar > 0`
+
+2. **Phase 2: Respect category ceilings** (NEW)
+   - When Phase 1 exhausts, continue buying BUT
+   - Only buy if it won't exceed the **category-level target**
+   - Example: Equity at 62%, target 70% → can still buy Equity holdings
+   - Stop when category would exceed its target (e.g., 70.1%)
+   - Move to next category with remaining budget
+
+3. **Phase 3: Small overshoots allowed** (OPTIONAL)
+   - If budget still remains after Phase 2
+   - Allow buying that overshoots category targets by max 1-2%
+   - Maximizes capital deployment while staying conservative
+
+**Implementation Logic:**
+```rust
+// Pseudocode for Phase 2
+loop {
+    let mut best_asset: Option<String> = None;
+    let mut best_score = Decimal::ZERO;
+
+    for shortfall in &shortfalls {
+        if shortfall.price_per_share > remaining_budget {
+            continue; // Can't afford
+        }
+
+        // Calculate new category % after this purchase
+        let new_category_percent = calculate_category_percent_after_buy(
+            &shortfall,
+            &shares_to_buy,
+            category_current_value,
+            new_total_value
+        );
+
+        // Allow if doesn't overshoot category ceiling
+        if new_category_percent <= category_target_percent {
+            // Score by: distance from target (prefer furthest below)
+            let score = category_target_percent - new_category_percent;
+            if score > best_score {
+                best_score = score;
+                best_asset = Some(shortfall.asset_id.clone());
+            }
+        }
+    }
+
+    if best_asset.is_none() {
+        break; // All categories at/above ceiling
+    }
+
+    // Buy the best asset
+    // ... (same as current implementation)
+}
+```
+
+**Benefits:**
+- ✅ Uses more available cash (better capital efficiency)
+- ✅ Respects category targets (won't overshoot asset class allocations)
+- ✅ Still conservative (doesn't force overweight positions)
+- ✅ Practical (maximizes investment of available capital)
+
+**Trade-offs:**
+- ⚠️ Some categories might be slightly under-target if share prices are large
+- ⚠️ Algorithm complexity increases slightly
+- ⚠️ Need to track category-level totals during optimization
+
+**Files to Modify:**
+- `crates/core/src/portfolio/rebalancing/rebalancing_service.rs`
+  - Update `optimize_whole_shares()` method (around line 200-285)
+  - Add Phase 2 loop after Phase 1 exhausts
+  - Add helper: `calculate_category_percent_after_buy()`
+
+**Testing:**
+- Unit tests with various share prices and category targets
+- Verify: Uses maximum budget without exceeding category ceilings
+- Edge case: Large share prices (e.g., Berkshire Hathaway)
+- Edge case: Multiple categories, different shortfall amounts
+
+---
+
 ### Verify
 
 **Backend tests** (`rebalancing_service_tests.rs`):

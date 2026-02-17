@@ -202,6 +202,11 @@ export function AllocationsOverview({
   // Handle click from donut chart (only receives categoryId)
   const handleDonutClick = useCallback(
     (categoryId: string) => {
+      // Don't allow drilling into Cash categories (they have synthetic holdings)
+      if (categoryId === "CASH" || categoryId === "CASH_BANK_DEPOSITS") {
+        return;
+      }
+
       // Find the deviation for this category
       const deviation = deviations.find((d) => d.categoryId === categoryId);
       if (!deviation) return;
