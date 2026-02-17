@@ -1211,12 +1211,7 @@ Two-phase approach to maximize cash deployment while respecting category targets
 - Score by distance from ceiling (prefer furthest below)
 - Location: `rebalancing_service.rs` lines 288-366
 
-**Phase 3: Small overshoots allowed** (FUTURE/OPTIONAL)
-- Not yet implemented
-- If budget still remains after Phase 2
-- Could allow buying that overshoots category targets by max 1-2%
-- Would maximize capital deployment even further
-- Decision: Wait for real-world usage data before adding
+
 
 **Implementation Details:**
 
@@ -1263,6 +1258,95 @@ if remaining_budget > Decimal::ZERO {
 - ✅ Manual testing: Confirmed improvement with €1000 cash example
 - ⏳ Unit tests: To be added
 - ⏳ Edge cases: Large share prices, multiple categories - to be tested
+
+---
+
+### Future Enhancements (Optional)
+
+**Allow Small Overshoots for Maximum Cash Utilization**
+
+**Current State:**
+- Algorithm stops when buying would exceed category target
+- Typical remaining cash: 5-10% of available funds
+- Example: €1000 available → €900-950 allocated
+
+**Proposed Enhancement:**
+Allow users to optionally permit small overshoots (1-2%) per category to maximize cash deployment.
+
+**Benefits:**
+- Higher cash utilization: 95-98% (vs current 90-95%)
+- Minimize idle cash in account
+- Flexible for different investor preferences
+
+**Implementation Options:**
+
+**Option A: Simple Toggle (Recommended)**
+```
+Settings → Portfolio Target → Rebalancing
+☐ Allow small overshoots to maximize cash deployment
+  Permits up to 2% overshoot per category to use remaining budget
+```
+
+**Option B: User-Defined Limit**
+```
+Max overshoot per category: [2.0]%
+  Range: 0% (disabled) to 5%
+  Default: 0% (conservative)
+```
+
+**Option C: Rebalancing Strategy Presets**
+```
+Rebalancing Strategy: [Conservative ▼]
+  • Conservative: Stop at target (90-95% utilization)
+  • Balanced: Allow 1% overshoot (95-97% utilization)
+  • Aggressive: Allow 2% overshoot (97-98% utilization)
+```
+
+**Technical Design:**
+
+*Database:*
+- Add column to `allocation_targets` table: `max_overshoot_percent REAL DEFAULT 0`
+- Nullable: NULL = disabled (conservative)
+- Range validation: 0.0 to 5.0
+
+*Backend:*
+```rust
+// After Phase 2, if budget remains and setting enabled
+if remaining_budget > 0 && max_overshoot_percent > 0.0 {
+    // Phase 3: Allow small overshoots
+    let overshoot_ceiling = category_target_percent + max_overshoot_percent;
+    
+    // Buy until hitting overshoot ceiling
+    // ... (similar to Phase 2 but with higher ceiling)
+}
+```
+
+*Frontend:*
+- Add toggle/slider to target settings
+- Show in Overview tab: "Overshoot allowed: ±2%"
+- Display in results: "Equity: 71.5% (target 70%, +1.5% overshoot)"
+
+**Trade-offs:**
+- ✅ Maximizes capital efficiency
+- ✅ User has control (opt-in)
+- ✅ Transparent (clearly shown)
+- ⚠️ Adds complexity to UI/UX
+- ⚠️ May confuse beginners ("why 71% when target is 70%?")
+- ⚠️ Requires validation and clear messaging
+
+**Recommendation:**
+- **Default**: Disabled (conservative, 0% overshoot)
+- **Storage**: Per-target setting (not global)
+- **UI**: Simple toggle in target settings, optional slider for advanced users
+- **Decision**: Wait for user feedback before implementing
+  - Current 90-95% utilization may be sufficient for most users
+  - Implement if users frequently ask "why isn't all my cash used?"
+
+**Estimated Effort:**
+- Backend: 1-2 hours (add setting column, implement logic)
+- Frontend: 1 hour (add toggle/slider to settings UI)
+- Testing: 30 minutes
+- Total: 2.5-3.5 hours
 
 ---
 
