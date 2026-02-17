@@ -763,6 +763,41 @@ html.app-lockdown .allow-select {
   touch-action: manipulation;
 }
 
+/* Print styles — let chat content flow across pages */
+@media print {
+  /* Remove fixed height/overflow so content flows naturally */
+  html,
+  body,
+  #root,
+  #root * {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Hide non-printable UI */
+  .aui-thread-viewport-footer,
+  .aui-thread-scroll-to-bottom,
+  .aui-assistant-action-bar-root,
+  .aui-user-action-bar-root,
+  .aui-branch-picker-root,
+  .aui-thread-welcome-suggestions {
+    display: none !important;
+  }
+
+  /* Hide sidebar and header */
+  aside,
+  header {
+    display: none !important;
+  }
+
+  /* Disable animations */
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 .liquid-glass {
   background: var(--liquid-glass-bg);
   backdrop-filter: blur(5px);
