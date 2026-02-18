@@ -147,30 +147,28 @@ within a category, referencing `portfolio_target_allocations.id`.
 
 - `crates/core/src/portfolio/targets/` — models, traits, service, deviation
   calculator
+- `crates/core/src/portfolio/rebalancing/` — rebalancing models, service, unit tests
 - `crates/storage-sqlite/src/portfolio/targets/` — Diesel repository
-- `apps/tauri/src/commands/portfolio_targets.rs` — 9 Tauri IPC commands
+- `apps/tauri/src/commands/portfolio_targets.rs` — 15 Tauri IPC commands
 - `apps/server/src/api/portfolio_targets.rs` — Axum REST routes
-- Migration: `crates/storage-sqlite/migrations/2026-02-11-000001_portfolio_targets/`
+- Migrations: `2026-02-11` (targets), `2026-02-13` (FK fix), `2026-02-15` (holding_targets)
 - Deviation calculator composes `AllocationService` for current state, compares
   against target percentages per category
 
-### Frontend (placeholder, needs redesign) — committed but will be reworked
+### Frontend — complete
 
 - Types in `lib/types.ts`: PortfolioTarget, TargetAllocation, AllocationDeviation,
-  DeviationReport, etc.
+  DeviationReport, HoldingTarget, RebalancingPlan, etc.
 - Schema in `lib/schemas.ts`: newPortfolioTargetSchema
 - Query keys in `lib/query-keys.ts`: PORTFOLIO_TARGETS, TARGET_ALLOCATIONS,
-  ALLOCATION_DEVIATIONS
-- Adapter in `adapters/shared/portfolio-targets.ts`: 9 adapter functions
+  ALLOCATION_DEVIATIONS, HOLDING_TARGETS
+- Adapters in `adapters/shared/portfolio-targets.ts`: 15 adapter functions
 - Web COMMANDS map entries in `adapters/web/core.ts`
 - Hooks in `hooks/use-portfolio-targets.ts`
 - Mutations in `pages/allocations/use-target-mutations.ts`
-- Page + components in `pages/allocations/` (will be reworked)
+- Page + all components in `pages/allocations/` — fully implemented
 - Route at `/allocations` in `routes.tsx`
 - Nav entry in `app-navigation.tsx`
-
-The adapters, hooks, mutations, types, and backend are solid. The page and
-components need a full redesign per the plan below.
 
 ---
 
@@ -749,7 +747,6 @@ pub trait RebalancingService: Send + Sync {
 pub struct RebalancingServiceImpl {
     target_service: Arc<dyn TargetService>,
     allocation_service: Arc<dyn AllocationService>,
-    holdings_service: Arc<dyn HoldingsService>,
 }
 ```
 
@@ -1438,6 +1435,12 @@ Section 3 (rebalancing advisor): ✅ COMPLETE
   3.4  ✅ Rebalancing tab UI (overview + detailed modes)
   3.5  ✅ Copy/export actions (clipboard + CSV)
   3.6  ✅ Polish + test
+  3.7  ✅ Unit tests for rebalancing service algorithm (5 scenarios)
+
+Post-PR fixes:
+  ✅ Rename misleading assetId params → symbol in HoldingTargetRow/CategorySidePanel
+  ✅ Category allocation batch save made atomic (batch_save_target_allocations)
+  ✅ Remove unused use-allocation-validation.ts hook (dead code)
 ```
 
 ---
@@ -1451,8 +1454,10 @@ Section 3 (rebalancing advisor): ✅ COMPLETE
 | `crates/core/src/portfolio/targets/target_model.rs` | Domain models |
 | `crates/core/src/portfolio/targets/target_traits.rs` | Service + repository traits |
 | `crates/core/src/portfolio/targets/target_service.rs` | CRUD + deviation calculator |
-| `crates/storage-sqlite/src/portfolio/targets/` | Diesel repository |
-| `apps/tauri/src/commands/portfolio_targets.rs` | Tauri IPC commands |
+| `crates/storage-sqlite/src/portfolio/targets/repository.rs` | Diesel repository |
+| `crates/core/src/portfolio/rebalancing/rebalancing_service.rs` | Two-phase greedy algorithm + unit tests |
+| `crates/core/src/portfolio/rebalancing/rebalancing_model.rs` | Rebalancing data structures |
+| `apps/tauri/src/commands/portfolio_targets.rs` | Tauri IPC commands (15 total) |
 | `apps/server/src/api/portfolio_targets.rs` | Axum REST routes |
 
 ### Frontend (built/modified)
@@ -1462,7 +1467,7 @@ Section 3 (rebalancing advisor): ✅ COMPLETE
 | `adapters/shared/portfolio-targets.ts` | ✅ Done (includes HoldingTarget adapters) |
 | `adapters/web/core.ts` (COMMANDS entries) | ✅ Done |
 | `hooks/use-portfolio-targets.ts` | ✅ Done |
-| `pages/allocations/use-target-mutations.ts` | ✅ Done |
+| `pages/allocations/use-target-mutations.ts` | ✅ Done (batch save atomic via `batch_save_target_allocations`) |
 | `lib/types.ts` (PortfolioTarget, HoldingTarget, etc.) | ✅ Done |
 | `lib/schemas.ts` (newPortfolioTargetSchema) | ✅ Done |
 | `lib/query-keys.ts` (PORTFOLIO_TARGETS, HOLDING_TARGETS, etc.) | ✅ Done |
