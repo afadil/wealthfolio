@@ -411,6 +411,621 @@ impl RebalancingServiceImpl {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::portfolio::allocation::{AllocationHoldings, PortfolioAllocations};
+    use crate::portfolio::holdings::{HoldingSummary, HoldingType};
+    use crate::portfolio::targets::{
+        AllocationDeviation, DeviationReport, HoldingTarget, NewHoldingTarget, NewPortfolioTarget,
+        NewTargetAllocation, PortfolioTarget, PortfolioTargetServiceTrait, TargetAllocation,
+    };
+    use chrono::NaiveDateTime;
+    use rust_decimal_macros::dec;
+
+    // ---------------------------------------------------------------
+    // Mock helpers
+    // ---------------------------------------------------------------
+
+    fn naive_now() -> NaiveDateTime {
+        chrono::Utc::now().naive_utc()
+    }
+
+    fn make_target(id: &str, account_id: &str) -> PortfolioTarget {
+        PortfolioTarget {
+            id: id.to_string(),
+            name: "Test Target".to_string(),
+            account_id: account_id.to_string(),
+            taxonomy_id: "asset_classes".to_string(),
+            is_active: true,
+            created_at: naive_now(),
+            updated_at: naive_now(),
+        }
+    }
+
+    fn make_allocation(
+        id: &str,
+        target_id: &str,
+        category_id: &str,
+        target_percent: i32,
+    ) -> TargetAllocation {
+        TargetAllocation {
+            id: id.to_string(),
+            target_id: target_id.to_string(),
+            category_id: category_id.to_string(),
+            target_percent,
+            is_locked: false,
+            created_at: naive_now(),
+            updated_at: naive_now(),
+        }
+    }
+
+    fn make_holding_target(
+        allocation_id: &str,
+        asset_id: &str,
+        target_percent: i32,
+    ) -> HoldingTarget {
+        HoldingTarget {
+            id: format!("ht-{}", asset_id),
+            allocation_id: allocation_id.to_string(),
+            asset_id: asset_id.to_string(),
+            target_percent,
+            is_locked: false,
+            created_at: naive_now(),
+            updated_at: naive_now(),
+        }
+    }
+
+    fn make_holding_summary(
+        id: &str,
+        symbol: &str,
+        quantity: Decimal,
+        market_value: Decimal,
+    ) -> HoldingSummary {
+        HoldingSummary {
+            id: id.to_string(),
+            symbol: symbol.to_string(),
+            name: Some(symbol.to_string()),
+            holding_type: HoldingType::Security,
+            quantity,
+            market_value,
+            currency: "USD".to_string(),
+            weight_in_category: Decimal::ZERO,
+            instrument_type_category: None,
+        }
+    }
+
+    fn make_deviation(
+        category_id: &str,
+        target_percent: Decimal,
+        current_percent: Decimal,
+        current_value: Decimal,
+        total_value: Decimal,
+    ) -> AllocationDeviation {
+        let target_value = (target_percent / dec!(100)) * total_value;
+        AllocationDeviation {
+            category_id: category_id.to_string(),
+            category_name: category_id.to_string(),
+            color: "#000".to_string(),
+            target_percent,
+            current_percent,
+            deviation_percent: current_percent - target_percent,
+            current_value,
+            target_value,
+            value_delta: current_value - target_value,
+            is_locked: false,
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // Mock PortfolioTargetService
+    // ---------------------------------------------------------------
+
+    struct MockTargetService {
+        target: PortfolioTarget,
+        allocations: Vec<TargetAllocation>,
+        deviation_report: DeviationReport,
+        holding_targets: Vec<HoldingTarget>,
+    }
+
+    #[async_trait]
+    impl PortfolioTargetServiceTrait for MockTargetService {
+        fn get_targets_by_account(&self, _: &str) -> Result<Vec<PortfolioTarget>> {
+            Ok(vec![self.target.clone()])
+        }
+        fn get_target(&self, _: &str) -> Result<Option<PortfolioTarget>> {
+            Ok(Some(self.target.clone()))
+        }
+        async fn create_target(&self, _: NewPortfolioTarget) -> Result<PortfolioTarget> {
+            unimplemented!()
+        }
+        async fn update_target(&self, _: PortfolioTarget) -> Result<PortfolioTarget> {
+            unimplemented!()
+        }
+        async fn delete_target(&self, _: &str) -> Result<usize> {
+            unimplemented!()
+        }
+        fn get_allocations_by_target(&self, _: &str) -> Result<Vec<TargetAllocation>> {
+            Ok(self.allocations.clone())
+        }
+        async fn upsert_allocation(&self, _: NewTargetAllocation) -> Result<TargetAllocation> {
+            unimplemented!()
+        }
+        async fn batch_save_target_allocations(
+            &self,
+            _: Vec<NewTargetAllocation>,
+        ) -> Result<Vec<TargetAllocation>> {
+            unimplemented!()
+        }
+        async fn delete_allocation(&self, _: &str) -> Result<usize> {
+            unimplemented!()
+        }
+        async fn get_deviation_report(&self, _: &str, _: &str) -> Result<DeviationReport> {
+            Ok(self.deviation_report.clone())
+        }
+        fn get_holding_targets_by_allocation(&self, _: &str) -> Result<Vec<HoldingTarget>> {
+            Ok(self.holding_targets.clone())
+        }
+        async fn upsert_holding_target(&self, _: NewHoldingTarget) -> Result<HoldingTarget> {
+            unimplemented!()
+        }
+        async fn batch_save_holding_targets(
+            &self,
+            _: Vec<NewHoldingTarget>,
+        ) -> Result<Vec<HoldingTarget>> {
+            unimplemented!()
+        }
+        async fn delete_holding_target(&self, _: &str) -> Result<usize> {
+            unimplemented!()
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // Mock AllocationService
+    // ---------------------------------------------------------------
+
+    struct MockAllocationService {
+        holdings: Vec<HoldingSummary>,
+        category_name: String,
+    }
+
+    #[async_trait]
+    impl AllocationServiceTrait for MockAllocationService {
+        async fn get_portfolio_allocations(
+            &self,
+            _: &str,
+            _: &str,
+        ) -> Result<PortfolioAllocations> {
+            unimplemented!()
+        }
+        async fn get_holdings_by_allocation(
+            &self,
+            _: &str,
+            _: &str,
+            taxonomy_id: &str,
+            category_id: &str,
+        ) -> Result<AllocationHoldings> {
+            Ok(AllocationHoldings {
+                taxonomy_id: taxonomy_id.to_string(),
+                taxonomy_name: taxonomy_id.to_string(),
+                category_id: category_id.to_string(),
+                category_name: self.category_name.clone(),
+                color: "#000".to_string(),
+                holdings: self.holdings.clone(),
+                total_value: self.holdings.iter().map(|h| h.market_value).sum(),
+                currency: "USD".to_string(),
+            })
+        }
+    }
+
+    fn make_service(
+        target: PortfolioTarget,
+        allocations: Vec<TargetAllocation>,
+        deviation_report: DeviationReport,
+        holding_targets: Vec<HoldingTarget>,
+        holdings: Vec<HoldingSummary>,
+    ) -> RebalancingServiceImpl {
+        RebalancingServiceImpl::new(
+            Arc::new(MockTargetService {
+                target,
+                allocations,
+                deviation_report,
+                holding_targets,
+            }),
+            Arc::new(MockAllocationService {
+                holdings,
+                category_name: "Equity".to_string(),
+            }),
+        )
+    }
+
+    // ---------------------------------------------------------------
+    // Tests
+    // ---------------------------------------------------------------
+
+    /// Basic case: 1 category (EQUITY 70% target, currently 45%),
+    /// 2 holdings, enough cash. Expect shares are bought and cash is deployed.
+    #[tokio::test]
+    async fn test_basic_buy_recommendations() {
+        let total_value = dec!(10000);
+        // VTI: 200 shares × $22.50 = $4500 (45% of portfolio)
+        // Equity target: 70% → target value = $7000 (with $1000 cash: new total = $11000, target = $7700)
+        let holdings = vec![make_holding_summary("vti", "VTI", dec!(200), dec!(4500))];
+        let target = make_target("t1", "acc1");
+        let alloc = make_allocation("alloc1", "t1", "EQUITY", 7000); // 70.00%
+        let deviation = make_deviation("EQUITY", dec!(70), dec!(45), dec!(4500), total_value);
+        let deviation_report = DeviationReport {
+            target_id: "t1".to_string(),
+            target_name: "Test".to_string(),
+            account_id: "acc1".to_string(),
+            taxonomy_id: "asset_classes".to_string(),
+            total_value,
+            deviations: vec![deviation],
+        };
+        // VTI is 100% of EQUITY category (10000 bps = 100.00%)
+        let holding_targets = vec![make_holding_target("alloc1", "vti", 10000)];
+
+        let svc = make_service(
+            target,
+            vec![alloc],
+            deviation_report,
+            holding_targets,
+            holdings,
+        );
+
+        let input = RebalancingInput {
+            target_id: "t1".to_string(),
+            available_cash: dec!(1000),
+            base_currency: "USD".to_string(),
+        };
+        let plan = svc.calculate_rebalancing_plan(input).await.unwrap();
+
+        // Should have bought some VTI shares
+        let vti_rec = plan
+            .recommendations
+            .iter()
+            .find(|r| r.asset_id == "vti")
+            .unwrap();
+        assert!(
+            vti_rec.shares > Decimal::ZERO,
+            "Expected shares to be bought for VTI"
+        );
+        assert_eq!(vti_rec.action, "BUY");
+        // Total allocated must not exceed available cash
+        assert!(plan.total_allocated <= dec!(1000));
+        assert!(plan.remaining_cash >= Decimal::ZERO);
+    }
+
+    /// When total shortfall exceeds available cash, budgets must be scaled proportionally.
+    #[tokio::test]
+    async fn test_budget_scaling_when_cash_insufficient() {
+        let total_value = dec!(10000);
+        // Two categories both underweight, combined shortfall > available cash
+        // EQUITY: target 60%, current 40% → shortfall = (60% of 11000) - 4000 = $2600
+        // BONDS:  target 40%, current 20% → shortfall = (40% of 11000) - 2000 = $2400
+        // Total shortfall = $5000, available = $1000 → scale factor = 0.2
+        let target = make_target("t1", "acc1");
+        let alloc_eq = make_allocation("alloc-eq", "t1", "EQUITY", 6000);
+        let alloc_bd = make_allocation("alloc-bd", "t1", "BONDS", 4000);
+        let deviations = vec![
+            make_deviation("EQUITY", dec!(60), dec!(40), dec!(4000), total_value),
+            make_deviation("BONDS", dec!(40), dec!(20), dec!(2000), total_value),
+        ];
+        let deviation_report = DeviationReport {
+            target_id: "t1".to_string(),
+            target_name: "Test".to_string(),
+            account_id: "acc1".to_string(),
+            taxonomy_id: "asset_classes".to_string(),
+            total_value,
+            deviations,
+        };
+        let holding_targets_eq = vec![make_holding_target("alloc-eq", "vti", 10000)];
+        let holding_targets_bd = vec![make_holding_target("alloc-bd", "bnd", 10000)];
+        // MockAllocationService returns same holdings for all calls — use EQUITY holdings
+        // For simplicity use a single holding per category; we combine them in the mock
+        let holdings_eq = vec![make_holding_summary("vti", "VTI", dec!(178), dec!(4000))];
+        let holdings_bd = vec![make_holding_summary("bnd", "BND", dec!(28), dec!(2000))];
+
+        // Build a custom service that serves different holdings per category
+        struct MultiCategoryAllocationService {
+            equity_holdings: Vec<HoldingSummary>,
+            bond_holdings: Vec<HoldingSummary>,
+        }
+        #[async_trait]
+        impl AllocationServiceTrait for MultiCategoryAllocationService {
+            async fn get_portfolio_allocations(
+                &self,
+                _: &str,
+                _: &str,
+            ) -> Result<PortfolioAllocations> {
+                unimplemented!()
+            }
+            async fn get_holdings_by_allocation(
+                &self,
+                _: &str,
+                _: &str,
+                _: &str,
+                category_id: &str,
+            ) -> Result<AllocationHoldings> {
+                let holdings = if category_id == "EQUITY" {
+                    self.equity_holdings.clone()
+                } else {
+                    self.bond_holdings.clone()
+                };
+                Ok(AllocationHoldings {
+                    taxonomy_id: "asset_classes".to_string(),
+                    taxonomy_name: "Asset Classes".to_string(),
+                    category_id: category_id.to_string(),
+                    category_name: category_id.to_string(),
+                    color: "#000".to_string(),
+                    total_value: holdings.iter().map(|h| h.market_value).sum(),
+                    holdings,
+                    currency: "USD".to_string(),
+                })
+            }
+        }
+
+        struct MultiCategoryTargetService {
+            target: PortfolioTarget,
+            allocations: Vec<TargetAllocation>,
+            deviation_report: DeviationReport,
+            holding_targets_eq: Vec<HoldingTarget>,
+            holding_targets_bd: Vec<HoldingTarget>,
+        }
+        #[async_trait]
+        impl PortfolioTargetServiceTrait for MultiCategoryTargetService {
+            fn get_targets_by_account(&self, _: &str) -> Result<Vec<PortfolioTarget>> {
+                Ok(vec![self.target.clone()])
+            }
+            fn get_target(&self, _: &str) -> Result<Option<PortfolioTarget>> {
+                Ok(Some(self.target.clone()))
+            }
+            async fn create_target(&self, _: NewPortfolioTarget) -> Result<PortfolioTarget> {
+                unimplemented!()
+            }
+            async fn update_target(&self, _: PortfolioTarget) -> Result<PortfolioTarget> {
+                unimplemented!()
+            }
+            async fn delete_target(&self, _: &str) -> Result<usize> {
+                unimplemented!()
+            }
+            fn get_allocations_by_target(&self, _: &str) -> Result<Vec<TargetAllocation>> {
+                Ok(self.allocations.clone())
+            }
+            async fn upsert_allocation(&self, _: NewTargetAllocation) -> Result<TargetAllocation> {
+                unimplemented!()
+            }
+            async fn batch_save_target_allocations(
+                &self,
+                _: Vec<NewTargetAllocation>,
+            ) -> Result<Vec<TargetAllocation>> {
+                unimplemented!()
+            }
+            async fn delete_allocation(&self, _: &str) -> Result<usize> {
+                unimplemented!()
+            }
+            async fn get_deviation_report(&self, _: &str, _: &str) -> Result<DeviationReport> {
+                Ok(self.deviation_report.clone())
+            }
+            fn get_holding_targets_by_allocation(
+                &self,
+                allocation_id: &str,
+            ) -> Result<Vec<HoldingTarget>> {
+                if allocation_id == "alloc-eq" {
+                    Ok(self.holding_targets_eq.clone())
+                } else {
+                    Ok(self.holding_targets_bd.clone())
+                }
+            }
+            async fn upsert_holding_target(&self, _: NewHoldingTarget) -> Result<HoldingTarget> {
+                unimplemented!()
+            }
+            async fn batch_save_holding_targets(
+                &self,
+                _: Vec<NewHoldingTarget>,
+            ) -> Result<Vec<HoldingTarget>> {
+                unimplemented!()
+            }
+            async fn delete_holding_target(&self, _: &str) -> Result<usize> {
+                unimplemented!()
+            }
+        }
+
+        let svc = RebalancingServiceImpl::new(
+            Arc::new(MultiCategoryTargetService {
+                target,
+                allocations: vec![alloc_eq, alloc_bd],
+                deviation_report,
+                holding_targets_eq,
+                holding_targets_bd,
+            }),
+            Arc::new(MultiCategoryAllocationService {
+                equity_holdings: holdings_eq,
+                bond_holdings: holdings_bd,
+            }),
+        );
+
+        let input = RebalancingInput {
+            target_id: "t1".to_string(),
+            available_cash: dec!(1000),
+            base_currency: "USD".to_string(),
+        };
+        let plan = svc.calculate_rebalancing_plan(input).await.unwrap();
+
+        // Total allocated must not exceed available cash
+        assert!(
+            plan.total_allocated <= dec!(1000),
+            "Over-allocated: {}",
+            plan.total_allocated
+        );
+        // Both categories should get some budget (plan has recs for both)
+        let cats: Vec<&str> = plan
+            .recommendations
+            .iter()
+            .map(|r| r.category_id.as_str())
+            .collect();
+        assert!(cats.contains(&"EQUITY"), "Expected EQUITY recommendations");
+        assert!(cats.contains(&"BONDS"), "Expected BONDS recommendations");
+        // additional_cash_needed should reflect the unmet shortfall
+        assert!(
+            plan.additional_cash_needed > Decimal::ZERO,
+            "Expected additional cash needed"
+        );
+    }
+
+    /// Category with no holding targets gets a category-level recommendation (shares=0).
+    #[tokio::test]
+    async fn test_category_without_holding_targets_gets_budget_recommendation() {
+        let total_value = dec!(10000);
+        let target = make_target("t1", "acc1");
+        let alloc = make_allocation("alloc1", "t1", "CASH", 500); // 5% target
+        let deviation = make_deviation("CASH", dec!(5), dec!(2), dec!(200), total_value);
+        let deviation_report = DeviationReport {
+            target_id: "t1".to_string(),
+            target_name: "Test".to_string(),
+            account_id: "acc1".to_string(),
+            taxonomy_id: "asset_classes".to_string(),
+            total_value,
+            deviations: vec![deviation],
+        };
+        // No holding targets for CASH
+        let holding_targets = vec![];
+        let holdings = vec![];
+
+        let svc = make_service(
+            target,
+            vec![alloc],
+            deviation_report,
+            holding_targets,
+            holdings,
+        );
+
+        let input = RebalancingInput {
+            target_id: "t1".to_string(),
+            available_cash: dec!(1000),
+            base_currency: "USD".to_string(),
+        };
+        let plan = svc.calculate_rebalancing_plan(input).await.unwrap();
+
+        let cash_rec = plan
+            .recommendations
+            .iter()
+            .find(|r| r.category_id == "CASH")
+            .unwrap();
+        assert_eq!(
+            cash_rec.shares,
+            Decimal::ZERO,
+            "Cash category should have 0 shares"
+        );
+        assert!(
+            cash_rec.total_amount > Decimal::ZERO,
+            "Cash category should have budget allocated"
+        );
+    }
+
+    /// Zero available cash: plan should have zero recommendations with amounts.
+    #[tokio::test]
+    async fn test_zero_cash_produces_no_allocations() {
+        let total_value = dec!(10000);
+        let target = make_target("t1", "acc1");
+        let alloc = make_allocation("alloc1", "t1", "EQUITY", 7000);
+        let deviation = make_deviation("EQUITY", dec!(70), dec!(45), dec!(4500), total_value);
+        let deviation_report = DeviationReport {
+            target_id: "t1".to_string(),
+            target_name: "Test".to_string(),
+            account_id: "acc1".to_string(),
+            taxonomy_id: "asset_classes".to_string(),
+            total_value,
+            deviations: vec![deviation],
+        };
+        let holding_targets = vec![make_holding_target("alloc1", "vti", 10000)];
+        let holdings = vec![make_holding_summary("vti", "VTI", dec!(200), dec!(4500))];
+
+        let svc = make_service(
+            target,
+            vec![alloc],
+            deviation_report,
+            holding_targets,
+            holdings,
+        );
+
+        let input = RebalancingInput {
+            target_id: "t1".to_string(),
+            available_cash: dec!(0),
+            base_currency: "USD".to_string(),
+        };
+        let plan = svc.calculate_rebalancing_plan(input).await.unwrap();
+
+        assert_eq!(plan.total_allocated, Decimal::ZERO);
+        assert_eq!(plan.remaining_cash, Decimal::ZERO);
+        // No shares should be bought
+        for rec in &plan.recommendations {
+            assert_eq!(
+                rec.shares,
+                Decimal::ZERO,
+                "Expected zero shares with zero cash"
+            );
+        }
+    }
+
+    /// Phase 2 should deploy remaining cash without exceeding category ceiling.
+    #[tokio::test]
+    async fn test_phase2_deploys_remaining_cash_without_overshoot() {
+        // EQUITY target 70%, currently 45% ($4500), price $22.50/share
+        // $1000 cash → new total = $11000, target = $7700
+        // Shortfall = $3200 (only $1000 available) → scale = 1.0
+        // Phase 1 buys floor($1000/$22.50) = 44 shares = $990 → $10 remaining
+        // Phase 2 should not buy another share ($22.50 > $10)
+        let total_value = dec!(10000);
+        let holdings = vec![make_holding_summary("vti", "VTI", dec!(200), dec!(4500))];
+        let target = make_target("t1", "acc1");
+        let alloc = make_allocation("alloc1", "t1", "EQUITY", 7000);
+        let deviation = make_deviation("EQUITY", dec!(70), dec!(45), dec!(4500), total_value);
+        let deviation_report = DeviationReport {
+            target_id: "t1".to_string(),
+            target_name: "Test".to_string(),
+            account_id: "acc1".to_string(),
+            taxonomy_id: "asset_classes".to_string(),
+            total_value,
+            deviations: vec![deviation],
+        };
+        let holding_targets = vec![make_holding_target("alloc1", "vti", 10000)];
+
+        let svc = make_service(
+            target,
+            vec![alloc],
+            deviation_report,
+            holding_targets,
+            holdings,
+        );
+
+        let input = RebalancingInput {
+            target_id: "t1".to_string(),
+            available_cash: dec!(1000),
+            base_currency: "USD".to_string(),
+        };
+        let plan = svc.calculate_rebalancing_plan(input).await.unwrap();
+
+        let vti_rec = plan
+            .recommendations
+            .iter()
+            .find(|r| r.asset_id == "vti")
+            .unwrap();
+        // Category ceiling: 70% of $11000 = $7700. Current after buys: $4500 + shares*$22.50
+        // Must not exceed ceiling
+        let shares_bought = vti_rec.shares;
+        let new_value = dec!(4500) + shares_bought * dec!(22.5);
+        let new_pct = (new_value / dec!(11000)) * dec!(100);
+        assert!(
+            new_pct <= dec!(70),
+            "Category ceiling exceeded: {}%",
+            new_pct
+        );
+        // Must not overspend
+        assert!(plan.total_allocated <= dec!(1000));
+    }
+}
+
 #[async_trait]
 impl RebalancingService for RebalancingServiceImpl {
     async fn calculate_rebalancing_plan(&self, input: RebalancingInput) -> Result<RebalancingPlan> {
