@@ -315,7 +315,22 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
     );
 
     useEffect(() => {
-      if (selectedResult) return;
+      if (selectedResult) {
+        const exchangeDisplay =
+          selectedResult.exchangeName || getExchangeDisplayName(selectedResult.exchange);
+        const exchangeSuffix = exchangeDisplay ? ` (${exchangeDisplay})` : "";
+        const displayText = `${selectedResult.symbol} - ${
+          selectedResult.longName || selectedResult.shortName || selectedResult.symbol
+        }${exchangeSuffix}`;
+        setSelected(displayText);
+        setSelectedTicker({
+          symbol: selectedResult.symbol,
+          name: selectedResult.longName || selectedResult.shortName || selectedResult.symbol,
+          exchangeDisplay: exchangeDisplay || "",
+        });
+        return;
+      }
+
       const current = value ?? defaultValue ?? "";
       if (!current) {
         setSelected("");
