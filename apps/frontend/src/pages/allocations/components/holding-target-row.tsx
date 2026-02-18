@@ -12,9 +12,9 @@ export interface HoldingTargetRowProps {
   categoryPercent: number;
   baseCurrency: string;
   totalValue: number;
-  onEditChange: (assetId: string, value: number) => void;
-  onToggleLock: (assetId: string) => void;
-  onDelete: (assetId: string) => void;
+  onEditChange: (symbol: string, value: number) => void;
+  onToggleLock: (symbol: string) => void;
+  onDelete: (symbol: string) => void;
   onNavigate: (holdingId: string) => void;
   getCascadedPercent: (holdingPercent: number) => number;
 }

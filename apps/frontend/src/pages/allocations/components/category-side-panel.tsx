@@ -265,14 +265,14 @@ export function CategorySidePanel({
   }, [isOpen, groupedHoldings]);
 
   // Handle edit change
-  const handleEditChange = useCallback((assetId: string, value: number) => {
+  const handleEditChange = useCallback((symbol: string, value: number) => {
     const clamped = Math.max(0, Math.min(100, value));
     const rounded = Math.round(clamped * 100) / 100;
 
     setPendingEdits((prev) => {
       const next = new Map(prev);
-      const existing = prev.get(assetId);
-      next.set(assetId, {
+      const existing = prev.get(symbol);
+      next.set(symbol, {
         targetPercent: rounded,
         isLocked: existing?.isLocked ?? false,
         userSet: true,
@@ -284,17 +284,17 @@ export function CategorySidePanel({
 
   // Handle lock toggle
   const handleToggleLock = useCallback(
-    async (assetId: string) => {
-      const pending = pendingEdits.get(assetId);
-      const saved = getSavedTarget(assetId);
-      const currentLocked = getIsLocked(assetId);
-      const displayPercent = getDisplayPercent(assetId);
+    async (symbol: string) => {
+      const pending = pendingEdits.get(symbol);
+      const saved = getSavedTarget(symbol);
+      const currentLocked = getIsLocked(symbol);
+      const displayPercent = getDisplayPercent(symbol);
 
       // If there's a pending edit (user has modified this), toggle lock in pending
       if (pending?.userSet) {
         setPendingEdits((prev) => {
           const next = new Map(prev);
-          next.set(assetId, {
+          next.set(symbol, {
             ...pending,
             isLocked: !currentLocked,
           });
@@ -309,7 +309,7 @@ export function CategorySidePanel({
       if (pendingEdits.size > 0 && displayPercent > 0) {
         setPendingEdits((prev) => {
           const next = new Map(prev);
-          next.set(assetId, {
+          next.set(symbol, {
             targetPercent: displayPercent,
             isLocked: !currentLocked,
             userSet: true,
@@ -322,9 +322,9 @@ export function CategorySidePanel({
 
       // If there's a saved target and no active editing, toggle lock via API (auto-save)
       if (saved && allocationId) {
-        const holding = holdings.find((h) => h.symbol === assetId);
+        const holding = holdings.find((h) => h.symbol === symbol);
         if (!holding) {
-          console.error("Cannot find holding for assetId:", assetId);
+          console.error("Cannot find holding for symbol:", symbol);
           return;
         }
 
@@ -410,15 +410,15 @@ export function CategorySidePanel({
 
   // Handle delete
   const handleDelete = useCallback(
-    (assetId: string) => {
-      const saved = getSavedTarget(assetId);
+    (symbol: string) => {
+      const saved = getSavedTarget(symbol);
       if (saved) {
         deleteHoldingTargetMutation.mutate(saved.id);
       }
       // Also remove from pending edits
       setPendingEdits((prev) => {
         const next = new Map(prev);
-        next.delete(assetId);
+        next.delete(symbol);
         return next;
       });
     },
