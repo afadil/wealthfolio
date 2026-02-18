@@ -73,6 +73,8 @@ apps/tauri/gen/schemas/
 .Trashes
 ehthumbs.db
 Thumbs.db
+wealthfolio.db
+src-tauri/dev.db
 
 # Playwright
 /test-results/
