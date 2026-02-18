@@ -35,7 +35,7 @@ export const CountryChart = ({ holdings, isLoading, onCountrySectionClick }: Cou
 
     return Array.from(countryMap, ([name, value]) => ({ name, value, currency }))
       .sort((a, b) => b.value - a.value)
-      .slice(0, 9); // Show top 10 countries
+      .slice(0, 10); // Show top 10 countries
   }, [holdings]);
 
   if (isLoading) {
