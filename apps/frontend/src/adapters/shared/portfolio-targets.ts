@@ -80,6 +80,17 @@ export const upsertTargetAllocation = async (
   }
 };
 
+export const batchSaveTargetAllocations = async (
+  allocations: NewTargetAllocation[],
+): Promise<TargetAllocation[]> => {
+  try {
+    return await invoke<TargetAllocation[]>("batch_save_target_allocations", { allocations });
+  } catch (error) {
+    logger.error("Error batch saving target allocations.");
+    throw error;
+  }
+};
+
 export const deleteTargetAllocation = async (id: string): Promise<void> => {
   try {
     await invoke<number>("delete_target_allocation", { id });

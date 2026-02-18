@@ -72,6 +72,16 @@ impl PortfolioTargetServiceTrait for PortfolioTargetService {
         self.repository.upsert_allocation(allocation).await
     }
 
+    async fn batch_save_target_allocations(
+        &self,
+        allocations: Vec<NewTargetAllocation>,
+    ) -> Result<Vec<TargetAllocation>> {
+        debug!("Batch saving {} target allocations", allocations.len());
+        self.repository
+            .batch_save_target_allocations(allocations)
+            .await
+    }
+
     async fn delete_allocation(&self, id: &str) -> Result<usize> {
         self.repository.delete_allocation(id).await
     }

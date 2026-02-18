@@ -4,13 +4,13 @@ import {
   updatePortfolioTarget,
   deletePortfolioTarget,
   upsertTargetAllocation,
+  batchSaveTargetAllocations,
   deleteTargetAllocation,
   upsertHoldingTarget,
   batchSaveHoldingTargets,
   deleteHoldingTarget,
 } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
-import type { NewTargetAllocation } from "@/lib/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -74,11 +74,9 @@ export const useTargetMutations = () => {
     },
   });
 
-  // Batch save: saves multiple allocations in one go with a single toast
+  // Batch save: saves multiple allocations atomically in a single DB transaction
   const batchSaveAllocationsMutation = useMutation({
-    mutationFn: async (allocations: NewTargetAllocation[]) => {
-      return Promise.all(allocations.map(upsertTargetAllocation));
-    },
+    mutationFn: batchSaveTargetAllocations,
     onSuccess: () => {
       invalidateAllocations();
       toast.success("Allocations saved.");

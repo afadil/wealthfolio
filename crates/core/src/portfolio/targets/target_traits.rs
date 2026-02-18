@@ -20,6 +20,10 @@ pub trait PortfolioTargetRepositoryTrait: Send + Sync {
 
     fn get_allocations_by_target(&self, target_id: &str) -> Result<Vec<TargetAllocation>>;
     async fn upsert_allocation(&self, allocation: NewTargetAllocation) -> Result<TargetAllocation>;
+    async fn batch_save_target_allocations(
+        &self,
+        allocations: Vec<NewTargetAllocation>,
+    ) -> Result<Vec<TargetAllocation>>;
     async fn delete_allocation(&self, id: &str) -> Result<usize>;
     async fn delete_allocations_by_target(&self, target_id: &str) -> Result<usize>;
 
@@ -45,6 +49,10 @@ pub trait PortfolioTargetServiceTrait: Send + Sync {
 
     fn get_allocations_by_target(&self, target_id: &str) -> Result<Vec<TargetAllocation>>;
     async fn upsert_allocation(&self, allocation: NewTargetAllocation) -> Result<TargetAllocation>;
+    async fn batch_save_target_allocations(
+        &self,
+        allocations: Vec<NewTargetAllocation>,
+    ) -> Result<Vec<TargetAllocation>>;
     async fn delete_allocation(&self, id: &str) -> Result<usize>;
 
     async fn get_deviation_report(

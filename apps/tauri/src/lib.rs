@@ -364,6 +364,7 @@ pub fn run() {
             commands::portfolio_targets::delete_portfolio_target,
             commands::portfolio_targets::get_target_allocations,
             commands::portfolio_targets::upsert_target_allocation,
+            commands::portfolio_targets::batch_save_target_allocations,
             commands::portfolio_targets::delete_target_allocation,
             commands::portfolio_targets::get_allocation_deviations,
             commands::portfolio_targets::get_holding_targets,

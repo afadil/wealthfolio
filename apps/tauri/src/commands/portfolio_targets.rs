@@ -92,6 +92,18 @@ pub async fn upsert_target_allocation(
 }
 
 #[tauri::command]
+pub async fn batch_save_target_allocations(
+    allocations: Vec<NewTargetAllocation>,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<TargetAllocation>, String> {
+    state
+        .portfolio_target_service()
+        .batch_save_target_allocations(allocations)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn delete_target_allocation(
     id: String,
     state: State<'_, Arc<ServiceContext>>,

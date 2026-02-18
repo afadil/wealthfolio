@@ -78,6 +78,17 @@ async fn upsert_target_allocation(
     Ok(Json(result))
 }
 
+async fn batch_save_target_allocations(
+    State(state): State<Arc<AppState>>,
+    Json(allocations): Json<Vec<NewTargetAllocation>>,
+) -> ApiResult<Json<Vec<TargetAllocation>>> {
+    let results = state
+        .portfolio_target_service
+        .batch_save_target_allocations(allocations)
+        .await?;
+    Ok(Json(results))
+}
+
 async fn delete_target_allocation(
     Path(id): Path<String>,
     State(state): State<Arc<AppState>>,
@@ -192,6 +203,10 @@ pub fn router() -> Router<Arc<AppState>> {
         .route(
             "/portfolio-targets/allocations",
             post(upsert_target_allocation),
+        )
+        .route(
+            "/portfolio-targets/allocations/batch",
+            post(batch_save_target_allocations),
         )
         .route(
             "/portfolio-targets/allocations/{id}",

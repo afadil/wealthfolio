@@ -129,6 +129,7 @@ export const COMMANDS: CommandMap = {
   delete_portfolio_target: { method: "DELETE", path: "/portfolio-targets" },
   get_target_allocations: { method: "GET", path: "/portfolio-targets" },
   upsert_target_allocation: { method: "POST", path: "/portfolio-targets/allocations" },
+  batch_save_target_allocations: { method: "POST", path: "/portfolio-targets/allocations/batch" },
   delete_target_allocation: { method: "DELETE", path: "/portfolio-targets/allocations" },
   get_allocation_deviations: { method: "GET", path: "/portfolio-targets" },
   get_holding_targets: { method: "GET", path: "/portfolio-targets/allocations" },
@@ -813,6 +814,11 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "upsert_target_allocation": {
       const { allocation } = payload as { allocation: Record<string, unknown> };
       body = JSON.stringify(allocation);
+      break;
+    }
+    case "batch_save_target_allocations": {
+      const { allocations } = payload as { allocations: Record<string, unknown>[] };
+      body = JSON.stringify(allocations);
       break;
     }
     case "delete_target_allocation": {

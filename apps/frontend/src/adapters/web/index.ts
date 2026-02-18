@@ -130,6 +130,7 @@ export {
   deletePortfolioTarget,
   getTargetAllocations,
   upsertTargetAllocation,
+  batchSaveTargetAllocations,
   deleteTargetAllocation,
   getAllocationDeviations,
   getHoldingTargets,

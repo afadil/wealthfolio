@@ -190,6 +190,70 @@ impl PortfolioTargetRepositoryTrait for PortfolioTargetRepository {
             .await
     }
 
+    async fn batch_save_target_allocations(
+        &self,
+        allocations: Vec<NewTargetAllocation>,
+    ) -> Result<Vec<TargetAllocation>> {
+        self.writer
+            .exec(
+                move |conn: &mut SqliteConnection| -> Result<Vec<TargetAllocation>> {
+                    conn.transaction(|conn| -> diesel::QueryResult<Vec<TargetAllocation>> {
+                        let now = chrono::Utc::now().to_rfc3339();
+                        let mut results = Vec::with_capacity(allocations.len());
+                        for allocation in allocations {
+                            let existing = portfolio_target_allocations::table
+                                .filter(
+                                    portfolio_target_allocations::target_id
+                                        .eq(&allocation.target_id)
+                                        .and(
+                                            portfolio_target_allocations::category_id
+                                                .eq(&allocation.category_id),
+                                        ),
+                                )
+                                .first::<TargetAllocationDB>(conn)
+                                .optional()?;
+
+                            let result = if let Some(existing) = existing {
+                                let updated = TargetAllocationDB {
+                                    id: existing.id.clone(),
+                                    target_id: existing.target_id,
+                                    category_id: existing.category_id,
+                                    target_percent: allocation.target_percent,
+                                    is_locked: if allocation.is_locked { 1 } else { 0 },
+                                    created_at: existing.created_at,
+                                    updated_at: now.clone(),
+                                };
+                                diesel::update(
+                                    portfolio_target_allocations::table.find(&existing.id),
+                                )
+                                .set(&updated)
+                                .returning(TargetAllocationDB::as_returning())
+                                .get_result(conn)?
+                            } else {
+                                let db = NewTargetAllocationDB {
+                                    id: allocation.id.unwrap_or_else(|| Uuid::new_v4().to_string()),
+                                    target_id: allocation.target_id,
+                                    category_id: allocation.category_id,
+                                    target_percent: allocation.target_percent,
+                                    is_locked: if allocation.is_locked { 1 } else { 0 },
+                                    created_at: now.clone(),
+                                    updated_at: now.clone(),
+                                };
+                                diesel::insert_into(portfolio_target_allocations::table)
+                                    .values(&db)
+                                    .returning(TargetAllocationDB::as_returning())
+                                    .get_result(conn)?
+                            };
+                            results.push(TargetAllocation::from(result));
+                        }
+                        Ok(results)
+                    })
+                    .map_err(|e| Into::<wealthfolio_core::Error>::into(StorageError::from(e)))
+                },
+            )
+            .await
+    }
+
     async fn delete_allocation(&self, id: &str) -> Result<usize> {
         let id = id.to_string();
         self.writer
