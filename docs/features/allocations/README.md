@@ -1,13 +1,13 @@
 # Allocations Feature — Master Plan
 
 **Branch**: `feature/allocation-targets`
-**Base**: `v3.0.0-beta.3`
+**Base**: `v3.0.0-beta.5`
 **Date**: February 2026
 **Status**: 
 - ✅ Section 0: Backend complete
 - ✅ Section 1: Category-level targets + UI complete
-- ⏳ Section 2: Per-holding targets (planned)
-- ⏳ Section 3: Rebalancing advisor (planned)
+- ✅ Section 2: Per-holding targets complete
+- ✅ Section 3: Rebalancing advisor complete
 
 ---
 
@@ -297,7 +297,7 @@ User selects account → check if PortfolioTarget exists for account
 
 ## Section 2: Per-Holding Targets
 
-**Status**: ⏳ PLANNED (NOT STARTED)
+**Status**: ✅ COMPLETE
 
 ### Overview
 
@@ -350,13 +350,17 @@ CREATE TABLE holding_targets (
 );
 ```
 
-New service methods:
-- `get_holding_targets(allocation_id)` → Vec<HoldingTarget>
+New service methods (implemented):
+- `get_holding_targets_by_allocation(allocation_id)` → Vec<HoldingTarget>
 - `upsert_holding_target(target)` → HoldingTarget
 - `delete_holding_target(id)` → usize
-- `batch_save_holding_targets(allocation_id, targets)` → Vec<HoldingTarget>
+- `delete_holding_targets_by_allocation(allocation_id)` → usize
 
-New Tauri commands + Axum routes to match.
+New Tauri commands: `get_holding_targets`, `upsert_holding_target`, `delete_holding_target`.
+
+Note: `batch_save_holding_targets` was not implemented as a single backend endpoint. 
+The frontend does `Promise.all(targets.map(upsertHoldingTarget))` — parallel individual 
+upserts. Functionally equivalent for this use case.
 
 ### Frontend additions
 
@@ -388,9 +392,14 @@ Side panel (Sheet) for per-holding targets within a category:
 └──────────────────────────────────────┘
 ```
 
-New components:
-- `category-side-panel.tsx` — Sheet component for holding targets (Section 2)
-- `holding-target-row.tsx` — per-holding row with text input, lock, progress bar
+New components (implemented):
+- `category-side-panel.tsx` — 820-line Sheet component containing all per-holding 
+  target logic: inline editing, auto-distribution, lock mechanism, cascaded % display,
+  batch save, and group collapsing.
+
+Note: `holding-target-row.tsx` and `auto-distribution.ts` were not created as separate 
+files. That logic lives inline in `category-side-panel.tsx`. The component works correctly;
+splitting it is a future refactor if needed.
 
 ### Auto-distribution logic (preview mode)
 
@@ -415,12 +424,12 @@ Deviation:
 
 ### Verify
 
-- Can set per-holding targets within a category
-- Auto-distribution fills unset holdings
-- Lock prevents auto-adjustment
-- Cascading % displayed correctly
-- Save All Targets works (batch)
-- Deviation report reflects per-holding targets
+- ✅ Can set per-holding targets within a category
+- ✅ Auto-distribution fills unset holdings
+- ✅ Lock prevents auto-adjustment
+- ✅ Cascading % displayed correctly
+- ✅ Save All Targets works (parallel upserts)
+- ✅ Deviation report reflects per-holding targets
 
 ---
 
@@ -1405,36 +1414,36 @@ pnpm tauri dev
 ## Implementation Order
 
 ```
-Section 1 (category targets + overview):
-  1.1  Single donut chart component            → verify: renders with current allocation
-  1.2  Target list component (inline editing)  → verify: renders with side-by-side bars
-  1.3  Drift indicators + hover details        → verify: shows underweight/overweight
-  1.4  Rewrite allocations-page.tsx            → verify: full flow works
-  1.5  Auto-create target logic                → verify: first-use flow smooth
-  1.6  Batch save with "Save All" button       → verify: single toast, all saved
-  1.7  "Clear All" functionality               → verify: clears all targets
-  1.8  Polish + test                           → verify: pnpm type-check, visual QA
+Section 1 (category targets + overview): ✅ COMPLETE
+  1.1  ✅ Single donut chart component
+  1.2  ✅ Target list component (inline editing)
+  1.3  ✅ Drift indicators + hover details
+  1.4  ✅ Rewrite allocations-page.tsx
+  1.5  ✅ Auto-create target logic
+  1.6  ✅ Batch save with "Save All" button
+  1.7  ✅ "Clear All" functionality
+  1.8  ✅ Polish + test
 
-Section 2 (per-holding targets):
-  2.1  DB migration for holding_targets        → verify: cargo test
-  2.2  Backend CRUD + batch save               → verify: cargo test
-  2.3  Tauri commands + Axum routes            → verify: cargo build
-  2.4  Frontend adapters + hooks               → verify: pnpm type-check
-  2.5  Category side panel component (Sheet)   → verify: opens when row clicked
-  2.6  Holding target row component            → verify: renders with inline editing
-  2.7  Auto-distribution logic                 → verify: unset holdings get remainder
-  2.8  Lock mechanism for holdings             → verify: locked targets don't auto-adjust
-  2.9  Cascading % display                     → verify: shows category % and portfolio %
-  2.10 Save All Targets (batch)                → verify: full flow
-  2.11 Polish + test                           → verify: visual QA
+Section 2 (per-holding targets): ✅ COMPLETE
+  2.1  ✅ DB migration for holding_targets
+  2.2  ✅ Backend CRUD (get, upsert, delete)
+  2.3  ✅ Tauri commands (get_holding_targets, upsert_holding_target, delete_holding_target)
+  2.4  ✅ Frontend adapters + hooks + mutations
+  2.5  ✅ Category side panel component (Sheet) — category-side-panel.tsx
+  2.6  ✅ Holding target rows (inline in category-side-panel.tsx, no separate file)
+  2.7  ✅ Auto-distribution logic (inline in category-side-panel.tsx)
+  2.8  ✅ Lock mechanism for holdings
+  2.9  ✅ Cascading % display
+  2.10 ✅ Save All Targets (parallel upserts)
+  2.11 ✅ Polish + test
 
-Section 3 (rebalancing advisor):
-  3.1  Backend rebalancing calculation         → verify: cargo test
-  3.2  Tauri commands + Axum routes            → verify: cargo build
-  3.3  Frontend adapters + hooks               → verify: pnpm type-check
-  3.4  Rebalancing tab UI                      → verify: renders, calculates
-  3.5  Copy/export actions                     → verify: clipboard + CSV
-  3.6  Polish + test                           → verify: visual QA
+Section 3 (rebalancing advisor): ✅ COMPLETE
+  3.1  ✅ Backend rebalancing calculation (Rust, two-phase greedy)
+  3.2  ✅ Tauri commands + Axum routes
+  3.3  ✅ Frontend adapters + hooks
+  3.4  ✅ Rebalancing tab UI (overview + detailed modes)
+  3.5  ✅ Copy/export actions (clipboard + CSV)
+  3.6  ✅ Polish + test
 ```
 
 ---
@@ -1452,33 +1461,28 @@ Section 3 (rebalancing advisor):
 | `apps/tauri/src/commands/portfolio_targets.rs` | Tauri IPC commands |
 | `apps/server/src/api/portfolio_targets.rs` | Axum REST routes |
 
-### Frontend (adapters/hooks — keep; page/components — rework)
+### Frontend (built/modified)
 
 | File | Status |
 |------|--------|
-| `adapters/shared/portfolio-targets.ts` | Keep |
-| `adapters/web/core.ts` (COMMANDS entries) | Keep |
-| `hooks/use-portfolio-targets.ts` | Keep |
-| `pages/allocations/use-target-mutations.ts` | Keep (fix batch save) |
-| `lib/types.ts` (PortfolioTarget, etc.) | Keep |
-| `lib/schemas.ts` (newPortfolioTargetSchema) | Keep |
-| `lib/query-keys.ts` (PORTFOLIO_TARGETS, etc.) | Keep |
-| `pages/allocations/allocations-page.tsx` | Rewrite |
-| `pages/allocations/components/target-form.tsx` | Remove |
-| `pages/allocations/components/allocation-editor.tsx` | Remove |
-| `pages/allocations/components/deviation-table.tsx` | Remove |
+| `adapters/shared/portfolio-targets.ts` | ✅ Done (includes HoldingTarget adapters) |
+| `adapters/web/core.ts` (COMMANDS entries) | ✅ Done |
+| `hooks/use-portfolio-targets.ts` | ✅ Done |
+| `pages/allocations/use-target-mutations.ts` | ✅ Done |
+| `lib/types.ts` (PortfolioTarget, HoldingTarget, etc.) | ✅ Done |
+| `lib/schemas.ts` (newPortfolioTargetSchema) | ✅ Done |
+| `lib/query-keys.ts` (PORTFOLIO_TARGETS, HOLDING_TARGETS, etc.) | ✅ Done |
+| `pages/allocations/allocations-page.tsx` | ✅ Rewritten |
+| `pages/allocations/components/allocation-donut.tsx` | ✅ Created (Section 1) |
+| `pages/allocations/components/target-list.tsx` | ✅ Created (Section 1) |
+| `pages/allocations/components/allocations-overview.tsx` | ✅ Created (Section 1) |
+| `pages/allocations/components/category-side-panel.tsx` | ✅ Created (Section 2) |
+| `pages/allocations/components/rebalancing-tab.tsx` | ✅ Created (Section 3) |
 
-### New frontend files (to create)
-
-| File | Section |
-|------|---------|
-| `pages/allocations/components/allocation-donut.tsx` | 1 |
-| `pages/allocations/components/target-list.tsx` | 1 |
-| `pages/allocations/components/category-side-panel.tsx` | 2 |
-| `pages/allocations/components/holding-target-row.tsx` | 2 |
-| `pages/allocations/lib/auto-distribution.ts` | 2 |
-| `pages/allocations/components/rebalancing-tab.tsx` | 3 |
-| `pages/allocations/components/trade-recommendations-table.tsx` | 3 |
+Not created (logic kept inline):
+- `holding-target-row.tsx` — lives inside `category-side-panel.tsx`
+- `auto-distribution.ts` — lives inside `category-side-panel.tsx`
+- `trade-recommendations-table.tsx` — lives inside `rebalancing-tab.tsx`
 
 ---
 
