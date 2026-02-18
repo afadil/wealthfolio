@@ -1437,7 +1437,7 @@ Section 3 (rebalancing advisor): ✅ COMPLETE
   3.6  ✅ Polish + test
   3.7  ✅ Unit tests for rebalancing service algorithm (5 scenarios)
 
-Post-PR fixes:
+Pre-merge cleanup:
   ✅ Rename misleading assetId params → symbol in HoldingTargetRow/CategorySidePanel
   ✅ Category allocation batch save made atomic (batch_save_target_allocations)
   ✅ Remove unused use-allocation-validation.ts hook (dead code)
