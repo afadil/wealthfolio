@@ -4,7 +4,8 @@ mod tests {
     use crate::activities::activities_model::*;
     use crate::activities::{ActivityRepositoryTrait, ActivityService, ActivityServiceTrait};
     use crate::assets::{
-        Asset, AssetKind, AssetServiceTrait, InstrumentType, ProviderProfile, UpdateAssetProfile,
+        Asset, AssetKind, AssetServiceTrait, InstrumentType, ProviderProfile, QuoteMode,
+        UpdateAssetProfile,
     };
     use crate::errors::Result;
     use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
@@ -1993,6 +1994,146 @@ mod tests {
         assert_eq!(checked.instrument_type.as_deref(), Some("EQUITY"));
         assert_eq!(checked.exchange_mic.as_deref(), Some("XLON"));
         assert_eq!(checked.quote_ccy.as_deref(), Some("GBP"));
+    }
+
+    #[tokio::test]
+    async fn test_check_import_allows_manual_quote_mode_without_mic() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let import = ActivityImport {
+            id: None,
+            date: "2024-01-15".to_string(),
+            symbol: "CUSTOM".to_string(),
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(10)),
+            unit_price: Some(dec!(120)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(1200)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: Some("Custom Security".to_string()),
+            exchange_mic: None,
+            quote_ccy: None,
+            instrument_type: None,
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+            quote_mode: Some("MANUAL".to_string()),
+        };
+
+        let result = activity_service
+            .check_activities_import("acc-1".to_string(), vec![import])
+            .await
+            .expect("import check should succeed");
+
+        assert_eq!(result.len(), 1);
+        let checked = &result[0];
+        assert!(checked.is_valid);
+        assert!(checked.errors.is_none());
+        assert_eq!(checked.exchange_mic, None);
+        assert_eq!(checked.quote_mode.as_deref(), Some("MANUAL"));
+    }
+
+    #[tokio::test]
+    async fn test_check_import_uses_existing_manual_asset_quote_mode() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        // Create an existing manual asset with EQUITY type
+        let mut manual_asset = create_test_asset_with_instrument(
+            "asset-custom",
+            "CUSTOM",
+            None,
+            Some(InstrumentType::Equity),
+            "USD",
+        );
+        manual_asset.quote_mode = QuoteMode::Manual;
+        manual_asset.name = Some("Custom Security".to_string());
+        manual_asset.instrument_key = Some("EQUITY:CUSTOM".to_string());
+        asset_service.add_asset(manual_asset);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        // Import activity for earlier created manual asset without `quote_mode` set
+        let import = ActivityImport {
+            id: None,
+            date: "2024-01-15".to_string(),
+            symbol: "CUSTOM".to_string(),
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(10)),
+            unit_price: Some(dec!(120)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(1200)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: None,
+            exchange_mic: None,
+            quote_ccy: None,
+            instrument_type: None,
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+            quote_mode: None,
+        };
+
+        let result = activity_service
+            .check_activities_import("acc-1".to_string(), vec![import])
+            .await
+            .expect("import check should succeed");
+
+        assert_eq!(result.len(), 1);
+        let checked = &result[0];
+
+        assert!(checked.is_valid);
+        assert!(checked.errors.is_none() || checked.errors.as_ref().unwrap().is_empty());
+
+        assert_eq!(checked.quote_mode.as_deref(), Some("MANUAL"));
+        assert_eq!(checked.symbol_name.as_deref(), Some("Custom Security"));
+        assert_eq!(checked.symbol, "CUSTOM");
+        assert_eq!(checked.exchange_mic, None);
     }
 
     #[tokio::test]

@@ -1,6 +1,6 @@
 //! Activity domain models.
 
-use crate::activities::activities_errors::ActivityError;
+use crate::{activities::activities_errors::ActivityError, QuoteMode};
 use crate::activities::csv_parser::ParseConfig;
 use crate::Result;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
@@ -637,6 +637,8 @@ pub struct SymbolMappingMeta {
     pub quote_ccy: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub instrument_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quote_mode: Option<QuoteMode>,
 }
 
 /// Model for activity import mapping data with structured mappings

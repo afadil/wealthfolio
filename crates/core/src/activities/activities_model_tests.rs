@@ -673,7 +673,7 @@ mod tests {
             exchange_mic: Some("XLON".to_string()),
             quote_ccy: Some("GBp".to_string()),
             instrument_type: Some("EQUITY".to_string()),
-            quote_mode: None,
+            quote_mode: Some("MANUAL".to_string()),
             errors: None,
             warnings: None,
             duplicate_of_id: None,
@@ -690,5 +690,6 @@ mod tests {
         assert_eq!(symbol.quote_ccy.as_deref(), Some("GBp"));
         assert_eq!(symbol.instrument_type.as_deref(), Some("EQUITY"));
         assert_eq!(symbol.exchange_mic.as_deref(), Some("XLON"));
+        assert_eq!(symbol.quote_mode.as_deref(), Some("MANUAL"));
     }
 }

@@ -110,6 +110,7 @@ function draftToActivityImport(draft: DraftActivity): ActivityImport {
     activityType: draft.activityType as ActivityImport["activityType"],
     date: draft.activityDate,
     symbol: draft.symbol ?? "",
+    symbolName: draft.symbolName,
     amount: draft.amount,
     quantity: draft.quantity,
     unitPrice: draft.unitPrice,

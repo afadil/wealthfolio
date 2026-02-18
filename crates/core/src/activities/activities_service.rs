@@ -1845,41 +1845,7 @@ impl ActivityServiceTrait for ActivityService {
                 base_symbol.to_string()
             };
 
-            // Parse quote_mode from the activity (same pattern as prepare_new_activity)
-            let is_manual_quote = activity
-                .quote_mode
-                .as_deref()
-                .map(|m| m.to_uppercase() == "MANUAL")
-                .unwrap_or(false);
-
-            // Equities (Investment + Equity instrument) must have a resolved exchange MIC
-            let is_equity = effective_kind == AssetKind::Investment
-                && effective_instrument_type.as_ref() == Some(&InstrumentType::Equity);
-            if is_equity && resolved_mic.is_none() && !is_manual_quote {
-                activity.is_valid = false;
-                let mut errors = std::collections::HashMap::new();
-                errors.insert(
-                    "symbol".to_string(),
-                    vec![format!(
-                        "Could not find '{}' in market data. Please search for the correct ticker symbol.",
-                        &activity.symbol
-                    )],
-                );
-                activity.errors = Some(errors);
-                activities_with_status.push(activity);
-                continue;
-            }
-
-            // Store resolved data back on activity for import step
-            activity.exchange_mic = resolved_mic.clone();
-            activity.symbol = normalized_symbol.clone();
-            if activity.instrument_type.is_none() {
-                activity.instrument_type = effective_instrument_type
-                    .as_ref()
-                    .map(|it| it.as_db_str().to_string());
-            }
-
-            // Read-only: check if asset exists for name/currency enrichment
+            // Read-only: check if asset exists for name/currency enrichment and quote mode
             let mut asset_currency: Option<String> = None;
             let quote_ccy_hint = if matches!(
                 effective_instrument_type,
@@ -1909,11 +1875,46 @@ impl ActivityServiceTrait for ActivityService {
                 if let Ok(asset) = self.asset_service.get_asset_by_id(id) {
                     activity.symbol_name = asset.name;
                     asset_currency = Some(asset.quote_ccy.clone());
-                } else {
-                    activity.symbol_name = Some(normalized_symbol.clone());
+                    activity.quote_mode = Some(asset.quote_mode.as_db_str().to_string());
                 }
-            } else {
+            }
+            if activity.symbol_name.is_none() {
                 activity.symbol_name = Some(normalized_symbol.clone());
+            }
+
+            // Parse quote_mode from the activity (same pattern as prepare_new_activity)
+            let is_manual_quote = activity
+                .quote_mode
+                .as_deref()
+                .map(|m| m.to_uppercase() == "MANUAL")
+                .unwrap_or(false);
+
+            // Equities (Investment + Equity instrument) must have a resolved exchange MIC unless
+            // they have a manual quote
+            let is_equity = effective_kind == AssetKind::Investment
+                && effective_instrument_type.as_ref() == Some(&InstrumentType::Equity);
+            if is_equity && resolved_mic.is_none() && !is_manual_quote {
+                activity.is_valid = false;
+                let mut errors = std::collections::HashMap::new();
+                errors.insert(
+                    "symbol".to_string(),
+                    vec![format!(
+                        "Could not find '{}' in market data. Please search for the correct ticker symbol.",
+                        &activity.symbol
+                    )],
+                );
+                activity.errors = Some(errors);
+                activities_with_status.push(activity);
+                continue;
+            }
+
+            // Store resolved data back on activity for import step
+            activity.exchange_mic = resolved_mic.clone();
+            activity.symbol = normalized_symbol.clone();
+            if activity.instrument_type.is_none() {
+                activity.instrument_type = effective_instrument_type
+                    .as_ref()
+                    .map(|it| it.as_db_str().to_string());
             }
 
             if activity.quote_ccy.is_none() {
