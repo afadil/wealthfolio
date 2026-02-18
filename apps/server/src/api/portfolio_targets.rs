@@ -122,6 +122,17 @@ async fn upsert_holding_target(
     Ok(Json(result))
 }
 
+async fn batch_save_holding_targets(
+    State(state): State<Arc<AppState>>,
+    Json(targets): Json<Vec<NewHoldingTarget>>,
+) -> ApiResult<Json<Vec<HoldingTarget>>> {
+    let results = state
+        .portfolio_target_service
+        .batch_save_holding_targets(targets)
+        .await?;
+    Ok(Json(results))
+}
+
 async fn delete_holding_target(
     Path(id): Path<String>,
     State(state): State<Arc<AppState>>,
@@ -195,6 +206,10 @@ pub fn router() -> Router<Arc<AppState>> {
             get(get_holding_targets),
         )
         .route("/portfolio-targets/holdings", post(upsert_holding_target))
+        .route(
+            "/portfolio-targets/holdings/batch",
+            post(batch_save_holding_targets),
+        )
         .route(
             "/portfolio-targets/holdings/{id}",
             delete(delete_holding_target),

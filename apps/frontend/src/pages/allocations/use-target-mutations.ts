@@ -6,10 +6,11 @@ import {
   upsertTargetAllocation,
   deleteTargetAllocation,
   upsertHoldingTarget,
+  batchSaveHoldingTargets,
   deleteHoldingTarget,
 } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
-import type { NewTargetAllocation, NewHoldingTarget } from "@/lib/types";
+import type { NewTargetAllocation } from "@/lib/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -113,9 +114,7 @@ export const useTargetMutations = () => {
   });
 
   const batchSaveHoldingTargetsMutation = useMutation({
-    mutationFn: async (targets: NewHoldingTarget[]) => {
-      return Promise.all(targets.map(upsertHoldingTarget));
-    },
+    mutationFn: batchSaveHoldingTargets,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDING_TARGETS] });
       toast.success("Holding targets saved.");

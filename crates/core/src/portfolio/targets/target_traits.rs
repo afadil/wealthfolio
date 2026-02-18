@@ -26,6 +26,10 @@ pub trait PortfolioTargetRepositoryTrait: Send + Sync {
     // Holding targets
     fn get_holding_targets_by_allocation(&self, allocation_id: &str) -> Result<Vec<HoldingTarget>>;
     async fn upsert_holding_target(&self, target: NewHoldingTarget) -> Result<HoldingTarget>;
+    async fn batch_save_holding_targets(
+        &self,
+        targets: Vec<NewHoldingTarget>,
+    ) -> Result<Vec<HoldingTarget>>;
     async fn delete_holding_target(&self, id: &str) -> Result<usize>;
     async fn delete_holding_targets_by_allocation(&self, allocation_id: &str) -> Result<usize>;
 }
@@ -52,5 +56,9 @@ pub trait PortfolioTargetServiceTrait: Send + Sync {
     // Holding targets
     fn get_holding_targets_by_allocation(&self, allocation_id: &str) -> Result<Vec<HoldingTarget>>;
     async fn upsert_holding_target(&self, target: NewHoldingTarget) -> Result<HoldingTarget>;
+    async fn batch_save_holding_targets(
+        &self,
+        targets: Vec<NewHoldingTarget>,
+    ) -> Result<Vec<HoldingTarget>>;
     async fn delete_holding_target(&self, id: &str) -> Result<usize>;
 }

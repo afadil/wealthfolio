@@ -368,6 +368,7 @@ pub fn run() {
             commands::portfolio_targets::get_allocation_deviations,
             commands::portfolio_targets::get_holding_targets,
             commands::portfolio_targets::upsert_holding_target,
+            commands::portfolio_targets::batch_save_holding_targets,
             commands::portfolio_targets::delete_holding_target,
             commands::portfolio_targets::calculate_rebalancing_plan,
             // Platform commands

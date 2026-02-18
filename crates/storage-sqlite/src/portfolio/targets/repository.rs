@@ -258,6 +258,44 @@ impl PortfolioTargetRepositoryTrait for PortfolioTargetRepository {
             .await
     }
 
+    async fn batch_save_holding_targets(
+        &self,
+        targets: Vec<NewHoldingTarget>,
+    ) -> Result<Vec<HoldingTarget>> {
+        use crate::schema::holding_targets::dsl::*;
+        self.writer
+            .exec(
+                move |conn: &mut SqliteConnection| -> Result<Vec<HoldingTarget>> {
+                    conn.transaction(|conn| -> diesel::QueryResult<Vec<HoldingTarget>> {
+                        let mut results = Vec::with_capacity(targets.len());
+                        for target in targets {
+                            let db_target: NewHoldingTargetDB = target.into();
+                            diesel::insert_into(holding_targets)
+                                .values(&db_target)
+                                .on_conflict(crate::schema::holding_targets::id)
+                                .do_update()
+                                .set((
+                                    crate::schema::holding_targets::target_percent
+                                        .eq(&db_target.target_percent),
+                                    crate::schema::holding_targets::is_locked
+                                        .eq(&db_target.is_locked),
+                                    crate::schema::holding_targets::updated_at
+                                        .eq(&db_target.updated_at),
+                                ))
+                                .execute(conn)?;
+
+                            let result: HoldingTargetDB =
+                                holding_targets.find(&db_target.id).first(conn)?;
+                            results.push(HoldingTarget::from(result));
+                        }
+                        Ok(results)
+                    })
+                    .map_err(|e| Into::<wealthfolio_core::Error>::into(StorageError::from(e)))
+                },
+            )
+            .await
+    }
+
     async fn delete_holding_target(&self, target_id: &str) -> Result<usize> {
         use crate::schema::holding_targets::dsl::*;
         let target_id = target_id.to_string();

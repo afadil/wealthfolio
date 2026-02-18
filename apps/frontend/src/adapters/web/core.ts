@@ -133,6 +133,7 @@ export const COMMANDS: CommandMap = {
   get_allocation_deviations: { method: "GET", path: "/portfolio-targets" },
   get_holding_targets: { method: "GET", path: "/portfolio-targets/allocations" },
   upsert_holding_target: { method: "POST", path: "/portfolio-targets/holdings" },
+  batch_save_holding_targets: { method: "POST", path: "/portfolio-targets/holdings/batch" },
   delete_holding_target: { method: "DELETE", path: "/portfolio-targets/holdings" },
   // Health Center
   get_health_status: { method: "GET", path: "/health/status" },
@@ -832,6 +833,11 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "upsert_holding_target": {
       const { target } = payload as { target: Record<string, unknown> };
       body = JSON.stringify(target);
+      break;
+    }
+    case "batch_save_holding_targets": {
+      const { targets } = payload as { targets: Record<string, unknown>[] };
+      body = JSON.stringify(targets);
       break;
     }
     case "delete_holding_target": {

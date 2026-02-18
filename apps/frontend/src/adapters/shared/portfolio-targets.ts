@@ -116,6 +116,17 @@ export const upsertHoldingTarget = async (target: NewHoldingTarget): Promise<Hol
   }
 };
 
+export const batchSaveHoldingTargets = async (
+  targets: NewHoldingTarget[],
+): Promise<HoldingTarget[]> => {
+  try {
+    return await invoke<HoldingTarget[]>("batch_save_holding_targets", { targets });
+  } catch (error) {
+    logger.error("Error batch saving holding targets.");
+    throw error;
+  }
+};
+
 export const deleteHoldingTarget = async (id: string): Promise<void> => {
   try {
     await invoke<number>("delete_holding_target", { id });

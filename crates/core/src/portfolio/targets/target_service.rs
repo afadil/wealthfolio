@@ -192,6 +192,14 @@ impl PortfolioTargetServiceTrait for PortfolioTargetService {
         self.repository.upsert_holding_target(target).await
     }
 
+    async fn batch_save_holding_targets(
+        &self,
+        targets: Vec<NewHoldingTarget>,
+    ) -> Result<Vec<HoldingTarget>> {
+        debug!("Batch saving {} holding targets", targets.len());
+        self.repository.batch_save_holding_targets(targets).await
+    }
+
     async fn delete_holding_target(&self, id: &str) -> Result<usize> {
         debug!("Deleting holding target {}", id);
         self.repository.delete_holding_target(id).await

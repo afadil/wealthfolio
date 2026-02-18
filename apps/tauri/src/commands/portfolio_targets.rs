@@ -142,6 +142,18 @@ pub async fn upsert_holding_target(
 }
 
 #[tauri::command]
+pub async fn batch_save_holding_targets(
+    targets: Vec<NewHoldingTarget>,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<HoldingTarget>, String> {
+    state
+        .portfolio_target_service()
+        .batch_save_holding_targets(targets)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn delete_holding_target(
     id: String,
     state: State<'_, Arc<ServiceContext>>,
