@@ -131,6 +131,9 @@ export const COMMANDS: CommandMap = {
   upsert_target_allocation: { method: "POST", path: "/portfolio-targets/allocations" },
   delete_target_allocation: { method: "DELETE", path: "/portfolio-targets/allocations" },
   get_allocation_deviations: { method: "GET", path: "/portfolio-targets" },
+  get_holding_targets: { method: "GET", path: "/portfolio-targets/allocations" },
+  upsert_holding_target: { method: "POST", path: "/portfolio-targets/holdings" },
+  delete_holding_target: { method: "DELETE", path: "/portfolio-targets/holdings" },
   // Health Center
   get_health_status: { method: "GET", path: "/health/status" },
   run_health_checks: { method: "POST", path: "/health/check" },
@@ -819,6 +822,21 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "get_allocation_deviations": {
       const { targetId } = payload as { targetId: string };
       url += `/${encodeURIComponent(targetId)}/deviations`;
+      break;
+    }
+    case "get_holding_targets": {
+      const { allocationId } = payload as { allocationId: string };
+      url += `/${encodeURIComponent(allocationId)}/holdings`;
+      break;
+    }
+    case "upsert_holding_target": {
+      const { target } = payload as { target: Record<string, unknown> };
+      body = JSON.stringify(target);
+      break;
+    }
+    case "delete_holding_target": {
+      const { id } = payload as { id: string };
+      url += `/${encodeURIComponent(id)}`;
       break;
     }
     // Health Center commands
