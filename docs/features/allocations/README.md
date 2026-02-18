@@ -692,8 +692,7 @@ in the calculation.
 Files:
 - `mod.rs` — module exports
 - `rebalancing_model.rs` — data structures
-- `rebalancing_service.rs` — algorithm implementation
-- `rebalancing_service_tests.rs` — unit tests
+- `rebalancing_service.rs` — algorithm implementation + inline unit tests (`#[cfg(test)]`)
 
 **Data structures** (`rebalancing_model.rs`):
 ```rust
@@ -1256,8 +1255,8 @@ if remaining_budget > Decimal::ZERO {
 
 **Testing Status:**
 - ✅ Manual testing: Confirmed improvement with €1000 cash example
-- ⏳ Unit tests: To be added
-- ⏳ Edge cases: Large share prices, multiple categories - to be tested
+- ✅ Unit tests: 5 scenarios in `rebalancing_service.rs` (`#[cfg(test)]`)
+- ✅ Edge cases covered: insufficient cash, zero cash, multiple categories, phase-2 ceiling
 
 ---
 
@@ -1352,13 +1351,12 @@ if remaining_budget > 0 && max_overshoot_percent > 0.0 {
 
 ### Verify
 
-**Backend tests** (`rebalancing_service_tests.rs`):
-1. Single category underweight, sufficient cash → correct BUY recommendations
-2. Insufficient cash → proportional scaling
-3. Multiple categories → distributes by shortfall ratio
-4. Whole-share optimization → greedy picks best improvement/dollar
-5. Zero shortfall → empty recommendations
-6. Edge: very large cash → all targets reached
+**Backend tests** (inline in `rebalancing_service.rs`, `#[cfg(test)]`):
+1. `test_basic_buy_recommendations` — sufficient cash → correct BUY shares
+2. `test_budget_scaling_when_cash_insufficient` — proportional scaling, `additional_cash_needed > 0`
+3. `test_category_without_holding_targets_gets_budget_recommendation` — cash-like categories get shares=0 rec
+4. `test_zero_cash_produces_no_allocations` — zero cash → empty recommendations
+5. `test_phase2_deploys_remaining_cash_without_overshoot` — phase-2 ceiling not exceeded
 
 **Frontend manual testing**:
 1. Create portfolio target (60% EQUITY, 40% FIXED_INCOME)
