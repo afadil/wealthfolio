@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, type ReactNode, type Dispatch } from "react";
-import type { ImportMappingData } from "@/lib/types";
+import type { ImportMappingData, QuoteMode } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -48,7 +48,7 @@ export interface DraftActivity {
   symbolName?: string;
   quoteCcy?: string;
   instrumentType?: string;
-  quoteMode?: string;
+  quoteMode?: QuoteMode;
 
   // Validation state
   status: DraftActivityStatus;

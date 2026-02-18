@@ -1,5 +1,5 @@
 import * as z from "zod";
-import { ActivityType, activityTypeSchema, accountTypeSchema } from "./constants";
+import { accountTypeSchema, ActivityType, activityTypeSchema, quoteModeSchema } from "./constants";
 import { tryParseDate } from "./utils";
 import {
   isCashActivity,
@@ -54,7 +54,7 @@ export const importMappingSchema = z.object({
         symbolName: z.string().optional(),
         quoteCcy: z.string().optional(),
         instrumentType: z.string().optional(),
-        quoteMode: z.string().optional(),
+        quoteMode: quoteModeSchema.optional(),
       }),
     )
     .optional(),
@@ -158,7 +158,7 @@ export const importActivitySchema = z
     /** Optional resolved instrument type hint (e.g., EQUITY, CRYPTO). */
     instrumentType: z.string().optional(),
     /** Optional quote mode hint (e.g., MANUAL, MARKET). */
-    quoteMode: z.string().optional(),
+    quoteMode: quoteModeSchema.optional(),
     errors: z.record(z.string(), z.array(z.string())).optional(),
     warnings: z.record(z.string(), z.array(z.string())).optional(),
     duplicateOfId: z.string().optional(),
