@@ -353,14 +353,12 @@ CREATE TABLE holding_targets (
 New service methods (implemented):
 - `get_holding_targets_by_allocation(allocation_id)` → Vec<HoldingTarget>
 - `upsert_holding_target(target)` → HoldingTarget
+- `batch_save_holding_targets(targets)` → Vec<HoldingTarget> — atomic DB transaction
 - `delete_holding_target(id)` → usize
 - `delete_holding_targets_by_allocation(allocation_id)` → usize
 
-New Tauri commands: `get_holding_targets`, `upsert_holding_target`, `delete_holding_target`.
-
-Note: `batch_save_holding_targets` was not implemented as a single backend endpoint. 
-The frontend does `Promise.all(targets.map(upsertHoldingTarget))` — parallel individual 
-upserts. Functionally equivalent for this use case.
+New Tauri commands: `get_holding_targets`, `upsert_holding_target`, `batch_save_holding_targets`, `delete_holding_target`.
+Axum routes: GET `/allocations/{id}/holdings`, POST `/holdings`, POST `/holdings/batch`, DELETE `/holdings/{id}`.
 
 ### Frontend additions
 
@@ -393,13 +391,9 @@ Side panel (Sheet) for per-holding targets within a category:
 ```
 
 New components (implemented):
-- `category-side-panel.tsx` — 820-line Sheet component containing all per-holding 
-  target logic: inline editing, auto-distribution, lock mechanism, cascaded % display,
-  batch save, and group collapsing.
-
-Note: `holding-target-row.tsx` and `auto-distribution.ts` were not created as separate 
-files. That logic lives inline in `category-side-panel.tsx`. The component works correctly;
-splitting it is a future refactor if needed.
+- `category-side-panel.tsx` — Sheet component with inline editing, auto-distribution,
+  lock mechanism, cascaded % display, batch save, and group collapsing.
+- `holding-target-row.tsx` — Per-holding row component (extracted from side panel).
 
 ### Auto-distribution logic (preview mode)
 
@@ -1427,14 +1421,14 @@ Section 1 (category targets + overview): ✅ COMPLETE
 Section 2 (per-holding targets): ✅ COMPLETE
   2.1  ✅ DB migration for holding_targets
   2.2  ✅ Backend CRUD (get, upsert, delete)
-  2.3  ✅ Tauri commands (get_holding_targets, upsert_holding_target, delete_holding_target)
+  2.3  ✅ Tauri commands + Axum routes (get, upsert, batch_save, delete)
   2.4  ✅ Frontend adapters + hooks + mutations
   2.5  ✅ Category side panel component (Sheet) — category-side-panel.tsx
-  2.6  ✅ Holding target rows (inline in category-side-panel.tsx, no separate file)
+  2.6  ✅ Holding target row component — holding-target-row.tsx
   2.7  ✅ Auto-distribution logic (inline in category-side-panel.tsx)
   2.8  ✅ Lock mechanism for holdings
   2.9  ✅ Cascading % display
-  2.10 ✅ Save All Targets (parallel upserts)
+  2.10 ✅ Save All Targets (atomic batch — batch_save_holding_targets)
   2.11 ✅ Polish + test
 
 Section 3 (rebalancing advisor): ✅ COMPLETE
@@ -1477,11 +1471,11 @@ Section 3 (rebalancing advisor): ✅ COMPLETE
 | `pages/allocations/components/target-list.tsx` | ✅ Created (Section 1) |
 | `pages/allocations/components/allocations-overview.tsx` | ✅ Created (Section 1) |
 | `pages/allocations/components/category-side-panel.tsx` | ✅ Created (Section 2) |
+| `pages/allocations/components/holding-target-row.tsx` | ✅ Created (Section 2) |
 | `pages/allocations/components/rebalancing-tab.tsx` | ✅ Created (Section 3) |
 
 Not created (logic kept inline):
-- `holding-target-row.tsx` — lives inside `category-side-panel.tsx`
-- `auto-distribution.ts` — lives inside `category-side-panel.tsx`
+- `auto-distribution.ts` — logic inline in `category-side-panel.tsx` (deleted dead-code version)
 - `trade-recommendations-table.tsx` — lives inside `rebalancing-tab.tsx`
 
 ---
