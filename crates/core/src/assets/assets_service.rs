@@ -786,30 +786,46 @@ impl AssetServiceTrait for AssetService {
             return Ok((0, 0, 0));
         }
 
-        let mut enriched_count = 0;
-        let mut skipped_count = 0;
-        let mut failed_count = 0;
+        let unique_ids_len = unique_ids.len();
 
-        for asset_id in unique_ids {
-            // Check sync state to see if enrichment is needed
-            let needs_enrichment = match self.quote_service.get_sync_state(&asset_id) {
-                Ok(Some(state)) => state.needs_profile_enrichment(),
-                Ok(None) => true,
-                Err(_) => true,
-            };
+        // Filter to only assets that need enrichment
+        let ids_to_enrich: Vec<String> = unique_ids
+            .into_iter()
+            .filter(|asset_id| {
+                let needs = match self.quote_service.get_sync_state(asset_id) {
+                    Ok(Some(state)) => state.needs_profile_enrichment(),
+                    Ok(None) => true,
+                    Err(_) => true,
+                };
+                if !needs {
+                    debug!("Skipping enrichment for {} - already enriched", asset_id);
+                }
+                needs
+            })
+            .collect();
 
-            if !needs_enrichment {
-                debug!("Skipping enrichment for {} - already enriched", asset_id);
-                skipped_count += 1;
-                continue;
-            }
+        let skipped_count = unique_ids_len - ids_to_enrich.len();
 
-            // Try to enrich the asset profile
-            match self.enrich_asset_profile(&asset_id).await {
-                Ok(_) => {
+        // Enrich assets concurrently (up to 5 at a time)
+        let results: Vec<(String, Result<Asset>)> = stream::iter(ids_to_enrich)
+            .map(|asset_id| async move {
+                let result = self.enrich_asset_profile(&asset_id).await;
+                if let Ok(_) = &result {
                     if let Err(e) = self.quote_service.mark_profile_enriched(&asset_id).await {
                         warn!("Failed to mark profile enriched for {}: {}", asset_id, e);
                     }
+                }
+                (asset_id, result)
+            })
+            .buffer_unordered(5)
+            .collect()
+            .await;
+
+        let mut enriched_count = 0;
+        let mut failed_count = 0;
+        for (asset_id, result) in &results {
+            match result {
+                Ok(_) => {
                     enriched_count += 1;
                     info!("Successfully enriched asset profile: {}", asset_id);
                 }
