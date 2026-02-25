@@ -15,6 +15,7 @@ vi.mock("@/hooks/use-settings", () => ({
 
 // Mock the fields components
 vi.mock("../fields", () => ({
+  AssetTypeSelector: () => null,
   AccountSelect: ({ name, accounts }: { name: string; accounts: AccountSelectOption[] }) => (
     <select data-testid={`select-${name}`} name={name}>
       <option value="">Select account...</option>

@@ -45,8 +45,8 @@ describe("Form Schemas Validation", () => {
       }
     });
 
-    it("fails when assetId is empty", () => {
-      const invalidData = {
+    it("allows empty assetId (for custom assets like bonds/options)", () => {
+      const data = {
         accountId: "acc-123",
         assetId: "",
         activityDate: new Date(),
@@ -55,11 +55,8 @@ describe("Form Schemas Validation", () => {
         currency: "USD",
       };
 
-      const result = buyFormSchema.safeParse(invalidData);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe("Please enter a symbol.");
-      }
+      const result = buyFormSchema.safeParse(data);
+      expect(result.success).toBe(true);
     });
 
     it("fails when quantity is zero or negative", () => {

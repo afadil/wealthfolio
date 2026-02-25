@@ -805,6 +805,13 @@ pub mod test_env {
             unimplemented!("MockQuoteService::get_asset_profile")
         }
 
+        async fn fetch_bond_details(
+            &self,
+            _isin: &str,
+        ) -> Option<wealthfolio_core::assets::BondSpec> {
+            None
+        }
+
         async fn fetch_quotes_from_provider(
             &self,
             _asset_id: &str,

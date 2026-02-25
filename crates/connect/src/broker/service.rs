@@ -1143,6 +1143,7 @@ mod tests {
             created_at: now,
             last_updated: now,
             is_alternative: false,
+            contract_multiplier: Decimal::ONE,
         }
     }
 

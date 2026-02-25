@@ -15,6 +15,7 @@ vi.mock("@/hooks/use-settings", () => ({
 
 // Mock the fields components
 vi.mock("../fields", () => ({
+  AssetTypeSelector: () => null,
   AccountSelect: ({
     name,
     accounts,

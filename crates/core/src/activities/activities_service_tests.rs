@@ -2125,6 +2125,7 @@ mod tests {
             exchange_mic: None,
             quote_ccy: None,
             instrument_type: None, // No explicit type -> should require review
+            quote_mode: None,
             errors: None,
             warnings: None,
             duplicate_of_id: None,
@@ -2198,6 +2199,7 @@ mod tests {
             exchange_mic: None,
             quote_ccy: None,
             instrument_type: Some("BOND".to_string()), // Explicit type
+            quote_mode: None,
             errors: None,
             warnings: None,
             duplicate_of_id: None,
