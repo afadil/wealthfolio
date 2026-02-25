@@ -332,7 +332,7 @@ pub fn looks_like_occ_symbol(symbol: &str) -> bool {
     let len = symbol.len();
 
     // Length check: 15-21 characters
-    if len < 15 || len > 21 {
+    if !(15..=21).contains(&len) {
         return false;
     }
 

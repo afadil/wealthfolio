@@ -80,6 +80,12 @@ pub struct BoerseFrankfurtProvider {
     salt: Arc<RwLock<Option<String>>>,
 }
 
+impl Default for BoerseFrankfurtProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BoerseFrankfurtProvider {
     pub fn new() -> Self {
         let client = Client::builder()

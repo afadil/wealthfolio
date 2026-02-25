@@ -35,6 +35,12 @@ pub struct OpenFigiProvider {
     client: Client,
 }
 
+impl Default for OpenFigiProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OpenFigiProvider {
     pub fn new() -> Self {
         let client = Client::builder()

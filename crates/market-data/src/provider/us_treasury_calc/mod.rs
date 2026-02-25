@@ -104,6 +104,12 @@ pub struct UsTreasuryCalcProvider {
     curve_cache: Arc<RwLock<HashMap<i32, YearCurves>>>,
 }
 
+impl Default for UsTreasuryCalcProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl UsTreasuryCalcProvider {
     pub fn new() -> Self {
         let client = reqwest::Client::builder()

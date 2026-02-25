@@ -92,10 +92,11 @@ export function normalizeOptionSymbol(symbol: string): string | null {
   if (looksLikeOccSymbol(s)) return null;
 
   // Find boundary: alpha prefix → digits
-  const match = s.match(/^([A-Za-z]+)(\d{6})([CPcp])(\d+)$/);
-  if (!match) return null;
+  const re = /^([A-Za-z]+)(\d{6})([CPcp])(\d+)$/;
+  const result = re.exec(s);
+  if (!result) return null;
 
-  const [, underlying, dateStr, typeChar, strikeStr] = match;
+  const [, underlying, dateStr, typeChar, strikeStr] = result;
 
   // Basic date validation
   const month = parseInt(dateStr.slice(2, 4), 10);

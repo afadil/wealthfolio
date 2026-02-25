@@ -706,7 +706,7 @@ where
                                     .map(|(n, s)| n == s)
                                     .unwrap_or(false);
                                 if is_placeholder {
-                                    if let Ok(profile) = client.get_profile(&asset).await {
+                                    if let Ok(profile) = client.get_profile(asset).await {
                                         if let Some(name) = profile.name {
                                             let _ =
                                                 self.asset_repo.update_name(&asset.id, &name).await;

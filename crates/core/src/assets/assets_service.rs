@@ -869,7 +869,7 @@ impl AssetServiceTrait for AssetService {
         if existing_asset.is_bond()
             && existing_asset
                 .bond_spec()
-                .map_or(true, |bs| bs.coupon_rate.is_none())
+                .is_none_or(|bs| bs.coupon_rate.is_none())
         {
             if let Some(isin) = existing_asset.instrument_symbol.as_deref() {
                 if let Some(bond_spec) = self.quote_service.fetch_bond_details(isin).await {
@@ -1154,7 +1154,7 @@ impl AssetServiceTrait for AssetService {
         let results: Vec<(String, Result<Asset>)> = stream::iter(ids_to_enrich)
             .map(|asset_id| async move {
                 let result = self.enrich_asset_profile(&asset_id).await;
-                if let Ok(_) = &result {
+                if result.is_ok() {
                     if let Err(e) = self.quote_service.mark_profile_enriched(&asset_id).await {
                         warn!("Failed to mark profile enriched for {}: {}", asset_id, e);
                     }
