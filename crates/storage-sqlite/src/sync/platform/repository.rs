@@ -1,5 +1,6 @@
 //! Repository for managing platform/brokerage data in the local database.
 
+use async_trait::async_trait;
 use diesel::prelude::*;
 use diesel::r2d2::{self, Pool};
 use diesel::sqlite::SqliteConnection;
@@ -9,9 +10,9 @@ use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
 use crate::schema::platforms;
 use crate::schema::platforms::dsl::*;
-use crate::sync::{write_outbox_event, OutboxWriteRequest};
+use wealthfolio_connect::broker::PlatformRepositoryTrait;
+use wealthfolio_connect::Platform as ConnectPlatform;
 use wealthfolio_core::errors::Result;
-use wealthfolio_core::sync::{SyncEntity, SyncOperation};
 
 use super::model::{Platform, PlatformDB};
 
@@ -75,7 +76,15 @@ impl PlatformRepository {
         let platform_db: PlatformDB = platform.into();
 
         self.writer
-            .exec(move |conn| {
+            .exec_tx(move |tx| {
+                let existed = platforms::table
+                    .find(&platform_db.id)
+                    .select(platforms::id)
+                    .first::<String>(tx.conn())
+                    .optional()
+                    .map_err(StorageError::from)?
+                    .is_some();
+
                 // Try to insert, on conflict update
                 diesel::insert_into(platforms::table)
                     .values(&platform_db)
@@ -86,18 +95,14 @@ impl PlatformRepository {
                         platforms::url.eq(&platform_db.url),
                         platforms::external_id.eq(&platform_db.external_id),
                     ))
-                    .execute(conn)
+                    .execute(tx.conn())
                     .map_err(StorageError::from)?;
 
-                write_outbox_event(
-                    conn,
-                    OutboxWriteRequest::new(
-                        SyncEntity::Platform,
-                        platform_db.id.clone(),
-                        SyncOperation::Update,
-                        serde_json::to_value(&platform_db)?,
-                    ),
-                )?;
+                if existed {
+                    tx.update(&platform_db)?;
+                } else {
+                    tx.insert(&platform_db)?;
+                }
 
                 // Return the platform
                 Ok(Platform::from(platform_db))
@@ -109,23 +114,76 @@ impl PlatformRepository {
     pub async fn delete(&self, platform_id: &str) -> Result<usize> {
         let id_to_delete = platform_id.to_string();
         self.writer
-            .exec(move |conn| {
+            .exec_tx(move |tx| {
+                let existing_platform = platforms
+                    .select(PlatformDB::as_select())
+                    .find(&id_to_delete)
+                    .first::<PlatformDB>(tx.conn())
+                    .optional()
+                    .map_err(StorageError::from)?;
                 let affected = diesel::delete(platforms.find(&id_to_delete))
-                    .execute(conn)
+                    .execute(tx.conn())
                     .map_err(StorageError::from)?;
                 if affected > 0 {
-                    write_outbox_event(
-                        conn,
-                        OutboxWriteRequest::new(
-                            SyncEntity::Platform,
-                            id_to_delete.clone(),
-                            SyncOperation::Delete,
-                            serde_json::json!({ "id": id_to_delete }),
-                        ),
-                    )?;
+                    if let Some(existing) = existing_platform.as_ref() {
+                        tx.delete_model(existing);
+                    }
                 }
                 Ok(affected)
             })
             .await
+    }
+}
+
+impl From<Platform> for ConnectPlatform {
+    fn from(value: Platform) -> Self {
+        Self {
+            id: value.id,
+            name: value.name,
+            url: value.url,
+            external_id: value.external_id,
+            kind: value.kind,
+            website_url: value.website_url,
+            logo_url: value.logo_url,
+        }
+    }
+}
+
+impl From<ConnectPlatform> for Platform {
+    fn from(value: ConnectPlatform) -> Self {
+        Self {
+            id: value.id,
+            name: value.name,
+            url: value.url,
+            external_id: value.external_id,
+            kind: value.kind,
+            website_url: value.website_url,
+            logo_url: value.logo_url,
+        }
+    }
+}
+
+#[async_trait]
+impl PlatformRepositoryTrait for PlatformRepository {
+    fn get_by_id(&self, platform_id: &str) -> Result<Option<ConnectPlatform>> {
+        PlatformRepository::get_by_id(self, platform_id).map(|p| p.map(Into::into))
+    }
+
+    fn get_by_external_id(&self, ext_id: &str) -> Result<Option<ConnectPlatform>> {
+        PlatformRepository::get_by_external_id(self, ext_id).map(|p| p.map(Into::into))
+    }
+
+    fn list(&self) -> Result<Vec<ConnectPlatform>> {
+        PlatformRepository::list(self).map(|items| items.into_iter().map(Into::into).collect())
+    }
+
+    async fn upsert(&self, platform: ConnectPlatform) -> Result<ConnectPlatform> {
+        PlatformRepository::upsert(self, platform.into())
+            .await
+            .map(Into::into)
+    }
+
+    async fn delete(&self, platform_id: &str) -> Result<usize> {
+        PlatformRepository::delete(self, platform_id).await
     }
 }

@@ -46,34 +46,36 @@ common task playbooks.
 
 ## Overview
 
-- **Frontend**: React + Vite + Tailwind v4 + shadcn (`src-front/`)
-- **Desktop**: Tauri/Rust with SQLite (`src-tauri/`, `crates/`)
-- **Web mode**: Axum HTTP server (`src-server/`)
+- **Frontend**: React + Vite + Tailwind v4 + shadcn (`apps/frontend/`)
+- **Desktop**: Tauri/Rust with SQLite (`apps/tauri/`, `crates/`)
+- **Web mode**: Axum HTTP server (`apps/server/`)
 - **Packages**: `@wealthfolio/ui`, addon-sdk, addon-dev-tools (`packages/`)
 
 ## Code Layout
 
 ```
-src-front/
-├── pages/          # Route pages
-├── components/     # Shared components
-├── features/       # Self-contained feature modules
-├── commands/       # Backend call wrappers (Tauri/Web)
-├── adapters/       # Runtime detection (desktop vs web)
-└── addons/         # Addon runtime
+apps/frontend/
+├── src/
+│   ├── pages/          # Route pages
+│   ├── components/     # Shared components
+│   ├── features/       # Self-contained feature modules
+│   ├── commands/       # Backend call wrappers (Tauri/Web)
+│   ├── adapters/       # Runtime detection (desktop vs web)
+│   └── addons/         # Addon runtime
 
-src-tauri/src/
-└── commands/       # Tauri IPC commands
+apps/tauri/src/
+└── commands/           # Tauri IPC commands
 
-src-server/src/
-└── api/            # Axum HTTP handlers
+apps/server/src/
+└── api/                # Axum HTTP handlers
 
 crates/
-├── core/           # Business logic, models, services
-├── storage-sqlite/ # Diesel ORM, repositories, migrations
-├── market-data/    # Market data providers
-├── connect/        # External integrations
-└── device-sync/    # Device sync, E2EE
+├── core/               # Business logic, models, services
+├── storage-sqlite/     # Diesel ORM, repositories, migrations
+├── market-data/        # Market data providers
+├── connect/            # External integrations
+├── device-sync/        # Device sync, E2EE
+└── ai/                 # AI providers and LLM integration
 ```
 
 ## Run Targets
@@ -94,20 +96,22 @@ crates/
 
 ### Adding a feature with backend data
 
-1. **Frontend route/UI** → `src-front/pages/`, `src-front/routes.tsx`
-2. **Command wrapper** → `src-front/commands/<domain>.ts` (follow `RUN_ENV`
-   pattern)
-3. **Tauri command** → `src-tauri/src/commands/*.rs`, wire in `mod.rs` +
+1. **Frontend route/UI** → `apps/frontend/src/pages/`,
+   `apps/frontend/src/routes.tsx`
+2. **Command wrapper** → `apps/frontend/src/commands/<domain>.ts` (follow
+   `RUN_ENV` pattern)
+3. **Tauri command** → `apps/tauri/src/commands/*.rs`, wire in `mod.rs` +
    `lib.rs`
-4. **Web endpoint** → `src-server/src/api/`, call `crates/core` service
+4. **Web endpoint** → `apps/server/src/api/`, call `crates/core` service
 5. **Core logic** → `crates/core/` services/repos
 6. **Tests** → Vitest for TS, `#[test]` for Rust
 
 ### UI patterns
 
 - Components: `@wealthfolio/ui` and `packages/ui/src/components/`
-- Forms: `react-hook-form` + `zod` schemas from `src-front/lib/schemas.ts`
-- Theme: tokens in `src-front/globals.css`
+- Forms: `react-hook-form` + `zod` schemas from
+  `apps/frontend/src/lib/schemas.ts`
+- Theme: tokens in `apps/frontend/src/globals.css`
 
 ### Architecture pattern
 

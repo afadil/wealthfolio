@@ -128,8 +128,6 @@ pub async fn backup_database_to_path(
         .expect("failed to convert path to string")
         .to_string();
 
-    let db_path = db::get_db_path(&app_data_dir);
-
     // Normalize the backup directory path (remove file:// prefix if present on iOS/Android)
     let normalized_backup_dir = normalize_file_path(&backup_dir);
 
@@ -138,33 +136,10 @@ pub async fn backup_database_to_path(
     let backup_filename = format!("wealthfolio_backup_{}.db", timestamp);
     let backup_path = Path::new(&normalized_backup_dir).join(&backup_filename);
 
-    // Ensure the backup directory exists
-    if let Some(parent) = backup_path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create backup directory: {}", e))?;
-    }
-
     let backup_path_str = backup_path.to_string_lossy().to_string();
 
-    // Copy main database file
-    std::fs::copy(&db_path, &backup_path_str)
+    db::backup_database_to_file(&app_data_dir, &backup_path_str)
         .map_err(|e| format!("Failed to backup database: {}", e))?;
-
-    // Copy WAL file if it exists
-    let wal_source = format!("{}-wal", db_path);
-    let wal_target = format!("{}-wal", backup_path_str);
-    if Path::new(&wal_source).exists() {
-        std::fs::copy(&wal_source, &wal_target)
-            .map_err(|e| format!("Failed to copy WAL file: {}", e))?;
-    }
-
-    // Copy SHM file if it exists
-    let shm_source = format!("{}-shm", db_path);
-    let shm_target = format!("{}-shm", backup_path_str);
-    if Path::new(&shm_source).exists() {
-        std::fs::copy(&shm_source, &shm_target)
-            .map_err(|e| format!("Failed to copy SHM file: {}", e))?;
-    }
 
     Ok(backup_path_str)
 }

@@ -882,9 +882,9 @@ where
 
     /// Execute sync for a list of plans.
     ///
-    /// Returns a boxed future to provide an explicit `Send` boundary, which is
-    /// required because `buffer_unordered` produces an opaque type that
-    /// `async_trait` cannot prove `Send` for all lifetimes.
+    /// Returns a boxed future to provide an explicit `Send` boundary for
+    /// `async_trait` compatibility when this method's composed stream/future
+    /// types are type-erased.
     fn execute_sync_plans(
         &self,
         plans: Vec<SymbolSyncPlan>,
@@ -914,25 +914,26 @@ where
             let asset_map: HashMap<String, Asset> =
                 assets.into_iter().map(|a| (a.id.clone(), a)).collect();
 
-            let asset_results: Vec<AssetSyncResult> = stream::iter(plans.into_iter().map(|plan| {
-                let asset = asset_map.get(&plan.asset_id).cloned();
-                Box::pin(async move {
-                    if let Some(asset) = asset {
-                        self.sync_asset(&asset, &plan).await
-                    } else {
-                        warn!("Asset not found for asset_id: {}", plan.asset_id);
-                        AssetSyncResult {
-                            asset_id: AssetId::new(&plan.asset_id),
-                            quotes_added: 0,
-                            status: SyncStatus::Failed,
-                            error: Some("Asset not found".to_string()),
+            let asset_results: Vec<AssetSyncResult> = stream::iter(plans)
+                .map(|plan| {
+                    let asset = asset_map.get(&plan.asset_id).cloned();
+                    async move {
+                        if let Some(asset) = asset {
+                            self.sync_asset(&asset, &plan).await
+                        } else {
+                            warn!("Asset not found for asset_id: {}", plan.asset_id);
+                            AssetSyncResult {
+                                asset_id: AssetId::new(&plan.asset_id),
+                                quotes_added: 0,
+                                status: SyncStatus::Failed,
+                                error: Some("Asset not found".to_string()),
+                            }
                         }
                     }
                 })
-            }))
-            .buffer_unordered(SYNC_CONCURRENCY)
-            .collect()
-            .await;
+                .buffer_unordered(SYNC_CONCURRENCY)
+                .collect()
+                .await;
 
             let mut result = SyncResult::default();
             for asset_result in asset_results {
@@ -1495,8 +1496,6 @@ where
         if symbol.is_empty() {
             return Ok(());
         }
-
-        debug!("Handling activity deletion for {}", symbol);
 
         debug!(
             "Activity deleted for {} - sync planning will recompute activity bounds on demand",

@@ -102,8 +102,9 @@ const useGlobalEventListener = () => {
 
     const handleMarketSyncError = (event: { payload: string }) => {
       const errorMsg = event.payload || "Unknown error";
-      syncContextRef.current?.setIdle();
-      if (!isMobileViewportRef.current) {
+      if (isMobileViewportRef.current && syncContextRef.current) {
+        syncContextRef.current.setIdle();
+      } else {
         toast.dismiss(TOAST_IDS.marketSyncStart);
       }
       toast.error("Market Data Sync Failed", {

@@ -156,6 +156,24 @@ mod tests {
         assert!(SnapshotSource::Synthetic.is_non_calculated());
     }
 
+    #[test]
+    fn test_snapshot_stable_id_is_deterministic_uuid() {
+        use crate::portfolio::snapshot::AccountStateSnapshot;
+        use chrono::NaiveDate;
+
+        let day = NaiveDate::from_ymd_opt(2026, 2, 18).unwrap();
+        let id1 = AccountStateSnapshot::stable_id("acc-123", day);
+        let id2 = AccountStateSnapshot::stable_id("acc-123", day);
+        let id3 = AccountStateSnapshot::stable_id("acc-123", day.succ_opt().unwrap());
+
+        assert_eq!(id1, id2, "stable id must be deterministic");
+        assert_ne!(id1, id3, "snapshot date should affect stable id");
+        assert!(
+            uuid::Uuid::parse_str(&id1).is_ok(),
+            "stable id must be valid UUID"
+        );
+    }
+
     // ==================== is_content_equal Tests ====================
 
     #[test]

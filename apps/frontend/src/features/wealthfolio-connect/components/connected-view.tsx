@@ -16,11 +16,11 @@ import { formatDistanceToNow } from "date-fns";
 import { useCallback, useState } from "react";
 import { useWealthfolioConnect } from "../providers/wealthfolio-connect-provider";
 import {
-  listBrokerConnections,
   listBrokerAccounts,
+  listBrokerConnections,
   syncBrokerData,
 } from "../services/broker-service";
-import type { BrokerConnection, BrokerAccount } from "../types";
+import type { BrokerAccount, BrokerConnection } from "../types";
 import { SubscriptionPlans } from "./subscription-plans";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -78,12 +78,12 @@ function ServiceUnavailableCard({ onRetry, isRetrying }: ServiceUnavailableCardP
           <Button variant="outline" onClick={onRetry} disabled={isRetrying}>
             {isRetrying ? (
               <>
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Icons.Spinner className="h-4 w-4 animate-spin" />
                 Retrying...
               </>
             ) : (
               <>
-                <Icons.Refresh className="mr-2 h-4 w-4" />
+                <Icons.Refresh className="h-4 w-4" />
                 Try Again
               </>
             )}
@@ -133,8 +133,6 @@ function getLastSyncDate(account: BrokerAccount): string | null {
 }
 
 function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
-  const isShared = account.owner && !account.owner.is_own_account;
-  const ownerName = account.owner?.full_name;
   const lastSyncDate = getLastSyncDate(account);
 
   // Find the connection that matches this account's brokerage_authorization
@@ -170,6 +168,18 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
                 Paper
               </Badge>
             )}
+            <Tooltip>
+              <TooltipTrigger>
+                {account.sync_enabled ? (
+                  <Icons.Eye className="h-4 w-4 shrink-0 text-blue-500" />
+                ) : (
+                  <Icons.EyeOff className="text-muted-foreground h-4 w-4 shrink-0" />
+                )}
+              </TooltipTrigger>
+              <TooltipContent>
+                {account.sync_enabled ? "Sync enabled" : "Sync disabled"}
+              </TooltipContent>
+            </Tooltip>
           </div>
           <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-xs">
             <span className="truncate">{account.institution_name}</span>
@@ -177,40 +187,16 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
           </div>
         </div>
 
-        {/* Status icons - always visible */}
-        <div className="flex shrink-0 items-center gap-1.5">
+        {/* Status - sync time and shared info */}
+        <div className="flex shrink-0 flex-col items-end gap-1">
           {account.shared_with_household && (
-            <Tooltip>
-              <TooltipTrigger>
-                <Icons.Link className="text-muted-foreground h-4 w-4" />
-              </TooltipTrigger>
-              <TooltipContent>Shared with household</TooltipContent>
-            </Tooltip>
+            <span className="text-muted-foreground flex items-center gap-1 text-xs">
+              <Icons.Users className="h-3 w-3" />
+              Shared
+            </span>
           )}
-          <Tooltip>
-            <TooltipTrigger>
-              {account.sync_enabled ? (
-                <Icons.Eye className="h-4 w-4 text-blue-500" />
-              ) : (
-                <Icons.EyeOff className="text-muted-foreground h-4 w-4" />
-              )}
-            </TooltipTrigger>
-            <TooltipContent>
-              {account.sync_enabled ? "Sync enabled" : "Sync disabled"}
-            </TooltipContent>
-          </Tooltip>
+          <span className="text-muted-foreground text-xs">{lastSyncedText}</span>
         </div>
-      </div>
-
-      {/* Bottom row - sync time and shared info */}
-      <div className="text-muted-foreground mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-        <span>{lastSyncedText}</span>
-        {isShared && ownerName && (
-          <span className="flex items-center gap-1">
-            <Icons.Users className="h-3 w-3" />
-            Shared by {ownerName}
-          </span>
-        )}
       </div>
     </div>
   );
@@ -289,7 +275,7 @@ function BrokerConnectionsCard({
             <div className="flex flex-col items-center justify-center py-6 text-center">
               <p className="text-muted-foreground text-sm">No broker connections yet</p>
               <Button className="mt-3" onClick={openConnectionsPortal}>
-                <Icons.Plus className="mr-2 h-4 w-4" />
+                <Icons.Plus className="h-4 w-4" />
                 Connect Broker
               </Button>
             </div>
@@ -448,39 +434,31 @@ export function ConnectedView() {
               </div>
               <p className="text-muted-foreground truncate text-sm">{user?.email}</p>
             </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span>
-                  <ActionConfirm
-                    handleConfirm={handleSignOut}
-                    isPending={isSigningOut}
-                    confirmTitle="Sign out of Wealthfolio Connect?"
-                    confirmMessage="You'll need to sign in again to access your synced broker accounts. Your local data will not be affected."
-                    confirmButtonText="Sign Out"
-                    pendingText="Signing out..."
-                    cancelButtonText="Cancel"
-                    confirmButtonVariant="destructive"
-                    button={
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-muted-foreground hover:text-foreground h-8 w-8 shrink-0"
-                        disabled={isSigningOut || isLoading}
-                      >
-                        {isSigningOut ? (
-                          <Icons.Spinner className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Icons.LogOut className="h-4 w-4" />
-                        )}
-                      </Button>
-                    }
-                  />
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Sign out</p>
-              </TooltipContent>
-            </Tooltip>
+            <ActionConfirm
+              handleConfirm={handleSignOut}
+              isPending={isSigningOut}
+              confirmTitle="Sign out of Wealthfolio Connect?"
+              confirmMessage="You'll need to sign in again to access your synced broker accounts. Your local data will not be affected."
+              confirmButtonText="Sign Out"
+              pendingText="Signing out..."
+              cancelButtonText="Cancel"
+              confirmButtonVariant="destructive"
+              button={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground shrink-0"
+                  disabled={isSigningOut || isLoading}
+                >
+                  {isSigningOut ? (
+                    <Icons.Spinner className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Icons.LogOut className="h-4 w-4" />
+                  )}
+                  <span>Sign out</span>
+                </Button>
+              }
+            />
           </div>
         </CardContent>
       </Card>
@@ -538,15 +516,13 @@ export function ConnectedView() {
               </div>
               <div className="flex items-center gap-1">
                 <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-foreground h-8 w-8"
-                  onClick={() => accountsQuery.refetch()}
-                  disabled={accountsQuery.isFetching}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => syncToLocalMutation.mutate()}
+                  disabled={isSyncing || accountsQuery.isFetching}
                 >
-                  <Icons.RefreshCw
-                    className={`h-4 w-4 ${accountsQuery.isFetching ? "animate-spin" : ""}`}
-                  />
+                  <Icons.CloudSync2 className={`h-4 w-4 ${isSyncing ? "animate-pulse" : ""}`} />
+                  Sync Now
                 </Button>
                 {/* Mobile: icon only */}
                 <Button
@@ -584,34 +560,14 @@ export function ConnectedView() {
                   </p>
                 </div>
               ) : (
-                <div>
-                  {/* Accounts list */}
-                  <div className="space-y-2">
-                    {brokerAccounts.map((account) => (
-                      <BrokerAccountCard
-                        key={account.id}
-                        account={account}
-                        connections={connections}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Sync Action */}
-                  <div className="mt-4">
-                    <Button onClick={() => syncToLocalMutation.mutate()} disabled={isSyncing}>
-                      {isSyncing ? (
-                        <>
-                          <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                          Syncing...
-                        </>
-                      ) : (
-                        <>
-                          <Icons.Download className="mr-2 h-4 w-4" />
-                          Sync to Local
-                        </>
-                      )}
-                    </Button>
-                  </div>
+                <div className="space-y-2">
+                  {brokerAccounts.map((account) => (
+                    <BrokerAccountCard
+                      key={account.id}
+                      account={account}
+                      connections={connections}
+                    />
+                  ))}
                 </div>
               )}
             </div>

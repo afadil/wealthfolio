@@ -3,19 +3,27 @@
 use serde::{Deserialize, Serialize};
 
 /// Canonical list of local tables that participate in app-side device sync.
-pub const APP_SYNC_TABLES: [&str; 13] = [
-    "accounts",
+/// Order matters: parent tables before children (FK dependencies).
+pub const APP_SYNC_TABLES: [&str; 15] = [
+    // Base tables (no FK deps)
+    "platforms",
     "assets",
-    "asset_taxonomy_assignments",
+    // Depends on: assets
+    "quotes",
+    "goals",
+    "ai_threads",
+    "contribution_limits",
+    // Depends on: platforms
+    "accounts",
+    // Depends on: accounts
+    "import_runs",
+    // Depends on: accounts, assets, import_runs, goals, ai_threads
     "activities",
     "activity_import_profiles",
-    "goals",
+    "asset_taxonomy_assignments",
     "goals_allocation",
-    "ai_threads",
     "ai_messages",
     "ai_thread_tags",
-    "contribution_limits",
-    "platforms",
     "holdings_snapshots",
 ];
 
@@ -25,6 +33,7 @@ pub const APP_SYNC_TABLES: [&str; 13] = [
 pub enum SyncEntity {
     Account,
     Asset,
+    Quote,
     AssetTaxonomyAssignment,
     Activity,
     ActivityImportProfile,
@@ -45,7 +54,6 @@ pub enum SyncOperation {
     Create,
     Update,
     Delete,
-    Request,
 }
 
 /// Local outbox lifecycle status.
@@ -242,6 +250,7 @@ mod tests {
         let actual = [
             SyncEntity::Account,
             SyncEntity::Asset,
+            SyncEntity::Quote,
             SyncEntity::AssetTaxonomyAssignment,
             SyncEntity::Activity,
             SyncEntity::ActivityImportProfile,
@@ -261,6 +270,7 @@ mod tests {
         let expected = vec![
             "\"account\"",
             "\"asset\"",
+            "\"quote\"",
             "\"asset_taxonomy_assignment\"",
             "\"activity\"",
             "\"activity_import_profile\"",

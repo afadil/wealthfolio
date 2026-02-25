@@ -316,29 +316,32 @@ export function AlternativeAssetQuickAddModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-border/50 bg-card gap-0 overflow-hidden p-0 shadow-2xl sm:max-w-[560px]">
+      <DialogContent
+        className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-[560px]"
+        mobileClassName="flex h-[90vh] flex-col"
+      >
         {/* Header with progress indicator */}
-        <DialogHeader className="border-border/50 border-b px-6 pb-4 pt-6">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-foreground text-xl font-semibold tracking-tight">
+        <DialogHeader className="border-b px-6 py-4">
+          <div className="flex flex-col items-center space-y-2 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+            <DialogTitle className="text-foreground text-lg font-semibold">
               {step === 1 ? "Add New Asset" : selectedAssetType?.label}
             </DialogTitle>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <div
                 className={cn(
-                  "h-2 w-8 rounded-full transition-colors duration-300",
+                  "h-1.5 w-10 rounded-full transition-colors duration-300",
                   step >= 1 ? "bg-primary" : "bg-muted",
                 )}
               />
               <div
                 className={cn(
-                  "h-2 w-8 rounded-full transition-colors duration-300",
+                  "h-1.5 w-10 rounded-full transition-colors duration-300",
                   step >= 2 ? "bg-primary" : "bg-muted",
                 )}
               />
             </div>
           </div>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="text-muted-foreground text-sm">
             {step === 1
               ? "Select the type of asset you want to add"
               : formData.kind === AlternativeAssetKind.LIABILITY
@@ -348,7 +351,7 @@ export function AlternativeAssetQuickAddModal({
         </DialogHeader>
 
         {/* Content area with animations */}
-        <div className="relative min-h-[380px]">
+        <div className="relative flex-1 overflow-y-auto">
           <AnimatePresence mode="wait">
             {step === 1 ? (
               <motion.div
@@ -357,7 +360,7 @@ export function AlternativeAssetQuickAddModal({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.2 }}
-                className="p-6"
+                className="p-4"
               >
                 {/* Asset Type Grid */}
                 <div className="grid grid-cols-2 gap-3">
@@ -422,7 +425,7 @@ export function AlternativeAssetQuickAddModal({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}
                 transition={{ duration: 0.2 }}
-                className="space-y-5 p-6"
+                className="space-y-3 p-4"
               >
                 {/* Type-specific fields */}
                 {formData.kind === AlternativeAssetKind.PRECIOUS_METAL && (
@@ -607,28 +610,26 @@ export function AlternativeAssetQuickAddModal({
         </div>
 
         {/* Footer with navigation */}
-        <div className="border-border/50 bg-muted/30 border-t px-6 py-4">
-          <div className="flex items-center justify-between">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => (step === 1 ? onOpenChange(false) : setStep(1))}
-              disabled={isSubmitting}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              {step === 1 ? (
-                "Cancel"
-              ) : (
-                <>
-                  <Icons.ArrowLeft className="mr-2 h-4 w-4" />
-                  Back
-                </>
-              )}
-            </Button>
+        <div className="mt-auto border-t px-6 py-4">
+          <div className="flex w-full gap-3">
+            {step === 2 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="default"
+                onClick={() => setStep(1)}
+                disabled={isSubmitting}
+                className="flex-1"
+              >
+                <Icons.ArrowLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
+            )}
             <Button
               onClick={() => (step === 1 ? setStep(2) : handleSubmit())}
               disabled={!canProceed || isSubmitting}
-              className="min-w-[140px]"
+              size="default"
+              className="flex-1 font-medium"
             >
               {isSubmitting ? (
                 <>

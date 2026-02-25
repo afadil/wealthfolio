@@ -9,17 +9,14 @@ functionality. This guide covers how to build, test, and distribute addons.
 Addons are TypeScript/React-based extensions that provide access to
 Wealthfolio's financial data and UI system.
 
-**Technical Foundation**  
-Each addon is a JavaScript function that receives an `AddonContext` object with
-access to APIs, UI components, and event system.
+**Technical Foundation** Each addon is a JavaScript function that receives an
+`AddonContext` object with access to APIs, UI components, and event system.
 
-**Integration Capabilities**  
-Addons can register new navigation items, routes, and components that integrate
-directly into Wealthfolio's interface.
+**Integration Capabilities** Addons can register new navigation items, routes,
+and components that integrate directly into Wealthfolio's interface.
 
-**Development Environment**  
-Built with TypeScript, React, and modern web APIs. Includes hot-reload
-development server and comprehensive type definitions.
+**Development Environment** Built with TypeScript, React, and modern web APIs.
+Includes hot-reload development server and comprehensive type definitions.
 
 ## Architecture Overview
 
@@ -365,7 +362,7 @@ export default defineConfig({
 ## Publishing
 
 Users can install addons directly from ZIP files. To publish your addon in the
-Wealthfolio Store, contact **wealthfolio@teymz.com**.
+Wealthfolio Store, contact **support@wealthfolio.app**.
 
 ## Quick Start
 
@@ -375,19 +372,19 @@ Wealthfolio Store, contact **wealthfolio@teymz.com**.
     <p class="text-muted-foreground mb-4">Create your first addon</p>
     <span class="text-primary">Get Started →</span>
   </Card>
-  
+
   <Card href="/docs/addons/api-reference">
     <h3 class="text-lg font-semibold mb-2">📖 API Reference</h3>
     <p class="text-muted-foreground mb-4">Explore available APIs</p>
     <span class="text-primary">Browse APIs →</span>
   </Card>
-  
+
   <Card href="https://github.com/afadil/wealthfolio/tree/main/addons/">
     <h3 class="text-lg font-semibold mb-2">💡 Examples</h3>
     <p class="text-muted-foreground mb-4">See real addon implementations</p>
     <span class="text-primary">Browse Examples →</span>
   </Card>
-  
+
   <Card href="https://wealthfolio.app/addons">
     <h3 class="text-lg font-semibold mb-2">🏪 Addon Store</h3>
     <p class="text-muted-foreground mb-4">Explore available addons</p>

@@ -252,13 +252,14 @@ export class PerformanceCalculator {
   }
 
   /**
-   * Generate calendar view of trading performance
+   * Generate calendar view of trading performance for all years with trades
    */
-  calculateCalendar(year: number, fxRateMap: Record<string, number> = {}): CalendarMonth[] {
+  calculateCalendar(fxRateMap: Record<string, number> = {}): CalendarMonth[] {
     const convert = this.createCurrencyConverter(fxRateMap);
     const tradeDateMap = new Map<string, { pl: number; count: number }>();
 
-    // Group trades by exit date
+    // Collect all years that have trades
+    const yearsWithTrades = new Set<number>();
     for (const trade of this.closedTrades) {
       const dateKey = format(trade.exitDate, "yyyy-MM-dd");
       const existing = tradeDateMap.get(dateKey) || { pl: 0, count: 0 };
@@ -267,47 +268,55 @@ export class PerformanceCalculator {
         pl: existing.pl + convert(trade.realizedPL, trade.currency),
         count: existing.count + 1,
       });
+
+      yearsWithTrades.add(trade.exitDate.getFullYear());
     }
+
+    // Always include current year
+    const currentYear = new Date().getFullYear();
+    yearsWithTrades.add(currentYear);
 
     const today = new Date();
     const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
+    const todayKey = format(today, "yyyy-MM-dd");
     const months: CalendarMonth[] = [];
 
-    // Generate calendar for each month
-    for (let month = 0; month < 12; month++) {
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
-      const days: CalendarDay[] = [];
+    // Generate calendar for each year that has trades
+    for (const year of [...yearsWithTrades].sort()) {
+      for (let month = 0; month < 12; month++) {
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const days: CalendarDay[] = [];
 
-      let monthlyPL = 0;
-      let monthlyTrades = 0;
+        let monthlyPL = 0;
+        let monthlyTrades = 0;
 
-      for (let day = 1; day <= daysInMonth; day++) {
-        const date = new Date(year, month, day);
-        const dateKey = format(date, "yyyy-MM-dd");
-        const tradeData = tradeDateMap.get(dateKey) || { pl: 0, count: 0 };
+        for (let day = 1; day <= daysInMonth; day++) {
+          const date = new Date(year, month, day);
+          const dateKey = format(date, "yyyy-MM-dd");
+          const tradeData = tradeDateMap.get(dateKey) || { pl: 0, count: 0 };
 
-        monthlyPL += tradeData.pl;
-        monthlyTrades += tradeData.count;
+          monthlyPL += tradeData.pl;
+          monthlyTrades += tradeData.count;
 
-        days.push({
-          date: dateKey,
-          realizedPL: tradeData.pl,
-          returnPercent: 0, // Would need portfolio value for accurate calculation
-          tradeCount: tradeData.count,
-          isToday: dateKey === format(today, "yyyy-MM-dd"),
-          isCurrentMonth: month === currentMonth && year === currentYear,
+          days.push({
+            date: dateKey,
+            realizedPL: tradeData.pl,
+            returnPercent: 0,
+            tradeCount: tradeData.count,
+            isToday: dateKey === todayKey,
+            isCurrentMonth: month === currentMonth && year === currentYear,
+          });
+        }
+
+        months.push({
+          year,
+          month: month + 1,
+          monthlyPL,
+          monthlyReturnPercent: 0,
+          totalTrades: monthlyTrades,
+          days,
         });
       }
-
-      months.push({
-        year,
-        month: month + 1,
-        monthlyPL,
-        monthlyReturnPercent: 0, // Would need portfolio value for accurate calculation
-        totalTrades: monthlyTrades,
-        days,
-      });
     }
 
     return months;

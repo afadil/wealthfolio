@@ -162,5 +162,11 @@ export const getPlatform = (): Promise<PlatformInfo> => {
     os,
     is_mobile,
     is_desktop: !is_mobile,
+    is_tauri: false,
+    capabilities: {
+      connect_sync: true,
+      device_sync: true,
+      cloud_sync: true,
+    },
   });
 };

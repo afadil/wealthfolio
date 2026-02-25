@@ -3,10 +3,19 @@ import {
   getPlatform as getPlatformApi,
   isDesktop as isDesktopEnv,
   isWeb as isWebEnv,
+  type PlatformCapabilities,
   type PlatformInfo,
 } from "@/adapters";
 
 export type { PlatformInfo };
+
+function defaultCapabilities(): PlatformCapabilities {
+  return {
+    connect_sync: true,
+    device_sync: true,
+    cloud_sync: true,
+  };
+}
 
 export interface UsePlatformResult {
   platform: PlatformInfo | null;
@@ -87,6 +96,7 @@ function detectPlatformFromUserAgent(): PlatformInfo {
       os: "unknown",
       is_mobile: false,
       is_desktop: true,
+      capabilities: defaultCapabilities(),
     };
   }
 
@@ -119,6 +129,7 @@ function detectPlatformFromUserAgent(): PlatformInfo {
     os,
     is_mobile,
     is_desktop: !is_mobile,
+    capabilities: defaultCapabilities(),
   };
 }
 

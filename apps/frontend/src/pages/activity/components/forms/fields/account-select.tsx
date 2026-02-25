@@ -10,7 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@wealthfolio/ui";
-import { useFormContext, type FieldPath, type FieldValues } from "react-hook-form";
+import { useEffect } from "react";
+import { useFormContext, type FieldPath, type FieldValues, type PathValue } from "react-hook-form";
 
 export interface AccountSelectOption {
   value: string;
@@ -36,7 +37,29 @@ export function AccountSelect<TFieldValues extends FieldValues = FieldValues>({
   placeholder = "Select an account",
   currencyName,
 }: AccountSelectProps<TFieldValues>) {
-  const { control, getFieldState, getValues, setValue } = useFormContext<TFieldValues>();
+  const { control, getFieldState, getValues, setValue, watch } = useFormContext<TFieldValues>();
+  const selectedAccountId = watch(name) as string | undefined;
+  const watchedCurrency = watch((currencyName ?? name) as FieldPath<TFieldValues>) as
+    | string
+    | undefined;
+
+  // Backfill currency when account options arrive after mount (e.g., preselected account via URL).
+  useEffect(() => {
+    if (!currencyName || !selectedAccountId) return;
+    const selected = accounts.find((account) => account.value === selectedAccountId);
+    if (!selected) return;
+
+    const currentCurrency = watchedCurrency?.trim();
+    if (currentCurrency === selected.currency) return;
+
+    const shouldAutoSetCurrency = !getFieldState(currencyName).isDirty || !currentCurrency;
+    if (!shouldAutoSetCurrency) return;
+
+    setValue(currencyName, selected.currency as PathValue<TFieldValues, typeof currencyName>, {
+      shouldDirty: false,
+      shouldValidate: true,
+    });
+  }, [accounts, currencyName, getFieldState, selectedAccountId, setValue, watchedCurrency]);
 
   return (
     <FormField
@@ -52,17 +75,18 @@ export function AccountSelect<TFieldValues extends FieldValues = FieldValues>({
                 if (!currencyName) return;
                 const selected = accounts.find((account) => account.value === value);
                 if (!selected) return;
-                const currentCurrency = (
-                  getValues(currencyName as any) as string | undefined
-                )?.trim();
+                const currentCurrency = (getValues(currencyName) as string | undefined)?.trim();
                 const shouldAutoSetCurrency =
-                  !getFieldState(currencyName as any).isDirty || !currentCurrency;
+                  !getFieldState(currencyName).isDirty || !currentCurrency;
                 if (shouldAutoSetCurrency) {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  setValue(currencyName, selected.currency as any, {
-                    shouldDirty: false,
-                    shouldValidate: true,
-                  });
+                  setValue(
+                    currencyName,
+                    selected.currency as PathValue<TFieldValues, typeof currencyName>,
+                    {
+                      shouldDirty: false,
+                      shouldValidate: true,
+                    },
+                  );
                 }
               }}
               defaultValue={field.value}

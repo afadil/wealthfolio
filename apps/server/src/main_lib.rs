@@ -10,7 +10,8 @@ use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, EnvFilter};
 use wealthfolio_ai::{AiProviderService, AiProviderServiceTrait, ChatConfig, ChatService};
 use wealthfolio_connect::{
-    BrokerSyncService, BrokerSyncServiceTrait, PlatformRepository, DEFAULT_CLOUD_API_URL,
+    BrokerSyncService, BrokerSyncServiceTrait, CoreImportRunRepositoryAdapter,
+    ImportRunRepositoryTrait,
 };
 use wealthfolio_core::addons::{AddonService, AddonServiceTrait};
 use wealthfolio_core::{
@@ -41,7 +42,7 @@ use wealthfolio_core::{
     settings::{SettingsRepositoryTrait, SettingsService, SettingsServiceTrait},
     taxonomies::{TaxonomyService, TaxonomyServiceTrait},
 };
-use wealthfolio_device_sync::DeviceEnrollService;
+use wealthfolio_device_sync::{engine::DeviceSyncRuntimeState, DeviceEnrollService};
 use wealthfolio_storage_sqlite::{
     accounts::AccountRepository,
     activities::ActivityRepository,
@@ -55,11 +56,11 @@ use wealthfolio_storage_sqlite::{
     market_data::{MarketDataRepository, QuoteSyncStateRepository},
     portfolio::{snapshot::SnapshotRepository, valuation::ValuationRepository},
     settings::SettingsRepository,
-    sync::ImportRunRepository,
+    sync::{AppSyncRepository, BrokerSyncStateRepository, ImportRunRepository, PlatformRepository},
     taxonomies::TaxonomyRepository,
 };
 
-/// In-memory cache for the current access token to avoid hitting Supabase on every request.
+/// In-memory cache for the current access token to avoid hitting the auth provider on every request.
 pub struct CachedAccessToken {
     pub token: String,
     pub expires_at: Instant,
@@ -102,6 +103,8 @@ pub struct AppState {
     pub event_bus: EventBus,
     pub auth: Option<Arc<AuthManager>>,
     pub device_enroll_service: Arc<DeviceEnrollService>,
+    pub app_sync_repository: Arc<AppSyncRepository>,
+    pub device_sync_runtime: Arc<DeviceSyncRuntimeState>,
     pub health_service: Arc<dyn HealthServiceTrait + Send + Sync>,
     pub token_cache: tokio::sync::RwLock<Option<CachedAccessToken>>,
 }
@@ -175,6 +178,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let market_data_repository = Arc::new(MarketDataRepository::new(pool.clone(), writer.clone()));
     let activity_repository = Arc::new(ActivityRepository::new(pool.clone(), writer.clone()));
     let snapshot_repository = Arc::new(SnapshotRepository::new(pool.clone(), writer.clone()));
+    let app_sync_repository = Arc::new(AppSyncRepository::new(pool.clone(), writer.clone()));
     let quote_sync_state_repository =
         Arc::new(QuoteSyncStateRepository::new(pool.clone(), writer.clone()));
 
@@ -287,7 +291,13 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         ));
 
     // Import run repository for tracking CSV imports
-    let import_run_repository = Arc::new(ImportRunRepository::new(pool.clone(), writer.clone()));
+    let import_run_repository: Arc<dyn ImportRunRepositoryTrait> =
+        Arc::new(ImportRunRepository::new(pool.clone(), writer.clone()));
+    let core_import_run_repository = Arc::new(CoreImportRunRepositoryAdapter::new(
+        import_run_repository.clone(),
+    ));
+    let broker_sync_state_repository =
+        Arc::new(BrokerSyncStateRepository::new(pool.clone(), writer.clone()));
 
     let activity_service: Arc<dyn ActivityServiceTrait + Send + Sync> = Arc::new(
         CoreActivityService::with_import_run_repository(
@@ -296,7 +306,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             asset_service.clone(),
             fx_service.clone(),
             quote_service.clone(),
-            import_run_repository,
+            core_import_run_repository,
         )
         .with_event_sink(domain_event_sink.clone()),
     );
@@ -325,9 +335,11 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             account_service.clone(),
             asset_service.clone(),
             activity_service.clone(),
+            activity_repository.clone(),
             platform_repository,
-            pool.clone(),
-            writer.clone(),
+            broker_sync_state_repository,
+            import_run_repository,
+            snapshot_repository.clone(),
         )
         .with_event_sink(domain_event_sink.clone())
         .with_snapshot_service(snapshot_service.clone()),
@@ -367,11 +379,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let ai_chat_service = Arc::new(ChatService::new(ai_environment, ChatConfig::default()));
 
     // Device enroll service for E2EE sync
-    let cloud_api_url = std::env::var("CONNECT_API_URL")
-        .ok()
-        .map(|v| v.trim().trim_end_matches('/').to_string())
-        .filter(|v| !v.is_empty())
-        .unwrap_or_else(|| DEFAULT_CLOUD_API_URL.to_string());
+    let cloud_api_url = crate::features::cloud_api_base_url().unwrap_or_default();
     let device_display_name = "Wealthfolio Server".to_string();
     let app_version = Some(env!("CARGO_PKG_VERSION").to_string());
     let device_enroll_service = Arc::new(DeviceEnrollService::new(
@@ -388,6 +396,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         Arc::new(HealthService::new(health_dismissal_repository));
 
     let event_bus = EventBus::new(256);
+    let device_sync_runtime = Arc::new(DeviceSyncRuntimeState::new());
 
     // Domain event sink - Phase 2: Start the worker now that all services are ready
     domain_event_sink.start_worker(
@@ -447,6 +456,8 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         event_bus,
         auth: auth_manager,
         device_enroll_service,
+        app_sync_repository,
+        device_sync_runtime,
         health_service,
         token_cache: tokio::sync::RwLock::new(None),
     }))

@@ -57,6 +57,9 @@ pub fn plan_portfolio_job(events: &[DomainEvent]) -> Option<PortfolioRequestPayl
                 has_recalc_events = true;
                 account_ids.insert(account_id.clone());
             }
+            DomainEvent::DeviceSyncPullComplete => {
+                has_recalc_events = true;
+            }
             DomainEvent::AssetsUpdated { asset_ids: ids } => {
                 has_recalc_events = true;
                 for id in ids {
@@ -340,5 +343,33 @@ mod tests {
 
         let result = plan_asset_enrichment(&events);
         assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn test_plan_portfolio_job_device_sync_pull_complete() {
+        let events = vec![DomainEvent::device_sync_pull_complete()];
+
+        let result = plan_portfolio_job(&events);
+        assert!(result.is_some());
+
+        let payload = result.unwrap();
+        // DeviceSyncPullComplete should trigger recalculation for all accounts
+        assert!(payload.account_ids.is_none());
+    }
+
+    #[test]
+    fn test_plan_portfolio_job_device_sync_pull_complete_triggers_incremental_sync() {
+        let events = vec![DomainEvent::device_sync_pull_complete()];
+
+        let result = plan_portfolio_job(&events).unwrap();
+
+        // Should use incremental sync mode
+        if let wealthfolio_core::quotes::MarketSyncMode::Incremental { asset_ids } =
+            result.market_sync_mode
+        {
+            assert!(asset_ids.is_none());
+        } else {
+            panic!("Expected Incremental sync mode");
+        }
     }
 }

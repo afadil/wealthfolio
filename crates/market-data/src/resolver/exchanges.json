@@ -37,7 +37,8 @@
       "currency": "USD",
       "timezone": "America/New_York",
       "close": [16, 0],
-      "yahoo": { "suffix": "", "codes": ["ARC"] }
+      "yahoo": { "suffix": "", "codes": ["ARC"] },
+      "alpha_vantage": { "suffix": "", "currency": "USD" }
     },
     {
       "mic": "BATS",
@@ -46,7 +47,8 @@
       "currency": "USD",
       "timezone": "America/New_York",
       "close": [16, 0],
-      "yahoo": { "suffix": "", "codes": ["BTS"] }
+      "yahoo": { "suffix": "", "codes": ["BTS"] },
+      "alpha_vantage": { "suffix": "", "currency": "USD" }
     },
     {
       "mic": "OTCM",

@@ -1,9 +1,11 @@
 use chrono::Local;
 use log::{error, info, warn};
+use rusqlite::Connection as RusqliteConnection;
 use std::fs;
 use std::io;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Duration;
 
 use diesel::connection::{Connection, SimpleConnection};
 use diesel::r2d2;
@@ -164,42 +166,60 @@ pub fn create_backup_path(app_data_dir: &str) -> Result<String> {
     Ok(backup_path.to_str().unwrap().to_string())
 }
 
-pub fn backup_database(app_data_dir: &str) -> Result<String> {
+pub fn backup_database_to_file(app_data_dir: &str, backup_path: &str) -> Result<()> {
     let db_path = get_db_path(app_data_dir);
-    let backup_path = create_backup_path(app_data_dir)?;
 
     info!(
         "Creating database backup from {} to {}",
         db_path, backup_path
     );
 
-    // Copy main database file
-    fs::copy(&db_path, &backup_path).map_err(|e| {
-        error!("Failed to create database backup: {}", e);
+    if let Some(parent) = Path::new(backup_path).parent() {
+        fs::create_dir_all(parent).map_err(|e| {
+            error!("Failed to create backup directory: {}", e);
+            Error::Database(DatabaseError::BackupFailed(e.to_string()))
+        })?;
+    }
+
+    if Path::new(backup_path).exists() {
+        fs::remove_file(backup_path).map_err(|e| {
+            error!("Failed to remove existing backup file: {}", e);
+            Error::Database(DatabaseError::BackupFailed(e.to_string()))
+        })?;
+    }
+
+    let source_conn = RusqliteConnection::open(&db_path).map_err(|e| {
+        error!("Failed to open source database for backup: {}", e);
         Error::Database(DatabaseError::BackupFailed(e.to_string()))
     })?;
 
-    // Copy WAL file if it exists
-    let wal_source = format!("{}-wal", db_path);
-    let wal_target = format!("{}-wal", backup_path);
-    if Path::new(&wal_source).exists() {
-        fs::copy(&wal_source, &wal_target).map_err(|e| {
-            error!("Failed to copy WAL file: {}", e);
-            Error::Database(DatabaseError::BackupFailed(e.to_string()))
-        })?;
-    }
+    source_conn
+        .busy_timeout(Duration::from_secs(30))
+        .map_err(|e| Error::Database(DatabaseError::BackupFailed(e.to_string())))?;
 
-    // Copy SHM file if it exists
-    let shm_source = format!("{}-shm", db_path);
-    let shm_target = format!("{}-shm", backup_path);
-    if Path::new(&shm_source).exists() {
-        fs::copy(&shm_source, &shm_target).map_err(|e| {
-            error!("Failed to copy SHM file: {}", e);
-            Error::Database(DatabaseError::BackupFailed(e.to_string()))
-        })?;
-    }
+    source_conn
+        .execute_batch("PRAGMA wal_checkpoint(FULL);")
+        .unwrap_or_else(|e| warn!("WAL checkpoint before backup failed: {}", e));
 
-    info!("Database backup created successfully (including WAL/SHM files if present)");
+    let escaped_backup_path = backup_path.replace('\'', "''");
+    let vacuum_sql = format!("VACUUM INTO '{}';", escaped_backup_path);
+
+    source_conn.execute_batch(&vacuum_sql).map_err(|e| {
+        error!(
+            "Failed to create self-contained backup via VACUUM INTO: {}",
+            e
+        );
+        Error::Database(DatabaseError::BackupFailed(e.to_string()))
+    })?;
+
+    info!("Database backup created successfully (self-contained .db)");
+    Ok(())
+}
+
+pub fn backup_database(app_data_dir: &str) -> Result<String> {
+    let backup_path = create_backup_path(app_data_dir)?;
+
+    backup_database_to_file(app_data_dir, &backup_path)?;
     Ok(backup_path)
 }
 

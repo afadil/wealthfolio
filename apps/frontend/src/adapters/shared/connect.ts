@@ -1,32 +1,35 @@
 // Broker / Connect Commands
-import type { Account, Platform } from "@/lib/types";
 import type {
-  BrokerConnection,
-  BrokerAccount,
-  PlansResponse,
-  UserInfo,
-  BrokerSyncState,
-  ImportRun,
-} from "@/features/wealthfolio-connect/types";
-import type {
-  Device,
-  CreatePairingResponse,
-  GetPairingResponse,
   ClaimPairingResponse,
-  PairingMessagesResponse,
+  CompletePairingResponse,
   ConfirmPairingResponse,
-  SuccessResponse,
+  CreatePairingResponse,
+  Device,
+  GetPairingResponse,
+  PairingMessagesResponse,
   ResetTeamSyncResponse,
+  SuccessResponse,
 } from "@/features/devices-sync/types";
 import type {
-  ImportRunsRequest,
-  BackendSyncStateResult,
+  BrokerAccount,
+  BrokerConnection,
+  BrokerSyncState,
+  ImportRun,
+  PlansResponse,
+  UserInfo,
+} from "@/features/wealthfolio-connect/types";
+import type { Account, Platform } from "@/lib/types";
+import type {
   BackendEnableSyncResult,
-  BackendSyncEngineStatusResult,
+  BackendSyncBackgroundEngineResult,
+  BackendSyncBootstrapOverwriteCheckResult,
   BackendSyncBootstrapResult,
   BackendSyncCycleResult,
-  BackendSyncBackgroundEngineResult,
+  BackendSyncEngineStatusResult,
+  BackendSyncReconcileReadyResult,
   BackendSyncSnapshotUploadResult,
+  BackendSyncStateResult,
+  ImportRunsRequest,
 } from "../types";
 
 import { invoke } from "./platform";
@@ -101,6 +104,17 @@ export const reinitializeDeviceSync = async (): Promise<BackendEnableSyncResult>
 
 export const getSyncEngineStatus = async (): Promise<BackendSyncEngineStatusResult> => {
   return invoke<BackendSyncEngineStatusResult>("device_sync_engine_status");
+};
+
+export const deviceSyncBootstrapOverwriteCheck =
+  async (): Promise<BackendSyncBootstrapOverwriteCheckResult> => {
+    return invoke<BackendSyncBootstrapOverwriteCheckResult>(
+      "device_sync_bootstrap_overwrite_check",
+    );
+  };
+
+export const deviceSyncReconcileReadyState = async (): Promise<BackendSyncReconcileReadyResult> => {
+  return invoke<BackendSyncReconcileReadyResult>("device_sync_reconcile_ready_state");
 };
 
 export const syncBootstrapSnapshotIfNeeded = async (): Promise<BackendSyncBootstrapResult> => {
@@ -179,8 +193,8 @@ export const completePairing = async (
   encryptedKeyBundle: string,
   sasProof: string | Record<string, unknown>,
   signature: string,
-): Promise<SuccessResponse> => {
-  return invoke<SuccessResponse>("complete_pairing", {
+): Promise<CompletePairingResponse> => {
+  return invoke<CompletePairingResponse>("complete_pairing", {
     pairingId,
     encryptedKeyBundle,
     sasProof,

@@ -1,4 +1,4 @@
-//! Snapshot generation, upload, bootstrap, and policy evaluation.
+//! Snapshot generation, upload, and bootstrap flows.
 
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
 use chrono::Utc;
@@ -11,15 +11,13 @@ use uuid::Uuid;
 use crate::context::ServiceContext;
 use crate::events::{emit_portfolio_trigger_recalculate, PortfolioRequestPayload};
 use wealthfolio_core::quotes::MarketSyncMode;
-use wealthfolio_core::sync::{
-    APP_SYNC_TABLES, DEVICE_SYNC_SNAPSHOT_EVENT_THRESHOLD, DEVICE_SYNC_SNAPSHOT_INTERVAL_SECS,
-};
+use wealthfolio_core::sync::APP_SYNC_TABLES;
 use wealthfolio_device_sync::SyncState;
 
 use super::{
     create_client, encrypt_sync_payload, get_access_token, get_sync_identity_from_store,
-    is_sqlite_image, persist_device_config_from_identity, request_snapshot_generation,
-    sha256_checksum, SyncBootstrapResult, SyncIdentity, SyncSnapshotUploadResult,
+    is_sqlite_image, persist_device_config_from_identity, sha256_checksum, SyncBootstrapResult,
+    SyncIdentity, SyncSnapshotUploadResult,
 };
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -195,17 +193,10 @@ pub async fn sync_bootstrap_snapshot_if_needed(
 
     let snapshot_id = latest.snapshot_id.trim().to_string();
     if snapshot_id.is_empty() {
-        debug!(
-            "[DeviceSync] Latest snapshot metadata had empty snapshot_id; requested snapshot generation and no local upload performed in this path"
+        return Err(
+            "Latest snapshot metadata had empty snapshot_id. No valid snapshot available."
+                .to_string(),
         );
-        return request_snapshot_generation(
-            &client,
-            &token,
-            &device_id,
-            &identity,
-            "Latest snapshot metadata was invalid. Requested a fresh snapshot.",
-        )
-        .await;
     }
     let snapshot_oplog_seq = latest.oplog_seq;
     let latest_checksum = if latest.checksum.trim().is_empty() {
@@ -219,10 +210,21 @@ pub async fn sync_bootstrap_snapshot_if_needed(
         latest.covers_tables
     };
 
-    let (headers, blob) = client
+    let (headers, blob) = match client
         .download_snapshot(&token, &device_id, &snapshot_id)
         .await
-        .map_err(|e| e.to_string())?;
+    {
+        Ok(value) => value,
+        Err(err) => {
+            if err.status_code() == Some(404) {
+                return Err(format!(
+                    "Snapshot {} is no longer available. No valid snapshot to download.",
+                    snapshot_id
+                ));
+            }
+            return Err(err.to_string());
+        }
+    };
     debug!(
         "[DeviceSync] Snapshot download response headers: schema_version={} tables={} checksum={} blob_size={}",
         headers.schema_version,
@@ -374,6 +376,7 @@ pub async fn generate_snapshot_now_internal(
         key_version,
     )?;
 
+    let base_seq = context.app_sync_repository().get_cursor().ok();
     let upload_headers = wealthfolio_device_sync::SnapshotUploadHeaders {
         event_id: Some(Uuid::now_v7().to_string()),
         schema_version: 1,
@@ -382,6 +385,7 @@ pub async fn generate_snapshot_now_internal(
         checksum,
         metadata_payload,
         payload_key_version: key_version,
+        base_seq,
     };
     let checksum_prefix = upload_headers
         .checksum
@@ -437,68 +441,4 @@ pub async fn generate_snapshot_now_internal(
         oplog_seq: Some(response.oplog_seq),
         message: "Snapshot uploaded".to_string(),
     })
-}
-
-pub(super) async fn maybe_generate_snapshot_for_policy(context: Arc<ServiceContext>) {
-    let cursor = match context.app_sync_repository().get_cursor() {
-        Ok(value) => value,
-        Err(err) => {
-            log::warn!(
-                "[DeviceSync] Failed reading cursor for snapshot policy: {}",
-                err
-            );
-            return;
-        }
-    };
-
-    let now = Utc::now();
-    let runtime = context.device_sync_runtime();
-    let (due_by_time, due_by_seq, last_uploaded_cursor) = {
-        let state = runtime.snapshot_policy.lock().await;
-        let due_by_time = state
-            .last_uploaded_at
-            .map(|at| (now - at).num_seconds() >= DEVICE_SYNC_SNAPSHOT_INTERVAL_SECS as i64)
-            .unwrap_or(true);
-        let last_uploaded_cursor = state.last_uploaded_cursor;
-        let due_by_seq =
-            cursor.saturating_sub(last_uploaded_cursor) >= DEVICE_SYNC_SNAPSHOT_EVENT_THRESHOLD;
-        (due_by_time, due_by_seq, last_uploaded_cursor)
-    };
-    let delta_seq = cursor.saturating_sub(last_uploaded_cursor);
-    debug!(
-        "[DeviceSync] Snapshot policy eval cursor={} last_uploaded_cursor={} delta_seq={} due_by_time={} due_by_seq={} threshold_seq={} threshold_secs={}",
-        cursor,
-        last_uploaded_cursor,
-        delta_seq,
-        due_by_time,
-        due_by_seq,
-        DEVICE_SYNC_SNAPSHOT_EVENT_THRESHOLD,
-        DEVICE_SYNC_SNAPSHOT_INTERVAL_SECS
-    );
-
-    if !due_by_time && !due_by_seq {
-        debug!("[DeviceSync] Snapshot policy skipped: neither time nor seq threshold met");
-        return;
-    }
-
-    match generate_snapshot_now_internal(None, Arc::clone(&context)).await {
-        Ok(result) if result.status == "uploaded" => {
-            let mut state = runtime.snapshot_policy.lock().await;
-            state.last_uploaded_at = Some(now);
-            state.last_uploaded_cursor = result.oplog_seq.unwrap_or(cursor);
-        }
-        Ok(_) => {}
-        Err(err) => {
-            let key_version = get_sync_identity_from_store()
-                .and_then(|identity| identity.key_version)
-                .unwrap_or(1)
-                .max(1);
-            log::warn!(
-                "[DeviceSync] Snapshot policy upload failed cursor={} key_version={} error={}",
-                cursor,
-                key_version,
-                err
-            );
-        }
-    }
 }

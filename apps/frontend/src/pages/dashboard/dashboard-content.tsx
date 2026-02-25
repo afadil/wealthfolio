@@ -1,4 +1,5 @@
 import { HistoryChart } from "@/components/history-chart";
+import { useHapticFeedback } from "@/hooks";
 import { useHoldings } from "@/hooks/use-holdings";
 import { useValuationHistory } from "@/hooks/use-valuation-history";
 import {
@@ -43,6 +44,7 @@ export function DashboardContent() {
   const [isAllTime, setIsAllTime] = useState<boolean>(() => intervalCode === "ALL");
 
   const { holdings: allHoldings, isLoading: isHoldingsLoading } = useHoldings(PORTFOLIO_ACCOUNT_ID);
+  const { triggerHaptic } = useHapticFeedback();
 
   // Filter holdings for display (exclude alternative assets and cash for TopHoldings)
   const holdings = useMemo(() => {
@@ -157,6 +159,7 @@ export function DashboardContent() {
             <IntervalSelector
               className="pointer-events-auto relative z-20 w-full max-w-screen-sm sm:max-w-screen-md md:max-w-2xl lg:max-w-3xl"
               onIntervalSelect={handleIntervalSelect}
+              onHaptic={triggerHaptic}
               isLoading={isValuationHistoryLoading}
               storageKey={INTERVAL_STORAGE_KEY}
               defaultValue={DEFAULT_INTERVAL}

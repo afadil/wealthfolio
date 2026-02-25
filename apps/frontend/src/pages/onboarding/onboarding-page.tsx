@@ -1,6 +1,7 @@
+import { usePlatform } from "@/hooks/use-platform";
 import { useSettings } from "@/hooks/use-settings";
-import { useSettingsContext } from "@/lib/settings-provider";
 import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
+import { useSettingsContext } from "@/lib/settings-provider";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { AnimatePresence, motion } from "motion/react";
@@ -11,23 +12,28 @@ import { OnboardingConnect } from "./onboarding-connect";
 import { OnboardingStep1 } from "./onboarding-step1";
 import { OnboardingStep2, OnboardingStep2Handle } from "./onboarding-step2";
 
-const MAX_STEPS = 4;
+const DESKTOP_MAX_STEPS = 4;
+const MOBILE_MAX_STEPS = 3;
 
 const OnboardingPage = () => {
   const { data: settings, isLoading: isSettingsLoading } = useSettings();
+  const { isMobile } = usePlatform();
   const { updateSettings } = useSettingsContext();
   const [currentStep, setCurrentStep] = useState(1);
   const [isStepValid, setIsStepValid] = useState(true);
   const settingsStepRef = useRef<OnboardingStep2Handle>(null);
   const appearanceStepRef = useRef<OnboardingAppearanceHandle>(null);
+  const maxSteps = isMobile ? MOBILE_MAX_STEPS : DESKTOP_MAX_STEPS;
+  const completionRoute = isMobile ? "/settings" : "/settings/accounts";
+  const isFinalStep = currentStep === maxSteps;
 
   if (isSettingsLoading) return null;
   if (settings?.onboardingCompleted) {
-    return <Navigate to="/settings/accounts" replace />;
+    return <Navigate to={completionRoute} replace />;
   }
 
   const handleNext = () => {
-    setCurrentStep((prev) => Math.min(prev + 1, MAX_STEPS));
+    setCurrentStep((prev) => Math.min(prev + 1, maxSteps));
   };
 
   const handleBack = () => {
@@ -58,7 +64,7 @@ const OnboardingPage = () => {
 
           {/* Progress indicators */}
           <div className="flex gap-2">
-            {Array.from({ length: MAX_STEPS }).map((_, index) => (
+            {Array.from({ length: maxSteps }).map((_, index) => (
               <div
                 key={index}
                 className={`h-1.5 rounded-full transition-all duration-300 ${
@@ -100,7 +106,7 @@ const OnboardingPage = () => {
                 onValidityChange={setIsStepValid}
               />
             )}
-            {currentStep === 4 && <OnboardingConnect />}
+            {!isMobile && currentStep === 4 && <OnboardingConnect />}
           </motion.div>
         </AnimatePresence>
       </main>
@@ -108,7 +114,7 @@ const OnboardingPage = () => {
       {/* Fixed Footer */}
       <footer className="flex-none pb-[env(safe-area-inset-bottom)]">
         <div className="sm:pb-18 mx-auto max-w-4xl px-4 pb-8 pt-6 sm:px-6">
-          {currentStep === 4 ? (
+          {isFinalStep ? (
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="order-2 sm:order-1">
                 <Button variant="ghost" onClick={handleBack} size="sm">
@@ -117,16 +123,18 @@ const OnboardingPage = () => {
                 </Button>
               </div>
               <div className="order-1 flex flex-col gap-2 sm:order-2 sm:flex-row sm:gap-3">
-                <Button asChild variant="outline" className="order-2 sm:order-1">
-                  <a
-                    href={WEALTHFOLIO_CONNECT_PORTAL_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Subscribe & Connect
-                    <Icons.ExternalLink className="ml-1.5 h-4 w-4" />
-                  </a>
-                </Button>
+                {!isMobile && (
+                  <Button asChild variant="outline" className="order-2 sm:order-1">
+                    <a
+                      href={WEALTHFOLIO_CONNECT_PORTAL_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Subscribe & Connect
+                      <Icons.ExternalLink className="ml-1.5 h-4 w-4" />
+                    </a>
+                  </Button>
+                )}
                 <Button
                   data-testid="onboarding-finish-button"
                   className="from-primary to-primary/90 bg-linear-to-r order-1 sm:order-2"

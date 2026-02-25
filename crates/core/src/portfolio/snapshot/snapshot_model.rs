@@ -3,7 +3,9 @@
 use chrono::{NaiveDate, NaiveDateTime, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use sha2::Digest;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 use super::Position;
 
@@ -86,7 +88,7 @@ impl HoldingsCalculationResult {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountStateSnapshot {
-    pub id: String, // e.g., "ACCOUNTID_YYYY-MM-DD" or unique DB ID
+    pub id: String, // Stable UUID derived from (account_id, snapshot_date)
     pub account_id: String,
     pub snapshot_date: NaiveDate,
     pub currency: String, // Account's reporting currency
@@ -145,6 +147,23 @@ impl Default for AccountStateSnapshot {
 }
 
 impl AccountStateSnapshot {
+    /// Returns a stable UUID for a snapshot identity (account_id + snapshot_date).
+    pub fn stable_id(account_id: &str, snapshot_date: NaiveDate) -> String {
+        // Derive a deterministic UUID from account/date so upserts target the same row.
+        let name = format!(
+            "wealthfolio:snapshot:{}:{}",
+            account_id,
+            snapshot_date.format("%Y-%m-%d")
+        );
+        let digest = sha2::Sha256::digest(name.as_bytes());
+        let mut bytes = [0u8; 16];
+        bytes.copy_from_slice(&digest[..16]);
+        // RFC4122 variant + version 5 bit layout.
+        bytes[6] = (bytes[6] & 0x0f) | 0x50;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+        Uuid::from_bytes(bytes).to_string()
+    }
+
     /// Compares the core content of two snapshots (positions and cash_balances).
     /// Returns true if the holdings are effectively the same, ignoring metadata
     /// like id, snapshot_date, calculated_at, source, etc.

@@ -1,6 +1,6 @@
 import { LiquidGlass } from "@/components/liquid-glass";
-import { useAggregatedSyncStatus } from "@/features/wealthfolio-connect/hooks";
 import { SyncStatusIcon } from "@/features/wealthfolio-connect/components/sync-status-icon";
+import { useAggregatedSyncStatus } from "@/features/wealthfolio-connect/hooks";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, Icons } from "@wealthfolio/ui";
 import { motion } from "motion/react";
@@ -70,7 +70,7 @@ export function FloatingNavigationBar({ navigation }: FloatingNavigationBarProps
     (hasAddons ? 1 : 0);
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 hidden md:block">
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40">
       <div className="flex justify-center px-4 pb-[max(var(--mobile-nav-gap),env(safe-area-inset-bottom))]">
         <LiquidGlass
           variant="floating"

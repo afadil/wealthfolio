@@ -23,15 +23,31 @@ const webNotes = [
   "Create backups regularly, especially before bulk imports or migrations.",
 ] as const;
 
-export const BackupRestoreForm = () => {
-  const { performBackup, performRestore, isBackingUp, isRestoring, isDesktop } = useBackupRestore();
+const mobileNotes = [
+  "Backups include WAL and SHM files for complete data integrity.",
+  "When you tap backup, the native share sheet opens so you can Save to Files.",
+  "Restore is available on iOS and desktop.",
+  "Create backups regularly, especially before bulk imports or migrations.",
+] as const;
 
-  return isDesktop ? (
+export const BackupRestoreForm = () => {
+  const { performBackup, performRestore, isBackingUp, isRestoring, canRestore, platformMode } =
+    useBackupRestore();
+
+  return platformMode === "desktop" ? (
     <DesktopBackupPanel
       performBackup={performBackup}
       performRestore={performRestore}
       isBackingUp={isBackingUp}
       isRestoring={isRestoring}
+    />
+  ) : platformMode === "mobile" ? (
+    <MobileBackupPanel
+      performBackup={performBackup}
+      performRestore={performRestore}
+      isBackingUp={isBackingUp}
+      isRestoring={isRestoring}
+      canRestore={canRestore}
     />
   ) : (
     <WebBackupPanel performBackup={performBackup} isBackingUp={isBackingUp} />
@@ -124,6 +140,73 @@ const WebBackupPanel = ({ performBackup, isBackingUp }: WebPanelProps) => {
       />
 
       <ImportantNotes notes={webNotes} />
+    </div>
+  );
+};
+
+interface MobilePanelProps extends WebPanelProps {
+  performRestore: () => Promise<void>;
+  isRestoring: boolean;
+  canRestore: boolean;
+}
+
+const MobileBackupPanel = ({
+  performBackup,
+  performRestore,
+  isBackingUp,
+  isRestoring,
+  canRestore,
+}: MobilePanelProps) => {
+  return (
+    <div className="space-y-6">
+      <PanelIntro />
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <BackupCard
+          title="Create Backup"
+          description="Create a complete backup and choose destination via the native share sheet."
+          isLoading={isBackingUp}
+          disabled={isBackingUp}
+          actionLabel="Backup Database"
+          onAction={performBackup}
+        />
+
+        <Card className="flex h-full flex-col">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Icons.DatabaseBackup className="h-5 w-5" />
+              Restore Backup
+            </CardTitle>
+            <CardDescription>
+              {canRestore
+                ? "Restore your database from a previous backup file. This will replace all current data."
+                : "Restore is currently available on desktop and iOS only."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="mt-auto">
+            <Button
+              onClick={performRestore}
+              disabled={!canRestore || isRestoring || isBackingUp}
+              variant="outline"
+              className="w-full"
+            >
+              {isRestoring ? (
+                <>
+                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  Restoring...
+                </>
+              ) : (
+                <>
+                  <Icons.Import className="mr-2 h-4 w-4" />
+                  Restore Database
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      <ImportantNotes notes={mobileNotes} />
     </div>
   );
 };

@@ -4,7 +4,7 @@ use chrono::Utc;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use wealthfolio_core::sync::{
+use wealthfolio_connect::broker_ingest::{
     ImportRun, ImportRunMode, ImportRunStatus, ImportRunType, ReviewMode,
 };
 

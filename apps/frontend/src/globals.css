@@ -679,6 +679,17 @@ body.qr-scan-active .scan-hide-target {
     max-width: 100%;
     overflow-x: hidden;
   }
+
+  /* assistant-ui thread needs native overflow behavior for sticky footer + viewport */
+  .aui-root,
+  .aui-root .flex,
+  .aui-root .grid {
+    overflow-x: visible;
+  }
+
+  .aui-thread-viewport {
+    overflow-x: auto;
+  }
 }
 
 number-flow-react::part(left),

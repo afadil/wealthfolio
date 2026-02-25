@@ -6,6 +6,7 @@
 mod engine;
 mod snapshot;
 
+use async_trait::async_trait;
 use log::{debug, info};
 use std::process::Command;
 use std::sync::atomic::Ordering;
@@ -15,16 +16,16 @@ use tauri::{AppHandle, State};
 use crate::context::ServiceContext;
 use crate::secret_store::KeyringSecretStore;
 use wealthfolio_core::secrets::SecretStore;
-use wealthfolio_core::sync::{SyncEntity, SyncOperation, APP_SYNC_TABLES};
+use wealthfolio_device_sync::engine as shared_sync_engine;
 use wealthfolio_device_sync::{
     ClaimPairingRequest, ClaimPairingResponse, CommitInitializeKeysRequest,
     CommitInitializeKeysResponse, CommitRotateKeysRequest, CommitRotateKeysResponse,
     CompletePairingRequest, ConfirmPairingRequest, ConfirmPairingResponse, CreatePairingRequest,
     CreatePairingResponse, Device, DevicePlatform, DeviceSyncClient, EnrollDeviceResponse,
     GetPairingResponse, InitializeKeysResult, PairingMessagesResponse, RegisterDeviceRequest,
-    ResetTeamSyncResponse, RotateKeysResponse, SnapshotRequestPayload, SuccessResponse,
-    UpdateDeviceRequest,
+    ResetTeamSyncResponse, RotateKeysResponse, SuccessResponse, UpdateDeviceRequest,
 };
+use wealthfolio_storage_sqlite::sync::SyncTableRowCount;
 
 // Re-export public items consumed by lib.rs
 pub use engine::{ensure_background_engine_started, ensure_background_engine_stopped};
@@ -36,13 +37,9 @@ pub use engine::{ensure_background_engine_started, ensure_background_engine_stop
 const CLOUD_ACCESS_TOKEN_KEY: &str = "sync_access_token";
 
 fn cloud_api_base_url() -> Result<String, String> {
-    std::env::var("CONNECT_API_URL")
-        .ok()
-        .map(|v| v.trim().trim_end_matches('/').to_string())
-        .filter(|v| !v.is_empty())
-        .ok_or_else(|| {
-            "CONNECT_API_URL not configured. Connect API operations are disabled.".to_string()
-        })
+    crate::services::cloud_api_base_url().ok_or_else(|| {
+        "Cloud API base URL is unavailable. Device sync operations are disabled.".to_string()
+    })
 }
 
 fn get_access_token() -> Result<String, String> {
@@ -156,6 +153,22 @@ pub struct SyncEngineStatusResult {
 
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct SyncBootstrapOverwriteCheckTableResult {
+    pub table: String,
+    pub rows: i64,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncBootstrapOverwriteCheckResult {
+    pub bootstrap_required: bool,
+    pub has_local_data: bool,
+    pub local_rows: i64,
+    pub non_empty_tables: Vec<SyncBootstrapOverwriteCheckTableResult>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SyncCycleResult {
     pub status: String,
     pub lock_version: i64,
@@ -163,6 +176,8 @@ pub struct SyncCycleResult {
     pub pulled_count: usize,
     pub cursor: i64,
     pub needs_bootstrap: bool,
+    pub bootstrap_snapshot_id: Option<String>,
+    pub bootstrap_snapshot_seq: Option<i64>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -181,6 +196,92 @@ pub struct SyncSnapshotUploadResult {
     pub message: String,
 }
 
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncReconcileReadyStateResult {
+    pub status: String,
+    pub message: String,
+    pub bootstrap_action: String,
+    pub bootstrap_status: String,
+    pub bootstrap_message: Option<String>,
+    pub bootstrap_snapshot_id: Option<String>,
+    pub cycle_status: Option<String>,
+    pub cycle_needs_bootstrap: bool,
+    pub retry_attempted: bool,
+    pub retry_cycle_status: Option<String>,
+    pub background_status: String,
+}
+
+impl From<shared_sync_engine::SyncReadyReconcileResult> for SyncReconcileReadyStateResult {
+    fn from(value: shared_sync_engine::SyncReadyReconcileResult) -> Self {
+        Self {
+            status: value.status,
+            message: value.message,
+            bootstrap_action: value.bootstrap_action,
+            bootstrap_status: value.bootstrap_status,
+            bootstrap_message: value.bootstrap_message,
+            bootstrap_snapshot_id: value.bootstrap_snapshot_id,
+            cycle_status: value.cycle_status,
+            cycle_needs_bootstrap: value.cycle_needs_bootstrap,
+            retry_attempted: value.retry_attempted,
+            retry_cycle_status: value.retry_cycle_status,
+            background_status: value.background_status,
+        }
+    }
+}
+
+struct TauriReadyReconcileRunner {
+    handle: AppHandle,
+    context: Arc<ServiceContext>,
+}
+
+#[async_trait]
+impl shared_sync_engine::ReadyReconcileStore for TauriReadyReconcileRunner {
+    async fn get_sync_state(&self) -> Result<wealthfolio_device_sync::SyncState, String> {
+        self.context
+            .device_enroll_service()
+            .get_sync_state()
+            .await
+            .map(|value| value.state)
+            .map_err(|err| err.message)
+    }
+
+    async fn bootstrap_snapshot_if_needed(
+        &self,
+    ) -> Result<shared_sync_engine::SyncBootstrapResult, String> {
+        let result =
+            snapshot::sync_bootstrap_snapshot_if_needed(self.handle.clone(), &self.context).await?;
+        Ok(shared_sync_engine::SyncBootstrapResult {
+            status: result.status,
+            message: result.message,
+            snapshot_id: result.snapshot_id,
+        })
+    }
+
+    async fn run_sync_cycle(&self) -> Result<shared_sync_engine::SyncCycleResult, String> {
+        let result = engine::run_sync_cycle(Arc::clone(&self.context)).await?;
+        Ok(shared_sync_engine::SyncCycleResult {
+            status: result.status,
+            lock_version: result.lock_version,
+            pushed_count: result.pushed_count,
+            pulled_count: result.pulled_count,
+            cursor: result.cursor,
+            needs_bootstrap: result.needs_bootstrap,
+            bootstrap_snapshot_id: result.bootstrap_snapshot_id,
+            bootstrap_snapshot_seq: result.bootstrap_snapshot_seq,
+        })
+    }
+
+    async fn ensure_background_started(&self) -> Result<bool, String> {
+        ensure_background_engine_started(Arc::clone(&self.context)).await?;
+        Ok(self
+            .context
+            .device_sync_runtime()
+            .is_background_running()
+            .await)
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared utility functions
 // ─────────────────────────────────────────────────────────────────────────────
@@ -191,65 +292,6 @@ fn is_sqlite_image(bytes: &[u8]) -> bool {
 
 fn sha256_checksum(bytes: &[u8]) -> String {
     wealthfolio_device_sync::crypto::sha256_checksum(bytes)
-}
-
-fn sync_entity_name(entity: &SyncEntity) -> &'static str {
-    match entity {
-        SyncEntity::Account => "account",
-        SyncEntity::Asset => "asset",
-        SyncEntity::AssetTaxonomyAssignment => "asset_taxonomy_assignment",
-        SyncEntity::Activity => "activity",
-        SyncEntity::ActivityImportProfile => "activity_import_profile",
-        SyncEntity::Goal => "goal",
-        SyncEntity::GoalsAllocation => "goals_allocation",
-        SyncEntity::AiThread => "ai_thread",
-        SyncEntity::AiMessage => "ai_message",
-        SyncEntity::AiThreadTag => "ai_thread_tag",
-        SyncEntity::ContributionLimit => "contribution_limit",
-        SyncEntity::Platform => "platform",
-        SyncEntity::Snapshot => "snapshot",
-    }
-}
-
-fn sync_operation_name(op: &SyncOperation) -> &'static str {
-    match op {
-        SyncOperation::Create => "create",
-        SyncOperation::Update => "update",
-        SyncOperation::Delete => "delete",
-        SyncOperation::Request => "request",
-    }
-}
-
-use wealthfolio_device_sync::ApiRetryClass;
-
-fn retry_class_code(class: ApiRetryClass) -> &'static str {
-    match class {
-        ApiRetryClass::Retryable => "retryable",
-        ApiRetryClass::Permanent => "permanent",
-        ApiRetryClass::ReauthRequired => "reauth_required",
-    }
-}
-
-fn parse_event_operation(event_type: &str) -> Option<SyncOperation> {
-    let mut parts = event_type.split('.');
-    let _entity = parts.next()?;
-    match parts.next()? {
-        "create" => Some(SyncOperation::Create),
-        "update" => Some(SyncOperation::Update),
-        "delete" => Some(SyncOperation::Delete),
-        "request" => Some(SyncOperation::Request),
-        _ => None,
-    }
-}
-
-fn millis_until_rfc3339(target: &str) -> Option<u64> {
-    let target = chrono::DateTime::parse_from_rfc3339(target).ok()?;
-    let now = chrono::Utc::now();
-    let diff = target.with_timezone(&chrono::Utc) - now;
-    if diff <= chrono::Duration::zero() {
-        return Some(0);
-    }
-    Some(diff.num_milliseconds() as u64)
 }
 
 fn encrypt_sync_payload(
@@ -282,44 +324,6 @@ fn decrypt_sync_payload(
         .map_err(|e| format!("Failed to derive event DEK: {}", e))?;
     wealthfolio_device_sync::crypto::decrypt(&dek, encrypted_payload)
         .map_err(|e| format!("Failed to decrypt sync payload: {}", e))
-}
-
-async fn request_snapshot_generation(
-    client: &DeviceSyncClient,
-    token: &str,
-    device_id: &str,
-    identity: &SyncIdentity,
-    message: &str,
-) -> Result<SyncBootstrapResult, String> {
-    let payload_key_version = identity.key_version.unwrap_or(1).max(1);
-    let request_response = client
-        .request_snapshot(
-            token,
-            device_id,
-            SnapshotRequestPayload {
-                min_schema_version: Some(1),
-                covers_tables: Some(APP_SYNC_TABLES.iter().map(|v| v.to_string()).collect()),
-                payload: encrypt_sync_payload("{}", identity, payload_key_version)?,
-                payload_key_version,
-            },
-        )
-        .await
-        .map_err(|e| e.to_string())?;
-    debug!(
-        "[DeviceSync] Snapshot request accepted: request_id={} status={} message={}",
-        request_response.request_id, request_response.status, request_response.message
-    );
-    debug!(
-        "[DeviceSync] Requested snapshot generation; no local upload performed in this path (device_id={} request_id={})",
-        device_id, request_response.request_id
-    );
-
-    Ok(SyncBootstrapResult {
-        status: "requested".to_string(),
-        message: message.to_string(),
-        snapshot_id: None,
-        cursor: None,
-    })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -707,7 +711,7 @@ pub async fn sync_engine_status(
         None => true,
     };
     let runtime = state.inner().device_sync_runtime();
-    let background_running = runtime.background_task.lock().await.is_some();
+    let background_running = runtime.is_background_running().await;
 
     Ok(SyncEngineStatusResult {
         cursor: status.cursor,
@@ -724,6 +728,46 @@ pub async fn sync_engine_status(
 }
 
 #[tauri::command]
+pub async fn device_sync_bootstrap_overwrite_check(
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<SyncBootstrapOverwriteCheckResult, String> {
+    let sync_repo = state.app_sync_repository();
+    let bootstrap_required = match get_device_id_from_store() {
+        Some(device_id) => sync_repo
+            .needs_bootstrap(&device_id)
+            .map_err(|e| e.to_string())?,
+        None => true,
+    };
+    if !bootstrap_required {
+        return Ok(SyncBootstrapOverwriteCheckResult {
+            bootstrap_required,
+            has_local_data: false,
+            local_rows: 0,
+            non_empty_tables: Vec::new(),
+        });
+    }
+    let summary = sync_repo
+        .get_local_sync_data_summary()
+        .map_err(|e| e.to_string())?;
+
+    Ok(SyncBootstrapOverwriteCheckResult {
+        bootstrap_required,
+        has_local_data: summary.total_rows > 0,
+        local_rows: summary.total_rows,
+        non_empty_tables: summary
+            .non_empty_tables
+            .into_iter()
+            .map(
+                |SyncTableRowCount { table, rows }| SyncBootstrapOverwriteCheckTableResult {
+                    table,
+                    rows,
+                },
+            )
+            .collect(),
+    })
+}
+
+#[tauri::command]
 pub async fn sync_trigger_cycle(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<SyncCycleResult, String> {
@@ -735,9 +779,22 @@ pub async fn device_sync_start_background_engine(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<SyncBackgroundEngineResult, String> {
     ensure_background_engine_started(Arc::clone(state.inner())).await?;
+    let background_running = state
+        .inner()
+        .device_sync_runtime()
+        .is_background_running()
+        .await;
     Ok(SyncBackgroundEngineResult {
-        status: "started".to_string(),
-        message: "Device sync background engine started".to_string(),
+        status: if background_running {
+            "started".to_string()
+        } else {
+            "skipped".to_string()
+        },
+        message: if background_running {
+            "Device sync background engine started".to_string()
+        } else {
+            "Background engine not started because sync identity is not configured".to_string()
+        },
     })
 }
 
@@ -783,14 +840,34 @@ pub async fn device_sync_engine_status(
 }
 
 #[tauri::command]
+pub async fn device_sync_reconcile_ready_state(
+    handle: AppHandle,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<SyncReconcileReadyStateResult, String> {
+    let runner = TauriReadyReconcileRunner {
+        handle,
+        context: Arc::clone(state.inner()),
+    };
+    let result = shared_sync_engine::run_ready_reconcile_state(&runner).await;
+    Ok(result.into())
+}
+
+#[tauri::command]
 pub async fn device_sync_bootstrap_snapshot_if_needed(
     handle: AppHandle,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<SyncBootstrapResult, String> {
-    let result = snapshot::sync_bootstrap_snapshot_if_needed(handle, state.inner()).await?;
+    let context = Arc::clone(state.inner());
+    let result = snapshot::sync_bootstrap_snapshot_if_needed(handle, &context).await?;
+    let should_start_engine = context
+        .device_enroll_service()
+        .get_sync_state()
+        .await
+        .map(|sync_state| sync_state.state == wealthfolio_device_sync::SyncState::Ready)
+        .unwrap_or(false);
 
-    // Start the background sync engine after successful bootstrap.
-    if result.status == "applied" {
+    // Start the background sync engine whenever this device is READY.
+    if should_start_engine {
         let engine_context = Arc::clone(state.inner());
         tauri::async_runtime::spawn(async move {
             if let Err(err) = ensure_background_engine_started(engine_context).await {
@@ -1008,4 +1085,45 @@ pub async fn confirm_pairing(
         )
         .await
         .map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reconcile_result_conversion_preserves_fields() {
+        let source = shared_sync_engine::SyncReadyReconcileResult {
+            status: "ok".to_string(),
+            message: "done".to_string(),
+            bootstrap_action: "NO_BOOTSTRAP".to_string(),
+            bootstrap_status: "applied".to_string(),
+            bootstrap_message: Some("bootstrap ok".to_string()),
+            bootstrap_snapshot_id: Some("snap-1".to_string()),
+            cycle_status: Some("ok".to_string()),
+            cycle_needs_bootstrap: false,
+            retry_attempted: true,
+            retry_cycle_status: Some("ok".to_string()),
+            background_status: "started".to_string(),
+        };
+
+        let converted: SyncReconcileReadyStateResult = source.clone().into();
+        assert_eq!(converted.status, source.status);
+        assert_eq!(converted.message, source.message);
+        assert_eq!(converted.bootstrap_action, source.bootstrap_action);
+        assert_eq!(converted.bootstrap_status, source.bootstrap_status);
+        assert_eq!(converted.bootstrap_message, source.bootstrap_message);
+        assert_eq!(
+            converted.bootstrap_snapshot_id,
+            source.bootstrap_snapshot_id
+        );
+        assert_eq!(converted.cycle_status, source.cycle_status);
+        assert_eq!(
+            converted.cycle_needs_bootstrap,
+            source.cycle_needs_bootstrap
+        );
+        assert_eq!(converted.retry_attempted, source.retry_attempted);
+        assert_eq!(converted.retry_cycle_status, source.retry_cycle_status);
+        assert_eq!(converted.background_status, source.background_status);
+    }
 }

@@ -62,7 +62,7 @@ pub fn handle_menu_event(app: &AppHandle, instance_id: &str, event_id: &str) {
         }
         "report_issue" => {
             app.dialog()
-                .message("If you encounter any issues, please email us at wealthfolio@teymz.com")
+                .message("If you encounter any issues, please email us at support@wealthfolio.app")
                 .title("Report Issue")
                 .show(|_| {});
         }

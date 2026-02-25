@@ -1,6 +1,6 @@
 {
   "name": "goal-progress-tracker-addon",
-  "version": "3.0.0-beta.1",
+  "version": "3.0.0",
   "description": "An addon for tracking investment progress towards target amounts with progress visualization",
   "type": "module",
   "main": "dist/addon.js",
@@ -40,6 +40,7 @@
     "@types/node": "^20.19.33",
     "@types/react": "^19.2.13",
     "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.3.4",
     "@wealthfolio/addon-dev-tools": "workspace:*",
     "clsx": "^2.1.1",
     "rollup-plugin-external-globals": "^0.13.0",

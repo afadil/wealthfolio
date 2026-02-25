@@ -58,4 +58,18 @@ describe("convertToCSV", () => {
     expect(headerRow).toContain('"price"');
     expect(headerRow).not.toContain("assetId");
   });
+
+  it("should include columns that appear in later rows", () => {
+    const data = [
+      { id: 1, name: "First" },
+      { id: 2, name: "Second", extra: "Present" },
+    ];
+
+    const csvOutput = convertToCSV(data);
+    const rows = csvOutput.split("\n");
+
+    expect(rows[0]).toBe('"id","name","extra"');
+    expect(rows[1]).toBe('"1","First",""');
+    expect(rows[2]).toBe('"2","Second","Present"');
+  });
 });

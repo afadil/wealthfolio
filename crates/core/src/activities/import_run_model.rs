@@ -1,4 +1,4 @@
-//! Import run domain models.
+//! Import run domain models used by broker ingest and manual activity imports.
 
 use crate::Result;
 use async_trait::async_trait;

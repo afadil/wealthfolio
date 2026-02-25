@@ -7,44 +7,50 @@
 // pairing operations which require real-time UI interaction.
 // ===========================================================================
 
+import type { BackendSyncReconcileReadyResult } from "@/adapters";
 import {
-  logger,
-  getDeviceSyncState as getDeviceSyncStateApi,
-  enableDeviceSync as enableDeviceSyncApi,
-  clearDeviceSyncData as clearDeviceSyncDataApi,
-  reinitializeDeviceSync as reinitializeDeviceSyncApi,
-  getSyncEngineStatus as getSyncEngineStatusApi,
-  syncBootstrapSnapshotIfNeeded as syncBootstrapSnapshotIfNeededApi,
-  syncTriggerCycle as syncTriggerCycleApi,
-  getDevice as getDeviceApi,
-  listDevices as listDevicesApi,
-  updateDevice as updateDeviceApi,
-  deleteDevice as deleteDeviceApi,
-  revokeDevice as revokeDeviceApi,
-  resetTeamSync as resetTeamSyncApi,
-  createPairing as createPairingApi,
-  getPairing as getPairingApi,
   approvePairing as approvePairingApi,
-  completePairing as completePairingApi,
   cancelPairing as cancelPairingApi,
   claimPairing as claimPairingApi,
-  getPairingMessages as getPairingMessagesApi,
+  clearDeviceSyncData as clearDeviceSyncDataApi,
+  completePairing as completePairingApi,
   confirmPairing as confirmPairingApi,
-  isDesktop,
+  createPairing as createPairingApi,
+  deleteDevice as deleteDeviceApi,
+  deviceSyncBootstrapOverwriteCheck as deviceSyncBootstrapOverwriteCheckApi,
+  deviceSyncReconcileReadyState as deviceSyncReconcileReadyStateApi,
+  deviceSyncStartBackgroundEngine as deviceSyncStartBackgroundEngineApi,
+  deviceSyncStopBackgroundEngine as deviceSyncStopBackgroundEngineApi,
+  enableDeviceSync as enableDeviceSyncApi,
+  getDevice as getDeviceApi,
+  getDeviceSyncState as getDeviceSyncStateApi,
+  getPairing as getPairingApi,
+  getPairingMessages as getPairingMessagesApi,
+  getSyncEngineStatus as getSyncEngineStatusApi,
+  listDevices as listDevicesApi,
+  logger,
+  reinitializeDeviceSync as reinitializeDeviceSyncApi,
+  resetTeamSync as resetTeamSyncApi,
+  revokeDevice as revokeDeviceApi,
+  syncBootstrapSnapshotIfNeeded as syncBootstrapSnapshotIfNeededApi,
+  syncTriggerCycle as syncTriggerCycleApi,
+  updateDevice as updateDeviceApi,
 } from "@/adapters";
-import { syncStorage } from "../storage/keyring";
 import * as crypto from "../crypto";
+import { syncStorage } from "../storage/keyring";
 import type {
+  BootstrapAction,
+  ClaimerSession,
   Device,
   DeviceSyncState,
-  PairingSession,
-  ClaimerSession,
   KeyBundlePayload,
-  TrustedDeviceSummary,
-  SyncIdentity,
+  PairingSession,
   StateDetectionResult,
+  SyncIdentity,
+  TrustedDeviceSummary,
 } from "../types";
 import { SyncError, SyncErrorCodes, SyncStates } from "../types";
+import { extractRemoteSeedPresent, resolveBootstrapAction } from "./reconcile-intent";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Exported Types
@@ -59,6 +65,8 @@ export interface EnableSyncResult {
   needsPairing: boolean;
   trustedDevices: TrustedDeviceSummary[];
 }
+
+export type ReconcileReadyStateResult = BackendSyncReconcileReadyResult;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sync Service Class
@@ -167,20 +175,6 @@ class SyncService {
     }
   }
 
-  /**
-   * Initialize E2EE keys for the team.
-   * NOTE: This is now handled automatically by enableSync() when in BOOTSTRAP mode.
-   * This method is kept for backwards compatibility with existing UI code.
-   */
-  async initializeKeys(): Promise<{ keyVersion: number }> {
-    logger.info("[SyncService] initializeKeys called - delegating to enableSync...");
-    const result = await this.enableSync();
-    if (result.keyVersion === null) {
-      throw new SyncError(SyncErrorCodes.REQUIRES_PAIRING, "Pairing required to get keys");
-    }
-    return { keyVersion: result.keyVersion };
-  }
-
   async getEngineStatus(): Promise<{
     cursor: number;
     lastPushAt: string | null;
@@ -193,21 +187,24 @@ class SyncService {
     backgroundRunning: boolean;
     bootstrapRequired: boolean;
   }> {
-    if (!isDesktop) {
-      return {
-        cursor: 0,
-        lastPushAt: null,
-        lastPullAt: null,
-        lastError: null,
-        consecutiveFailures: 0,
-        nextRetryAt: null,
-        lastCycleStatus: "web_stub",
-        lastCycleDurationMs: null,
-        backgroundRunning: false,
-        bootstrapRequired: false,
-      };
-    }
     return getSyncEngineStatusApi();
+  }
+
+  async reconcileReadyState(): Promise<ReconcileReadyStateResult> {
+    return deviceSyncReconcileReadyStateApi();
+  }
+
+  resolveBootstrapAction(result: ReconcileReadyStateResult): BootstrapAction {
+    return resolveBootstrapAction(result);
+  }
+
+  async getBootstrapOverwriteCheck(): Promise<{
+    bootstrapRequired: boolean;
+    hasLocalData: boolean;
+    localRows: number;
+    nonEmptyTables: { table: string; rows: number }[];
+  }> {
+    return deviceSyncBootstrapOverwriteCheckApi();
   }
 
   async bootstrapSnapshotIfNeeded(): Promise<{
@@ -216,14 +213,6 @@ class SyncService {
     snapshotId: string | null;
     cursor: number | null;
   }> {
-    if (!isDesktop) {
-      return {
-        status: "skipped",
-        message: "Snapshot bootstrap is desktop-only",
-        snapshotId: null,
-        cursor: null,
-      };
-    }
     return syncBootstrapSnapshotIfNeededApi();
   }
 
@@ -235,17 +224,15 @@ class SyncService {
     cursor: number;
     needsBootstrap: boolean;
   }> {
-    if (!isDesktop) {
-      return {
-        status: "skipped",
-        lockVersion: 0,
-        pushedCount: 0,
-        pulledCount: 0,
-        cursor: 0,
-        needsBootstrap: false,
-      };
-    }
     return syncTriggerCycleApi();
+  }
+
+  async startBackgroundEngine(): Promise<{ status: string; message: string }> {
+    return deviceSyncStartBackgroundEngineApi();
+  }
+
+  async stopBackgroundEngine(): Promise<{ status: string; message: string }> {
+    return deviceSyncStopBackgroundEngineApi();
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -328,7 +315,7 @@ class SyncService {
    * Complete pairing by sending encrypted key bundle to claimer.
    * Note: The claimer's device ID is already known by the server from the claim step.
    */
-  async completePairing(session: PairingSession): Promise<void> {
+  async completePairing(session: PairingSession): Promise<{ remoteSeedPresent: boolean | null }> {
     if (new Date() > session.expiresAt) {
       throw new SyncError(SyncErrorCodes.PAIRING_EXPIRED, "Pairing session expired");
     }
@@ -363,7 +350,8 @@ class SyncService {
     const signature = await crypto.hashPairingCode(signatureData);
 
     // Complete on server (server knows claimer from claim step)
-    await completePairingApi(session.pairingId, encryptedKeyBundle, sas, signature);
+    const result = await completePairingApi(session.pairingId, encryptedKeyBundle, sas, signature);
+    return { remoteSeedPresent: extractRemoteSeedPresent(result) };
   }
 
   /**
@@ -473,7 +461,7 @@ class SyncService {
   async confirmPairingAsClaimer(
     session: ClaimerSession,
     keyBundle: KeyBundlePayload,
-  ): Promise<{ keyVersion: number }> {
+  ): Promise<{ keyVersion: number; remoteSeedPresent: boolean | null }> {
     if (new Date() > session.expiresAt) {
       throw new SyncError(SyncErrorCodes.PAIRING_EXPIRED, "Pairing session expired");
     }
@@ -496,7 +484,10 @@ class SyncService {
     });
 
     logger.info(`[SyncService] Pairing confirmed, key version: ${keyBundle.keyVersion}`);
-    return { keyVersion: keyBundle.keyVersion };
+    return {
+      keyVersion: keyBundle.keyVersion,
+      remoteSeedPresent: extractRemoteSeedPresent(result),
+    };
   }
 
   /**

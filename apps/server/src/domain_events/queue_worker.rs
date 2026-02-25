@@ -420,29 +420,21 @@ async fn run_portfolio_job(
 // Broker Sync
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Default Supabase auth URL for token refresh
-const DEFAULT_SUPABASE_AUTH_URL: &str = "https://vvalcadcvxqwligwzxaw.supabase.co";
-
 /// Storage key for refresh token (without prefix - the SecretStore adds "wealthfolio_" prefix)
 const CLOUD_REFRESH_TOKEN_KEY: &str = "sync_refresh_token";
 
 fn cloud_api_base_url() -> String {
-    std::env::var("CONNECT_API_URL")
-        .ok()
-        .map(|v| v.trim().trim_end_matches('/').to_string())
-        .filter(|v| !v.is_empty())
-        .unwrap_or_else(|| wealthfolio_connect::DEFAULT_CLOUD_API_URL.to_string())
+    crate::features::cloud_api_base_url().unwrap_or_default()
 }
 
-fn supabase_auth_url() -> String {
+fn connect_auth_url() -> Option<String> {
     std::env::var("CONNECT_AUTH_URL")
         .ok()
         .map(|v| v.trim().trim_end_matches('/').to_string())
         .filter(|v| !v.is_empty())
-        .unwrap_or_else(|| DEFAULT_SUPABASE_AUTH_URL.to_string())
 }
 
-fn supabase_api_key() -> Option<String> {
+fn connect_auth_api_key() -> Option<String> {
     std::env::var("CONNECT_AUTH_PUBLISHABLE_KEY").ok()
 }
 
@@ -495,19 +487,20 @@ async fn mint_access_token(secret_store: &Arc<dyn SecretStore>) -> Result<String
         .map_err(|e| format!("Failed to get refresh token: {}", e))?
         .ok_or_else(|| "No refresh token configured. Please sign in first.".to_string())?;
 
-    // Get Supabase config
-    let auth_url = supabase_auth_url();
-    let api_key = supabase_api_key()
+    // Get auth config
+    let auth_url =
+        connect_auth_url().ok_or_else(|| "CONNECT_AUTH_URL not configured".to_string())?;
+    let api_key = connect_auth_api_key()
         .ok_or_else(|| "CONNECT_AUTH_PUBLISHABLE_KEY not configured".to_string())?;
 
-    // Call Supabase token endpoint
+    // Call auth token endpoint
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(10))
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
     let token_url = format!("{}/auth/v1/token?grant_type=refresh_token", auth_url);
-    tracing::debug!("Refreshing access token from: {}", token_url);
+    tracing::debug!("Refreshing access token");
 
     let response = client
         .post(&token_url)
@@ -526,12 +519,12 @@ async fn mint_access_token(secret_store: &Arc<dyn SecretStore>) -> Result<String
 
     if !status.is_success() {
         #[derive(serde::Deserialize)]
-        struct SupabaseErrorResponse {
+        struct AuthErrorResponse {
             error: Option<String>,
             error_description: Option<String>,
         }
 
-        if let Ok(err) = serde_json::from_str::<SupabaseErrorResponse>(&body) {
+        if let Ok(err) = serde_json::from_str::<AuthErrorResponse>(&body) {
             let msg = err
                 .error_description
                 .or(err.error)
@@ -539,16 +532,16 @@ async fn mint_access_token(secret_store: &Arc<dyn SecretStore>) -> Result<String
             tracing::error!("Token refresh failed: {}", msg);
             return Err(format!("Session expired. Please sign in again. ({})", msg));
         }
-        tracing::error!("Token refresh failed with status {}: {}", status, body);
+        tracing::error!("Token refresh failed with status {}", status);
         return Err("Session expired. Please sign in again.".to_string());
     }
 
     #[derive(serde::Deserialize)]
-    struct SupabaseTokenResponse {
+    struct AuthTokenResponse {
         access_token: String,
     }
 
-    let token_response: SupabaseTokenResponse = serde_json::from_str(&body)
+    let token_response: AuthTokenResponse = serde_json::from_str(&body)
         .map_err(|e| format!("Failed to parse token response: {}", e))?;
 
     tracing::debug!("Access token refreshed successfully");
@@ -564,6 +557,10 @@ async fn perform_broker_sync(
     secret_store: Arc<dyn SecretStore>,
 ) -> Result<wealthfolio_connect::SyncResult, String> {
     use wealthfolio_connect::{ConnectApiClient, SyncConfig, SyncOrchestrator};
+
+    if !crate::features::connect_sync_enabled() {
+        return Err("Connect sync feature is disabled in this build.".to_string());
+    }
 
     // Create API client with fresh access token
     let token = mint_access_token(&secret_store).await?;

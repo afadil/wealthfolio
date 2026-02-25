@@ -21,7 +21,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@wealthfolio/ui";
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { restrictionAllowsType } from "@/lib/activity-restrictions";
 import type { AccountSelectOption } from "../forms/fields";
@@ -38,6 +38,7 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
   const { settings } = useSettingsContext();
   const isManualAsset = watch("quoteMode") === QuoteMode.MANUAL;
   const accountId = watch("accountId");
+  const currency = watch("currency");
 
   // Filter accounts by activity type (exclude HOLDINGS accounts for unsupported types)
   const filteredAccounts = useMemo(
@@ -79,6 +80,24 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
   const displayAccountText = selectedAccount
     ? `${selectedAccount.label} (${selectedAccount.currency})`
     : "Select an account";
+
+  // Backfill currency for preselected accounts when options arrive asynchronously.
+  useEffect(() => {
+    if (!accountId) return;
+    const selected = filteredAccounts.find((account) => account.value === accountId);
+    if (!selected) return;
+
+    const currentCurrency = currency?.trim();
+    if (currentCurrency === selected.currency) return;
+
+    const shouldAutoSetCurrency = !getFieldState("currency").isDirty || !currentCurrency;
+    if (!shouldAutoSetCurrency) return;
+
+    setValue("currency", selected.currency, {
+      shouldDirty: false,
+      shouldValidate: true,
+    });
+  }, [accountId, currency, filteredAccounts, getFieldState, setValue]);
 
   return (
     <div className="flex h-full flex-col">
@@ -328,7 +347,7 @@ function MobileAccountSheet({ accounts, open, onOpenChange, onSelect }: MobileAc
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="rounded-t-4xl mx-1 h-[70vh] p-0">
-        <SheetHeader className="border-border border-b">
+        <SheetHeader className="border-border border-b px-6 py-4">
           <SheetTitle>Select Account</SheetTitle>
           <SheetDescription>Choose the account for this transaction</SheetDescription>
         </SheetHeader>

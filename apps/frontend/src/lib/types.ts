@@ -227,6 +227,7 @@ export interface SymbolInput {
 
 export interface ActivityCreate {
   id?: string;
+  idempotencyKey?: string;
   accountId: string;
   activityType: string;
   subtype?: string | null; // Semantic variation (DRIP, STAKING_REWARD, etc.)

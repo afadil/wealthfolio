@@ -13,7 +13,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { getActivityRestrictionLevel } from "@/lib/activity-restrictions";
 import { ActivityDeleteModal } from "./components/activity-delete-modal";
 import { ActivityDataGrid } from "./components/activity-data-grid/activity-data-grid";
-import { ActivityFormV2 as ActivityForm } from "./components/activity-form-v2";
+import { ActivityForm } from "./components/activity-form";
 import { ActivityMobileControls } from "./components/activity-mobile-controls";
 import { ActivityPagination } from "./components/activity-pagination";
 import ActivityTable from "./components/activity-table/activity-table";

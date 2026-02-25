@@ -6463,6 +6463,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-mobile-share"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d6bd716cc93b5fb9aa1b59637d3433af2932a665324921dbc50bfe4215b7927"
+dependencies = [
+ "tauri",
+ "tauri-plugin",
+]
+
+[[package]]
 name = "tauri-plugin-shell"
 version = "2.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7596,7 +7606,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-ai"
-version = "3.0.0-beta.5"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7620,9 +7630,10 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-app"
-version = "3.0.0-beta.5"
+version = "3.0.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "base64 0.22.1",
  "chacha20poly1305",
  "chrono",
@@ -7648,6 +7659,7 @@ dependencies = [
  "tauri-plugin-fs",
  "tauri-plugin-haptics",
  "tauri-plugin-log",
+ "tauri-plugin-mobile-share",
  "tauri-plugin-shell",
  "tauri-plugin-updater",
  "tauri-plugin-web-auth",
@@ -7666,13 +7678,11 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-connect"
-version = "3.0.0-beta.5"
+version = "3.0.0"
 dependencies = [
  "async-trait",
  "chrono",
- "diesel",
  "log",
- "r2d2",
  "reqwest 0.12.28",
  "rust_decimal",
  "serde",
@@ -7681,12 +7691,11 @@ dependencies = [
  "tokio",
  "uuid",
  "wealthfolio-core",
- "wealthfolio-storage-sqlite",
 ]
 
 [[package]]
 name = "wealthfolio-core"
-version = "3.0.0-beta.5"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7724,11 +7733,12 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-device-sync"
-version = "3.0.0-beta.5"
+version = "3.0.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
  "chacha20poly1305",
+ "chrono",
  "hkdf",
  "log",
  "rand 0.8.5",
@@ -7746,7 +7756,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-market-data"
-version = "0.1.0"
+version = "3.0.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7769,10 +7779,11 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-server"
-version = "3.0.0-beta.5"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "argon2",
+ "async-trait",
  "axum 0.8.8",
  "base64 0.21.7",
  "chacha20poly1305",
@@ -7812,7 +7823,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-storage-sqlite"
-version = "3.0.0-beta.5"
+version = "3.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7831,7 +7842,9 @@ dependencies = [
  "tokio",
  "uuid",
  "wealthfolio-ai",
+ "wealthfolio-connect",
  "wealthfolio-core",
+ "wealthfolio-device-sync",
 ]
 
 [[package]]

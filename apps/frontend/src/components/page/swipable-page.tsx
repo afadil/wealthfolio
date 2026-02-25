@@ -142,7 +142,7 @@ export function SwipablePage({
 }: SwipablePageProps) {
   const isMobile = useIsMobileViewport();
   const [searchParams, setSearchParams] = useSearchParams();
-  const hapticFeedback = useHapticFeedback();
+  const { triggerHaptic } = useHapticFeedback();
 
   // Single source of truth: URL search params
   const tabFromUrl = searchParams.get("tab");
@@ -164,7 +164,7 @@ export function SwipablePage({
       }
 
       if (isMobile) {
-        hapticFeedback();
+        triggerHaptic();
       }
 
       // Update URL - this is the single source of truth
@@ -172,7 +172,7 @@ export function SwipablePage({
       setSearchParams({ tab: nextView }, { replace: true });
       onViewChange?.(nextView);
     },
-    [currentView, setSearchParams, onViewChange, isMobile, hapticFeedback],
+    [currentView, setSearchParams, onViewChange, isMobile, triggerHaptic],
   );
 
   return (
@@ -185,12 +185,16 @@ export function SwipablePage({
           /* Mobile: SwipableView with navigation */
           <div className="flex h-full flex-col md:hidden">
             {/* Mobile Navigation at top */}
-            <div className="pt-safe flex shrink-0 items-center justify-center pb-2">
+            <div className="pt-safe flex shrink-0 items-center justify-between px-3 pb-2">
+              <div className="w-10" />
               <MobileNavigation
                 views={views}
                 currentView={currentView}
                 onViewChange={handleViewChange}
               />
+              <div className="flex items-center gap-1.5">
+                {views.find((v) => v.value === currentView)?.actions}
+              </div>
             </div>
 
             <div className="min-h-0 flex-1 overflow-hidden">
@@ -199,7 +203,17 @@ export function SwipablePage({
                 selectedIndex={currentIndex}
                 items={views.map((v) => ({
                   name: v.label,
-                  content: <div className={cn("pb-safe", withPadding && "p-2")}>{v.content}</div>,
+                  content: (
+                    <div
+                      className={cn(
+                        withPadding
+                          ? "p-2 pb-[calc(var(--mobile-nav-ui-height)+max(var(--mobile-nav-gap),env(safe-area-inset-bottom)))]"
+                          : "pb-safe",
+                      )}
+                    >
+                      {v.content}
+                    </div>
+                  ),
                 }))}
                 displayToggle={false}
                 onViewChange={(_index: number, name: string) => {

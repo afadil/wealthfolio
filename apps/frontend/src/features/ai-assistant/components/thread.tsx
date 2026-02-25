@@ -10,8 +10,8 @@ import {
 
 import type { FC, ReactNode } from "react";
 
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { ComposerAddAttachment, ComposerAttachments, UserMessageAttachments } from "./attachment";
 import { MarkdownText } from "./markdown-text";
 import { ToolFallback } from "./tool-fallback";
@@ -27,13 +27,14 @@ export interface ThreadProps {
 export const Thread: FC<ThreadProps> = ({ composerActions }) => {
   return (
     <ThreadPrimitive.Root
-      className="aui-root aui-thread-root bg-background @container flex h-full flex-col"
+      className="aui-root aui-thread-root bg-background @container flex h-full min-h-0 flex-col"
       style={{
         ["--thread-max-width" as string]: "44rem",
       }}
     >
       <ThreadPrimitive.Viewport
         autoScroll
+        turnAnchor="top"
         scrollToBottomOnRunStart
         scrollToBottomOnInitialize
         scrollToBottomOnThreadSwitch
@@ -51,12 +52,11 @@ export const Thread: FC<ThreadProps> = ({ composerActions }) => {
               AssistantMessage,
             }}
           />
-          <div className="flex-1" />
-          <ThreadPrimitive.ViewportFooter className="aui-thread-viewport-footer bg-background max-w-(--thread-max-width) sticky bottom-0 mx-auto mt-4 flex w-full flex-col gap-4 overflow-visible rounded-t-3xl pb-4 md:pb-6">
+          <ThreadPrimitive.ViewportFooter className="aui-thread-viewport-footer bg-background max-w-(--thread-max-width) sticky bottom-[calc(var(--mobile-nav-ui-height)+max(var(--mobile-nav-gap),env(safe-area-inset-bottom)))] z-10 mx-auto mt-auto flex w-full flex-col gap-4 overflow-visible rounded-t-3xl pb-4 md:bottom-0 md:pb-6">
             <ThreadScrollToBottom />
             <Composer composerActions={composerActions} />
             <p className="text-muted-foreground/70 text-center text-xs">
-              Responses may be inaccurate. Not financial advice. Consult a qualified advisor.
+              Responses may be inaccurate. Not a financial advice.
             </p>
           </ThreadPrimitive.ViewportFooter>
         </div>
@@ -99,7 +99,7 @@ const ThreadWelcome: FC = () => {
 
 const ThreadSuggestions: FC = () => {
   return (
-    <div className="aui-thread-welcome-suggestions flex flex-wrap items-center justify-center gap-2 pb-4">
+    <div className="aui-thread-welcome-suggestions flex flex-col items-stretch gap-2 pb-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center">
       {[
         {
           icon: "TrendingUp" as const,
@@ -122,13 +122,13 @@ const ThreadSuggestions: FC = () => {
         return (
           <div
             key={`suggested-action-${index}`}
-            className="fade-in slide-in-from-bottom-4 animate-in fill-mode-both duration-300 ease-out"
+            className="fade-in slide-in-from-bottom-4 animate-in fill-mode-both w-full duration-300 ease-out sm:w-auto"
             style={{ animationDelay: `${index * 50}ms` }}
           >
             <ThreadPrimitive.Suggestion prompt={suggestion.text} asChild>
               <Button
                 variant="ghost"
-                className="text-muted-foreground hover:text-foreground dark:hover:bg-accent/60 h-auto gap-2 rounded-full border px-4 py-2.5 text-sm font-normal"
+                className="text-muted-foreground hover:text-foreground dark:hover:bg-accent/60 h-auto w-full max-w-full justify-start gap-2 whitespace-normal rounded-full border px-4 py-2.5 text-left text-sm font-normal sm:w-auto sm:justify-center sm:whitespace-nowrap sm:text-center"
                 aria-label={suggestion.text}
               >
                 <Icon className="size-4 shrink-0 opacity-60" />

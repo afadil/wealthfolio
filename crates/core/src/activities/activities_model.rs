@@ -53,7 +53,7 @@ pub struct Activity {
     pub asset_id: Option<String>, // NOW OPTIONAL - NULL for pure cash movements
 
     // Classification
-    pub activity_type: String, // Canonical type (closed set of 15)
+    pub activity_type: String, // Canonical type (closed set of 14)
     pub activity_type_override: Option<String>, // User override (never touched by sync)
     pub source_type: Option<String>, // Raw provider label (REI, DIV, etc.)
     pub subtype: Option<String>, // Semantic variation (DRIP, STAKING_REWARD, etc.)

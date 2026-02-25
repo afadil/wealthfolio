@@ -1,9 +1,9 @@
-import * as React from "react";
-import { Popover, PopoverTrigger, PopoverContent } from "@wealthfolio/ui/components/ui/popover";
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Button } from "@wealthfolio/ui/components/ui/button";
-import { cn } from "@wealthfolio/ui/lib/utils";
 import { useHapticFeedback } from "@/hooks";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
+import { cn } from "@wealthfolio/ui/lib/utils";
+import * as React from "react";
 
 export interface ActionPaletteItem {
   icon: React.ComponentType<{ className?: string }>;
@@ -36,7 +36,7 @@ export function ActionPalette({
   align = "end",
   side = "bottom",
 }: ActionPaletteProps) {
-  const triggerHaptic = useHapticFeedback();
+  const { triggerHaptic } = useHapticFeedback();
 
   const handleItemClick = React.useCallback(
     (item: ActionPaletteItem) => {
@@ -121,7 +121,7 @@ export function ActionPalette({
                       >
                         <IconComponent
                           className={cn(
-                            "h-5 w-5 flex-shrink-0",
+                            "h-5 w-5 shrink-0",
                             isDestructive ? "text-destructive" : "text-muted-foreground",
                           )}
                         />

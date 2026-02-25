@@ -1,10 +1,9 @@
 //! Database models for broker sync state.
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
-
-use wealthfolio_core::sync::{BrokerSyncState, SyncStatus};
+use wealthfolio_connect::broker_ingest::{BrokerSyncState, SyncStatus};
 
 /// Database model for broker sync state
 #[derive(
@@ -37,7 +36,13 @@ pub struct BrokerSyncStateDB {
 
 impl From<BrokerSyncStateDB> for BrokerSyncState {
     fn from(db: BrokerSyncStateDB) -> Self {
-        use chrono::DateTime;
+        let sync_status = match db.sync_status.as_str() {
+            "IDLE" => SyncStatus::Idle,
+            "RUNNING" | "SYNCING" => SyncStatus::Running,
+            "NEEDS_REVIEW" => SyncStatus::NeedsReview,
+            "FAILED" => SyncStatus::Failed,
+            _ => SyncStatus::Idle,
+        };
 
         Self {
             account_id: db.account_id,
@@ -57,8 +62,7 @@ impl From<BrokerSyncStateDB> for BrokerSyncState {
             }),
             last_error: db.last_error,
             last_run_id: db.last_run_id,
-            sync_status: serde_json::from_str(&format!("\"{}\"", db.sync_status))
-                .unwrap_or(SyncStatus::Idle),
+            sync_status,
             created_at: DateTime::parse_from_rfc3339(&db.created_at)
                 .map(|dt| dt.with_timezone(&Utc))
                 .unwrap_or_else(|_| Utc::now()),
@@ -71,6 +75,13 @@ impl From<BrokerSyncStateDB> for BrokerSyncState {
 
 impl From<BrokerSyncState> for BrokerSyncStateDB {
     fn from(domain: BrokerSyncState) -> Self {
+        let sync_status = match domain.sync_status {
+            SyncStatus::Idle => "IDLE",
+            SyncStatus::Running => "RUNNING",
+            SyncStatus::NeedsReview => "NEEDS_REVIEW",
+            SyncStatus::Failed => "FAILED",
+        };
+
         Self {
             account_id: domain.account_id,
             provider: domain.provider,
@@ -81,10 +92,7 @@ impl From<BrokerSyncState> for BrokerSyncStateDB {
             last_successful_at: domain.last_successful_at.map(|dt| dt.to_rfc3339()),
             last_error: domain.last_error,
             last_run_id: domain.last_run_id,
-            sync_status: serde_json::to_string(&domain.sync_status)
-                .unwrap_or_default()
-                .trim_matches('"')
-                .to_string(),
+            sync_status: sync_status.to_string(),
             created_at: domain.created_at.to_rfc3339(),
             updated_at: domain.updated_at.to_rfc3339(),
         }

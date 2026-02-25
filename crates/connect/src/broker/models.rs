@@ -555,6 +555,18 @@ pub struct SyncHoldingsResponse {
     pub new_asset_ids: Vec<String>,
 }
 
+/// Position-level diff for a holdings sync, compared to the latest snapshot.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct HoldingsDiff {
+    pub total_positions: usize,
+    pub added_positions: usize,
+    pub updated_positions: usize,
+    pub removed_positions: usize,
+    pub unchanged_positions: usize,
+    pub snapshot_saved: bool,
+}
+
 /// Information about a newly created account that needs user configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

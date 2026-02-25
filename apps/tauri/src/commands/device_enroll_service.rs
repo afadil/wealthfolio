@@ -6,10 +6,13 @@
 use std::sync::Arc;
 use tauri::State;
 
+use crate::commands::device_sync::{
+    ensure_background_engine_started, ensure_background_engine_stopped,
+};
 use crate::context::ServiceContext;
 
 // Re-export types for use in other modules
-pub use wealthfolio_device_sync::{EnableSyncResult, SyncStateResult};
+pub use wealthfolio_device_sync::{EnableSyncResult, SyncState, SyncStateResult};
 
 /// Get the current device sync state.
 /// Returns the state machine status: FRESH, REGISTERED, READY, STALE, or RECOVERY.
@@ -30,17 +33,32 @@ pub async fn get_device_sync_state(
 pub async fn enable_device_sync(
     context: State<'_, Arc<ServiceContext>>,
 ) -> Result<EnableSyncResult, String> {
-    context
+    let result = context
         .device_enroll_service()
         .enable_sync()
         .await
-        .map_err(|e| e.message)
+        .map_err(|e| e.message)?;
+
+    if result.state == SyncState::Ready {
+        let engine_context = Arc::clone(context.inner());
+        tauri::async_runtime::spawn(async move {
+            if let Err(err) = ensure_background_engine_started(engine_context).await {
+                log::warn!(
+                    "[DeviceSync] Post-enable background engine start failed: {}",
+                    err
+                );
+            }
+        });
+    }
+
+    Ok(result)
 }
 
 /// Clear all device sync data and return to FRESH state.
 /// Use for troubleshooting or when user wants to reset sync.
 #[tauri::command]
-pub fn clear_device_sync_data(context: State<'_, Arc<ServiceContext>>) -> Result<(), String> {
+pub async fn clear_device_sync_data(context: State<'_, Arc<ServiceContext>>) -> Result<(), String> {
+    ensure_background_engine_stopped(Arc::clone(context.inner())).await?;
     context
         .device_enroll_service()
         .clear_sync_data()
@@ -53,9 +71,23 @@ pub fn clear_device_sync_data(context: State<'_, Arc<ServiceContext>>) -> Result
 pub async fn reinitialize_device_sync(
     context: State<'_, Arc<ServiceContext>>,
 ) -> Result<EnableSyncResult, String> {
-    context
+    let result = context
         .device_enroll_service()
         .reinitialize_sync()
         .await
-        .map_err(|e| e.message)
+        .map_err(|e| e.message)?;
+
+    if result.state == SyncState::Ready {
+        let engine_context = Arc::clone(context.inner());
+        tauri::async_runtime::spawn(async move {
+            if let Err(err) = ensure_background_engine_started(engine_context).await {
+                log::warn!(
+                    "[DeviceSync] Post-reinitialize background engine start failed: {}",
+                    err
+                );
+            }
+        });
+    }
+
+    Ok(result)
 }

@@ -75,6 +75,9 @@ pub fn plan_portfolio_job(events: &[DomainEvent]) -> Option<PortfolioJobConfig> 
                     account_ids.insert(account_id.clone());
                 }
             }
+            DomainEvent::DeviceSyncPullComplete => {
+                has_recalc_event = true;
+            }
             DomainEvent::AssetsUpdated { asset_ids: ids } => {
                 has_recalc_event = true;
                 for id in ids {

@@ -8,12 +8,10 @@ use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
 use crate::schema::accounts;
 use crate::schema::accounts::dsl::*;
-use crate::sync::{write_outbox_event, OutboxWriteRequest};
 
 use super::model::AccountDB;
 use wealthfolio_core::accounts::{Account, AccountRepositoryTrait, AccountUpdate, NewAccount};
 use wealthfolio_core::errors::Result;
-use wealthfolio_core::sync::{SyncEntity, SyncOperation};
 
 /// Repository for managing account data in the database
 pub struct AccountRepository {
@@ -39,26 +37,18 @@ impl AccountRepositoryTrait for AccountRepository {
         new_account.validate()?;
 
         self.writer
-            .exec(move |conn| {
+            .exec_tx(move |tx| {
                 let mut account_db: AccountDB = new_account.into();
                 account_db.id = uuid::Uuid::new_v4().to_string();
 
                 diesel::insert_into(accounts::table)
                     .values(&account_db)
-                    .execute(conn)
+                    .execute(tx.conn())
                     .map_err(StorageError::from)?;
 
                 let payload_db = account_db.clone();
                 let account: Account = account_db.into();
-                write_outbox_event(
-                    conn,
-                    OutboxWriteRequest::new(
-                        SyncEntity::Account,
-                        account.id.clone(),
-                        SyncOperation::Create,
-                        serde_json::to_value(&payload_db)?,
-                    ),
-                )?;
+                tx.insert(&payload_db)?;
 
                 Ok(account)
             })
@@ -73,13 +63,13 @@ impl AccountRepositoryTrait for AccountRepository {
         let tracking_mode_provided = account_update.tracking_mode.is_some();
 
         self.writer
-            .exec(move |conn| {
+            .exec_tx(move |tx| {
                 let mut account_db: AccountDB = account_update.into();
 
                 let existing = accounts
                     .select(AccountDB::as_select())
                     .find(&account_db.id)
-                    .first::<AccountDB>(conn)
+                    .first::<AccountDB>(tx.conn())
                     .map_err(StorageError::from)?;
 
                 // Preserve fields that shouldn't change
@@ -104,20 +94,12 @@ impl AccountRepositoryTrait for AccountRepository {
 
                 diesel::update(accounts.find(&account_db.id))
                     .set(&account_db)
-                    .execute(conn)
+                    .execute(tx.conn())
                     .map_err(StorageError::from)?;
 
                 let payload_db = account_db.clone();
                 let account: Account = account_db.into();
-                write_outbox_event(
-                    conn,
-                    OutboxWriteRequest::new(
-                        SyncEntity::Account,
-                        account.id.clone(),
-                        SyncOperation::Update,
-                        serde_json::to_value(&payload_db)?,
-                    ),
-                )?;
+                tx.update(&payload_db)?;
 
                 Ok(account)
             })
@@ -175,21 +157,13 @@ impl AccountRepositoryTrait for AccountRepository {
         let id_to_delete_owned = account_id_param.to_string();
         let event_entity_id = id_to_delete_owned.clone();
         self.writer
-            .exec(move |conn| {
+            .exec_tx(move |tx| {
                 let affected_rows = diesel::delete(accounts.find(id_to_delete_owned))
-                    .execute(conn)
+                    .execute(tx.conn())
                     .map_err(StorageError::from)?;
 
                 if affected_rows > 0 {
-                    write_outbox_event(
-                        conn,
-                        OutboxWriteRequest::new(
-                            SyncEntity::Account,
-                            event_entity_id.clone(),
-                            SyncOperation::Delete,
-                            serde_json::json!({ "id": event_entity_id }),
-                        ),
-                    )?;
+                    tx.delete::<AccountDB>(event_entity_id.clone());
                 }
                 Ok(affected_rows)
             })

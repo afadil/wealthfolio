@@ -1,13 +1,16 @@
 //! Repository for broker sync state persistence.
 
+use async_trait::async_trait;
 use chrono::Utc;
 use diesel::prelude::*;
 use diesel::r2d2::{self, Pool};
 use diesel::sqlite::SqliteConnection;
 use std::sync::Arc;
 
+use wealthfolio_connect::broker_ingest::{
+    BrokerSyncState, BrokerSyncStateRepositoryTrait as ConnectBrokerSyncStateRepositoryTrait,
+};
 use wealthfolio_core::errors::Result;
-use wealthfolio_core::sync::BrokerSyncState;
 
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
@@ -104,7 +107,7 @@ impl BrokerSyncStateRepository {
             .await
     }
 
-    /// Record a sync attempt (upsert with SYNCING status)
+    /// Record a sync attempt (upsert with RUNNING status)
     pub async fn upsert_attempt(&self, account_id: String, provider: String) -> Result<()> {
         self.writer
             .exec(move |conn| {
@@ -124,7 +127,7 @@ impl BrokerSyncStateRepository {
                         diesel::update(brokers_sync_state::table.find((&account_id, &provider)))
                             .set((
                                 brokers_sync_state::last_attempted_at.eq(&now_str),
-                                brokers_sync_state::sync_status.eq("SYNCING"),
+                                brokers_sync_state::sync_status.eq("RUNNING"),
                                 brokers_sync_state::updated_at.eq(&now_str),
                             ))
                             .execute(conn)
@@ -140,7 +143,7 @@ impl BrokerSyncStateRepository {
                             last_successful_at: None,
                             last_error: None,
                             last_run_id: None,
-                            sync_status: "SYNCING".to_string(),
+                            sync_status: "RUNNING".to_string(),
                             created_at: now_str.clone(),
                             updated_at: now_str,
                         };
@@ -313,5 +316,48 @@ impl BrokerSyncStateRepository {
                 Ok(())
             })
             .await
+    }
+}
+
+#[async_trait]
+impl ConnectBrokerSyncStateRepositoryTrait for BrokerSyncStateRepository {
+    fn get_by_account_id(&self, account_id: &str) -> Result<Option<BrokerSyncState>> {
+        BrokerSyncStateRepository::get_by_account_id(self, account_id)
+    }
+
+    async fn upsert_attempt(&self, account_id: String, provider: String) -> Result<()> {
+        BrokerSyncStateRepository::upsert_attempt(self, account_id, provider).await
+    }
+
+    async fn upsert_success(
+        &self,
+        account_id: String,
+        provider: String,
+        last_synced_date: String,
+        import_run_id: Option<String>,
+    ) -> Result<()> {
+        BrokerSyncStateRepository::upsert_success(
+            self,
+            account_id,
+            provider,
+            last_synced_date,
+            import_run_id,
+        )
+        .await
+    }
+
+    async fn upsert_failure(
+        &self,
+        account_id: String,
+        provider: String,
+        error: String,
+        import_run_id: Option<String>,
+    ) -> Result<()> {
+        BrokerSyncStateRepository::upsert_failure(self, account_id, provider, error, import_run_id)
+            .await
+    }
+
+    fn get_all(&self) -> Result<Vec<BrokerSyncState>> {
+        BrokerSyncStateRepository::get_all(self)
     }
 }

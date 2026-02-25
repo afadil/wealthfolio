@@ -14,7 +14,10 @@ use wealthfolio_core::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
 use wealthfolio_core::events::DomainEvent;
 use wealthfolio_core::health::HealthServiceTrait;
 
-use super::planner::{plan_asset_enrichment, plan_broker_sync, plan_portfolio_job};
+#[cfg(feature = "connect-sync")]
+use super::planner::plan_broker_sync;
+use super::planner::{plan_asset_enrichment, plan_portfolio_job};
+#[cfg(feature = "connect-sync")]
 use crate::commands::brokers_sync::perform_broker_sync;
 use crate::context::ServiceContext;
 use crate::events::{
@@ -136,31 +139,34 @@ async fn process_event_batch(
         });
     }
 
-    // Plan and trigger broker sync for eligible tracking mode changes
-    let sync_account_ids = plan_broker_sync(events);
-    if !sync_account_ids.is_empty() {
-        info!(
-            "Triggering broker sync for {} accounts (tracking mode changed)",
-            sync_account_ids.len()
-        );
+    #[cfg(feature = "connect-sync")]
+    {
+        // Plan and trigger broker sync for eligible tracking mode changes
+        let sync_account_ids = plan_broker_sync(events);
+        if !sync_account_ids.is_empty() {
+            info!(
+                "Triggering broker sync for {} accounts (tracking mode changed)",
+                sync_account_ids.len()
+            );
 
-        // Spawn broker sync as a background task
-        let context_clone = context.clone();
-        let app_handle_clone = app_handle.clone();
+            // Spawn broker sync as a background task
+            let context_clone = context.clone();
+            let app_handle_clone = app_handle.clone();
 
-        tokio::spawn(async move {
-            match perform_broker_sync(&context_clone, Some(&app_handle_clone)).await {
-                Ok(result) => {
-                    info!(
-                        "Broker sync completed after tracking mode change: success={}, message={}",
-                        result.success, result.message
-                    );
+            tokio::spawn(async move {
+                match perform_broker_sync(&context_clone, Some(&app_handle_clone)).await {
+                    Ok(result) => {
+                        info!(
+                            "Broker sync completed after tracking mode change: success={}, message={}",
+                            result.success, result.message
+                        );
+                    }
+                    Err(e) => {
+                        warn!("Broker sync failed after tracking mode change: {}", e);
+                    }
                 }
-                Err(e) => {
-                    warn!("Broker sync failed after tracking mode change: {}", e);
-                }
-            }
-        });
+            });
+        }
     }
 }
 

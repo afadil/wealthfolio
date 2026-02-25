@@ -62,6 +62,7 @@ pub struct AssetDB {
     pub instrument_type: Option<String>,
     pub instrument_symbol: Option<String>,
     pub instrument_exchange_mic: Option<String>,
+    #[serde(skip_serializing)]
     pub instrument_key: Option<String>, // STORED generated column (read-only)
     pub provider_config: Option<String>,
     pub created_at: String,

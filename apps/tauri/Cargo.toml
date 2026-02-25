@@ -39,6 +39,7 @@ uuid = { workspace = true }
 anyhow = { workspace = true }
 diesel = { workspace = true }
 rust_decimal = { workspace = true }
+async-trait = { workspace = true }
 
 # Additional dependencies
 dotenvy = "0.15.7"
@@ -56,10 +57,13 @@ sha2 = { workspace = true }
 rand = { workspace = true }
 
 [features]
+default = ["connect-sync", "device-sync"]
 # this feature is used for production builds or when `devPath` points to the filesystem
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
 appstore = [] # Feature flag for App Store builds
+connect-sync = []
+device-sync = []
 
 [lib]
 name = "wealthfolio_app_lib"
@@ -76,3 +80,4 @@ tauri-plugin-barcode-scanner = { git = "https://github.com/tauri-apps/plugins-wo
 
 [target.'cfg(target_os = "ios")'.dependencies]
 tauri-plugin-web-auth = "1"
+tauri-plugin-mobile-share = "0.1.2"

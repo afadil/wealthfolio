@@ -3,27 +3,9 @@
 // State Machine: FRESH → REGISTERED → READY (+ STALE, RECOVERY)
 // ==================================================================
 
-import { useState, useCallback } from "react";
+import { backupDatabase, openFileSaveDialog } from "@/adapters";
 import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { Avatar, AvatarFallback } from "@wealthfolio/ui/components/ui/avatar";
-import { Badge } from "@wealthfolio/ui/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wealthfolio/ui/components/ui/card";
-import { Button } from "@wealthfolio/ui/components/ui/button";
-import { Input } from "@wealthfolio/ui/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@wealthfolio/ui/components/ui/dialog";
+import { Icons, Skeleton } from "@wealthfolio/ui";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -33,6 +15,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@wealthfolio/ui/components/ui/alert-dialog";
+import { Avatar, AvatarFallback } from "@wealthfolio/ui/components/ui/avatar";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@wealthfolio/ui/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@wealthfolio/ui/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,19 +39,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@wealthfolio/ui/components/ui/dropdown-menu";
-import { Icons, Skeleton } from "@wealthfolio/ui";
+import { Input } from "@wealthfolio/ui/components/ui/input";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@wealthfolio/ui/components/ui/tooltip";
-import { useDeviceSync } from "../providers/device-sync-provider";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { useDevices, useRenameDevice, useRevokeDevice } from "../hooks";
-import { E2EESetupCard } from "./e2ee-setup-card";
-import { RecoveryDialog } from "./recovery-dialog";
-import { PairingFlow } from "./pairing-flow";
+import { useDeviceSync } from "../providers/device-sync-provider";
 import { SyncStates, type Device, type SyncState } from "../types";
+import { E2EESetupCard } from "./e2ee-setup-card";
+import { PairingFlow } from "./pairing-flow";
+import { RecoveryDialog } from "./recovery-dialog";
 
 const PORTAL_DEVICES_URL = "https://connect.wealthfolio.app/settings/devices";
 
@@ -72,7 +73,12 @@ export function DeviceSyncSection() {
   const queryClient = useQueryClient();
   const [isPairingOpen, setIsPairingOpen] = useState(false);
   const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
+  const [showBootstrapOverwriteDialog, setShowBootstrapOverwriteDialog] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isTogglingEngine, setIsTogglingEngine] = useState(false);
+  const [isBackingUpBeforeBootstrap, setIsBackingUpBeforeBootstrap] = useState(false);
+  const [isApplyingBootstrapOverwrite, setIsApplyingBootstrapOverwrite] = useState(false);
+  const isBackgroundRunning = state.engineStatus?.backgroundRunning ?? false;
 
   const handlePairingComplete = useCallback(() => {
     setIsPairingOpen(false);
@@ -97,11 +103,77 @@ export function DeviceSyncSection() {
     setTimeout(() => setIsRefreshing(false), 600);
   }, [queryClient]);
 
-  // Show recovery dialog when in RECOVERY state
-  const isRecovery = state.syncState === SyncStates.RECOVERY;
-  if (isRecovery && !showRecoveryDialog) {
-    setShowRecoveryDialog(true);
-  }
+  const handleToggleEngine = useCallback(async () => {
+    setIsTogglingEngine(true);
+    try {
+      if (isBackgroundRunning) {
+        await actions.stopBackgroundSync();
+        toast.success("Background sync paused");
+      } else {
+        await actions.startBackgroundSync();
+        toast.success("Background sync resumed");
+      }
+    } catch (err) {
+      toast.error("Failed to update background sync", {
+        description: err instanceof Error ? err.message : "An unexpected error occurred",
+      });
+    } finally {
+      setIsTogglingEngine(false);
+    }
+  }, [actions, isBackgroundRunning]);
+
+  const handleBackupBeforeBootstrap = useCallback(async (): Promise<boolean> => {
+    setIsBackingUpBeforeBootstrap(true);
+    try {
+      const { filename, data } = await backupDatabase();
+      const saved = await openFileSaveDialog(data, filename);
+      if (!saved) {
+        return false;
+      }
+      toast.success("Backup saved", {
+        description: `A local backup was saved as ${filename}.`,
+      });
+      return true;
+    } catch (err) {
+      toast.error("Backup failed", {
+        description: err instanceof Error ? err.message : "An unexpected error occurred",
+      });
+      return false;
+    } finally {
+      setIsBackingUpBeforeBootstrap(false);
+    }
+  }, []);
+
+  const handleApplyBootstrapOverwrite = useCallback(async () => {
+    setIsApplyingBootstrapOverwrite(true);
+    try {
+      await actions.continueBootstrapWithOverwrite();
+      setShowBootstrapOverwriteDialog(false);
+    } catch (err) {
+      toast.error("Unable to continue sync", {
+        description: err instanceof Error ? err.message : "An unexpected error occurred",
+      });
+    } finally {
+      setIsApplyingBootstrapOverwrite(false);
+    }
+  }, [actions]);
+
+  const handleBackupThenApplyOverwrite = useCallback(async () => {
+    const saved = await handleBackupBeforeBootstrap();
+    if (!saved) {
+      return;
+    }
+    await handleApplyBootstrapOverwrite();
+  }, [handleApplyBootstrapOverwrite, handleBackupBeforeBootstrap]);
+
+  // Keep recovery dialog strictly in sync with RECOVERY state.
+  useEffect(() => {
+    setShowRecoveryDialog(state.syncState === SyncStates.RECOVERY);
+  }, [state.syncState]);
+
+  useEffect(() => {
+    setShowBootstrapOverwriteDialog(!!state.bootstrapOverwriteRisk);
+  }, [state.bootstrapOverwriteRisk]);
 
   // Loading state (detecting)
   if (state.isDetecting) {
@@ -158,7 +230,11 @@ export function DeviceSyncSection() {
             </div>
             <h3 className="text-base font-semibold">Device Sync</h3>
           </div>
-          <OrphanedKeysPrompt onReinitialize={actions.reinitializeSync} />
+          <OrphanedKeysPrompt
+            onReinitialize={async () => {
+              await actions.reinitializeSync();
+            }}
+          />
         </CardContent>
       </Card>
     );
@@ -275,6 +351,45 @@ export function DeviceSyncSection() {
               <Button
                 variant="ghost"
                 size="icon"
+                className="text-muted-foreground hover:text-foreground h-8 w-8 sm:hidden"
+                onClick={handleToggleEngine}
+                disabled={isTogglingEngine}
+              >
+                {isTogglingEngine ? (
+                  <Icons.Loader className="h-4 w-4 animate-spin" />
+                ) : isBackgroundRunning ? (
+                  <Icons.PauseCircle className="h-4 w-4" />
+                ) : (
+                  <Icons.PlayCircle className="h-4 w-4" />
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:text-foreground hidden sm:inline-flex"
+                onClick={handleToggleEngine}
+                disabled={isTogglingEngine}
+              >
+                {isTogglingEngine ? (
+                  <>
+                    <Icons.Loader className="h-4 w-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : isBackgroundRunning ? (
+                  <>
+                    <Icons.PauseCircle className="h-4 w-4" />
+                    Pause Sync
+                  </>
+                ) : (
+                  <>
+                    <Icons.PlayCircle className="h-4 w-4" />
+                    Resume Sync
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
                 className="text-muted-foreground hover:text-foreground h-8 w-8"
                 onClick={handleRefreshDevices}
                 disabled={isRefreshing}
@@ -317,6 +432,63 @@ export function DeviceSyncSection() {
                 {state.bootstrapMessage}
               </div>
             )}
+            {state.bootstrapAction === "NO_REMOTE_PULL" && (
+              <div className="bg-muted/60 text-muted-foreground mb-3 flex items-center gap-2 rounded-md px-3 py-2 text-xs">
+                <Icons.Info className="h-3.5 w-3.5" />
+                No data replacement is needed. This device can keep its current data.
+              </div>
+            )}
+            {state.remoteSeedPresent === false && (
+              <div className="bg-muted/60 text-muted-foreground mb-3 flex items-center gap-2 rounded-md px-3 py-2 text-xs">
+                <Icons.Info className="h-3.5 w-3.5" />
+                Sync setup is almost done. Finish pairing on a trusted device to complete key setup.
+              </div>
+            )}
+            {state.bootstrapOverwriteRisk && (
+              <div className="mb-3 rounded-md border border-amber-200 bg-amber-50/80 px-3 py-3 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-900/20 dark:text-amber-200">
+                <div className="flex items-start gap-2">
+                  <Icons.AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium">Local data will be replaced</p>
+                    <p className="mt-1 leading-relaxed">
+                      To finish linking this device, we need to replace local sync data with data
+                      from your paired device. This device currently has{" "}
+                      <span className="font-semibold">
+                        {state.bootstrapOverwriteRisk.localRows.toLocaleString()}
+                      </span>{" "}
+                      items.
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowBootstrapOverwriteDialog(true)}
+                      >
+                        See details
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleBackupBeforeBootstrap}
+                        disabled={isBackingUpBeforeBootstrap || isApplyingBootstrapOverwrite}
+                      >
+                        {isBackingUpBeforeBootstrap ? (
+                          <>
+                            <Icons.Spinner className="mr-2 h-3.5 w-3.5 animate-spin" />
+                            Backing up...
+                          </>
+                        ) : (
+                          <>
+                            <Icons.Download className="mr-2 h-3.5 w-3.5" />
+                            Back up this device
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             {!state.device ? (
               <Skeleton className="h-16 w-full rounded-lg" />
             ) : !isTrusted ? (
@@ -346,6 +518,71 @@ export function DeviceSyncSection() {
             <PairingFlow onComplete={handlePairingComplete} onCancel={handlePairingCancel} />
           </DialogContent>
         </Dialog>
+
+        <AlertDialog
+          open={showBootstrapOverwriteDialog && !!state.bootstrapOverwriteRisk}
+          onOpenChange={setShowBootstrapOverwriteDialog}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Finish linking this device?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This device currently has{" "}
+                {state.bootstrapOverwriteRisk?.localRows.toLocaleString() ?? "0"} local sync items.
+                Continuing will replace local sync data with snapshot data from your paired device.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {state.bootstrapOverwriteRisk &&
+              state.bootstrapOverwriteRisk.nonEmptyTables.length > 0 && (
+                <div className="bg-muted/60 rounded-md px-3 py-2 text-xs">
+                  <p className="text-muted-foreground mb-1 font-medium">Data that may be updated</p>
+                  <div className="max-h-40 space-y-1 overflow-y-auto pr-1">
+                    {state.bootstrapOverwriteRisk.nonEmptyTables.map((table) => (
+                      <div key={table.table} className="flex items-center justify-between gap-3">
+                        <span>{formatSyncTableLabel(table.table)}</span>
+                        <span className="text-muted-foreground">{table.rows.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            <AlertDialogFooter>
+              <AlertDialogCancel
+                disabled={isBackingUpBeforeBootstrap || isApplyingBootstrapOverwrite}
+              >
+                Not now
+              </AlertDialogCancel>
+              <Button
+                variant="outline"
+                onClick={handleBackupThenApplyOverwrite}
+                disabled={isBackingUpBeforeBootstrap || isApplyingBootstrapOverwrite}
+              >
+                {isBackingUpBeforeBootstrap ? (
+                  <>
+                    <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                    Backing up...
+                  </>
+                ) : (
+                  "Back up, then replace"
+                )}
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleApplyBootstrapOverwrite}
+                disabled={isBackingUpBeforeBootstrap || isApplyingBootstrapOverwrite}
+              >
+                {isApplyingBootstrapOverwrite ? (
+                  <>
+                    <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                    Replacing...
+                  </>
+                ) : (
+                  "Replace now"
+                )}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </Card>
 
       {/* Recovery Dialog */}
@@ -414,6 +651,7 @@ function OrphanedKeysPrompt({ onReinitialize }: { onReinitialize: () => Promise<
           className="mt-3 sm:mt-4"
           variant="outline"
           onClick={() => setShowConfirmDialog(true)}
+          disabled={isReinitializing}
         >
           <Icons.RefreshCw className="mr-2 h-4 w-4" />
           Reinitialize Sync
@@ -445,6 +683,35 @@ function OrphanedKeysPrompt({ onReinitialize }: { onReinitialize: () => Promise<
       </AlertDialog>
     </>
   );
+}
+
+function formatSyncTableName(table: string): string {
+  return table
+    .split("_")
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+}
+
+function formatSyncTableLabel(table: string): string {
+  const labels: Record<string, string> = {
+    accounts: "Accounts",
+    assets: "Investments",
+    quotes: "Price history",
+    goals: "Goals",
+    goals_allocation: "Goal allocations",
+    activities: "Transactions",
+    activity_import_profiles: "Import settings",
+    asset_taxonomy_assignments: "Categories",
+    contribution_limits: "Contribution limits",
+    platforms: "Connected services",
+    holdings_snapshots: "Portfolio snapshots",
+    import_runs: "Import history",
+    ai_threads: "AI chats",
+    ai_messages: "AI chat messages",
+    ai_thread_tags: "AI chat labels",
+  };
+
+  return labels[table] ?? formatSyncTableName(table);
 }
 
 // Helper to format relative time
@@ -523,7 +790,7 @@ function ConnectedDevicesList({
 
       {/* Link Device button - matches "Sync to Local" pattern */}
       <div className="mt-4">
-        <Button onClick={onLinkDevice}>
+        <Button onClick={onLinkDevice} size="sm">
           <Icons.Link className="mr-2 h-4 w-4" />
           Link Device
         </Button>
@@ -592,6 +859,8 @@ function DeviceCard({
   const platform = device.platform?.toLowerCase() || "unknown";
   const Icon = platformIcons[platform] || Icons.Monitor;
   const isTrusted = device.trustState === "trusted";
+  const isUntrusted = device.trustState === "untrusted";
+  const isRevoked = device.trustState === "revoked";
   // Current device is always "Online", others show relative time
   const lastSeenText = device.isCurrent ? "Online" : formatLastSeen(device.lastSeenAt);
 
@@ -649,7 +918,7 @@ function DeviceCard({
                 <Input
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  className="h-7 w-full max-w-[160px] text-sm"
+                  className="h-7 w-full max-w-40 text-sm"
                   maxLength={64}
                   autoFocus
                   onKeyDown={(e) => {
@@ -696,10 +965,16 @@ function DeviceCard({
                       Trusted
                     </span>
                   )}
-                  {!isTrusted && (
+                  {isUntrusted && (
                     <span className="flex items-center gap-1 text-amber-600 dark:text-amber-500">
                       <Icons.ShieldAlert className="h-3 w-3" />
                       Needs pairing
+                    </span>
+                  )}
+                  {isRevoked && (
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      <Icons.XCircle className="h-3 w-3" />
+                      Revoked
                     </span>
                   )}
                 </div>
@@ -712,7 +987,7 @@ function DeviceCard({
         {!isRenaming && (
           <div className="flex shrink-0 items-center gap-2">
             {/* Pair button for untrusted remote devices */}
-            {!isTrusted && !device.isCurrent && (
+            {isUntrusted && !device.isCurrent && (
               <Button variant="outline" size="sm" onClick={onPair}>
                 Pair
               </Button>

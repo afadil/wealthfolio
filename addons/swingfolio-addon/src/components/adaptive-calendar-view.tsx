@@ -282,8 +282,24 @@ function YearlyCalendarView({
   onYearChange,
   currency,
 }: Omit<AdaptiveCalendarViewProps, "selectedPeriod">) {
-  // Filter calendar data for the selected year
-  const yearlyData = calendar.filter((cal) => cal.year === selectedYear.getFullYear());
+  // Build 12 months for the selected year, using calendar data when available
+  const year = selectedYear.getFullYear();
+  const calendarMap = new Map(
+    calendar.filter((cal) => cal.year === year).map((cal) => [cal.month, cal]),
+  );
+  const yearlyData: CalendarMonth[] = Array.from({ length: 12 }, (_, i) => {
+    const month = i + 1;
+    return (
+      calendarMap.get(month) ?? {
+        year,
+        month,
+        monthlyPL: 0,
+        monthlyReturnPercent: 0,
+        totalTrades: 0,
+        days: [],
+      }
+    );
+  });
 
   const yearlyPL = yearlyData.reduce((sum, month) => sum + month.monthlyPL, 0);
   const yearlyTrades = yearlyData.reduce((sum, month) => sum + month.totalTrades, 0);

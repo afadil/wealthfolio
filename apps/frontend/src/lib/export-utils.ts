@@ -12,13 +12,23 @@ export function formatData(data: unknown[], format: ExportedFileFormat): string 
 
 export function convertToCSV<T extends Record<string, unknown>>(data: T[]): string {
   if (!data || data.length === 0) return "";
-  const headers = Object.keys(data[0]);
-  // Check if 'assetID' is present and replace it with 'symbol'
-  const assetIDIndex = headers.indexOf("assetId");
-  if (assetIDIndex !== -1) {
-    headers[assetIDIndex] = "symbol";
-  }
-  const dataRows = data.map((row) => Object.values(row).map(String));
+  const sourceKeys = Array.from(new Set(data.flatMap((row) => Object.keys(row))));
+  const headers = sourceKeys.map((key) => (key === "assetId" ? "symbol" : key));
+
+  const dataRows = data.map((row) =>
+    sourceKeys.map((key) => {
+      const value = row[key];
+      if (value === null || value === undefined) {
+        return "";
+      }
+      if (typeof value === "object") {
+        return JSON.stringify(value);
+      }
+      // eslint-disable-next-line @typescript-eslint/no-base-to-string
+      return String(value);
+    }),
+  );
+
   const array = [headers].concat(dataRows);
   return array
     .map((row) => {

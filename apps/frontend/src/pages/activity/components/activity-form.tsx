@@ -22,14 +22,14 @@ import type { PickerActivityType } from "../config/activity-form-config";
 // Re-export for consumers
 export type { AccountSelectOption };
 
-interface ActivityFormV2Props {
+interface ActivityFormProps {
   accounts: AccountSelectOption[];
   activity?: Partial<ActivityDetails>;
   open?: boolean;
   onClose?: () => void;
 }
 
-export function ActivityFormV2({ accounts, activity, open, onClose }: ActivityFormV2Props) {
+export function ActivityForm({ accounts, activity, open, onClose }: ActivityFormProps) {
   // Derive the editing state and initial type from activity prop
   const isEditing = !!activity?.id;
   const initialType = mapActivityTypeToPicker(activity?.activityType);

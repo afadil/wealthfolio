@@ -121,7 +121,7 @@ export const AssetProfilePage = () => {
   const [editSheetDefaultTab, setEditSheetDefaultTab] = useState<
     "general" | "classification" | "market-data"
   >("general");
-  const triggerHaptic = useHapticFeedback();
+  const { triggerHaptic } = useHapticFeedback();
   const isMobile = useIsMobileViewport();
 
   const {

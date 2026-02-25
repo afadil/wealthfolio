@@ -8,6 +8,7 @@ mod activities_traits;
 mod compiler;
 mod csv_parser;
 mod idempotency;
+mod import_run_model;
 
 #[cfg(test)]
 mod activities_service_tests;
@@ -31,4 +32,8 @@ pub use compiler::{ActivityCompiler, DefaultActivityCompiler};
 pub use csv_parser::{parse_csv, ParseConfig, ParseError, ParsedCsvResult};
 pub use idempotency::{
     compute_activity_idempotency_key, compute_idempotency_key, generate_manual_idempotency_key,
+};
+pub use import_run_model::{
+    ImportRun, ImportRunMode, ImportRunRepositoryTrait, ImportRunStatus, ImportRunSummary,
+    ImportRunType, ReviewMode,
 };

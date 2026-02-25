@@ -22,6 +22,10 @@ pub fn default_adapter_descriptors() -> Vec<EntityAdapterDescriptor> {
             table_name: "assets",
         },
         EntityAdapterDescriptor {
+            entity: SyncEntity::Quote,
+            table_name: "quotes",
+        },
+        EntityAdapterDescriptor {
             entity: SyncEntity::AssetTaxonomyAssignment,
             table_name: "asset_taxonomy_assignments",
         },

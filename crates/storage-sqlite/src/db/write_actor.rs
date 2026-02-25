@@ -1,9 +1,12 @@
 use super::DbPool;
 use crate::errors::StorageError;
+use crate::sync::app_sync::ProjectedChange;
+use crate::sync::{flush_projected_outbox, OutboxWriteRequest, SyncOutboxModel};
 use diesel::SqliteConnection;
 use std::any::Any;
 use tokio::sync::{mpsc, oneshot};
 use wealthfolio_core::errors::Result;
+use wealthfolio_core::sync::SyncOperation;
 
 // Type alias for the job to be executed by the writer actor.
 // It takes a mutable reference to a SqliteConnection and returns a Result.
@@ -61,6 +64,129 @@ impl WriteHandle {
                     .downcast::<T>()
                     .unwrap_or_else(|_| panic!("Failed to downcast writer actor result."))
             })
+    }
+
+    /// Executes a database job and appends projected sync-outbox records in the same transaction.
+    pub async fn exec_projected<F, T>(&self, job: F) -> Result<T>
+    where
+        F: FnOnce(&mut SqliteConnection, &mut WriteProjection) -> Result<T> + Send + 'static,
+        T: Send + 'static + Any,
+    {
+        self.exec(move |conn| {
+            let mut projection = WriteProjection::default();
+            let result = job(conn, &mut projection)?;
+            projection.flush(conn)?;
+            Ok(result)
+        })
+        .await
+    }
+
+    /// Executes a database job using the centralized write transaction API.
+    pub async fn exec_tx<F, T>(&self, job: F) -> Result<T>
+    where
+        F: FnOnce(&mut DbWriteTx<'_>) -> Result<T> + Send + 'static,
+        T: Send + 'static + Any,
+    {
+        self.exec(move |conn| {
+            let mut projection = WriteProjection::default();
+            let result = {
+                let mut tx = DbWriteTx {
+                    conn,
+                    projection: &mut projection,
+                };
+                job(&mut tx)?
+            };
+            projection.flush(conn)?;
+            Ok(result)
+        })
+        .await
+    }
+}
+
+pub struct DbWriteTx<'a> {
+    conn: &'a mut SqliteConnection,
+    projection: &'a mut WriteProjection,
+}
+
+impl<'a> DbWriteTx<'a> {
+    pub fn conn(&mut self) -> &mut SqliteConnection {
+        self.conn
+    }
+
+    pub fn run<T, F>(&mut self, job: F) -> Result<T>
+    where
+        F: FnOnce(&mut SqliteConnection) -> Result<T>,
+    {
+        job(self.conn)
+    }
+
+    pub fn insert<T: SyncOutboxModel>(&mut self, model: &T) -> Result<()> {
+        self.projection.capture_model(model, SyncOperation::Create)
+    }
+
+    pub fn update<T: SyncOutboxModel>(&mut self, model: &T) -> Result<()> {
+        self.projection.capture_model(model, SyncOperation::Update)
+    }
+
+    pub fn delete<T: SyncOutboxModel>(&mut self, entity_id: impl Into<String>) {
+        self.projection.capture_delete::<T>(entity_id);
+    }
+
+    pub fn delete_model<T: SyncOutboxModel>(&mut self, model: &T) {
+        self.projection.capture_model_delete(model);
+    }
+}
+
+/// Collects projected outbox writes and flushes them before transaction commit.
+#[derive(Default)]
+pub struct WriteProjection {
+    outbox_requests: Vec<OutboxWriteRequest>,
+    projected_changes: Vec<ProjectedChange>,
+}
+
+impl WriteProjection {
+    pub fn queue_outbox(&mut self, request: OutboxWriteRequest) {
+        self.outbox_requests.push(request);
+    }
+
+    /// Record a generic model mutation to be projected to outbox at commit-time.
+    pub fn capture_model<T: SyncOutboxModel>(
+        &mut self,
+        model: &T,
+        op: SyncOperation,
+    ) -> Result<()> {
+        if !model.should_sync_outbox(op) {
+            return Ok(());
+        }
+        self.projected_changes
+            .push(ProjectedChange::for_model(model, op)?);
+        Ok(())
+    }
+
+    pub fn capture_create<T: SyncOutboxModel>(&mut self, model: &T) -> Result<()> {
+        self.capture_model(model, SyncOperation::Create)
+    }
+
+    pub fn capture_update<T: SyncOutboxModel>(&mut self, model: &T) -> Result<()> {
+        self.capture_model(model, SyncOperation::Update)
+    }
+
+    pub fn capture_delete<T: SyncOutboxModel>(&mut self, entity_id: impl Into<String>) {
+        let entity_id = entity_id.into();
+        if T::should_sync_outbox_delete(&entity_id) {
+            self.projected_changes
+                .push(ProjectedChange::delete_for_model::<T>(entity_id));
+        }
+    }
+
+    pub fn capture_model_delete<T: SyncOutboxModel>(&mut self, model: &T) {
+        if model.should_sync_outbox(SyncOperation::Delete) {
+            self.capture_delete::<T>(model.sync_entity_id().to_string());
+        }
+    }
+
+    fn flush(self, conn: &mut SqliteConnection) -> Result<()> {
+        flush_projected_outbox(conn, self.outbox_requests, self.projected_changes)
     }
 }
 

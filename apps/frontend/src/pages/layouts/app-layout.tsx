@@ -23,8 +23,12 @@ const AppLayoutContent = () => {
   const navigation = useNavigation();
   const { isMobile } = usePlatform();
   const isMobileViewport = useIsMobileViewport();
+  const isIPad =
+    typeof window !== "undefined" &&
+    (/ipad/i.test(window.navigator.userAgent) ||
+      (/macintosh/i.test(window.navigator.userAgent) && window.navigator.maxTouchPoints > 1));
   const { isLaunchBar, isFocusMode } = useNavigationMode();
-  const shouldUseMobileNavigation = isMobile || isMobileViewport;
+  const shouldUseMobileNavigation = isIPad ? false : isMobile || isMobileViewport;
   const shouldUseBottomNavigation = shouldUseMobileNavigation || (isLaunchBar && !isFocusMode);
   const isDesktopFocusMode = !shouldUseMobileNavigation && isFocusMode;
   const launchBarHeight =

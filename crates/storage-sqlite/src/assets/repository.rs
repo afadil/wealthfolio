@@ -12,9 +12,7 @@ use super::model::{AssetDB, InsertableAssetDB};
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
 use crate::schema::{activities, assets, quotes};
-use crate::sync::{write_outbox_event, OutboxWriteRequest};
 use crate::utils::chunk_for_sqlite;
-use wealthfolio_core::sync::{SyncEntity, SyncOperation};
 
 /// Repository for managing asset data in the database
 pub struct AssetRepository {
@@ -115,22 +113,14 @@ impl AssetRepositoryTrait for AssetRepository {
         let asset_db: InsertableAssetDB = new_asset.into();
 
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<Asset> {
+            .exec_tx(move |tx| -> Result<Asset> {
                 let result_db = diesel::insert_into(assets::table)
                     .values(&asset_db)
-                    .get_result::<AssetDB>(conn)
+                    .get_result::<AssetDB>(tx.conn())
                     .map_err(StorageError::from)?;
                 let payload_db = result_db.clone();
                 let asset: Asset = result_db.into();
-                write_outbox_event(
-                    conn,
-                    OutboxWriteRequest::new(
-                        SyncEntity::Asset,
-                        asset.id.clone(),
-                        SyncOperation::Create,
-                        serde_json::to_value(&payload_db)?,
-                    ),
-                )?;
+                tx.insert(&payload_db)?;
                 Ok(asset)
             })
             .await
@@ -147,11 +137,11 @@ impl AssetRepositoryTrait for AssetRepository {
         let ids: Vec<String> = assets_db.iter().filter_map(|a| a.id.clone()).collect();
 
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<Vec<Asset>> {
+            .exec_tx(move |tx| -> Result<Vec<Asset>> {
                 let existing_ids: HashSet<String> = assets::table
                     .filter(assets::id.eq_any(&ids))
                     .select(assets::id)
-                    .load::<String>(conn)
+                    .load::<String>(tx.conn())
                     .map_err(StorageError::from)?
                     .into_iter()
                     .collect();
@@ -162,26 +152,18 @@ impl AssetRepositoryTrait for AssetRepository {
                         .values(asset_db)
                         .on_conflict(assets::id)
                         .do_nothing()
-                        .execute(conn)
+                        .execute(tx.conn())
                         .map_err(StorageError::from)?;
                 }
 
                 // Re-read all to return the full set
                 let results = assets::table
                     .filter(assets::id.eq_any(&ids))
-                    .load::<AssetDB>(conn)
+                    .load::<AssetDB>(tx.conn())
                     .map_err(StorageError::from)?;
                 for result in &results {
                     if !existing_ids.contains(&result.id) {
-                        write_outbox_event(
-                            conn,
-                            OutboxWriteRequest::new(
-                                SyncEntity::Asset,
-                                result.id.clone(),
-                                SyncOperation::Create,
-                                serde_json::to_value(result)?,
-                            ),
-                        )?;
+                        tx.insert(result)?;
                     }
                 }
                 Ok(results.into_iter().map(|r| r.into()).collect())
@@ -196,11 +178,11 @@ impl AssetRepositoryTrait for AssetRepository {
         let payload_owned = payload.clone();
 
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<Asset> {
+            .exec_tx(move |tx| -> Result<Asset> {
                 // First, get the existing asset to preserve fields if not provided
                 let existing: AssetDB = assets::table
                     .filter(assets::id.eq(&asset_id_owned))
-                    .first(conn)
+                    .first(tx.conn())
                     .map_err(StorageError::from)?;
 
                 // Use payload metadata if provided, otherwise preserve existing
@@ -271,7 +253,7 @@ impl AssetRepositoryTrait for AssetRepository {
                             assets::instrument_exchange_mic.eq(&instrument_exchange_mic_value),
                             assets::provider_config.eq(&provider_config_str),
                         ))
-                        .get_result::<AssetDB>(conn)
+                        .get_result::<AssetDB>(tx.conn())
                         .map_err(StorageError::from)?
                 } else {
                     diesel::update(assets::table.filter(assets::id.eq(&asset_id_owned)))
@@ -288,20 +270,12 @@ impl AssetRepositoryTrait for AssetRepository {
                             assets::instrument_exchange_mic.eq(&instrument_exchange_mic_value),
                             assets::provider_config.eq(&provider_config_str),
                         ))
-                        .get_result::<AssetDB>(conn)
+                        .get_result::<AssetDB>(tx.conn())
                         .map_err(StorageError::from)?
                 };
                 let payload_db = result_db.clone();
                 let asset: Asset = result_db.into();
-                write_outbox_event(
-                    conn,
-                    OutboxWriteRequest::new(
-                        SyncEntity::Asset,
-                        asset.id.clone(),
-                        SyncOperation::Update,
-                        serde_json::to_value(&payload_db)?,
-                    ),
-                )?;
+                tx.update(&payload_db)?;
                 Ok(asset)
             })
             .await
@@ -330,21 +304,13 @@ impl AssetRepositoryTrait for AssetRepository {
         let asset_id_owned = asset_id.to_string();
         let quote_mode_owned = quote_mode.to_string();
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<Asset> {
+            .exec_tx(move |tx| -> Result<Asset> {
                 let result_db = diesel::update(assets::table.filter(assets::id.eq(asset_id_owned)))
                     .set(assets::quote_mode.eq(quote_mode_owned))
-                    .get_result::<AssetDB>(conn)
+                    .get_result::<AssetDB>(tx.conn())
                     .map_err(StorageError::from)?;
                 let payload_db = result_db.clone();
-                write_outbox_event(
-                    conn,
-                    OutboxWriteRequest::new(
-                        SyncEntity::Asset,
-                        payload_db.id.clone(),
-                        SyncOperation::Update,
-                        serde_json::to_value(&payload_db)?,
-                    ),
-                )?;
+                tx.update(&payload_db)?;
                 Ok(result_db.into())
             })
             .await
@@ -369,12 +335,12 @@ impl AssetRepositoryTrait for AssetRepository {
         let asset_id_owned = asset_id.to_string();
         let asset_id_for_event = asset_id_owned.clone();
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+            .exec_tx(move |tx| -> Result<()> {
                 // Check for activities constraint
                 let activity_count: i64 = activities::table
                     .filter(activities::asset_id.eq(&asset_id_owned))
                     .count()
-                    .get_result(conn)
+                    .get_result(tx.conn())
                     .map_err(StorageError::from)?;
 
                 if activity_count > 0 {
@@ -385,23 +351,15 @@ impl AssetRepositoryTrait for AssetRepository {
 
                 // Delete all quotes for this asset (by asset_id)
                 diesel::delete(quotes::table.filter(quotes::asset_id.eq(&asset_id_owned)))
-                    .execute(conn)
+                    .execute(tx.conn())
                     .map_err(StorageError::from)?;
 
                 // Delete the asset
                 diesel::delete(assets::table.filter(assets::id.eq(&asset_id_owned)))
-                    .execute(conn)
+                    .execute(tx.conn())
                     .map_err(StorageError::from)?;
 
-                write_outbox_event(
-                    conn,
-                    OutboxWriteRequest::new(
-                        SyncEntity::Asset,
-                        asset_id_owned.clone(),
-                        SyncOperation::Delete,
-                        serde_json::json!({ "id": asset_id_for_event }),
-                    ),
-                )?;
+                tx.delete::<AssetDB>(asset_id_for_event.clone());
 
                 Ok(())
             })
@@ -429,11 +387,11 @@ impl AssetRepositoryTrait for AssetRepository {
     async fn cleanup_legacy_metadata(&self, asset_id: &str) -> Result<()> {
         let asset_id_owned = asset_id.to_string();
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+            .exec_tx(move |tx| -> Result<()> {
                 // Get current metadata
                 let existing: AssetDB = assets::table
                     .filter(assets::id.eq(&asset_id_owned))
-                    .first(conn)
+                    .first(tx.conn())
                     .map_err(StorageError::from)?;
 
                 // Parse current metadata and remove $.legacy, keep $.identifiers
@@ -450,21 +408,13 @@ impl AssetRepositoryTrait for AssetRepository {
                 // Update the asset
                 diesel::update(assets::table.filter(assets::id.eq(&asset_id_owned)))
                     .set(assets::metadata.eq(new_metadata))
-                    .execute(conn)
+                    .execute(tx.conn())
                     .map_err(StorageError::from)?;
                 let updated = assets::table
                     .filter(assets::id.eq(&asset_id_owned))
-                    .first::<AssetDB>(conn)
+                    .first::<AssetDB>(tx.conn())
                     .map_err(StorageError::from)?;
-                write_outbox_event(
-                    conn,
-                    OutboxWriteRequest::new(
-                        SyncEntity::Asset,
-                        updated.id.clone(),
-                        SyncOperation::Update,
-                        serde_json::to_value(&updated)?,
-                    ),
-                )?;
+                tx.update(&updated)?;
 
                 Ok(())
             })
@@ -488,20 +438,12 @@ impl AssetRepositoryTrait for AssetRepository {
     async fn deactivate(&self, asset_id: &str) -> Result<()> {
         let asset_id_owned = asset_id.to_string();
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+            .exec_tx(move |tx| -> Result<()> {
                 let updated = diesel::update(assets::table.filter(assets::id.eq(&asset_id_owned)))
                     .set(assets::is_active.eq(0))
-                    .get_result::<AssetDB>(conn)
+                    .get_result::<AssetDB>(tx.conn())
                     .map_err(StorageError::from)?;
-                write_outbox_event(
-                    conn,
-                    OutboxWriteRequest::new(
-                        SyncEntity::Asset,
-                        updated.id.clone(),
-                        SyncOperation::Update,
-                        serde_json::to_value(&updated)?,
-                    ),
-                )?;
+                tx.update(&updated)?;
                 Ok(())
             })
             .await
@@ -510,20 +452,12 @@ impl AssetRepositoryTrait for AssetRepository {
     async fn reactivate(&self, asset_id: &str) -> Result<()> {
         let asset_id_owned = asset_id.to_string();
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+            .exec_tx(move |tx| -> Result<()> {
                 let updated = diesel::update(assets::table.filter(assets::id.eq(&asset_id_owned)))
                     .set(assets::is_active.eq(1))
-                    .get_result::<AssetDB>(conn)
+                    .get_result::<AssetDB>(tx.conn())
                     .map_err(StorageError::from)?;
-                write_outbox_event(
-                    conn,
-                    OutboxWriteRequest::new(
-                        SyncEntity::Asset,
-                        updated.id.clone(),
-                        SyncOperation::Update,
-                        serde_json::to_value(&updated)?,
-                    ),
-                )?;
+                tx.update(&updated)?;
                 Ok(())
             })
             .await
@@ -533,11 +467,11 @@ impl AssetRepositoryTrait for AssetRepository {
         let source_id_owned = source_id.to_string();
         let target_id_owned = target_id.to_string();
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
+            .exec_tx(move |tx| -> Result<()> {
                 // Get source asset
                 let source: AssetDB = assets::table
                     .filter(assets::id.eq(&source_id_owned))
-                    .first(conn)
+                    .first(tx.conn())
                     .map_err(StorageError::from)?;
 
                 // Only copy notes (user-editable field) if source has content
@@ -547,17 +481,9 @@ impl AssetRepositoryTrait for AssetRepository {
                         let updated =
                             diesel::update(assets::table.filter(assets::id.eq(&target_id_owned)))
                                 .set(assets::notes.eq(notes))
-                                .get_result::<AssetDB>(conn)
+                                .get_result::<AssetDB>(tx.conn())
                                 .map_err(StorageError::from)?;
-                        write_outbox_event(
-                            conn,
-                            OutboxWriteRequest::new(
-                                SyncEntity::Asset,
-                                updated.id.clone(),
-                                SyncOperation::Update,
-                                serde_json::to_value(&updated)?,
-                            ),
-                        )?;
+                        tx.update(&updated)?;
                     }
                 }
 
@@ -568,7 +494,7 @@ impl AssetRepositoryTrait for AssetRepository {
 
     async fn deactivate_orphaned_investments(&self) -> Result<Vec<String>> {
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<Vec<String>> {
+            .exec_tx(move |tx| -> Result<Vec<String>> {
                 // Find active INVESTMENT assets with zero activities
                 let orphan_ids: Vec<String> = assets::table
                     .select(assets::id)
@@ -577,7 +503,7 @@ impl AssetRepositoryTrait for AssetRepository {
                     .filter(diesel::dsl::sql::<diesel::sql_types::Bool>(
                         "id NOT IN (SELECT DISTINCT asset_id FROM activities WHERE asset_id IS NOT NULL)",
                     ))
-                    .load::<String>(conn)
+                    .load::<String>(tx.conn())
                     .map_err(StorageError::from)?;
 
                 if !orphan_ids.is_empty() {
@@ -585,24 +511,16 @@ impl AssetRepositoryTrait for AssetRepository {
                         assets::table.filter(assets::id.eq_any(&orphan_ids)),
                     )
                     .set(assets::is_active.eq(0))
-                    .execute(conn)
+                    .execute(tx.conn())
                     .map_err(StorageError::from)?;
 
                     let updated_rows = assets::table
                         .filter(assets::id.eq_any(&orphan_ids))
                         .select(AssetDB::as_select())
-                        .load::<AssetDB>(conn)
+                        .load::<AssetDB>(tx.conn())
                         .map_err(StorageError::from)?;
                     for updated in updated_rows {
-                        write_outbox_event(
-                            conn,
-                            OutboxWriteRequest::new(
-                                SyncEntity::Asset,
-                                updated.id.clone(),
-                                SyncOperation::Update,
-                                serde_json::to_value(&updated)?,
-                            ),
-                        )?;
+                        tx.update(&updated)?;
                     }
                 }
 

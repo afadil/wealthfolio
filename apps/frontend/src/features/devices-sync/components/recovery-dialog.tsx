@@ -45,14 +45,11 @@ export function RecoveryDialog({ open, onOpenChange }: RecoveryDialogProps) {
             <AlertDialogTitle>Device Removed</AlertDialogTitle>
           </div>
           <AlertDialogDescription className="space-y-2">
-            <p>
-              This device was removed from your account, either from another device or from the web
-              portal.
-            </p>
-            <p>
-              You&apos;ll need to re-enable device sync and pair with a trusted device to continue
-              syncing your data.
-            </p>
+            This device was removed from your account, either from another device or from the web
+            portal.
+            <br />
+            You&apos;ll need to re-enable device sync and pair with a trusted device to continue
+            syncing your data.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

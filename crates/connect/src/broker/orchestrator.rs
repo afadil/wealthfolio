@@ -6,13 +6,15 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 
-use super::models::{NewAccountInfo, SyncActivitiesResponse, SyncHoldingsResponse, SyncResult};
+use super::models::{
+    HoldingsDiff, NewAccountInfo, SyncActivitiesResponse, SyncHoldingsResponse, SyncResult,
+};
 use super::progress::{SyncProgressPayload, SyncProgressReporter, SyncStatus};
 use super::traits::{BrokerApiClient, BrokerSyncServiceTrait};
+use crate::broker_ingest::{ImportRunMode, ImportRunStatus, ImportRunSummary};
 use wealthfolio_core::accounts::TrackingMode;
-use wealthfolio_core::sync::{ImportRunMode, ImportRunStatus, ImportRunSummary};
 
 /// Configuration for sync operations.
 #[derive(Debug, Clone)]
@@ -300,25 +302,159 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
                     continue;
                 }
                 TrackingMode::Holdings => {
+                    let account_id = account.id.clone();
+                    let account_name = account.name.clone();
+
+                    // Determine import run mode from existing sync state
+                    let import_mode = match self.sync_service.get_activity_sync_state(&account_id) {
+                        Ok(Some(state)) if state.last_successful_at.is_some() => {
+                            ImportRunMode::Incremental
+                        }
+                        Ok(_) => ImportRunMode::Initial,
+                        Err(e) => {
+                            warn!(
+                                "Failed to read sync state for '{}' before holdings sync: {}",
+                                account_name, e
+                            );
+                            ImportRunMode::Initial
+                        }
+                    };
+                    // Mark sync attempt
+                    if let Err(err) = self
+                        .sync_service
+                        .mark_activity_sync_attempt(account_id.clone())
+                        .await
+                        .map_err(|e| format!("Failed to mark holdings sync attempt: {}", e))
+                    {
+                        error!(
+                            "Failed to mark holdings sync attempt for '{}': {}",
+                            account_name, err
+                        );
+                        holdings_summary.accounts_failed += 1;
+                        continue;
+                    }
+
+                    // Create import run for holdings sync
+                    let import_run = match self
+                        .sync_service
+                        .create_import_run(&account_id, import_mode)
+                        .await
+                    {
+                        Ok(run) => {
+                            debug!(
+                                "Created holdings import run {} for account '{}'",
+                                run.id, account_name
+                            );
+                            Some(run)
+                        }
+                        Err(e) => {
+                            error!(
+                                "Failed to create holdings import run for '{}': {}",
+                                account_name, e
+                            );
+                            None
+                        }
+                    };
+                    let import_run_id = import_run.as_ref().map(|r| r.id.clone());
+
                     // Sync holdings for HOLDINGS mode accounts
                     match self
                         .sync_account_holdings(
                             api_client,
-                            &account.id,
-                            &account.name,
+                            &account_id,
+                            &account_name,
                             &broker_account_id,
                         )
                         .await
                     {
-                        Ok((positions_saved, assets_created, new_asset_ids)) => {
+                        Ok((diff, assets_created, new_asset_ids)) => {
+                            let summary = ImportRunSummary {
+                                fetched: diff.total_positions as u32,
+                                inserted: diff.added_positions as u32,
+                                updated: diff.updated_positions as u32,
+                                skipped: diff.unchanged_positions as u32,
+                                warnings: 0,
+                                errors: 0,
+                                removed: diff.removed_positions as u32,
+                                assets_created: assets_created as u32,
+                            };
+
+                            // Finalize sync success (updates brokers_sync_state table)
+                            let last_synced_date = end_date.format("%Y-%m-%d").to_string();
+                            let sync_state_failed = self
+                                .sync_service
+                                .finalize_activity_sync_success(
+                                    account_id.clone(),
+                                    last_synced_date,
+                                    import_run_id.clone(),
+                                )
+                                .await
+                                .is_err();
+
+                            if sync_state_failed {
+                                error!(
+                                    "Failed to update holdings sync state for '{}', but holdings were synced",
+                                    account_name
+                                );
+                            }
+
+                            // Always finalize import run (even if sync state update failed)
+                            if let Some(ref run_id) = import_run_id {
+                                let _ = self
+                                    .sync_service
+                                    .finalize_import_run(
+                                        run_id,
+                                        summary,
+                                        ImportRunStatus::Applied,
+                                        None,
+                                    )
+                                    .await;
+                            }
+
                             holdings_summary.accounts_synced += 1;
-                            holdings_summary.positions_upserted += positions_saved;
-                            holdings_summary.snapshots_upserted += 1;
+                            holdings_summary.positions_upserted +=
+                                diff.added_positions + diff.updated_positions;
+                            holdings_summary.snapshots_upserted +=
+                                if diff.snapshot_saved { 1 } else { 0 };
                             holdings_summary.assets_inserted += assets_created;
                             holdings_summary.new_asset_ids.extend(new_asset_ids);
                         }
                         Err(err) => {
-                            error!("Failed to sync holdings for '{}': {}", account.name, err);
+                            error!("Failed to sync holdings for '{}': {}", account_name, err);
+
+                            // Finalize sync failure
+                            let _ = self
+                                .sync_service
+                                .finalize_activity_sync_failure(
+                                    account_id.clone(),
+                                    err.clone(),
+                                    import_run_id.clone(),
+                                )
+                                .await;
+
+                            // Finalize import run as failed
+                            if let Some(ref run_id) = import_run_id {
+                                let _ = self
+                                    .sync_service
+                                    .finalize_import_run(
+                                        run_id,
+                                        ImportRunSummary::default(),
+                                        ImportRunStatus::Failed,
+                                        Some(err.clone()),
+                                    )
+                                    .await;
+                            }
+
+                            // Emit failure event
+                            self.progress_reporter.report_progress(
+                                SyncProgressPayload::new(
+                                    &account_id,
+                                    &account_name,
+                                    SyncStatus::Failed,
+                                )
+                                .with_message(err),
+                            );
+
                             holdings_summary.accounts_failed += 1;
                         }
                     }
@@ -520,14 +656,14 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
     /// Sync holdings for a single account (HOLDINGS tracking mode).
     ///
     /// Fetches current holdings from the broker API and saves as a snapshot.
-    /// Returns (positions_saved, assets_created, new_asset_ids).
+    /// Returns (position_diff, assets_created, new_asset_ids).
     async fn sync_account_holdings(
         &self,
         api_client: &dyn BrokerApiClient,
         account_id: &str,
         account_name: &str,
         broker_account_id: &str,
-    ) -> Result<(usize, usize, Vec<String>), String> {
+    ) -> Result<(HoldingsDiff, usize, Vec<String>), String> {
         info!(
             "Syncing holdings for account '{}' ({})",
             account_name, broker_account_id
@@ -554,7 +690,7 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
         );
 
         // Save holdings as a snapshot
-        let (positions_saved, assets_created, new_asset_ids) = self
+        let (diff, assets_created, new_asset_ids) = self
             .sync_service
             .save_broker_holdings(
                 account_id.to_string(),
@@ -564,17 +700,28 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
             .await
             .map_err(|e| format!("Failed to save broker holdings: {}", e))?;
 
+        let changed_positions =
+            diff.added_positions + diff.updated_positions + diff.removed_positions;
+        let summary_message = if changed_positions == 0 {
+            format!(
+                "No position changes detected ({} positions checked)",
+                diff.total_positions
+            )
+        } else {
+            format!(
+                "Positions: +{}, {} updated, {} removed",
+                diff.added_positions, diff.updated_positions, diff.removed_positions
+            )
+        };
+
         // Emit completion event
         self.progress_reporter.report_progress(
             SyncProgressPayload::new(account_id, account_name, SyncStatus::Complete).with_message(
-                format!(
-                    "Synced {} positions ({} assets created)",
-                    positions_saved, assets_created
-                ),
+                format!("{} ({} assets created)", summary_message, assets_created),
             ),
         );
 
-        Ok((positions_saved, assets_created, new_asset_ids))
+        Ok((diff, assets_created, new_asset_ids))
     }
 
     /// Sync activities for a single account with full pagination.

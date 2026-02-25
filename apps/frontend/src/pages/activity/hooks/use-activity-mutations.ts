@@ -1,4 +1,5 @@
 import { logger, createActivity, deleteActivity, saveActivities, updateActivity } from "@/adapters";
+import { generateId } from "@/lib/id";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import {
   ActivityBulkMutationRequest,
@@ -177,6 +178,7 @@ export function useActivityMutations(
 
     // For duplicating, use nested asset object
     const createPayload: ActivityCreate = {
+      idempotencyKey: generateId("manual-duplicate"),
       accountId: restOfActivityData.accountId,
       activityType: restOfActivityData.activityType,
       subtype: restOfActivityData.subtype,

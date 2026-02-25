@@ -117,6 +117,13 @@ impl YahooProvider {
     fn convert_yahoo_error(&self, e: yahoo::YahooError, symbol: &str) -> MarketDataError {
         let error_msg = e.to_string();
 
+        // Detect no-data boundary from Yahoo API error message
+        if error_msg.contains("Data doesn't exist for startDate")
+            || error_msg.contains("No data found, symbol may be delisted")
+        {
+            return MarketDataError::NoDataForRange;
+        }
+
         // Detect rate limiting from error message
         if error_msg.contains("Too many requests")
             || error_msg.contains("rate limit")
@@ -1210,5 +1217,19 @@ mod tests {
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].name, "BARC.L");
         assert_eq!(results[0].currency, None);
+    }
+
+    #[test]
+    fn test_no_data_range_error_message_detection() {
+        let provider = YahooProvider {
+            connector: yahoo::YahooConnector::new().expect("Failed to initialize Yahoo connector"),
+        };
+        let err = yahoo::YahooError::FetchFailed(
+            "yahoo! finance returned api error: YErrorMessage { code: Some(\"Bad Request\") description: Some(\"Data doesn't exist for startDate = 1747094400 endDate = 1750118399\") }"
+                .to_string(),
+        );
+
+        let mapped = provider.convert_yahoo_error(err, "TEST");
+        assert!(matches!(mapped, MarketDataError::NoDataForRange));
     }
 }

@@ -515,7 +515,7 @@ export function NetWorthContent({ onAddAsset, onAddLiability }: NetWorthContentP
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:gap-20">
           {/* Left column: Breakdown */}
           <div className="lg:col-span-2">
-            <div className="mb-4 w-full">
+            <div className="mb-4 mt-8 w-full lg:mt-0">
               <h2 className="text-md pb-2 font-semibold tracking-tight">Breakdown</h2>
 
               {isLoading ? (

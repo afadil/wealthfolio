@@ -797,7 +797,51 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
 
 // Main provider that chooses enabled/disabled path based on configuration
 export function WealthfolioConnectProvider({ children }: { children: ReactNode }) {
-  if (!CONNECT_ENABLED) {
+  const [isCapabilityCheckComplete, setIsCapabilityCheckComplete] = useState(!CONNECT_ENABLED);
+  const [isCloudSyncAvailable, setIsCloudSyncAvailable] = useState(false);
+
+  useEffect(() => {
+    if (!CONNECT_ENABLED) return;
+
+    let cancelled = false;
+
+    void getPlatform()
+      .then((platform) => {
+        if (cancelled) return;
+        setIsCloudSyncAvailable(
+          platform.capabilities?.cloud_sync ?? platform.capabilities?.connect_sync ?? true,
+        );
+      })
+      .catch(() => {
+        // Fall back to enabled on detection errors to preserve current behavior.
+        if (cancelled) return;
+        setIsCloudSyncAvailable(true);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setIsCapabilityCheckComplete(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!isCapabilityCheckComplete) {
+    return (
+      <WealthfolioConnectContext.Provider
+        value={{
+          ...disabledContextValue,
+          isEnabled: true,
+          isInitializing: true,
+        }}
+      >
+        {children}
+      </WealthfolioConnectContext.Provider>
+    );
+  }
+
+  if (!CONNECT_ENABLED || !isCloudSyncAvailable) {
     return (
       <WealthfolioConnectContext.Provider value={disabledContextValue}>
         {children}

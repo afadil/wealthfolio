@@ -2,13 +2,20 @@
 //!
 //! Syncs broker data once on app startup. After that, user manually triggers sync.
 
+#[cfg(feature = "connect-sync")]
 use std::sync::Arc;
 
+#[cfg(feature = "connect-sync")]
 use log::{debug, info, warn};
+#[cfg(not(feature = "connect-sync"))]
+use tauri::AppHandle;
+#[cfg(feature = "connect-sync")]
 use tauri::AppHandle;
 
+#[cfg(feature = "connect-sync")]
 use wealthfolio_core::quotes::MarketSyncMode;
 
+#[cfg(feature = "connect-sync")]
 use crate::commands::brokers_sync::perform_broker_sync;
 use crate::context::ServiceContext;
 
@@ -18,12 +25,8 @@ use crate::context::ServiceContext;
 /// - Checks if user has an active subscription
 /// - Performs the sync silently (no toast - user didn't request it)
 /// - Triggers portfolio update if activities were synced
+#[cfg(feature = "connect-sync")]
 pub async fn run_startup_sync(handle: &AppHandle, context: &Arc<ServiceContext>) {
-    if !crate::services::is_connect_configured() {
-        debug!("Startup sync skipped: CONNECT_API_URL not configured");
-        return;
-    }
-
     info!("Running startup broker sync...");
 
     // Check subscription status first using ConnectService
@@ -100,3 +103,6 @@ pub async fn run_startup_sync(handle: &AppHandle, context: &Arc<ServiceContext>)
         }
     }
 }
+
+#[cfg(not(feature = "connect-sync"))]
+pub async fn run_startup_sync(_handle: &AppHandle, _context: &std::sync::Arc<ServiceContext>) {}

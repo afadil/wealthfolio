@@ -139,7 +139,7 @@ export function useSwingDashboard(ctx: AddonContext, period: PeriodType) {
           ? new PerformanceCalculator(closedTrades) // All trades for 'ALL' period
           : historicalCalculator; // Period-filtered for specific periods
 
-      const calendar = calendarCalculator.calculateCalendar(new Date().getFullYear(), fxRateMap);
+      const calendar = calendarCalculator.calculateCalendar(fxRateMap);
 
       // Calculate equity curve for the selected period (historical performance)
       const equityCurve = historicalCalculator.calculateEquityCurve(reportingCurrency, fxRateMap);
@@ -164,13 +164,28 @@ export function useSwingDashboard(ctx: AddonContext, period: PeriodType) {
  * Filter activities based on user preferences
  */
 function filterSelectedActivities(activities: any[], preferences: any) {
+  // First pass: collect symbols from selected BUY/SELL activities
+  const selectedSymbols = new Set<string>();
+  for (const activity of activities) {
+    if (activity.activityType === "SPLIT") continue;
+    const isSelected =
+      preferences.selectedActivityIds.includes(activity.id) ||
+      (preferences.includeSwingTag && activity.hasSwingTag);
+    if (isSelected) {
+      selectedSymbols.add(activity.assetSymbol);
+    }
+  }
+
+  // Second pass: include selected activities + SPLIT activities for those symbols
   return activities.filter((activity) => {
-    // Include if explicitly selected
+    if (activity.activityType === "SPLIT") {
+      return selectedSymbols.has(activity.assetSymbol);
+    }
+
     if (preferences.selectedActivityIds.includes(activity.id)) {
       return true;
     }
 
-    // Include if swing tag is enabled and activity has swing tag
     if (preferences.includeSwingTag && activity.hasSwingTag) {
       return true;
     }

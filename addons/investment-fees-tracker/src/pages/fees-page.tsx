@@ -126,7 +126,7 @@ export default function FeesPage({ ctx }: FeesPageProps) {
     <Page>
       <PageHeader heading="Fees Tracker" actions={headerActions} />
       <PageContent>
-        <div className="grid gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-3">
+        <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
           <FeeOverviewCards
             feeSummary={periodSummary}
             feeAnalytics={analyticsData}

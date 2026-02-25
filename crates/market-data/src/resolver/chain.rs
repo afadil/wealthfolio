@@ -252,9 +252,9 @@ mod tests {
         let chain = ResolverChain::new();
 
         let context = QuoteContext {
-            instrument: InstrumentId::Equity {
-                ticker: Arc::from("TEST"),
-                mic: Some("UNKNOWN_MIC".into()),
+            instrument: InstrumentId::Crypto {
+                base: Arc::from("BTC"),
+                quote: "USD".into(),
             },
             overrides: None,
             currency_hint: None,

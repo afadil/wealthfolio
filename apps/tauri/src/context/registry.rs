@@ -1,8 +1,4 @@
-use chrono::{DateTime, Utc};
-use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, RwLock};
-use tokio::sync::Mutex;
-use tokio::task::JoinHandle;
 use wealthfolio_ai::{AiProviderServiceTrait, ChatService};
 use wealthfolio_connect::BrokerSyncServiceTrait;
 use wealthfolio_core::{
@@ -11,38 +7,13 @@ use wealthfolio_core::{
     events::DomainEventSink,
     fx, goals, health, limits, portfolio, quotes, settings, taxonomies,
 };
-use wealthfolio_device_sync::DeviceEnrollService;
+use wealthfolio_device_sync::{engine::DeviceSyncRuntimeState, DeviceEnrollService};
 use wealthfolio_storage_sqlite::{
     portfolio::snapshot::SnapshotRepository, sync::AppSyncRepository,
 };
 
 use super::TauriAiEnvironment;
 use crate::services::ConnectService;
-
-#[derive(Debug, Default)]
-pub struct SnapshotPolicyState {
-    pub last_uploaded_at: Option<DateTime<Utc>>,
-    pub last_uploaded_cursor: i64,
-}
-
-#[derive(Debug)]
-pub struct DeviceSyncRuntimeState {
-    pub cycle_mutex: Mutex<()>,
-    pub background_task: Mutex<Option<JoinHandle<()>>>,
-    pub snapshot_policy: Mutex<SnapshotPolicyState>,
-    pub snapshot_upload_cancelled: AtomicBool,
-}
-
-impl DeviceSyncRuntimeState {
-    pub fn new() -> Self {
-        Self {
-            cycle_mutex: Mutex::new(()),
-            background_task: Mutex::new(None),
-            snapshot_policy: Mutex::new(SnapshotPolicyState::default()),
-            snapshot_upload_cancelled: AtomicBool::new(false),
-        }
-    }
-}
 
 pub struct ServiceContext {
     pub base_currency: Arc<RwLock<String>>,

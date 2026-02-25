@@ -33,7 +33,7 @@ export function usePullToRefresh({
 }: UsePullToRefreshOptions = {}): [boolean, PullToRefreshHandlers, PullToRefreshState] {
   const queryClient = useQueryClient();
   const { mutateAsync: triggerPortfolioUpdate } = useUpdatePortfolioMutation();
-  const triggerHapticFeedback = useHapticFeedback();
+  const { triggerHaptic: triggerHapticFeedback } = useHapticFeedback();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPulling, setIsPulling] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);

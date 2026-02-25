@@ -92,14 +92,17 @@ function MobileSidebar() {
           <span className="sr-only">Toggle menu</span>
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-[280px] p-0">
+      <SheetContent
+        side="left"
+        className="flex w-[280px] flex-col gap-0 px-0 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-[max(env(safe-area-inset-top),0.75rem)]"
+      >
         <SheetHeader className="sr-only">
           <SheetTitle>Conversations</SheetTitle>
         </SheetHeader>
         <div className="flex h-14 items-center border-b px-4">
           <span className="font-semibold">Conversations</span>
         </div>
-        <div className="p-3">
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
           <ThreadList />
         </div>
       </SheetContent>
@@ -218,21 +221,21 @@ function ChatShellInner({ className }: ChatShellProps) {
         <RecordActivityToolUI />
         <ImportCsvToolUI />
 
-        <div className={cn("bg-background flex h-full w-full", className)}>
+        <div className={cn("bg-background flex h-full min-h-0 w-full", className)}>
           {/* Desktop Sidebar */}
           <div className="hidden md:block">
             <Sidebar collapsed={sidebarCollapsed} />
           </div>
 
           {/* Main Content Area */}
-          <div className="flex flex-1 flex-col overflow-hidden">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <Header
               sidebarCollapsed={sidebarCollapsed}
               onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
             />
 
             {/* Thread (Chat Messages) */}
-            <main className="flex-1 overflow-hidden">
+            <main className="min-h-0 flex-1 overflow-hidden">
               <Thread composerActions={<ModelPicker />} />
             </main>
           </div>

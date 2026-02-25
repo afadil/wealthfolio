@@ -8,7 +8,6 @@ imports.
 ## Overview
 
 Wealthfolio uses a closed set of **14 canonical activity types**. Each activity
-type has specific semantics affecting:
 
 - **Cash Balance**: The cash position in the account (by currency)
 - **Asset Quantity**: The number of shares/units held
@@ -34,7 +33,7 @@ type has specific semantics affecting:
 | **CREDIT**       | Income   | +(amount - fee)      | No change         | No change          | Depends on subtype      | No             |
 | **FEE**          | Charge   | -amount              | No change         | No change          | No change               | Optional       |
 | **TAX**          | Charge   | -amount              | No change         | No change          | No change               | Optional       |
-| **ADJUSTMENT**   | Other    | Varies               | Varies            | Varies             | No change               | Optional       |
+| **ADJUSTMENT**   | Other    | Varies               | Varies            | Varies             | No change               | Yes (required) |
 | **UNKNOWN**      | Other    | No auto impact       | No auto impact    | No auto impact     | No change               | Optional       |
 
 ---
@@ -94,8 +93,9 @@ Fields**: `fee`, `amount`
 | **Cost Basis**       | Per-share cost adjusted (total cost unchanged) |
 | **Net Contribution** | No change                                      |
 
-**Required Fields**: `asset`, `quantity` (new total shares) **Optional Fields**:
-`metadata.split_ratio` (e.g., "2:1")
+**Required Fields**: `asset`, `amount` (split ratio, e.g., 2 for 2:1) **Optional
+Fields**: `metadata.split_ratio` (e.g., "2:1"), `quantity` (unused, use `amount`
+for ratio)
 
 **Example**: 2-for-1 split of 100 shares at $200/share
 
@@ -320,8 +320,8 @@ asset-specific taxes)
 | **Cost Basis**       | May change          |
 | **Net Contribution** | No change           |
 
-**Required Fields**: Varies by use case **Optional Fields**: `metadata` with
-adjustment details
+**Required Fields**: `asset`, varies by use case **Optional Fields**: `metadata`
+with adjustment details
 
 **Use Cases**:
 
@@ -530,11 +530,15 @@ BUY, SELL, SPLIT
 DIVIDEND, INTEREST
 ```
 
-### Cash-Only Types (no asset required)
+### Cash-Only Types (never have an asset)
 
 ```
-DEPOSIT, WITHDRAWAL, INTEREST, TRANSFER_IN, TRANSFER_OUT, TAX, FEE, CREDIT
+DEPOSIT, WITHDRAWAL, FEE, TAX, CREDIT
 ```
+
+**Note**: TRANSFER_IN/TRANSFER_OUT can be cash OR asset depending on whether
+quantity/price is provided. INTEREST can have an optional asset (e.g., bond
+interest).
 
 ---
 
@@ -552,7 +556,7 @@ DEPOSIT, WITHDRAWAL, INTEREST, TRANSFER_IN, TRANSFER_OUT, TAX, FEE, CREDIT
 | **TRANSFER_OUT** | Amount (cash) or Asset+Quantity (asset), Currency            |
 | **FEE**          | Amount or Fee, Currency                                      |
 | **TAX**          | Amount, Currency                                             |
-| **SPLIT**        | Asset, Quantity (new total)                                  |
+| **SPLIT**        | Asset, Amount (split ratio)                                  |
 | **CREDIT**       | Amount, Currency                                             |
 | **ADJUSTMENT**   | Varies                                                       |
 

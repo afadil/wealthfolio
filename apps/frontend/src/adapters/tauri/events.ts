@@ -75,6 +75,7 @@ export async function listenMarketSyncError<T>(handler: EventCallback<T>): Promi
   return adaptUnlisten(unlisten);
 }
 
+<<<<<<< HEAD
 export async function listenAssetEnrichmentStart<T>(handler: EventCallback<T>): Promise<UnlistenFn> {
   const unlisten = await listen<T>("asset:enrichment-start", adaptCallback(handler));
   return adaptUnlisten(unlisten);
@@ -95,6 +96,8 @@ export async function listenAssetEnrichmentProgress<T>(handler: EventCallback<T>
   return adaptUnlisten(unlisten);
 }
 
+=======
+>>>>>>> v3.0.0
 export async function listenBrokerSyncStart<T>(handler: EventCallback<T>): Promise<UnlistenFn> {
   const unlisten = await listen<T>("broker:sync-start", adaptCallback(handler));
   return adaptUnlisten(unlisten);

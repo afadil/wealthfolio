@@ -41,5 +41,39 @@ export function useHapticFeedback() {
     })();
   }, [isMobile, isTauri]);
 
-  return triggerHaptic;
+  const triggerHapticPattern = useCallback(
+    (count = 3, intervalMs = 80) => {
+      if (!isMobile || !isTauri) {
+        return;
+      }
+
+      void (async () => {
+        try {
+          const haptics = await loadHapticsModule();
+          const hasVibrate = typeof haptics.vibrate === "function";
+
+          if (hasVibrate) {
+            await haptics.vibrate(50);
+            for (let i = 1; i < count; i++) {
+              await new Promise((resolve) => setTimeout(resolve, intervalMs));
+              await haptics.vibrate(50);
+            }
+          } else if (typeof haptics.impactFeedback === "function") {
+            await haptics.impactFeedback("medium");
+            for (let i = 1; i < count; i++) {
+              await new Promise((resolve) => setTimeout(resolve, intervalMs));
+              await haptics.impactFeedback("medium");
+            }
+          }
+        } catch (unknownError) {
+          if (import.meta.env.DEV) {
+            console.warn("Haptic feedback unavailable:", unknownError);
+          }
+        }
+      })();
+    },
+    [isMobile, isTauri],
+  );
+
+  return { triggerHaptic, triggerHapticPattern };
 }

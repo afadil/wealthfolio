@@ -23,6 +23,7 @@ import { QueryKeys } from "@/lib/query-keys";
 import { generateId } from "@/lib/id";
 import { AI_THREADS_KEY } from "./use-threads";
 import { deleteAiThread, getAiThreadMessages, updateAiThread } from "@/adapters";
+import { useHapticFeedback } from "@/hooks";
 
 function deriveInitialThreadTitle(firstUserMessage: string): string {
   const normalized = firstUserMessage.replace(/\s+/g, " ").trim();
@@ -386,6 +387,10 @@ export function useChatRuntime(config?: ChatModelConfig) {
   // Abort controller for cancelling streams
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Haptic feedback for streaming start
+  const { triggerHapticPattern } = useHapticFeedback();
+  const hapticTriggeredRef = useRef(false);
+
   const setCurrentThreadId = useCallback((threadId: string | null) => {
     threadIdRef.current = threadId;
     setCurrentThreadIdState(threadId);
@@ -622,6 +627,11 @@ export function useChatRuntime(config?: ChatModelConfig) {
             }
 
             case "textDelta":
+              // Trigger haptic pattern when streaming starts (first text delta)
+              if (!hapticTriggeredRef.current) {
+                hapticTriggeredRef.current = true;
+                triggerHapticPattern(3, 80);
+              }
               // Append to existing text part or create new one
               if (textPartIndex !== null) {
                 const part = streamParts[textPartIndex];

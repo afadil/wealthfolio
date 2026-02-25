@@ -36,6 +36,7 @@
 
 mod client;
 pub mod crypto;
+pub mod engine;
 mod enroll_service;
 mod error;
 mod types;

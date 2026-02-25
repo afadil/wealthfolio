@@ -1,3 +1,4 @@
+import { usePersistentState } from "@/hooks/use-persistent-state";
 import type { ToolCallMessagePartProps } from "@assistant-ui/react";
 import { makeAssistantToolUI } from "@assistant-ui/react";
 import {
@@ -21,12 +22,14 @@ import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { ResponsiveContainer, Treemap, Tooltip as ChartTooltip } from "recharts";
 import { useSettingsContext } from "@/lib/settings-provider";
+import { AnimatedToggleGroup } from "@wealthfolio/ui";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 type ViewMode = "table" | "treemap" | "both";
+type ReturnType = "daily" | "total";
 
 interface GetHoldingsArgs {
   accountId?: string;
@@ -325,6 +328,11 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
   const { isBalanceHidden } = useBalancePrivacy();
   const parsed = normalizeResult(result, baseCurrency);
 
+  const [returnType, setReturnType] = usePersistentState<ReturnType>(
+    "ai-holdings-return-type",
+    "daily",
+  );
+
   // Sort holdings by marketValueBase descending
   const sortedHoldings = useMemo(() => {
     if (!parsed?.holdings) return [];
@@ -346,24 +354,24 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
     return { totalValue: value, totalGain: gain, totalGainPct: gainPct };
   }, [parsed?.totalValue, sortedHoldings]);
 
-  // Prepare treemap data for daily performance visualization
-  // Note: dayChangePct from backend is in decimal form (e.g., -0.1579 for -15.79%)
-  const { treemapData, hasDayChangeData, totalDayChange } = useMemo(() => {
+  // Prepare treemap data based on returnType
+  // Note: dayChangePct and unrealizedGainPct from backend are in decimal form (e.g., -0.1579 for -15.79%)
+  const { treemapData, hasData, totalChange } = useMemo(() => {
     let maxGain = -Infinity;
     let minGain = Infinity;
-    let totalDayChangeAmount = 0;
-    let hasDayData = false;
+    let totalChangeAmount = 0;
+    let hasAnyData = false;
 
     const data = sortedHoldings
       .filter((h) => h.marketValueBase > 0)
       .map((h) => {
-        // dayChangePct is already in decimal form (e.g., -0.1579 for -15.79%)
-        const gain = h.dayChangePct ?? 0;
-        if (h.dayChangePct != null) {
-          hasDayData = true;
+        const gain = returnType === "daily" ? (h.dayChangePct ?? 0) : (h.unrealizedGainPct ?? 0);
+
+        if (gain !== 0) {
+          hasAnyData = true;
           maxGain = Math.max(maxGain, gain);
           minGain = Math.min(minGain, gain);
-          totalDayChangeAmount += h.marketValueBase * gain;
+          totalChangeAmount += h.marketValueBase * gain;
         }
         return {
           symbol: h.symbol,
@@ -373,17 +381,16 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
         };
       });
 
-    // Add min/max to each item
     const treemapData = data.map((item) => ({
       ...item,
       maxGain: maxGain === -Infinity ? 0 : maxGain,
       minGain: minGain === Infinity ? 0 : minGain,
     }));
 
-    const totalDayChangePct = totalValue > 0 ? totalDayChangeAmount / totalValue : 0;
+    const totalChangePct = totalValue > 0 ? totalChangeAmount / totalValue : 0;
 
-    return { treemapData, hasDayChangeData: hasDayData, totalDayChange: totalDayChangePct };
-  }, [sortedHoldings, totalValue]);
+    return { treemapData, hasData: hasAnyData, totalChange: totalChangePct };
+  }, [sortedHoldings, totalValue, returnType]);
 
   const accountLabel = parsed?.accountScope ?? args?.accountId ?? "TOTAL";
   const isLoading = status?.type === "running";
@@ -476,16 +483,17 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
 
   // Determine view mode: use response viewMode, fallback to args, then default to "treemap"
   const viewMode = parsed?.viewMode ?? args?.viewMode ?? "treemap";
-  const canShowTreemap = hasDayChangeData && treemapData.length > 0;
+  const canShowTreemap = hasData && treemapData.length > 0;
+  const returnLabel = returnType === "daily" ? "Today" : "Total Return";
 
   // Treemap view component
   const TreemapView = () => (
     <div className="pb-2 pt-4">
       <div className="flex flex-wrap items-start justify-between gap-2 px-4 pb-2">
         <div>
-          <p className="text-sm font-medium">Your Portfolio Today</p>
+          <p className="text-sm font-medium">Your Portfolio {returnLabel}</p>
           <p className="text-muted-foreground mt-1 text-xs">
-            {holdingsCount} position{holdingsCount !== 1 ? "s" : ""} · Today
+            {holdingsCount} position{holdingsCount !== 1 ? "s" : ""} · {returnLabel}
             {accountLabel !== "TOTAL" && (
               <Badge variant="outline" className="ml-2 text-xs uppercase">
                 {accountLabel}
@@ -499,11 +507,11 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
             <p
               className={cn(
                 "text-sm font-medium",
-                totalDayChange >= 0 ? "text-success" : "text-destructive",
+                totalChange >= 0 ? "text-success" : "text-destructive",
               )}
             >
-              {totalDayChange > 0 ? "+" : ""}
-              {formatPercent(totalDayChange)} today
+              {totalChange > 0 ? "+" : ""}
+              {formatPercent(totalChange)} {returnLabel === "Today" ? "today" : "total"}
             </p>
           )}
         </div>
@@ -524,100 +532,128 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
   );
 
   // Table view component
-  const TableView = ({ showHeader = true }: { showHeader?: boolean }) => (
-    <>
-      {showHeader && (
-        <div className="flex flex-wrap items-start justify-between gap-2 px-4 pb-2">
-          <div>
-            <p className="text-sm font-medium">Holdings</p>
-            <p className="text-muted-foreground mt-1 text-xs">
-              {holdingsCount} position{holdingsCount !== 1 ? "s" : ""}
-              {accountLabel !== "TOTAL" && (
-                <Badge variant="outline" className="ml-2 text-xs uppercase">
-                  {accountLabel}
-                </Badge>
-              )}
-              {parsed?.truncated && parsed.originalCount && (
-                <Badge variant="secondary" className="ml-1 text-xs">
-                  {holdingsCount} / {parsed.originalCount}
-                </Badge>
-              )}
-            </p>
-          </div>
-          <div className="text-right">
-            <span className="text-xl font-bold">{formatValue(totalValue)}</span>
-            {!isBalanceHidden && (
-              <p
-                className={cn(
-                  "text-sm font-medium",
-                  totalGain >= 0 ? "text-success" : "text-destructive",
+  const TableView = ({ showHeader = true }: { showHeader?: boolean }) => {
+    const gainPct = returnType === "daily" ? totalChange : totalGainPct;
+    const gainAmount = returnType === "daily" ? totalValue * totalChange : totalGain;
+
+    return (
+      <>
+        {showHeader && (
+          <div className="flex flex-wrap items-start justify-between gap-2 px-4 pb-2">
+            <div>
+              <p className="text-sm font-medium">Holdings {returnLabel}</p>
+              <p className="text-muted-foreground mt-1 text-xs">
+                {holdingsCount} position{holdingsCount !== 1 ? "s" : ""}
+                {accountLabel !== "TOTAL" && (
+                  <Badge variant="outline" className="ml-2 text-xs uppercase">
+                    {accountLabel}
+                  </Badge>
                 )}
-              >
-                {totalGain > 0 ? "+" : ""}
-                {formatAmount(totalGain, currency)} ({totalGainPct > 0 ? "+" : ""}
-                {formatPercent(totalGainPct)})
+                {parsed?.truncated && parsed.originalCount && (
+                  <Badge variant="secondary" className="ml-1 text-xs">
+                    {holdingsCount} / {parsed.originalCount}
+                  </Badge>
+                )}
               </p>
-            )}
-          </div>
-        </div>
-      )}
-      <div className="max-h-[320px] overflow-y-auto">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="pl-4 text-xs">Symbol</TableHead>
-              <TableHead className="text-right text-xs">Value</TableHead>
-              <TableHead className="hidden text-right text-xs sm:table-cell">Weight</TableHead>
-              <TableHead className="pr-4 text-right text-xs">Gain</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedHoldings.map((holding) => (
-              <TableRow key={`${holding.account}-${holding.symbol}`} className="text-xs">
-                <TableCell className="py-2 pl-4">
-                  <div>
-                    <div className="font-medium">{holding.symbol}</div>
-                    {holding.name && (
-                      <div className="text-muted-foreground max-w-[120px] truncate text-[10px] sm:max-w-[200px]">
-                        {holding.name}
-                      </div>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="py-2 text-right font-medium tabular-nums">
-                  <div>{formatValue(holding.marketValueBase)}</div>
-                  <div className="text-muted-foreground text-[10px]">{holding.currency}</div>
-                </TableCell>
-                <TableCell className="hidden py-2 text-right tabular-nums sm:table-cell">
-                  {(holding.weight * 100).toFixed(1)}%
-                </TableCell>
-                <TableCell className="py-2 pr-4 text-right">
-                  {holding.unrealizedGainPct != null ? (
-                    <span
-                      className={cn(
-                        "tabular-nums",
-                        holding.unrealizedGainPct >= 0 ? "text-success" : "text-destructive",
-                      )}
-                    >
-                      {holding.unrealizedGainPct > 0 ? "+" : ""}
-                      {formatPercent(holding.unrealizedGainPct)}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">-</span>
+            </div>
+            <div className="text-right">
+              <span className="text-xl font-bold">{formatValue(totalValue)}</span>
+              {!isBalanceHidden && (
+                <p
+                  className={cn(
+                    "text-sm font-medium",
+                    gainAmount >= 0 ? "text-success" : "text-destructive",
                   )}
-                </TableCell>
+                >
+                  {gainAmount > 0 ? "+" : ""}
+                  {formatAmount(gainAmount, currency)} ({gainPct > 0 ? "+" : ""}
+                  {formatPercent(gainPct)})
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+        <div className="max-h-[320px] overflow-y-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="pl-4 text-xs">Symbol</TableHead>
+                <TableHead className="text-right text-xs">Value</TableHead>
+                <TableHead className="hidden text-right text-xs sm:table-cell">Weight</TableHead>
+                <TableHead className="pr-4 text-right text-xs">
+                  {returnType === "daily" ? "Today" : "Total"}
+                </TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    </>
-  );
+            </TableHeader>
+            <TableBody>
+              {sortedHoldings.map((holding) => {
+                const tableGainPct =
+                  returnType === "daily"
+                    ? (holding.dayChangePct ?? null)
+                    : (holding.unrealizedGainPct ?? null);
+                return (
+                  <TableRow key={`${holding.account}-${holding.symbol}`} className="text-xs">
+                    <TableCell className="py-2 pl-4">
+                      <div>
+                        <div className="font-medium">{holding.symbol}</div>
+                        {holding.name && (
+                          <div className="text-muted-foreground max-w-[120px] truncate text-[10px] sm:max-w-[200px]">
+                            {holding.name}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-2 text-right font-medium tabular-nums">
+                      <div>{formatValue(holding.marketValueBase)}</div>
+                      <div className="text-muted-foreground text-[10px]">{holding.currency}</div>
+                    </TableCell>
+                    <TableCell className="hidden py-2 text-right tabular-nums sm:table-cell">
+                      {(holding.weight * 100).toFixed(1)}%
+                    </TableCell>
+                    <TableCell className="py-2 pr-4 text-right">
+                      {tableGainPct != null ? (
+                        <span
+                          className={cn(
+                            "tabular-nums",
+                            tableGainPct >= 0 ? "text-success" : "text-destructive",
+                          )}
+                        >
+                          {tableGainPct > 0 ? "+" : ""}
+                          {formatPercent(tableGainPct)}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </>
+    );
+  };
 
   // Render based on viewMode
+  const ReturnTypeToggle = (
+    <AnimatedToggleGroup
+      items={[
+        { value: "daily", label: "Daily" },
+        { value: "total", label: "Total" },
+      ]}
+      value={returnType}
+      onValueChange={(value: ReturnType) => setReturnType(value)}
+      size="sm"
+    />
+  );
+
   if (viewMode === "both" && canShowTreemap) {
     return (
       <Card className="bg-muted/40 border-primary/10 w-full overflow-hidden">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0">
+          {ReturnTypeToggle}
+        </CardHeader>
         <CardContent className="p-0">
           <TreemapView />
           <div className="border-t pt-2">
@@ -631,6 +667,9 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
   if (viewMode === "treemap" && canShowTreemap) {
     return (
       <Card className="bg-muted/40 border-primary/10 w-full overflow-hidden">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0">
+          {ReturnTypeToggle}
+        </CardHeader>
         <CardContent className="p-0">
           <TreemapView />
         </CardContent>
@@ -641,6 +680,9 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
   // Table view (default fallback)
   return (
     <Card className="bg-muted/40 border-primary/10 w-full overflow-hidden">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0">
+        {ReturnTypeToggle}
+      </CardHeader>
       <CardContent className="px-0 pb-0 pt-4">
         <TableView />
       </CardContent>

@@ -76,7 +76,7 @@ pub async fn sync_broker_data(
     app: AppHandle,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<(), String> {
-    info!("[Connect] Starting broker data sync (non-blocking)...");
+    info!("[Connect] Starting broker data sync ...");
 
     // Clone what we need for the spawned task
     let context = state.inner().clone();
@@ -173,12 +173,11 @@ pub async fn get_platforms(state: State<'_, Arc<ServiceContext>>) -> Result<Vec<
 pub async fn list_broker_connections(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Vec<BrokerConnection>, String> {
-    info!("Fetching broker connections from cloud API...");
+    debug!("Fetching broker connections from cloud API...");
 
     let client = state.connect_service().get_api_client()?;
     let connections = client.list_connections().await.map_err(|e| e.to_string())?;
 
-    info!("Found {} broker connections", connections.len());
     Ok(connections)
 }
 
@@ -188,7 +187,7 @@ pub async fn list_broker_connections(
 pub async fn list_broker_accounts(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Vec<BrokerAccount>, String> {
-    info!("Fetching broker accounts from cloud API...");
+    debug!("Fetching broker accounts from cloud API...");
 
     let client = state.connect_service().get_api_client()?;
     let accounts = client
@@ -196,7 +195,6 @@ pub async fn list_broker_accounts(
         .await
         .map_err(|e| e.to_string())?;
 
-    info!("Found {} broker accounts", accounts.len());
     Ok(accounts)
 }
 
@@ -209,14 +207,11 @@ pub async fn list_broker_accounts(
 pub async fn get_subscription_plans(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<PlansResponse, String> {
-    info!("Fetching subscription plans from cloud API...");
+    debug!("Fetching subscription plans from cloud API...");
 
     let client = state.connect_service().get_api_client()?;
     match client.get_subscription_plans().await {
-        Ok(response) => {
-            info!("Found {} subscription plans", response.plans.len());
-            Ok(response)
-        }
+        Ok(response) => Ok(response),
         Err(e) => {
             error!("Failed to get subscription plans: {}", e);
             Err(e.to_string())
@@ -229,13 +224,9 @@ pub async fn get_subscription_plans(
 pub async fn get_subscription_plans_public() -> Result<PlansResponse, String> {
     info!("Fetching subscription plans from cloud API (public)...");
 
-    let base_url = std::env::var("CONNECT_API_URL")
-        .ok()
-        .map(|v| v.trim().trim_end_matches('/').to_string())
-        .filter(|v| !v.is_empty())
-        .ok_or_else(|| {
-            "CONNECT_API_URL not configured. Connect API operations are disabled.".to_string()
-        })?;
+    let base_url = crate::services::cloud_api_base_url().ok_or_else(|| {
+        "Cloud API base URL is unavailable. Connect API operations are disabled.".to_string()
+    })?;
 
     match fetch_subscription_plans_public(&base_url).await {
         Ok(response) => {
@@ -252,17 +243,11 @@ pub async fn get_subscription_plans_public() -> Result<PlansResponse, String> {
 /// Get current user info from the cloud API
 #[tauri::command]
 pub async fn get_user_info(state: State<'_, Arc<ServiceContext>>) -> Result<UserInfo, String> {
-    info!("Fetching user info from cloud API...");
+    debug!("Fetching user info from cloud API...");
 
     let client = state.connect_service().get_api_client()?;
     match client.get_user_info().await {
-        Ok(user_info) => {
-            info!(
-                "User info retrieved for: {}",
-                user_info.email.as_deref().unwrap_or("unknown")
-            );
-            Ok(user_info)
-        }
+        Ok(user_info) => Ok(user_info),
         Err(e) => {
             error!("Failed to get user info: {}", e);
             Err(e.to_string())
@@ -278,7 +263,7 @@ pub async fn get_user_info(state: State<'_, Arc<ServiceContext>>) -> Result<User
 #[tauri::command]
 pub async fn get_broker_sync_states(
     state: State<'_, Arc<ServiceContext>>,
-) -> Result<Vec<wealthfolio_core::sync::BrokerSyncState>, String> {
+) -> Result<Vec<wealthfolio_connect::BrokerSyncState>, String> {
     debug!("Fetching all broker sync states...");
     state
         .sync_service()
@@ -290,7 +275,7 @@ pub async fn get_broker_sync_states(
 #[tauri::command]
 pub async fn get_broker_ingest_states(
     state: State<'_, Arc<ServiceContext>>,
-) -> Result<Vec<wealthfolio_core::sync::BrokerSyncState>, String> {
+) -> Result<Vec<wealthfolio_connect::BrokerSyncState>, String> {
     get_broker_sync_states(state).await
 }
 
@@ -301,7 +286,7 @@ pub async fn get_import_runs(
     limit: Option<i64>,
     offset: Option<i64>,
     state: State<'_, Arc<ServiceContext>>,
-) -> Result<Vec<wealthfolio_core::sync::ImportRun>, String> {
+) -> Result<Vec<wealthfolio_connect::ImportRun>, String> {
     let limit = limit.unwrap_or(50);
     let offset = offset.unwrap_or(0);
     debug!(
@@ -322,7 +307,7 @@ pub async fn get_data_import_runs(
     limit: Option<i64>,
     offset: Option<i64>,
     state: State<'_, Arc<ServiceContext>>,
-) -> Result<Vec<wealthfolio_core::sync::ImportRun>, String> {
+) -> Result<Vec<wealthfolio_connect::ImportRun>, String> {
     get_import_runs(run_type, limit, offset, state).await
 }
 

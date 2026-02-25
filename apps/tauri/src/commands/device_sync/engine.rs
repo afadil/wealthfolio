@@ -1,654 +1,325 @@
-//! Sync cycle engine: push/pull/replay and background loop.
+//! Tauri adapter for device sync engine orchestration.
 
-use chrono::Utc;
-use log::{debug, info};
 use std::sync::Arc;
 
+use async_trait::async_trait;
+
 use crate::context::ServiceContext;
-use wealthfolio_core::sync::{
-    backoff_seconds as core_sync_backoff_seconds, SyncEntity, SyncOperation,
-    DEVICE_SYNC_FOREGROUND_INTERVAL_SECS, DEVICE_SYNC_INTERVAL_JITTER_SECS,
+use wealthfolio_core::events::DomainEvent;
+use wealthfolio_device_sync::engine::{
+    CredentialStore, OutboxStore, ReplayEvent, ReplayStore, SyncIdentity, SyncTransport,
+    TransportError,
 };
-use wealthfolio_device_sync::{ApiRetryClass, SyncPushEventRequest, SyncPushRequest, SyncState};
-
-use super::{
-    create_client, decrypt_sync_payload, encrypt_sync_payload, get_access_token,
-    get_sync_identity_from_store, millis_until_rfc3339, parse_event_operation,
-    persist_device_config_from_identity, retry_class_code, sync_entity_name, sync_operation_name,
-    SyncCycleResult,
+use wealthfolio_device_sync::{
+    ReconcileReadyStateResponse, SyncPullResponse, SyncPushRequest, SyncPushResponse, SyncState,
 };
 
-use super::snapshot::maybe_generate_snapshot_for_policy;
-
-/// A decoded remote event ready for LWW replay.
-struct DecodedRemoteEvent {
-    entity: SyncEntity,
-    entity_id: String,
-    op: SyncOperation,
-    event_id: String,
-    client_timestamp: String,
-    seq: i64,
-    payload: serde_json::Value,
-}
-
-/// Tracks mutable progress during a sync cycle and provides a helper to record failures.
-struct CycleContext {
-    sync_repo: Arc<wealthfolio_storage_sqlite::sync::AppSyncRepository>,
-    started_at: std::time::Instant,
-    lock_version: i64,
-    local_cursor: i64,
-    pushed_count: usize,
-    pulled_count: usize,
-}
-
-impl CycleContext {
-    /// Record a cycle failure: persist error + outcome, then return a result.
-    async fn fail(
-        &self,
-        status: &str,
-        message: String,
-        retry_secs: Option<i64>,
-    ) -> Result<SyncCycleResult, String> {
-        self.sync_repo
-            .mark_engine_error(message)
-            .await
-            .map_err(|e| e.to_string())?;
-        let retry_at = retry_secs.map(|s| (Utc::now() + chrono::Duration::seconds(s)).to_rfc3339());
-        let _ = self
-            .sync_repo
-            .mark_cycle_outcome(
-                status.to_string(),
-                self.started_at.elapsed().as_millis() as i64,
-                retry_at,
-            )
-            .await;
-        Ok(SyncCycleResult {
-            status: status.to_string(),
-            lock_version: self.lock_version,
-            pushed_count: self.pushed_count,
-            pulled_count: self.pulled_count,
-            cursor: self.local_cursor,
-            needs_bootstrap: status == "stale_cursor",
-        })
+fn transport_err_from_sync(e: wealthfolio_device_sync::DeviceSyncError) -> TransportError {
+    TransportError {
+        message: e.to_string(),
+        retry_class: e.retry_class(),
+        error_code: e.error_code().map(|s| s.to_string()),
+        details: match &e {
+            wealthfolio_device_sync::DeviceSyncError::Api { details, .. } => details.clone(),
+            _ => None,
+        },
     }
 }
 
-/// Runs one sync engine cycle (push + pull skeleton with backoff and stale cursor handling).
+fn transport_err_permanent(message: String) -> TransportError {
+    TransportError {
+        message,
+        retry_class: wealthfolio_device_sync::ApiRetryClass::Permanent,
+        error_code: None,
+        details: None,
+    }
+}
+use wealthfolio_storage_sqlite::sync::SqliteSyncEngineDbPorts;
+
+use super::{
+    create_client, decrypt_sync_payload, encrypt_sync_payload, get_access_token,
+    get_sync_identity_from_store, persist_device_config_from_identity, SyncCycleResult,
+};
+
+struct TauriEnginePorts {
+    context: Arc<ServiceContext>,
+    db: SqliteSyncEngineDbPorts,
+}
+
+impl TauriEnginePorts {
+    fn new(context: Arc<ServiceContext>) -> Self {
+        let db = SqliteSyncEngineDbPorts::new(context.app_sync_repository());
+        Self { context, db }
+    }
+
+    fn to_parent_identity(identity: &SyncIdentity) -> super::SyncIdentity {
+        super::SyncIdentity {
+            device_id: identity.device_id.clone(),
+            root_key: identity.root_key.clone(),
+            key_version: identity.key_version,
+        }
+    }
+}
+
+#[async_trait]
+impl OutboxStore for TauriEnginePorts {
+    async fn list_pending_outbox(
+        &self,
+        limit: i64,
+    ) -> Result<Vec<wealthfolio_core::sync::SyncOutboxEvent>, String> {
+        self.db.list_pending_outbox(limit).await
+    }
+
+    async fn mark_outbox_dead(
+        &self,
+        event_ids: Vec<String>,
+        error_message: Option<String>,
+        error_code: Option<String>,
+    ) -> Result<(), String> {
+        self.db
+            .mark_outbox_dead(event_ids, error_message, error_code)
+            .await
+    }
+
+    async fn mark_outbox_sent(&self, event_ids: Vec<String>) -> Result<(), String> {
+        self.db.mark_outbox_sent(event_ids).await
+    }
+
+    async fn schedule_outbox_retry(
+        &self,
+        event_ids: Vec<String>,
+        delay_seconds: i64,
+        error_message: Option<String>,
+        error_code: Option<String>,
+    ) -> Result<(), String> {
+        self.db
+            .schedule_outbox_retry(event_ids, delay_seconds, error_message, error_code)
+            .await
+    }
+
+    async fn mark_push_completed(&self) -> Result<(), String> {
+        self.db.mark_push_completed().await
+    }
+
+    async fn has_pending_outbox(&self) -> Result<bool, String> {
+        self.db.has_pending_outbox().await
+    }
+}
+
+#[async_trait]
+impl ReplayStore for TauriEnginePorts {
+    async fn acquire_cycle_lock(&self) -> Result<i64, String> {
+        self.db.acquire_cycle_lock().await
+    }
+
+    async fn verify_cycle_lock(&self, lock_version: i64) -> Result<bool, String> {
+        self.db.verify_cycle_lock(lock_version).await
+    }
+
+    async fn get_cursor(&self) -> Result<i64, String> {
+        self.db.get_cursor().await
+    }
+
+    async fn set_cursor(&self, cursor: i64) -> Result<(), String> {
+        self.db.set_cursor(cursor).await
+    }
+
+    async fn apply_remote_events_lww_batch(
+        &self,
+        events: Vec<ReplayEvent>,
+    ) -> Result<usize, String> {
+        self.db.apply_remote_events_lww_batch(events).await
+    }
+
+    async fn apply_remote_event_lww(&self, event: ReplayEvent) -> Result<bool, String> {
+        self.db.apply_remote_event_lww(event).await
+    }
+
+    async fn mark_pull_completed(&self) -> Result<(), String> {
+        self.db.mark_pull_completed().await
+    }
+
+    async fn mark_cycle_outcome(
+        &self,
+        status: String,
+        duration_ms: i64,
+        next_retry_at: Option<String>,
+    ) -> Result<(), String> {
+        self.db
+            .mark_cycle_outcome(status, duration_ms, next_retry_at)
+            .await
+    }
+
+    async fn mark_engine_error(&self, message: String) -> Result<(), String> {
+        self.db.mark_engine_error(message).await
+    }
+
+    async fn prune_applied_events_up_to_seq(&self, seq: i64) -> Result<(), String> {
+        self.db.prune_applied_events_up_to_seq(seq).await
+    }
+
+    async fn get_engine_status(&self) -> Result<wealthfolio_core::sync::SyncEngineStatus, String> {
+        self.db.get_engine_status().await
+    }
+
+    async fn on_pull_complete(&self, pulled_count: usize) -> Result<(), String> {
+        if pulled_count > 0 {
+            self.context
+                .domain_event_sink
+                .emit(DomainEvent::device_sync_pull_complete());
+        }
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl SyncTransport for TauriEnginePorts {
+    async fn get_events_cursor(
+        &self,
+        token: &str,
+        device_id: &str,
+    ) -> Result<wealthfolio_device_sync::SyncCursorResponse, TransportError> {
+        create_client()
+            .map_err(transport_err_permanent)?
+            .get_events_cursor(token, device_id)
+            .await
+            .map_err(transport_err_from_sync)
+    }
+
+    async fn push_events(
+        &self,
+        token: &str,
+        device_id: &str,
+        request: SyncPushRequest,
+    ) -> Result<SyncPushResponse, TransportError> {
+        create_client()
+            .map_err(transport_err_permanent)?
+            .push_events(token, device_id, request)
+            .await
+            .map_err(transport_err_from_sync)
+    }
+
+    async fn pull_events(
+        &self,
+        token: &str,
+        device_id: &str,
+        from_cursor: Option<i64>,
+        limit: Option<i64>,
+    ) -> Result<SyncPullResponse, TransportError> {
+        create_client()
+            .map_err(transport_err_permanent)?
+            .pull_events(
+                token,
+                device_id,
+                from_cursor,
+                limit.map(|value| value as i32),
+            )
+            .await
+            .map_err(transport_err_from_sync)
+    }
+
+    async fn get_reconcile_ready_state(
+        &self,
+        token: &str,
+        device_id: &str,
+    ) -> Result<ReconcileReadyStateResponse, TransportError> {
+        create_client()
+            .map_err(transport_err_permanent)?
+            .get_reconcile_ready_state(token, device_id)
+            .await
+            .map_err(transport_err_from_sync)
+    }
+}
+
+#[async_trait]
+impl CredentialStore for TauriEnginePorts {
+    fn get_sync_identity(&self) -> Option<SyncIdentity> {
+        get_sync_identity_from_store().map(|identity| SyncIdentity {
+            device_id: identity.device_id,
+            root_key: identity.root_key,
+            key_version: identity.key_version,
+        })
+    }
+
+    fn get_access_token(&self) -> Result<String, String> {
+        get_access_token()
+    }
+
+    async fn get_sync_state(&self) -> Result<SyncState, String> {
+        self.context
+            .device_enroll_service()
+            .get_sync_state()
+            .await
+            .map(|value| value.state)
+            .map_err(|err| err.message)
+    }
+
+    async fn persist_device_config(&self, identity: &SyncIdentity, trust_state: &str) {
+        let identity = Self::to_parent_identity(identity);
+        persist_device_config_from_identity(self.context.as_ref(), &identity, trust_state).await;
+    }
+
+    fn encrypt_sync_payload(
+        &self,
+        plaintext_payload: &str,
+        identity: &SyncIdentity,
+        payload_key_version: i32,
+    ) -> Result<String, String> {
+        encrypt_sync_payload(
+            plaintext_payload,
+            &Self::to_parent_identity(identity),
+            payload_key_version,
+        )
+    }
+
+    fn decrypt_sync_payload(
+        &self,
+        encrypted_payload: &str,
+        identity: &SyncIdentity,
+        payload_key_version: i32,
+    ) -> Result<String, String> {
+        decrypt_sync_payload(
+            encrypted_payload,
+            &Self::to_parent_identity(identity),
+            payload_key_version,
+        )
+    }
+}
+
 pub(super) async fn run_sync_cycle(
     context: Arc<ServiceContext>,
 ) -> Result<SyncCycleResult, String> {
     let runtime = context.device_sync_runtime();
-    let _cycle_guard = runtime.cycle_mutex.lock().await;
-    let cycle_started_at = std::time::Instant::now();
-    let sync_repo = context.app_sync_repository();
+    let ports = TauriEnginePorts::new(Arc::clone(&context));
+    let result = runtime.run_cycle(&ports).await?;
 
-    let mut ctx = CycleContext {
-        sync_repo: sync_repo.clone(),
-        started_at: cycle_started_at,
-        lock_version: 0,
-        local_cursor: sync_repo.get_cursor().unwrap_or(0),
-        pushed_count: 0,
-        pulled_count: 0,
-    };
-
-    let identity = match get_sync_identity_from_store() {
-        Some(value) => value,
-        None => {
-            return ctx
-                .fail(
-                    "config_error",
-                    "No sync identity configured. Please enable sync first.".to_string(),
-                    None,
-                )
-                .await;
-        }
-    };
-    let device_id = match identity.device_id.clone() {
-        Some(value) => value,
-        None => {
-            return ctx
-                .fail("config_error", "No device ID configured".to_string(), None)
-                .await;
-        }
-    };
-
-    let runtime_state = match context.device_enroll_service().get_sync_state().await {
-        Ok(value) => value,
-        Err(err) => {
-            return ctx
-                .fail(
-                    "state_error",
-                    format!("Failed to read sync state: {}", err.message),
-                    Some(15),
-                )
-                .await;
-        }
-    };
-    if runtime_state.state != SyncState::Ready {
-        persist_device_config_from_identity(context.as_ref(), &identity, "untrusted").await;
-        let _ = sync_repo
-            .mark_cycle_outcome(
-                "not_ready".to_string(),
-                cycle_started_at.elapsed().as_millis() as i64,
-                None,
-            )
-            .await;
-        return Ok(SyncCycleResult {
-            status: "not_ready".to_string(),
-            lock_version: 0,
-            pushed_count: 0,
-            pulled_count: 0,
-            cursor: ctx.local_cursor,
-            needs_bootstrap: false,
-        });
-    }
-
-    persist_device_config_from_identity(context.as_ref(), &identity, "trusted").await;
-    let token = match get_access_token() {
-        Ok(value) => value,
-        Err(err) => {
-            return ctx
-                .fail("auth_error", format!("Auth error: {}", err), Some(30))
-                .await;
-        }
-    };
-
-    ctx.lock_version = sync_repo
-        .acquire_cycle_lock()
-        .await
-        .map_err(|e| e.to_string())?;
-    ctx.local_cursor = sync_repo.get_cursor().map_err(|e| e.to_string())?;
-    let lock_version = ctx.lock_version;
-    let mut local_cursor = ctx.local_cursor;
-    let client = create_client()?;
-
-    let cursor_response = match client.get_events_cursor(&token, &device_id).await {
-        Ok(response) => response,
-        Err(err) => {
-            return ctx
-                .fail(
-                    "cursor_error",
-                    format!("Cursor check failed: {}", err),
-                    Some(10),
-                )
-                .await;
-        }
-    };
-    if let Some(gc_watermark) = cursor_response.gc_watermark {
-        if local_cursor < gc_watermark {
-            return ctx
-                .fail(
-                    "stale_cursor",
-                    format!(
-                        "Local cursor {} is older than GC watermark {}. Snapshot bootstrap required.",
-                        local_cursor, gc_watermark
-                    ),
-                    None,
-                )
-                .await;
-        }
-    }
-
-    let pending = sync_repo
-        .list_pending_outbox(500)
-        .map_err(|e| e.to_string())?;
-    let mut push_events = Vec::new();
-    let mut push_event_ids = Vec::new();
-    let mut max_retry_count = 0;
-
-    for event in pending {
-        max_retry_count = max_retry_count.max(event.retry_count);
-        let event_type = format!(
-            "{}.{}.v1",
-            sync_entity_name(&event.entity),
-            sync_operation_name(&event.op)
-        );
-        push_event_ids.push(event.event_id.clone());
-        let payload_key_version = event.payload_key_version.max(1);
-        let encrypted_payload =
-            match encrypt_sync_payload(&event.payload, &identity, payload_key_version) {
-                Ok(payload) => payload,
-                Err(err) => {
-                    return ctx
-                        .fail(
-                            "push_prepare_error",
-                            format!("Push payload encryption failed: {}", err),
-                            Some(15),
-                        )
-                        .await;
-                }
-            };
-        push_events.push(SyncPushEventRequest {
-            event_id: event.event_id,
-            device_id: device_id.clone(),
-            event_type,
-            entity: event.entity,
-            entity_id: event.entity_id,
-            client_timestamp: event.client_timestamp,
-            payload: encrypted_payload,
-            payload_key_version,
-        });
-    }
-
-    let mut pushed_count = 0usize;
-    if !push_events.is_empty() {
-        match client
-            .push_events(
-                &token,
-                &device_id,
-                SyncPushRequest {
-                    events: push_events,
-                },
-            )
-            .await
-        {
-            Ok(push_response) => {
-                let mut sent_ids: Vec<String> = push_response
-                    .accepted
-                    .into_iter()
-                    .map(|item| item.event_id)
-                    .collect();
-                sent_ids.extend(
-                    push_response
-                        .duplicate
-                        .into_iter()
-                        .map(|item| item.event_id),
-                );
-                pushed_count = sent_ids.len();
-                sync_repo
-                    .mark_outbox_sent(sent_ids)
-                    .await
-                    .map_err(|e| e.to_string())?;
-                sync_repo
-                    .mark_push_completed()
-                    .await
-                    .map_err(|e| e.to_string())?;
-            }
-            Err(err) => {
-                let err_str = err.to_string();
-
-                // Key version mismatch — re-pairing required
-                if err_str.contains("KEY_VERSION_MISMATCH") {
-                    sync_repo
-                        .mark_outbox_dead(
-                            push_event_ids,
-                            Some(err_str.clone()),
-                            Some("key_version_mismatch".to_string()),
-                        )
-                        .await
-                        .map_err(|e| e.to_string())?;
-                    return ctx
-                        .fail(
-                            "key_version_mismatch",
-                            "Key version mismatch — re-pairing required".to_string(),
-                            None,
-                        )
-                        .await;
-                }
-
-                let backoff = core_sync_backoff_seconds(max_retry_count);
-                let retry_class = err.retry_class();
-                match retry_class {
-                    ApiRetryClass::ReauthRequired => {
-                        sync_repo
-                            .schedule_outbox_retry(
-                                push_event_ids,
-                                30, // longer delay for auth refresh
-                                Some(err_str.clone()),
-                                Some(retry_class_code(retry_class).to_string()),
-                            )
-                            .await
-                            .map_err(|e| e.to_string())?;
-                        log::warn!("[DeviceSync] Auth error during push — token may need refresh");
-                        return ctx
-                            .fail(
-                                "auth_error",
-                                "Authentication required".to_string(),
-                                Some(30),
-                            )
-                            .await;
-                    }
-                    ApiRetryClass::Retryable => {
-                        sync_repo
-                            .schedule_outbox_retry(
-                                push_event_ids,
-                                backoff,
-                                Some(err_str),
-                                Some(retry_class_code(retry_class).to_string()),
-                            )
-                            .await
-                            .map_err(|e| e.to_string())?;
-                    }
-                    ApiRetryClass::Permanent => {
-                        sync_repo
-                            .mark_outbox_dead(
-                                push_event_ids,
-                                Some(err_str),
-                                Some(retry_class_code(retry_class).to_string()),
-                            )
-                            .await
-                            .map_err(|e| e.to_string())?;
-                    }
-                }
-                return ctx
-                    .fail("push_error", format!("Push failed: {}", err), Some(backoff))
-                    .await;
-            }
-        }
-    }
-
-    ctx.pushed_count = pushed_count;
-
-    // Verify the cycle lock is still held before starting pull.
-    if !sync_repo
-        .verify_cycle_lock(lock_version)
-        .map_err(|e| e.to_string())?
-    {
-        let _ = sync_repo
-            .mark_cycle_outcome(
-                "preempted".to_string(),
-                cycle_started_at.elapsed().as_millis() as i64,
-                None,
-            )
-            .await;
-        return Ok(SyncCycleResult {
-            status: "preempted".to_string(),
-            lock_version,
-            pushed_count,
-            pulled_count: 0,
-            cursor: local_cursor,
-            needs_bootstrap: false,
-        });
-    }
-
-    let mut pulled_count = 0usize;
-    if cursor_response.cursor > local_cursor {
-        loop {
-            ctx.local_cursor = local_cursor;
-            ctx.pulled_count = pulled_count;
-            let pull_response = match client
-                .pull_events(&token, &device_id, Some(local_cursor), Some(500))
-                .await
-            {
-                Ok(value) => value,
-                Err(err) => {
-                    if err.retry_class() == ApiRetryClass::ReauthRequired {
-                        log::warn!("[DeviceSync] Auth error during pull — token may need refresh");
-                        return ctx
-                            .fail(
-                                "auth_error",
-                                "Authentication required".to_string(),
-                                Some(30),
-                            )
-                            .await;
-                    }
-                    return ctx
-                        .fail("pull_error", format!("Pull failed: {}", err), Some(10))
-                        .await;
-                }
-            };
-
-            if let Some(gc_watermark) = pull_response.gc_watermark {
-                if local_cursor < gc_watermark {
-                    return ctx
-                        .fail(
-                            "stale_cursor",
-                            format!(
-                                "Cursor {} is older than pull GC watermark {}",
-                                local_cursor, gc_watermark
-                            ),
-                            None,
-                        )
-                        .await;
-                }
-            }
-
-            let mut decoded_events: Vec<DecodedRemoteEvent> =
-                Vec::with_capacity(pull_response.events.len());
-            for remote_event in pull_response.events {
-                // Skip events originating from this device — already applied locally.
-                if remote_event.device_id == device_id {
-                    continue;
-                }
-                let local_entity = remote_event.entity;
-                if local_entity == SyncEntity::Snapshot {
-                    debug!(
-                        "[DeviceSync] Skipping snapshot control event during replay: event_id={} event_type={} seq={}",
-                        remote_event.event_id, remote_event.event_type, remote_event.seq
-                    );
-                    continue;
-                }
-                let local_op = match parse_event_operation(&remote_event.event_type) {
-                    Some(op) => op,
-                    None => {
-                        log::warn!(
-                            "[DeviceSync] Replay blocked: unsupported event type '{}' for event {}",
-                            remote_event.event_type,
-                            remote_event.event_id
-                        );
-                        return ctx
-                            .fail(
-                                "replay_blocked",
-                                format!(
-                                    "Replay blocked: unsupported event type '{}' for event {}",
-                                    remote_event.event_type, remote_event.event_id
-                                ),
-                                Some(6 * 60 * 60),
-                            )
-                            .await;
-                    }
-                };
-                let decrypted_payload = match decrypt_sync_payload(
-                    &remote_event.payload,
-                    &identity,
-                    remote_event.payload_key_version,
-                ) {
-                    Ok(payload) => payload,
-                    Err(err) => {
-                        return ctx
-                            .fail(
-                                "replay_error",
-                                format!(
-                                    "Replay decrypt failed for event {}: {}",
-                                    remote_event.event_id, err
-                                ),
-                                Some(10),
-                            )
-                            .await;
-                    }
-                };
-                let payload_json: serde_json::Value = match serde_json::from_str(&decrypted_payload)
-                {
-                    Ok(payload) => payload,
-                    Err(err) => {
-                        return ctx
-                            .fail(
-                                "replay_error",
-                                format!(
-                                    "Replay payload decode failed for event {}: {}",
-                                    remote_event.event_id, err
-                                ),
-                                Some(10),
-                            )
-                            .await;
-                    }
-                };
-
-                decoded_events.push(DecodedRemoteEvent {
-                    entity: local_entity,
-                    entity_id: remote_event.entity_id,
-                    op: local_op,
-                    event_id: remote_event.event_id,
-                    client_timestamp: remote_event.client_timestamp,
-                    seq: remote_event.seq,
-                    payload: payload_json,
-                });
-            }
-
-            let batch_tuples: Vec<_> = decoded_events
-                .into_iter()
-                .map(|e| {
-                    (
-                        e.entity,
-                        e.entity_id,
-                        e.op,
-                        e.event_id,
-                        e.client_timestamp,
-                        e.seq,
-                        e.payload,
-                    )
-                })
-                .collect();
-            let applied_count = match sync_repo.apply_remote_events_lww_batch(batch_tuples).await {
-                Ok(applied) => applied,
-                Err(err) => {
-                    return ctx
-                        .fail(
-                            "replay_error",
-                            format!("Replay apply failed: {}", err),
-                            Some(10),
-                        )
-                        .await;
-                }
-            };
-            pulled_count += applied_count;
-
-            local_cursor = pull_response.next_cursor;
-            sync_repo
-                .set_cursor(local_cursor)
-                .await
-                .map_err(|e| e.to_string())?;
-
-            if !pull_response.has_more {
-                break;
-            }
-        }
-        sync_repo
-            .mark_pull_completed()
-            .await
-            .map_err(|e| e.to_string())?;
-    }
-
-    if local_cursor > 20_000 {
-        let prune_seq = local_cursor - 10_000;
-        let _ = sync_repo.prune_applied_events_up_to_seq(prune_seq).await;
-    }
-
-    sync_repo
-        .mark_cycle_outcome(
-            "ok".to_string(),
-            cycle_started_at.elapsed().as_millis() as i64,
-            None,
-        )
-        .await
-        .map_err(|e| e.to_string())?;
+    // Note: on_pull_complete is now called by the engine itself via ReplayStore trait
 
     Ok(SyncCycleResult {
-        status: "ok".to_string(),
-        lock_version,
-        pushed_count,
-        pulled_count,
-        cursor: local_cursor,
-        needs_bootstrap: false,
+        status: result.status,
+        lock_version: result.lock_version,
+        pushed_count: result.pushed_count,
+        pulled_count: result.pulled_count,
+        cursor: result.cursor,
+        needs_bootstrap: result.needs_bootstrap,
+        bootstrap_snapshot_id: result.bootstrap_snapshot_id,
+        bootstrap_snapshot_seq: result.bootstrap_snapshot_seq,
     })
 }
 
 pub async fn ensure_background_engine_started(context: Arc<ServiceContext>) -> Result<(), String> {
-    // Don't spawn the loop if sync isn't configured yet.
     if get_sync_identity_from_store().is_none() {
         return Ok(());
     }
 
     let runtime = context.device_sync_runtime();
-    let mut guard = runtime.background_task.lock().await;
-    if let Some(handle) = guard.as_ref() {
-        if !handle.is_finished() {
-            return Ok(());
-        }
-        // Task finished (loop broke on revoked/not_ready) — clear and respawn.
-        guard.take();
-    }
-
-    let handle = tokio::spawn(async move {
-        let mut consecutive_not_ready: u32 = 0;
-        loop {
-            let cycle_result = run_sync_cycle(Arc::clone(&context)).await;
-            if let Err(err) = &cycle_result {
-                log::warn!("[DeviceSync] Background cycle failed: {}", err);
-                consecutive_not_ready = 0;
-            }
-            if let Ok(result) = &cycle_result {
-                debug!(
-                    "[DeviceSync] Cycle complete status={} needs_bootstrap={} cursor={} pushed={} pulled={}",
-                    result.status,
-                    result.needs_bootstrap,
-                    result.cursor,
-                    result.pushed_count,
-                    result.pulled_count
-                );
-                if result.status == "not_ready" || result.status == "config_error" {
-                    consecutive_not_ready += 1;
-                    // Check if device was revoked (has device_id but no root_key)
-                    if let Some(identity) = get_sync_identity_from_store() {
-                        if identity.root_key.is_none() && identity.device_id.is_some() {
-                            info!(
-                                "[DeviceSync] Device appears revoked. Stopping background engine."
-                            );
-                            break;
-                        }
-                    }
-                    if consecutive_not_ready >= 5 {
-                        info!("[DeviceSync] {} consecutive not_ready/config_error cycles. Stopping background engine.", consecutive_not_ready);
-                        break;
-                    }
-                } else {
-                    consecutive_not_ready = 0;
-                }
-                if result.status == "ok" {
-                    maybe_generate_snapshot_for_policy(Arc::clone(&context)).await;
-                } else {
-                    debug!(
-                        "[DeviceSync] Snapshot policy skipped because cycle status is '{}' (requires 'ok')",
-                        result.status
-                    );
-                }
-            }
-
-            let jitter_bound = DEVICE_SYNC_INTERVAL_JITTER_SECS.saturating_mul(1000);
-            let jitter_ms = if jitter_bound > 0 {
-                Utc::now().timestamp_millis().unsigned_abs() % jitter_bound
-            } else {
-                0
-            };
-            let mut delay_ms =
-                DEVICE_SYNC_FOREGROUND_INTERVAL_SECS.saturating_mul(1000) + jitter_ms;
-
-            if let Ok(engine_status) = context.app_sync_repository().get_engine_status() {
-                if let Some(next_retry_at) = engine_status.next_retry_at.as_deref() {
-                    if let Some(wait_ms) = millis_until_rfc3339(next_retry_at) {
-                        delay_ms = wait_ms.saturating_add(jitter_ms).max(1_000);
-                    }
-                }
-            }
-
-            if let Ok(pending) = context.app_sync_repository().list_pending_outbox(1) {
-                if !pending.is_empty() {
-                    delay_ms = delay_ms.min(2_000 + (jitter_ms % 500));
-                }
-            }
-
-            tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
-        }
-    });
-    *guard = Some(handle);
+    let ports = Arc::new(TauriEnginePorts::new(context));
+    runtime.ensure_background_started(ports).await;
     Ok(())
 }
 
 pub async fn ensure_background_engine_stopped(context: Arc<ServiceContext>) -> Result<(), String> {
     let runtime = context.device_sync_runtime();
-    let mut guard = runtime.background_task.lock().await;
-    if let Some(handle) = guard.take() {
-        handle.abort();
-    }
+    runtime.ensure_background_stopped().await;
     Ok(())
 }

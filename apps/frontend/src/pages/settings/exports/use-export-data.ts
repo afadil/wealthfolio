@@ -1,16 +1,16 @@
 import {
-  isDesktop,
-  logger,
-  getGoals,
-  getHistoricalValuations,
-  getActivities,
-  getAccounts,
-  openFileSaveDialog,
-  openFolderDialog,
   backupDatabase,
   backupDatabaseToPath,
+  getAccounts,
+  getActivities,
+  getGoals,
+  getHistoricalValuations,
+  isWeb,
+  logger,
+  openFileSaveDialog,
+  openFolderDialog,
 } from "@/adapters";
-import { toast } from "@wealthfolio/ui/components/ui/use-toast";
+import { getPlatform as getRuntimePlatform } from "@/hooks/use-platform";
 import { formatData } from "@/lib/export-utils";
 import { QueryKeys } from "@/lib/query-keys";
 import {
@@ -22,6 +22,7 @@ import {
   Goal,
 } from "@/lib/types";
 import { QueryObserverResult, useMutation, useQuery } from "@tanstack/react-query";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 
 interface ExportParams {
   format: ExportedFileFormat;
@@ -37,8 +38,6 @@ interface SQLiteBackupResult {
 type ExportMutationResult = SQLiteBackupResult | boolean | null;
 
 export function useExportData() {
-  const isDesktopEnv = isDesktop;
-
   const { refetch: fetchAccounts } = useQuery<Account[], Error>({
     queryKey: [QueryKeys.ACCOUNTS],
     queryFn: () => getAccounts(),
@@ -68,7 +67,13 @@ export function useExportData() {
     mutationFn: async (params: ExportParams) => {
       const { format, data: desiredData } = params;
       if (format === "SQLite") {
-        if (isDesktopEnv) {
+        if (isWeb) {
+          const { filename } = await backupDatabase();
+          return { mode: "sqlite", target: "server" as const, value: filename };
+        }
+
+        const runtimePlatform = await getRuntimePlatform();
+        if (runtimePlatform.is_desktop) {
           // Open folder dialog to let user choose backup location
           const selectedDir = await openFolderDialog();
 
@@ -82,8 +87,13 @@ export function useExportData() {
           return { mode: "sqlite", target: "local" as const, value: backupPath };
         }
 
-        const { filename } = await backupDatabase();
-        return { mode: "sqlite", target: "server" as const, value: filename };
+        // Mobile: create backup and let user pick destination file.
+        const { filename, data } = await backupDatabase();
+        const saved = await openFileSaveDialog(data, filename);
+        if (!saved) {
+          return null;
+        }
+        return { mode: "sqlite", target: "local" as const, value: filename };
       } else {
         let exportedData: string | undefined;
         let fileName: string;
@@ -137,7 +147,7 @@ export function useExportData() {
         const description =
           result.target === "server"
             ? `Backup created on the server as ${result.value}`
-            : `Backup saved to: ${result.value}`;
+            : `Backup saved as ${result.value}`;
 
         toast({
           title: "Database backup completed successfully.",

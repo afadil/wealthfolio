@@ -5,7 +5,9 @@
 
 use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
+use tokio::sync::Mutex;
+use tokio::time::{sleep, Duration};
 
 use wealthfolio_core::secrets::SecretStore;
 
@@ -20,6 +22,13 @@ use crate::{
 
 const SYNC_IDENTITY_KEY: &str = "sync_identity";
 const CLOUD_ACCESS_TOKEN_KEY: &str = "sync_access_token";
+const RESET_REASON_REINITIALIZE: &str = "reinitialize";
+
+static ENROLL_OPERATION_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+fn enroll_operation_lock() -> &'static Mutex<()> {
+    ENROLL_OPERATION_LOCK.get_or_init(|| Mutex::new(()))
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -91,6 +100,16 @@ pub struct EnrollServiceError {
     pub message: String,
 }
 
+enum KeyInitializationOutcome {
+    Initialized {
+        key_version: i32,
+    },
+    PairingRequired {
+        server_key_version: i32,
+        trusted_devices: Vec<TrustedDeviceSummary>,
+    },
+}
+
 impl std::fmt::Display for EnrollServiceError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: {}", self.code, self.message)
@@ -146,14 +165,11 @@ impl DeviceEnrollService {
     /// Get the current sync state.
     /// Reads from secret store and optionally verifies with server.
     pub async fn get_sync_state(&self) -> Result<SyncStateResult, EnrollServiceError> {
-        info!("[DeviceEnrollService] Getting sync state...");
-
         // Read identity from secret store
         let identity = self.read_identity()?;
 
         // No identity or no nonce = FRESH
         if identity.device_nonce.is_none() {
-            info!("[DeviceEnrollService] State: FRESH (no device nonce)");
             return Ok(SyncStateResult {
                 state: SyncState::Fresh,
                 device_id: None,
@@ -169,7 +185,6 @@ impl DeviceEnrollService {
         let device_id = match &identity.device_id {
             Some(id) => id.clone(),
             None => {
-                info!("[DeviceEnrollService] State: FRESH (no device ID)");
                 return Ok(SyncStateResult {
                     state: SyncState::Fresh,
                     device_id: None,
@@ -228,23 +243,28 @@ impl DeviceEnrollService {
         let has_key_version = identity.key_version.is_some();
 
         if !has_root_key || !has_key_version {
-            // REGISTERED: No local E2EE credentials
-            let trusted_devices = if !is_trusted {
-                self.get_trusted_devices(&token).await
-            } else {
-                vec![]
-            };
+            // REGISTERED or ORPHANED: local E2EE credentials are incomplete.
+            return Ok(self
+                .build_registered_or_orphaned_state(
+                    &token,
+                    &device_id,
+                    &device.display_name,
+                    server_key_version,
+                    is_trusted,
+                )
+                .await);
+        }
 
-            info!("[DeviceEnrollService] State: REGISTERED (no E2EE keys)");
-            return Ok(SyncStateResult {
-                state: SyncState::Registered,
-                device_id: Some(device_id),
-                device_name: Some(device.display_name),
-                key_version: None,
-                server_key_version,
-                is_trusted,
-                trusted_devices,
-            });
+        if !is_trusted {
+            return Ok(self
+                .build_registered_or_orphaned_state(
+                    &token,
+                    &device_id,
+                    &device.display_name,
+                    server_key_version,
+                    is_trusted,
+                )
+                .await);
         }
 
         // Check key version match
@@ -270,7 +290,6 @@ impl DeviceEnrollService {
         }
 
         // All checks passed = READY
-        info!("[DeviceEnrollService] State: READY");
         Ok(SyncStateResult {
             state: SyncState::Ready,
             device_id: Some(device_id),
@@ -290,32 +309,31 @@ impl DeviceEnrollService {
     /// 3. If BOOTSTRAP mode: initialize E2EE keys
     /// 4. Save all credentials to secret store
     pub async fn enable_sync(&self) -> Result<EnableSyncResult, EnrollServiceError> {
+        let _guard = enroll_operation_lock().lock().await;
+        self.enable_sync_inner(false).await
+    }
+
+    async fn enable_sync_inner(
+        &self,
+        _allow_orphaned_auto_recover: bool,
+    ) -> Result<EnableSyncResult, EnrollServiceError> {
         info!("[DeviceEnrollService] Enabling sync...");
 
-        // Generate device nonce
-        let device_nonce = crypto::generate_device_id();
-        debug!(
-            "[DeviceEnrollService] Generated device nonce: {}",
-            device_nonce
-        );
+        let mut existing_identity = self.read_identity()?;
+        let device_nonce = self.ensure_device_nonce(&mut existing_identity)?;
+        let token = self.get_access_token()?;
+        if let Some(result) = self
+            .try_resume_existing_sync(&token, &existing_identity)
+            .await?
+        {
+            return Ok(result);
+        }
 
-        // Save nonce immediately (so we can recover if later steps fail)
-        self.save_identity(&SyncIdentity {
-            version: 2,
-            device_nonce: Some(device_nonce.clone()),
-            ..Default::default()
-        })?;
-
-        // Get platform info
         let platform = DevicePlatform::detect().to_string();
-
         info!(
             "[DeviceEnrollService] Enrolling device: {} ({})",
             self.device_display_name, platform
         );
-
-        // Enroll with server
-        let token = self.get_access_token()?;
 
         let enroll_result = self
             .client
@@ -332,141 +350,98 @@ impl DeviceEnrollService {
             .await
             .map_err(|e| format!("Enrollment failed: {}", e))?;
 
-        // Extract device ID, mode, and server key version
-        let (device_id, mode, server_key_version, trusted_devices) = match &enroll_result {
+        match enroll_result {
             EnrollDeviceResponse::Bootstrap {
                 device_id,
                 e2ee_key_version,
-            } => (
-                device_id.clone(),
-                "BOOTSTRAP",
-                Some(*e2ee_key_version),
-                vec![],
-            ),
+            } => {
+                info!(
+                    "[DeviceEnrollService] Device enrolled: {} (mode: BOOTSTRAP, server_key_version: {:?})",
+                    device_id,
+                    Some(e2ee_key_version)
+                );
+                self.save_enrolled_identity(&device_nonce, &device_id)?;
+                let outcome = self.initialize_e2ee_keys(&token, &device_id).await?;
+                Ok(self.enable_result_from_key_init_outcome(device_id, outcome))
+            }
             EnrollDeviceResponse::Pair {
                 device_id,
                 e2ee_key_version,
                 trusted_devices,
                 ..
             } => {
-                let summaries: Vec<TrustedDeviceSummary> = trusted_devices.clone();
-                (
-                    device_id.clone(),
-                    "PAIR",
-                    Some(*e2ee_key_version),
-                    summaries,
-                )
+                info!(
+                    "[DeviceEnrollService] Device enrolled: {} (mode: PAIR, server_key_version: {:?})",
+                    device_id,
+                    Some(e2ee_key_version)
+                );
+                self.save_enrolled_identity(&device_nonce, &device_id)?;
+                if trusted_devices.is_empty() {
+                    info!(
+                        "[DeviceEnrollService] PAIR mode with no trusted devices - probing key initialization state..."
+                    );
+                    let outcome = self.initialize_e2ee_keys(&token, &device_id).await?;
+                    return Ok(self.enable_result_from_key_init_outcome(device_id, outcome));
+                }
+                Ok(EnableSyncResult {
+                    device_id,
+                    state: SyncState::Registered,
+                    key_version: None,
+                    server_key_version: Some(e2ee_key_version),
+                    needs_pairing: true,
+                    trusted_devices,
+                })
             }
             EnrollDeviceResponse::Ready {
                 device_id,
                 e2ee_key_version,
                 ..
-            } => (device_id.clone(), "READY", Some(*e2ee_key_version), vec![]),
-        };
-
-        info!(
-            "[DeviceEnrollService] Device enrolled: {} (mode: {}, server_key_version: {:?})",
-            device_id, mode, server_key_version
-        );
-
-        // Update identity with device ID
-        self.save_identity(&SyncIdentity {
-            version: 2,
-            device_nonce: Some(device_nonce),
-            device_id: Some(device_id.clone()),
-            ..Default::default()
-        })?;
-
-        // If BOOTSTRAP mode, initialize E2EE keys
-        if mode == "BOOTSTRAP" {
-            info!("[DeviceEnrollService] Bootstrap mode - initializing E2EE keys...");
-            let key_version = self.initialize_e2ee_keys(&token, &device_id).await?;
-
-            return Ok(EnableSyncResult {
-                device_id,
-                state: SyncState::Ready,
-                key_version: Some(key_version),
-                server_key_version: Some(key_version),
-                needs_pairing: false,
-                trusted_devices: vec![],
-            });
-        }
-
-        // PAIR mode - but no trusted devices to pair with
-        if trusted_devices.is_empty() {
-            let has_keys = server_key_version.map(|v| v > 0).unwrap_or(false);
-
-            if has_keys {
-                // Keys exist but no trusted devices - orphaned state
-                warn!(
-                    "[DeviceEnrollService] Orphaned state: keys exist (v{}) but no trusted devices",
-                    server_key_version.unwrap()
+            } => {
+                info!(
+                    "[DeviceEnrollService] Device enrolled: {} (mode: READY, server_key_version: {:?})",
+                    device_id,
+                    Some(e2ee_key_version)
                 );
-                return Ok(EnableSyncResult {
-                    device_id,
-                    state: SyncState::Orphaned,
-                    key_version: None,
-                    server_key_version,
-                    needs_pairing: false,
-                    trusted_devices: vec![],
-                });
-            } else {
-                // No keys and no trusted devices - bootstrap as first device
-                info!("[DeviceEnrollService] PAIR mode but no keys/devices - bootstrapping...");
-                let key_version = self.initialize_e2ee_keys(&token, &device_id).await?;
-
-                return Ok(EnableSyncResult {
-                    device_id,
-                    state: SyncState::Ready,
-                    key_version: Some(key_version),
-                    server_key_version: Some(key_version),
-                    needs_pairing: false,
-                    trusted_devices: vec![],
-                });
+                self.save_enrolled_identity(&device_nonce, &device_id)?;
+                let outcome = self.initialize_e2ee_keys(&token, &device_id).await?;
+                Ok(self.enable_result_from_key_init_outcome(device_id, outcome))
             }
         }
-
-        // Normal PAIR mode - return REGISTERED state
-        Ok(EnableSyncResult {
-            device_id,
-            state: SyncState::Registered,
-            key_version: None,
-            server_key_version,
-            needs_pairing: true,
-            trusted_devices,
-        })
     }
 
     /// Clear all sync data and return to FRESH state.
     pub fn clear_sync_data(&self) -> Result<(), EnrollServiceError> {
         info!("[DeviceEnrollService] Clearing sync data...");
-        self.secret_store
-            .delete_secret(SYNC_IDENTITY_KEY)
-            .map_err(|e| format!("Failed to clear sync data: {}", e))?;
+        let existing_identity = self.read_identity()?;
+        let preserved_nonce = existing_identity.device_nonce;
+        self.save_identity(&SyncIdentity {
+            version: 2,
+            device_nonce: preserved_nonce,
+            ..Default::default()
+        })?;
         Ok(())
     }
 
     /// Reinitialize sync - reset server data and enable sync in one operation.
     /// Used when sync is in orphaned state (keys exist but no devices).
     pub async fn reinitialize_sync(&self) -> Result<EnableSyncResult, EnrollServiceError> {
+        let _guard = enroll_operation_lock().lock().await;
         info!("[DeviceEnrollService] Reinitializing sync...");
 
         let token = self.get_access_token()?;
+        let existing_identity = self.read_identity()?;
+        let preserved_nonce = existing_identity
+            .device_nonce
+            .unwrap_or_else(crypto::generate_device_id);
+        self.reset_team_sync_checked(&token, RESET_REASON_REINITIALIZE)
+            .await?;
+        self.save_identity(&SyncIdentity {
+            version: 2,
+            device_nonce: Some(preserved_nonce),
+            ..Default::default()
+        })?;
 
-        // Step 1: Reset team sync on server (deletes orphaned keys)
-        info!("[DeviceEnrollService] Resetting team sync on server...");
-        self.client
-            .reset_team_sync(&token, Some("reinitialize"))
-            .await
-            .map_err(|e| format!("Failed to reset team sync: {}", e))?;
-
-        // Step 2: Clear local secret store
-        info!("[DeviceEnrollService] Clearing local sync data...");
-        self.clear_sync_data()?;
-
-        // Step 3: Enable sync (will now be in bootstrap mode)
-        info!("[DeviceEnrollService] Enabling sync...");
-        self.enable_sync().await
+        self.enable_sync_inner(false).await
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -477,7 +452,7 @@ impl DeviceEnrollService {
         &self,
         token: &str,
         device_id: &str,
-    ) -> Result<i32, EnrollServiceError> {
+    ) -> Result<KeyInitializationOutcome, EnrollServiceError> {
         // Phase 1: Get challenge from server
         let init_result = self
             .client
@@ -491,14 +466,24 @@ impl DeviceEnrollService {
                 nonce,
                 key_version,
             } => (challenge, nonce, key_version),
-            InitializeKeysResult::PairingRequired { .. } => {
-                return Err("Pairing required but expected bootstrap mode"
-                    .to_string()
-                    .into());
+            InitializeKeysResult::PairingRequired {
+                e2ee_key_version,
+                trusted_devices,
+                ..
+            } => {
+                return Ok(KeyInitializationOutcome::PairingRequired {
+                    server_key_version: e2ee_key_version,
+                    trusted_devices,
+                });
             }
             InitializeKeysResult::Ready { e2ee_key_version } => {
-                // Already initialized - this shouldn't happen in bootstrap mode
-                return Ok(e2ee_key_version);
+                // Server reports this device as ready at current key version.
+                // If local key material is missing, treat as pairing-required
+                // recovery for this client.
+                return Ok(KeyInitializationOutcome::PairingRequired {
+                    server_key_version: e2ee_key_version,
+                    trusted_devices: self.get_trusted_devices(token).await,
+                });
             }
         };
 
@@ -559,7 +544,7 @@ impl DeviceEnrollService {
             "[DeviceEnrollService] E2EE keys initialized (version: {})",
             key_version
         );
-        Ok(key_version)
+        Ok(KeyInitializationOutcome::Initialized { key_version })
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -600,6 +585,112 @@ impl DeviceEnrollService {
     // INTERNAL: HELPERS
     // ═══════════════════════════════════════════════════════════════════════════
 
+    fn ensure_device_nonce(
+        &self,
+        identity: &mut SyncIdentity,
+    ) -> Result<String, EnrollServiceError> {
+        let device_nonce = identity
+            .device_nonce
+            .clone()
+            .unwrap_or_else(crypto::generate_device_id);
+        if identity.device_nonce.is_none() {
+            identity.version = 2;
+            identity.device_nonce = Some(device_nonce.clone());
+            self.save_identity(identity)?;
+        }
+        Ok(device_nonce)
+    }
+
+    fn save_enrolled_identity(
+        &self,
+        device_nonce: &str,
+        device_id: &str,
+    ) -> Result<(), EnrollServiceError> {
+        self.save_identity(&SyncIdentity {
+            version: 2,
+            device_nonce: Some(device_nonce.to_string()),
+            device_id: Some(device_id.to_string()),
+            ..Default::default()
+        })
+    }
+
+    async fn try_resume_existing_sync(
+        &self,
+        _token: &str,
+        identity: &SyncIdentity,
+    ) -> Result<Option<EnableSyncResult>, EnrollServiceError> {
+        if identity.device_id.is_none() {
+            return Ok(None);
+        }
+
+        let state = self.get_sync_state().await?;
+        match state.state {
+            SyncState::Ready | SyncState::Registered | SyncState::Stale => {
+                self.enable_result_from_state(state).map(Some)
+            }
+            SyncState::Orphaned => Ok(None),
+            SyncState::Fresh | SyncState::Recovery => Ok(None),
+        }
+    }
+
+    async fn build_registered_or_orphaned_state(
+        &self,
+        token: &str,
+        device_id: &str,
+        device_name: &str,
+        server_key_version: Option<i32>,
+        is_trusted: bool,
+    ) -> SyncStateResult {
+        let trusted_devices = if is_trusted {
+            vec![]
+        } else {
+            self.get_trusted_devices(token).await
+        };
+        let orphaned = self
+            .detect_orphaned_without_trusted_devices(
+                token,
+                device_id,
+                server_key_version,
+                is_trusted,
+                &trusted_devices,
+            )
+            .await;
+        SyncStateResult {
+            state: if orphaned {
+                SyncState::Orphaned
+            } else {
+                SyncState::Registered
+            },
+            device_id: Some(device_id.to_string()),
+            device_name: Some(device_name.to_string()),
+            key_version: None,
+            server_key_version,
+            is_trusted,
+            trusted_devices,
+        }
+    }
+
+    async fn reset_team_sync_checked(
+        &self,
+        token: &str,
+        reason: &str,
+    ) -> Result<(), EnrollServiceError> {
+        let reset_result = self
+            .client
+            .reset_team_sync(token, Some(reason))
+            .await
+            .map_err(|e| format!("Failed to reset team sync: {}", e))?;
+        if !reset_result.success {
+            return Err(
+                "Team sync reset was not accepted. Please verify account permissions and try again."
+                    .to_string()
+                    .into(),
+            );
+        }
+        sleep(Duration::from_millis(350)).await;
+        Ok(())
+    }
+
     async fn get_trusted_devices(&self, token: &str) -> Vec<TrustedDeviceSummary> {
         match self.client.list_devices(token, Some("my")).await {
             Ok(devices) => devices
@@ -613,6 +704,104 @@ impl DeviceEnrollService {
                 })
                 .collect(),
             Err(_) => vec![],
+        }
+    }
+
+    async fn detect_orphaned_without_trusted_devices(
+        &self,
+        token: &str,
+        device_id: &str,
+        server_key_version: Option<i32>,
+        is_trusted: bool,
+        trusted_devices: &[TrustedDeviceSummary],
+    ) -> bool {
+        if is_trusted || !trusted_devices.is_empty() {
+            return false;
+        }
+
+        let mut orphaned = server_key_version.map(|v| v > 0).unwrap_or(false);
+        if orphaned {
+            return true;
+        }
+
+        // Some server responses omit key version for untrusted devices.
+        // In that case, probe key-init state to distinguish REGISTERED vs ORPHANED.
+        match self.client.initialize_team_keys(token, device_id).await {
+            Ok(InitializeKeysResult::PairingRequired {
+                e2ee_key_version,
+                trusted_devices: pairing_trusted_devices,
+                ..
+            }) => {
+                orphaned = e2ee_key_version > 0 && pairing_trusted_devices.is_empty();
+            }
+            Ok(_) => {}
+            Err(err) => {
+                debug!(
+                    "[DeviceEnrollService] initialize_team_keys probe failed while resolving REGISTERED/ORPHANED: {}",
+                    err
+                );
+            }
+        }
+        orphaned
+    }
+
+    fn enable_result_from_state(
+        &self,
+        state: SyncStateResult,
+    ) -> Result<EnableSyncResult, EnrollServiceError> {
+        let SyncStateResult {
+            state,
+            device_id,
+            key_version,
+            server_key_version,
+            trusted_devices,
+            ..
+        } = state;
+        let device_id = device_id.ok_or_else(|| "Missing device ID in sync state".to_string())?;
+        let needs_pairing = matches!(state, SyncState::Registered | SyncState::Stale);
+
+        Ok(EnableSyncResult {
+            device_id,
+            needs_pairing,
+            state,
+            key_version,
+            server_key_version,
+            trusted_devices,
+        })
+    }
+
+    fn enable_result_from_key_init_outcome(
+        &self,
+        device_id: String,
+        outcome: KeyInitializationOutcome,
+    ) -> EnableSyncResult {
+        match outcome {
+            KeyInitializationOutcome::Initialized { key_version } => EnableSyncResult {
+                device_id,
+                state: SyncState::Ready,
+                key_version: Some(key_version),
+                server_key_version: Some(key_version),
+                needs_pairing: false,
+                trusted_devices: vec![],
+            },
+            KeyInitializationOutcome::PairingRequired {
+                server_key_version,
+                trusted_devices,
+            } => {
+                let orphaned = trusted_devices.is_empty() && server_key_version > 0;
+                EnableSyncResult {
+                    device_id,
+                    state: if orphaned {
+                        SyncState::Orphaned
+                    } else {
+                        SyncState::Registered
+                    },
+                    key_version: None,
+                    server_key_version: Some(server_key_version),
+                    needs_pairing: !orphaned,
+                    trusted_devices,
+                }
+            }
         }
     }
 }

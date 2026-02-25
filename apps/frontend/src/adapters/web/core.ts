@@ -198,6 +198,14 @@ export const COMMANDS: CommandMap = {
   clear_device_sync_data: { method: "DELETE", path: "/connect/device/sync-data" },
   reinitialize_device_sync: { method: "POST", path: "/connect/device/reinitialize" },
   device_sync_engine_status: { method: "GET", path: "/connect/device/engine-status" },
+  device_sync_bootstrap_overwrite_check: {
+    method: "GET",
+    path: "/connect/device/bootstrap-overwrite-check",
+  },
+  device_sync_reconcile_ready_state: {
+    method: "POST",
+    path: "/connect/device/reconcile-ready-state",
+  },
   device_sync_bootstrap_snapshot_if_needed: {
     method: "POST",
     path: "/connect/device/bootstrap-snapshot",
@@ -1228,6 +1236,8 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     "sync_broker_data",
     "broker_ingest_run",
     "device_sync_engine_status",
+    "device_sync_bootstrap_overwrite_check",
+    "device_sync_reconcile_ready_state",
     "device_sync_bootstrap_snapshot_if_needed",
     "device_sync_trigger_cycle",
     "device_sync_start_background_engine",
@@ -1269,9 +1279,13 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     const parsed = (await res.json()) as { path: string };
     return parsed.path as T;
   }
-  // Handle responses with no body (204 No Content, 202 Accepted)
+  // Handle responses with no body (204 No Content, 202 Accepted, or empty 200)
   if (res.status === 204 || res.status === 202) {
     return undefined as T;
   }
-  return (await res.json()) as T;
+  const text = await res.text();
+  if (!text) {
+    return undefined as T;
+  }
+  return JSON.parse(text) as T;
 };

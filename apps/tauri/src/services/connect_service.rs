@@ -7,26 +7,38 @@ use log::{debug, error};
 
 use crate::secret_store::KeyringSecretStore;
 use wealthfolio_connect::ConnectApiClient;
+use wealthfolio_connect::DEFAULT_CLOUD_API_URL;
 use wealthfolio_core::secrets::SecretStore;
 
 /// Secret key for storing the cloud API access token.
 /// Note: SecretStore adds "wealthfolio_" prefix automatically.
 const CLOUD_ACCESS_TOKEN_KEY: &str = "sync_access_token";
 
-/// Returns true when the Connect API URL is configured via environment.
-pub fn is_connect_configured() -> bool {
-    std::env::var("CONNECT_API_URL")
-        .ok()
-        .filter(|v| !v.trim().is_empty())
-        .is_some()
+/// Returns true when broker/connect sync was compiled in.
+pub fn is_connect_sync_enabled() -> bool {
+    cfg!(feature = "connect-sync")
 }
 
-/// Returns the cloud API base URL from environment when configured.
-fn cloud_api_base_url() -> Option<String> {
-    std::env::var("CONNECT_API_URL")
-        .ok()
+/// Returns true when device sync was compiled in.
+pub fn is_device_sync_enabled() -> bool {
+    cfg!(feature = "device-sync")
+}
+
+/// Returns true when any cloud sync feature is compiled in.
+pub fn is_cloud_sync_enabled() -> bool {
+    is_connect_sync_enabled() || is_device_sync_enabled()
+}
+
+/// Returns the cloud API base URL when a sync feature is enabled.
+pub fn cloud_api_base_url() -> Option<String> {
+    if !is_cloud_sync_enabled() {
+        return None;
+    }
+
+    option_env!("CONNECT_API_URL")
         .map(|v| v.trim().trim_end_matches('/').to_string())
         .filter(|v| !v.is_empty())
+        .or_else(|| Some(DEFAULT_CLOUD_API_URL.to_string()))
 }
 
 /// Service for interacting with Wealthfolio Connect cloud API.
@@ -49,8 +61,12 @@ impl ConnectService {
     /// Returns `Ok(ConnectApiClient)` if a valid token is found and the client
     /// can be created, or `Err(String)` if no token is configured or an error occurs.
     pub fn get_api_client(&self) -> Result<ConnectApiClient, String> {
+        if !is_connect_sync_enabled() {
+            return Err("Connect sync feature is disabled in this build.".to_string());
+        }
+
         let cloud_api_base_url = cloud_api_base_url().ok_or_else(|| {
-            "CONNECT_API_URL not configured. Connect API operations are disabled.".to_string()
+            "Cloud API base URL is unavailable. Connect API operations are disabled.".to_string()
         })?;
 
         let access_token = match KeyringSecretStore.get_secret(CLOUD_ACCESS_TOKEN_KEY) {

@@ -1,7 +1,7 @@
 {
   "build": {
-    "beforeDevCommand": "pnpm --filter frontend dev:tauri",
-    "beforeBuildCommand": "pnpm --filter frontend build:tauri",
+    "beforeDevCommand": "node ./apps/tauri/scripts/sync-ios-composer-icon.mjs && pnpm --filter frontend dev:tauri",
+    "beforeBuildCommand": "node ./apps/tauri/scripts/sync-ios-composer-icon.mjs && pnpm --filter frontend build:tauri",
     "frontendDist": "../../dist",
     "devUrl": "http://localhost:1420"
   },
@@ -9,6 +9,8 @@
     "active": true,
     "targets": "all",
     "icon": [
+      "icons/icon.png",
+      "icons/ios/AppIcon-512@2x.png",
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
@@ -19,12 +21,13 @@
     "category": "Finance",
     "createUpdaterArtifacts": "v1Compatible",
     "iOS": {
-      "developmentTeam": "DYDJ2RNL5H"
+      "developmentTeam": "DYDJ2RNL5H",
+      "infoPlist": "Info.ios.plist"
     }
   },
   "productName": "Wealthfolio",
   "mainBinaryName": "Wealthfolio",
-  "version": "3.0.0-beta.5",
+  "version": "3.0.0",
   "identifier": "com.teymz.wealthfolio",
   "plugins": {
     "updater": {

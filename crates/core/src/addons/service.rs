@@ -69,7 +69,6 @@ where
 
     serde_json::from_str(&response_text).map_err(|e| {
         log::error!("Failed to parse {} API response as JSON: {}", operation, e);
-        log::error!("Response body was: {}", response_text);
         format!("Failed to parse {} API response: {}", operation, e)
     })
 }
@@ -971,7 +970,7 @@ pub async fn download_addon_from_store(
             format!("Failed to read download response: {}", e)
         })?;
 
-        log::debug!("Download API JSON response: {}", response_text);
+        log::debug!("Download API returned JSON response");
 
         let download_response: serde_json::Value =
             serde_json::from_str(&response_text).map_err(|e| {
@@ -1205,7 +1204,6 @@ pub async fn fetch_addon_store_listings(
     // Parse the response as an object first to handle the {"addons": [...]} structure
     let response_json: serde_json::Value = serde_json::from_str(&response_text).map_err(|e| {
         log::error!("Failed to parse store API response as JSON: {}", e);
-        log::error!("Response body was: {}", response_text);
         format!("Failed to parse store API response: {}", e)
     })?;
 
@@ -1288,7 +1286,6 @@ pub async fn submit_addon_rating(
             "Failed to parse rating submission API response as JSON: {}",
             e
         );
-        log::error!("Response body was: {}", response_text);
         format!("Failed to parse rating submission API response: {}", e)
     })?;
 

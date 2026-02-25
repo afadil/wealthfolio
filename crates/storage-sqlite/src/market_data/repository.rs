@@ -47,26 +47,60 @@ impl QuoteStore for MarketDataRepository {
         let quote_cloned = quote.clone();
         let db_row = QuoteDB::from(&quote_cloned);
 
-        self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
-                diesel::replace_into(quotes_dsl::quotes)
-                    .values(&db_row)
-                    .execute(conn)
+        let saved_row = self
+            .writer
+            .exec_tx(move |tx| -> Result<QuoteDB> {
+                let mut payload = db_row;
+                let existing = quotes_dsl::quotes
+                    .filter(quotes_dsl::asset_id.eq(&payload.asset_id))
+                    .filter(quotes_dsl::day.eq(&payload.day))
+                    .filter(quotes_dsl::source.eq(&payload.source))
+                    .select(QuoteDB::as_select())
+                    .first::<QuoteDB>(tx.conn())
+                    .optional()
                     .map_err(StorageError::QueryFailed)?;
-                Ok(())
+
+                let is_update = existing.is_some();
+                if let Some(existing_row) = existing {
+                    payload.id = existing_row.id;
+                }
+
+                diesel::replace_into(quotes_dsl::quotes)
+                    .values(&payload)
+                    .execute(tx.conn())
+                    .map_err(StorageError::QueryFailed)?;
+
+                if is_update {
+                    tx.update(&payload)?;
+                } else {
+                    tx.insert(&payload)?;
+                }
+
+                Ok(payload)
             })
             .await?;
 
-        Ok(quote_cloned)
+        Ok(Quote::from(saved_row))
     }
 
     async fn delete_quote(&self, quote_id: &str) -> Result<()> {
         let id_to_delete = quote_id.to_string();
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<()> {
-                diesel::delete(quotes_dsl::quotes.filter(quotes_dsl::id.eq(id_to_delete)))
-                    .execute(conn)
+            .exec_tx(move |tx| -> Result<()> {
+                let existing = quotes_dsl::quotes
+                    .filter(quotes_dsl::id.eq(&id_to_delete))
+                    .select(QuoteDB::as_select())
+                    .first::<QuoteDB>(tx.conn())
+                    .optional()
                     .map_err(StorageError::QueryFailed)?;
+
+                diesel::delete(quotes_dsl::quotes.filter(quotes_dsl::id.eq(&id_to_delete)))
+                    .execute(tx.conn())
+                    .map_err(StorageError::QueryFailed)?;
+
+                if let Some(row) = existing {
+                    tx.delete_model(&row);
+                }
                 Ok(())
             })
             .await
@@ -80,7 +114,7 @@ impl QuoteStore for MarketDataRepository {
         let db_rows: Vec<QuoteDB> = input_quotes.iter().map(QuoteDB::from).collect();
 
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
+            .exec_tx(move |tx| -> Result<usize> {
                 // Skip provider quotes for days that already have a MANUAL override.
                 let db_rows = {
                     let provider_pairs: HashSet<(&str, &str)> = db_rows
@@ -100,7 +134,7 @@ impl QuoteStore for MarketDataRepository {
                             .filter(quotes_dsl::asset_id.eq_any(&asset_ids))
                             .filter(quotes_dsl::day.eq_any(&days))
                             .select((quotes_dsl::asset_id, quotes_dsl::day))
-                            .load::<(String, String)>(conn)
+                            .load::<(String, String)>(tx.conn())
                             .map_err(StorageError::QueryFailed)?
                             .into_iter()
                             .collect();
@@ -120,12 +154,45 @@ impl QuoteStore for MarketDataRepository {
                     }
                 };
 
-                let mut total_upserted = 0;
-                for chunk in db_rows.chunks(1_000) {
+                let mut total_upserted: usize = 0;
+
+                let (manual_rows, provider_rows): (Vec<QuoteDB>, Vec<QuoteDB>) = db_rows
+                    .into_iter()
+                    .partition(|row| row.source.eq_ignore_ascii_case("MANUAL"));
+
+                for chunk in provider_rows.chunks(1_000) {
                     total_upserted += diesel::replace_into(quotes_dsl::quotes)
                         .values(chunk)
-                        .execute(conn)
+                        .execute(tx.conn())
                         .map_err(StorageError::QueryFailed)?;
+                }
+
+                for row in manual_rows {
+                    let mut payload = row;
+                    let existing = quotes_dsl::quotes
+                        .filter(quotes_dsl::asset_id.eq(&payload.asset_id))
+                        .filter(quotes_dsl::day.eq(&payload.day))
+                        .filter(quotes_dsl::source.eq(&payload.source))
+                        .select(QuoteDB::as_select())
+                        .first::<QuoteDB>(tx.conn())
+                        .optional()
+                        .map_err(StorageError::QueryFailed)?;
+
+                    let is_update = existing.is_some();
+                    if let Some(existing_row) = existing {
+                        payload.id = existing_row.id;
+                    }
+
+                    total_upserted += diesel::replace_into(quotes_dsl::quotes)
+                        .values(&payload)
+                        .execute(tx.conn())
+                        .map_err(StorageError::QueryFailed)?;
+
+                    if is_update {
+                        tx.update(&payload)?;
+                    } else {
+                        tx.insert(&payload)?;
+                    }
                 }
                 Ok(total_upserted)
             })
@@ -136,12 +203,23 @@ impl QuoteStore for MarketDataRepository {
         let asset_id_str = asset_id.as_str().to_string();
 
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
+            .exec_tx(move |tx| -> Result<usize> {
+                let existing_rows = quotes_dsl::quotes
+                    .filter(quotes_dsl::asset_id.eq(&asset_id_str))
+                    .select(QuoteDB::as_select())
+                    .load::<QuoteDB>(tx.conn())
+                    .map_err(StorageError::QueryFailed)?;
+
                 let count = diesel::delete(
-                    quotes_dsl::quotes.filter(quotes_dsl::asset_id.eq(asset_id_str)),
+                    quotes_dsl::quotes.filter(quotes_dsl::asset_id.eq(&asset_id_str)),
                 )
-                .execute(conn)
+                .execute(tx.conn())
                 .map_err(StorageError::QueryFailed)?;
+
+                for row in &existing_rows {
+                    tx.delete_model(row);
+                }
+
                 Ok(count)
             })
             .await

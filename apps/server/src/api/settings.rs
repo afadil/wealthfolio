@@ -264,52 +264,19 @@ async fn backup_database_to_path_route(
     let target_dir = body.backup_dir.clone();
 
     let backup_path = task::spawn_blocking(move || -> anyhow::Result<String> {
-        let db_path = db::get_db_path(&data_root);
         let normalized_backup_dir = normalize_file_path(&target_dir);
 
         let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
         let backup_filename = format!("wealthfolio_backup_{}.db", timestamp);
         let backup_path = StdPath::new(&normalized_backup_dir).join(&backup_filename);
 
-        if let Some(parent) = backup_path.parent() {
-            std::fs::create_dir_all(parent).with_context(|| {
-                format!("Failed to create backup directory {}", parent.display())
-            })?;
-        }
-
         let backup_path_str = backup_path
             .to_str()
             .ok_or_else(|| anyhow::anyhow!("Invalid backup path"))?
             .to_string();
 
-        std::fs::copy(&db_path, &backup_path_str).with_context(|| {
-            format!(
-                "Failed to copy database from {} to {}",
-                db_path, backup_path_str
-            )
-        })?;
-
-        let wal_source = format!("{}-wal", db_path);
-        let wal_target = format!("{}-wal", backup_path_str);
-        if StdPath::new(&wal_source).exists() {
-            std::fs::copy(&wal_source, &wal_target).with_context(|| {
-                format!(
-                    "Failed to copy WAL file from {} to {}",
-                    wal_source, wal_target
-                )
-            })?;
-        }
-
-        let shm_source = format!("{}-shm", db_path);
-        let shm_target = format!("{}-shm", backup_path_str);
-        if StdPath::new(&shm_source).exists() {
-            std::fs::copy(&shm_source, &shm_target).with_context(|| {
-                format!(
-                    "Failed to copy SHM file from {} to {}",
-                    shm_source, shm_target
-                )
-            })?;
-        }
+        db::backup_database_to_file(&data_root, &backup_path_str)
+            .with_context(|| format!("Failed to create backup file {}", backup_path_str))?;
 
         Ok(backup_path_str)
     })

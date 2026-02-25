@@ -395,7 +395,7 @@ export function AssetEditSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex h-full w-full flex-col sm:max-w-2xl">
+      <SheetContent side="right" className="pb-safe flex h-full w-full flex-col sm:max-w-2xl">
         <SheetHeader className="shrink-0 pb-4">
           <div className="flex items-center gap-3">
             <TickerAvatar symbol={asset.displayCode ?? ""} className="size-10" />
@@ -812,6 +812,17 @@ export function AssetEditSheet({
             </TabsContent>
           </div>
         </Tabs>
+
+        <div className="mt-auto border-t pt-4 sm:hidden">
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full"
+            onClick={() => onOpenChange(false)}
+          >
+            Close
+          </Button>
+        </div>
       </SheetContent>
     </Sheet>
   );

@@ -124,6 +124,75 @@ impl DeviceSyncClient {
         debug!("API response error ({}): {}", status, preview);
     }
 
+    fn snapshot_from_cursor_latest(value: SyncLatestSnapshotRef) -> SnapshotLatestResponse {
+        SnapshotLatestResponse {
+            snapshot_id: value.snapshot_id,
+            schema_version: value.schema_version,
+            covers_tables: Vec::new(),
+            oplog_seq: value.oplog_seq,
+            size_bytes: 0,
+            checksum: String::new(),
+            created_at: String::new(),
+        }
+    }
+
+    fn choose_snapshot_from_latest_and_cursor(
+        latest: SnapshotLatestResponse,
+        cursor_latest: Option<SyncLatestSnapshotRef>,
+    ) -> SnapshotLatestResponse {
+        let latest_id = latest.snapshot_id.trim();
+        let Some(cursor_latest) = cursor_latest else {
+            return latest;
+        };
+        let cursor_id = cursor_latest.snapshot_id.trim();
+        if cursor_id.is_empty() {
+            return latest;
+        }
+
+        let latest_is_strict_uuid = Self::is_backend_strict_uuid(latest_id);
+        let cursor_is_strict_uuid = Self::is_backend_strict_uuid(cursor_id);
+
+        if !latest_is_strict_uuid && cursor_is_strict_uuid {
+            debug!(
+                "Using cursor latest snapshot id '{}' over non-UUID snapshots/latest id '{}'",
+                cursor_id, latest_id
+            );
+            return Self::snapshot_from_cursor_latest(cursor_latest);
+        }
+
+        if cursor_latest.oplog_seq > latest.oplog_seq {
+            debug!(
+                "Using cursor latest snapshot id '{}' because oplog_seq {} > snapshots/latest {}",
+                cursor_id, cursor_latest.oplog_seq, latest.oplog_seq
+            );
+            return Self::snapshot_from_cursor_latest(cursor_latest);
+        }
+
+        latest
+    }
+
+    fn snapshot_download_url(&self, snapshot_id: &str) -> Result<reqwest::Url> {
+        let snapshot_id = snapshot_id.trim();
+        if snapshot_id.is_empty() {
+            return Err(DeviceSyncError::invalid_request(
+                "snapshot_id is required for download",
+            ));
+        }
+
+        let mut url = reqwest::Url::parse(&format!("{}/api/v1/sync/snapshots/", self.base_url))
+            .map_err(|err| {
+                DeviceSyncError::invalid_request(format!("Invalid base URL: {}", err))
+            })?;
+        {
+            let mut segments = url.path_segments_mut().map_err(|_| {
+                DeviceSyncError::invalid_request("Invalid base URL path for snapshot download")
+            })?;
+            segments.pop_if_empty();
+            segments.push(snapshot_id);
+        }
+        Ok(url)
+    }
+
     /// Create a new device sync client.
     ///
     /// # Arguments
@@ -173,11 +242,17 @@ impl DeviceSyncClient {
         Self::log_response(status, &body);
 
         if !status.is_success() {
-            // Try to parse error response
             if let Ok(error) = serde_json::from_str::<ApiErrorResponse>(&body) {
-                return Err(DeviceSyncError::api(
+                let code = if error.code.is_empty() {
+                    error.error
+                } else {
+                    error.code
+                };
+                return Err(DeviceSyncError::api_structured(
                     status.as_u16(),
-                    format!("{}: {}", error.code, error.message),
+                    code,
+                    error.message,
+                    error.details,
                 ));
             }
             return Err(DeviceSyncError::api(
@@ -206,9 +281,16 @@ impl DeviceSyncClient {
         let body = response.text().await?;
         Self::log_response(status, &body);
         if let Ok(error) = serde_json::from_str::<ApiErrorResponse>(&body) {
-            return Err(DeviceSyncError::api(
+            let code = if error.code.is_empty() {
+                error.error
+            } else {
+                error.code
+            };
+            return Err(DeviceSyncError::api_structured(
                 status.as_u16(),
-                format!("{}: {}", error.code, error.message),
+                code,
+                error.message,
+                error.details,
             ));
         }
 
@@ -540,6 +622,24 @@ impl DeviceSyncClient {
         Self::parse_response(response).await
     }
 
+    /// Get the reconcile-ready-state for this device.
+    ///
+    /// GET /api/v1/sync/events/reconcile-ready-state
+    pub async fn get_reconcile_ready_state(
+        &self,
+        token: &str,
+        device_id: &str,
+    ) -> Result<ReconcileReadyStateResponse> {
+        let url = format!("{}/api/v1/sync/events/reconcile-ready-state", self.base_url);
+        let response = self
+            .client
+            .get(url)
+            .headers(self.headers_with_device(token, Some(device_id))?)
+            .send()
+            .await?;
+        Self::parse_response(response).await
+    }
+
     /// Get lightweight current server cursor.
     ///
     /// GET /api/v1/sync/events/cursor
@@ -551,7 +651,7 @@ impl DeviceSyncClient {
         let url = format!("{}/api/v1/sync/events/cursor", self.base_url);
         let response = self
             .client
-            .get(&url)
+            .get(url)
             .headers(self.headers_with_device(token, Some(device_id))?)
             .send()
             .await?;
@@ -569,7 +669,7 @@ impl DeviceSyncClient {
         let url = format!("{}/api/v1/sync/snapshots/latest", self.base_url);
         let response = self
             .client
-            .get(&url)
+            .get(url)
             .headers(self.headers_with_device(token, Some(device_id))?)
             .send()
             .await?;
@@ -584,31 +684,35 @@ impl DeviceSyncClient {
     ) -> Result<Option<SnapshotLatestResponse>> {
         match self.get_latest_snapshot(token, device_id).await {
             Ok(snapshot) => {
-                if Self::is_backend_strict_uuid(&snapshot.snapshot_id) {
+                let snapshot_id = snapshot.snapshot_id.trim();
+                if snapshot_id.is_empty() {
+                    let cursor = self.get_events_cursor(token, device_id).await?;
+                    return Ok(cursor
+                        .latest_snapshot
+                        .map(Self::snapshot_from_cursor_latest));
+                }
+                if Self::is_backend_strict_uuid(snapshot_id) {
                     return Ok(Some(snapshot));
                 }
-                let cursor = self.get_events_cursor(token, device_id).await?;
-                Ok(cursor.latest_snapshot.map(|value| SnapshotLatestResponse {
-                    snapshot_id: value.snapshot_id,
-                    schema_version: value.schema_version,
-                    covers_tables: Vec::new(),
-                    oplog_seq: value.oplog_seq,
-                    size_bytes: 0,
-                    checksum: String::new(),
-                    created_at: String::new(),
-                }))
+                match self.get_events_cursor(token, device_id).await {
+                    Ok(cursor) => Ok(Some(Self::choose_snapshot_from_latest_and_cursor(
+                        snapshot,
+                        cursor.latest_snapshot,
+                    ))),
+                    Err(err) => {
+                        debug!(
+                            "Failed to resolve cursor fallback for non-UUID snapshots/latest id '{}': {}. Using snapshots/latest.",
+                            snapshot_id, err
+                        );
+                        Ok(Some(snapshot))
+                    }
+                }
             }
             Err(err) if err.is_snapshot_id_validation_error() => {
                 let cursor = self.get_events_cursor(token, device_id).await?;
-                Ok(cursor.latest_snapshot.map(|value| SnapshotLatestResponse {
-                    snapshot_id: value.snapshot_id,
-                    schema_version: value.schema_version,
-                    covers_tables: Vec::new(),
-                    oplog_seq: value.oplog_seq,
-                    size_bytes: 0,
-                    checksum: String::new(),
-                    created_at: String::new(),
-                }))
+                Ok(cursor
+                    .latest_snapshot
+                    .map(Self::snapshot_from_cursor_latest))
             }
             Err(err) => Err(err),
         }
@@ -623,10 +727,10 @@ impl DeviceSyncClient {
         device_id: &str,
         snapshot_id: &str,
     ) -> Result<(SnapshotDownloadHeaders, Vec<u8>)> {
-        let url = format!("{}/api/v1/sync/snapshots/{}", self.base_url, snapshot_id);
+        let url = self.snapshot_download_url(snapshot_id)?;
         let response = self
             .client
-            .get(&url)
+            .get(url)
             .headers(self.headers_with_device(token, Some(device_id))?)
             .send()
             .await?;
@@ -646,26 +750,6 @@ impl DeviceSyncClient {
         };
 
         Ok((snapshot_headers, body))
-    }
-
-    /// Request a trusted device to generate snapshot.
-    ///
-    /// POST /api/v1/sync/snapshots/request
-    pub async fn request_snapshot(
-        &self,
-        token: &str,
-        device_id: &str,
-        req: SnapshotRequestPayload,
-    ) -> Result<SnapshotRequestResponse> {
-        let url = format!("{}/api/v1/sync/snapshots/request", self.base_url);
-        let response = self
-            .client
-            .post(&url)
-            .headers(self.headers_with_device(token, Some(device_id))?)
-            .json(&req)
-            .send()
-            .await?;
-        Self::parse_response(response).await
     }
 
     /// Upload a snapshot blob.
@@ -834,6 +918,9 @@ impl DeviceSyncClient {
                     |_| DeviceSyncError::invalid_request("Invalid snapshot payload key version"),
                 )?,
             );
+            if let Some(base_seq) = upload_headers.base_seq {
+                headers.insert("x-snapshot-base-seq", HeaderValue::from(base_seq));
+            }
 
             let send_result = self
                 .client
@@ -855,9 +942,16 @@ impl DeviceSyncClient {
                     let error = if let Ok(api_error) =
                         serde_json::from_str::<ApiErrorResponse>(&body)
                     {
-                        DeviceSyncError::api(
+                        let code = if api_error.code.is_empty() {
+                            api_error.error
+                        } else {
+                            api_error.code
+                        };
+                        DeviceSyncError::api_structured(
                             status.as_u16(),
-                            format!("{}: {}", api_error.code, api_error.message),
+                            code,
+                            api_error.message,
+                            api_error.details,
                         )
                     } else {
                         DeviceSyncError::api(status.as_u16(), format!("Request failed: {}", body))
@@ -1125,6 +1219,26 @@ mod tests {
     use tokio::net::TcpListener;
     use tokio::sync::Mutex as TokioMutex;
 
+    fn latest_snapshot(snapshot_id: &str, oplog_seq: i64) -> SnapshotLatestResponse {
+        SnapshotLatestResponse {
+            snapshot_id: snapshot_id.to_string(),
+            schema_version: 1,
+            covers_tables: Vec::new(),
+            oplog_seq,
+            size_bytes: 0,
+            checksum: String::new(),
+            created_at: String::new(),
+        }
+    }
+
+    fn cursor_snapshot(snapshot_id: &str, oplog_seq: i64) -> SyncLatestSnapshotRef {
+        SyncLatestSnapshotRef {
+            snapshot_id: snapshot_id.to_string(),
+            schema_version: 1,
+            oplog_seq,
+        }
+    }
+
     #[derive(Debug, Clone)]
     struct CapturedUploadRequest {
         event_id: Option<String>,
@@ -1165,6 +1279,7 @@ mod tests {
             checksum: compute_sha256_checksum(payload),
             metadata_payload: "meta".to_string(),
             payload_key_version: 1,
+            base_seq: None,
         }
     }
 
@@ -1310,6 +1425,47 @@ mod tests {
         });
 
         (format!("http://{}", addr), captured, handle)
+    }
+
+    #[test]
+    fn choose_snapshot_prefers_cursor_when_latest_id_is_non_uuid_and_cursor_is_uuid() {
+        let latest = latest_snapshot("snap-legacy-id", 100);
+        let cursor = cursor_snapshot("019bb9fe-f707-71e9-a40d-733575f4f246", 90);
+
+        let selected =
+            DeviceSyncClient::choose_snapshot_from_latest_and_cursor(latest, Some(cursor));
+        assert_eq!(selected.snapshot_id, "019bb9fe-f707-71e9-a40d-733575f4f246");
+    }
+
+    #[test]
+    fn choose_snapshot_prefers_higher_oplog_seq_from_cursor() {
+        let latest = latest_snapshot("019bb9fe-f707-71e9-a40d-733575f4f246", 100);
+        let cursor = cursor_snapshot("019bb9fe-f707-71e9-a40d-733575f4f247", 120);
+
+        let selected =
+            DeviceSyncClient::choose_snapshot_from_latest_and_cursor(latest, Some(cursor));
+        assert_eq!(selected.snapshot_id, "019bb9fe-f707-71e9-a40d-733575f4f247");
+    }
+
+    #[test]
+    fn choose_snapshot_keeps_latest_when_cursor_missing() {
+        let latest = latest_snapshot("019bb9fe-f707-71e9-a40d-733575f4f246", 100);
+
+        let selected = DeviceSyncClient::choose_snapshot_from_latest_and_cursor(latest, None);
+        assert_eq!(selected.snapshot_id, "019bb9fe-f707-71e9-a40d-733575f4f246");
+    }
+
+    #[test]
+    fn snapshot_download_url_encodes_snapshot_id_path_segment() {
+        let client = DeviceSyncClient::new("https://sync.example.com");
+        let url = client
+            .snapshot_download_url("snapshot/segment with spaces")
+            .expect("url");
+
+        assert_eq!(
+            url.as_str(),
+            "https://sync.example.com/api/v1/sync/snapshots/snapshot%2Fsegment%20with%20spaces"
+        );
     }
 
     #[tokio::test]

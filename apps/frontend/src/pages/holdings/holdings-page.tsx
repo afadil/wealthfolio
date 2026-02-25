@@ -24,10 +24,12 @@ import {
 } from "@/lib/constants";
 import { Account, HoldingType, AlternativeAssetHolding, AlternativeAssetKind } from "@/lib/types";
 import { canAddHoldings } from "@/lib/activity-restrictions";
+import { useIsMobileViewport } from "@/hooks/use-platform";
 import { HoldingsMobileFilterSheet } from "./components/holdings-mobile-filter-sheet";
 import { HoldingsTable } from "./components/holdings-table";
 import { HoldingsTableMobile } from "./components/holdings-table-mobile";
 import { AlternativeHoldingsTable } from "./components/alternative-holdings-table";
+import { AlternativeHoldingsListMobile } from "./components/alternative-holdings-list-mobile";
 import { HoldingsEditMode } from "./components/holdings-edit-mode";
 import {
   AlternativeAssetQuickAddModal,
@@ -45,6 +47,7 @@ import { QueryKeys } from "@/lib/query-keys";
 import { useSettingsContext } from "@/lib/settings-provider";
 
 export const HoldingsPage = () => {
+  const isMobileViewport = useIsMobileViewport();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const currentTab = searchParams.get("tab") ?? "investments";
@@ -440,18 +443,31 @@ export const HoldingsPage = () => {
           </EmptyPlaceholder>
         </div>
       ) : (
-        <AlternativeHoldingsTable
-          holdings={assetsHoldings}
-          isLoading={isDataLoading}
-          emptyTitle="No assets"
-          emptyDescription="Add your first asset using the button above."
-          onEdit={handleEditAsset}
-          onUpdateValue={setUpdateValueAsset}
-          onViewHistory={handleViewHistory}
-          onDelete={handleDeleteAsset}
-          onRowClick={handleRowClick}
-          isDeleting={isDeleting}
-        />
+        <>
+          {/* Desktop View */}
+          <div className="hidden md:block">
+            <AlternativeHoldingsTable
+              holdings={assetsHoldings}
+              isLoading={isDataLoading}
+              emptyTitle="No assets"
+              emptyDescription="Add your first asset using the button above."
+              onEdit={handleEditAsset}
+              onUpdateValue={setUpdateValueAsset}
+              onViewHistory={handleViewHistory}
+              onDelete={handleDeleteAsset}
+              onRowClick={handleRowClick}
+              isDeleting={isDeleting}
+            />
+          </div>
+          {/* Mobile View */}
+          <div className="block md:hidden">
+            <AlternativeHoldingsListMobile
+              holdings={assetsHoldings}
+              isLoading={isDataLoading}
+              onRowClick={handleRowClick}
+            />
+          </div>
+        </>
       )}
     </>
   );
@@ -473,18 +489,31 @@ export const HoldingsPage = () => {
           </EmptyPlaceholder>
         </div>
       ) : (
-        <AlternativeHoldingsTable
-          holdings={liabilitiesHoldings}
-          isLoading={isDataLoading}
-          emptyTitle="No liabilities"
-          emptyDescription="Add your first liability using the button above."
-          onEdit={handleEditAsset}
-          onUpdateValue={setUpdateValueAsset}
-          onViewHistory={handleViewHistory}
-          onDelete={handleDeleteAsset}
-          onRowClick={handleRowClick}
-          isDeleting={isDeleting}
-        />
+        <>
+          {/* Desktop View */}
+          <div className="hidden md:block">
+            <AlternativeHoldingsTable
+              holdings={liabilitiesHoldings}
+              isLoading={isDataLoading}
+              emptyTitle="No liabilities"
+              emptyDescription="Add your first liability using the button above."
+              onEdit={handleEditAsset}
+              onUpdateValue={setUpdateValueAsset}
+              onViewHistory={handleViewHistory}
+              onDelete={handleDeleteAsset}
+              onRowClick={handleRowClick}
+              isDeleting={isDeleting}
+            />
+          </div>
+          {/* Mobile View */}
+          <div className="block md:hidden">
+            <AlternativeHoldingsListMobile
+              holdings={liabilitiesHoldings}
+              isLoading={isDataLoading}
+              onRowClick={handleRowClick}
+            />
+          </div>
+        </>
       )}
     </>
   );
@@ -530,14 +559,26 @@ export const HoldingsPage = () => {
   const sharedActions = useMemo(
     () => (
       <>
-        <AccountSelector
-          selectedAccount={selectedAccount}
-          setSelectedAccount={handleAccountSelect}
-          variant="dropdown"
-          includePortfolio={true}
-          iconOnly={true}
-          icon={Icons.ListFilter}
-        />
+        {isMobileViewport && currentTab === "investments" ? (
+          <Button
+            size="icon-sm"
+            variant="outline"
+            className="h-9 w-9 rounded-full"
+            onClick={() => setIsFilterSheetOpen(true)}
+            aria-label="Open holdings filters"
+          >
+            <Icons.ListFilter className="h-4 w-4" />
+          </Button>
+        ) : (
+          <AccountSelector
+            selectedAccount={selectedAccount}
+            setSelectedAccount={handleAccountSelect}
+            variant="dropdown"
+            includePortfolio={true}
+            iconOnly={true}
+            icon={Icons.ListFilter}
+          />
+        )}
         {/* Show Update button for HOLDINGS-mode manual accounts (only on investments tab) */}
         {canEditHoldings && !isEditMode && currentTab === "investments" && (
           <Button size="sm" variant="outline" onClick={() => setIsEditMode(true)}>
@@ -553,6 +594,8 @@ export const HoldingsPage = () => {
       </>
     ),
     [
+      isMobileViewport,
+      setIsFilterSheetOpen,
       selectedAccount,
       handleAccountSelect,
       canEditHoldings,
@@ -575,7 +618,7 @@ export const HoldingsPage = () => {
       },
       {
         value: "assets",
-        label: "Personal Assets",
+        label: "Assets",
         icon: Icons.Wallet,
         content: assetsContent,
         actions: sharedActions,

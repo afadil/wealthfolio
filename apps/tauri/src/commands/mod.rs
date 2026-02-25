@@ -5,8 +5,11 @@ pub mod ai_chat;
 pub mod ai_providers;
 pub mod alternative_assets;
 pub mod asset;
+#[cfg(feature = "connect-sync")]
 pub mod brokers_sync;
+#[cfg(feature = "device-sync")]
 pub mod device_enroll_service;
+#[cfg(feature = "device-sync")]
 pub mod device_sync;
 pub mod error;
 pub mod goal;
@@ -18,7 +21,9 @@ pub mod portfolio;
 pub mod providers_settings;
 pub mod secrets;
 pub mod settings;
+#[cfg(feature = "device-sync")]
 pub mod sync_crypto;
 pub mod taxonomy;
 pub mod utilities;
+#[cfg(any(feature = "connect-sync", feature = "device-sync"))]
 pub mod wealthfolio_connect;

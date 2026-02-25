@@ -138,7 +138,7 @@ const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.C
         <SheetContent
           side={side}
           showCloseButton={showCloseButton}
-          className={cn(mobileClassName, "!rounded-t-4xl mx-1")}
+          className={cn(mobileClassName, "!rounded-t-4xl mx-1", className)}
         >
           {children}
         </SheetContent>

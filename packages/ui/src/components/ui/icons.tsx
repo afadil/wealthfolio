@@ -92,6 +92,7 @@ import {
   PanelLeft,
   PanelLeftOpen,
   PauseCircle,
+  PlayCircle,
   Pencil,
   Percent,
   PieChart,
@@ -240,6 +241,7 @@ const IconsInternal = {
   Minus: Minus,
   MinusCircle: MinusCircle,
   PauseCircle: PauseCircle,
+  PlayCircle: PlayCircle,
   Monitor: Monitor,
   QrCode: QrCode,
   Smartphone: Smartphone,
@@ -783,6 +785,7 @@ export type IconName =
   | "Minus"
   | "MinusCircle"
   | "PauseCircle"
+  | "PlayCircle"
   | "Monitor"
   | "QrCode"
   | "Smartphone"

@@ -13,9 +13,13 @@ pub use wealthfolio_core::sync::SyncEntity;
 /// API error response.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiErrorResponse {
+    #[serde(default)]
     pub error: String,
+    #[serde(default)]
     pub code: String,
     pub message: String,
+    #[serde(default)]
+    pub details: Option<serde_json::Value>,
 }
 
 /// Generic success response.
@@ -611,29 +615,6 @@ pub struct SnapshotDownloadHeaders {
     pub checksum: String,
 }
 
-/// Body for requesting on-demand snapshot generation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SnapshotRequestPayload {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(alias = "minSchemaVersion")]
-    pub min_schema_version: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(alias = "coversTables")]
-    pub covers_tables: Option<Vec<String>>,
-    pub payload: String,
-    #[serde(alias = "payloadKeyVersion")]
-    pub payload_key_version: i32,
-}
-
-/// Response from snapshot request endpoint.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SnapshotRequestResponse {
-    #[serde(alias = "requestId")]
-    pub request_id: String,
-    pub status: String,
-    pub message: String,
-}
-
 /// Header metadata required for snapshot upload.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SnapshotUploadHeaders {
@@ -650,6 +631,20 @@ pub struct SnapshotUploadHeaders {
     pub metadata_payload: String,
     #[serde(alias = "payloadKeyVersion")]
     pub payload_key_version: i32,
+    /// Oplog seq at which the snapshot was generated.
+    #[serde(default, alias = "baseSeq")]
+    pub base_seq: Option<i64>,
+}
+
+/// Response from the reconcile-ready-state endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReconcileReadyStateResponse {
+    /// "NOOP" | "PULL_TAIL" | "BOOTSTRAP_SNAPSHOT" | "WAIT_SNAPSHOT"
+    pub action: String,
+    #[serde(default)]
+    pub cursor: Option<i64>,
+    #[serde(default, alias = "latestSnapshot")]
+    pub latest_snapshot: Option<SyncLatestSnapshotRef>,
 }
 
 /// Snapshot upload response.

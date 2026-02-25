@@ -7,12 +7,10 @@ use crate::errors::StorageError;
 use crate::schema::goals;
 use crate::schema::goals::dsl::*;
 use crate::schema::goals_allocation;
-use crate::sync::{write_outbox_event, OutboxWriteRequest};
 use async_trait::async_trait;
 use diesel::prelude::*;
 use diesel::r2d2::{self, Pool};
 use diesel::SqliteConnection;
-use wealthfolio_core::sync::{SyncEntity, SyncOperation};
 
 use std::sync::Arc;
 use uuid::Uuid;
@@ -61,26 +59,18 @@ impl GoalRepositoryTrait for GoalRepository {
 
     async fn insert_new_goal(&self, new_goal: NewGoal) -> Result<Goal> {
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<Goal> {
+            .exec_tx(move |tx| -> Result<Goal> {
                 let mut new_goal_db: NewGoalDB = new_goal.into();
                 new_goal_db.id = Some(Uuid::new_v4().to_string());
 
                 let result_db = diesel::insert_into(goals::table)
                     .values(&new_goal_db)
                     .returning(GoalDB::as_returning())
-                    .get_result(conn)
+                    .get_result(tx.conn())
                     .map_err(StorageError::from)?;
                 let payload_db = result_db.clone();
                 let goal = Goal::from(result_db);
-                write_outbox_event(
-                    conn,
-                    OutboxWriteRequest::new(
-                        SyncEntity::Goal,
-                        goal.id.clone(),
-                        SyncOperation::Create,
-                        serde_json::to_value(&payload_db)?,
-                    ),
-                )?;
+                tx.insert(&payload_db)?;
                 Ok(goal)
             })
             .await
@@ -97,26 +87,18 @@ impl GoalRepositoryTrait for GoalRepository {
         };
 
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<Goal> {
+            .exec_tx(move |tx| -> Result<Goal> {
                 diesel::update(goals.find(goal_id_owned.clone()))
                     .set(&goal_db)
-                    .execute(conn)
+                    .execute(tx.conn())
                     .map_err(StorageError::from)?;
                 let result_db = goals
                     .filter(id.eq(goal_id_owned))
-                    .first::<GoalDB>(conn)
+                    .first::<GoalDB>(tx.conn())
                     .map_err(StorageError::from)?;
                 let payload_db = result_db.clone();
                 let goal = Goal::from(result_db);
-                write_outbox_event(
-                    conn,
-                    OutboxWriteRequest::new(
-                        SyncEntity::Goal,
-                        goal.id.clone(),
-                        SyncOperation::Update,
-                        serde_json::to_value(&payload_db)?,
-                    ),
-                )?;
+                tx.update(&payload_db)?;
                 Ok(goal)
             })
             .await
@@ -125,21 +107,13 @@ impl GoalRepositoryTrait for GoalRepository {
     async fn delete_goal(&self, goal_id_to_delete: String) -> Result<usize> {
         let goal_id_for_event = goal_id_to_delete.clone();
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
+            .exec_tx(move |tx| -> Result<usize> {
                 let affected = diesel::delete(goals.find(goal_id_to_delete))
-                    .execute(conn)
+                    .execute(tx.conn())
                     .map_err(StorageError::from)?;
 
                 if affected > 0 {
-                    write_outbox_event(
-                        conn,
-                        OutboxWriteRequest::new(
-                            SyncEntity::Goal,
-                            goal_id_for_event.clone(),
-                            SyncOperation::Delete,
-                            serde_json::json!({ "id": goal_id_for_event }),
-                        ),
-                    )?;
+                    tx.delete::<GoalDB>(goal_id_for_event.clone());
                 }
 
                 Ok(affected)
@@ -153,7 +127,7 @@ impl GoalRepositoryTrait for GoalRepository {
 
     async fn upsert_goal_allocations(&self, allocations: Vec<GoalsAllocation>) -> Result<usize> {
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
+            .exec_tx(move |tx| -> Result<usize> {
                 let mut affected_rows = 0;
                 for allocation in allocations {
                     let allocation_db: GoalsAllocationDB = allocation.into();
@@ -162,17 +136,9 @@ impl GoalRepositoryTrait for GoalRepository {
                         .on_conflict(goals_allocation::id)
                         .do_update()
                         .set(&allocation_db)
-                        .execute(conn)
+                        .execute(tx.conn())
                         .map_err(StorageError::from)?;
-                    write_outbox_event(
-                        conn,
-                        OutboxWriteRequest::new(
-                            SyncEntity::GoalsAllocation,
-                            allocation_db.id.clone(),
-                            SyncOperation::Update,
-                            serde_json::to_value(&allocation_db)?,
-                        ),
-                    )?;
+                    tx.update(&allocation_db)?;
                 }
                 Ok(affected_rows)
             })

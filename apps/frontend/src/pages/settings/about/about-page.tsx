@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import { getAppInfo } from "@/adapters";
+import { usePlatform } from "@/hooks/use-platform";
+import { useCheckForUpdates } from "@/hooks/use-updater";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Card,
@@ -12,8 +14,6 @@ import {
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
-import { usePlatform } from "@/hooks/use-platform";
-import { useCheckForUpdates } from "@/hooks/use-updater";
 import { SettingsHeader } from "../settings-header";
 
 export default function AboutSettingsPage() {
@@ -181,7 +181,7 @@ export default function AboutSettingsPage() {
           <div className="space-y-4">
             <p className="text-muted-foreground text-sm">
               Have questions or found a bug? Please email us at{" "}
-              <span className="select-all font-mono font-semibold">wealthfolio@teymz.com</span>
+              <span className="select-all font-mono font-semibold">support@wealthfolio.app</span>
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <Button
@@ -190,7 +190,7 @@ export default function AboutSettingsPage() {
                 size="sm"
                 className="inline-flex items-center gap-2"
               >
-                <a href="mailto:wealthfolio@teymz.com">
+                <a href="mailto:support@wealthfolio.app">
                   <Icons.ExternalLink className="h-4 w-4" />
                   Email Us
                 </a>

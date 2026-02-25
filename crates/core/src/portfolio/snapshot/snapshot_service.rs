@@ -1003,7 +1003,7 @@ impl SnapshotService {
     // create_initial_snapshot creates a snapshot with default values
     fn create_initial_snapshot(account: &Account, date: NaiveDate) -> AccountStateSnapshot {
         AccountStateSnapshot {
-            id: format!("{}_{}", account.id, date.format("%Y-%m-%d")),
+            id: AccountStateSnapshot::stable_id(&account.id, date),
             account_id: account.id.clone(),
             snapshot_date: date,
             currency: account.currency.clone(),
@@ -1560,11 +1560,7 @@ impl SnapshotServiceTrait for SnapshotService {
         // Note: snapshot.source is preserved from the caller (ManualEntry or CsvImport)
 
         // Generate the snapshot ID based on account_id and date
-        snapshot.id = format!(
-            "{}_{}",
-            account_id,
-            snapshot.snapshot_date.format("%Y-%m-%d")
-        );
+        snapshot.id = AccountStateSnapshot::stable_id(account_id, snapshot.snapshot_date);
 
         // Check if content is unchanged from existing snapshot on the same date (skip if identical)
         // Only compare against the same date to avoid false matches with SYNTHETIC backfill snapshots
@@ -1682,7 +1678,7 @@ impl SnapshotServiceTrait for SnapshotService {
 
         // Clone the earliest snapshot with new date and source
         let synthetic = AccountStateSnapshot {
-            id: format!("{}_{}", account_id, synthetic_date.format("%Y-%m-%d")),
+            id: AccountStateSnapshot::stable_id(account_id, synthetic_date),
             account_id: account_id.to_string(),
             snapshot_date: synthetic_date,
             source: SnapshotSource::Synthetic,
