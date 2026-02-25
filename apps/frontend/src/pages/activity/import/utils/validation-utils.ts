@@ -12,10 +12,7 @@ import { logger } from "@/adapters";
 import { SUBTYPES_BY_ACTIVITY_TYPE, SUBTYPE_DISPLAY_NAMES } from "@/lib/constants";
 import { looksLikeOccSymbol, normalizeOptionSymbol } from "@/lib/occ-symbol";
 import { looksLikeIsin } from "@/lib/isin";
-import {
-  normalizeInstrumentType,
-  splitInstrumentPrefixedSymbol,
-} from "./instrument-type";
+import { normalizeInstrumentType, splitInstrumentPrefixedSymbol } from "./instrument-type";
 
 // Ticker symbol validation regex
 const tickerRegex = /^(CASH:[A-Z]{3}|[A-Z0-9]{1,10}([.-][A-Z0-9]+){0,2})$/;

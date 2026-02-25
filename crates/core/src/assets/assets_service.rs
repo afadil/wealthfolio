@@ -751,22 +751,25 @@ impl AssetServiceTrait for AssetService {
 
         // Build option metadata from OCC symbol when creating an option asset
         let asset_metadata = if instrument_type.as_ref() == Some(&InstrumentType::Option) {
-            let symbol_str = canonical_identity
-                .instrument_symbol
-                .as_deref()
-                .or_else(|| metadata.as_ref().and_then(|m| m.instrument_symbol.as_deref()));
+            let symbol_str = canonical_identity.instrument_symbol.as_deref().or_else(|| {
+                metadata
+                    .as_ref()
+                    .and_then(|m| m.instrument_symbol.as_deref())
+            });
             symbol_str.and_then(|sym| {
-                crate::utils::occ_symbol::parse_occ_symbol(sym).ok().map(|parsed| {
-                    let option_spec = super::OptionSpec {
-                        underlying_asset_id: String::new(),
-                        expiration: parsed.expiration,
-                        right: parsed.option_type.as_str().to_string(),
-                        strike: parsed.strike_price,
-                        multiplier: rust_decimal::Decimal::from(100),
-                        occ_symbol: Some(sym.to_string()),
-                    };
-                    serde_json::json!({ "option": option_spec })
-                })
+                crate::utils::occ_symbol::parse_occ_symbol(sym)
+                    .ok()
+                    .map(|parsed| {
+                        let option_spec = super::OptionSpec {
+                            underlying_asset_id: String::new(),
+                            expiration: parsed.expiration,
+                            right: parsed.option_type.as_str().to_string(),
+                            strike: parsed.strike_price,
+                            multiplier: rust_decimal::Decimal::from(100),
+                            occ_symbol: Some(sym.to_string()),
+                        };
+                        serde_json::json!({ "option": option_spec })
+                    })
             })
         } else {
             None
@@ -809,7 +812,10 @@ impl AssetServiceTrait for AssetService {
             };
             let classifier = AutoClassificationService::new(Arc::clone(taxonomy_service));
             if let Err(e) = classifier.classify_asset(&asset.id, &input).await {
-                debug!("Auto-classification at creation failed for {}: {}", asset.id, e);
+                debug!(
+                    "Auto-classification at creation failed for {}: {}",
+                    asset.id, e
+                );
             }
         }
 
@@ -893,10 +899,7 @@ impl AssetServiceTrait for AssetService {
                         provider_config: existing_asset.provider_config.clone(),
                         metadata: Some(serde_json::Value::Object(metadata)),
                     };
-                    let _ = self
-                        .asset_repository
-                        .update_profile(asset_id, update)
-                        .await;
+                    let _ = self.asset_repository.update_profile(asset_id, update).await;
                 }
             }
         }
@@ -1075,10 +1078,10 @@ impl AssetServiceTrait for AssetService {
                     .instrument_type
                     .as_ref()
                     .map(|t| t.as_db_str()),
-                _ => provider_profile
-                    .asset_type
-                    .as_deref()
-                    .or(existing_asset.instrument_type.as_ref().map(|t| t.as_db_str())),
+                _ => provider_profile.asset_type.as_deref().or(existing_asset
+                    .instrument_type
+                    .as_ref()
+                    .map(|t| t.as_db_str())),
             };
             let classification_input = ClassificationInput::from_provider_profile(
                 provider_quote_type,

@@ -45,7 +45,10 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
     const parsed = parseOccSymbol(upper);
     if (parsed) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setValue(underlyingName, parsed.underlying as any, { shouldValidate: true, shouldDirty: true });
+      setValue(underlyingName, parsed.underlying as any, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setValue(strikePriceName, parsed.strikePrice as any, { shouldDirty: true });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -103,7 +106,9 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
                   step="0.01"
                   {...field}
                   value={(field.value as number) ?? ""}
-                  onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                  onChange={(e) =>
+                    field.onChange(e.target.value ? Number(e.target.value) : undefined)
+                  }
                   className="h-10"
                   aria-label="Strike Price"
                 />

@@ -289,10 +289,7 @@ mod tests {
             unimplemented!()
         }
 
-        async fn fetch_bond_details(
-            &self,
-            _isin: &str,
-        ) -> Option<crate::assets::BondSpec> {
+        async fn fetch_bond_details(&self, _isin: &str) -> Option<crate::assets::BondSpec> {
             None
         }
 

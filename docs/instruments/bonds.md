@@ -1,7 +1,8 @@
 # Bond Support
 
-Bonds (corporate, government, treasury) are first-class instrument types identified
-by ISIN. Prices follow the percentage-of-par convention used in fixed income markets.
+Bonds (corporate, government, treasury) are first-class instrument types
+identified by ISIN. Prices follow the percentage-of-par convention used in fixed
+income markets.
 
 ## Data Model
 
@@ -27,64 +28,69 @@ Bond prices are stored as **decimal fractions of par** (0-1 range):
 - 97.025% of par is stored as `0.97025`
 - 100% of par is stored as `1.0`
 
-Users enter prices as percentages on the frontend; the entry boundary divides by 100.
-All providers convert to this convention before returning quotes.
+Users enter prices as percentages on the frontend; the entry boundary divides
+by 100. All providers convert to this convention before returning quotes.
 
 ## Market Data Providers
 
 Three providers handle bonds, registered in `crates/core/src/quotes/client.rs`:
 
-| Provider | Priority | Capabilities | Coverage |
-|----------|----------|-------------|----------|
-| US Treasury Calc | 10 | Pricing only | US Treasuries (ISIN prefix `US912`) |
-| Boerse Frankfurt | 15 | Pricing + profiles | European bonds, some US corporates |
-| OpenFIGI | 5 | Profiles only | Global (any ISIN) |
+| Provider         | Priority | Capabilities       | Coverage                            |
+| ---------------- | -------- | ------------------ | ----------------------------------- |
+| US Treasury Calc | 10       | Pricing only       | US Treasuries (ISIN prefix `US912`) |
+| Boerse Frankfurt | 15       | Pricing + profiles | European bonds, some US corporates  |
+| OpenFIGI         | 5        | Profiles only      | Global (any ISIN)                   |
 
-**Pricing flow:** The resolver (`crates/market-data/src/resolver/rules_resolver.rs`)
-passes the ISIN through to each provider. US Treasury Calc is skipped for non-`US912`
-ISINs. Providers are tried in priority order until one succeeds.
+**Pricing flow:** The resolver
+(`crates/market-data/src/resolver/rules_resolver.rs`) passes the ISIN through to
+each provider. US Treasury Calc is skipped for non-`US912` ISINs. Providers are
+tried in priority order until one succeeds.
 
-**Profile flow (name enrichment):** Boerse Frankfurt is tried first (nice European
-names like "Nestl&eacute; Finance International Ltd. 1,5% 20/30"), then OpenFIGI as
-fallback (US corporates like "JPMORGAN CHASE & CO - JPM V2.069 06/01/29").
+**Profile flow (name enrichment):** Boerse Frankfurt is tried first (nice
+European names like "Nestl&eacute; Finance International Ltd. 1,5% 20/30"), then
+OpenFIGI as fallback (US corporates like "JPMORGAN CHASE & CO - JPM V2.069
+06/01/29").
 
 ### US Treasury Calc
 
 `crates/market-data/src/provider/us_treasury_calc/mod.rs`
 
-Computes bond present value from Treasury.gov yield curve data. Fetches daily XML
-yield curves, interpolates to the bond's remaining maturity, and discounts coupon
-payments + principal. Handles both coupon bonds (PV of cash flows) and zero-coupon
-T-bills (simple discount). Requires `BondQuoteMetadata` (coupon rate, maturity,
-face value, frequency) in the `QuoteContext`.
+Computes bond present value from Treasury.gov yield curve data. Fetches daily
+XML yield curves, interpolates to the bond's remaining maturity, and discounts
+coupon payments + principal. Handles both coupon bonds (PV of cash flows) and
+zero-coupon T-bills (simple discount). Requires `BondQuoteMetadata` (coupon
+rate, maturity, face value, frequency) in the `QuoteContext`.
 
 ### Boerse Frankfurt
 
 `crates/market-data/src/provider/boerse_frankfurt/mod.rs`
 
-Fetches bond price history from Deutsche Boerse's live API (XFRA exchange). Uses a
-salt scraped from the frontend JS bundle to compute per-request auth headers. Also
-provides profile data (instrument names) via the `instrument_information` endpoint.
+Fetches bond price history from Deutsche Boerse's live API (XFRA exchange). Uses
+a salt scraped from the frontend JS bundle to compute per-request auth headers.
+Also provides profile data (instrument names) via the `instrument_information`
+endpoint.
 
 ### OpenFIGI
 
 `crates/market-data/src/provider/openfigi/mod.rs`
 
-Profile-only provider. POSTs to `api.openfigi.com/v3/mapping` with an ISIN, returns
-issuer name + ticker in format `"{name} - {ticker}"`. Free, no API key, 25 req/min
-rate limit.
+Profile-only provider. POSTs to `api.openfigi.com/v3/mapping` with an ISIN,
+returns issuer name + ticker in format `"{name} - {ticker}"`. Free, no API key,
+25 req/min rate limit.
 
 ## Provider Pinning
 
 On first successful price sync, the winning provider is saved to
-`asset.provider_config.preferred_provider`. Subsequent syncs skip the trial-and-error
-and go directly to the pinned provider. See `crates/core/src/quotes/sync.rs`.
+`asset.provider_config.preferred_provider`. Subsequent syncs skip the
+trial-and-error and go directly to the pinned provider. See
+`crates/core/src/quotes/sync.rs`.
 
 ## Name Enrichment
 
-During sync, if a bond's name is still a placeholder (name == ISIN), the sync service
-calls `get_profile()` to fetch a real name from Boerse Frankfurt or OpenFIGI, then
-persists it via `update_name()`. See `crates/core/src/quotes/sync.rs`.
+During sync, if a bond's name is still a placeholder (name == ISIN), the sync
+service calls `get_profile()` to fetch a real name from Boerse Frankfurt or
+OpenFIGI, then persists it via `update_name()`. See
+`crates/core/src/quotes/sync.rs`.
 
 ## ISIN and CUSIP Utilities
 
@@ -97,15 +103,16 @@ persists it via `update_name()`. See `crates/core/src/quotes/sync.rs`.
 
 Bonds reuse standard types:
 
-| Action | Activity Type |
-|--------|--------------|
-| Buy | `BUY` |
-| Sell | `SELL` |
-| Coupon payment | `INTEREST` |
+| Action         | Activity Type |
+| -------------- | ------------- |
+| Buy            | `BUY`         |
+| Sell           | `SELL`        |
+| Coupon payment | `INTEREST`    |
 
 ## CSV Import
 
 Bonds are detected during CSV import by:
+
 1. Explicit type hint (`BOND` or `FIXED_INCOME` in a type column)
 2. ISIN detection via Luhn validation on the symbol
 
@@ -115,9 +122,10 @@ be added later via the asset edit sheet.
 
 ## Frontend
 
-Bond fields are integrated into the buy/sell forms via the `assetType` discriminator,
-with labels that adapt ("Face Value" / "Price % of Par" instead of "Shares" / "Price").
-Bond-specific fields in `apps/frontend/src/pages/activity/components/forms/fields/`.
+Bond fields are integrated into the buy/sell forms via the `assetType`
+discriminator, with labels that adapt ("Face Value" / "Price % of Par" instead
+of "Shares" / "Price"). Bond-specific fields in
+`apps/frontend/src/pages/activity/components/forms/fields/`.
 
 ## Performance Tips
 
@@ -129,10 +137,10 @@ For non-Treasury bonds, US Treasury Calc fails quickly, but Boerse Frankfurt
 network calls add latency for each bond.
 
 If your portfolio is mostly US Treasuries, you can speed up the initial sync by
-configuring the provider priority to try US Treasury Calc before Boerse Frankfurt.
-After the first successful sync, each bond is pinned to its winning provider
-(see "Provider Pinning" above), so subsequent syncs are fast regardless of
-priority order.
+configuring the provider priority to try US Treasury Calc before Boerse
+Frankfurt. After the first successful sync, each bond is pinned to its winning
+provider (see "Provider Pinning" above), so subsequent syncs are fast regardless
+of priority order.
 
 Note: US Treasury Calc only supports `US912`-prefix ISINs and requires bond
 metadata (coupon rate, maturity date) from enrichment. It will fail for

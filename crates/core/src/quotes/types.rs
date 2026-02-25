@@ -348,12 +348,8 @@ impl From<DataSource> for QuoteSource {
             DataSource::MarketDataApp => QuoteSource::Provider(ProviderId::marketdata_app()),
             DataSource::MetalPriceApi => QuoteSource::Provider(ProviderId::metal_price_api()),
             DataSource::Finnhub => QuoteSource::Provider(ProviderId::finnhub()),
-            DataSource::BoerseFrankfurt => {
-                QuoteSource::Provider(ProviderId::boerse_frankfurt())
-            }
-            DataSource::UsTreasuryCalc => {
-                QuoteSource::Provider(ProviderId::us_treasury_calc())
-            }
+            DataSource::BoerseFrankfurt => QuoteSource::Provider(ProviderId::boerse_frankfurt()),
+            DataSource::UsTreasuryCalc => QuoteSource::Provider(ProviderId::us_treasury_calc()),
         }
     }
 }

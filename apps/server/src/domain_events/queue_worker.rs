@@ -130,10 +130,11 @@ async fn process_event_batch(events: &[DomainEvent], deps: Arc<QueueWorkerDeps>)
         );
 
         let total = enrichment_assets.len();
-        deps.event_bus.publish(crate::events::ServerEvent::with_payload(
-            crate::events::ASSET_ENRICHMENT_START,
-            serde_json::json!({ "total": total }),
-        ));
+        deps.event_bus
+            .publish(crate::events::ServerEvent::with_payload(
+                crate::events::ASSET_ENRICHMENT_START,
+                serde_json::json!({ "total": total }),
+            ));
 
         let mut total_enriched: usize = 0;
         let mut total_skipped: usize = 0;
@@ -149,21 +150,23 @@ async fn process_event_batch(events: &[DomainEvent], deps: Arc<QueueWorkerDeps>)
                     total_failed += failed;
 
                     let completed = total_enriched + total_skipped + total_failed;
-                    deps.event_bus.publish(crate::events::ServerEvent::with_payload(
-                        crate::events::ASSET_ENRICHMENT_PROGRESS,
-                        serde_json::json!({
-                            "completed": completed,
-                            "total": total,
-                        }),
-                    ));
+                    deps.event_bus
+                        .publish(crate::events::ServerEvent::with_payload(
+                            crate::events::ASSET_ENRICHMENT_PROGRESS,
+                            serde_json::json!({
+                                "completed": completed,
+                                "total": total,
+                            }),
+                        ));
                 }
                 Err(e) => {
                     tracing::warn!("Asset enrichment chunk failed: {}", e);
                     had_error = true;
-                    deps.event_bus.publish(crate::events::ServerEvent::with_payload(
-                        crate::events::ASSET_ENRICHMENT_ERROR,
-                        serde_json::json!(e.to_string()),
-                    ));
+                    deps.event_bus
+                        .publish(crate::events::ServerEvent::with_payload(
+                            crate::events::ASSET_ENRICHMENT_ERROR,
+                            serde_json::json!(e.to_string()),
+                        ));
                     break;
                 }
             }
@@ -176,14 +179,15 @@ async fn process_event_batch(events: &[DomainEvent], deps: Arc<QueueWorkerDeps>)
                 total_skipped,
                 total_failed
             );
-            deps.event_bus.publish(crate::events::ServerEvent::with_payload(
-                crate::events::ASSET_ENRICHMENT_COMPLETE,
-                serde_json::json!({
-                    "enriched": total_enriched,
-                    "skipped": total_skipped,
-                    "failed": total_failed,
-                }),
-            ));
+            deps.event_bus
+                .publish(crate::events::ServerEvent::with_payload(
+                    crate::events::ASSET_ENRICHMENT_COMPLETE,
+                    serde_json::json!({
+                        "enriched": total_enriched,
+                        "skipped": total_skipped,
+                        "failed": total_failed,
+                    }),
+                ));
         }
     }
 
@@ -352,7 +356,9 @@ async fn run_portfolio_job(
             .force_recalculate_total_portfolio_snapshots()
             .await
     } else {
-        deps.snapshot_service.calculate_total_portfolio_snapshots().await
+        deps.snapshot_service
+            .calculate_total_portfolio_snapshots()
+            .await
     };
     if let Err(err) = total_result {
         let err_msg = format!("Failed to calculate TOTAL portfolio snapshot: {}", err);

@@ -11,7 +11,9 @@ use serde::Deserialize;
 use std::time::Duration;
 
 use crate::errors::MarketDataError;
-use crate::models::{AssetProfile, Coverage, InstrumentKind, ProviderInstrument, Quote, QuoteContext};
+use crate::models::{
+    AssetProfile, Coverage, InstrumentKind, ProviderInstrument, Quote, QuoteContext,
+};
 use crate::provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
 
 const PROVIDER_ID: &str = "OPENFIGI";
@@ -76,15 +78,22 @@ impl OpenFigiProvider {
             .into_iter()
             .next()
             .and_then(|r| r.data)
-            .and_then(|mut d| if d.is_empty() { None } else { Some(d.remove(0)) })
+            .and_then(|mut d| {
+                if d.is_empty() {
+                    None
+                } else {
+                    Some(d.remove(0))
+                }
+            })
             .ok_or_else(|| MarketDataError::SymbolNotFound(isin.to_string()))?;
 
-        let name = data.name.filter(|n| !n.is_empty()).ok_or_else(|| {
-            MarketDataError::ProviderError {
-                provider: PROVIDER_ID.to_string(),
-                message: format!("No name found for {}", isin),
-            }
-        })?;
+        let name =
+            data.name
+                .filter(|n| !n.is_empty())
+                .ok_or_else(|| MarketDataError::ProviderError {
+                    provider: PROVIDER_ID.to_string(),
+                    message: format!("No name found for {}", isin),
+                })?;
 
         match data.ticker.filter(|t| !t.is_empty()) {
             Some(ticker) => Ok(format!("{} - {}", name, ticker)),

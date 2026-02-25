@@ -292,7 +292,9 @@ export const ActivityTable = ({
 
           const isBond = row.original.instrumentType === "BOND";
           if (isBond) {
-            return <div className="text-right">{displayBondPrice(unitPrice, "BOND").toFixed(3)}%</div>;
+            return (
+              <div className="text-right">{displayBondPrice(unitPrice, "BOND").toFixed(3)}%</div>
+            );
           }
           return <div className="text-right">{formatAmount(unitPrice, currency)}</div>;
         },

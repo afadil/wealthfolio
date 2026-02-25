@@ -19,7 +19,9 @@ use tokio::sync::RwLock;
 use tracing::warn;
 
 use crate::errors::MarketDataError;
-use crate::models::{AssetProfile, Coverage, InstrumentKind, ProviderInstrument, Quote, QuoteContext};
+use crate::models::{
+    AssetProfile, Coverage, InstrumentKind, ProviderInstrument, Quote, QuoteContext,
+};
 use crate::provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
 
 const PROVIDER_ID: &str = "BOERSE_FRANKFURT";

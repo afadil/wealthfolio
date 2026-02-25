@@ -10,10 +10,7 @@ import { tryParseDate } from "@/lib/utils";
 import { parse, parseISO, isValid } from "date-fns";
 import { getDateFnsPattern } from "../utils/date-format-options";
 import { findMappedActivityType } from "../utils/activity-type-mapping";
-import {
-  normalizeInstrumentType,
-  splitInstrumentPrefixedSymbol,
-} from "../utils/instrument-type";
+import { normalizeInstrumentType, splitInstrumentPrefixedSymbol } from "../utils/instrument-type";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { ProgressIndicator } from "@wealthfolio/ui/components/ui/progress-indicator";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -696,10 +693,7 @@ export function ReviewStep() {
                 warnings: localValidation.warnings,
                 duplicateOfId: undefined,
                 duplicateOfLineNumber: undefined,
-                status:
-                  draft.status === "skipped"
-                    ? draft.status
-                    : localValidation.status,
+                status: draft.status === "skipped" ? draft.status : localValidation.status,
               };
             }
 

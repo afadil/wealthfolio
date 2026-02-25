@@ -3682,11 +3682,8 @@ mod tests {
         let mut repo = MockAssetRepository::new();
         repo.add_option_asset("AAPL240119C00195000", "USD", dec!(100));
 
-        let calculator = create_calculator_with_repo(
-            Arc::new(mock_fx_service),
-            base_currency,
-            repo,
-        );
+        let calculator =
+            create_calculator_with_repo(Arc::new(mock_fx_service), base_currency, repo);
 
         let target_date_str = "2024-01-02";
         let target_date = NaiveDate::from_str(target_date_str).unwrap();
@@ -3732,17 +3729,15 @@ mod tests {
         let mut repo = MockAssetRepository::new();
         repo.add_option_asset("AAPL240119C00195000", "USD", dec!(100));
 
-        let calculator = create_calculator_with_repo(
-            Arc::new(mock_fx_service),
-            base_currency,
-            repo,
-        );
+        let calculator =
+            create_calculator_with_repo(Arc::new(mock_fx_service), base_currency, repo);
 
         let target_date_str = "2024-01-02";
         let target_date = NaiveDate::from_str(target_date_str).unwrap();
 
         // Set up previous snapshot with an existing option position (2 contracts)
-        let mut previous_snapshot = create_initial_snapshot("acc_opt", account_currency, "2024-01-01");
+        let mut previous_snapshot =
+            create_initial_snapshot("acc_opt", account_currency, "2024-01-01");
         let mut position = Position::new(
             "acc_opt".to_string(),
             "AAPL240119C00195000".to_string(),
@@ -3761,7 +3756,9 @@ mod tests {
             acquisition_date: Utc::now(),
             fx_rate_to_position: None,
         }]);
-        previous_snapshot.positions.insert("AAPL240119C00195000".to_string(), position);
+        previous_snapshot
+            .positions
+            .insert("AAPL240119C00195000".to_string(), position);
 
         let sell = create_activity_with_fx_rate(
             "opt_sell_1",
@@ -3802,17 +3799,15 @@ mod tests {
         let mut repo = MockAssetRepository::new();
         repo.add_option_asset("AAPL240119C00195000", "USD", dec!(100));
 
-        let calculator = create_calculator_with_repo(
-            Arc::new(mock_fx_service),
-            base_currency,
-            repo,
-        );
+        let calculator =
+            create_calculator_with_repo(Arc::new(mock_fx_service), base_currency, repo);
 
         let target_date_str = "2024-01-19";
         let target_date = NaiveDate::from_str(target_date_str).unwrap();
 
         // Set up previous snapshot with 3 option contracts
-        let mut previous_snapshot = create_initial_snapshot("acc_opt", account_currency, "2024-01-18");
+        let mut previous_snapshot =
+            create_initial_snapshot("acc_opt", account_currency, "2024-01-18");
         let mut position = Position::new(
             "acc_opt".to_string(),
             "AAPL240119C00195000".to_string(),
@@ -3831,18 +3826,22 @@ mod tests {
             acquisition_date: Utc::now(),
             fx_rate_to_position: None,
         }]);
-        previous_snapshot.positions.insert("AAPL240119C00195000".to_string(), position);
+        previous_snapshot
+            .positions
+            .insert("AAPL240119C00195000".to_string(), position);
 
         // Seed initial cash balance to verify no change
-        previous_snapshot.cash_balances.insert("USD".to_string(), dec!(5000));
+        previous_snapshot
+            .cash_balances
+            .insert("USD".to_string(), dec!(5000));
 
         let mut expiry = create_activity_with_fx_rate(
             "opt_expiry_1",
             ActivityType::from_str("ADJUSTMENT").unwrap(),
             "AAPL240119C00195000",
-            dec!(3),    // 3 contracts expiring
-            dec!(0),    // no price
-            dec!(0),    // no fee
+            dec!(3), // 3 contracts expiring
+            dec!(0), // no price
+            dec!(0), // no fee
             "USD",
             target_date_str,
             None,
@@ -3856,12 +3855,23 @@ mod tests {
 
         // Position: all lots removed
         let position = state.positions.get("AAPL240119C00195000").unwrap();
-        assert_eq!(position.quantity, dec!(0), "All lots should be removed after expiry");
-        assert!(position.lots.is_empty(), "Lot queue should be empty after expiry");
+        assert_eq!(
+            position.quantity,
+            dec!(0),
+            "All lots should be removed after expiry"
+        );
+        assert!(
+            position.lots.is_empty(),
+            "Lot queue should be empty after expiry"
+        );
 
         // Cash: unchanged (no cash effect for expiry)
         let cash = state.cash_balances.get("USD").unwrap();
-        assert_eq!(*cash, dec!(5000), "Cash should be unchanged after option expiry");
+        assert_eq!(
+            *cash,
+            dec!(5000),
+            "Cash should be unchanged after option expiry"
+        );
     }
 
     #[test]
@@ -3875,7 +3885,8 @@ mod tests {
 
         let target_date_str = "2024-01-02";
         let target_date = NaiveDate::from_str(target_date_str).unwrap();
-        let previous_snapshot = create_initial_snapshot("acc_stock", account_currency, "2024-01-01");
+        let previous_snapshot =
+            create_initial_snapshot("acc_stock", account_currency, "2024-01-01");
 
         let buy = create_activity_with_fx_rate(
             "stock_buy_1",

@@ -39,9 +39,9 @@ use crate::secrets::SecretStore;
 use wealthfolio_market_data::{
     mic_to_currency, mic_to_exchange_name, yahoo_exchange_to_mic, yahoo_suffix_to_mic,
     AlphaVantageProvider, AssetProfile as MarketAssetProfile, BoerseFrankfurtProvider,
-    BondQuoteMetadata, FinnhubProvider, MarketDataAppProvider, MetalPriceApiProvider, OpenFigiProvider,
-    ProviderId, ProviderRegistry, Quote as MarketQuote, QuoteContext, ResolverChain,
-    SearchResult as MarketSearchResult, UsTreasuryCalcProvider, YahooProvider,
+    BondQuoteMetadata, FinnhubProvider, MarketDataAppProvider, MetalPriceApiProvider,
+    OpenFigiProvider, ProviderId, ProviderRegistry, Quote as MarketQuote, QuoteContext,
+    ResolverChain, SearchResult as MarketSearchResult, UsTreasuryCalcProvider, YahooProvider,
 };
 
 /// Market data error types.
@@ -205,15 +205,9 @@ impl MarketDataClient {
                 }
                 Ok(None)
             }
-            DATA_SOURCE_BOERSE_FRANKFURT => {
-                Ok(Some(Arc::new(BoerseFrankfurtProvider::new())))
-            }
-            DATA_SOURCE_US_TREASURY_CALC => {
-                Ok(Some(Arc::new(UsTreasuryCalcProvider::new())))
-            }
-            DATA_SOURCE_OPENFIGI => {
-                Ok(Some(Arc::new(OpenFigiProvider::new())))
-            }
+            DATA_SOURCE_BOERSE_FRANKFURT => Ok(Some(Arc::new(BoerseFrankfurtProvider::new()))),
+            DATA_SOURCE_US_TREASURY_CALC => Ok(Some(Arc::new(UsTreasuryCalcProvider::new()))),
+            DATA_SOURCE_OPENFIGI => Ok(Some(Arc::new(OpenFigiProvider::new()))),
             _ => {
                 warn!("Unknown provider ID: {}", provider_id);
                 Ok(None)
@@ -317,7 +311,9 @@ impl MarketDataClient {
             let coupon_rate = bs.coupon_rate?;
             let maturity_date = bs.maturity_date?;
             let face_value = bs.face_value?;
-            let coupon_frequency = bs.coupon_frequency.unwrap_or_else(|| "SEMI_ANNUAL".to_string());
+            let coupon_frequency = bs
+                .coupon_frequency
+                .unwrap_or_else(|| "SEMI_ANNUAL".to_string());
             Some(BondQuoteMetadata {
                 coupon_rate,
                 maturity_date,

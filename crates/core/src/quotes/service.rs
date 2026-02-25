@@ -228,10 +228,7 @@ pub trait QuoteServiceTrait: Send + Sync {
     async fn get_asset_profile(&self, asset: &Asset) -> Result<ProviderProfile>;
 
     /// Fetch bond details from TreasuryDirect for US Treasury bonds.
-    async fn fetch_bond_details(
-        &self,
-        isin: &str,
-    ) -> Option<crate::assets::BondSpec>;
+    async fn fetch_bond_details(&self, isin: &str) -> Option<crate::assets::BondSpec>;
 
     /// Fetch historical quotes from provider.
     async fn fetch_quotes_from_provider(
@@ -1030,10 +1027,7 @@ where
         self.client.read().await.get_profile(asset).await
     }
 
-    async fn fetch_bond_details(
-        &self,
-        isin: &str,
-    ) -> Option<crate::assets::BondSpec> {
+    async fn fetch_bond_details(&self, isin: &str) -> Option<crate::assets::BondSpec> {
         let details = self.client.read().await.fetch_bond_details(isin).await?;
         Some(crate::assets::BondSpec {
             isin: Some(isin.to_string()),

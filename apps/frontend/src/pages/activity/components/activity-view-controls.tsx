@@ -148,9 +148,7 @@ export function ActivityViewControls({
           title="Instrument"
           options={instrumentTypeOptions}
           selectedValues={new Set(selectedInstrumentTypes)}
-          onFilterChange={(values: Set<string>) =>
-            onInstrumentTypesChange(Array.from(values))
-          }
+          onFilterChange={(values: Set<string>) => onInstrumentTypesChange(Array.from(values))}
         />
 
         <FacetedFilter

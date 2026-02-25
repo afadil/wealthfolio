@@ -116,9 +116,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
         symbolInstrumentType: d.symbolInstrumentType,
         currency: d.currency,
         fxRate: d.fxRate,
-        assetMetadata: d.assetKind
-          ? { ...d.assetMetadata, kind: d.assetKind }
-          : d.assetMetadata,
+        assetMetadata: d.assetKind ? { ...d.assetMetadata, kind: d.assetKind } : d.assetMetadata,
       };
     },
   },
@@ -155,9 +153,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
         symbolInstrumentType: d.symbolInstrumentType,
         currency: d.currency,
         fxRate: d.fxRate,
-        assetMetadata: d.assetKind
-          ? { ...d.assetMetadata, kind: d.assetKind }
-          : d.assetMetadata,
+        assetMetadata: d.assetKind ? { ...d.assetMetadata, kind: d.assetKind } : d.assetMetadata,
       };
     },
   },

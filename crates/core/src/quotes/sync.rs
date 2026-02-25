@@ -683,8 +683,7 @@ where
                                     let new_config = match &asset.provider_config {
                                         Some(existing) => {
                                             let mut c = existing.clone();
-                                            c["preferred_provider"] =
-                                                serde_json::json!(source);
+                                            c["preferred_provider"] = serde_json::json!(source);
                                             c
                                         }
                                         None => {
@@ -709,10 +708,8 @@ where
                                 if is_placeholder {
                                     if let Ok(profile) = client.get_profile(&asset).await {
                                         if let Some(name) = profile.name {
-                                            let _ = self
-                                                .asset_repo
-                                                .update_name(&asset.id, &name)
-                                                .await;
+                                            let _ =
+                                                self.asset_repo.update_name(&asset.id, &name).await;
                                         }
                                     }
                                 }

@@ -104,7 +104,8 @@ export const HoldingsInsightsPage = ({ accountId: accountIdProp }: HoldingsInsig
 
   const syncContext = usePortfolioSyncOptional();
   const isPipelineActive = syncContext != null && syncContext.status !== "idle";
-  const hasNoHoldingsAtAll = !isLoading && !isPipelineActive && (!holdings || holdings.length === 0);
+  const hasNoHoldingsAtAll =
+    !isLoading && !isPipelineActive && (!holdings || holdings.length === 0);
 
   const hasRiskAllocations =
     allocations?.riskCategory && allocations.riskCategory.categories.length > 0;

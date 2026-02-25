@@ -5,8 +5,8 @@ use crate::portfolio::snapshot::Position;
 use crate::portfolio::snapshot::SnapshotServiceTrait;
 use crate::portfolio::valuation::valuation_calculator::calculate_valuation;
 use crate::portfolio::valuation::valuation_model::DailyAccountValuation;
-use crate::quotes::Quote;
 use crate::portfolio::valuation::ValuationRepositoryTrait;
+use crate::quotes::Quote;
 use crate::quotes::QuoteServiceTrait;
 use crate::utils::time_utils;
 use async_trait::async_trait;
@@ -284,8 +284,10 @@ impl ValuationServiceTrait for ValuationService {
             let account_id_clone = account_id.to_string();
             let base_curr_clone = base_curr.clone();
 
-            let quotes_for_current_date =
-                quotes_by_date.get(&current_date).cloned().unwrap_or_default();
+            let quotes_for_current_date = quotes_by_date
+                .get(&current_date)
+                .cloned()
+                .unwrap_or_default();
 
             for (asset_id, quote) in &quotes_for_current_date {
                 last_known_quotes_by_asset.insert(asset_id.clone(), quote.clone());
@@ -392,8 +394,8 @@ mod tests {
     use crate::quotes::{DataSource, Quote};
     use chrono::{TimeZone, Utc};
     use rust_decimal_macros::dec;
-    use std::collections::VecDeque;
     use std::collections::HashMap;
+    use std::collections::VecDeque;
 
     fn test_quote(asset_id: &str, close: rust_decimal::Decimal, day: (i32, u32, u32)) -> Quote {
         Quote {
@@ -441,10 +443,16 @@ mod tests {
         positions.insert("BBB".to_string(), test_position());
 
         let mut today_quotes = HashMap::new();
-        today_quotes.insert("AAA".to_string(), test_quote("AAA", dec!(101), (2025, 1, 2)));
+        today_quotes.insert(
+            "AAA".to_string(),
+            test_quote("AAA", dec!(101), (2025, 1, 2)),
+        );
 
         let mut last_known = HashMap::new();
-        last_known.insert("BBB".to_string(), test_quote("BBB", dec!(202), (2025, 1, 1)));
+        last_known.insert(
+            "BBB".to_string(),
+            test_quote("BBB", dec!(202), (2025, 1, 1)),
+        );
 
         let effective =
             ValuationService::effective_quotes_for_day(&positions, &today_quotes, &last_known);
@@ -459,10 +467,16 @@ mod tests {
         positions.insert("AAA".to_string(), test_position());
 
         let mut today_quotes = HashMap::new();
-        today_quotes.insert("AAA".to_string(), test_quote("AAA", dec!(150), (2025, 1, 2)));
+        today_quotes.insert(
+            "AAA".to_string(),
+            test_quote("AAA", dec!(150), (2025, 1, 2)),
+        );
 
         let mut last_known = HashMap::new();
-        last_known.insert("AAA".to_string(), test_quote("AAA", dec!(140), (2025, 1, 1)));
+        last_known.insert(
+            "AAA".to_string(),
+            test_quote("AAA", dec!(140), (2025, 1, 1)),
+        );
 
         let effective =
             ValuationService::effective_quotes_for_day(&positions, &today_quotes, &last_known);

@@ -581,7 +581,10 @@ impl ActivityService {
     }
 
     /// Parses the underlying ticker from an option asset's OCC symbol.
-    fn parse_option_underlying_symbol(&self, option_asset: &crate::assets::Asset) -> Option<String> {
+    fn parse_option_underlying_symbol(
+        &self,
+        option_asset: &crate::assets::Asset,
+    ) -> Option<String> {
         let occ_symbol = option_asset
             .option_spec()
             .and_then(|spec| spec.occ_symbol)
@@ -1517,9 +1520,7 @@ impl ActivityService {
         // Build metadata for options (from OCC symbol) and bonds (from ISIN)
         let (metadata, quote_mode, display_code) =
             if instrument_type.as_ref() == Some(&InstrumentType::Option) {
-                if let Ok(parsed) =
-                    crate::utils::occ_symbol::parse_occ_symbol(&normalized_symbol)
-                {
+                if let Ok(parsed) = crate::utils::occ_symbol::parse_occ_symbol(&normalized_symbol) {
                     let option_spec = crate::assets::OptionSpec {
                         underlying_asset_id: String::new(),
                         expiration: parsed.expiration,
@@ -2001,9 +2002,20 @@ impl ActivityServiceTrait for ActivityService {
 
             // Reject unmapped activity types before they reach the DB
             const VALID_TYPES: &[&str] = &[
-                "BUY", "SELL", "SPLIT", "DIVIDEND", "INTEREST", "DEPOSIT",
-                "WITHDRAWAL", "TRANSFER_IN", "TRANSFER_OUT", "FEE", "TAX",
-                "CREDIT", "ADJUSTMENT", "UNKNOWN",
+                "BUY",
+                "SELL",
+                "SPLIT",
+                "DIVIDEND",
+                "INTEREST",
+                "DEPOSIT",
+                "WITHDRAWAL",
+                "TRANSFER_IN",
+                "TRANSFER_OUT",
+                "FEE",
+                "TAX",
+                "CREDIT",
+                "ADJUSTMENT",
+                "UNKNOWN",
             ];
             if !VALID_TYPES.contains(&activity.activity_type.as_str()) {
                 activity.is_valid = false;
@@ -2232,10 +2244,8 @@ impl ActivityServiceTrait for ActivityService {
             }
 
             if activity.quote_ccy.is_none() {
-                let is_metal = effective_instrument_type.as_ref()
-                    == Some(&InstrumentType::Metal);
-                let is_bond = effective_instrument_type.as_ref()
-                    == Some(&InstrumentType::Bond);
+                let is_metal = effective_instrument_type.as_ref() == Some(&InstrumentType::Metal);
+                let is_bond = effective_instrument_type.as_ref() == Some(&InstrumentType::Bond);
                 if is_metal {
                     activity.quote_ccy = Some("USD".to_string());
                 } else if is_bond {
@@ -2856,10 +2866,7 @@ impl ActivityServiceTrait for ActivityService {
                     Self::parse_instrument_type_hint(a.get_instrument_type_hint());
                 // Only equities need exchange MIC resolution;
                 // bonds, options, metals, crypto, and FX are identified without MICs.
-                let needs_mic = matches!(
-                    instrument_type_hint,
-                    None | Some(InstrumentType::Equity)
-                );
+                let needs_mic = matches!(instrument_type_hint, None | Some(InstrumentType::Equity));
                 let is_cash = symbol.starts_with("CASH:");
                 if !has_mic && !is_cash && needs_mic {
                     Some(symbol.to_string())

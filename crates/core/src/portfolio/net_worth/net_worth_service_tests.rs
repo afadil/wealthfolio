@@ -487,10 +487,7 @@ impl QuoteServiceTrait for MockMarketDataRepository {
         unimplemented!()
     }
 
-    async fn fetch_bond_details(
-        &self,
-        _isin: &str,
-    ) -> Option<crate::assets::BondSpec> {
+    async fn fetch_bond_details(&self, _isin: &str) -> Option<crate::assets::BondSpec> {
         None
     }
 

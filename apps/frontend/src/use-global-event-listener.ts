@@ -188,7 +188,9 @@ const useGlobalEventListener = () => {
       toast.dismiss(TOAST_IDS.assetEnrichmentStart);
     };
 
-    const handleAssetEnrichmentProgress = (event: { payload: { completed: number; total: number } }) => {
+    const handleAssetEnrichmentProgress = (event: {
+      payload: { completed: number; total: number };
+    }) => {
       const { completed, total } = event.payload;
       toast.loading(`Fetching asset metadata... (${completed}/${total})`, {
         id: TOAST_IDS.assetEnrichmentStart,
@@ -328,10 +330,18 @@ const useGlobalEventListener = () => {
       const unlistenMarketStart = await listenMarketSyncStart(handleMarketSyncStart);
       const unlistenMarketComplete = await listenMarketSyncComplete(handleMarketSyncComplete);
       const unlistenMarketError = await listenMarketSyncError(handleMarketSyncError);
-      const unlistenAssetEnrichmentStart = await listenAssetEnrichmentStart(handleAssetEnrichmentStart);
-      const unlistenAssetEnrichmentComplete = await listenAssetEnrichmentComplete(handleAssetEnrichmentComplete);
-      const unlistenAssetEnrichmentError = await listenAssetEnrichmentError(handleAssetEnrichmentError);
-      const unlistenAssetEnrichmentProgress = await listenAssetEnrichmentProgress(handleAssetEnrichmentProgress);
+      const unlistenAssetEnrichmentStart = await listenAssetEnrichmentStart(
+        handleAssetEnrichmentStart,
+      );
+      const unlistenAssetEnrichmentComplete = await listenAssetEnrichmentComplete(
+        handleAssetEnrichmentComplete,
+      );
+      const unlistenAssetEnrichmentError = await listenAssetEnrichmentError(
+        handleAssetEnrichmentError,
+      );
+      const unlistenAssetEnrichmentProgress = await listenAssetEnrichmentProgress(
+        handleAssetEnrichmentProgress,
+      );
       const unlistenDatabaseRestored = await listenDatabaseRestored(handleDatabaseRestored);
       const unlistenBrokerSyncComplete = await listenBrokerSyncComplete(handleBrokerSyncComplete);
       const unlistenBrokerSyncError = await listenBrokerSyncError(handleBrokerSyncError);

@@ -194,9 +194,7 @@ export function BuyForm({
   const quantityLabel = isOption ? "Contracts" : assetType === "bond" ? "Bonds" : "Quantity";
   const priceLabel = isOption ? "Premium/Share" : "Price";
   const symbolPlaceholder =
-    assetType === "bond"
-      ? "Enter ISIN (e.g. US0378331005) or name"
-      : "Enter symbol";
+    assetType === "bond" ? "Enter ISIN (e.g. US0378331005) or name" : "Enter symbol";
 
   // Get account currency from selected account
   const selectedAccount = useMemo(
@@ -212,8 +210,19 @@ export function BuyForm({
       data.currency = accounts.find((a) => a.value === accountId)?.currency ?? data.currency;
     }
     // For options: build OCC symbol from structured fields
-    if (data.assetType === "option" && data.underlyingSymbol && data.strikePrice && data.expirationDate && data.optionType) {
-      const occSymbol = buildOccSymbol(data.underlyingSymbol, data.expirationDate, data.optionType, data.strikePrice);
+    if (
+      data.assetType === "option" &&
+      data.underlyingSymbol &&
+      data.strikePrice &&
+      data.expirationDate &&
+      data.optionType
+    ) {
+      const occSymbol = buildOccSymbol(
+        data.underlyingSymbol,
+        data.expirationDate,
+        data.optionType,
+        data.strikePrice,
+      );
       data.assetId = occSymbol;
       data.assetMetadata = {
         ...data.assetMetadata,
@@ -282,7 +291,12 @@ export function BuyForm({
             )}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <QuantityInput name="quantity" label={quantityLabel} />
-              <AmountInput name="unitPrice" label={priceLabel} maxDecimalPlaces={4} currency={currency} />
+              <AmountInput
+                name="unitPrice"
+                label={priceLabel}
+                maxDecimalPlaces={4}
+                currency={currency}
+              />
               <AmountInput name="fee" label="Fee" currency={currency} />
             </div>
 

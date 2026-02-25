@@ -99,7 +99,11 @@ impl NetWorthService {
             .map(|q| {
                 let (normalized_price, normalized_currency) =
                     normalize_amount(q.close, &q.currency);
-                (normalized_price, normalized_currency.to_string(), q.timestamp.date_naive())
+                (
+                    normalized_price,
+                    normalized_currency.to_string(),
+                    q.timestamp.date_naive(),
+                )
             })
     }
 
@@ -317,10 +321,13 @@ impl NetWorthServiceTrait for NetWorthService {
                         None => {
                             // No quote found, use cost basis as fallback
                             if position.quantity > Decimal::ZERO {
-                                let implied_price =
-                                    position.total_cost_basis / position.quantity;
+                                let implied_price = position.total_cost_basis / position.quantity;
                                 // Use snapshot date as valuation date
-                                (implied_price, position.currency.clone(), snapshot.snapshot_date)
+                                (
+                                    implied_price,
+                                    position.currency.clone(),
+                                    snapshot.snapshot_date,
+                                )
                             } else {
                                 warn!(
                                     "No quote found for {} and cannot derive from cost basis",

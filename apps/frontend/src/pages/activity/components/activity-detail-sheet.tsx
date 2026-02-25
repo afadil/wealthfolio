@@ -178,7 +178,10 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
                   activity.instrumentType === "BOND" ? (
                     <span>{displayBondPrice(Number(activity.unitPrice), "BOND").toFixed(3)}%</span>
                   ) : (
-                    <AmountDisplay value={Number(activity.unitPrice)} currency={activity.currency} />
+                    <AmountDisplay
+                      value={Number(activity.unitPrice)}
+                      currency={activity.currency}
+                    />
                   )
                 }
               />

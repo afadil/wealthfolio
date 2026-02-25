@@ -533,7 +533,10 @@ mod tests {
 
         // Non-US-Treasury ISIN should NOT resolve for US_TREASURY_CALC
         let result = resolver.resolve(&"US_TREASURY_CALC".into(), &context);
-        assert!(result.is_none(), "Non-US-Treasury bond should not resolve for US_TREASURY_CALC");
+        assert!(
+            result.is_none(),
+            "Non-US-Treasury bond should not resolve for US_TREASURY_CALC"
+        );
 
         // But should resolve for other providers
         for provider in &["BOERSE_FRANKFURT", "YAHOO"] {

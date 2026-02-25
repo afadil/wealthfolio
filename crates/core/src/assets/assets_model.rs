@@ -6,9 +6,9 @@ use std::sync::Arc;
 
 use chrono::NaiveDateTime;
 use rust_decimal::Decimal;
-use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::str::FromStr;
 
 use super::asset_id::{parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix};
 use crate::errors::Result;

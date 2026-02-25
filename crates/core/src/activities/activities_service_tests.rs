@@ -458,10 +458,7 @@ mod tests {
             unimplemented!()
         }
 
-        async fn fetch_bond_details(
-            &self,
-            _isin: &str,
-        ) -> Option<crate::assets::BondSpec> {
+        async fn fetch_bond_details(&self, _isin: &str) -> Option<crate::assets::BondSpec> {
             None
         }
 
@@ -2146,7 +2143,10 @@ mod tests {
 
         assert_eq!(result.len(), 1);
         let checked = &result[0];
-        assert!(!checked.is_valid, "Ambiguous ISIN rows should require review");
+        assert!(
+            !checked.is_valid,
+            "Ambiguous ISIN rows should require review"
+        );
         let symbol_errors = checked
             .errors
             .as_ref()
@@ -2216,7 +2216,10 @@ mod tests {
 
         assert_eq!(result.len(), 1);
         let checked = &result[0];
-        assert!(checked.is_valid, "Explicitly typed ISIN rows should pass validation");
+        assert!(
+            checked.is_valid,
+            "Explicitly typed ISIN rows should pass validation"
+        );
         assert_eq!(checked.instrument_type.as_deref(), Some("BOND"));
     }
 
@@ -2638,7 +2641,7 @@ mod tests {
             activity_type: "TRANSFER_IN".to_string(),
             subtype: None,
             activity_date: "2024-01-15".to_string(),
-            quantity: Some(dec!(800000)),  // Face value
+            quantity: Some(dec!(800000)),   // Face value
             unit_price: Some(dec!(52.598)), // % of par
             currency: "EUR".to_string(),
             fee: Some(dec!(0)),

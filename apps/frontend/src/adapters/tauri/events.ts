@@ -75,29 +75,33 @@ export async function listenMarketSyncError<T>(handler: EventCallback<T>): Promi
   return adaptUnlisten(unlisten);
 }
 
-<<<<<<< HEAD
-export async function listenAssetEnrichmentStart<T>(handler: EventCallback<T>): Promise<UnlistenFn> {
+export async function listenAssetEnrichmentStart<T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> {
   const unlisten = await listen<T>("asset:enrichment-start", adaptCallback(handler));
   return adaptUnlisten(unlisten);
 }
 
-export async function listenAssetEnrichmentComplete<T>(handler: EventCallback<T>): Promise<UnlistenFn> {
+export async function listenAssetEnrichmentComplete<T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> {
   const unlisten = await listen<T>("asset:enrichment-complete", adaptCallback(handler));
   return adaptUnlisten(unlisten);
 }
 
-export async function listenAssetEnrichmentError<T>(handler: EventCallback<T>): Promise<UnlistenFn> {
+export async function listenAssetEnrichmentError<T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> {
   const unlisten = await listen<T>("asset:enrichment-error", adaptCallback(handler));
   return adaptUnlisten(unlisten);
 }
 
-export async function listenAssetEnrichmentProgress<T>(handler: EventCallback<T>): Promise<UnlistenFn> {
+export async function listenAssetEnrichmentProgress<T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> {
   const unlisten = await listen<T>("asset:enrichment-progress", adaptCallback(handler));
   return adaptUnlisten(unlisten);
 }
-
-=======
->>>>>>> v3.0.0
 export async function listenBrokerSyncStart<T>(handler: EventCallback<T>): Promise<UnlistenFn> {
   const unlisten = await listen<T>("broker:sync-start", adaptCallback(handler));
   return adaptUnlisten(unlisten);

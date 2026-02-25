@@ -21,14 +21,19 @@ const INSTRUMENT_TYPE_ALIASES: Record<string, string> = {
 };
 
 function normalizeToken(raw: string): string {
-  return raw.trim().replace(/[\s-]+/g, "_").toUpperCase();
+  return raw
+    .trim()
+    .replace(/[\s-]+/g, "_")
+    .toUpperCase();
 }
 
 export function normalizeInstrumentType(raw: string | undefined | null): string | undefined {
   if (!raw) return undefined;
   const normalized = normalizeToken(raw);
   if (!normalized) return undefined;
-  return INSTRUMENT_TYPE_ALIASES[normalized] ?? INSTRUMENT_TYPE_ALIASES[normalized.replace(/_/g, "")];
+  return (
+    INSTRUMENT_TYPE_ALIASES[normalized] ?? INSTRUMENT_TYPE_ALIASES[normalized.replace(/_/g, "")]
+  );
 }
 
 /**
@@ -37,9 +42,10 @@ export function normalizeInstrumentType(raw: string | undefined | null): string 
  * - option:AAPL240621C00190000
  * - crypto:BTC-USD
  */
-export function splitInstrumentPrefixedSymbol(
-  rawSymbol: string | undefined,
-): { symbol: string | undefined; instrumentType?: string } {
+export function splitInstrumentPrefixedSymbol(rawSymbol: string | undefined): {
+  symbol: string | undefined;
+  instrumentType?: string;
+} {
   if (!rawSymbol) return { symbol: undefined };
 
   const trimmed = rawSymbol.trim();
@@ -62,4 +68,3 @@ export function splitInstrumentPrefixedSymbol(
 
   return { symbol, instrumentType: inferredType };
 }
-

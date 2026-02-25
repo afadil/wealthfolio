@@ -188,7 +188,9 @@ export const listenAssetEnrichmentStart = <T>(handler: EventCallback<T>): Promis
   return portfolioEventBridge.listen("asset:enrichment-start", handler);
 };
 
-export const listenAssetEnrichmentComplete = <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
+export const listenAssetEnrichmentComplete = <T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> => {
   return portfolioEventBridge.listen("asset:enrichment-complete", handler);
 };
 
@@ -196,7 +198,9 @@ export const listenAssetEnrichmentError = <T>(handler: EventCallback<T>): Promis
   return portfolioEventBridge.listen("asset:enrichment-error", handler);
 };
 
-export const listenAssetEnrichmentProgress = <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
+export const listenAssetEnrichmentProgress = <T>(
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> => {
   return portfolioEventBridge.listen("asset:enrichment-progress", handler);
 };
 
