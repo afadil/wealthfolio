@@ -2227,6 +2227,8 @@ function useDataGrid<TData>({
   const getMemoizedSortedRowModel = React.useMemo(() => getSortedRowModel(), []);
 
   // Memoize state object to reduce shallow equality checks
+  // Note: props.state (e.g. columnVisibility) must be in deps so external
+  // state changes trigger a recompute. propsRef alone is stable and won't.
   const tableState = React.useMemo<Partial<TableState>>(
     () => ({
       ...propsRef.current.state,
@@ -2234,7 +2236,7 @@ function useDataGrid<TData>({
       columnFilters,
       rowSelection,
     }),
-    [propsRef, sorting, columnFilters, rowSelection],
+    [propsRef, sorting, columnFilters, rowSelection, props.state],
   );
 
   const tableOptions = React.useMemo<TableOptions<TData>>(() => {

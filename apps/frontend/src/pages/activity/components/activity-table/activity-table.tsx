@@ -25,7 +25,7 @@ import {
   isIncomeActivity,
   isSplitActivity,
 } from "@/lib/activity-utils";
-import { ActivityType, getExchangeDisplayName } from "@/lib/constants";
+import { ActivityType, getExchangeDisplayName, INSTRUMENT_TYPE_OPTIONS } from "@/lib/constants";
 import { ActivityDetails } from "@/lib/types";
 import { formatDateTime, displayBondPrice } from "@/lib/utils";
 import {
@@ -38,7 +38,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { Button, formatAmount } from "@wealthfolio/ui";
+import { Badge, Button, formatAmount } from "@wealthfolio/ui";
 import { Link } from "react-router-dom";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import { ActivityOperations } from "../activity-operations";
@@ -73,6 +73,7 @@ export const ActivityTable = ({
     accountCurrency: false,
     assetName: false,
     currency: false,
+    instrumentType: false,
   });
   const symbolExchangeCountMap = React.useMemo(() => {
     const exchangesBySymbol = new Map<string, Set<string>>();
@@ -139,6 +140,26 @@ export const ActivityTable = ({
               <span>{formattedDate.date}</span>
               <span className="text-muted-foreground text-xs font-light">{formattedDate.time}</span>
             </div>
+          );
+        },
+      },
+      {
+        id: "instrumentType",
+        accessorKey: "instrumentType",
+        enableSorting: false,
+        enableHiding: true,
+        meta: {
+          label: "Instrument",
+        },
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Instrument" />,
+        cell: ({ row }) => {
+          const value = row.getValue("instrumentType") as string | undefined;
+          if (!value) return <span className="text-muted-foreground">—</span>;
+          const option = INSTRUMENT_TYPE_OPTIONS.find((o) => o.value === value);
+          return (
+            <Badge variant="outline" className="text-xs font-normal">
+              {option?.label ?? value}
+            </Badge>
           );
         },
       },
@@ -409,6 +430,7 @@ export const ActivityTable = ({
                         className="capitalize"
                         checked={column.getIsVisible()}
                         onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                        onSelect={(e) => e.preventDefault()}
                       >
                         {meta?.label ?? column.id}
                       </DropdownMenuCheckboxItem>

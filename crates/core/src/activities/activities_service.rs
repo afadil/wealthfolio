@@ -1644,6 +1644,7 @@ impl ActivityServiceTrait for ActivityService {
         needs_review_filter: Option<bool>,
         date_from: Option<NaiveDate>,
         date_to: Option<NaiveDate>,
+        instrument_type_filter: Option<Vec<String>>,
     ) -> Result<ActivitySearchResponse> {
         self.activity_repository.search_activities(
             page,
@@ -1655,6 +1656,7 @@ impl ActivityServiceTrait for ActivityService {
             needs_review_filter,
             date_from,
             date_to,
+            instrument_type_filter,
         )
     }
 

@@ -269,6 +269,7 @@ pub mod test_env {
             _needs_review_filter: Option<bool>,
             _date_from: Option<chrono::NaiveDate>,
             _date_to: Option<chrono::NaiveDate>,
+            _instrument_type_filter: Option<Vec<String>>,
         ) -> CoreResult<ActivitySearchResponse> {
             Ok(ActivitySearchResponse {
                 data: self.activities.clone(),

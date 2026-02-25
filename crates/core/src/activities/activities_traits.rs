@@ -38,6 +38,7 @@ pub trait ActivityRepositoryTrait: Send + Sync {
         needs_review_filter: Option<bool>,
         date_from: Option<NaiveDate>,
         date_to: Option<NaiveDate>,
+        instrument_type_filter: Option<Vec<String>>,
     ) -> Result<ActivitySearchResponse>;
     async fn create_activity(&self, new_activity: NewActivity) -> Result<Activity>;
     async fn update_activity(&self, activity_update: ActivityUpdate) -> Result<Activity>;
@@ -126,6 +127,7 @@ pub trait ActivityServiceTrait: Send + Sync {
         needs_review_filter: Option<bool>,
         date_from: Option<NaiveDate>,
         date_to: Option<NaiveDate>,
+        instrument_type_filter: Option<Vec<String>>,
     ) -> Result<ActivitySearchResponse>;
     fn get_first_activity_date(
         &self,

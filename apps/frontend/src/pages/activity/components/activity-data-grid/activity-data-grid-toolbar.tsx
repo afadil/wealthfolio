@@ -15,6 +15,7 @@ import type { ChangesSummary, LocalTransaction } from "./types";
 const COLUMN_DISPLAY_NAMES: Record<string, string> = {
   activityType: "Type",
   subtype: "Subtype",
+  instrumentType: "Instrument",
   activityStatus: "Status",
   date: "Date & Time",
   assetSymbol: "Symbol",
@@ -32,6 +33,7 @@ const COLUMN_DISPLAY_NAMES: Record<string, string> = {
 const TOGGLEABLE_COLUMNS = [
   "activityType",
   "subtype",
+  "instrumentType",
   "activityStatus",
   "date",
   "assetSymbol",

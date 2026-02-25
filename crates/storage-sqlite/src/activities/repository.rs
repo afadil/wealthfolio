@@ -120,6 +120,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
         needs_review_filter: Option<bool>, // Optional needs_review filter (maps to DRAFT status)
         date_from: Option<NaiveDate>,      // Optional start date filter (inclusive)
         date_to: Option<NaiveDate>,        // Optional end date filter (inclusive)
+        instrument_type_filter: Option<Vec<String>>, // Optional instrument type filter
     ) -> Result<ActivitySearchResponse> {
         let mut conn = get_connection(&self.pool)?;
 
@@ -146,6 +147,9 @@ impl ActivityRepositoryTrait for ActivityRepository {
                         .like(pattern.clone())
                         .or(assets::name.like(pattern)),
                 );
+            }
+            if let Some(ref instrument_types) = instrument_type_filter {
+                query = query.filter(assets::instrument_type.eq_any(instrument_types));
             }
             // Map needs_review_filter to status filter (DRAFT status means needs review)
             if let Some(needs_review) = needs_review_filter {

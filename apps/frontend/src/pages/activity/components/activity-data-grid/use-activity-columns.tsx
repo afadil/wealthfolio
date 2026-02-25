@@ -5,6 +5,7 @@ import {
   ActivityType,
   ActivityTypeNames,
   getExchangeDisplayName,
+  INSTRUMENT_TYPE_OPTIONS,
   SUBTYPE_DISPLAY_NAMES,
   SUBTYPES_BY_ACTIVITY_TYPE,
 } from "@/lib/constants";
@@ -191,7 +192,29 @@ export function useActivityColumns({
           },
         },
       },
-      // 7. External (checkbox for TRANSFER_IN/TRANSFER_OUT only)
+      // 7. Instrument Type (read-only badge, hidden by default)
+      {
+        id: "instrumentType",
+        accessorKey: "instrumentType",
+        header: "Instrument",
+        size: 110,
+        minSize: 110,
+        maxSize: 110,
+        enableResizing: false,
+        enableSorting: false,
+        enableHiding: true,
+        cell: ({ row }) => {
+          const value = row.original.instrumentType;
+          if (!value) return <span className="text-muted-foreground">—</span>;
+          const option = INSTRUMENT_TYPE_OPTIONS.find((o) => o.value === value);
+          return (
+            <Badge variant="outline" className="text-xs font-normal">
+              {option?.label ?? value}
+            </Badge>
+          );
+        },
+      },
+      // 8. External (checkbox for TRANSFER_IN/TRANSFER_OUT only)
       {
         id: "isExternal",
         accessorKey: "isExternal",

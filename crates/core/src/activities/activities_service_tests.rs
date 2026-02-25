@@ -637,6 +637,7 @@ mod tests {
             _is_draft_filter: Option<bool>,
             _date_from: Option<chrono::NaiveDate>,
             _date_to: Option<chrono::NaiveDate>,
+            _instrument_type_filter: Option<Vec<String>>,
         ) -> Result<ActivitySearchResponse> {
             unimplemented!()
         }

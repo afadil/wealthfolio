@@ -38,6 +38,7 @@ const ActivityPage = () => {
   // Filter and search state
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [selectedActivityTypes, setSelectedActivityTypes] = useState<ActivityType[]>([]);
+  const [selectedInstrumentTypes, setSelectedInstrumentTypes] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<ActivityStatusFilter>("all");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -97,6 +98,7 @@ const ActivityPage = () => {
     filters: {
       accountIds: selectedAccounts,
       activityTypes: selectedActivityTypes,
+      instrumentTypes: selectedInstrumentTypes,
       status: statusFilter,
     },
     searchQuery,
@@ -109,6 +111,7 @@ const ActivityPage = () => {
     filters: {
       accountIds: selectedAccounts,
       activityTypes: selectedActivityTypes,
+      instrumentTypes: selectedInstrumentTypes,
       status: statusFilter,
     },
     searchQuery,
@@ -123,7 +126,7 @@ const ActivityPage = () => {
       setPageIndex(0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAccounts, selectedActivityTypes, statusFilter, searchQuery, sorting]);
+  }, [selectedAccounts, selectedActivityTypes, selectedInstrumentTypes, statusFilter, searchQuery, sorting]);
 
   // Use appropriate data based on view mode
   const tableActivities = infiniteSearch.data;
@@ -251,6 +254,8 @@ const ActivityPage = () => {
               onAccountIdsChange={setSelectedAccounts}
               selectedActivityTypes={selectedActivityTypes}
               onActivityTypesChange={setSelectedActivityTypes}
+              selectedInstrumentTypes={selectedInstrumentTypes}
+              onInstrumentTypesChange={setSelectedInstrumentTypes}
               statusFilter={statusFilter}
               onStatusFilterChange={setStatusFilter}
               viewMode={viewMode}

@@ -227,6 +227,7 @@ impl<E: AiEnvironment + 'static> Tool for SearchActivitiesTool<E> {
                 None, // needs_review_filter
                 date_from,
                 date_to,
+                None, // instrument_type_filter
             )
             .map_err(|e| AiError::ToolExecutionFailed(e.to_string()))?;
 

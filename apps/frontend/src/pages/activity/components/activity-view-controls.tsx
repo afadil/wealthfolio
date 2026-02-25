@@ -1,7 +1,7 @@
 import { debounce } from "lodash";
 import { useEffect, useMemo, useState } from "react";
 
-import { ActivityType, ActivityTypeNames } from "@/lib/constants";
+import { ActivityType, ActivityTypeNames, INSTRUMENT_TYPE_OPTIONS } from "@/lib/constants";
 import { Account } from "@/lib/types";
 import {
   AnimatedToggleGroup,
@@ -22,6 +22,8 @@ interface ActivityViewControlsProps {
   onAccountIdsChange: (ids: string[]) => void;
   selectedActivityTypes: ActivityType[];
   onActivityTypesChange: (types: ActivityType[]) => void;
+  selectedInstrumentTypes: string[];
+  onInstrumentTypesChange: (types: string[]) => void;
   statusFilter: ActivityStatusFilter;
   onStatusFilterChange: (status: ActivityStatusFilter) => void;
   viewMode: ActivityViewMode;
@@ -41,6 +43,8 @@ export function ActivityViewControls({
   onAccountIdsChange,
   selectedActivityTypes,
   onActivityTypesChange,
+  selectedInstrumentTypes,
+  onInstrumentTypesChange,
   statusFilter,
   onStatusFilterChange,
   viewMode,
@@ -87,6 +91,15 @@ export function ActivityViewControls({
     [],
   );
 
+  const instrumentTypeOptions = useMemo(
+    () =>
+      INSTRUMENT_TYPE_OPTIONS.map(({ value, label }) => ({
+        value,
+        label,
+      })),
+    [],
+  );
+
   const statusOptions = useMemo(
     () => [
       { value: "all", label: "All Activities" },
@@ -100,6 +113,7 @@ export function ActivityViewControls({
     searchQuery.trim().length > 0 ||
     selectedAccountIds.length > 0 ||
     selectedActivityTypes.length > 0 ||
+    selectedInstrumentTypes.length > 0 ||
     statusFilter !== "all";
 
   return (
@@ -131,6 +145,15 @@ export function ActivityViewControls({
         />
 
         <FacetedFilter
+          title="Instrument"
+          options={instrumentTypeOptions}
+          selectedValues={new Set(selectedInstrumentTypes)}
+          onFilterChange={(values: Set<string>) =>
+            onInstrumentTypesChange(Array.from(values))
+          }
+        />
+
+        <FacetedFilter
           title="Status"
           options={statusOptions}
           selectedValues={new Set(statusFilter === "all" ? [] : [statusFilter])}
@@ -152,6 +175,7 @@ export function ActivityViewControls({
               onSearchQueryChange("");
               onAccountIdsChange([]);
               onActivityTypesChange([]);
+              onInstrumentTypesChange([]);
               onStatusFilterChange("all");
             }}
           >

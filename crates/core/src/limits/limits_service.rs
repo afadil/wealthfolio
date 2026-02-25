@@ -304,6 +304,7 @@ mod tests {
             _: Option<bool>,
             _: Option<NaiveDate>,
             _: Option<NaiveDate>,
+            _: Option<Vec<String>>,
         ) -> Result<ActivitySearchResponse> {
             unimplemented!()
         }
