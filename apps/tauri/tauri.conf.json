@@ -18,11 +18,20 @@
       "icons/icon.ico"
     ],
     "copyright": "2026 Teymz Inc.",
-    "category": "Finance",
+    "category": "public.app-category.finance",
     "createUpdaterArtifacts": "v1Compatible",
     "iOS": {
       "developmentTeam": "DYDJ2RNL5H",
       "infoPlist": "Info.ios.plist"
+    },
+    "macOS": {
+      "bundleVersion": "20260225.7",
+      "signingIdentity": "Apple Distribution: Teymz Inc (DYDJ2RNL5H)",
+      "entitlements": "./Entitlements.plist",
+      "files": {
+        "embedded.provisionprofile": "../../../../app-store/embedded.provisionprofile"
+      },
+      "minimumSystemVersion": "10.13"
     }
   },
   "productName": "Wealthfolio",
