@@ -2,6 +2,7 @@ import { TickerAvatar } from "@/components/ticker-avatar";
 import { Card } from "@wealthfolio/ui/components/ui/card";
 import {
   calculateActivityValue,
+  formatSplitRatio,
   isCashActivity,
   isCashTransfer,
   isFeeActivity,
@@ -197,7 +198,7 @@ export const ActivityTableMobile = ({
                     {activity.activityType === "FEE"
                       ? "-"
                       : activity.activityType === "SPLIT"
-                        ? `${Number(activity.amount).toFixed(0)} : 1`
+                        ? formatSplitRatio(Number(activity.amount))
                         : isCashActivity(activity.activityType) ||
                             isCashTransfer(activity.activityType, symbol) ||
                             isIncomeActivity(activity.activityType)
