@@ -167,6 +167,12 @@ export interface InternalHostAPI {
   getQueryClient(): unknown;
   invalidateQueries(queryKey: string | string[]): void;
   refetchQueries(queryKey: string | string[]): void;
+
+  // Toast functions
+  toastSuccess(message: string): void;
+  toastError(message: string): void;
+  toastWarning(message: string): void;
+  toastInfo(message: string): void;
 }
 
 /**
@@ -288,6 +294,13 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: s
       getClient: internalAPI.getQueryClient,
       invalidateQueries: internalAPI.invalidateQueries,
       refetchQueries: internalAPI.refetchQueries,
+    },
+
+    toast: {
+      success: internalAPI.toastSuccess,
+      error: internalAPI.toastError,
+      warning: internalAPI.toastWarning,
+      info: internalAPI.toastInfo,
     },
   } as unknown as SDKHostAPI;
 }

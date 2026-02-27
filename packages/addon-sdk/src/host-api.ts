@@ -621,6 +621,36 @@ export interface NavigationAPI {
 }
 
 /**
+ * Toast notification APIs
+ * Allows addons to show toast notifications using the host application's toast system
+ */
+export interface ToastAPI {
+  /**
+   * Show a success toast
+   * @param message Message to display
+   */
+  success(message: string): void;
+
+  /**
+   * Show an error toast
+   * @param message Message to display
+   */
+  error(message: string): void;
+
+  /**
+   * Show a warning toast
+   * @param message Message to display
+   */
+  warning(message: string): void;
+
+  /**
+   * Show an info toast
+   * @param message Message to display
+   */
+  info(message: string): void;
+}
+
+/**
  * Query management APIs for React Query integration
  */
 export interface QueryAPI {
@@ -698,4 +728,7 @@ export interface HostAPI {
 
   /** React Query operations */
   query: QueryAPI;
+
+  /** Toast notification operations */
+  toast: ToastAPI;
 }

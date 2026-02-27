@@ -18,13 +18,20 @@ import {
 } from "@wealthfolio/ui";
 import { format } from "date-fns";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
+import {
+  type QuantityCheckpoint,
+  POSITION_ACTIVITY_TYPES,
+  buildQuantityTimeline,
+  getQuantityAtDate,
+} from "../lib/quantity-timeline";
 import { fetchYahooDividends, toYahooSymbol } from "../lib/yahoo-dividends";
 
 interface DividendSuggestion {
   id: string;
   symbol: string;
   date: string; // YYYY-MM-DD
+  shares: number;
+  dividendPerShare: number;
   amount: number;
   currency: string;
   accountId: string;
@@ -60,15 +67,24 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
   const seenIds = useRef<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
 
-  const { data: holdings = [], isLoading: holdingsLoading } = useQuery({
-    queryKey: ["holdings"],
-    queryFn: () => ctx.api.portfolio.getHoldings("TOTAL"),
-  });
-
-  const { data: accounts = [] } = useQuery({
+  const { data: accounts = [], isLoading: accountsLoading } = useQuery({
     queryKey: ["accounts"],
     queryFn: () => ctx.api.accounts.getAll(),
   });
+
+  const holdingsQueries = useQueries({
+    queries: useMemo(
+      () =>
+        accounts.map((account) => ({
+          queryKey: ["holdings", account.id],
+          queryFn: () => ctx.api.portfolio.getHoldings(account.id),
+        })),
+      [accounts, ctx.api.portfolio],
+    ),
+  });
+
+  const holdingsLoading = accounts.length > 0 && holdingsQueries.some((q) => q.isLoading);
+  const holdings = useMemo(() => holdingsQueries.flatMap((q) => q.data ?? []), [holdingsQueries]);
 
   const { data: existingDivs } = useQuery({
     queryKey: ["activities", "DIVIDEND"],
@@ -78,17 +94,24 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
     },
   });
 
-  // Build symbol → { accountIds, currency } map from security holdings
+  // Build symbol → { accountIds, currency, assetId } map
   const { symbolMap, symbols, instrumentIds } = useMemo(() => {
     const securityHoldings = holdings.filter(
       (h) => h.holdingType === "security" && h.instrument?.symbol,
     );
 
-    const symbolMap = new Map<string, { accountIds: string[]; currency: string }>();
+    const symbolMap = new Map<
+      string,
+      { accountIds: string[]; currency: string; assetId: string }
+    >();
     for (const h of securityHoldings) {
       const sym = h.instrument!.symbol;
       if (!symbolMap.has(sym)) {
-        symbolMap.set(sym, { accountIds: [], currency: h.instrument!.currency });
+        symbolMap.set(sym, {
+          accountIds: [],
+          currency: h.instrument!.currency,
+          assetId: h.instrument!.id,
+        });
       }
       const entry = symbolMap.get(sym)!;
       if (!entry.accountIds.includes(h.accountId)) {
@@ -150,8 +173,59 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
 
   const allYahooLoaded = yahooQueries.length === 0 || yahooQueries.every((q) => !q.isLoading);
 
+  // Fetch position-affecting activities per symbol to build historical quantity timelines
+  // Note: The backend search matches against assets.id (not display_code), so we must
+  // use the asset ID from symbolMap rather than the display symbol.
+  const positionActivityQueries = useQueries({
+    queries: useMemo(
+      () =>
+        symbols.map((symbol) => {
+          const assetId = symbolMap.get(symbol)?.assetId ?? symbol;
+          return {
+            queryKey: ["position-activities", symbol],
+            queryFn: async () => {
+              const res = await ctx.api.activities.search(
+                0,
+                5000,
+                { activityTypes: POSITION_ACTIVITY_TYPES, symbol: assetId },
+                "",
+                { id: "date", desc: false },
+              );
+              return res.data;
+            },
+            staleTime: 5 * 60 * 1000,
+          };
+        }),
+      [symbols, symbolMap, ctx.api.activities],
+    ),
+  });
+
+  const allPositionActivitiesLoaded =
+    positionActivityQueries.length === 0 || positionActivityQueries.every((q) => !q.isLoading);
+
+  // Build (symbol, accountId) → QuantityCheckpoint[] timelines
+  const quantityTimelines = useMemo(() => {
+    if (!allPositionActivitiesLoaded) return new Map<string, QuantityCheckpoint[]>();
+
+    const map = new Map<string, QuantityCheckpoint[]>();
+    symbols.forEach((symbol, i) => {
+      const activities = positionActivityQueries[i]?.data;
+      if (!activities) return;
+
+      const entry = symbolMap.get(symbol);
+      if (!entry) return;
+
+      for (const accountId of entry.accountIds) {
+        const key = `${symbol}::${accountId}`;
+        map.set(key, buildQuantityTimeline(activities, accountId));
+      }
+    });
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allPositionActivitiesLoaded, symbols, symbolMap, positionActivityQueries]);
+
   const baseSuggestions = useMemo(() => {
-    if (!allYahooLoaded || !existingDivs) return [];
+    if (!allYahooLoaded || !existingDivs || !allPositionActivitiesLoaded) return [];
 
     const result: DividendSuggestion[] = [];
 
@@ -167,12 +241,21 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
         const dateStr = new Date(dateMs).toISOString().slice(0, 10);
 
         for (const accountId of entry.accountIds) {
+          // Look up historical quantity at the ex-date
+          const timeline = quantityTimelines.get(`${symbol}::${accountId}`) ?? [];
+          const shares = getQuantityAtDate(timeline, dateStr);
+
+          // Skip if no position existed before the ex-date
+          if (shares <= 0) continue;
+
           if (!isDuplicate(symbol, dateMs, accountId, existingDivs)) {
             result.push({
               id: `${symbol}-${dateStr}-${accountId}`,
               symbol,
               date: dateStr,
-              amount: div.amount,
+              shares,
+              dividendPerShare: div.amount,
+              amount: parseFloat((div.amount * shares).toFixed(4)),
               currency: entry.currency,
               accountId,
               availableAccountIds: [...entry.accountIds],
@@ -185,7 +268,15 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
     result.sort((a, b) => b.date.localeCompare(a.date));
     return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allYahooLoaded, existingDivs, symbols, symbolMap, yahooQueries]);
+  }, [
+    allYahooLoaded,
+    allPositionActivitiesLoaded,
+    existingDivs,
+    symbols,
+    symbolMap,
+    yahooQueries,
+    quantityTimelines,
+  ]);
 
   const suggestions = useMemo(
     () => baseSuggestions.map((s) => ({ ...s, ...overrides.get(s.id) })),
@@ -213,7 +304,13 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
   }, [baseSuggestions]);
 
   const accountNameMap = new Map(accounts.map((a) => [a.id, a.name]));
-  const isLoading = holdingsLoading || !allProfilesLoaded || !allYahooLoaded || !existingDivs;
+  const isLoading =
+    accountsLoading ||
+    holdingsLoading ||
+    !allProfilesLoaded ||
+    !allYahooLoaded ||
+    !allPositionActivitiesLoaded ||
+    !existingDivs;
 
   const toggleCheck = (id: string) => {
     setCheckedIds((prev) => {
@@ -254,31 +351,53 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
     const selected = suggestions.filter((s) => checkedIds.has(s.id));
     if (selected.length === 0) return;
 
-    setSaving(true);
-    try {
-      const result = await ctx.api.activities.saveMany({
-        creates: selected.map((s) => ({
-          accountId: s.accountId,
-          activityType: "DIVIDEND",
-          activityDate: s.date,
-          amount: s.amount,
-          currency: s.currency,
-          symbol: { symbol: s.symbol },
-        })),
-      });
+    // Filter out TOTAL virtual account (cannot receive activities directly)
+    const valid = selected.filter((s) => s.accountId !== "TOTAL");
+    const skipped = selected.length - valid.length;
 
-      const created = result.created.length;
-      const errors = result.errors.length;
-      if (errors > 0) {
-        toast.warning(`${created} added, ${errors} failed`);
+    // Group by accountId — backend bulk create requires all creates share the same account
+    const byAccount = new Map<string, typeof valid>();
+    for (const s of valid) {
+      if (!byAccount.has(s.accountId)) byAccount.set(s.accountId, []);
+      byAccount.get(s.accountId)!.push(s);
+    }
+
+    setSaving(true);
+    let totalCreated = 0;
+    let totalErrors = skipped;
+    const errorMessages: string[] = [];
+
+    try {
+      for (const [, group] of byAccount) {
+        const result = await ctx.api.activities.saveMany({
+          creates: group.map((s) => ({
+            accountId: s.accountId,
+            activityType: "DIVIDEND",
+            activityDate: s.date,
+            amount: s.amount,
+            currency: s.currency,
+            symbol: { symbol: s.symbol },
+          })),
+        });
+        totalCreated += result.created.length;
+        totalErrors += result.errors.length;
+        for (const err of result.errors) {
+          ctx.api.logger.error(`Failed to create dividend: ${err.message}`);
+          errorMessages.push(err.message);
+        }
+      }
+
+      if (totalErrors > 0) {
+        const detail = errorMessages.length > 0 ? `\n${errorMessages.slice(0, 3).join("\n")}` : "";
+        ctx.api.toast.warning(`${totalCreated} added, ${totalErrors} failed${detail}`);
       } else {
-        toast.success(`${created} dividend${created !== 1 ? "s" : ""} added`);
+        ctx.api.toast.success(`${totalCreated} dividend${totalCreated !== 1 ? "s" : ""} added`);
       }
 
       ctx.api.query.invalidateQueries(["activities"]);
       onSaved();
     } catch (err) {
-      toast.error("Failed to save: " + (err as Error).message);
+      ctx.api.toast.error("Failed to save: " + (err as Error).message);
     } finally {
       setSaving(false);
     }
@@ -322,6 +441,8 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
               </TableHead>
               <TableHead>Symbol</TableHead>
               <TableHead>Ex-Date</TableHead>
+              <TableHead className="text-right">Shares</TableHead>
+              <TableHead className="text-right">Dividend</TableHead>
               <TableHead>Amount</TableHead>
               <TableHead>Currency</TableHead>
               <TableHead>Account</TableHead>
@@ -338,6 +459,8 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
                 </TableCell>
                 <TableCell className="font-mono font-medium">{s.symbol}</TableCell>
                 <TableCell>{format(new Date(s.date + "T00:00:00"), "MMM d, yyyy")}</TableCell>
+                <TableCell className="text-right">{s.shares}</TableCell>
+                <TableCell className="text-right">{s.dividendPerShare.toFixed(4)}</TableCell>
                 <TableCell>
                   <Input
                     type="number"

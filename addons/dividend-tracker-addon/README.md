@@ -9,6 +9,11 @@ fetching historical dividend data from Yahoo Finance.
 - Fetches the last 2 years of dividend history from Yahoo Finance (no API key
   required)
 - Compares against your existing DIVIDEND activities
+- **Only suggests dividends you were eligible for** — uses your
+  BUY/SELL/SPLIT/TRANSFER history to compute the exact share count at each
+  ex-date, skipping dividends from before you owned the stock
+- Calculates the correct dividend amount based on your historical position size
+  at each ex-date (not your current holdings)
 - Surfaces missing dividends as pre-checked suggestions you can review and
   bulk-add
 
@@ -51,6 +56,13 @@ pnpm bundle
 ```
 
 The zip is written to `dist/dividend-tracker-addon-1.0.0.zip`.
+
+## Testing
+
+```bash
+# From the repo root
+pnpm --filter frontend exec vitest run --root ../.. addons/dividend-tracker-addon/src/lib/quantity-timeline.test.ts
+```
 
 ## Development
 
