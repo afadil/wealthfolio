@@ -1,5 +1,5 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
-import type { ActivityDetails, AddonContext } from "@wealthfolio/addon-sdk";
+import type { AddonContext } from "@wealthfolio/addon-sdk";
 import {
   Button,
   Checkbox,
@@ -18,6 +18,7 @@ import {
 } from "@wealthfolio/ui";
 import { format } from "date-fns";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { isDuplicate } from "../lib/is-duplicate";
 import {
   type QuantityCheckpoint,
   POSITION_ACTIVITY_TYPES,
@@ -36,22 +37,6 @@ interface DividendSuggestion {
   currency: string;
   accountId: string;
   availableAccountIds: string[];
-}
-
-const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
-
-function isDuplicate(
-  symbol: string,
-  dateMs: number,
-  accountId: string,
-  existing: ActivityDetails[],
-): boolean {
-  return existing.some((a) => {
-    if ((a.assetSymbol ?? "").toUpperCase() !== symbol.toUpperCase()) return false;
-    if (a.accountId !== accountId) return false;
-    const actMs = new Date(a.date).getTime();
-    return Math.abs(actMs - dateMs) <= THREE_DAYS_MS;
-  });
 }
 
 interface SuggestionsTabProps {

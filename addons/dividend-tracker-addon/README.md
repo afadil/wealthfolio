@@ -61,7 +61,7 @@ The zip is written to `dist/dividend-tracker-addon-1.0.0.zip`.
 
 ```bash
 # From the repo root
-pnpm --filter frontend exec vitest run --root ../.. addons/dividend-tracker-addon/src/lib/quantity-timeline.test.ts
+pnpm --filter frontend exec vitest run --root ../.. dividend-tracker-addon
 ```
 
 ## Development

@@ -23,6 +23,9 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.18",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20.19.33",
     "@types/react": "^19.2.13",
     "@types/react-dom": "^19.2.3",
