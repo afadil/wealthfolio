@@ -59,37 +59,39 @@ export function toYahooSymbol(symbol: string, mic?: string | null): string {
   return symbol + suffix;
 }
 
+import type { LoggerAPI } from "@wealthfolio/addon-sdk";
+
 export interface YahooDividend {
   amount: number;
   date: number; // unix seconds
 }
 
-export async function fetchYahooDividends(symbol: string): Promise<YahooDividend[]> {
-  const now = Math.floor(Date.now() / 1000);
-  const twoYearsAgo = now - 2 * 365 * 24 * 60 * 60;
+type TauriInvoke = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
 
-  const url =
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}` +
-    `?interval=1d&period1=${twoYearsAgo}&period2=${now}&events=div`;
+function getTauriInvoke(): TauriInvoke | null {
+  const tauri = (window as unknown as { __TAURI__?: { core?: { invoke?: TauriInvoke } } })
+    .__TAURI__;
+  return tauri?.core?.invoke ?? null;
+}
 
-  const resp = await fetch(url, { headers: { Accept: "application/json" } });
+export async function fetchYahooDividends(
+  symbol: string,
+  logger: LoggerAPI,
+): Promise<YahooDividend[]> {
+  logger.debug(`Fetching dividends for ${symbol}`);
 
-  if (!resp.ok) {
-    throw new Error(`Yahoo Finance returned ${resp.status} for ${symbol}`);
+  const invoke = getTauriInvoke();
+  if (!invoke) {
+    logger.error("Tauri invoke not available");
+    throw new Error("Tauri invoke not available");
   }
 
-  const json = (await resp.json()) as {
-    chart?: {
-      result?: Array<{
-        events?: {
-          dividends?: Record<string, YahooDividend>;
-        };
-      }>;
-    };
-  };
-
-  const dividends = json?.chart?.result?.[0]?.events?.dividends;
-  if (!dividends) return [];
-
-  return Object.values(dividends).sort((a, b) => a.date - b.date);
+  try {
+    const data = (await invoke("fetch_yahoo_dividends", { symbol })) as YahooDividend[];
+    logger.debug(`Found ${data.length} dividends for ${symbol}`);
+    return data;
+  } catch (err) {
+    logger.error(`Failed to fetch dividends for ${symbol}: ${String(err)}`);
+    throw err;
+  }
 }

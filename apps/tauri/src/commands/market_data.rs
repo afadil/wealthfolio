@@ -223,3 +223,18 @@ pub async fn resolve_symbol_quote(
 pub fn get_exchanges() -> Vec<ExchangeInfo> {
     wealthfolio_market_data::get_exchange_list()
 }
+
+/// Fetch dividend events for a symbol from Yahoo Finance.
+/// Routes through the Rust backend to avoid CORS restrictions in the webview.
+#[tauri::command]
+pub async fn fetch_yahoo_dividends(
+    symbol: String,
+) -> Result<Vec<wealthfolio_market_data::YahooDividend>, String> {
+    let provider = wealthfolio_market_data::YahooProvider::new()
+        .await
+        .map_err(|e| e.to_string())?;
+    provider
+        .fetch_dividends(&symbol)
+        .await
+        .map_err(|e| e.to_string())
+}

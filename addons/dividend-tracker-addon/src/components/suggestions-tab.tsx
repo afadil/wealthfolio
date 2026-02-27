@@ -17,7 +17,7 @@ import {
   TableRow,
 } from "@wealthfolio/ui";
 import { format } from "date-fns";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { fetchYahooDividends, toYahooSymbol } from "../lib/yahoo-dividends";
 
@@ -53,9 +53,10 @@ interface SuggestionsTabProps {
 }
 
 export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
-  const [suggestions, setSuggestions] = useState<DividendSuggestion[]>([]);
+  const [overrides, setOverrides] = useState<Map<string, { amount?: number; accountId?: string }>>(
+    new Map(),
+  );
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
-  const [isInitialized, setIsInitialized] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const { data: holdings = [], isLoading: holdingsLoading } = useQuery({
@@ -114,16 +115,19 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
   instrumentIds.forEach((id, i) => {
     const asset = assetProfileQueries[i]?.data;
     if (!asset?.instrumentSymbol) return;
-    yahooSymbolMap.set(
-      asset.instrumentSymbol,
-      toYahooSymbol(asset.instrumentSymbol, asset.instrumentExchangeMic),
-    );
+    const yahooSymbol = toYahooSymbol(asset.instrumentSymbol, asset.instrumentExchangeMic);
+    if (yahooSymbol !== asset.instrumentSymbol) {
+      ctx.api.logger.debug(
+        `Mapped ${asset.instrumentSymbol} → ${yahooSymbol} (MIC: ${asset.instrumentExchangeMic})`,
+      );
+    }
+    yahooSymbolMap.set(asset.instrumentSymbol, yahooSymbol);
   });
 
   const yahooQueries = useQueries({
     queries: symbols.map((symbol) => ({
       queryKey: ["yahoo-dividends", symbol],
-      queryFn: () => fetchYahooDividends(yahooSymbolMap.get(symbol) ?? symbol),
+      queryFn: () => fetchYahooDividends(yahooSymbolMap.get(symbol) ?? symbol, ctx.api.logger),
       enabled: allProfilesLoaded,
       staleTime: 30 * 60 * 1000,
       retry: 1,
@@ -132,8 +136,8 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
 
   const allYahooLoaded = yahooQueries.length === 0 || yahooQueries.every((q) => !q.isLoading);
 
-  useEffect(() => {
-    if (isInitialized || !allYahooLoaded || !existingDivs) return;
+  const baseSuggestions = useMemo(() => {
+    if (!allYahooLoaded || !existingDivs) return [];
 
     const result: DividendSuggestion[] = [];
 
@@ -165,11 +169,30 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
     });
 
     result.sort((a, b) => b.date.localeCompare(a.date));
-    setSuggestions(result);
-    setCheckedIds(new Set(result.map((s) => s.id)));
-    setIsInitialized(true);
+    return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isInitialized, allYahooLoaded, existingDivs]);
+  }, [allYahooLoaded, existingDivs, symbols, symbolMap, yahooQueries]);
+
+  const suggestions = useMemo(
+    () => baseSuggestions.map((s) => ({ ...s, ...overrides.get(s.id) })),
+    [baseSuggestions, overrides],
+  );
+
+  // Initialize checkedIds when new suggestions appear
+  useEffect(() => {
+    if (baseSuggestions.length === 0) return;
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      for (const s of baseSuggestions) {
+        if (!next.has(s.id)) {
+          next.add(s.id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [baseSuggestions]);
 
   const accountNameMap = new Map(accounts.map((a) => [a.id, a.name]));
   const isLoading = holdingsLoading || !allProfilesLoaded || !allYahooLoaded || !existingDivs;
@@ -194,11 +217,19 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
   const updateAmount = (id: string, value: string) => {
     const amount = parseFloat(value);
     if (isNaN(amount)) return;
-    setSuggestions((prev) => prev.map((s) => (s.id === id ? { ...s, amount } : s)));
+    setOverrides((prev) => {
+      const next = new Map(prev);
+      next.set(id, { ...next.get(id), amount });
+      return next;
+    });
   };
 
   const updateAccount = (id: string, accountId: string) => {
-    setSuggestions((prev) => prev.map((s) => (s.id === id ? { ...s, accountId } : s)));
+    setOverrides((prev) => {
+      const next = new Map(prev);
+      next.set(id, { ...next.get(id), accountId });
+      return next;
+    });
   };
 
   const handleSave = async () => {

@@ -82,6 +82,13 @@ pub struct YahooProvider {
     connector: yahoo::YahooConnector,
 }
 
+/// A single dividend event returned by Yahoo Finance.
+#[derive(Debug, serde::Serialize)]
+pub struct YahooDividend {
+    pub amount: f64,
+    pub date: i64, // unix seconds
+}
+
 impl YahooProvider {
     /// Create a new Yahoo Finance provider.
     pub async fn new() -> Result<Self, MarketDataError> {
@@ -219,6 +226,112 @@ impl YahooProvider {
     fn clear_crumb(&self) {
         let mut guard = YAHOO_CRUMB.write().unwrap();
         *guard = None;
+    }
+
+    // ========================================================================
+    // Dividend Fetching
+    // ========================================================================
+
+    /// Fetch dividend events for a symbol over the past two years.
+    pub async fn fetch_dividends(
+        &self,
+        symbol: &str,
+    ) -> Result<Vec<YahooDividend>, MarketDataError> {
+        use std::collections::HashMap;
+
+        let crumb_data = self.ensure_crumb().await?;
+
+        let now = chrono::Utc::now().timestamp();
+        let two_years_ago = now - 2 * 365 * 24 * 60 * 60;
+        let encoded = urlencoding::encode(symbol);
+        let url = format!(
+            "https://query1.finance.yahoo.com/v8/finance/chart/{}?interval=1d&period1={}&period2={}&events=div&crumb={}",
+            encoded,
+            two_years_ago,
+            now,
+            urlencoding::encode(&crumb_data.crumb)
+        );
+
+        let client = reqwest::Client::new();
+        let resp = client
+            .get(&url)
+            .header(header::ACCEPT, "application/json")
+            .header(
+                header::USER_AGENT,
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            )
+            .header(header::COOKIE, &crumb_data.cookie)
+            .send()
+            .await
+            .map_err(|e| MarketDataError::ProviderError {
+                provider: "YAHOO".to_string(),
+                message: format!("Failed to fetch dividends: {}", e),
+            })?;
+
+        let status = resp.status();
+        if status == reqwest::StatusCode::UNAUTHORIZED {
+            self.clear_crumb();
+        }
+        if !status.is_success() {
+            return Err(MarketDataError::ProviderError {
+                provider: "YAHOO".to_string(),
+                message: format!("Yahoo returned {}", status),
+            });
+        }
+
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| MarketDataError::ProviderError {
+                provider: "YAHOO".to_string(),
+                message: format!("Failed to read dividends response: {}", e),
+            })?;
+
+        #[derive(serde::Deserialize)]
+        struct DivItem {
+            amount: f64,
+            date: i64,
+        }
+        #[derive(serde::Deserialize)]
+        struct Events {
+            dividends: Option<HashMap<String, DivItem>>,
+        }
+        #[derive(serde::Deserialize)]
+        struct ChartResult {
+            events: Option<Events>,
+        }
+        #[derive(serde::Deserialize)]
+        struct Chart {
+            result: Option<Vec<ChartResult>>,
+        }
+        #[derive(serde::Deserialize)]
+        struct Root {
+            chart: Option<Chart>,
+        }
+
+        let parsed: Root =
+            serde_json::from_str(&text).map_err(|e| MarketDataError::ProviderError {
+                provider: "YAHOO".to_string(),
+                message: format!("Failed to parse dividends: {}", e),
+            })?;
+
+        let divs = parsed
+            .chart
+            .and_then(|c| c.result)
+            .and_then(|r| r.into_iter().next())
+            .and_then(|r| r.events)
+            .and_then(|e| e.dividends)
+            .unwrap_or_default();
+
+        let mut result: Vec<YahooDividend> = divs
+            .into_values()
+            .map(|d| YahooDividend {
+                amount: d.amount,
+                date: d.date,
+            })
+            .collect();
+        result.sort_by_key(|d| d.date);
+        Ok(result)
     }
 
     // ========================================================================
