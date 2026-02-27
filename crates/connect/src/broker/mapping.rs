@@ -258,6 +258,8 @@ pub fn map_broker_activity(
     // Build metadata JSON
     let metadata = build_activity_metadata(activity);
 
+    let is_never_asset_type = activities::NEVER_ASSET_TYPES.contains(&activity_type.as_str());
+
     let is_cash_like = matches!(
         activity_type.as_str(),
         activities::ACTIVITY_TYPE_DEPOSIT
@@ -349,8 +351,10 @@ pub fn map_broker_activity(
         exchange_mic
     };
 
-    // Build SymbolInput for non-cash activities that have a symbol
-    let symbol_input = if is_cash_like && display_symbol.is_none() && option_symbol.is_none() {
+    // Never-asset types are always pure cash, even if brokers send a symbol.
+    let symbol_input = if is_never_asset_type {
+        None
+    } else if is_cash_like && display_symbol.is_none() && option_symbol.is_none() {
         // Cash activity without symbol - no asset needed
         None
     } else {
@@ -592,5 +596,49 @@ mod tests {
 
         assert_eq!(symbol.symbol.as_deref(), Some("AAPL"));
         assert_ne!(symbol.kind.as_deref(), Some("OPTION"));
+    }
+
+    #[test]
+    fn test_map_broker_activity_clears_symbol_for_all_never_asset_types() {
+        for activity_type in activities::NEVER_ASSET_TYPES {
+            let activity = AccountUniversalActivity {
+                id: Some(format!("act-{}", activity_type.to_lowercase())),
+                activity_type: Some(activity_type.to_string()),
+                symbol: Some(crate::broker::models::AccountUniversalActivitySymbol {
+                    symbol: Some("AAPL".to_string()),
+                    raw_symbol: Some("AAPL".to_string()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+
+            let mapped =
+                map_broker_activity(&activity, "acct-1", Some("USD"), Some("USD")).unwrap();
+            assert!(
+                mapped.symbol.is_none(),
+                "expected no symbol for never-asset type {}",
+                activity_type
+            );
+        }
+    }
+
+    #[test]
+    fn test_map_broker_activity_keeps_symbol_for_transfer_with_symbol() {
+        let activity = AccountUniversalActivity {
+            id: Some("act-tr-in".to_string()),
+            activity_type: Some("TRANSFER_IN".to_string()),
+            symbol: Some(crate::broker::models::AccountUniversalActivitySymbol {
+                symbol: Some("AAPL".to_string()),
+                raw_symbol: Some("AAPL".to_string()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let mapped = map_broker_activity(&activity, "acct-1", Some("USD"), Some("USD")).unwrap();
+        assert_eq!(
+            mapped.symbol.and_then(|s| s.symbol),
+            Some("AAPL".to_string())
+        );
     }
 }
