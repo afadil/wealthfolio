@@ -2,6 +2,7 @@ import type { AddonContext } from "@wealthfolio/addon-sdk";
 import {
   Button,
   Checkbox,
+  DatePickerInput,
   Input,
   Select,
   SelectContent,
@@ -91,10 +92,11 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
     });
   };
 
-  const updatePayDate = (id: string, value: string) => {
+  const updatePayDate = (id: string, date: Date | undefined) => {
+    const value = date ? format(date, "yyyy-MM-dd") : undefined;
     setOverrides((prev) => {
       const next = new Map(prev);
-      next.set(id, { ...next.get(id), payDate: value || undefined });
+      next.set(id, { ...next.get(id), payDate: value });
       return next;
     });
   };
@@ -214,10 +216,9 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
                 <TableCell className="font-mono font-medium">{s.symbol}</TableCell>
                 <TableCell>{format(new Date(s.date + "T00:00:00"), "MMM d, yyyy")}</TableCell>
                 <TableCell>
-                  <Input
-                    type="date"
-                    value={s.payDate ?? ""}
-                    onChange={(e) => updatePayDate(s.id, e.target.value)}
+                  <DatePickerInput
+                    value={s.payDate}
+                    onChange={(date) => updatePayDate(s.id, date)}
                     className="w-36"
                   />
                 </TableCell>
