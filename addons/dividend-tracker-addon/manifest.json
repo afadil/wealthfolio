@@ -1,0 +1,32 @@
+{
+  "id": "dividend-tracker-addon",
+  "name": "Dividend Tracker",
+  "version": "1.0.0",
+  "description": "Find and add missing dividend activities by fetching historical data from Yahoo Finance",
+  "author": "Wealthfolio",
+  "main": "dist/addon.js",
+  "sdkVersion": "3.0.0",
+  "enabled": true,
+  "permissions": [
+    {
+      "category": "portfolio",
+      "functions": ["getHoldings"],
+      "purpose": "Get current holdings to check for missing dividends"
+    },
+    {
+      "category": "activities",
+      "functions": ["search", "saveMany"],
+      "purpose": "Check existing dividends and create new ones"
+    },
+    {
+      "category": "settings",
+      "functions": ["get"],
+      "purpose": "Get base currency"
+    },
+    {
+      "category": "ui",
+      "functions": ["sidebar.addItem", "router.add"],
+      "purpose": "Navigation"
+    }
+  ]
+}
