@@ -5,7 +5,7 @@ import {
   ImportFormat,
   SUBTYPES_BY_ACTIVITY_TYPE,
 } from "@/lib/constants";
-import type { ActivityImport, SymbolSearchResult } from "@/lib/types";
+import type { ActivityImport, QuoteMode, SymbolSearchResult } from "@/lib/types";
 import { tryParseDate } from "@/lib/utils";
 import { parse, parseISO, isValid } from "date-fns";
 import { getDateFnsPattern } from "../utils/date-format-options";
@@ -234,7 +234,7 @@ function mapSymbol(
       symbolName?: string;
       quoteCcy?: string;
       instrumentType?: string;
-      quoteMode?: string;
+      quoteMode?: QuoteMode;
     }
   >,
 ): {
@@ -243,7 +243,7 @@ function mapSymbol(
   symbolName?: string;
   quoteCcy?: string;
   instrumentType?: string;
-  quoteMode?: string;
+  quoteMode?: QuoteMode;
 } {
   if (!csvSymbol) return { symbol: undefined };
 
@@ -449,7 +449,13 @@ function createDraftActivities(
     accountMappings: Record<string, string>;
     symbolMappingMeta?: Record<
       string,
-      { exchangeMic?: string; symbolName?: string; quoteCcy?: string; instrumentType?: string }
+      {
+        exchangeMic?: string;
+        symbolName?: string;
+        quoteCcy?: string;
+        instrumentType?: string;
+        quoteMode?: QuoteMode;
+      }
     >;
   },
   parseConfig: {
@@ -650,6 +656,7 @@ export function ReviewStep() {
                 activityType: draft.activityType as ActivityImport["activityType"],
                 date: draft.activityDate || "",
                 symbol: draft.symbol || "",
+                symbolName: draft.symbolName,
                 exchangeMic: draft.exchangeMic,
                 quoteCcy: draft.quoteCcy,
                 instrumentType: draft.instrumentType,
@@ -723,6 +730,7 @@ export function ReviewStep() {
               exchangeMic: backendResult.exchangeMic,
               quoteCcy: backendResult.quoteCcy,
               instrumentType: backendResult.instrumentType,
+              quoteMode: backendResult.quoteMode,
               status:
                 draft.status === "skipped"
                   ? draft.status
