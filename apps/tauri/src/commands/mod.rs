@@ -5,6 +5,7 @@ pub mod ai_chat;
 pub mod ai_providers;
 pub mod alternative_assets;
 pub mod asset;
+pub mod bank_connect;
 #[cfg(feature = "connect-sync")]
 pub mod brokers_sync;
 #[cfg(feature = "device-sync")]

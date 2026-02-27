@@ -54,6 +54,8 @@ pub struct ServiceContext {
     pub device_enroll_service: Arc<DeviceEnrollService>,
     pub device_sync_runtime: Arc<DeviceSyncRuntimeState>,
     pub health_service: Arc<health::HealthService>,
+    pub bank_connect_repository:
+        Arc<wealthfolio_storage_sqlite::bank_connect::BankConnectRepository>,
 }
 
 impl ServiceContext {
@@ -167,5 +169,11 @@ impl ServiceContext {
 
     pub fn health_service(&self) -> Arc<health::HealthService> {
         Arc::clone(&self.health_service)
+    }
+
+    pub fn bank_connect_repository(
+        &self,
+    ) -> Arc<wealthfolio_storage_sqlite::bank_connect::BankConnectRepository> {
+        Arc::clone(&self.bank_connect_repository)
     }
 }

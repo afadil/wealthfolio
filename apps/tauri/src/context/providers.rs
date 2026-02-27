@@ -37,6 +37,7 @@ use wealthfolio_storage_sqlite::{
     activities::ActivityRepository,
     ai_chat::AiChatRepository,
     assets::{AlternativeAssetRepository, AssetRepository},
+    bank_connect::BankConnectRepository,
     db::{self, write_actor},
     fx::FxRepository,
     goals::GoalRepository,
@@ -306,6 +307,9 @@ pub async fn initialize_context(
         Arc::new(HealthDismissalRepository::new(pool.clone(), writer.clone()));
     let health_service = Arc::new(HealthService::new(health_dismissal_repository));
 
+    let bank_connect_repository =
+        Arc::new(BankConnectRepository::new(pool.clone(), writer.clone()));
+
     Ok(ContextInitResult {
         context: ServiceContext {
             base_currency,
@@ -337,6 +341,7 @@ pub async fn initialize_context(
             device_enroll_service,
             device_sync_runtime,
             health_service,
+            bank_connect_repository,
         },
         event_receiver,
     })

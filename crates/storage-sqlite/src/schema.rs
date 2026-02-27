@@ -417,6 +417,20 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    bank_download_runs (id) {
+        id -> Text,
+        bank_key -> Text,
+        account_name -> Nullable<Text>,
+        status -> Text,
+        files_downloaded -> Integer,
+        files_skipped -> Integer,
+        error_message -> Nullable<Text>,
+        started_at -> Text,
+        completed_at -> Nullable<Text>,
+    }
+}
+
 diesel::joinable!(accounts -> platforms (platform_id));
 diesel::joinable!(activities -> accounts (account_id));
 diesel::joinable!(activities -> assets (asset_id));
@@ -435,6 +449,7 @@ diesel::joinable!(taxonomy_categories -> taxonomies (taxonomy_id));
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     activities,
+    bank_download_runs,
     activity_import_profiles,
     ai_messages,
     ai_thread_tags,

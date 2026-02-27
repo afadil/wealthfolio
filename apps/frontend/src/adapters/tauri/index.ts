@@ -184,6 +184,28 @@ export {
   openUrlInBrowser,
 } from "./files";
 
+// Bank Connect Commands
+export {
+  getBankConnectSettings,
+  saveBankConnectSettings,
+  listBankDownloadRuns,
+  openBankWindow,
+  closeBankWindow,
+  startBankDownload,
+  listenBankLoginDetected,
+  listenBankProgress,
+  listenBankDownloadComplete,
+  listenBankWindowClosed,
+} from "./bank-connect";
+export type {
+  BankConnectSettings,
+  BankDownloadRun,
+  BankLoginDetectedPayload,
+  BankProgressPayload,
+  BankDownloadCompletePayload,
+  BankWindowClosedPayload,
+} from "./bank-connect";
+
 // Crypto Commands (sync crypto operations)
 export {
   syncGenerateRootKey,
