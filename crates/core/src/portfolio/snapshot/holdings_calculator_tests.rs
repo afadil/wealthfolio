@@ -795,7 +795,57 @@ mod tests {
 
         // Cost basis should remain unchanged as it's a cash activity
         assert_eq!(next_state.cost_basis, previous_snapshot.cost_basis);
-        assert!(next_state.positions.is_empty()); // No positions involved
+        assert!(next_state.positions.is_empty());
+    }
+
+    #[test]
+    fn test_withdrawal_with_negative_amount_from_csv_import() {
+        let mock_fx_service = Arc::new(MockFxService::new());
+        let target_date_str = "2025-03-10";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+        let account_currency = "CNY";
+
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = create_calculator(mock_fx_service, base_currency);
+
+        let mut previous_snapshot =
+            create_initial_snapshot("acc_csv_import", account_currency, "2025-03-07");
+        previous_snapshot
+            .cash_balances
+            .insert(account_currency.to_string(), dec!(20135.50));
+        previous_snapshot.net_contribution = dec!(20208.24);
+        previous_snapshot.net_contribution_base = dec!(20208.24);
+
+        let withdrawal_negative_activity = create_cash_activity(
+            "act_withdraw_csv",
+            ActivityType::Withdrawal,
+            dec!(-10118), // Negative amount from CSV import
+            dec!(0),
+            "CNY",
+            target_date_str,
+        );
+
+        let activities_today = vec![withdrawal_negative_activity];
+
+        let result =
+            calculator.calculate_next_holdings(&previous_snapshot, &activities_today, target_date);
+        assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
+        let next_state = result.unwrap().snapshot;
+
+        // Cash should DECREASE by 10118 (not increase!)
+        // Previous: 20135.50, After withdrawal: 20135.50 - 10118 = 10017.50
+        assert_eq!(
+            next_state.cash_balances.get(account_currency),
+            Some(&dec!(10017.50)),
+            "Cash should decrease by withdrawal amount, not increase"
+        );
+
+        // Net contribution should DECREASE (not increase!)
+        // Previous: 20208.24 - 10118 = 10090.24
+        assert_eq!(
+            next_state.net_contribution, dec!(10090.24),
+            "Net contribution should decrease by withdrawal amount"
+        );
     }
 
     #[test]
@@ -871,6 +921,150 @@ mod tests {
 
         assert_eq!(next_state.cost_basis, previous_snapshot.cost_basis);
         assert!(next_state.positions.is_empty());
+    }
+
+    #[test]
+    fn test_deposit_with_positive_amount_from_csv_import() {
+        let mock_fx_service = Arc::new(MockFxService::new());
+        let target_date_str = "2025-02-13";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+        let account_currency = "CNY";
+
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = create_calculator(mock_fx_service, base_currency);
+
+        let mut previous_snapshot =
+            create_initial_snapshot("acc_deposit", account_currency, "2025-02-12");
+        previous_snapshot
+            .cash_balances
+            .insert(account_currency.to_string(), dec!(1000.00));
+        previous_snapshot.net_contribution = dec!(1000.00);
+        previous_snapshot.net_contribution_base = dec!(1000.00);
+
+        let deposit_positive_activity = create_cash_activity(
+            "act_deposit_csv",
+            ActivityType::Deposit,
+            dec!(10000), // Positive amount from CSV import
+            dec!(0),
+            "CNY",
+            target_date_str,
+        );
+
+        let activities_today = vec![deposit_positive_activity];
+
+        let result =
+            calculator.calculate_next_holdings(&previous_snapshot, &activities_today, target_date);
+        assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
+        let next_state = result.unwrap().snapshot;
+
+        // Cash should INCREASE by 10000
+        assert_eq!(
+            next_state.cash_balances.get(account_currency),
+            Some(&dec!(11000.00)),
+            "Cash should increase by deposit amount"
+        );
+
+        // Net contribution should INCREASE
+        assert_eq!(
+            next_state.net_contribution, dec!(11000.00),
+            "Net contribution should increase by deposit amount"
+        );
+    }
+
+    #[test]
+    fn test_fee_with_negative_amount_from_csv_import() {
+        let mock_fx_service = Arc::new(MockFxService::new());
+        let target_date_str = "2025-03-07";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+        let account_currency = "CNY";
+
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = create_calculator(mock_fx_service, base_currency);
+
+        let mut previous_snapshot =
+            create_initial_snapshot("acc_fee", account_currency, "2025-03-06");
+        previous_snapshot
+            .cash_balances
+            .insert(account_currency.to_string(), dec!(1000.00));
+        previous_snapshot.net_contribution = dec!(500.00);
+        previous_snapshot.net_contribution_base = dec!(500.00);
+
+        let fee_negative_activity = create_cash_activity(
+            "act_fee_csv",
+            ActivityType::Fee,
+            dec!(-5.21), // Negative fee from CSV import
+            dec!(-5.21), // Also in fee field
+            "CNY",
+            target_date_str,
+        );
+
+        let activities_today = vec![fee_negative_activity];
+
+        let result =
+            calculator.calculate_next_holdings(&previous_snapshot, &activities_today, target_date);
+        assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
+        let next_state = result.unwrap().snapshot;
+
+        // Cash should DECREASE by 5.21 (fee)
+        assert_eq!(
+            next_state.cash_balances.get(account_currency),
+            Some(&dec!(994.79)),
+            "Cash should decrease by fee amount (abs value)"
+        );
+
+        // Net contribution should NOT change for fees
+        assert_eq!(
+            next_state.net_contribution, dec!(500.00),
+            "Net contribution should not change for fees"
+        );
+    }
+
+    #[test]
+    fn test_transfer_out_with_negative_amount_from_csv_import() {
+        let mock_fx_service = Arc::new(MockFxService::new());
+        let target_date_str = "2025-03-10";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+        let account_currency = "CNY";
+
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = create_calculator(mock_fx_service, base_currency);
+
+        let mut previous_snapshot =
+            create_initial_snapshot("acc_transfer_out", account_currency, "2025-03-09");
+        previous_snapshot
+            .cash_balances
+            .insert(account_currency.to_string(), dec!(10000.00));
+        previous_snapshot.net_contribution = dec!(8000.00);
+        previous_snapshot.net_contribution_base = dec!(8000.00);
+
+        let transfer_out_negative_activity = create_cash_activity(
+            "act_transfer_out_csv",
+            ActivityType::TransferOut,
+            dec!(-5000), // Negative amount from CSV import
+            dec!(0),
+            "CNY",
+            target_date_str,
+        );
+
+        let activities_today = vec![transfer_out_negative_activity];
+
+        let result =
+            calculator.calculate_next_holdings(&previous_snapshot, &activities_today, target_date);
+        assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
+        let next_state = result.unwrap().snapshot;
+
+        // Cash should DECREASE by 5000 (not increase!)
+        assert_eq!(
+            next_state.cash_balances.get(account_currency),
+            Some(&dec!(5000.00)),
+            "Cash should decrease by transfer out amount, not increase"
+        );
+
+        // Net contribution should DECREASE (not increase!)
+        assert_eq!(
+            next_state.net_contribution, dec!(3000.00),
+            "Net contribution should decrease by transfer out amount"
+        );
     }
 
     #[test]

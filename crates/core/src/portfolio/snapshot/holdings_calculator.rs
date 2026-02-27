@@ -391,11 +391,12 @@ impl HoldingsCalculator {
     ) -> Result<()> {
         let activity_currency = &activity.currency;
         let activity_date = activity.activity_date.naive_utc().date();
-        let activity_amount = activity.amt();
+        // Use absolute value - activity type dictates direction
+        let activity_amount = -activity.amt().abs();
 
         // Book cash outflow in ACTIVITY currency (amount + fee)
-        let net_amount = activity_amount + activity.fee_amt();
-        add_cash(state, activity_currency, -net_amount);
+        let net_amount = activity_amount - activity.fee_amt();
+        add_cash(state, activity_currency, net_amount);
 
         // Convert for net_contribution (pre-fee amount in account currency)
         let amount_acct = self.convert_to_account_currency(
@@ -423,8 +424,8 @@ impl HoldingsCalculator {
             }
         };
 
-        state.net_contribution -= amount_acct;
-        state.net_contribution_base -= amount_base;
+        state.net_contribution += amount_acct;
+        state.net_contribution_base += amount_base;
         Ok(())
     }
 
@@ -655,15 +656,16 @@ impl HoldingsCalculator {
         _asset_currency_cache: &mut HashMap<String, (String, bool)>,
     ) -> Result<()> {
         let activity_currency = &activity.currency;
-        let activity_amount = activity.amt();
+        let activity_date = activity.activity_date.naive_utc().date();
+        // Use absolute value - activity type dictates direction
+        let activity_amount = -activity.amt().abs();
         let asset_id = activity.asset_id.as_deref().unwrap_or("");
 
         if asset_id.is_empty() {
             // Cash transfer: book outflow in ACTIVITY currency (amount + fee)
-            let net_amount = activity_amount + activity.fee_amt();
-            add_cash(state, activity_currency, -net_amount);
+            let net_amount = activity_amount - activity.fee_amt();
+            add_cash(state, activity_currency, net_amount);
 
-            let activity_date = activity.activity_date.naive_utc().date();
             let amount_acct = self.convert_to_account_currency(
                 activity_amount,
                 activity,
@@ -688,8 +690,8 @@ impl HoldingsCalculator {
                 }
             };
 
-            state.net_contribution -= amount_acct;
-            state.net_contribution_base -= amount_base;
+            state.net_contribution += amount_acct;
+            state.net_contribution_base += amount_base;
         } else {
             // Asset transfer
             let activity_date = activity.activity_date.naive_utc().date();
