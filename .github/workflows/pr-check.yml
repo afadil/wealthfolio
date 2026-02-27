@@ -12,21 +12,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ─── Frontend ───────────────────────────────────────────────────────────────
   frontend-check:
-    name: Frontend Check
+    name: Frontend
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
         with:
           version: 9
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "pnpm"
@@ -37,7 +35,7 @@ jobs:
       - name: Build package types
         run: pnpm run build:types
 
-      - name: Check formatting
+      - name: Format check
         run: pnpm format:check
 
       - name: Lint
@@ -46,53 +44,59 @@ jobs:
       - name: Type check
         run: pnpm type-check
 
-      - name: Run tests
-        run: pnpm test
+      - name: Unit tests
+        run: pnpm test -- --reporter=verbose
+
+      - name: Property tests
+        run: pnpm --filter frontend test -- --reporter=verbose src/lib/*.property.test.ts
 
       - name: Build frontend
         run: pnpm build
 
+  # ─── Rust ───────────────────────────────────────────────────────────────────
   rust-check:
-    name: Rust Check
+    name: Rust
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
 
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
 
-      - name: Install system dependencies
+      - name: System dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev
 
-      - name: Create dist folder for Tauri context
-        run:
-          mkdir -p dist && echo '<!DOCTYPE html><html><head></head><body></body></html>' >
-          dist/index.html
+      - name: Create dist stub for Tauri context
+        run: |
+          mkdir -p dist
+          echo '<!DOCTYPE html><html><head></head><body></body></html>' > dist/index.html
 
-      - name: Check formatting
+      - name: Format check
         run: cargo fmt --all -- --check
 
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-      - name: Test
-        run: cargo test --workspace
+      - name: Unit tests
+        run: cargo test --workspace --lib --bins
         env:
-          # Required for outbox tests in storage-sqlite
           CONNECT_API_URL: http://test.local
 
-      - name: Build (src-server)
+      - name: Integration tests
+        run: cargo test --workspace --tests
+        env:
+          CONNECT_API_URL: http://test.local
+
+      - name: Build server
         run: cargo build -p wealthfolio-server --release
 
+  # ─── Gate ───────────────────────────────────────────────────────────────────
   build-status:
     name: Build Status
     runs-on: ubuntu-latest
@@ -100,12 +104,14 @@ jobs:
     if: always()
 
     steps:
-      - name: Check build status
+      - name: Check results
         run: |
-          if [[ "${{ needs.frontend-check.result }}" == "failure" ]] || [[ "${{ needs.rust-check.result }}" == "failure" ]]; then
+          if [[ "${{ needs.frontend-check.result }}" == "failure" ]] || \
+             [[ "${{ needs.rust-check.result }}" == "failure" ]]; then
             echo "❌ Build failed"
             exit 1
-          elif [[ "${{ needs.frontend-check.result }}" == "cancelled" ]] || [[ "${{ needs.rust-check.result }}" == "cancelled" ]]; then
+          elif [[ "${{ needs.frontend-check.result }}" == "cancelled" ]] || \
+               [[ "${{ needs.rust-check.result }}" == "cancelled" ]]; then
             echo "⚠️ Build was cancelled"
             exit 1
           else
