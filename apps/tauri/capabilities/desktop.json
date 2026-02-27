@@ -41,6 +41,7 @@
     "core:window:allow-theme",
     "updater:default",
     "log:default",
-    "window-state:default"
+    "window-state:default",
+    "core:window:allow-create"
   ]
 }

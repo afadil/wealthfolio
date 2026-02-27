@@ -50,3 +50,4 @@ chrono-tz = "0.10"
 [dev-dependencies]
 tempfile = "3"
 proptest = "1.4"
+insta = { version = "1", features = ["json", "redactions"] }

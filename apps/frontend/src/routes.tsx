@@ -21,6 +21,7 @@ import PerformancePage from "@/pages/performance/performance-page";
 import SettingsAccountsPage from "@/pages/settings/accounts/accounts-page";
 import SettingsAppearancePage from "@/pages/settings/appearance/appearance-page";
 import AccountPage from "./pages/account/account-page";
+import BankConnectPage from "./pages/bank-connect/bank-connect-page";
 import AiAssistantPage from "./pages/ai-assistant/ai-assistant-page";
 import AssetProfilePage from "./pages/asset/asset-profile-page";
 import HealthPage from "./pages/health/health-page";
@@ -91,6 +92,7 @@ export function AppRoutes() {
           <Route path="health" element={<HealthPage />} />
           <Route path="assistant" element={<AiAssistantPage />} />
           <Route path="connect" element={<ConnectPage />} />
+          <Route path="bank-connect" element={<BankConnectPage />} />
           {/* Dynamic addon routes */}
           {dynamicRoutes.map(({ path, component: Component }) => (
             <Route

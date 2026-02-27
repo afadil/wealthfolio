@@ -1,5 +1,6 @@
 import { getDynamicNavItems, subscribeToNavigationUpdates } from "@/addons/addons-runtime-context";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Building2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export interface NavLink {
@@ -52,6 +53,13 @@ const staticNavigation: NavigationProps = {
       href: "/assistant",
       keywords: ["ai", "assistant", "chat", "help", "ask"],
       label: "AI Assistant",
+    },
+    {
+      icon: <Building2 className="size-6" />,
+      title: "Bank Connect",
+      href: "/bank-connect",
+      keywords: ["bank", "statements", "download", "australia"],
+      label: "Download Bank Statements",
     },
   ],
   secondary: [

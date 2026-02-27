@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod banks;
 mod commands;
 mod context;
 mod domain_events;
@@ -522,6 +523,13 @@ pub fn run() {
             commands::sync_crypto::sync_compute_sas,
             #[cfg(feature = "device-sync")]
             commands::sync_crypto::sync_generate_device_id,
+            // Bank Connect commands
+            commands::bank_connect::get_bank_connect_settings,
+            commands::bank_connect::save_bank_connect_settings,
+            commands::bank_connect::list_bank_download_runs,
+            commands::bank_connect::open_bank_window,
+            commands::bank_connect::close_bank_window,
+            commands::bank_connect::start_bank_download,
             // Health commands
             commands::health::get_health_status,
             commands::health::run_health_checks,

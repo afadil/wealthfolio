@@ -1,0 +1,255 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 2 * * *" # 02:00 UTC daily
+  workflow_dispatch:
+
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+jobs:
+  # ─── Rust Coverage ──────────────────────────────────────────────────────────
+  rust-coverage:
+    name: Rust Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: System dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Create dist stub
+        run: |
+          mkdir -p dist
+          echo '<!DOCTYPE html><html><head></head><body></body></html>' > dist/index.html
+
+      - name: Generate coverage
+        run: |
+          cargo llvm-cov --workspace --lcov --output-path lcov.info
+        env:
+          CONNECT_API_URL: http://test.local
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: lcov.info
+          flags: rust
+          fail_ci_if_error: false
+
+  # ─── TypeScript Coverage ────────────────────────────────────────────────────
+  ts-coverage:
+    name: TypeScript Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build package types
+        run: pnpm run build:types
+
+      - name: Coverage
+        run: pnpm test:coverage
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: apps/frontend/coverage/lcov.info
+          flags: typescript
+          fail_ci_if_error: false
+
+  # ─── Snapshot Regression ────────────────────────────────────────────────────
+  snapshot-regression:
+    name: Snapshot Regression
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: System dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev
+
+      - name: Create dist stub
+        run: |
+          mkdir -p dist
+          echo '<!DOCTYPE html><html><head></head><body></body></html>' > dist/index.html
+
+      - name: Install cargo-insta
+        run: cargo install cargo-insta --locked
+
+      - name: Run snapshot tests
+        run: cargo test --workspace --tests regression
+        env:
+          CONNECT_API_URL: http://test.local
+
+      - name: Check for snapshot diffs
+        run: cargo insta test --workspace --unreferenced reject
+        env:
+          CONNECT_API_URL: http://test.local
+
+  # ─── Property / Fuzzing ─────────────────────────────────────────────────────
+  property-tests:
+    name: Property Tests (extended)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: System dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev
+
+      - name: Create dist stub
+        run: |
+          mkdir -p dist
+          echo '<!DOCTYPE html><html><head></head><body></body></html>' > dist/index.html
+
+      - name: Property tests (10 000 cases)
+        run: cargo test --workspace -- --include-ignored property
+        env:
+          PROPTEST_CASES: 10000
+          CONNECT_API_URL: http://test.local
+
+  # ─── Formal Verification (Kani) ─────────────────────────────────────────────
+  kani:
+    name: Formal Verification (Kani)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Kani
+        uses: model-checking/kani-github-action@v1
+        with:
+          # Verify specific harnesses in crates/core
+          args: >
+            --workspace
+            --include-pattern "kani::"
+            --output-format terse
+        continue-on-error: false
+
+  # ─── E2E (Web Mode) ─────────────────────────────────────────────────────────
+  e2e:
+    name: E2E — Web Mode
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: System dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev \
+            pkg-config libssl-dev
+
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build package types
+        run: pnpm run build:types
+
+      - name: Build frontend (web mode)
+        run: BUILD_TARGET=web pnpm build
+        env:
+          BUILD_TARGET: web
+
+      - name: Build server
+        run: cargo build -p wealthfolio-server
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Prepare E2E environment
+        run: node scripts/prep-e2e.mjs
+
+      - name: Run E2E tests
+        run: node scripts/run-e2e.mjs
+        env:
+          CI: true
+          WF_SECRET_KEY: ${{ secrets.E2E_SECRET_KEY || 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }}
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  # ─── Migration Integrity ────────────────────────────────────────────────────
+  migration-integrity:
+    name: Migration Integrity
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: System dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev
+
+      - name: Create dist stub
+        run: |
+          mkdir -p dist
+          echo '<!DOCTYPE html><html><head></head><body></body></html>' > dist/index.html
+
+      - name: Migration round-trip tests
+        run: cargo test --test migration_integrity --package wealthfolio-storage-sqlite
+        env:
+          CONNECT_API_URL: http://test.local
