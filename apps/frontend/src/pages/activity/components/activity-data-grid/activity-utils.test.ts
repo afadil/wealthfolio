@@ -130,6 +130,15 @@ describe("activity-utils", () => {
       });
       expect(resolveAssetIdForTransaction(tx, "USD")).toBeUndefined();
     });
+
+    it("should keep transfer activity asset identifiers when symbol is set", () => {
+      const tx = createMockTransaction({
+        activityType: ActivityType.TRANSFER_IN,
+        assetId: "",
+        assetSymbol: "AAPL",
+      });
+      expect(resolveAssetIdForTransaction(tx, "USD")).toBe("AAPL");
+    });
   });
 
   describe("createDraftTransaction", () => {
@@ -407,6 +416,37 @@ describe("activity-utils", () => {
       expect(result.updates[0].symbol).toBeUndefined();
     });
 
+    it("should not force account currency for securities transfers", () => {
+      const transactions: LocalTransaction[] = [
+        createMockTransaction({
+          id: "tx-1",
+          activityType: ActivityType.TRANSFER_IN,
+          assetId: "",
+          assetSymbol: "AAPL",
+          currency: "",
+          accountCurrency: "USD",
+        }),
+      ];
+      const dirtyIds = new Set(["tx-1"]);
+
+      const result = buildSavePayload(
+        transactions,
+        dirtyIds,
+        new Set(),
+        () => undefined,
+        dirtyCurrencyLookup,
+        assetCurrencyLookup,
+        "USD",
+      );
+
+      expect(result.updates[0].currency).toBeUndefined();
+      expect(result.updates[0].symbol).toEqual(
+        expect.objectContaining({
+          symbol: "AAPL",
+        }),
+      );
+    });
+
     it("should remove quantity and unitPrice for SPLIT activities", () => {
       const transactions: LocalTransaction[] = [
         createMockTransaction({
@@ -452,6 +492,31 @@ describe("activity-utils", () => {
       });
 
       expect(updated.amount).toBeNull();
+    });
+
+    it("should not force transfer activity rows to CASH", () => {
+      const accountLookup = new Map<string, { id: string; name: string; currency: string }>([
+        ["account-1", { id: "account-1", name: "Test Account", currency: "USD" }],
+      ]);
+      const assetCurrencyLookup = new Map<string, string>();
+      const tx = createMockTransaction({
+        activityType: ActivityType.BUY,
+        assetSymbol: "AAPL",
+        assetId: "AAPL",
+      });
+
+      const updated = applyTransactionUpdate({
+        transaction: tx,
+        field: "activityType",
+        value: ActivityType.TRANSFER_IN,
+        accountLookup,
+        assetCurrencyLookup,
+        fallbackCurrency: "USD",
+        resolveTransactionCurrency: () => "USD",
+      });
+
+      expect(updated.assetSymbol).toBe("AAPL");
+      expect(updated.assetId).toBe("AAPL");
     });
   });
 
