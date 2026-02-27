@@ -275,28 +275,49 @@ impl HoldingsCalculator {
             fx_rate_used,
         )?;
 
-        // Book cash outflow in ACTIVITY currency
+        // Book cash outflow
         let total_cost = (activity.qty() * activity.price()) + activity.fee_amt();
-        add_cash(state, activity_currency, -total_cost);
+        if activity_currency != account_currency {
+            if let Some(fx_rate) = activity.fx_rate.filter(|r| *r != Decimal::ZERO) {
+                // Broker converted at transaction time — book in account currency
+                add_cash(state, account_currency, -(total_cost * fx_rate));
+            } else {
+                // No fx_rate — book in activity currency (multi-currency account)
+                add_cash(state, activity_currency, -total_cost);
+            }
+        } else {
+            add_cash(state, activity_currency, -total_cost);
+        }
 
         Ok(())
     }
 
     /// Handle SELL activity.
-    /// Books cash inflow in ACTIVITY currency.
+    /// Books cash inflow in account currency when fx_rate is provided,
+    /// otherwise in activity currency.
     fn handle_sell(
         &self,
         activity: &Activity,
         state: &mut AccountStateSnapshot,
-        _account_currency: &str,
+        account_currency: &str,
         _asset_currency_cache: &mut HashMap<String, (String, bool)>,
     ) -> Result<()> {
         let activity_currency = &activity.currency;
         let asset_id = activity.asset_id.as_deref().unwrap_or("");
 
-        // Book cash inflow in ACTIVITY currency (proceeds = qty * price - fee)
+        // Book cash inflow
         let total_proceeds = (activity.qty() * activity.price()) - activity.fee_amt();
-        add_cash(state, activity_currency, total_proceeds);
+        if activity_currency != account_currency {
+            if let Some(fx_rate) = activity.fx_rate.filter(|r| *r != Decimal::ZERO) {
+                // Broker converted at transaction time — book in account currency
+                add_cash(state, account_currency, total_proceeds * fx_rate);
+            } else {
+                // No fx_rate — book in activity currency (multi-currency account)
+                add_cash(state, activity_currency, total_proceeds);
+            }
+        } else {
+            add_cash(state, activity_currency, total_proceeds);
+        }
 
         if let Some(position) = state.positions.get_mut(asset_id) {
             // reduce_lots_fifo only needs quantity, not price
