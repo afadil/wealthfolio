@@ -19,6 +19,7 @@ import {
 } from "@wealthfolio/ui/components/ui/table";
 import {
   calculateActivityValue,
+  isAssetBackedIncomeActivity,
   isCashActivity,
   isCashTransfer,
   isFeeActivity,
@@ -153,10 +154,11 @@ export const ActivityTable = ({
           const activityType = String(row.getValue("activityType"));
           const isTransferActivity =
             activityType === ActivityType.TRANSFER_IN || activityType === ActivityType.TRANSFER_OUT;
+          const isAssetBackedIncome = isAssetBackedIncomeActivity(activityType, symbol, assetId);
           const hasAsset = Boolean(assetId?.trim());
           const isCash = isTransferActivity
             ? !hasAsset || isCashTransfer(activityType, symbol)
-            : isCashActivity(activityType);
+            : isCashActivity(activityType) && !isAssetBackedIncome;
           const displaySymbol = isCash ? "Cash" : symbol;
           const avatarSymbol = isCash ? "$CASH" : symbol;
           const normalizedSymbol = symbol.trim().toUpperCase();
@@ -217,13 +219,23 @@ export const ActivityTable = ({
         cell: ({ row }) => {
           const activityType = String(row.getValue("activityType"));
           const quantity = row.getValue("quantity");
+          const assetSymbol = String(row.getValue("assetSymbol"));
+          const isAssetBackedIncome = isAssetBackedIncomeActivity(
+            activityType,
+            assetSymbol,
+            row.original.assetId,
+          );
 
           if (
-            isCashActivity(activityType) ||
-            isIncomeActivity(activityType) ||
+            (isCashActivity(activityType) && !isAssetBackedIncome) ||
+            (isIncomeActivity(activityType) && !isAssetBackedIncome) ||
             isSplitActivity(activityType) ||
             isFeeActivity(activityType)
           ) {
+            return <div className="pr-4 text-right">-</div>;
+          }
+
+          if (quantity == null || String(quantity).trim() === "") {
             return <div className="pr-4 text-right">-</div>;
           }
 
@@ -255,6 +267,11 @@ export const ActivityTable = ({
               ? currencyVal
               : row.original.accountCurrency || "USD";
           const assetSymbol = String(row.getValue("assetSymbol"));
+          const isAssetBackedIncome = isAssetBackedIncomeActivity(
+            activityType,
+            assetSymbol,
+            row.original.assetId,
+          );
 
           if (activityType === "FEE") {
             return <div className="pr-4 text-right">-</div>;
@@ -263,9 +280,9 @@ export const ActivityTable = ({
             return <div className="text-right">{formatSplitRatio(Number(amount))}</div>;
           }
           if (
-            isCashActivity(activityType) ||
+            (isCashActivity(activityType) && !isAssetBackedIncome) ||
             isCashTransfer(activityType, assetSymbol) ||
-            isIncomeActivity(activityType)
+            (isIncomeActivity(activityType) && !isAssetBackedIncome)
           ) {
             return <div className="text-right">{formatAmount(Number(amount), currency)}</div>;
           }

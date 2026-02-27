@@ -960,6 +960,49 @@ mod tests {
     }
 
     #[test]
+    fn test_zero_price_buy_lot_adds_quantity_without_cash_or_cost_basis_change() {
+        let mock_fx_service = Arc::new(MockFxService::new());
+        let account_currency = "USD";
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = create_calculator(mock_fx_service, base_currency);
+
+        let target_date_str = "2023-01-07";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+        let previous_snapshot = create_initial_snapshot("acc_1", account_currency, "2023-01-06");
+
+        // Mirrors staking BUY-leg behavior when broker sends quantity but FMV is zero.
+        let zero_price_buy = create_default_activity(
+            "act_staking_buy_leg_1",
+            ActivityType::Buy,
+            "AAPL",
+            dec!(0.000000329),
+            dec!(0),
+            dec!(0),
+            account_currency,
+            target_date_str,
+        );
+
+        let result =
+            calculator.calculate_next_holdings(&previous_snapshot, &[zero_price_buy], target_date);
+        assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
+        let next_state = result.unwrap().snapshot;
+
+        let position = next_state.positions.get("AAPL").unwrap();
+        assert_eq!(position.quantity, dec!(0.000000329));
+        assert_eq!(position.average_cost, dec!(0));
+        assert_eq!(position.total_cost_basis, dec!(0));
+
+        // Zero-FMV lot should not move cash or contributions.
+        assert_eq!(
+            next_state.cash_balances.get(account_currency),
+            Some(&dec!(0))
+        );
+        assert_eq!(next_state.cost_basis, dec!(0));
+        assert_eq!(next_state.net_contribution, dec!(0));
+        assert_eq!(next_state.net_contribution_base, dec!(0));
+    }
+
+    #[test]
     fn test_charge_activities_fee_and_tax() {
         let mut mock_fx_service = MockFxService::new();
         let target_date_str = "2023-01-07";

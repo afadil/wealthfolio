@@ -3,6 +3,7 @@ import { Card } from "@wealthfolio/ui/components/ui/card";
 import {
   calculateActivityValue,
   formatSplitRatio,
+  isAssetBackedIncomeActivity,
   isCashActivity,
   isCashTransfer,
   isFeeActivity,
@@ -50,10 +51,15 @@ export const ActivityTableMobile = ({
         const activityType = activity.activityType;
         const isTransferActivity =
           activityType === ActivityType.TRANSFER_IN || activityType === ActivityType.TRANSFER_OUT;
+        const isAssetBackedIncome = isAssetBackedIncomeActivity(
+          activityType,
+          symbol,
+          activity.assetId,
+        );
         const hasAsset = Boolean(activity.assetId?.trim());
         const isCash = isTransferActivity
           ? !hasAsset || isCashTransfer(activityType, symbol)
-          : isCashActivity(activityType);
+          : isCashActivity(activityType) && !isAssetBackedIncome;
         const displaySymbol = isCash ? "Cash" : symbol;
         const avatarSymbol = isCash ? "$CASH" : symbol;
         const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -82,10 +88,11 @@ export const ActivityTableMobile = ({
                         <p className="text-muted-foreground text-xs">{activityTypeLabel}</p>
                         <div className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-xs">
                           <span>{formattedDate.date}</span>
-                          {!isCashActivity(activity.activityType) &&
-                            !isIncomeActivity(activity.activityType) &&
+                          {!(isCashActivity(activity.activityType) && !isAssetBackedIncome) &&
+                            !(isIncomeActivity(activity.activityType) && !isAssetBackedIncome) &&
                             !isSplitActivity(activity.activityType) &&
-                            !isFeeActivity(activity.activityType) && (
+                            !isFeeActivity(activity.activityType) &&
+                            activity.quantity && (
                               <>
                                 <span>•</span>
                                 <span>{activity.quantity} shares</span>
@@ -173,10 +180,11 @@ export const ActivityTableMobile = ({
                 </div>
 
                 {/* Quantity (if applicable) */}
-                {!isCashActivity(activity.activityType) &&
-                  !isIncomeActivity(activity.activityType) &&
+                {!(isCashActivity(activity.activityType) && !isAssetBackedIncome) &&
+                  !(isIncomeActivity(activity.activityType) && !isAssetBackedIncome) &&
                   !isSplitActivity(activity.activityType) &&
-                  !isFeeActivity(activity.activityType) && (
+                  !isFeeActivity(activity.activityType) &&
+                  activity.quantity && (
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">Shares</span>
                       <span className="font-medium">{activity.quantity}</span>
@@ -188,9 +196,9 @@ export const ActivityTableMobile = ({
                   <span className="text-muted-foreground">
                     {activity.activityType === "SPLIT"
                       ? "Ratio"
-                      : isCashActivity(activity.activityType) ||
+                      : (isCashActivity(activity.activityType) && !isAssetBackedIncome) ||
                           isCashTransfer(activity.activityType, symbol) ||
-                          isIncomeActivity(activity.activityType)
+                          (isIncomeActivity(activity.activityType) && !isAssetBackedIncome)
                         ? "Amount"
                         : "Price"}
                   </span>
@@ -199,9 +207,9 @@ export const ActivityTableMobile = ({
                       ? "-"
                       : activity.activityType === "SPLIT"
                         ? formatSplitRatio(Number(activity.amount))
-                        : isCashActivity(activity.activityType) ||
+                        : (isCashActivity(activity.activityType) && !isAssetBackedIncome) ||
                             isCashTransfer(activity.activityType, symbol) ||
-                            isIncomeActivity(activity.activityType)
+                            (isIncomeActivity(activity.activityType) && !isAssetBackedIncome)
                           ? formatAmount(Number(activity.amount), activity.currency)
                           : formatAmount(Number(activity.unitPrice), activity.currency)}
                   </span>
