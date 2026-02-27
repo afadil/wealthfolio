@@ -17,7 +17,7 @@ import {
   TableRow,
 } from "@wealthfolio/ui";
 import { format } from "date-fns";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { fetchYahooDividends, toYahooSymbol } from "../lib/yahoo-dividends";
 
@@ -57,6 +57,7 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
     new Map(),
   );
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const seenIds = useRef<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
 
   const { data: holdings = [], isLoading: holdingsLoading } = useQuery({
@@ -78,60 +79,73 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
   });
 
   // Build symbol → { accountIds, currency } map from security holdings
-  const securityHoldings = holdings.filter(
-    (h) => h.holdingType === "security" && h.instrument?.symbol,
-  );
+  const { symbolMap, symbols, instrumentIds } = useMemo(() => {
+    const securityHoldings = holdings.filter(
+      (h) => h.holdingType === "security" && h.instrument?.symbol,
+    );
 
-  const symbolMap = new Map<string, { accountIds: string[]; currency: string }>();
-  for (const h of securityHoldings) {
-    const sym = h.instrument!.symbol;
-    if (!symbolMap.has(sym)) {
-      symbolMap.set(sym, { accountIds: [], currency: h.instrument!.currency });
+    const symbolMap = new Map<string, { accountIds: string[]; currency: string }>();
+    for (const h of securityHoldings) {
+      const sym = h.instrument!.symbol;
+      if (!symbolMap.has(sym)) {
+        symbolMap.set(sym, { accountIds: [], currency: h.instrument!.currency });
+      }
+      const entry = symbolMap.get(sym)!;
+      if (!entry.accountIds.includes(h.accountId)) {
+        entry.accountIds.push(h.accountId);
+      }
     }
-    const entry = symbolMap.get(sym)!;
-    if (!entry.accountIds.includes(h.accountId)) {
-      entry.accountIds.push(h.accountId);
-    }
-  }
 
-  const symbols = Array.from(symbolMap.keys());
+    const symbols = Array.from(symbolMap.keys());
+    const instrumentIds = [...new Set(securityHoldings.map((h) => h.instrument!.id))];
 
-  // Fetch asset profiles to get exchange MIC for Yahoo suffix mapping
-  const instrumentIds = [...new Set(securityHoldings.map((h) => h.instrument!.id))];
+    return { symbolMap, symbols, instrumentIds };
+  }, [holdings]);
 
   const assetProfileQueries = useQueries({
-    queries: instrumentIds.map((id) => ({
-      queryKey: ["asset-profile", id],
-      queryFn: () => ctx.api.assets.getProfile(id),
-      staleTime: 5 * 60 * 1000,
-    })),
+    queries: useMemo(
+      () =>
+        instrumentIds.map((id) => ({
+          queryKey: ["asset-profile", id],
+          queryFn: () => ctx.api.assets.getProfile(id),
+          staleTime: 5 * 60 * 1000,
+        })),
+      [instrumentIds, ctx.api.assets],
+    ),
   });
 
   const allProfilesLoaded =
     instrumentIds.length === 0 || assetProfileQueries.every((q) => !q.isLoading);
 
   // Build symbol → yahooSymbol map
-  const yahooSymbolMap = new Map<string, string>();
-  instrumentIds.forEach((id, i) => {
-    const asset = assetProfileQueries[i]?.data;
-    if (!asset?.instrumentSymbol) return;
-    const yahooSymbol = toYahooSymbol(asset.instrumentSymbol, asset.instrumentExchangeMic);
-    if (yahooSymbol !== asset.instrumentSymbol) {
-      ctx.api.logger.debug(
-        `Mapped ${asset.instrumentSymbol} → ${yahooSymbol} (MIC: ${asset.instrumentExchangeMic})`,
-      );
-    }
-    yahooSymbolMap.set(asset.instrumentSymbol, yahooSymbol);
-  });
+  const yahooSymbolMap = useMemo(() => {
+    const map = new Map<string, string>();
+    instrumentIds.forEach((id, i) => {
+      const asset = assetProfileQueries[i]?.data;
+      if (!asset?.instrumentSymbol) return;
+      const yahooSymbol = toYahooSymbol(asset.instrumentSymbol, asset.instrumentExchangeMic);
+      if (yahooSymbol !== asset.instrumentSymbol) {
+        ctx.api.logger.debug(
+          `Mapped ${asset.instrumentSymbol} → ${yahooSymbol} (MIC: ${asset.instrumentExchangeMic})`,
+        );
+      }
+      map.set(asset.instrumentSymbol, yahooSymbol);
+    });
+    return map;
+  }, [instrumentIds, assetProfileQueries, ctx.api.logger]);
 
   const yahooQueries = useQueries({
-    queries: symbols.map((symbol) => ({
-      queryKey: ["yahoo-dividends", symbol],
-      queryFn: () => fetchYahooDividends(yahooSymbolMap.get(symbol) ?? symbol, ctx.api.logger),
-      enabled: allProfilesLoaded,
-      staleTime: 30 * 60 * 1000,
-      retry: 1,
-    })),
+    queries: useMemo(
+      () =>
+        symbols.map((symbol) => ({
+          queryKey: ["yahoo-dividends", symbol],
+          queryFn: () => fetchYahooDividends(yahooSymbolMap.get(symbol) ?? symbol, ctx.api.logger),
+          enabled: allProfilesLoaded,
+          staleTime: 30 * 60 * 1000,
+          retry: 1,
+        })),
+      [symbols, yahooSymbolMap, ctx.api.logger, allProfilesLoaded],
+    ),
   });
 
   const allYahooLoaded = yahooQueries.length === 0 || yahooQueries.every((q) => !q.isLoading);
@@ -178,19 +192,23 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
     [baseSuggestions, overrides],
   );
 
-  // Initialize checkedIds when new suggestions appear
+  // Initialize checkedIds when new suggestions appear for the first time
   useEffect(() => {
     if (baseSuggestions.length === 0) return;
+
+    const unseenSuggestions = baseSuggestions.filter((s) => !seenIds.current.has(s.id));
+    if (unseenSuggestions.length === 0) return;
+
+    for (const s of unseenSuggestions) {
+      seenIds.current.add(s.id);
+    }
+
     setCheckedIds((prev) => {
       const next = new Set(prev);
-      let changed = false;
-      for (const s of baseSuggestions) {
-        if (!next.has(s.id)) {
-          next.add(s.id);
-          changed = true;
-        }
+      for (const s of unseenSuggestions) {
+        next.add(s.id);
       }
-      return changed ? next : prev;
+      return next;
     });
   }, [baseSuggestions]);
 
