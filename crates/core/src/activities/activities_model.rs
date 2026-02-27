@@ -223,6 +223,7 @@ pub struct NewActivity {
     )]
     pub amount: Option<Decimal>,
     pub status: Option<ActivityStatus>,
+    #[serde(alias = "comment")]
     pub notes: Option<String>,
     #[serde(
         default,

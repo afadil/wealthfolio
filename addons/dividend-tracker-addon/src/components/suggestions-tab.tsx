@@ -26,9 +26,9 @@ interface SuggestionsTabProps {
 }
 
 export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
-  const [overrides, setOverrides] = useState<Map<string, { amount?: number; accountId?: string }>>(
-    new Map(),
-  );
+  const [overrides, setOverrides] = useState<
+    Map<string, { amount?: number; accountId?: string; payDate?: string }>
+  >(new Map());
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const seenIds = useRef<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
@@ -91,6 +91,14 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
     });
   };
 
+  const updatePayDate = (id: string, value: string) => {
+    setOverrides((prev) => {
+      const next = new Map(prev);
+      next.set(id, { ...next.get(id), payDate: value || undefined });
+      return next;
+    });
+  };
+
   const handleSave = async () => {
     const selected = suggestions.filter((s) => checkedIds.has(s.id));
     if (selected.length === 0) return;
@@ -117,10 +125,11 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
           creates: group.map((s) => ({
             accountId: s.accountId,
             activityType: "DIVIDEND",
-            activityDate: s.date,
+            activityDate: s.payDate ?? s.date,
             amount: s.amount,
             currency: s.currency,
             symbol: { symbol: s.symbol },
+            comment: s.payDate ? `ex-date:${s.date}` : null,
           })),
         });
         totalCreated += result.created.length;
@@ -185,6 +194,7 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
               </TableHead>
               <TableHead>Symbol</TableHead>
               <TableHead>Ex-Date</TableHead>
+              <TableHead>Pay-Date (opt.)</TableHead>
               <TableHead className="text-right">Shares</TableHead>
               <TableHead className="text-right">Dividend</TableHead>
               <TableHead>Amount</TableHead>
@@ -203,6 +213,14 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
                 </TableCell>
                 <TableCell className="font-mono font-medium">{s.symbol}</TableCell>
                 <TableCell>{format(new Date(s.date + "T00:00:00"), "MMM d, yyyy")}</TableCell>
+                <TableCell>
+                  <Input
+                    type="date"
+                    value={s.payDate ?? ""}
+                    onChange={(e) => updatePayDate(s.id, e.target.value)}
+                    className="w-36"
+                  />
+                </TableCell>
                 <TableCell className="text-right">{s.shares}</TableCell>
                 <TableCell className="text-right">{s.dividendPerShare.toFixed(4)}</TableCell>
                 <TableCell>
