@@ -11,7 +11,6 @@ import {
   type ActivityFormValues,
   type PickerActivityType,
 } from "../config/activity-form-config";
-import { isPureCashActivity } from "../utils/activity-form-utils";
 import { useActivityMutations } from "./use-activity-mutations";
 
 function generateSourceGroupId(): string {
@@ -136,7 +135,6 @@ export function useActivityForm({
           const submitData: NewActivityFormValues = {
             ...basePayload,
             activityType,
-            currency: account?.currency,
           } as NewActivityFormValues;
 
           if (!submitData.currency?.trim() && account?.currency) {
@@ -164,10 +162,6 @@ export function useActivityForm({
         const submitData: NewActivityFormValues = {
           ...basePayload,
           activityType: config.activityType as NewActivityFormValues["activityType"],
-          // For pure cash activities, include account currency
-          ...(isPureCashActivity(config.activityType) && account
-            ? { currency: account.currency }
-            : {}),
         } as NewActivityFormValues;
 
         if (!submitData.currency?.trim() && account?.currency) {
