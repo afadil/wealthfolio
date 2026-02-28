@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use tokio::sync::mpsc;
-use wealthfolio_connect::BrokerSyncServiceTrait;
+use wealthfolio_connect::{BrokerSyncServiceTrait, TokenLifecycleState};
 use wealthfolio_core::{
     assets::AssetServiceTrait,
     events::{DomainEvent, DomainEventSink},
@@ -70,6 +70,7 @@ impl WebDomainEventSink {
         account_service: Arc<wealthfolio_core::accounts::AccountService>,
         fx_service: Arc<dyn wealthfolio_core::fx::FxServiceTrait + Send + Sync>,
         secret_store: Arc<dyn SecretStore>,
+        token_lifecycle: Arc<TokenLifecycleState>,
     ) {
         let rx = self
             .rx
@@ -89,6 +90,7 @@ impl WebDomainEventSink {
             account_service,
             fx_service,
             secret_store,
+            token_lifecycle,
         });
 
         // Spawn the background worker

@@ -100,7 +100,7 @@ pub async fn sync_bootstrap_snapshot_if_needed(
         .device_id
         .clone()
         .ok_or_else(|| "No device ID configured".to_string())?;
-    let token = get_access_token()?;
+    let token = get_access_token(context).await?;
 
     let sync_state = context
         .device_enroll_service()
@@ -311,7 +311,7 @@ pub async fn generate_snapshot_now_internal(
         .clone()
         .ok_or_else(|| "No device ID configured".to_string())?;
     let key_version = identity.key_version.unwrap_or(1).max(1);
-    let token = get_access_token()?;
+    let token = get_access_token(&context).await?;
 
     let sync_state = create_client()?
         .get_device(&token, &device_id)

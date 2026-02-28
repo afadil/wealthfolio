@@ -29,6 +29,7 @@ async fn main() -> anyhow::Result<()> {
     #[cfg(feature = "device-sync")]
     #[allow(clippy::collapsible_if)]
     if features::device_sync_enabled() {
+        let _ = api::connect::mint_access_token(&state).await;
         if state
             .device_enroll_service
             .get_sync_state()

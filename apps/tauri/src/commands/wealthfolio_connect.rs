@@ -13,7 +13,7 @@ const SYNC_REFRESH_TOKEN_KEY: &str = "sync_refresh_token";
 pub async fn store_sync_session(
     access_token: String,
     refresh_token: Option<String>,
-    _state: State<'_, Arc<ServiceContext>>, // keep signature consistent
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<(), String> {
     if access_token.trim().is_empty() {
         return Err("Access token cannot be empty".to_string());
@@ -44,13 +44,12 @@ pub async fn store_sync_session(
     }
 
     info!("Sync session stored successfully in keyring");
+    state.connect_service().clear_cached_token().await;
     Ok(())
 }
 
 #[tauri::command]
-pub async fn clear_sync_session(
-    _state: State<'_, Arc<ServiceContext>>, // keep signature consistent
-) -> Result<(), String> {
+pub async fn clear_sync_session(state: State<'_, Arc<ServiceContext>>) -> Result<(), String> {
     // Try to delete both tokens, collecting errors instead of failing fast
     let access_result = KeyringSecretStore.delete_secret(SYNC_ACCESS_TOKEN_KEY);
     let refresh_result = KeyringSecretStore.delete_secret(SYNC_REFRESH_TOKEN_KEY);
@@ -65,6 +64,8 @@ pub async fn clear_sync_session(
         error!("Failed to delete refresh token from keyring: {}", e);
         errors.push(format!("refresh_token: {}", e));
     }
+
+    state.connect_service().clear_cached_token().await;
 
     if errors.is_empty() {
         info!("Sync session cleared from keyring");

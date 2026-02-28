@@ -34,19 +34,14 @@ pub use engine::{ensure_background_engine_started, ensure_background_engine_stop
 // Shared Constants & Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-const CLOUD_ACCESS_TOKEN_KEY: &str = "sync_access_token";
-
 fn cloud_api_base_url() -> Result<String, String> {
     crate::services::cloud_api_base_url().ok_or_else(|| {
         "Cloud API base URL is unavailable. Device sync operations are disabled.".to_string()
     })
 }
 
-fn get_access_token() -> Result<String, String> {
-    KeyringSecretStore
-        .get_secret(CLOUD_ACCESS_TOKEN_KEY)
-        .map_err(|e| format!("Failed to get access token: {}", e))?
-        .ok_or_else(|| "No access token configured. Please sign in first.".to_string())
+pub(super) async fn get_access_token(context: &Arc<ServiceContext>) -> Result<String, String> {
+    context.connect_service().get_valid_access_token().await
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -238,6 +233,10 @@ struct TauriReadyReconcileRunner {
 #[async_trait]
 impl shared_sync_engine::ReadyReconcileStore for TauriReadyReconcileRunner {
     async fn get_sync_state(&self) -> Result<wealthfolio_device_sync::SyncState, String> {
+        self.context
+            .connect_service()
+            .get_valid_access_token()
+            .await?;
         self.context
             .device_enroll_service()
             .get_sync_state()
@@ -448,11 +447,11 @@ fn get_app_version() -> Option<String> {
 pub async fn enroll_device(
     device_nonce: String,
     display_name: String,
-    _state: State<'_, Arc<ServiceContext>>,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<EnrollDeviceResponse, String> {
     info!("[DeviceSync] Enrolling device: {}", display_name);
 
-    let token = get_access_token()?;
+    let token = get_access_token(state.inner()).await?;
     let client = create_client()?;
 
     let platform = DevicePlatform::detect().to_string();
@@ -498,9 +497,9 @@ pub async fn enroll_device(
 #[tauri::command(rename_all = "camelCase")]
 pub async fn get_device(
     device_id: Option<String>,
-    _state: State<'_, Arc<ServiceContext>>,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Device, String> {
-    let token = get_access_token()?;
+    let token = get_access_token(state.inner()).await?;
     let device_id = device_id
         .or_else(get_device_id_from_store)
         .ok_or_else(|| "No device ID configured".to_string())?;
@@ -514,11 +513,11 @@ pub async fn get_device(
 #[tauri::command]
 pub async fn list_devices(
     scope: Option<String>,
-    _state: State<'_, Arc<ServiceContext>>,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Vec<Device>, String> {
     info!("[DeviceSync] Listing devices (scope: {:?})...", scope);
 
-    let token = get_access_token()?;
+    let token = get_access_token(state.inner()).await?;
 
     let devices = create_client()?
         .list_devices(&token, scope.as_deref())
@@ -533,14 +532,14 @@ pub async fn list_devices(
 pub async fn update_device(
     device_id: String,
     display_name: Option<String>,
-    _state: State<'_, Arc<ServiceContext>>,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<SuccessResponse, String> {
     info!(
         "[DeviceSync] Updating device {}: name={:?}",
         device_id, display_name
     );
 
-    let token = get_access_token()?;
+    let token = get_access_token(state.inner()).await?;
 
     create_client()?
         .update_device(
@@ -558,11 +557,11 @@ pub async fn update_device(
 #[tauri::command(rename_all = "camelCase")]
 pub async fn delete_device(
     device_id: String,
-    _state: State<'_, Arc<ServiceContext>>,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<SuccessResponse, String> {
     info!("[DeviceSync] Deleting device: {}", device_id);
 
-    let token = get_access_token()?;
+    let token = get_access_token(state.inner()).await?;
 
     create_client()?
         .delete_device(&token, &device_id)
@@ -573,11 +572,11 @@ pub async fn delete_device(
 #[tauri::command(rename_all = "camelCase")]
 pub async fn revoke_device(
     device_id: String,
-    _state: State<'_, Arc<ServiceContext>>,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<SuccessResponse, String> {
     info!("[DeviceSync] Revoking device: {}", device_id);
 
-    let token = get_access_token()?;
+    let token = get_access_token(state.inner()).await?;
 
     create_client()?
         .revoke_device(&token, &device_id)
@@ -591,11 +590,11 @@ pub async fn revoke_device(
 
 #[tauri::command]
 pub async fn initialize_team_keys(
-    _state: State<'_, Arc<ServiceContext>>,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<InitializeKeysResult, String> {
     info!("[DeviceSync] Initializing team keys...");
 
-    let token = get_access_token()?;
+    let token = get_access_token(state.inner()).await?;
     let device_id =
         get_device_id_from_store().ok_or_else(|| "No device ID configured".to_string())?;
 
@@ -623,11 +622,11 @@ pub async fn commit_initialize_team_keys(
     signature: String,
     challenge_response: Option<String>,
     recovery_envelope: Option<String>,
-    _state: State<'_, Arc<ServiceContext>>,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<CommitInitializeKeysResponse, String> {
     info!("[DeviceSync] Committing team key initialization...");
 
-    let token = get_access_token()?;
+    let token = get_access_token(state.inner()).await?;
     let device_id =
         get_device_id_from_store().ok_or_else(|| "No device ID configured".to_string())?;
 
@@ -648,11 +647,11 @@ pub async fn commit_initialize_team_keys(
 
 #[tauri::command]
 pub async fn rotate_team_keys(
-    _state: State<'_, Arc<ServiceContext>>,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<RotateKeysResponse, String> {
     info!("[DeviceSync] Starting key rotation...");
 
-    let token = get_access_token()?;
+    let token = get_access_token(state.inner()).await?;
     let device_id =
         get_device_id_from_store().ok_or_else(|| "No device ID configured".to_string())?;
 
@@ -665,11 +664,11 @@ pub async fn rotate_team_keys(
 #[tauri::command]
 pub async fn commit_rotate_team_keys(
     request: CommitRotateKeysRequest,
-    _state: State<'_, Arc<ServiceContext>>,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<CommitRotateKeysResponse, String> {
     info!("[DeviceSync] Committing key rotation...");
 
-    let token = get_access_token()?;
+    let token = get_access_token(state.inner()).await?;
     let device_id =
         get_device_id_from_store().ok_or_else(|| "No device ID configured".to_string())?;
 
@@ -682,11 +681,11 @@ pub async fn commit_rotate_team_keys(
 #[tauri::command]
 pub async fn reset_team_sync(
     reason: Option<String>,
-    _state: State<'_, Arc<ServiceContext>>,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ResetTeamSyncResponse, String> {
     info!("[DeviceSync] Resetting team sync...");
 
-    let token = get_access_token()?;
+    let token = get_access_token(state.inner()).await?;
 
     create_client()?
         .reset_team_sync(&token, reason.as_deref())
@@ -859,6 +858,7 @@ pub async fn device_sync_bootstrap_snapshot_if_needed(
 ) -> Result<SyncBootstrapResult, String> {
     let context = Arc::clone(state.inner());
     let result = snapshot::sync_bootstrap_snapshot_if_needed(handle, &context).await?;
+    context.connect_service().get_valid_access_token().await?;
     let should_start_engine = context
         .device_enroll_service()
         .get_sync_state()
@@ -894,11 +894,11 @@ pub async fn device_sync_trigger_cycle(
 pub async fn create_pairing(
     code_hash: String,
     ephemeral_public_key: String,
-    _state: State<'_, Arc<ServiceContext>>,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<CreatePairingResponse, String> {
     debug!("[DeviceSync] Creating pairing session...");
 
-    let token = get_access_token()?;
+    let token = get_access_token(state.inner()).await?;
     let device_id =
         get_device_id_from_store().ok_or_else(|| "No device ID configured".to_string())?;
 
@@ -918,11 +918,11 @@ pub async fn create_pairing(
 #[tauri::command(rename_all = "camelCase")]
 pub async fn get_pairing(
     pairing_id: String,
-    _state: State<'_, Arc<ServiceContext>>,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<GetPairingResponse, String> {
     debug!("[DeviceSync] Getting pairing session: {}", pairing_id);
 
-    let token = get_access_token()?;
+    let token = get_access_token(state.inner()).await?;
     let device_id =
         get_device_id_from_store().ok_or_else(|| "No device ID configured".to_string())?;
 
@@ -935,11 +935,11 @@ pub async fn get_pairing(
 #[tauri::command(rename_all = "camelCase")]
 pub async fn approve_pairing(
     pairing_id: String,
-    _state: State<'_, Arc<ServiceContext>>,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<SuccessResponse, String> {
     debug!("[DeviceSync] Approving pairing session: {}", pairing_id);
 
-    let token = get_access_token()?;
+    let token = get_access_token(state.inner()).await?;
     let device_id =
         get_device_id_from_store().ok_or_else(|| "No device ID configured".to_string())?;
 
@@ -961,7 +961,7 @@ pub async fn complete_pairing(
 ) -> Result<SuccessResponse, String> {
     debug!("[DeviceSync] Completing pairing session: {}", pairing_id);
 
-    let token = get_access_token()?;
+    let token = get_access_token(state.inner()).await?;
     let device_id =
         get_device_id_from_store().ok_or_else(|| "No device ID configured".to_string())?;
 
@@ -1004,11 +1004,11 @@ pub async fn complete_pairing(
 #[tauri::command(rename_all = "camelCase")]
 pub async fn cancel_pairing(
     pairing_id: String,
-    _state: State<'_, Arc<ServiceContext>>,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<SuccessResponse, String> {
     debug!("[DeviceSync] Canceling pairing session: {}", pairing_id);
 
-    let token = get_access_token()?;
+    let token = get_access_token(state.inner()).await?;
     let device_id =
         get_device_id_from_store().ok_or_else(|| "No device ID configured".to_string())?;
 
@@ -1026,11 +1026,11 @@ pub async fn cancel_pairing(
 pub async fn claim_pairing(
     code: String,
     ephemeral_public_key: String,
-    _state: State<'_, Arc<ServiceContext>>,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ClaimPairingResponse, String> {
     info!("[DeviceSync] Claiming pairing session...");
 
-    let token = get_access_token()?;
+    let token = get_access_token(state.inner()).await?;
     let device_id =
         get_device_id_from_store().ok_or_else(|| "No device ID configured".to_string())?;
 
@@ -1050,11 +1050,11 @@ pub async fn claim_pairing(
 #[tauri::command(rename_all = "camelCase")]
 pub async fn get_pairing_messages(
     pairing_id: String,
-    _state: State<'_, Arc<ServiceContext>>,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<PairingMessagesResponse, String> {
     debug!("[DeviceSync] Polling for pairing messages: {}", pairing_id);
 
-    let token = get_access_token()?;
+    let token = get_access_token(state.inner()).await?;
     let device_id =
         get_device_id_from_store().ok_or_else(|| "No device ID configured".to_string())?;
 
@@ -1068,11 +1068,11 @@ pub async fn get_pairing_messages(
 pub async fn confirm_pairing(
     pairing_id: String,
     proof: Option<String>,
-    _state: State<'_, Arc<ServiceContext>>,
+    state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ConfirmPairingResponse, String> {
     info!("[DeviceSync] Confirming pairing: {}", pairing_id);
 
-    let token = get_access_token()?;
+    let token = get_access_token(state.inner()).await?;
     let device_id =
         get_device_id_from_store().ok_or_else(|| "No device ID configured".to_string())?;
 

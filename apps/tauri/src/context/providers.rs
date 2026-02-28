@@ -258,7 +258,7 @@ pub async fn initialize_context(
         .with_snapshot_service(snapshot_service.clone()),
     );
 
-    let connect_service = Arc::new(ConnectService::new());
+    let connect_service = Arc::new(ConnectService::new(secret_store.clone()));
 
     // AI provider service - catalog is embedded at compile time
     let ai_catalog_json = include_str!("../../../../crates/ai/src/ai_providers.json");

@@ -7671,6 +7671,7 @@ name = "wealthfolio-connect"
 version = "3.0.0"
 dependencies = [
  "async-trait",
+ "base64 0.22.1",
  "chrono",
  "log",
  "reqwest 0.12.28",

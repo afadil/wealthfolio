@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
-use std::time::Instant;
 
 use crate::{
     ai_environment::ServerAiEnvironment, auth::AuthManager, config::Config,
@@ -11,7 +10,7 @@ use tracing_subscriber::{fmt, EnvFilter};
 use wealthfolio_ai::{AiProviderService, AiProviderServiceTrait, ChatConfig, ChatService};
 use wealthfolio_connect::{
     BrokerSyncService, BrokerSyncServiceTrait, CoreImportRunRepositoryAdapter,
-    ImportRunRepositoryTrait,
+    ImportRunRepositoryTrait, TokenLifecycleState,
 };
 use wealthfolio_core::addons::{AddonService, AddonServiceTrait};
 use wealthfolio_core::{
@@ -60,12 +59,6 @@ use wealthfolio_storage_sqlite::{
     taxonomies::TaxonomyRepository,
 };
 
-/// In-memory cache for the current access token to avoid hitting the auth provider on every request.
-pub struct CachedAccessToken {
-    pub token: String,
-    pub expires_at: Instant,
-}
-
 pub struct AppState {
     /// Domain event sink for emitting events after mutations.
     /// Note: The sink is used by services injected at construction time; this field
@@ -106,7 +99,7 @@ pub struct AppState {
     pub app_sync_repository: Arc<AppSyncRepository>,
     pub device_sync_runtime: Arc<DeviceSyncRuntimeState>,
     pub health_service: Arc<dyn HealthServiceTrait + Send + Sync>,
-    pub token_cache: tokio::sync::RwLock<Option<CachedAccessToken>>,
+    pub token_lifecycle: Arc<TokenLifecycleState>,
 }
 
 pub fn init_tracing() {
@@ -397,6 +390,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
 
     let event_bus = EventBus::new(256);
     let device_sync_runtime = Arc::new(DeviceSyncRuntimeState::new());
+    let token_lifecycle = Arc::new(TokenLifecycleState::new());
 
     // Domain event sink - Phase 2: Start the worker now that all services are ready
     domain_event_sink.start_worker(
@@ -410,6 +404,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         account_service.clone(),
         fx_service.clone(),
         secret_store.clone(),
+        token_lifecycle.clone(),
     );
 
     let addon_service: Arc<dyn AddonServiceTrait + Send + Sync> = Arc::new(AddonService::new(
@@ -459,6 +454,6 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         app_sync_repository,
         device_sync_runtime,
         health_service,
-        token_cache: tokio::sync::RwLock::new(None),
+        token_lifecycle,
     }))
 }

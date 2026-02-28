@@ -4,7 +4,6 @@
 //! from the Wealthfolio Connect cloud service.
 
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 
 use axum::{
     extract::{Query, State},
@@ -26,21 +25,14 @@ use wealthfolio_connect::{
         BrokerApiClient, PlansResponse, SyncAccountsResponse, SyncActivitiesResponse,
         SyncConnectionsResponse, UserInfo,
     },
-    fetch_subscription_plans_public, ConnectApiClient, SyncConfig, SyncOrchestrator,
-    SyncProgressPayload, SyncProgressReporter, SyncResult,
+    ensure_valid_access_token, fetch_subscription_plans_public, ConnectApiClient, SyncConfig,
+    SyncOrchestrator, SyncProgressPayload, SyncProgressReporter, SyncResult, TokenLifecycleConfig,
+    TokenLifecycleError, CLOUD_ACCESS_TOKEN_KEY, CLOUD_REFRESH_TOKEN_KEY,
 };
 use wealthfolio_core::accounts::TrackingMode;
 use wealthfolio_device_sync::{EnableSyncResult, SyncState, SyncStateResult};
 
-// Storage keys (without prefix - the SecretStore adds "wealthfolio_" prefix)
-const CLOUD_REFRESH_TOKEN_KEY: &str = "sync_refresh_token";
-const CLOUD_ACCESS_TOKEN_KEY: &str = "sync_access_token";
 const DEVICE_ID_KEY: &str = "sync_device_id";
-
-/// Seconds before actual expiry to treat a cached token as expired (buffer for clock skew / latency).
-const TOKEN_EXPIRY_BUFFER_SECS: u64 = 60;
-/// Default TTL assumed when storing a token received from the frontend (no expires_in available).
-const DEFAULT_TOKEN_TTL_SECS: u64 = 55 * 60;
 
 fn ensure_cloud_sync_enabled() -> ApiResult<()> {
     if crate::features::cloud_sync_enabled() {
@@ -90,6 +82,12 @@ fn connect_auth_api_key() -> Option<String> {
     std::env::var("CONNECT_AUTH_PUBLISHABLE_KEY").ok()
 }
 
+fn token_lifecycle_config() -> Option<TokenLifecycleConfig> {
+    let auth_url = connect_auth_url()?;
+    let api_key = connect_auth_api_key()?;
+    Some(TokenLifecycleConfig::new(auth_url, api_key))
+}
+
 /// Create a ConnectApiClient with a fresh access token
 async fn create_connect_client(state: &AppState) -> ApiResult<ConnectApiClient> {
     ensure_cloud_sync_enabled()?;
@@ -107,20 +105,6 @@ async fn create_connect_client(state: &AppState) -> ApiResult<ConnectApiClient> 
 pub struct StoreSyncSessionRequest {
     pub access_token: Option<String>,
     pub refresh_token: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "snake_case")]
-struct ConnectAuthTokenResponse {
-    access_token: String,
-    refresh_token: String,
-    expires_in: Option<i64>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ConnectAuthErrorResponse {
-    error: Option<String>,
-    error_description: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -298,17 +282,9 @@ async fn store_sync_session(
                 .secret_store
                 .set_secret(CLOUD_ACCESS_TOKEN_KEY, access_token)
                 .map_err(|e| ApiError::Internal(format!("Failed to store access token: {}", e)))?;
-
-            // Populate in-memory cache. The frontend doesn't send expires_in, so use a
-            // conservative default (55 min) that keeps us safely within the 1-hour TTL.
-            let expires_at = Instant::now() + Duration::from_secs(DEFAULT_TOKEN_TTL_SECS);
-            let mut cache = state.token_cache.write().await;
-            *cache = Some(crate::main_lib::CachedAccessToken {
-                token: access_token.clone(),
-                expires_at,
-            });
         }
     }
+    state.token_lifecycle.clear_cache().await;
 
     info!("[Connect] Sync session stored successfully");
     Ok(Json(()))
@@ -321,9 +297,7 @@ async fn clear_sync_session(State(state): State<Arc<AppState>>) -> ApiResult<Jso
     let _ = state.secret_store.delete_secret(CLOUD_REFRESH_TOKEN_KEY);
     let _ = state.secret_store.delete_secret(CLOUD_ACCESS_TOKEN_KEY);
 
-    // Clear in-memory cache
-    let mut cache = state.token_cache.write().await;
-    *cache = None;
+    state.token_lifecycle.clear_cache().await;
 
     info!("[Connect] Sync session cleared");
     Ok(Json(()))
@@ -346,120 +320,25 @@ async fn get_sync_session_status(
 // Token Management
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Return a valid access token, using the in-memory cache when possible.
-///
-/// - Cache hit (token not yet expired): returns immediately, no network call.
-/// - Cache miss / expired: exchanges the stored refresh token with the auth provider, then:
-///   - Persists the rotated refresh token (the auth provider invalidates the old one on each use).
-///   - Persists the new access token so `DeviceEnrollService` (which reads it from the store
-///     directly) stays in sync after a background refresh.
-///   - Updates the in-memory cache for subsequent requests.
-///
-/// A write-lock is held across the auth call to prevent concurrent refresh storms.
 pub(crate) async fn mint_access_token(state: &AppState) -> ApiResult<String> {
     ensure_cloud_sync_enabled()?;
-    // Fast path: check cache under a read lock.
-    {
-        let cache = state.token_cache.read().await;
-        if let Some(ref cached) = *cache {
-            if cached.expires_at > Instant::now() {
-                return Ok(cached.token.clone());
-            }
-        }
+    let config = token_lifecycle_config();
+    ensure_valid_access_token(
+        state.secret_store.as_ref(),
+        state.token_lifecycle.as_ref(),
+        config.as_ref(),
+    )
+    .await
+    .map_err(map_token_lifecycle_error)
+}
+
+fn map_token_lifecycle_error(err: TokenLifecycleError) -> ApiError {
+    match err {
+        TokenLifecycleError::Unauthorized(message) => ApiError::Unauthorized(message),
+        TokenLifecycleError::NotConfigured(message)
+        | TokenLifecycleError::RefreshFailed(message)
+        | TokenLifecycleError::Internal(message) => ApiError::Internal(message),
     }
-
-    // Slow path: acquire write lock, double-check, then refresh.
-    let mut cache = state.token_cache.write().await;
-    if let Some(ref cached) = *cache {
-        if cached.expires_at > Instant::now() {
-            return Ok(cached.token.clone());
-        }
-    }
-
-    let refresh_token = state
-        .secret_store
-        .get_secret(CLOUD_REFRESH_TOKEN_KEY)
-        .map_err(|e| ApiError::Internal(format!("Failed to get refresh token: {}", e)))?
-        .ok_or_else(|| {
-            ApiError::Unauthorized("No refresh token configured. Please sign in first.".to_string())
-        })?;
-
-    let auth_url = connect_auth_url()
-        .ok_or_else(|| ApiError::Internal("CONNECT_AUTH_URL not configured".to_string()))?;
-    let api_key = connect_auth_api_key().ok_or_else(|| {
-        ApiError::Internal("CONNECT_AUTH_PUBLISHABLE_KEY not configured".to_string())
-    })?;
-
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(10))
-        .build()
-        .map_err(|e| ApiError::Internal(format!("Failed to create HTTP client: {}", e)))?;
-
-    let token_url = format!("{}/auth/v1/token?grant_type=refresh_token", auth_url);
-    debug!("[Connect] Refreshing access token from auth provider");
-
-    let response = client
-        .post(&token_url)
-        .header("apikey", &api_key)
-        .header("Content-Type", "application/json")
-        .json(&serde_json::json!({ "refresh_token": refresh_token }))
-        .send()
-        .await
-        .map_err(|e| ApiError::Internal(format!("Failed to refresh token: {}", e)))?;
-
-    let status = response.status();
-    let body = response
-        .text()
-        .await
-        .map_err(|e| ApiError::Internal(format!("Failed to read response: {}", e)))?;
-
-    if !status.is_success() {
-        if let Ok(err) = serde_json::from_str::<ConnectAuthErrorResponse>(&body) {
-            let msg = err
-                .error_description
-                .or(err.error)
-                .unwrap_or_else(|| "Unknown error".to_string());
-            error!("[Connect] Token refresh failed: {}", msg);
-            return Err(ApiError::Unauthorized(format!(
-                "Session expired. Please sign in again. ({})",
-                msg
-            )));
-        }
-        error!(
-            "[Connect] Token refresh failed with status {}: {}",
-            status, body
-        );
-        return Err(ApiError::Unauthorized(
-            "Session expired. Please sign in again.".to_string(),
-        ));
-    }
-
-    let token_response: ConnectAuthTokenResponse = serde_json::from_str(&body)
-        .map_err(|e| ApiError::Internal(format!("Failed to parse token response: {}", e)))?;
-
-    // Persist the rotated refresh token — the auth provider invalidates the old one on each use.
-    state
-        .secret_store
-        .set_secret(CLOUD_REFRESH_TOKEN_KEY, &token_response.refresh_token)
-        .map_err(|e| ApiError::Internal(format!("Failed to store refresh token: {}", e)))?;
-
-    // Persist the new access token so DeviceEnrollService (reads from store directly) stays in sync.
-    state
-        .secret_store
-        .set_secret(CLOUD_ACCESS_TOKEN_KEY, &token_response.access_token)
-        .map_err(|e| ApiError::Internal(format!("Failed to store access token: {}", e)))?;
-
-    // Update in-memory cache. Apply buffer so we refresh before actual expiry.
-    let ttl =
-        (token_response.expires_in.unwrap_or(3600) as u64).saturating_sub(TOKEN_EXPIRY_BUFFER_SECS);
-    let expires_at = Instant::now() + Duration::from_secs(ttl);
-    *cache = Some(crate::main_lib::CachedAccessToken {
-        token: token_response.access_token.clone(),
-        expires_at,
-    });
-
-    debug!("[Connect] Access token refreshed and cached (TTL {}s)", ttl);
-    Ok(token_response.access_token)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

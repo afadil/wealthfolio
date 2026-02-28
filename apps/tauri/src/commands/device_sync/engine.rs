@@ -37,8 +37,8 @@ fn transport_err_permanent(message: String) -> TransportError {
 use wealthfolio_storage_sqlite::sync::SqliteSyncEngineDbPorts;
 
 use super::{
-    create_client, decrypt_sync_payload, encrypt_sync_payload, get_access_token,
-    get_sync_identity_from_store, persist_device_config_from_identity, SyncCycleResult,
+    create_client, decrypt_sync_payload, encrypt_sync_payload, get_sync_identity_from_store,
+    persist_device_config_from_identity, SyncCycleResult,
 };
 
 struct TauriEnginePorts {
@@ -242,10 +242,17 @@ impl CredentialStore for TauriEnginePorts {
     }
 
     fn get_access_token(&self) -> Result<String, String> {
-        get_access_token()
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current()
+                .block_on(self.context.connect_service().get_valid_access_token())
+        })
     }
 
     async fn get_sync_state(&self) -> Result<SyncState, String> {
+        self.context
+            .connect_service()
+            .get_valid_access_token()
+            .await?;
         self.context
             .device_enroll_service()
             .get_sync_state()
