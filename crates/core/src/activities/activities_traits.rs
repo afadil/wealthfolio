@@ -177,18 +177,33 @@ pub trait ActivityServiceTrait: Send + Sync {
         activities: Vec<super::ActivityUpsert>,
     ) -> Result<super::BulkUpsertResult>;
 
-    /// Prepares activities for persistence.
-    /// This is the unified entry point for all activity preparation logic.
+    /// Prepares activities for normal save/create flows.
+    /// Uses only payload metadata (no live symbol/provider resolution).
     ///
     /// Steps:
-    /// 1. Batch resolve symbols → exchange MICs
+    /// 1. Build canonical asset specs from payload data
     /// 2. Compute canonical asset IDs
     /// 3. Ensure all assets exist (batch)
     /// 4. Register FX pairs (batch)
     /// 5. Validate each activity
     ///
-    /// All entry points (forms, CSV import, broker sync) should use this.
-    async fn prepare_activities(
+    async fn prepare_activities_for_save(
+        &self,
+        activities: Vec<NewActivity>,
+        account: &crate::accounts::Account,
+    ) -> Result<PrepareActivitiesResult>;
+
+    /// Prepares activities for import apply flows.
+    /// Uses only pre-validated payload metadata (no live resolution).
+    async fn prepare_activities_for_import(
+        &self,
+        activities: Vec<NewActivity>,
+        account: &crate::accounts::Account,
+    ) -> Result<PrepareActivitiesResult>;
+
+    /// Prepares activities for automated broker sync.
+    /// Live symbol/provider resolution is allowed because no user review step exists.
+    async fn prepare_activities_for_sync(
         &self,
         activities: Vec<NewActivity>,
         account: &crate::accounts::Account,

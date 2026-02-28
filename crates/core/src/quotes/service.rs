@@ -25,7 +25,8 @@ use super::sync_state::{QuoteSyncState, SymbolSyncPlan, SyncMode, SyncStateStore
 use super::types::{quote_id, AssetId, Day, QuoteSource};
 use crate::activities::ActivityRepositoryTrait;
 use crate::assets::{
-    Asset, AssetKind, AssetRepositoryTrait, InstrumentType, ProviderProfile, QuoteMode,
+    symbol_resolution_candidates, Asset, AssetKind, AssetRepositoryTrait, InstrumentType,
+    ProviderProfile, QuoteMode,
 };
 use crate::errors::Result;
 use crate::fx::currency::{get_normalization_rule, normalize_currency_code};
@@ -923,49 +924,52 @@ where
             trimmed_symbol
         };
 
-        let temp_asset = Asset {
-            id: format!("_QUOTE_RESOLVE_{}", clean_symbol),
-            kind: AssetKind::Investment,
-            quote_mode: QuoteMode::Market,
-            quote_ccy: String::new(),
-            instrument_type: instrument_type.cloned().or(Some(InstrumentType::Equity)),
-            instrument_symbol: Some(clean_symbol.to_string()),
-            display_code: Some(clean_symbol.to_string()),
-            instrument_exchange_mic: exchange_mic.map(str::to_string),
-            ..Default::default()
-        };
+        for attempt_symbol in symbol_resolution_candidates(clean_symbol) {
+            let temp_asset = Asset {
+                id: format!("_QUOTE_RESOLVE_{}", attempt_symbol),
+                kind: AssetKind::Investment,
+                quote_mode: QuoteMode::Market,
+                quote_ccy: String::new(),
+                instrument_type: instrument_type.cloned().or(Some(InstrumentType::Equity)),
+                instrument_symbol: Some(attempt_symbol.clone()),
+                display_code: Some(attempt_symbol.clone()),
+                instrument_exchange_mic: exchange_mic.map(str::to_string),
+                ..Default::default()
+            };
 
-        match self
-            .client
-            .read()
-            .await
-            .fetch_latest_quote(&temp_asset)
-            .await
-        {
-            Ok(quote) => {
-                let currency = {
-                    let c = quote.currency.trim();
-                    if c.is_empty() {
+            match self
+                .client
+                .read()
+                .await
+                .fetch_latest_quote(&temp_asset)
+                .await
+            {
+                Ok(quote) => {
+                    let currency = {
+                        let c = quote.currency.trim();
+                        if c.is_empty() {
+                            None
+                        } else {
+                            Some(c.to_string())
+                        }
+                    };
+                    let price = if quote.close.is_zero() {
                         None
                     } else {
-                        Some(c.to_string())
-                    }
-                };
-                let price = if quote.close.is_zero() {
-                    None
-                } else {
-                    Some(quote.close)
-                };
-                Ok(ResolvedQuote { currency, price })
-            }
-            Err(err) => {
-                debug!(
-                    "resolve_symbol_quote: provider lookup failed for symbol='{}' mic={:?}: {}",
-                    clean_symbol, exchange_mic, err
-                );
-                Ok(ResolvedQuote::default())
+                        Some(quote.close)
+                    };
+                    return Ok(ResolvedQuote { currency, price });
+                }
+                Err(err) => {
+                    debug!(
+                        "resolve_symbol_quote: provider lookup failed for symbol='{}' mic={:?}: {}",
+                        attempt_symbol, exchange_mic, err
+                    );
+                }
             }
         }
+
+        Ok(ResolvedQuote::default())
     }
 
     async fn get_asset_profile(&self, asset: &Asset) -> Result<ProviderProfile> {

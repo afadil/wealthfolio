@@ -329,10 +329,10 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             return Ok((0, 0, Vec::new(), 0));
         }
 
-        // 2. Use prepare_activities for asset creation + FX registration
+        // 2. Use sync preparation for asset creation + FX registration
         let prepare_result = self
             .activity_service
-            .prepare_activities(new_activities, &account)
+            .prepare_activities_for_sync(new_activities, &account)
             .await?;
         let new_asset_ids = prepare_result.created_asset_ids.clone();
 
@@ -617,7 +617,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 instrument_exchange_mic: exchange_mic,
                 instrument_type: Some(instrument_type),
                 quote_ccy: currency.clone(),
-                quote_ccy_hint: Some(currency.clone()),
+                requested_quote_ccy: Some(currency.clone()),
                 kind: AssetKind::Investment,
                 quote_mode: None,
                 name: asset_name,

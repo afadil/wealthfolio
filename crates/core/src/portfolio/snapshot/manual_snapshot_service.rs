@@ -110,7 +110,7 @@ impl ManualSnapshotService {
                 ..Default::default()
             };
 
-            let quote_mode_hint = match holding.data_source.as_deref() {
+            let quote_mode = match holding.data_source.as_deref() {
                 Some("MANUAL") => Some("MANUAL".to_string()),
                 _ => None,
             };
@@ -121,12 +121,12 @@ impl ManualSnapshotService {
                     &asset_id,
                     Some(holding.currency.clone()),
                     Some(metadata),
-                    quote_mode_hint.clone(),
+                    quote_mode.clone(),
                 )
                 .await?;
 
             // For MANUAL data source: update quote mode on existing assets and create a price quote
-            if let Some(ref mode) = quote_mode_hint {
+            if let Some(ref mode) = quote_mode {
                 let requested_mode = mode.to_uppercase();
                 let current_mode = asset.quote_mode.as_db_str();
                 if requested_mode != current_mode {

@@ -620,7 +620,7 @@ mod tests {
     }
 
     #[test]
-    fn test_new_activity_symbol_hint_helpers() {
+    fn test_new_activity_symbol_helpers() {
         let activity = NewActivity {
             id: Some("a1".to_string()),
             account_id: "acc-1".to_string(),
@@ -650,12 +650,12 @@ mod tests {
             idempotency_key: None,
         };
 
-        assert_eq!(activity.get_quote_ccy_hint(), Some("GBp"));
-        assert_eq!(activity.get_instrument_type_hint(), Some("EQUITY"));
+        assert_eq!(activity.get_quote_ccy(), Some("GBp"));
+        assert_eq!(activity.get_instrument_type(), Some("EQUITY"));
     }
 
     #[test]
-    fn test_activity_import_to_new_activity_preserves_symbol_hints() {
+    fn test_activity_import_to_new_activity_preserves_symbol_inputs() {
         let import = ActivityImport {
             id: Some("imp-1".to_string()),
             date: "2024-01-15".to_string(),

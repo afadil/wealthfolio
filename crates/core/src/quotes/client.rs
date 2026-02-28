@@ -771,6 +771,27 @@ mod tests {
         assert_eq!(result.currency_source.as_deref(), Some("exchange_inferred"));
     }
 
+    #[test]
+    fn test_convert_search_result_maps_cxe_to_cboe_mic() {
+        let provider_result = MarketSearchResult::new("VWRPL.XC", "Vanguard ETF", "CXE", "ETF")
+            .with_score(20001.0);
+
+        let result = MarketDataClient::convert_search_result(provider_result);
+        assert_eq!(result.symbol, "VWRPL.XC");
+        assert_eq!(result.exchange_mic.as_deref(), Some("CXE"));
+        assert_eq!(result.currency.as_deref(), Some("GBP"));
+        assert_eq!(result.currency_source.as_deref(), Some("exchange_inferred"));
+    }
+
+    #[test]
+    fn test_convert_search_result_maps_lowercase_exchange_code() {
+        let provider_result = MarketSearchResult::new("VWRPL.XC", "Vanguard ETF", "cxe", "ETF")
+            .with_score(20001.0);
+
+        let result = MarketDataClient::convert_search_result(provider_result);
+        assert_eq!(result.exchange_mic.as_deref(), Some("CXE"));
+    }
+
     // =========================================================================
     // Build Quote Context Tests
     // =========================================================================

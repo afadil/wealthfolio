@@ -16,6 +16,7 @@ import type { ActivityDetails } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm, type Resolver, type SubmitHandler } from "react-hook-form";
+import { toast } from "sonner";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import type { AccountSelectOption } from "../forms/fields";
 import { newActivitySchema, type NewActivityFormValues } from "../forms/schemas";
@@ -26,6 +27,17 @@ interface MobileActivityFormProps {
   activity?: Partial<ActivityDetails>;
   open?: boolean;
   onClose?: () => void;
+}
+
+function extractErrorMessage(error: unknown): string {
+  if (typeof error === "string" && error.trim()) return error;
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (error && typeof error === "object") {
+    const raw = error as Record<string, unknown>;
+    if (typeof raw.error === "string" && raw.error.trim()) return raw.error;
+    if (typeof raw.message === "string" && raw.message.trim()) return raw.message;
+  }
+  return "Failed to save activity. Please check your inputs and try again.";
 }
 
 export function MobileActivityForm({ accounts, activity, open, onClose }: MobileActivityFormProps) {
@@ -132,6 +144,7 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
       form.reset(defaultValues);
       setCurrentStep(1);
     } catch (error) {
+      toast.error("Failed to save activity", { description: extractErrorMessage(error) });
       logger.error(
         `Mobile Activity Form Submit Error: ${JSON.stringify({ error, formValues: form.getValues() })}`,
       );

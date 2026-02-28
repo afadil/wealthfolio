@@ -242,34 +242,26 @@ test.describe("Activity Creation Tests", () => {
 
   async function fillAmount(value: number, testId = "amount-input") {
     const amountInput = page.getByTestId(testId);
-    await amountInput.click();
-    await amountInput.press("Control+a");
-    await amountInput.type(String(value), { delay: 50 });
+    await amountInput.fill(String(value));
     await amountInput.blur();
     await page.waitForTimeout(200);
   }
 
   async function fillQuantity(value: number) {
     const quantityInput = page.getByTestId("quantity-input");
-    await quantityInput.click();
-    await quantityInput.press("Control+a");
-    await quantityInput.type(String(value), { delay: 50 });
+    await quantityInput.fill(String(value));
     await quantityInput.blur();
   }
 
   async function fillPrice(value: number) {
     const priceInput = page.getByTestId("price-input");
-    await priceInput.click();
-    await priceInput.press("Control+a");
-    await priceInput.type(String(value), { delay: 50 });
+    await priceInput.fill(String(value));
     await priceInput.blur();
   }
 
   async function fillFee(value: number) {
     const feeInput = page.getByTestId("fee-input");
-    await feeInput.click();
-    await feeInput.press("Control+a");
-    await feeInput.type(String(value), { delay: 50 });
+    await feeInput.fill(String(value));
     await feeInput.blur();
   }
 
@@ -302,9 +294,7 @@ test.describe("Activity Creation Tests", () => {
   async function fillFxRate(rate: number) {
     const fxRateInput = page.getByTestId("fx-rate-input");
     await expect(fxRateInput).toBeVisible({ timeout: 5000 });
-    await fxRateInput.click();
-    await fxRateInput.press("Control+a");
-    await fxRateInput.type(String(rate), { delay: 50 });
+    await fxRateInput.fill(String(rate));
     await fxRateInput.blur();
   }
 
@@ -683,9 +673,7 @@ test.describe("Activity Creation Tests", () => {
 
     // Fill split ratio
     const splitRatioInput = page.getByLabel("Split Ratio");
-    await splitRatioInput.click();
-    await splitRatioInput.press("Control+a");
-    await splitRatioInput.type(String(split.splitRatio), { delay: 50 });
+    await splitRatioInput.fill(String(split.splitRatio));
     await splitRatioInput.blur();
 
     await fillNotes(split.notes);

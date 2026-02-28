@@ -118,9 +118,10 @@ impl ExchangeMap {
 
 /// Map Yahoo exchange code to MIC.
 pub fn yahoo_exchange_to_mic(code: &str) -> Option<Mic> {
+    let normalized = code.trim().to_uppercase();
     REGISTRY
         .yahoo_code_to_mic
-        .get(code)
+        .get(&normalized)
         .map(|mic| Cow::Owned(mic.clone()))
 }
 
@@ -146,19 +147,21 @@ pub fn yahoo_suffix_to_mic(suffix: &str) -> Option<&'static str> {
 /// share classes like BRK.B or RDS.A (since .B and .A are not in the whitelist).
 pub fn strip_yahoo_suffix(symbol: &str) -> &str {
     // Handle special suffixes first
-    if let Some(stripped) = symbol.strip_suffix("=X") {
+    if symbol.len() >= 2 && symbol[symbol.len() - 2..].eq_ignore_ascii_case("=X") {
         // FX pairs like EURUSD=X
-        return stripped;
+        return &symbol[..symbol.len() - 2];
     }
-    if let Some(stripped) = symbol.strip_suffix("=F") {
+    if symbol.len() >= 2 && symbol[symbol.len() - 2..].eq_ignore_ascii_case("=F") {
         // Futures like GC=F
-        return stripped;
+        return &symbol[..symbol.len() - 2];
     }
 
     // Only strip if suffix is in our known exchange whitelist
     for suffix in yahoo_exchange_suffixes() {
-        if let Some(stripped) = symbol.strip_suffix(suffix) {
-            return stripped;
+        if symbol.len() >= suffix.len()
+            && symbol[symbol.len() - suffix.len()..].eq_ignore_ascii_case(suffix)
+        {
+            return &symbol[..symbol.len() - suffix.len()];
         }
     }
 
@@ -213,6 +216,16 @@ mod tests {
             Some("GBp")
         );
 
+        // Cboe UK (Yahoo .XC) - provider reports GBP for this venue
+        assert_eq!(
+            map.get_suffix(&Cow::Borrowed("CXE"), &Cow::Borrowed("YAHOO")),
+            Some(".XC")
+        );
+        assert_eq!(
+            map.get_currency(&Cow::Borrowed("CXE"), &Cow::Borrowed("YAHOO")),
+            Some("GBP")
+        );
+
         // XETRA
         assert_eq!(
             map.get_suffix(&Cow::Borrowed("XETR"), &Cow::Borrowed("YAHOO")),
@@ -238,6 +251,20 @@ mod tests {
             Some(Cow::Owned("XTSE".to_string()))
         );
 
+        // Cboe UK Yahoo exchange code resolves to dedicated Cboe UK MIC.
+        assert_eq!(
+            yahoo_exchange_to_mic("CXE"),
+            Some(Cow::Owned("CXE".to_string()))
+        );
+        assert_eq!(
+            yahoo_exchange_to_mic(" cxe "),
+            Some(Cow::Owned("CXE".to_string()))
+        );
+        assert_eq!(
+            yahoo_exchange_to_mic("xice"),
+            Some(Cow::Owned("XICE".to_string()))
+        );
+
         // Unknown
         assert_eq!(yahoo_exchange_to_mic("UNKNOWN"), None);
     }
@@ -246,8 +273,10 @@ mod tests {
     fn test_strip_yahoo_suffix() {
         // Normal exchange suffixes
         assert_eq!(strip_yahoo_suffix("SHOP.TO"), "SHOP");
+        assert_eq!(strip_yahoo_suffix("shop.to"), "shop");
         assert_eq!(strip_yahoo_suffix("AAPL"), "AAPL");
         assert_eq!(strip_yahoo_suffix("VOD.L"), "VOD");
+        assert_eq!(strip_yahoo_suffix("vod.l"), "vod");
 
         // Share classes preserved
         assert_eq!(strip_yahoo_suffix("BRK.B"), "BRK.B");
@@ -255,7 +284,9 @@ mod tests {
 
         // Special suffixes
         assert_eq!(strip_yahoo_suffix("EURUSD=X"), "EURUSD");
+        assert_eq!(strip_yahoo_suffix("eurusd=x"), "eurusd");
         assert_eq!(strip_yahoo_suffix("GC=F"), "GC");
+        assert_eq!(strip_yahoo_suffix("gc=f"), "gc");
     }
 
     #[test]
@@ -267,8 +298,11 @@ mod tests {
 
         // UK & Europe
         assert_eq!(yahoo_suffix_to_mic("L"), Some("XLON"));
+        assert_eq!(yahoo_suffix_to_mic("XC"), Some("CXE"));
+        assert_eq!(yahoo_suffix_to_mic("xc"), Some("CXE"));
         assert_eq!(yahoo_suffix_to_mic("DE"), Some("XETR"));
         assert_eq!(yahoo_suffix_to_mic("PA"), Some("XPAR"));
+        assert_eq!(yahoo_suffix_to_mic("AE"), None); // Ambiguous between XDFM and XADS
 
         // Asia
         assert_eq!(yahoo_suffix_to_mic("T"), Some("XTKS"));

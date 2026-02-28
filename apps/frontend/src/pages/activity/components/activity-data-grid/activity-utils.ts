@@ -40,6 +40,12 @@ function toDecimalString(value: unknown): string | null | undefined {
   return normalized ?? undefined;
 }
 
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+}
+
 /**
  * Converts a value to a timestamp for date comparison
  */
@@ -438,14 +444,17 @@ export function buildSavePayload(
         // Backend will generate the canonical ID
         const symbol = (transaction.assetSymbol || "").trim().toUpperCase();
         if (symbol) {
-          createPayload.symbol = {
+          const symbolInput = {
             symbol,
-            exchangeMic: transaction.exchangeMic,
-            kind: transaction.pendingAssetKind,
-            name: transaction.pendingAssetName,
-            quoteMode: transaction.assetQuoteMode,
-            quoteCcy: transaction.pendingQuoteCcy,
-            instrumentType: transaction.pendingInstrumentType,
+            exchangeMic: normalizeOptionalString(transaction.exchangeMic),
+            kind: normalizeOptionalString(transaction.pendingAssetKind),
+            name: normalizeOptionalString(transaction.pendingAssetName),
+            quoteMode: normalizeOptionalString(transaction.assetQuoteMode),
+            quoteCcy: normalizeOptionalString(transaction.pendingQuoteCcy),
+            instrumentType: normalizeOptionalString(transaction.pendingInstrumentType),
+          };
+          createPayload.symbol = {
+            ...symbolInput,
           };
         }
       }
@@ -463,22 +472,25 @@ export function buildSavePayload(
 
         if (symbolChanged && currentSymbol) {
           // Symbol changed: send symbol + exchangeMic for backend to generate new canonical ID
-          updatePayload.symbol = {
+          const symbolInput = {
             symbol: currentSymbol,
-            exchangeMic: transaction.exchangeMic,
-            kind: transaction.pendingAssetKind,
-            name: transaction.pendingAssetName,
-            quoteMode: transaction.assetQuoteMode,
-            quoteCcy: transaction.pendingQuoteCcy,
-            instrumentType: transaction.pendingInstrumentType,
+            exchangeMic: normalizeOptionalString(transaction.exchangeMic),
+            kind: normalizeOptionalString(transaction.pendingAssetKind),
+            name: normalizeOptionalString(transaction.pendingAssetName),
+            quoteMode: normalizeOptionalString(transaction.assetQuoteMode),
+            quoteCcy: normalizeOptionalString(transaction.pendingQuoteCcy),
+            instrumentType: normalizeOptionalString(transaction.pendingInstrumentType),
+          };
+          updatePayload.symbol = {
+            ...symbolInput,
           };
         } else if (transaction._originalAssetId) {
           // Symbol unchanged: send existing asset ID with quoteMode to allow mode updates
           updatePayload.symbol = {
             id: transaction._originalAssetId,
-            quoteMode: transaction.assetQuoteMode,
-            quoteCcy: transaction.pendingQuoteCcy,
-            instrumentType: transaction.pendingInstrumentType,
+            quoteMode: normalizeOptionalString(transaction.assetQuoteMode),
+            quoteCcy: normalizeOptionalString(transaction.pendingQuoteCcy),
+            instrumentType: normalizeOptionalString(transaction.pendingInstrumentType),
           };
         }
       }

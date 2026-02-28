@@ -578,8 +578,8 @@ pub struct AssetMetadata {
     pub instrument_symbol: Option<String>,
     pub instrument_type: Option<InstrumentType>,
     pub display_code: Option<String>,
-    /// Explicit quote currency hint provided by caller/search/provider (e.g. "GBp").
-    pub quote_ccy_hint: Option<String>,
+    /// Input quote currency provided by caller/search/provider (e.g. "GBp").
+    pub requested_quote_ccy: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -592,7 +592,7 @@ pub struct CanonicalMarketIdentity {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QuoteCcyResolutionSource {
-    ExplicitHint,
+    ExplicitInput,
     ExistingAsset,
     ProviderQuote,
     MicFallback,
@@ -628,14 +628,14 @@ pub fn normalize_quote_ccy_code(value: Option<&str>) -> Option<String> {
 }
 
 pub fn resolve_quote_ccy_precedence(
-    explicit_hint: Option<&str>,
+    explicit_quote_ccy: Option<&str>,
     existing_asset_quote_ccy: Option<&str>,
     provider_quote_ccy: Option<&str>,
     mic_fallback_quote_ccy: Option<&str>,
     terminal_fallback_quote_ccy: Option<&str>,
 ) -> Option<(String, QuoteCcyResolutionSource)> {
-    if let Some(ccy) = normalize_quote_ccy(explicit_hint) {
-        return Some((ccy, QuoteCcyResolutionSource::ExplicitHint));
+    if let Some(ccy) = normalize_quote_ccy(explicit_quote_ccy) {
+        return Some((ccy, QuoteCcyResolutionSource::ExplicitInput));
     }
     if let Some(ccy) = normalize_quote_ccy(existing_asset_quote_ccy) {
         return Some((ccy, QuoteCcyResolutionSource::ExistingAsset));
@@ -783,8 +783,8 @@ pub struct AssetSpec {
     pub instrument_type: Option<InstrumentType>,
     /// Currency for quotes/valuations
     pub quote_ccy: String,
-    /// Explicit quote currency hint from caller/search/provider (strong evidence for repair).
-    pub quote_ccy_hint: Option<String>,
+    /// Input quote currency from caller/search/provider.
+    pub requested_quote_ccy: Option<String>,
     /// Asset kind
     pub kind: AssetKind,
     /// Optional quote mode override

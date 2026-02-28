@@ -229,9 +229,7 @@ test.describe("FX Cash Balance - Cross-currency Buy", () => {
 
     // Fill amount
     const amountInput = page.getByTestId("amount-input");
-    await amountInput.click();
-    await amountInput.press("Control+a");
-    await amountInput.type(String(DEPOSIT_AMOUNT), { delay: 50 });
+    await amountInput.fill(String(DEPOSIT_AMOUNT));
     await amountInput.blur();
     await page.waitForTimeout(200);
 
@@ -283,24 +281,18 @@ test.describe("FX Cash Balance - Cross-currency Buy", () => {
 
     // Fill quantity
     const quantityInput = page.getByTestId("quantity-input");
-    await quantityInput.click();
-    await quantityInput.press("Control+a");
-    await quantityInput.type(String(BUY.quantity), { delay: 50 });
-    await quantityInput.blur();
+    await quantityInput.fill(String(BUY.quantity));
+    await expect(quantityInput).toHaveValue(String(BUY.quantity));
 
     // Fill price
     const priceInput = page.getByTestId("price-input");
-    await priceInput.click();
-    await priceInput.press("Control+a");
-    await priceInput.type(String(BUY.price), { delay: 50 });
-    await priceInput.blur();
+    await priceInput.fill(String(BUY.price));
+    await expect(priceInput).toHaveValue(String(BUY.price));
 
     // Fill fee
     const feeInput = page.getByTestId("fee-input");
-    await feeInput.click();
-    await feeInput.press("Control+a");
-    await feeInput.type(String(BUY.fee), { delay: 50 });
-    await feeInput.blur();
+    await feeInput.fill(String(BUY.fee));
+    await expect(feeInput).toHaveValue(String(BUY.fee));
 
     // Expand advanced options to set currency and FX rate
     const advancedButton = page.getByTestId("advanced-options-button");
@@ -313,10 +305,8 @@ test.describe("FX Cash Balance - Cross-currency Buy", () => {
     await expect(fxRateInput).toBeVisible({ timeout: 5000 });
 
     // Fill FX rate
-    await fxRateInput.click();
-    await fxRateInput.press("Control+a");
-    await fxRateInput.type(String(BUY.fxRate), { delay: 50 });
-    await fxRateInput.blur();
+    await fxRateInput.fill(String(BUY.fxRate));
+    await expect(fxRateInput).toHaveValue(String(BUY.fxRate));
     await page.waitForTimeout(300);
 
     // Submit

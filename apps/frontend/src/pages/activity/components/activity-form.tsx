@@ -115,7 +115,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
             isEditing={isEditing}
           />
 
-          {/* Display mutation error */}
+          {/* Display mutation error inside sheet */}
           {isError && (
             <Alert variant="destructive">
               <Icons.AlertCircle className="h-4 w-4" />

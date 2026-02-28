@@ -174,15 +174,15 @@ pub struct SymbolInput {
     pub symbol: Option<String>,
     /// Exchange MIC code (e.g., "XNAS", "XTSE") for securities
     pub exchange_mic: Option<String>,
-    /// Asset kind hint (e.g., "SECURITY", "CRYPTO") - if not provided, inferred
+    /// Asset kind input (e.g., "SECURITY", "CRYPTO") - if not provided, inferred
     pub kind: Option<String>,
     /// Asset name for custom/manual assets
     pub name: Option<String>,
     /// Quote mode: "MARKET" or "MANUAL" - controls how asset is priced
     pub quote_mode: Option<String>,
-    /// Optional quote currency hint from symbol search/provider (e.g., "GBp")
+    /// Optional quote currency from symbol search/provider (e.g., "GBp")
     pub quote_ccy: Option<String>,
-    /// Optional instrument type hint from symbol search/provider (e.g., "EQUITY", "CRYPTO")
+    /// Optional instrument type from symbol search/provider (e.g., "EQUITY", "CRYPTO")
     pub instrument_type: Option<String>,
 }
 
@@ -278,7 +278,7 @@ impl NewActivity {
         self.symbol.as_ref().and_then(|a| a.exchange_mic.as_deref())
     }
 
-    pub fn get_kind_hint(&self) -> Option<&str> {
+    pub fn get_kind(&self) -> Option<&str> {
         self.symbol.as_ref().and_then(|a| a.kind.as_deref())
     }
 
@@ -290,11 +290,11 @@ impl NewActivity {
         self.symbol.as_ref().and_then(|a| a.quote_mode.as_deref())
     }
 
-    pub fn get_quote_ccy_hint(&self) -> Option<&str> {
+    pub fn get_quote_ccy(&self) -> Option<&str> {
         self.symbol.as_ref().and_then(|a| a.quote_ccy.as_deref())
     }
 
-    pub fn get_instrument_type_hint(&self) -> Option<&str> {
+    pub fn get_instrument_type(&self) -> Option<&str> {
         self.symbol
             .as_ref()
             .and_then(|a| a.instrument_type.as_deref())
@@ -385,7 +385,7 @@ impl ActivityUpdate {
         self.symbol.as_ref().and_then(|a| a.exchange_mic.as_deref())
     }
 
-    pub fn get_kind_hint(&self) -> Option<&str> {
+    pub fn get_kind(&self) -> Option<&str> {
         self.symbol.as_ref().and_then(|a| a.kind.as_deref())
     }
 
@@ -397,11 +397,11 @@ impl ActivityUpdate {
         self.symbol.as_ref().and_then(|a| a.quote_mode.as_deref())
     }
 
-    pub fn get_quote_ccy_hint(&self) -> Option<&str> {
+    pub fn get_quote_ccy(&self) -> Option<&str> {
         self.symbol.as_ref().and_then(|a| a.quote_ccy.as_deref())
     }
 
-    pub fn get_instrument_type_hint(&self) -> Option<&str> {
+    pub fn get_instrument_type(&self) -> Option<&str> {
         self.symbol
             .as_ref()
             .and_then(|a| a.instrument_type.as_deref())
@@ -580,11 +580,11 @@ pub struct ActivityImport {
     pub symbol_name: Option<String>,
     /// Resolved exchange MIC for the symbol (populated during validation)
     pub exchange_mic: Option<String>,
-    /// Optional quote currency hint for the resolved symbol (e.g., "GBp")
+    /// Optional quote currency for the resolved symbol (e.g., "GBp")
     pub quote_ccy: Option<String>,
-    /// Optional resolved instrument type hint (e.g., "EQUITY", "CRYPTO")
+    /// Optional resolved instrument type (e.g., "EQUITY", "CRYPTO")
     pub instrument_type: Option<String>,
-    /// Optional quote mode hint (e.g., "MANUAL", "MARKET")
+    /// Optional quote mode (e.g., "MANUAL", "MARKET")
     pub quote_mode: Option<String>,
     pub errors: Option<std::collections::HashMap<String, Vec<String>>>,
     pub warnings: Option<std::collections::HashMap<String, Vec<String>>>,

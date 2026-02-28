@@ -213,7 +213,7 @@ pub fn is_broker_crypto(code: Option<&str>) -> bool {
 /// Maps a broker API activity into a `NewActivity` with unresolved `SymbolInput`.
 ///
 /// The returned `NewActivity` has `SymbolInput { symbol, exchange_mic, kind }` set
-/// so that `prepare_activities()` can handle asset creation and dedup via `instrument_key`.
+/// so that `prepare_activities_for_sync()` can handle asset creation and dedup via `instrument_key`.
 ///
 /// Returns `None` if the activity should be skipped (e.g. no id).
 pub fn map_broker_activity(
@@ -379,7 +379,7 @@ pub fn map_broker_activity(
                         .filter(|d| !d.trim().is_empty())
                 });
             SymbolInput {
-                id: None, // Let prepare_activities resolve via instrument_key
+                id: None, // Let sync preparation resolve via instrument_key
                 symbol: Some(sym),
                 exchange_mic: exchange_mic.clone(),
                 kind: kind_hint,
