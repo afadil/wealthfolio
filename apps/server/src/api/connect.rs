@@ -267,8 +267,6 @@ async fn store_sync_session(
     Json(body): Json<StoreSyncSessionRequest>,
 ) -> ApiResult<Json<()>> {
     ensure_cloud_sync_enabled()?;
-    info!("[Connect] Storing sync session");
-
     state
         .secret_store
         .set_secret(CLOUD_REFRESH_TOKEN_KEY, &body.refresh_token)
@@ -286,7 +284,6 @@ async fn store_sync_session(
     }
     state.token_lifecycle.clear_cache().await;
 
-    info!("[Connect] Sync session stored successfully");
     Ok(Json(()))
 }
 
@@ -683,7 +680,6 @@ async fn get_subscription_plans_public() -> ApiResult<Json<PlansResponse>> {
 
 async fn get_user_info(State(state): State<Arc<AppState>>) -> ApiResult<Json<UserInfo>> {
     ensure_cloud_sync_enabled()?;
-    info!("[Connect] Getting user info...");
 
     let client = create_connect_client(&state).await?;
 
