@@ -1,5 +1,7 @@
 import type { AddonContext } from "@wealthfolio/addon-sdk";
 import {
+  Alert,
+  AlertDescription,
   Button,
   Checkbox,
   DatePickerInput,
@@ -34,7 +36,7 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
   const seenIds = useRef<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
 
-  const { suggestions: baseSuggestions, isLoading, accountNameMap } = useDividendSuggestions(ctx);
+  const { suggestions: baseSuggestions, isLoading, accountNameMap, errors } = useDividendSuggestions(ctx);
 
   const suggestions = useMemo(
     () => baseSuggestions.map((s) => ({ ...s, ...overrides.get(s.id) })),
@@ -158,19 +160,43 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
     }
   };
 
+  const errorBanner =
+    errors.length > 0 ? (
+      <Alert variant="destructive" className="mb-4">
+        <AlertDescription>
+          Failed to fetch dividend data for:{" "}
+          {errors.map((e) => e.symbol).join(", ")}.
+          <Button
+            variant="link"
+            size="sm"
+            className="ml-2 h-auto p-0 text-inherit underline"
+            onClick={() => ctx.api.query.invalidateQueries(["yahoo-dividends"])}
+          >
+            Retry
+          </Button>
+        </AlertDescription>
+      </Alert>
+    ) : null;
+
   if (isLoading) {
     return (
-      <div className="text-muted-foreground py-12 text-center text-sm">
-        Loading dividend data...
-      </div>
+      <>
+        {errorBanner}
+        <div className="text-muted-foreground py-12 text-center text-sm">
+          Loading dividend data...
+        </div>
+      </>
     );
   }
 
   if (suggestions.length === 0) {
     return (
-      <div className="text-muted-foreground py-12 text-center text-sm">
-        No missing dividends found for your current holdings.
-      </div>
+      <>
+        {errorBanner}
+        <div className="text-muted-foreground py-12 text-center text-sm">
+          No missing dividends found for your current holdings.
+        </div>
+      </>
     );
   }
 
@@ -178,6 +204,7 @@ export default function SuggestionsTab({ ctx, onSaved }: SuggestionsTabProps) {
 
   return (
     <div className="space-y-4">
+      {errorBanner}
       <div className="flex items-center justify-between">
         <p className="text-muted-foreground text-sm">
           {suggestions.length} missing dividend{suggestions.length !== 1 ? "s" : ""} found

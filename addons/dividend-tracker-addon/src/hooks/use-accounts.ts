@@ -6,6 +6,7 @@ export function useAccounts(ctx: AddonContext): { accounts: Account[]; isLoading
   const { data: accounts = [], isLoading } = useQuery({
     queryKey: [QueryKeys.ACCOUNTS],
     queryFn: () => ctx.api.accounts.getAll(),
+    staleTime: 5 * 60 * 1000,
   });
 
   return { accounts, isLoading };

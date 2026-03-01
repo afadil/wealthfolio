@@ -1,5 +1,5 @@
 import { useQueries } from "@tanstack/react-query";
-import type { AddonContext, Asset } from "@wealthfolio/addon-sdk";
+import { QueryKeys, type AddonContext, type Asset } from "@wealthfolio/addon-sdk";
 import { useMemo } from "react";
 
 export function useAssetProfiles(
@@ -10,7 +10,7 @@ export function useAssetProfiles(
     queries: useMemo(
       () =>
         instrumentIds.map((id) => ({
-          queryKey: ["asset-profile", id],
+          queryKey: [QueryKeys.ASSET_DATA, id],
           queryFn: () => ctx.api.assets.getProfile(id),
           staleTime: 5 * 60 * 1000,
         })),
