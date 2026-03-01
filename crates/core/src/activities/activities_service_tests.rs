@@ -796,9 +796,19 @@ mod tests {
 
         fn check_existing_duplicates(
             &self,
-            _idempotency_keys: &[String],
+            idempotency_keys: &[String],
         ) -> Result<std::collections::HashMap<String, String>> {
-            Ok(std::collections::HashMap::new())
+            let stored = self.activities.lock().unwrap();
+            let mut map = std::collections::HashMap::new();
+            for requested_key in idempotency_keys {
+                if let Some(existing) = stored
+                    .iter()
+                    .find(|a| a.idempotency_key.as_deref() == Some(requested_key.as_str()))
+                {
+                    map.insert(requested_key.clone(), existing.id.clone());
+                }
+            }
+            Ok(map)
         }
 
         async fn bulk_upsert(
@@ -1026,7 +1036,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_manual_create_generates_unique_manual_idempotency_key() {
+    async fn test_duplicate_manual_create_returns_clear_error() {
         let account_service = Arc::new(MockAccountService::new());
         let asset_service = Arc::new(MockAssetService::new());
         let fx_service = Arc::new(MockFxService::new());
@@ -1044,7 +1054,7 @@ mod tests {
             quote_service,
         );
 
-        let base_activity = NewActivity {
+        let duplicate_activity = NewActivity {
             id: None,
             account_id: "acc-1".to_string(),
             symbol: Some(SymbolInput {
@@ -1070,38 +1080,24 @@ mod tests {
             idempotency_key: None,
         };
 
-        let first = activity_service
-            .create_activity(base_activity.clone())
+        activity_service
+            .create_activity(duplicate_activity.clone())
             .await
-            .expect("first manual create should succeed");
-        let second = activity_service
-            .create_activity(base_activity)
+            .expect("first create should succeed");
+        let err = activity_service
+            .create_activity(duplicate_activity)
             .await
-            .expect("second manual create should succeed");
-
-        let first_key = first
-            .idempotency_key
-            .expect("manual create should assign idempotency key");
-        let second_key = second
-            .idempotency_key
-            .expect("manual create should assign idempotency key");
+            .expect_err("second identical create should be rejected as duplicate");
 
         assert!(
-            first_key.starts_with("manual:"),
-            "manual idempotency key should use manual prefix"
-        );
-        assert!(
-            second_key.starts_with("manual:"),
-            "manual idempotency key should use manual prefix"
-        );
-        assert_ne!(
-            first_key, second_key,
-            "manual creates should not collide on idempotency key"
+            err.to_string().contains("Duplicate activity detected"),
+            "error should clearly explain duplicate detection: {}",
+            err
         );
     }
 
     #[tokio::test]
-    async fn test_provider_create_keeps_stable_content_idempotency_key() {
+    async fn test_source_record_id_changes_idempotency_for_provider_create() {
         let account_service = Arc::new(MockAccountService::new());
         let asset_service = Arc::new(MockAssetService::new());
         let fx_service = Arc::new(MockFxService::new());
@@ -1119,7 +1115,7 @@ mod tests {
             quote_service,
         );
 
-        let provider_activity = NewActivity {
+        let provider_activity_one = NewActivity {
             id: None,
             account_id: "acc-1".to_string(),
             symbol: Some(SymbolInput {
@@ -1140,36 +1136,84 @@ mod tests {
             metadata: None,
             needs_review: None,
             source_system: Some("SNAPTRADE".to_string()),
-            source_record_id: Some("provider-activity-123".to_string()),
+            source_record_id: Some("provider-1".to_string()),
             source_group_id: None,
             idempotency_key: None,
         };
 
-        let first = activity_service
-            .create_activity(provider_activity.clone())
+        let mut provider_activity_two = provider_activity_one.clone();
+        provider_activity_two.source_record_id = Some("provider-2".to_string());
+
+        activity_service
+            .create_activity(provider_activity_one)
             .await
             .expect("first provider create should succeed");
-        let second = activity_service
-            .create_activity(provider_activity)
+        activity_service
+            .create_activity(provider_activity_two)
             .await
-            .expect("second provider create should succeed");
+            .expect("second provider create with different source record id should succeed");
+    }
 
-        let first_key = first
-            .idempotency_key
-            .expect("provider create should assign idempotency key");
-        let second_key = second
-            .idempotency_key
-            .expect("provider create should assign idempotency key");
+    #[tokio::test]
+    async fn test_bulk_create_assigns_idempotency_key() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
 
-        assert_eq!(
-            first_key, second_key,
-            "provider creates should keep stable content key"
+        account_service.add_account(create_test_account("acc-1", "USD"));
+        asset_service.add_asset(create_test_asset("AAPL", "USD"));
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
         );
-        assert_eq!(
-            first_key.len(),
-            64,
-            "provider idempotency key should be a sha256 hex string"
-        );
+
+        let request = ActivityBulkMutationRequest {
+            creates: vec![NewActivity {
+                id: Some("temp-1".to_string()),
+                account_id: "acc-1".to_string(),
+                symbol: Some(SymbolInput {
+                    id: Some("AAPL".to_string()),
+                    ..Default::default()
+                }),
+                activity_type: "BUY".to_string(),
+                subtype: None,
+                activity_date: "2026-02-27T21:32:00Z".to_string(),
+                quantity: Some(dec!(25)),
+                unit_price: Some(dec!(51.90)),
+                currency: "USD".to_string(),
+                fee: Some(dec!(0)),
+                amount: None,
+                status: None,
+                notes: None,
+                fx_rate: None,
+                metadata: None,
+                needs_review: None,
+                source_system: None,
+                source_record_id: None,
+                source_group_id: None,
+                idempotency_key: None,
+            }],
+            updates: vec![],
+            delete_ids: vec![],
+        };
+
+        let result = activity_service
+            .bulk_mutate_activities(request)
+            .await
+            .expect("bulk create should succeed");
+
+        assert_eq!(result.created.len(), 1);
+        let key = result.created[0]
+            .idempotency_key
+            .as_deref()
+            .expect("bulk create should assign idempotency key");
+        assert_eq!(key.len(), 64, "key should be a sha256 hex string");
     }
 
     /// Test: When activity currency, asset currency, and account currency are all the same,

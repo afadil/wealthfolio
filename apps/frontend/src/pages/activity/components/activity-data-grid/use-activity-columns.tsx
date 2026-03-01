@@ -228,7 +228,9 @@ export function useActivityColumns({
             variant: "symbol",
             isDisabled: (rowData: unknown) => {
               const row = rowData as LocalTransaction;
-              return isCashActivity(row.activityType ?? "") && !isTransferActivity(row.activityType);
+              return (
+                isCashActivity(row.activityType ?? "") && !isTransferActivity(row.activityType)
+              );
             },
             getDisplayContext: (rowData: unknown) => {
               const row = rowData as LocalTransaction;
