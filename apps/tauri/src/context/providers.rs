@@ -3,6 +3,7 @@ use super::registry::ServiceContext;
 use crate::domain_events::TauriDomainEventSink;
 use crate::secret_store::shared_secret_store;
 use crate::services::ConnectService;
+use log::error;
 use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 use wealthfolio_ai::{AiProviderService, ChatConfig, ChatService};
@@ -62,7 +63,10 @@ pub async fn initialize_context(
     db::run_migrations(&db_path)?;
 
     let pool = db::create_pool(&db_path)?;
-    let writer = write_actor::spawn_writer(pool.as_ref().clone());
+    let writer = write_actor::spawn_writer(pool.as_ref().clone()).map_err(|e| {
+        error!("Failed to initialize writer actor: {}", e);
+        e
+    })?;
 
     // Instantiate Repositories
     let settings_repository = Arc::new(SettingsRepository::new(pool.clone(), writer.clone()));

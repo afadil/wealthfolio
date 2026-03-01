@@ -933,7 +933,7 @@ mod tests {
 
         // spawn_writer expects DbPool (not Arc<DbPool>), so we need to clone the inner pool
         // Since pool is Arc<DbPool>, we dereference to get DbPool, then clone it
-        let writer = spawn_writer((*pool).clone());
+        let writer = spawn_writer((*pool).clone()).expect("Failed to spawn writer actor");
 
         let repo = SnapshotRepository::new(Arc::clone(&pool), writer);
         (repo, pool, temp_dir)
