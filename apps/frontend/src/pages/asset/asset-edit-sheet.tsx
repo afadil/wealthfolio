@@ -415,20 +415,18 @@ export function AssetEditSheet({
           onValueChange={(v) => setActiveTab(v as EditTab)}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <TabsList className="grid w-full grid-cols-2">
-            {asset.kind === "FX" ? (
-              <>
-                <TabsTrigger value="general">General</TabsTrigger>
-                <TabsTrigger value="market-data">Market Data</TabsTrigger>
-              </>
-            ) : (
-              <>
-                <TabsTrigger value="general">General</TabsTrigger>
-                <TabsTrigger value="classification">Classification</TabsTrigger>
-                <TabsTrigger value="market-data">Market Data</TabsTrigger>
-              </>
-            )}
-          </TabsList>
+          {asset.kind === "FX" ? (
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="general">General</TabsTrigger>
+              <TabsTrigger value="market-data">Market Data</TabsTrigger>
+            </TabsList>
+          ) : (
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="general">General</TabsTrigger>
+              <TabsTrigger value="classification">Classification</TabsTrigger>
+              <TabsTrigger value="market-data">Market Data</TabsTrigger>
+            </TabsList>
+          )}
 
           <div className="min-h-0 flex-1 overflow-y-auto pt-4">
             {/* General Tab */}
