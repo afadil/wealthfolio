@@ -23,6 +23,7 @@ export interface SyncActivitiesResponse {
   activities_upserted: number;
   assets_inserted: number;
   accounts_failed: number;
+  accounts_warned?: number;
 }
 
 export interface SyncResult {

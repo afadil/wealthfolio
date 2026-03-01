@@ -281,6 +281,64 @@ impl BrokerSyncStateRepository {
             .await
     }
 
+    /// Record a partial sync warning (upsert with NEEDS_REVIEW status)
+    pub async fn upsert_needs_review(
+        &self,
+        account_id: String,
+        provider: String,
+        warning: String,
+        import_run_id: Option<String>,
+    ) -> Result<()> {
+        self.writer
+            .exec(move |conn| {
+                let now = Utc::now();
+                let now_str = now.to_rfc3339();
+
+                // Check if exists
+                let existing = brokers_sync_state::table
+                    .find((&account_id, &provider))
+                    .first::<BrokerSyncStateDB>(conn)
+                    .optional()
+                    .map_err(StorageError::from)?;
+
+                match existing {
+                    Some(_) => {
+                        diesel::update(brokers_sync_state::table.find((&account_id, &provider)))
+                            .set((
+                                brokers_sync_state::sync_status.eq("NEEDS_REVIEW"),
+                                brokers_sync_state::last_error.eq(&warning),
+                                brokers_sync_state::last_run_id.eq(&import_run_id),
+                                brokers_sync_state::updated_at.eq(&now_str),
+                            ))
+                            .execute(conn)
+                            .map_err(StorageError::from)?;
+                    }
+                    None => {
+                        let new_state = BrokerSyncStateDB {
+                            account_id,
+                            provider,
+                            checkpoint_json: None,
+                            last_attempted_at: Some(now_str.clone()),
+                            last_successful_at: None,
+                            last_error: Some(warning),
+                            last_run_id: import_run_id,
+                            sync_status: "NEEDS_REVIEW".to_string(),
+                            created_at: now_str.clone(),
+                            updated_at: now_str,
+                        };
+
+                        diesel::insert_into(brokers_sync_state::table)
+                            .values(&new_state)
+                            .execute(conn)
+                            .map_err(StorageError::from)?;
+                    }
+                }
+
+                Ok(())
+            })
+            .await
+    }
+
     /// Get all sync states for an account
     pub fn get_for_account(&self, account_id: &str) -> Result<Vec<BrokerSyncState>> {
         let mut conn = get_connection(&self.pool)?;
@@ -355,6 +413,23 @@ impl ConnectBrokerSyncStateRepositoryTrait for BrokerSyncStateRepository {
     ) -> Result<()> {
         BrokerSyncStateRepository::upsert_failure(self, account_id, provider, error, import_run_id)
             .await
+    }
+
+    async fn upsert_needs_review(
+        &self,
+        account_id: String,
+        provider: String,
+        warning: String,
+        import_run_id: Option<String>,
+    ) -> Result<()> {
+        BrokerSyncStateRepository::upsert_needs_review(
+            self,
+            account_id,
+            provider,
+            warning,
+            import_run_id,
+        )
+        .await
     }
 
     fn get_all(&self) -> Result<Vec<BrokerSyncState>> {
