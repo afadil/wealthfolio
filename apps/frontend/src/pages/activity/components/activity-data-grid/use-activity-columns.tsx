@@ -28,6 +28,10 @@ const STATUS_DISPLAY: Record<
   [ActivityStatus.VOID]: { label: "Void", variant: "destructive" },
 };
 
+const isTransferActivity = (activityType: string | undefined): boolean => {
+  return activityType === ActivityType.TRANSFER_IN || activityType === ActivityType.TRANSFER_OUT;
+};
+
 interface UseActivityColumnsOptions {
   accounts: Account[];
   onEditActivity: (activity: ActivityDetails) => void;
@@ -50,10 +54,6 @@ export function useActivityColumns({
   onSymbolSelect,
   onCreateCustomAsset,
 }: UseActivityColumnsOptions) {
-  const isTransferActivity = (activityType: string | undefined): boolean => {
-    return activityType === ActivityType.TRANSFER_IN || activityType === ActivityType.TRANSFER_OUT;
-  };
-
   const activityTypeOptions = useMemo(
     () =>
       (Object.values(ActivityType) as ActivityType[]).map((type) => ({

@@ -1,26 +1,34 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
-import { useQuery } from "@tanstack/react-query";
+import { getExchanges } from "@/adapters";
+import { MultiSelectTaxonomy } from "@/components/classification/multi-select-taxonomy";
+import { SingleSelectTaxonomy } from "@/components/classification/single-select-taxonomy";
+import { TickerAvatar } from "@/components/ticker-avatar";
+import { useMarketDataProviders } from "@/hooks/use-market-data-providers";
+import { useTaxonomies } from "@/hooks/use-taxonomies";
+import { ASSET_KIND_DISPLAY_NAMES, type AssetKind, EDITABLE_ASSET_KINDS } from "@/lib/constants";
+import type { Asset, Quote } from "@/lib/types";
+import { formatAmount } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { useQuery } from "@tanstack/react-query";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  ResponsiveSelect,
-  type ResponsiveSelectOption,
-  SearchableSelect,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  Switch,
-  Label,
   Alert,
   AlertDescription,
   CurrencyInput,
+  Label,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  ResponsiveSelect,
+  type ResponsiveSelectOption,
+  SearchableSelect,
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  Switch,
 } from "@wealthfolio/ui";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Form,
   FormControl,
@@ -29,22 +37,14 @@ import {
   FormLabel,
   FormMessage,
 } from "@wealthfolio/ui/components/ui/form";
-import { Input } from "@wealthfolio/ui/components/ui/input";
-import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
-import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
-import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { TickerAvatar } from "@/components/ticker-avatar";
-import { SingleSelectTaxonomy } from "@/components/classification/single-select-taxonomy";
-import { MultiSelectTaxonomy } from "@/components/classification/multi-select-taxonomy";
-import { useTaxonomies } from "@/hooks/use-taxonomies";
-import { EDITABLE_ASSET_KINDS, ASSET_KIND_DISPLAY_NAMES, type AssetKind } from "@/lib/constants";
-import type { Asset, Quote } from "@/lib/types";
-import { formatAmount } from "@/lib/utils";
-import { getExchanges } from "@/adapters";
-import { useMarketDataProviders } from "@/hooks/use-market-data-providers";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
+import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useFieldArray, useForm } from "react-hook-form";
+import * as z from "zod";
 import { useAssetProfileMutations } from "./hooks/use-asset-profile-mutations";
 
 const PROVIDERS = [
