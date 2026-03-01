@@ -12,7 +12,7 @@ use crate::activities::activities_constants::{
 use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
 use crate::activities::csv_parser::{self, ParseConfig, ParsedCsvResult};
-use crate::activities::idempotency::compute_idempotency_key;
+use crate::activities::idempotency::{compute_idempotency_key, generate_manual_idempotency_key};
 use crate::activities::{ActivityRepositoryTrait, ActivityServiceTrait};
 use crate::activities::{
     ImportRun, ImportRunMode, ImportRunRepositoryTrait, ImportRunSummary, ImportRunType, ReviewMode,
@@ -1002,8 +1002,25 @@ impl ActivityService {
             .filter(|value| !value.is_empty())
             .map(str::to_string);
 
+        let normalized_source_system = activity
+            .source_system
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        let has_source_record_id = activity
+            .source_record_id
+            .as_deref()
+            .map(str::trim)
+            .is_some_and(|value| !value.is_empty());
+
+        let should_use_manual_key = normalized_source_system
+            .is_none_or(|source| source.eq_ignore_ascii_case("MANUAL"))
+            && !has_source_record_id;
+
         if let Some(key) = explicit_idempotency_key {
             activity.idempotency_key = Some(key);
+        } else if should_use_manual_key {
+            activity.idempotency_key = Some(generate_manual_idempotency_key());
         } else if let Ok(date) = DateTime::parse_from_rfc3339(&activity.activity_date)
             .map(|dt| dt.with_timezone(&Utc))
             .or_else(|_| {

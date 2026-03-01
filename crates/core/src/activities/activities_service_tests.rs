@@ -675,7 +675,7 @@ mod tests {
                 source_system: None,
                 source_record_id: None,
                 source_group_id: None,
-                idempotency_key: None,
+                idempotency_key: new_activity.idempotency_key,
                 import_run_id: None,
                 is_user_modified: false,
                 needs_review: false,
@@ -1022,6 +1022,153 @@ mod tests {
             registered_pairs.contains(&("EUR".to_string(), "USD".to_string())),
             "Expected FX pair EUR/USD to be registered. Registered pairs: {:?}",
             registered_pairs
+        );
+    }
+
+    #[tokio::test]
+    async fn test_manual_create_generates_unique_manual_idempotency_key() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        account_service.add_account(create_test_account("acc-1", "USD"));
+        asset_service.add_asset(create_test_asset("AAPL", "USD"));
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let base_activity = NewActivity {
+            id: None,
+            account_id: "acc-1".to_string(),
+            symbol: Some(SymbolInput {
+                id: Some("AAPL".to_string()),
+                ..Default::default()
+            }),
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2026-02-27T21:32:00Z".to_string(),
+            quantity: Some(dec!(25)),
+            unit_price: Some(dec!(51.90)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: None,
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+        };
+
+        let first = activity_service
+            .create_activity(base_activity.clone())
+            .await
+            .expect("first manual create should succeed");
+        let second = activity_service
+            .create_activity(base_activity)
+            .await
+            .expect("second manual create should succeed");
+
+        let first_key = first
+            .idempotency_key
+            .expect("manual create should assign idempotency key");
+        let second_key = second
+            .idempotency_key
+            .expect("manual create should assign idempotency key");
+
+        assert!(
+            first_key.starts_with("manual:"),
+            "manual idempotency key should use manual prefix"
+        );
+        assert!(
+            second_key.starts_with("manual:"),
+            "manual idempotency key should use manual prefix"
+        );
+        assert_ne!(
+            first_key, second_key,
+            "manual creates should not collide on idempotency key"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_provider_create_keeps_stable_content_idempotency_key() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        account_service.add_account(create_test_account("acc-1", "USD"));
+        asset_service.add_asset(create_test_asset("AAPL", "USD"));
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let provider_activity = NewActivity {
+            id: None,
+            account_id: "acc-1".to_string(),
+            symbol: Some(SymbolInput {
+                id: Some("AAPL".to_string()),
+                ..Default::default()
+            }),
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2026-02-27T21:32:00Z".to_string(),
+            quantity: Some(dec!(25)),
+            unit_price: Some(dec!(51.90)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: None,
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: Some("SNAPTRADE".to_string()),
+            source_record_id: Some("provider-activity-123".to_string()),
+            source_group_id: None,
+            idempotency_key: None,
+        };
+
+        let first = activity_service
+            .create_activity(provider_activity.clone())
+            .await
+            .expect("first provider create should succeed");
+        let second = activity_service
+            .create_activity(provider_activity)
+            .await
+            .expect("second provider create should succeed");
+
+        let first_key = first
+            .idempotency_key
+            .expect("provider create should assign idempotency key");
+        let second_key = second
+            .idempotency_key
+            .expect("provider create should assign idempotency key");
+
+        assert_eq!(
+            first_key, second_key,
+            "provider creates should keep stable content key"
+        );
+        assert_eq!(
+            first_key.len(),
+            64,
+            "provider idempotency key should be a sha256 hex string"
         );
     }
 
