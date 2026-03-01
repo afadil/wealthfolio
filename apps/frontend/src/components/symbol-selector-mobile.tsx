@@ -4,6 +4,7 @@ import { useSettingsContext } from "@/lib/settings-provider";
 import { SymbolSearchResult } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
+import { CurrencyInput } from "@wealthfolio/ui/components/financial";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Input } from "@wealthfolio/ui/components/ui/input";
@@ -25,7 +26,6 @@ import {
   SheetTrigger,
 } from "@wealthfolio/ui/components/ui/sheet";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { CurrencyInput } from "@wealthfolio/ui/components/financial";
 import { forwardRef, useState } from "react";
 
 interface SymbolSelectorMobileProps {

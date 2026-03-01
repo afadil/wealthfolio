@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { ActivityType, QuoteMode } from "@/lib/constants";
+import { z } from "zod";
 
 // Asset metadata schema for custom assets
 export const assetMetadataSchema = z
@@ -59,42 +59,44 @@ export const holdingsActivitySchema = baseActivitySchema.extend({
     .optional(),
 });
 
-export const bulkHoldingRowSchema = z.object({
-  id: z.string(),
-  ticker: z.string().min(1, { message: "Ticker is required" }),
-  name: z.string().optional(),
-  sharesOwned: z.coerce
-    .number({
-      required_error: "Shares owned is required.",
-      invalid_type_error: "Shares must be a number.",
-    })
-    .positive({ message: "Shares must be greater than 0" }),
-  averageCost: z.coerce
-    .number({
-      required_error: "Average cost is required.",
-      invalid_type_error: "Average cost must be a number.",
-    })
-    .positive({ message: "Average cost must be greater than 0" }),
-  totalValue: z.number().optional(),
-  assetId: z.string().optional(),
-  quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).optional(),
-  // Exchange MIC for canonical asset ID generation (e.g., "XNAS", "XTSE")
-  exchangeMic: z.string().optional(),
-  // Optional symbol-level quote currency hint from search/provider (e.g., "USD")
-  symbolQuoteCcy: z.string().optional(),
-  // Optional symbol-level instrument type hint from search/provider (e.g., "EQUITY")
-  symbolInstrumentType: z.string().optional(),
-  // Optional asset kind for custom assets (e.g., "INVESTMENT", "OTHER")
-  assetKind: z.string().optional(),
-}).superRefine((row, ctx) => {
-  if ((row.quoteMode ?? QuoteMode.MARKET) === QuoteMode.MARKET && !row.symbolQuoteCcy?.trim()) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["ticker"],
-      message: "Please select the symbol from search so quote currency is populated.",
-    });
-  }
-});
+export const bulkHoldingRowSchema = z
+  .object({
+    id: z.string(),
+    ticker: z.string().min(1, { message: "Ticker is required" }),
+    name: z.string().optional(),
+    sharesOwned: z.coerce
+      .number({
+        required_error: "Shares owned is required.",
+        invalid_type_error: "Shares must be a number.",
+      })
+      .positive({ message: "Shares must be greater than 0" }),
+    averageCost: z.coerce
+      .number({
+        required_error: "Average cost is required.",
+        invalid_type_error: "Average cost must be a number.",
+      })
+      .positive({ message: "Average cost must be greater than 0" }),
+    totalValue: z.number().optional(),
+    assetId: z.string().optional(),
+    quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).optional(),
+    // Exchange MIC for canonical asset ID generation (e.g., "XNAS", "XTSE")
+    exchangeMic: z.string().optional(),
+    // Optional symbol-level quote currency hint from search/provider (e.g., "USD")
+    symbolQuoteCcy: z.string().optional(),
+    // Optional symbol-level instrument type hint from search/provider (e.g., "EQUITY")
+    symbolInstrumentType: z.string().optional(),
+    // Optional asset kind for custom assets (e.g., "INVESTMENT", "OTHER")
+    assetKind: z.string().optional(),
+  })
+  .superRefine((row, ctx) => {
+    if ((row.quoteMode ?? QuoteMode.MARKET) === QuoteMode.MARKET && !row.symbolQuoteCcy?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["ticker"],
+        message: "Please select the symbol from search so quote currency is populated.",
+      });
+    }
+  });
 
 export const bulkHoldingsFormSchema = baseActivitySchema.extend({
   holdings: z.array(bulkHoldingRowSchema).min(1, { message: "At least one holding is required" }),

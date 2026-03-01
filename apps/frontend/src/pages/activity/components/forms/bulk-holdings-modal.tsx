@@ -1,7 +1,6 @@
-import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { ActivityType, QuoteMode } from "@/lib/constants";
-import { Account, ActivityBulkMutationRequest, ActivityCreate } from "@/lib/types";
 import { useSettingsContext } from "@/lib/settings-provider";
+import { Account, ActivityBulkMutationRequest, ActivityCreate } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Button,
@@ -13,6 +12,7 @@ import {
   DialogTitle,
   Form,
 } from "@wealthfolio/ui";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useCallback, useEffect } from "react";
 import { FormProvider, useForm, type Resolver, type SubmitHandler } from "react-hook-form";
 import { z } from "zod";

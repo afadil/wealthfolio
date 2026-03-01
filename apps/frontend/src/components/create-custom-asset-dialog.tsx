@@ -1,8 +1,8 @@
-import { useCallback, useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { useSettingsContext } from "@/lib/settings-provider";
+import type { SymbolSearchResult } from "@/lib/types";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { CurrencyInput } from "@wealthfolio/ui";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +20,6 @@ import {
   FormMessage,
 } from "@wealthfolio/ui/components/ui/form";
 import { Input } from "@wealthfolio/ui/components/ui/input";
-import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -28,8 +27,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@wealthfolio/ui/components/ui/select";
-import { CurrencyInput } from "@wealthfolio/ui";
-import type { SymbolSearchResult } from "@/lib/types";
+import { useCallback, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 // Simplified asset types for the form (values are InstrumentType)
 const ASSET_TYPE_OPTIONS = [

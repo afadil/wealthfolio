@@ -1,6 +1,6 @@
 import { getHoldings, getSnapshots, searchActivities } from "@/adapters";
-import type { ActivityDetails } from "@/lib/types";
 import { HistoryChart } from "@/components/history-chart";
+import type { ActivityDetails } from "@/lib/types";
 import {
   Card,
   CardContent,
@@ -22,7 +22,30 @@ import { useMemo, useState } from "react";
 
 import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
 import { PrivacyToggle } from "@/components/privacy-toggle";
+import { useAccounts } from "@/hooks/use-accounts";
+import { useRecalculatePortfolioMutation } from "@/hooks/use-calculate-portfolio";
+import { useValuationHistory } from "@/hooks/use-valuation-history";
+import { canAddHoldings } from "@/lib/activity-restrictions";
+import { AccountType } from "@/lib/constants";
+import { QueryKeys } from "@/lib/query-keys";
+import { useSettingsContext } from "@/lib/settings-provider";
+import {
+  Account,
+  AccountValuation,
+  DateRange,
+  Holding,
+  SnapshotInfo,
+  TimePeriod,
+  TrackedItem,
+} from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { ActivityTableMobile } from "@/pages/activity/components/activity-table/activity-table-mobile";
 import { BulkHoldingsModal } from "@/pages/activity/components/forms/bulk-holdings-modal";
+import { PortfolioUpdateTrigger } from "@/pages/dashboard/portfolio-update-trigger";
+import { HoldingsEditMode } from "@/pages/holdings/components/holdings-edit-mode";
+import { useCalculatePerformanceHistory } from "@/pages/performance/hooks/use-performance-data";
+import { useQuery } from "@tanstack/react-query";
+import { Icons, type Icon } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Command,
@@ -42,34 +65,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@wealthfolio/ui/components/ui/sheet";
-import { useAccounts } from "@/hooks/use-accounts";
-import { useValuationHistory } from "@/hooks/use-valuation-history";
-import { AccountType } from "@/lib/constants";
-import { QueryKeys } from "@/lib/query-keys";
-import { useSettingsContext } from "@/lib/settings-provider";
-import {
-  Account,
-  AccountValuation,
-  DateRange,
-  Holding,
-  SnapshotInfo,
-  TimePeriod,
-  TrackedItem,
-} from "@/lib/types";
-import { canAddHoldings } from "@/lib/activity-restrictions";
-import { cn } from "@/lib/utils";
-import { PortfolioUpdateTrigger } from "@/pages/dashboard/portfolio-update-trigger";
-import { useRecalculatePortfolioMutation } from "@/hooks/use-calculate-portfolio";
-import { useCalculatePerformanceHistory } from "@/pages/performance/hooks/use-performance-data";
-import { useQuery } from "@tanstack/react-query";
-import { Icons, type Icon } from "@wealthfolio/ui";
 import { format, parseISO, subMonths } from "date-fns";
 import { useNavigate, useParams } from "react-router-dom";
 import { AccountContributionLimit } from "./account-contribution-limit";
 import AccountHoldings from "./account-holdings";
 import AccountMetrics from "./account-metrics";
-import { HoldingsEditMode } from "@/pages/holdings/components/holdings-edit-mode";
-import { ActivityTableMobile } from "@/pages/activity/components/activity-table/activity-table-mobile";
 
 interface HistoryChartData {
   date: string;
