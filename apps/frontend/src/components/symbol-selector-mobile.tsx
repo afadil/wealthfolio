@@ -137,7 +137,12 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
         longName: customName.trim(),
         shortName: customName.trim(),
         exchange: "MANUAL",
-        quoteType: customAssetType === "CRYPTO" ? "CRYPTOCURRENCY" : "EQUITY",
+        quoteType:
+          customAssetType === "CRYPTO"
+            ? "CRYPTOCURRENCY"
+            : customAssetType === "OTHER"
+              ? "OTHER"
+              : "EQUITY",
         index: "MANUAL",
         typeDisplay: "Custom Asset",
         dataSource: "MANUAL",
@@ -336,7 +341,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                               onClick={() => handleSymbolSelect(ticker)}
                               className="card-mobile hover:bg-accent active:bg-accent/80 focus:border-primary flex w-full items-center gap-3 border border-transparent text-left transition-colors focus:outline-none"
                             >
-                              <div className="bg-primary/10 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full">
+                              <div className="bg-primary/10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full">
                                 <Icons.TrendingUp className="text-primary h-5 w-5" />
                               </div>
                               <div className="min-w-0 flex-1">
@@ -354,7 +359,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                                   </div>
                                 )}
                               </div>
-                              <Icons.ChevronRight className="text-muted-foreground h-5 w-5 flex-shrink-0" />
+                              <Icons.ChevronRight className="text-muted-foreground h-5 w-5 shrink-0" />
                             </button>
                           ))}
                         </div>

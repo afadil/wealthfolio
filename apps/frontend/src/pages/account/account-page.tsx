@@ -22,6 +22,7 @@ import { useMemo, useState } from "react";
 
 import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
 import { PrivacyToggle } from "@/components/privacy-toggle";
+import { BulkHoldingsModal } from "@/pages/activity/components/forms/bulk-holdings-modal";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Command,
@@ -118,6 +119,7 @@ const AccountPage = () => {
   const [editingSnapshotDate, setEditingSnapshotDate] = useState<string | null>(null);
   const [selectedActivityDate, setSelectedActivityDate] = useState<string | null>(null);
   const [isActivitySheetOpen, setIsActivitySheetOpen] = useState(false);
+  const [showBulkHoldingsForm, setShowBulkHoldingsForm] = useState(false);
 
   const recalculatePortfolioMutation = useRecalculatePortfolioMutation();
   const { accounts, isLoading: isAccountsLoading } = useAccounts();
@@ -346,6 +348,15 @@ const AccountPage = () => {
                           label: "Record Transaction",
                           onClick: () => navigate(`/activities/manage?account=${id}`),
                         },
+                        ...(isHoldingsMode
+                          ? []
+                          : [
+                              {
+                                icon: Icons.Holdings,
+                                label: "Transfer Holdings",
+                                onClick: () => setShowBulkHoldingsForm(true),
+                              },
+                            ]),
                         {
                           icon: Icons.Import,
                           label: "Import CSV",
@@ -397,7 +408,7 @@ const AccountPage = () => {
                       <Icons.ChevronDown className="text-muted-foreground size-5" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[240px] p-0" align="start">
+                  <PopoverContent className="w-60 p-0" align="start">
                     <Command>
                       <CommandInput placeholder="Search accounts..." />
                       <CommandList>
@@ -475,7 +486,7 @@ const AccountPage = () => {
                                         : "border-transparent",
                                     )}
                                   >
-                                    <div className="bg-primary/10 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full">
+                                    <div className="bg-primary/10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full">
                                       <IconComponent className="text-primary h-5 w-5" />
                                     </div>
                                     <div className="min-w-0 flex-1">
@@ -487,7 +498,7 @@ const AccountPage = () => {
                                       </div>
                                     </div>
                                     {account?.id === acc.id && (
-                                      <Icons.Check className="text-primary h-5 w-5 flex-shrink-0" />
+                                      <Icons.Check className="text-primary h-5 w-5 shrink-0" />
                                     )}
                                   </button>
                                 );
@@ -569,7 +580,7 @@ const AccountPage = () => {
                 <CardContent className="p-0">
                   <div className="w-full p-0">
                     <div className="flex w-full flex-col">
-                      <div className="h-[480px] w-full">
+                      <div className="h-120 w-full">
                         <HistoryChart
                           data={chartData}
                           isLoading={false}
@@ -679,6 +690,16 @@ const AccountPage = () => {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Bulk Holdings Modal for Transfer Holdings */}
+      <BulkHoldingsModal
+        open={showBulkHoldingsForm}
+        onClose={() => setShowBulkHoldingsForm(false)}
+        defaultAccount={account}
+        onSuccess={() => {
+          setShowBulkHoldingsForm(false);
+        }}
+      />
     </Page>
   );
 };

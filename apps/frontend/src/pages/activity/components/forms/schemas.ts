@@ -80,6 +80,20 @@ export const bulkHoldingRowSchema = z.object({
   quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).optional(),
   // Exchange MIC for canonical asset ID generation (e.g., "XNAS", "XTSE")
   exchangeMic: z.string().optional(),
+  // Optional symbol-level quote currency hint from search/provider (e.g., "USD")
+  symbolQuoteCcy: z.string().optional(),
+  // Optional symbol-level instrument type hint from search/provider (e.g., "EQUITY")
+  symbolInstrumentType: z.string().optional(),
+  // Optional asset kind for custom assets (e.g., "INVESTMENT", "OTHER")
+  assetKind: z.string().optional(),
+}).superRefine((row, ctx) => {
+  if ((row.quoteMode ?? QuoteMode.MARKET) === QuoteMode.MARKET && !row.symbolQuoteCcy?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["ticker"],
+      message: "Please select the symbol from search so quote currency is populated.",
+    });
+  }
 });
 
 export const bulkHoldingsFormSchema = baseActivitySchema.extend({
