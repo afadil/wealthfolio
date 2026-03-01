@@ -119,6 +119,24 @@ fn should_treat_backfill_error_as_non_fatal(category: &SyncCategory, error: &Err
     )
 }
 
+fn error_message_contains_provider_id(message: &str) -> bool {
+    super::constants::MARKET_DATA_PROVIDER_IDS
+    .iter()
+    .any(|provider_id| message.contains(provider_id))
+}
+
+fn format_sync_failure_message(error: &Error, provider_id: Option<&str>) -> String {
+    let message = error.to_string();
+    if error_message_contains_provider_id(&message) {
+        return message;
+    }
+
+    match provider_id {
+        Some(provider_id) if !provider_id.is_empty() => format!("{}: {}", provider_id, message),
+        _ => message,
+    }
+}
+
 // Test helpers - expose lock functions for testing
 #[cfg(test)]
 fn try_acquire_sync_lock(asset_id: &str) -> bool {
@@ -717,7 +735,7 @@ where
         // Fetch quotes via MarketDataClient
         let client = self.client.read().await;
         match client
-            .fetch_historical_quotes(asset, start_dt, end_dt)
+            .fetch_historical_quotes_with_context(asset, start_dt, end_dt)
             .await
         {
             Ok(mut quotes) => {
@@ -818,11 +836,15 @@ where
                     }
                 }
             }
-            Err(e) => {
-                if should_treat_backfill_error_as_non_fatal(&plan.category, &e) {
+            Err(fetch_error) => {
+                let error = fetch_error.error;
+                let sync_failure_message =
+                    format_sync_failure_message(&error, fetch_error.provider_id.as_deref());
+
+                if should_treat_backfill_error_as_non_fatal(&plan.category, &error) {
                     info!(
                         "Backfill reached provider data boundary for {} ({}). Treating as complete.",
-                        asset.id, e
+                        asset.id, error
                     );
 
                     if let Err(state_err) = self.sync_state_store.update_after_sync(&asset.id).await
@@ -841,12 +863,12 @@ where
                     };
                 }
 
-                error!("Failed to fetch quotes for {}: {:?}", asset.id, e);
+                error!("Failed to fetch quotes for {}: {:?}", asset.id, error);
 
                 // Update sync state with failure
                 if let Err(state_err) = self
                     .sync_state_store
-                    .update_after_failure(&asset.id, &e.to_string())
+                    .update_after_failure(&asset.id, &sync_failure_message)
                     .await
                 {
                     warn!(
@@ -859,7 +881,7 @@ where
                     asset_id,
                     quotes_added: 0,
                     status: SyncStatus::Failed,
-                    error: Some(e.to_string()),
+                    error: Some(sync_failure_message),
                 }
             }
         }
@@ -1563,6 +1585,35 @@ mod tests {
             &SyncCategory::Active,
             &err
         ));
+    }
+
+    #[test]
+    fn test_format_sync_failure_message_adds_provider_when_missing() {
+        let err = Error::MarketData(MarketDataError::NoData);
+        let message = format_sync_failure_message(&err, Some("FINNHUB"));
+        assert_eq!(
+            message,
+            "FINNHUB: Market data operation failed: No data found"
+        );
+    }
+
+    #[test]
+    fn test_format_sync_failure_message_keeps_existing_provider() {
+        let err = Error::MarketData(MarketDataError::ProviderError(
+            "FINNHUB: Access forbidden".to_string(),
+        ));
+        let message = format_sync_failure_message(&err, Some("YAHOO"));
+        assert_eq!(
+            message,
+            "Market data operation failed: Provider error: FINNHUB: Access forbidden"
+        );
+    }
+
+    #[test]
+    fn test_format_sync_failure_message_without_provider_hint() {
+        let err = Error::MarketData(MarketDataError::NoData);
+        let message = format_sync_failure_message(&err, None);
+        assert_eq!(message, "Market data operation failed: No data found");
     }
 
     // =========================================================================
