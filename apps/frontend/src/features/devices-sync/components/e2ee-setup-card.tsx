@@ -71,7 +71,7 @@ export function E2EESetupCard() {
               <ul className="text-muted-foreground mt-1 space-y-0.5 text-xs">
                 {trustedDevicePreview.map((device) => (
                   <li key={device.id} className="truncate">
-                    {device.displayName}
+                    {device.name}
                   </li>
                 ))}
                 {state.trustedDevices.length > trustedDevicePreview.length && (
