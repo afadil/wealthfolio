@@ -508,11 +508,15 @@ impl SnapshotService {
                     );
                 }
                 SnapshotRecalcMode::SinceDate(since) => {
-                    // Use the snapshot just before `since` as the initial state,
+                    // Use the snapshot strictly before `since` as the initial state,
                     // then recalculate forward from `since`.
+                    // get_latest_snapshot_before_date is inclusive (<=), so subtract one day
+                    // to avoid seeding from a keyframe on `since` itself, which would
+                    // cause that day's activities to be applied twice.
+                    let day_before_since = since.pred_opt().unwrap_or(*since);
                     if let Some(latest_snapshot) = self
                         .snapshot_repository
-                        .get_latest_snapshot_before_date(acc_id, *since)?
+                        .get_latest_snapshot_before_date(acc_id, day_before_since)?
                     {
                         initial_snapshot_for_acc = Some(latest_snapshot);
                     }
