@@ -28,9 +28,6 @@
       "bundleVersion": "20260301.1",
       "signingIdentity": "Apple Distribution: Teymz Inc (DYDJ2RNL5H)",
       "entitlements": "./Entitlements.plist",
-      "files": {
-        "embedded.provisionprofile": "../../../../app-store/embedded.provisionprofile"
-      },
       "minimumSystemVersion": "10.13"
     }
   },
