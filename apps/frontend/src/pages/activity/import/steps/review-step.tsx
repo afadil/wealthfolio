@@ -646,7 +646,7 @@ export function ReviewStep() {
           .map(
             (draft) =>
               ({
-                accountId,
+                accountId: draft.accountId || accountId,
                 activityType: draft.activityType as ActivityImport["activityType"],
                 date: draft.activityDate || "",
                 symbol: draft.symbol || "",
@@ -683,7 +683,7 @@ export function ReviewStep() {
             if (!backendResult) {
               return {
                 ...draft,
-                accountId,
+                accountId: draft.accountId || accountId,
                 duplicateOfId: undefined,
                 duplicateOfLineNumber: undefined,
               };
@@ -714,7 +714,7 @@ export function ReviewStep() {
 
             return {
               ...draft,
-              accountId,
+              accountId: draft.accountId || accountId,
               errors: mergedErrors,
               warnings: mergedWarnings,
               duplicateOfId: backendResult.duplicateOfId,
