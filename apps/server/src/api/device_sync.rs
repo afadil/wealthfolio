@@ -11,17 +11,18 @@ use axum::{
     Json, Router,
 };
 use serde::Deserialize;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
+use crate::api::device_sync_engine;
 use crate::error::{ApiError, ApiResult};
 use crate::main_lib::AppState;
 use wealthfolio_device_sync::{
     ClaimPairingRequest, ClaimPairingResponse, CommitInitializeKeysRequest,
     CommitInitializeKeysResponse, CommitRotateKeysRequest, CommitRotateKeysResponse,
-    CompletePairingRequest, ConfirmPairingRequest, ConfirmPairingResponse, CreatePairingRequest,
-    CreatePairingResponse, Device, DeviceSyncClient, EnrollDeviceResponse, GetPairingResponse,
-    InitializeKeysResult, PairingMessagesResponse, RegisterDeviceRequest, ResetTeamSyncResponse,
-    RotateKeysResponse, SuccessResponse, SyncIdentity, UpdateDeviceRequest,
+    CompletePairingRequest, CompletePairingResponse, ConfirmPairingRequest, ConfirmPairingResponse,
+    CreatePairingRequest, CreatePairingResponse, Device, DeviceSyncClient, EnrollDeviceResponse,
+    GetPairingResponse, InitializeKeysResult, PairingMessagesResponse, RegisterDeviceRequest,
+    ResetTeamSyncResponse, RotateKeysResponse, SuccessResponse, SyncIdentity, UpdateDeviceRequest,
 };
 
 // Storage keys (without prefix - the SecretStore adds "wealthfolio_" prefix)
@@ -155,6 +156,7 @@ pub struct ClaimPairingBody {
 #[serde(rename_all = "camelCase")]
 pub struct ConfirmPairingBody {
     pub proof: String,
+    pub min_snapshot_created_at: Option<String>,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -472,7 +474,7 @@ async fn complete_pairing(
     State(state): State<Arc<AppState>>,
     Path(pairing_id): Path<String>,
     Json(body): Json<CompletePairingBody>,
-) -> ApiResult<Json<SuccessResponse>> {
+) -> ApiResult<Json<CompletePairingResponse>> {
     debug!("Completing pairing session: {}", pairing_id);
 
     let token = get_access_token(&state).await?;
@@ -492,6 +494,37 @@ async fn complete_pairing(
         )
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    // Generate a snapshot in the background so newly paired devices can bootstrap.
+    let snapshot_state = Arc::clone(&state);
+    tokio::spawn(async move {
+        match device_sync_engine::generate_snapshot_now(Arc::clone(&snapshot_state)).await {
+            Ok(upload) => {
+                if upload.status == "uploaded" {
+                    info!(
+                        "[DeviceSync] Post-pairing snapshot upload completed: snapshot_id={:?}",
+                        upload.snapshot_id
+                    );
+                } else {
+                    debug!(
+                        "[DeviceSync] Post-pairing snapshot upload skipped: status={} message={}",
+                        upload.status, upload.message
+                    );
+                }
+            }
+            Err(err) => {
+                warn!("[DeviceSync] Post-pairing snapshot upload failed: {}", err);
+            }
+        }
+    });
+
+    // Ensure the background sync engine is running (no-op if already active).
+    let engine_state = Arc::clone(&state);
+    tokio::spawn(async move {
+        if let Err(err) = device_sync_engine::ensure_background_engine_started(engine_state).await {
+            warn!("[DeviceSync] Post-pairing engine start failed: {}", err);
+        }
+    });
 
     Ok(Json(result))
 }
@@ -583,6 +616,30 @@ async fn confirm_pairing_endpoint(
         )
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    if let Some(min_created_at) = body.min_snapshot_created_at.as_deref() {
+        if let Ok(parsed_min) = chrono::DateTime::parse_from_rfc3339(min_created_at) {
+            let max_allowed = chrono::Utc::now() + chrono::Duration::minutes(10);
+            if parsed_min.with_timezone(&chrono::Utc) > max_allowed {
+                warn!(
+                    "[DeviceSync] Ignoring minSnapshotCreatedAt too far in the future: {}",
+                    min_created_at
+                );
+            } else if let Err(err) =
+                device_sync_engine::set_min_snapshot_created_at_in_store(&device_id, min_created_at)
+            {
+                warn!(
+                    "[DeviceSync] Failed to persist min snapshot freshness gate after confirm_pairing: {}",
+                    err
+                );
+            }
+        } else {
+            warn!(
+                "[DeviceSync] Ignoring invalid minSnapshotCreatedAt value: {}",
+                min_created_at
+            );
+        }
+    }
 
     Ok(Json(result))
 }

@@ -174,9 +174,24 @@ where
     let device_id = match identity.device_id.clone() {
         Some(value) => value,
         None => {
-            return ctx
-                .fail("config_error", "No device ID configured".to_string(), None)
-                .await;
+            ports
+                .mark_cycle_outcome(
+                    "not_ready".to_string(),
+                    cycle_started_at.elapsed().as_millis() as i64,
+                    None,
+                )
+                .await
+                .map_err(|e| e.to_string())?;
+            return Ok(SyncCycleResult {
+                status: "not_ready".to_string(),
+                lock_version: 0,
+                pushed_count: 0,
+                pulled_count: 0,
+                cursor: ctx.local_cursor,
+                needs_bootstrap: false,
+                bootstrap_snapshot_id: None,
+                bootstrap_snapshot_seq: None,
+            });
         }
     };
 
@@ -356,6 +371,9 @@ where
     let mut push_event_ids = Vec::new();
     let mut invalid_entity_id_event_ids = Vec::new();
     let mut max_retry_count = 0;
+    let current_key_version = identity.key_version.unwrap_or(1).max(1);
+    let mut stale_key_version_event_ids = Vec::new();
+    let mut future_key_version_event_ids = Vec::new();
 
     for event in pending {
         if !remote_entity_id_is_valid(&event.entity_id) {
@@ -376,6 +394,11 @@ where
         );
         push_event_ids.push(event.event_id.clone());
         let payload_key_version = event.payload_key_version.max(1);
+        if payload_key_version < current_key_version {
+            stale_key_version_event_ids.push(event.event_id.clone());
+        } else if payload_key_version > current_key_version {
+            future_key_version_event_ids.push(event.event_id.clone());
+        }
         let encrypted_payload =
             match ports.encrypt_sync_payload(&event.payload, &identity, payload_key_version) {
                 Ok(payload) => payload,
@@ -450,6 +473,43 @@ where
                 let err_str = err.to_string();
 
                 if err_str.contains("KEY_VERSION_MISMATCH") {
+                    if !stale_key_version_event_ids.is_empty()
+                        && future_key_version_event_ids.is_empty()
+                    {
+                        ports
+                            .mark_outbox_dead(
+                                stale_key_version_event_ids.clone(),
+                                Some(err_str.clone()),
+                                Some("key_version_mismatch".to_string()),
+                            )
+                            .await
+                            .map_err(|e| e.to_string())?;
+
+                        warn!(
+                            "[DeviceSync] Dropped {} stale outbox events after key version mismatch (current_key_version={})",
+                            stale_key_version_event_ids.len(),
+                            current_key_version,
+                        );
+                        ports
+                            .mark_cycle_outcome(
+                                "ok".to_string(),
+                                ctx.started_at.elapsed().as_millis() as i64,
+                                None,
+                            )
+                            .await
+                            .map_err(|e| e.to_string())?;
+                        return Ok(SyncCycleResult {
+                            status: "ok".to_string(),
+                            lock_version,
+                            pushed_count: 0,
+                            pulled_count: 0,
+                            cursor: local_cursor,
+                            needs_bootstrap: false,
+                            bootstrap_snapshot_id: None,
+                            bootstrap_snapshot_seq: None,
+                        });
+                    }
+
                     ports
                         .mark_outbox_dead(
                             push_event_ids,
@@ -458,6 +518,7 @@ where
                         )
                         .await
                         .map_err(|e| e.to_string())?;
+
                     return ctx
                         .fail(
                             "key_version_mismatch",
@@ -810,7 +871,7 @@ fn derive_bootstrap_action(bootstrap_status: &str, bootstrap_snapshot_id: Option
     }
 
     if bootstrap_status == "requested" {
-        return "NO_REMOTE_PULL".to_string();
+        return "WAIT_REMOTE_SNAPSHOT".to_string();
     }
 
     if bootstrap_snapshot_id
@@ -1046,6 +1107,10 @@ mod tests {
         identity: Option<SyncIdentity>,
         sync_state: Result<SyncState, String>,
         fail_mark_cycle_outcome: bool,
+        pending_outbox: Arc<Mutex<Vec<wealthfolio_core::sync::SyncOutboxEvent>>>,
+        dead_outbox_batches: Arc<Mutex<Vec<Vec<String>>>>,
+        push_error: Option<TransportError>,
+        reconcile_response: crate::ReconcileReadyStateResponse,
         persisted_trust_states: Arc<Mutex<Vec<String>>>,
         cycle_outcomes: Arc<Mutex<Vec<String>>>,
         engine_errors: Arc<Mutex<Vec<String>>>,
@@ -1058,6 +1123,14 @@ mod tests {
                 identity,
                 sync_state,
                 fail_mark_cycle_outcome: false,
+                pending_outbox: Arc::new(Mutex::new(Vec::new())),
+                dead_outbox_batches: Arc::new(Mutex::new(Vec::new())),
+                push_error: None,
+                reconcile_response: crate::ReconcileReadyStateResponse {
+                    action: "NOOP".to_string(),
+                    cursor: Some(0),
+                    latest_snapshot: None,
+                },
                 persisted_trust_states: Arc::new(Mutex::new(Vec::new())),
                 cycle_outcomes: Arc::new(Mutex::new(Vec::new())),
                 engine_errors: Arc::new(Mutex::new(Vec::new())),
@@ -1069,17 +1142,27 @@ mod tests {
     impl OutboxStore for TestPorts {
         async fn list_pending_outbox(
             &self,
-            _limit: i64,
+            limit: i64,
         ) -> Result<Vec<wealthfolio_core::sync::SyncOutboxEvent>, String> {
-            Ok(Vec::new())
+            let pending = self.pending_outbox.lock().await.clone();
+            let max = usize::try_from(limit.max(0)).unwrap_or(usize::MAX);
+            Ok(pending.into_iter().take(max).collect())
         }
 
         async fn mark_outbox_dead(
             &self,
-            _event_ids: Vec<String>,
+            event_ids: Vec<String>,
             _error_message: Option<String>,
             _error_code: Option<String>,
         ) -> Result<(), String> {
+            if !event_ids.is_empty() {
+                self.dead_outbox_batches
+                    .lock()
+                    .await
+                    .push(event_ids.clone());
+                let mut pending = self.pending_outbox.lock().await;
+                pending.retain(|event| !event_ids.iter().any(|id| id == &event.event_id));
+            }
             Ok(())
         }
 
@@ -1102,7 +1185,7 @@ mod tests {
         }
 
         async fn has_pending_outbox(&self) -> Result<bool, String> {
-            Ok(false)
+            Ok(!self.pending_outbox.lock().await.is_empty())
         }
     }
 
@@ -1191,7 +1274,14 @@ mod tests {
             _device_id: &str,
             _request: SyncPushRequest,
         ) -> Result<crate::SyncPushResponse, TransportError> {
-            unreachable!("not used by these tests")
+            if let Some(err) = &self.push_error {
+                return Err(err.clone());
+            }
+            Ok(crate::SyncPushResponse {
+                accepted: Vec::new(),
+                duplicate: Vec::new(),
+                server_cursor: self.cursor,
+            })
         }
 
         async fn pull_events(
@@ -1209,7 +1299,7 @@ mod tests {
             _token: &str,
             _device_id: &str,
         ) -> Result<crate::ReconcileReadyStateResponse, TransportError> {
-            unreachable!("not used by these tests")
+            Ok(self.reconcile_response.clone())
         }
     }
 
@@ -1236,11 +1326,11 @@ mod tests {
 
         fn encrypt_sync_payload(
             &self,
-            _plaintext_payload: &str,
+            plaintext_payload: &str,
             _identity: &SyncIdentity,
             _payload_key_version: i32,
         ) -> Result<String, String> {
-            unreachable!("not used by these tests")
+            Ok(plaintext_payload.to_string())
         }
 
         fn decrypt_sync_payload(
@@ -1267,6 +1357,24 @@ mod tests {
             ports.cycle_outcomes.lock().await.as_slice(),
             ["config_error"]
         );
+    }
+
+    #[tokio::test]
+    async fn run_sync_cycle_with_identity_missing_device_id_is_not_ready() {
+        let identity = SyncIdentity {
+            device_id: None,
+            root_key: None,
+            key_version: Some(0),
+        };
+        let ports = TestPorts::new(Some(identity), Ok(SyncState::Ready));
+
+        let result = run_sync_cycle(&ports)
+            .await
+            .expect("cycle should return a status");
+
+        assert_eq!(result.status, "not_ready");
+        assert!(ports.engine_errors.lock().await.is_empty());
+        assert_eq!(ports.cycle_outcomes.lock().await.as_slice(), ["not_ready"]);
     }
 
     #[tokio::test]
@@ -1305,6 +1413,114 @@ mod tests {
             .expect_err("cycle should fail when status persistence fails");
 
         assert!(error.contains("forced cycle_outcome failure"));
+    }
+
+    fn outbox_event(
+        event_id: &str,
+        entity_id: &str,
+        payload_key_version: i32,
+    ) -> wealthfolio_core::sync::SyncOutboxEvent {
+        wealthfolio_core::sync::SyncOutboxEvent {
+            event_id: event_id.to_string(),
+            entity: SyncEntity::Account,
+            entity_id: entity_id.to_string(),
+            op: SyncOperation::Update,
+            client_timestamp: "2026-03-02T00:00:00Z".to_string(),
+            payload: "{}".to_string(),
+            payload_key_version,
+            sent: false,
+            status: wealthfolio_core::sync::SyncOutboxStatus::Pending,
+            retry_count: 0,
+            next_retry_at: None,
+            last_error: None,
+            last_error_code: None,
+            created_at: "2026-03-02T00:00:00Z".to_string(),
+        }
+    }
+
+    #[tokio::test]
+    async fn run_sync_cycle_key_version_mismatch_drops_only_stale_outbox_events() {
+        let identity = SyncIdentity {
+            device_id: Some("019cb093-06a8-7534-8677-546317b17957".to_string()),
+            root_key: Some("root-key".to_string()),
+            key_version: Some(40),
+        };
+        let mut ports = TestPorts::new(Some(identity), Ok(SyncState::Ready));
+        ports.push_error = Some(TransportError {
+            message: "SYNC_KEY_VERSION_MISMATCH".to_string(),
+            retry_class: ApiRetryClass::Permanent,
+            error_code: Some("SYNC_KEY_VERSION_MISMATCH".to_string()),
+            details: None,
+        });
+        {
+            let mut pending = ports.pending_outbox.lock().await;
+            pending.push(outbox_event(
+                "evt-stale",
+                "019cb093-06a8-7534-8677-546317b17957",
+                38,
+            ));
+            pending.push(outbox_event(
+                "evt-current",
+                "019cb093-06a8-7534-8677-546317b17957",
+                40,
+            ));
+        }
+
+        let result = run_sync_cycle(&ports)
+            .await
+            .expect("cycle should self-heal stale key version mismatch");
+
+        assert_eq!(result.status, "ok");
+        let dead_batches = ports.dead_outbox_batches.lock().await.clone();
+        assert_eq!(dead_batches.len(), 1);
+        assert_eq!(dead_batches[0], vec!["evt-stale".to_string()]);
+        let remaining_ids = ports
+            .pending_outbox
+            .lock()
+            .await
+            .iter()
+            .map(|event| event.event_id.clone())
+            .collect::<Vec<_>>();
+        assert_eq!(remaining_ids, vec!["evt-current".to_string()]);
+        assert!(ports.engine_errors.lock().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn run_sync_cycle_key_version_mismatch_without_stale_events_fails() {
+        let identity = SyncIdentity {
+            device_id: Some("019cb093-06a8-7534-8677-546317b17957".to_string()),
+            root_key: Some("root-key".to_string()),
+            key_version: Some(40),
+        };
+        let mut ports = TestPorts::new(Some(identity), Ok(SyncState::Ready));
+        ports.push_error = Some(TransportError {
+            message: "SYNC_KEY_VERSION_MISMATCH".to_string(),
+            retry_class: ApiRetryClass::Permanent,
+            error_code: Some("SYNC_KEY_VERSION_MISMATCH".to_string()),
+            details: None,
+        });
+        {
+            let mut pending = ports.pending_outbox.lock().await;
+            pending.push(outbox_event(
+                "evt-current",
+                "019cb093-06a8-7534-8677-546317b17957",
+                40,
+            ));
+        }
+
+        let result = run_sync_cycle(&ports)
+            .await
+            .expect("cycle should return a key version mismatch status");
+
+        assert_eq!(result.status, "key_version_mismatch");
+        let dead_batches = ports.dead_outbox_batches.lock().await.clone();
+        assert_eq!(dead_batches.len(), 1);
+        assert_eq!(dead_batches[0], vec!["evt-current".to_string()]);
+        assert_eq!(ports.engine_errors.lock().await.len(), 1);
+        assert_eq!(
+            ports.cycle_outcomes.lock().await.last().map(String::as_str),
+            Some("key_version_mismatch")
+        );
     }
 
     #[derive(Clone)]

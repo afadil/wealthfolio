@@ -14,6 +14,7 @@ const adapterMocks = vi.hoisted(() => ({
   reinitializeDeviceSync: vi.fn(),
   getSyncEngineStatus: vi.fn(),
   deviceSyncBootstrapOverwriteCheck: vi.fn(),
+  deviceSyncGenerateSnapshotNow: vi.fn(),
   deviceSyncReconcileReadyState: vi.fn(),
   syncBootstrapSnapshotIfNeeded: vi.fn(),
   syncTriggerCycle: vi.fn(),
@@ -128,7 +129,7 @@ describe("syncService pairing remote seed status", () => {
 
     const result = await syncService.confirmPairingAsClaimer(session, keyBundle);
 
-    expect(adapterMocks.confirmPairing).toHaveBeenCalledWith("pair_2", "proof");
+    expect(adapterMocks.confirmPairing).toHaveBeenCalledWith("pair_2", "proof", undefined);
     expect(storageMocks.setE2EECredentials).toHaveBeenCalledTimes(1);
     expect(result.remoteSeedPresent).toBe(true);
   });

@@ -78,6 +78,8 @@ export function DeviceSyncSection() {
   const [isTogglingEngine, setIsTogglingEngine] = useState(false);
   const [isBackingUpBeforeBootstrap, setIsBackingUpBeforeBootstrap] = useState(false);
   const [isApplyingBootstrapOverwrite, setIsApplyingBootstrapOverwrite] = useState(false);
+  const [isRetryingBootstrap, setIsRetryingBootstrap] = useState(false);
+  const [isUploadingSnapshot, setIsUploadingSnapshot] = useState(false);
   const isBackgroundRunning = state.engineStatus?.backgroundRunning ?? false;
 
   const handlePairingComplete = useCallback(() => {
@@ -165,6 +167,56 @@ export function DeviceSyncSection() {
     }
     await handleApplyBootstrapOverwrite();
   }, [handleApplyBootstrapOverwrite, handleBackupBeforeBootstrap]);
+
+  const handleRetryBootstrap = useCallback(async () => {
+    setIsRetryingBootstrap(true);
+    try {
+      await actions.retryBootstrap();
+      toast.success("Sync retry started", {
+        description: "Checking for an updated snapshot and applying pending sync changes.",
+      });
+    } catch (err) {
+      toast.error("Could not retry sync", {
+        description: err instanceof Error ? err.message : "An unexpected error occurred",
+      });
+    } finally {
+      setIsRetryingBootstrap(false);
+    }
+  }, [actions]);
+
+  const handleUploadSnapshotNow = useCallback(async () => {
+    setIsUploadingSnapshot(true);
+    try {
+      const result = await actions.generateSnapshotNow();
+      if (result.status === "uploaded") {
+        toast.success("Snapshot uploaded", {
+          description: "Newly paired devices can now finish syncing from this snapshot.",
+        });
+        return;
+      }
+      if (result.status === "skipped") {
+        toast.message("Snapshot upload skipped", {
+          description: result.message,
+        });
+        return;
+      }
+      if (result.status === "cancelled") {
+        toast.message("Snapshot upload cancelled", {
+          description: result.message,
+        });
+        return;
+      }
+      toast.message("Snapshot upload result", {
+        description: result.message,
+      });
+    } catch (err) {
+      toast.error("Snapshot upload failed", {
+        description: err instanceof Error ? err.message : "An unexpected error occurred",
+      });
+    } finally {
+      setIsUploadingSnapshot(false);
+    }
+  }, [actions]);
 
   // Keep recovery dialog strictly in sync with RECOVERY state.
   useEffect(() => {
@@ -333,6 +385,11 @@ export function DeviceSyncSection() {
 
   // READY state - Show connected devices
   const isTrusted = state.device?.trustState === "trusted";
+  const isWaitingForRemoteSnapshot =
+    state.bootstrapAction === "WAIT_REMOTE_SNAPSHOT" ||
+    state.engineStatus?.lastCycleStatus === "wait_snapshot" ||
+    state.engineStatus?.lastCycleStatus === "stale_cursor" ||
+    !!state.engineStatus?.bootstrapRequired;
   const dialogTitle = isTrusted ? "Link New Device" : "Connect This Device";
   const dialogDescription = isTrusted
     ? "Scan or enter this code on your other device"
@@ -436,16 +493,69 @@ export function DeviceSyncSection() {
                 {state.bootstrapMessage}
               </div>
             )}
+            {isWaitingForRemoteSnapshot && (
+              <div className="bg-muted/60 text-muted-foreground mb-3 rounded-md px-3 py-3 text-xs">
+                <div className="flex items-start gap-2">
+                  <Icons.Cloud className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-foreground font-medium">
+                      {isTrusted
+                        ? "Your other device is still finishing setup."
+                        : "Your setup is almost done."}
+                    </p>
+                    <p className="mt-1 leading-relaxed">
+                      {isTrusted
+                        ? "You can speed things up now, or wait and we’ll continue automatically in the background."
+                        : "Please finish setup on your trusted device first. This page will update automatically."}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRetryBootstrap}
+                        disabled={isRetryingBootstrap || state.bootstrapStatus === "running"}
+                      >
+                        {isRetryingBootstrap ? (
+                          <>
+                            <Icons.Spinner className="mr-2 h-3.5 w-3.5 animate-spin" />
+                            Checking...
+                          </>
+                        ) : (
+                          <>
+                            <Icons.RefreshCw className="mr-2 h-3.5 w-3.5" />
+                            Check again
+                          </>
+                        )}
+                      </Button>
+                      {isTrusted && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleUploadSnapshotNow}
+                          disabled={isUploadingSnapshot}
+                        >
+                          {isUploadingSnapshot ? (
+                            <>
+                              <Icons.Spinner className="mr-2 h-3.5 w-3.5 animate-spin" />
+                              Preparing...
+                            </>
+                          ) : (
+                            <>
+                              <Icons.Upload className="mr-2 h-3.5 w-3.5" />
+                              Speed up setup
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             {state.bootstrapAction === "NO_REMOTE_PULL" && (
               <div className="bg-muted/60 text-muted-foreground mb-3 flex items-center gap-2 rounded-md px-3 py-2 text-xs">
                 <Icons.Info className="h-3.5 w-3.5" />
-                No data replacement is needed. This device can keep its current data.
-              </div>
-            )}
-            {state.remoteSeedPresent === false && (
-              <div className="bg-muted/60 text-muted-foreground mb-3 flex items-center gap-2 rounded-md px-3 py-2 text-xs">
-                <Icons.Info className="h-3.5 w-3.5" />
-                Sync setup is almost done. Finish pairing on a trusted device to complete key setup.
+                No remote data replacement is needed. This device can keep its current data.
               </div>
             )}
             {state.bootstrapOverwriteRisk && (

@@ -77,7 +77,7 @@ type SyncAction =
 
   // Pairing - Claimer
   | { type: "CLAIMER_SESSION_STARTED"; session: ClaimerSession }
-  | { type: "CLAIMER_KEY_RECEIVED"; keyBundle: KeyBundlePayload }
+  | { type: "CLAIMER_KEY_RECEIVED"; keyBundle: KeyBundlePayload; keyBundleCreatedAt?: string }
   | { type: "REMOTE_SEED_STATUS"; remoteSeedPresent: boolean | null }
 
   // Common
@@ -223,7 +223,11 @@ function syncReducer(state: SyncState, action: SyncAction): SyncState {
       return {
         ...state,
         claimerSession: state.claimerSession
-          ? { ...state.claimerSession, status: "approved" }
+          ? {
+              ...state.claimerSession,
+              status: "approved",
+              keyBundleCreatedAt: action.keyBundleCreatedAt,
+            }
           : null,
       };
 
@@ -262,6 +266,13 @@ interface SyncContextValue {
     // State management
     refreshState: () => Promise<void>;
     continueBootstrapWithOverwrite: () => Promise<void>;
+    retryBootstrap: () => Promise<void>;
+    generateSnapshotNow: () => Promise<{
+      status: string;
+      snapshotId: string | null;
+      oplogSeq: number | null;
+      message: string;
+    }>;
 
     // Enable sync (FRESH state)
     enableSync: () => Promise<EnableSyncResult>;
@@ -274,8 +285,15 @@ interface SyncContextValue {
 
     // Pairing - Claimer (new device)
     claimPairing: (code: string) => Promise<ClaimerSession>;
-    pollForKeyBundle: () => Promise<{ received: boolean; keyBundle?: KeyBundlePayload }>;
-    confirmPairingAsClaimer: (keyBundle: KeyBundlePayload) => Promise<void>;
+    pollForKeyBundle: () => Promise<{
+      received: boolean;
+      keyBundle?: KeyBundlePayload;
+      keyBundleCreatedAt?: string;
+    }>;
+    confirmPairingAsClaimer: (
+      keyBundle: KeyBundlePayload,
+      minSnapshotCreatedAt?: string,
+    ) => Promise<void>;
 
     // Pairing - Common
     cancelPairing: () => Promise<void>;
@@ -473,6 +491,46 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
     };
   }, [state.syncState, state.identity?.deviceId, state.device?.id, runReconcileReadyState]);
 
+  useEffect(() => {
+    if (state.syncState !== SyncStates.READY) {
+      return;
+    }
+    if (state.bootstrapOverwriteRisk) {
+      return;
+    }
+
+    const shouldRetry =
+      state.bootstrapAction === "WAIT_REMOTE_SNAPSHOT" ||
+      state.engineStatus?.lastCycleStatus === "wait_snapshot" ||
+      state.engineStatus?.lastCycleStatus === "stale_cursor" ||
+      !!state.engineStatus?.bootstrapRequired;
+
+    if (!shouldRetry || state.bootstrapStatus === "running") {
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void runReconcileReadyState({
+        bypassOverwriteGuard: false,
+        isCancelled: () => cancelled,
+      });
+    }, 30_000);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [
+    runReconcileReadyState,
+    state.bootstrapAction,
+    state.bootstrapOverwriteRisk,
+    state.bootstrapStatus,
+    state.engineStatus?.bootstrapRequired,
+    state.engineStatus?.lastCycleStatus,
+    state.syncState,
+  ]);
+
   // Actions
   const refreshState = useCallback(async () => {
     dispatch({ type: "DETECT_START" });
@@ -497,6 +555,20 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
   const continueBootstrapWithOverwrite = useCallback(async () => {
     await runReconcileReadyState({ bypassOverwriteGuard: true });
   }, [runReconcileReadyState]);
+
+  const retryBootstrap = useCallback(async () => {
+    await runReconcileReadyState({ bypassOverwriteGuard: false });
+  }, [runReconcileReadyState]);
+
+  const generateSnapshotNow = useCallback(async () => {
+    const result = await syncService.generateSnapshotNow();
+    if (result.status === "uploaded") {
+      await runReconcileReadyState({ bypassOverwriteGuard: false });
+    } else {
+      await refreshEngineStatus();
+    }
+    return result;
+  }, [refreshEngineStatus, runReconcileReadyState]);
 
   const enableSync = useCallback(async (): Promise<EnableSyncResult> => {
     dispatch({ type: "OPERATION_START" });
@@ -592,18 +664,30 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
     }
     const result = await syncService.pollForKeyBundle(session);
     if (result.received && result.keyBundle) {
-      dispatch({ type: "CLAIMER_KEY_RECEIVED", keyBundle: result.keyBundle });
+      dispatch({
+        type: "CLAIMER_KEY_RECEIVED",
+        keyBundle: result.keyBundle,
+        keyBundleCreatedAt: result.keyBundleCreatedAt,
+      });
     }
-    return { received: result.received, keyBundle: result.keyBundle };
+    return {
+      received: result.received,
+      keyBundle: result.keyBundle,
+      keyBundleCreatedAt: result.keyBundleCreatedAt,
+    };
   }, []); // No dependencies - uses ref for latest session
 
   const confirmPairingAsClaimer = useCallback(
-    async (keyBundle: KeyBundlePayload) => {
+    async (keyBundle: KeyBundlePayload, minSnapshotCreatedAt?: string) => {
       const session = claimerSessionRef.current;
       if (!session) {
         throw new SyncError(SyncErrorCodes.NO_SESSION, "No active claimer session");
       }
-      const result = await syncService.confirmPairingAsClaimer(session, keyBundle);
+      const result = await syncService.confirmPairingAsClaimer(
+        session,
+        keyBundle,
+        minSnapshotCreatedAt,
+      );
       dispatch({ type: "REMOTE_SEED_STATUS", remoteSeedPresent: result.remoteSeedPresent });
       dispatch({ type: "CLEAR_PAIRING_STATE" });
       // NOTE: Don't call refreshState() here - same issue as completePairing
@@ -704,6 +788,8 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
     actions: {
       refreshState,
       continueBootstrapWithOverwrite,
+      retryBootstrap,
+      generateSnapshotNow,
       enableSync,
       startPairing,
       pollForClaimerConnection,

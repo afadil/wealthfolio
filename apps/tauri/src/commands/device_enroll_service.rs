@@ -7,7 +7,8 @@ use std::sync::Arc;
 use tauri::State;
 
 use crate::commands::device_sync::{
-    ensure_background_engine_started, ensure_background_engine_stopped,
+    clear_min_snapshot_created_at_from_store, ensure_background_engine_started,
+    ensure_background_engine_stopped,
 };
 use crate::context::ServiceContext;
 
@@ -40,6 +41,7 @@ pub async fn enable_device_sync(
         .enable_sync()
         .await
         .map_err(|e| e.message)?;
+    clear_min_snapshot_created_at_from_store();
 
     if result.state == SyncState::Ready {
         let engine_context = Arc::clone(context.inner());
@@ -61,10 +63,14 @@ pub async fn enable_device_sync(
 #[tauri::command]
 pub async fn clear_device_sync_data(context: State<'_, Arc<ServiceContext>>) -> Result<(), String> {
     ensure_background_engine_stopped(Arc::clone(context.inner())).await?;
-    context
+    let result = context
         .device_enroll_service()
         .clear_sync_data()
-        .map_err(|e| e.message)
+        .map_err(|e| e.message);
+    if result.is_ok() {
+        clear_min_snapshot_created_at_from_store();
+    }
+    result
 }
 
 /// Reinitialize device sync - resets server data and enables sync in one operation.
@@ -79,6 +85,7 @@ pub async fn reinitialize_device_sync(
         .reinitialize_sync()
         .await
         .map_err(|e| e.message)?;
+    clear_min_snapshot_created_at_from_store();
 
     if result.state == SyncState::Ready {
         let engine_context = Arc::clone(context.inner());

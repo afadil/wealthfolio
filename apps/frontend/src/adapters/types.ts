@@ -241,7 +241,11 @@ export interface BackendSyncBootstrapOverwriteCheckResult {
 
 export interface BackendSyncReconcileReadyResult {
   action?: "PULL_TAIL" | "BOOTSTRAP_SNAPSHOT" | "WAIT_SNAPSHOT" | "NOOP";
-  bootstrapAction: "PULL_REMOTE_OVERWRITE" | "NO_REMOTE_PULL" | "NO_BOOTSTRAP";
+  bootstrapAction:
+    | "PULL_REMOTE_OVERWRITE"
+    | "NO_REMOTE_PULL"
+    | "WAIT_REMOTE_SNAPSHOT"
+    | "NO_BOOTSTRAP";
   reason?: string;
   reconcileReason?: string;
   cursor?: number;

@@ -1,5 +1,6 @@
+use std::collections::HashMap;
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, OnceLock};
 
 use async_trait::async_trait;
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
@@ -32,6 +33,7 @@ fn transport_err_from_sync(e: wealthfolio_device_sync::DeviceSyncError) -> Trans
 use wealthfolio_storage_sqlite::sync::{SqliteSyncEngineDbPorts, SyncTableRowCount};
 
 const SYNC_IDENTITY_KEY: &str = "sync_identity";
+static MIN_SNAPSHOT_CREATED_AT: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
 
 #[derive(Debug, Clone)]
 pub struct SyncEngineStatusResult {
@@ -138,6 +140,41 @@ fn get_sync_identity_from_store(state: &AppState) -> Option<SyncIdentity> {
         root_key: identity.root_key,
         key_version: identity.key_version,
     })
+}
+
+fn min_snapshot_created_at_state() -> &'static Mutex<HashMap<String, String>> {
+    MIN_SNAPSHOT_CREATED_AT.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+pub fn set_min_snapshot_created_at_in_store(device_id: &str, value: &str) -> Result<(), String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Ok(());
+    }
+    let mut guard = min_snapshot_created_at_state()
+        .lock()
+        .map_err(|_| "Failed to lock in-memory freshness gate".to_string())?;
+    guard.insert(device_id.to_string(), trimmed.to_string());
+    Ok(())
+}
+
+fn remove_min_snapshot_created_at_from_store(device_id: &str) {
+    if let Ok(mut guard) = min_snapshot_created_at_state().lock() {
+        guard.remove(device_id);
+    }
+}
+
+pub fn clear_min_snapshot_created_at_from_store() {
+    if let Ok(mut guard) = min_snapshot_created_at_state().lock() {
+        guard.clear();
+    }
+}
+
+fn get_min_snapshot_created_at_from_store(device_id: &str) -> Option<String> {
+    min_snapshot_created_at_state()
+        .lock()
+        .ok()
+        .and_then(|map| map.get(device_id).cloned())
 }
 
 async fn persist_device_config_from_identity(
@@ -609,6 +646,49 @@ fn snapshot_upload_cancelled_result(message: &str) -> SyncSnapshotUploadResult {
     }
 }
 
+enum MissingSnapshotDisposition {
+    CompleteNoBootstrap { message: String },
+    WaitForSnapshot { message: String },
+}
+
+async fn classify_missing_snapshot_disposition(
+    client: &DeviceSyncClient,
+    token: &str,
+    device_id: &str,
+) -> MissingSnapshotDisposition {
+    match client.get_reconcile_ready_state(token, device_id).await {
+        Ok(reconcile) => match reconcile.action.as_str() {
+            "NOOP" | "PULL_TAIL" => MissingSnapshotDisposition::CompleteNoBootstrap {
+                message: "No remote snapshot is required for this device".to_string(),
+            },
+            "WAIT_SNAPSHOT" | "BOOTSTRAP_SNAPSHOT" => MissingSnapshotDisposition::WaitForSnapshot {
+                message: "Waiting for a trusted device to upload a snapshot".to_string(),
+            },
+            other => {
+                tracing::debug!(
+                    "[DeviceSync] Snapshot missing with reconcile action='{}'; waiting for remote snapshot",
+                    other
+                );
+                MissingSnapshotDisposition::WaitForSnapshot {
+                    message:
+                        "Snapshot is not available yet. Waiting for upload from a trusted device."
+                            .to_string(),
+                }
+            }
+        },
+        Err(err) => {
+            tracing::debug!(
+                "[DeviceSync] Failed to inspect reconcile action while snapshot missing: {}",
+                err
+            );
+            MissingSnapshotDisposition::WaitForSnapshot {
+                message: "Snapshot is not available yet. Waiting for upload from a trusted device."
+                    .to_string(),
+            }
+        }
+    }
+}
+
 pub async fn sync_bootstrap_snapshot_if_needed(
     state: Arc<AppState>,
 ) -> Result<SyncBootstrapResult, String> {
@@ -622,6 +702,19 @@ pub async fn sync_bootstrap_snapshot_if_needed(
     let token = crate::api::connect::mint_access_token(&state)
         .await
         .map_err(|e| e.to_string())?;
+    let min_snapshot_created_at =
+        get_min_snapshot_created_at_from_store(&device_id).and_then(|value| {
+            if chrono::DateTime::parse_from_rfc3339(&value).is_ok() {
+                Some(value)
+            } else {
+                tracing::warn!(
+                    "[DeviceSync] Dropping invalid min snapshot freshness gate: {}",
+                    value
+                );
+                remove_min_snapshot_created_at_from_store(&device_id);
+                None
+            }
+        });
 
     let sync_state = state
         .device_enroll_service
@@ -643,12 +736,27 @@ pub async fn sync_bootstrap_snapshot_if_needed(
         .needs_bootstrap(&device_id)
         .map_err(|e| e.to_string())?
     {
+        clear_min_snapshot_created_at_from_store();
         return Ok(SyncBootstrapResult {
             status: "skipped".to_string(),
             message: "Snapshot bootstrap already completed".to_string(),
             snapshot_id: None,
             cursor: Some(sync_repo.get_cursor().map_err(|e| e.to_string())?),
         });
+    }
+
+    let reconcile = create_client()
+        .get_reconcile_ready_state(&token, &device_id)
+        .await;
+    if let Ok(reconcile) = reconcile {
+        if reconcile.action == "WAIT_SNAPSHOT" {
+            return Ok(SyncBootstrapResult {
+                status: "requested".to_string(),
+                message: "Waiting for a trusted device to upload a fresh snapshot".to_string(),
+                snapshot_id: None,
+                cursor: Some(sync_repo.get_cursor().map_err(|e| e.to_string())?),
+            });
+        }
     }
 
     let latest = match create_client()
@@ -658,16 +766,30 @@ pub async fn sync_bootstrap_snapshot_if_needed(
         Ok(value) => value,
         Err(err) => {
             if err.status_code() == Some(404) {
-                sync_repo
-                    .mark_bootstrap_complete(device_id, identity.key_version)
-                    .await
-                    .map_err(|e| e.to_string())?;
-                return Ok(SyncBootstrapResult {
-                    status: "skipped".to_string(),
-                    message: "First device — no snapshot needed".to_string(),
-                    snapshot_id: None,
-                    cursor: Some(sync_repo.get_cursor().map_err(|e| e.to_string())?),
-                });
+                let client = create_client();
+                match classify_missing_snapshot_disposition(&client, &token, &device_id).await {
+                    MissingSnapshotDisposition::CompleteNoBootstrap { message } => {
+                        sync_repo
+                            .mark_bootstrap_complete(device_id, identity.key_version)
+                            .await
+                            .map_err(|e| e.to_string())?;
+                        clear_min_snapshot_created_at_from_store();
+                        return Ok(SyncBootstrapResult {
+                            status: "skipped".to_string(),
+                            message,
+                            snapshot_id: None,
+                            cursor: Some(sync_repo.get_cursor().map_err(|e| e.to_string())?),
+                        });
+                    }
+                    MissingSnapshotDisposition::WaitForSnapshot { message } => {
+                        return Ok(SyncBootstrapResult {
+                            status: "requested".to_string(),
+                            message,
+                            snapshot_id: None,
+                            cursor: Some(sync_repo.get_cursor().map_err(|e| e.to_string())?),
+                        });
+                    }
+                }
             }
             return Err(err.to_string());
         }
@@ -676,16 +798,30 @@ pub async fn sync_bootstrap_snapshot_if_needed(
     let latest = match latest {
         Some(value) => value,
         None => {
-            sync_repo
-                .mark_bootstrap_complete(device_id, identity.key_version)
-                .await
-                .map_err(|e| e.to_string())?;
-            return Ok(SyncBootstrapResult {
-                status: "skipped".to_string(),
-                message: "First device — no snapshot needed".to_string(),
-                snapshot_id: None,
-                cursor: Some(sync_repo.get_cursor().map_err(|e| e.to_string())?),
-            });
+            let client = create_client();
+            match classify_missing_snapshot_disposition(&client, &token, &device_id).await {
+                MissingSnapshotDisposition::CompleteNoBootstrap { message } => {
+                    sync_repo
+                        .mark_bootstrap_complete(device_id, identity.key_version)
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    clear_min_snapshot_created_at_from_store();
+                    return Ok(SyncBootstrapResult {
+                        status: "skipped".to_string(),
+                        message,
+                        snapshot_id: None,
+                        cursor: Some(sync_repo.get_cursor().map_err(|e| e.to_string())?),
+                    });
+                }
+                MissingSnapshotDisposition::WaitForSnapshot { message } => {
+                    return Ok(SyncBootstrapResult {
+                        status: "requested".to_string(),
+                        message,
+                        snapshot_id: None,
+                        cursor: Some(sync_repo.get_cursor().map_err(|e| e.to_string())?),
+                    });
+                }
+            }
         }
     };
 
@@ -706,6 +842,20 @@ pub async fn sync_bootstrap_snapshot_if_needed(
     }
 
     let snapshot_oplog_seq = latest.oplog_seq;
+    if let Some(min_created_at) = min_snapshot_created_at.as_deref() {
+        let latest_created_at = chrono::DateTime::parse_from_rfc3339(&latest.created_at)
+            .map_err(|e| format!("Invalid snapshot created_at in metadata: {}", e))?;
+        let min_created_at = chrono::DateTime::parse_from_rfc3339(min_created_at)
+            .map_err(|e| format!("Invalid min snapshot freshness gate: {}", e))?;
+        if latest_created_at <= min_created_at {
+            return Ok(SyncBootstrapResult {
+                status: "requested".to_string(),
+                message: "Waiting for a snapshot generated after pairing confirmation".to_string(),
+                snapshot_id: None,
+                cursor: Some(sync_repo.get_cursor().map_err(|e| e.to_string())?),
+            });
+        }
+    }
     let latest_checksum = if latest.checksum.trim().is_empty() {
         None
     } else {
@@ -784,6 +934,9 @@ pub async fn sync_bootstrap_snapshot_if_needed(
         message: "Snapshot bootstrap completed".to_string(),
         snapshot_id: Some(snapshot_id),
         cursor: Some(snapshot_oplog_seq),
+    })
+    .inspect(|_| {
+        clear_min_snapshot_created_at_from_store();
     })
 }
 
@@ -872,7 +1025,7 @@ pub async fn generate_snapshot_now(
         base_seq,
     };
 
-    let response = create_client()
+    let upload_result = create_client()
         .upload_snapshot_with_cancel_flag(
             &token,
             &device_id,
@@ -880,8 +1033,19 @@ pub async fn generate_snapshot_now(
             payload,
             Some(&state.device_sync_runtime.snapshot_upload_cancelled),
         )
-        .await
-        .map_err(|e| e.to_string())?;
+        .await;
+    let response = match upload_result {
+        Ok(value) => value,
+        Err(err) => {
+            let message = err.to_string();
+            if message.to_ascii_lowercase().contains("cancelled") {
+                return Ok(snapshot_upload_cancelled_result(
+                    "Snapshot upload cancelled during transfer",
+                ));
+            }
+            return Err(message);
+        }
+    };
 
     Ok(SyncSnapshotUploadResult {
         status: "uploaded".to_string(),

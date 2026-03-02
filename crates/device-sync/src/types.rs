@@ -401,6 +401,17 @@ pub struct CompletePairingRequest {
     pub signature: String,
 }
 
+/// Response from completing pairing (issuer side).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompletePairingResponse {
+    /// Operation succeeded
+    pub success: bool,
+    /// Whether a remote seed/snapshot already exists for the team
+    #[serde(default, alias = "remote_seed_present")]
+    pub remote_seed_present: Option<bool>,
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Claimer-Side Pairing Types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -481,6 +492,9 @@ pub struct ConfirmPairingResponse {
     /// E2EE key version the device is now trusted at
     #[serde(alias = "key_version")]
     pub key_version: i32,
+    /// Whether a remote seed/snapshot already exists for the team
+    #[serde(default, alias = "remote_seed_present")]
+    pub remote_seed_present: Option<bool>,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

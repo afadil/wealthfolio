@@ -998,9 +998,13 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     }
     case "confirm_pairing": {
-      const { pairingId, proof } = payload as { pairingId: string; proof?: string };
+      const { pairingId, proof, minSnapshotCreatedAt } = payload as {
+        pairingId: string;
+        proof?: string;
+        minSnapshotCreatedAt?: string;
+      };
       url += `/${encodeURIComponent(pairingId)}/confirm`;
-      body = JSON.stringify({ proof });
+      body = JSON.stringify({ proof, minSnapshotCreatedAt });
       break;
     }
     // Wealthfolio Connect commands

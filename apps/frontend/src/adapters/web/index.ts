@@ -210,6 +210,8 @@ export {
   createPairing,
   deleteDevice,
   deviceSyncBootstrapOverwriteCheck,
+  deviceSyncCancelSnapshotUpload,
+  deviceSyncGenerateSnapshotNow,
   deviceSyncReconcileReadyState,
   deviceSyncStartBackgroundEngine,
   deviceSyncStopBackgroundEngine,
