@@ -1,4 +1,4 @@
-import { logger, createActivity, deleteActivity, saveActivities, updateActivity } from "@/adapters";
+import { createActivity, deleteActivity, logger, saveActivities, updateActivity } from "@/adapters";
 import { generateId } from "@/lib/id";
 import {
   ActivityBulkMutationRequest,
@@ -45,7 +45,7 @@ export function useActivityMutations(
     const normalizedAssetId = normalizeOptionalString(assetId);
     const normalizedSymbolId = normalizeOptionalString(symbolId);
     const symbol = {
-      id: includeId ? normalizedSymbolId ?? normalizedAssetId : undefined,
+      id: includeId ? (normalizedSymbolId ?? normalizedAssetId) : undefined,
       symbol: normalizedAssetId,
       exchangeMic: normalizeOptionalString(exchangeMic),
       kind: normalizeOptionalString(assetKind) ?? normalizeOptionalString(assetMetadata?.kind),

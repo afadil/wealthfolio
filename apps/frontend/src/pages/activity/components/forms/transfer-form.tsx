@@ -1,26 +1,26 @@
-import { useMemo } from "react";
+import { useSettings } from "@/hooks/use-settings";
+import { ActivityType, QuoteMode } from "@/lib/constants";
 import { formatAmount } from "@/lib/utils";
-import { useForm, FormProvider, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { AnimatedToggleGroup } from "@wealthfolio/ui/components/ui/animated-toggle-group";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { AnimatedToggleGroup } from "@wealthfolio/ui/components/ui/animated-toggle-group";
 import { Checkbox } from "@wealthfolio/ui/components/ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "@wealthfolio/ui/components/ui/radio-group";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Label } from "@wealthfolio/ui/components/ui/label";
-import { ActivityType, QuoteMode } from "@/lib/constants";
-import { useSettings } from "@/hooks/use-settings";
+import { RadioGroup, RadioGroupItem } from "@wealthfolio/ui/components/ui/radio-group";
+import { useMemo } from "react";
+import { FormProvider, useForm, type Resolver } from "react-hook-form";
+import { z } from "zod";
 import {
   AccountSelect,
-  SymbolSearch,
-  DatePicker,
-  AmountInput,
-  QuantityInput,
-  NotesInput,
   AdvancedOptionsSection,
+  AmountInput,
   createValidatedSubmit,
+  DatePicker,
+  NotesInput,
+  QuantityInput,
+  SymbolSearch,
   type AccountSelectOption,
 } from "./fields";
 

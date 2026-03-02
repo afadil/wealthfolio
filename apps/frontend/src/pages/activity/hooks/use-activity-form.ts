@@ -1,8 +1,8 @@
-import { useCallback, useMemo } from "react";
 import { logger } from "@/adapters";
 import { ActivityType } from "@/lib/constants";
 import { generateId } from "@/lib/id";
 import type { ActivityCreate, ActivityDetails } from "@/lib/types";
+import { useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import type { AccountSelectOption } from "../components/forms/fields";
 import type { NewActivityFormValues } from "../components/forms/schemas";
@@ -158,7 +158,7 @@ export function useActivityForm({
               id: activity.id,
               existingAssetId: activity.assetId,
               ...submitData,
-            });
+            } as NewActivityFormValues & { id: string; existingAssetId?: string });
           } else {
             await addActivityMutation.mutateAsync(submitData);
           }
@@ -186,7 +186,7 @@ export function useActivityForm({
             id: activity.id,
             existingAssetId: activity.assetId,
             ...submitData,
-          });
+          } as NewActivityFormValues & { id: string; existingAssetId?: string });
         } else {
           await addActivityMutation.mutateAsync(submitData);
         }
