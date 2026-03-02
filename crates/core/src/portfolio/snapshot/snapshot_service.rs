@@ -1179,11 +1179,11 @@ impl SnapshotService {
     // --- New method to calculate and store TOTAL portfolio snapshots ---
     async fn calculate_total_portfolio_snapshots_impl(
         &self,
-        force_full_calculation: bool,
+        mode: &SnapshotRecalcMode,
     ) -> Result<usize> {
         debug!(
-            "Starting calculation of TOTAL portfolio snapshots (force={})",
-            force_full_calculation
+            "Starting calculation of TOTAL portfolio snapshots (mode={:?})",
+            mode
         );
 
         // Use non-archived accounts for TOTAL calculation (includes closed but not archived accounts)
@@ -1236,43 +1236,51 @@ impl SnapshotService {
             return Ok(0);
         }
 
-        // --- Incremental calculation logic (skip if already up-to-date) ---
+        // --- Determine which dates to calculate ---
         let calculation_start_date: Option<NaiveDate>;
 
-        if force_full_calculation {
-            debug!("Force full calculation: will regenerate all TOTAL snapshots.");
-            calculation_start_date = None; // Calculate all dates
-        } else {
-            // Check if TOTAL is already up-to-date
-            let today = valuation_date_today();
-            let tomorrow = today.succ_opt().unwrap_or(today);
-            let latest_total_snapshot = self
-                .snapshot_repository
-                .get_latest_snapshot_before_date(PORTFOLIO_TOTAL_ACCOUNT_ID, tomorrow)?;
+        match mode {
+            SnapshotRecalcMode::Full => {
+                debug!("Force full calculation: will regenerate all TOTAL snapshots.");
+                calculation_start_date = None;
+            }
+            SnapshotRecalcMode::SinceDate(since) => {
+                // Rebuild TOTAL from `since` forward so backdated edits are reflected.
+                debug!("SinceDate TOTAL calculation from {}", since);
+                calculation_start_date = Some(*since);
+            }
+            SnapshotRecalcMode::IncrementalFromLast => {
+                // Check if TOTAL is already up-to-date
+                let today = valuation_date_today();
+                let tomorrow = today.succ_opt().unwrap_or(today);
+                let latest_total_snapshot = self
+                    .snapshot_repository
+                    .get_latest_snapshot_before_date(PORTFOLIO_TOTAL_ACCOUNT_ID, tomorrow)?;
 
-            if let Some(ref total_snapshot) = latest_total_snapshot {
-                if let Some(max_date) = max_individual_keyframe_date {
-                    if total_snapshot.snapshot_date >= max_date {
+                if let Some(ref total_snapshot) = latest_total_snapshot {
+                    if let Some(max_date) = max_individual_keyframe_date {
+                        if total_snapshot.snapshot_date >= max_date {
+                            debug!(
+                                "TOTAL snapshots already up-to-date (latest TOTAL: {}, max individual: {}). Skipping recalculation.",
+                                total_snapshot.snapshot_date, max_date
+                            );
+                            return Ok(0);
+                        }
+                        // Only calculate from the day after the latest TOTAL snapshot
+                        calculation_start_date = total_snapshot.snapshot_date.succ_opt();
                         debug!(
-                            "TOTAL snapshots already up-to-date (latest TOTAL: {}, max individual: {}). Skipping recalculation.",
-                            total_snapshot.snapshot_date, max_date
+                            "Incremental TOTAL calculation from {} (latest TOTAL: {}, max individual: {})",
+                            calculation_start_date.unwrap_or(total_snapshot.snapshot_date),
+                            total_snapshot.snapshot_date,
+                            max_date
                         );
-                        return Ok(0);
+                    } else {
+                        calculation_start_date = None;
                     }
-                    // Only calculate from the day after the latest TOTAL snapshot
-                    calculation_start_date = total_snapshot.snapshot_date.succ_opt();
-                    debug!(
-                        "Incremental TOTAL calculation from {} (latest TOTAL: {}, max individual: {})",
-                        calculation_start_date.unwrap_or(total_snapshot.snapshot_date),
-                        total_snapshot.snapshot_date,
-                        max_date
-                    );
                 } else {
+                    debug!("No existing TOTAL snapshots. Will calculate all dates.");
                     calculation_start_date = None;
                 }
-            } else {
-                debug!("No existing TOTAL snapshots. Will calculate all dates.");
-                calculation_start_date = None;
             }
         }
 
@@ -1360,20 +1368,44 @@ impl SnapshotService {
                 total_portfolio_snapshots_to_save.len()
             );
 
-            if force_full_calculation || calculation_start_date.is_none() {
-                // Full recalculation: overwrite all
-                self.snapshot_repository
-                    .overwrite_all_snapshots_for_account(
-                        PORTFOLIO_TOTAL_ACCOUNT_ID,
-                        &total_portfolio_snapshots_to_save,
-                    )
-                    .await?;
-            } else {
-                // Incremental: append new snapshots (save_or_update each)
-                for snapshot in &total_portfolio_snapshots_to_save {
+            match mode {
+                SnapshotRecalcMode::Full => {
                     self.snapshot_repository
-                        .save_or_update_snapshot(snapshot)
+                        .overwrite_all_snapshots_for_account(
+                            PORTFOLIO_TOTAL_ACCOUNT_ID,
+                            &total_portfolio_snapshots_to_save,
+                        )
                         .await?;
+                }
+                SnapshotRecalcMode::SinceDate(since) => {
+                    // Overwrite TOTAL snapshots from `since` forward, preserving earlier history.
+                    let end_date = valuation_date_today();
+                    self.snapshot_repository
+                        .overwrite_snapshots_for_account_in_range(
+                            PORTFOLIO_TOTAL_ACCOUNT_ID,
+                            *since,
+                            end_date,
+                            &total_portfolio_snapshots_to_save,
+                        )
+                        .await?;
+                }
+                SnapshotRecalcMode::IncrementalFromLast => {
+                    if calculation_start_date.is_none() {
+                        // No prior TOTAL snapshots — first-time build, overwrite all.
+                        self.snapshot_repository
+                            .overwrite_all_snapshots_for_account(
+                                PORTFOLIO_TOTAL_ACCOUNT_ID,
+                                &total_portfolio_snapshots_to_save,
+                            )
+                            .await?;
+                    } else {
+                        // Append only the newly calculated dates.
+                        for snapshot in &total_portfolio_snapshots_to_save {
+                            self.snapshot_repository
+                                .save_or_update_snapshot(snapshot)
+                                .await?;
+                        }
+                    }
                 }
             }
 
@@ -1383,7 +1415,7 @@ impl SnapshotService {
 
             Ok(total_portfolio_snapshots_to_save.len())
         } else {
-            if force_full_calculation {
+            if matches!(mode, SnapshotRecalcMode::Full) {
                 warn!("No TOTAL portfolio snapshots were generated to save. Deleting existing TOTAL snapshots.");
                 self.snapshot_repository
                     .overwrite_all_snapshots_for_account(PORTFOLIO_TOTAL_ACCOUNT_ID, &[])
@@ -1578,9 +1610,7 @@ impl SnapshotServiceTrait for SnapshotService {
         &self,
         mode: SnapshotRecalcMode,
     ) -> Result<usize> {
-        let force_full = matches!(mode, SnapshotRecalcMode::Full);
-        self.calculate_total_portfolio_snapshots_impl(force_full)
-            .await
+        self.calculate_total_portfolio_snapshots_impl(&mode).await
     }
 
     async fn save_manual_snapshot(
