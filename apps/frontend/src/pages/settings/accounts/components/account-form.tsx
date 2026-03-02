@@ -379,9 +379,9 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                 </AlertDialogTitle>
               </div>
               <AlertDialogDescription>
-                  Your account value and performance history will be rebuilt entirely from
-                  transactions. Holdings snapshots will no longer be used.
-                </AlertDialogDescription>
+                Your account value and performance history will be rebuilt entirely from
+                transactions. Holdings snapshots will no longer be used.
+              </AlertDialogDescription>
             </AlertDialogHeader>
 
             {/* Checklist */}
