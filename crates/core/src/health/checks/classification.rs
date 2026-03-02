@@ -12,6 +12,7 @@ use crate::health::model::{
 };
 use crate::health::traits::{HealthCheck, HealthContext};
 use crate::taxonomies::TaxonomyServiceTrait;
+use log::{debug, error};
 
 /// Data about an unclassified asset.
 #[derive(Debug, Clone)]
@@ -65,7 +66,7 @@ pub fn gather_legacy_migration_status(
     // Get all assets
     let assets = match asset_service.get_assets() {
         Ok(assets) => {
-            info!(
+            debug!(
                 "gather_legacy_migration_status: loaded {} assets",
                 assets.len()
             );
