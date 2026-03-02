@@ -82,6 +82,13 @@ pub struct YahooProvider {
     connector: yahoo::YahooConnector,
 }
 
+/// A single dividend event returned by Yahoo Finance.
+#[derive(Debug, serde::Serialize)]
+pub struct YahooDividend {
+    pub amount: f64,
+    pub date: i64, // unix seconds
+}
+
 impl YahooProvider {
     /// Create a new Yahoo Finance provider.
     pub async fn new() -> Result<Self, MarketDataError> {
@@ -219,6 +226,146 @@ impl YahooProvider {
     fn clear_crumb(&self) {
         let mut guard = YAHOO_CRUMB.write().unwrap();
         *guard = None;
+    }
+
+    // ========================================================================
+    // Dividend Fetching
+    // ========================================================================
+
+    /// Fetch dividend events for a symbol over the past two years.
+    pub async fn fetch_dividends(
+        &self,
+        symbol: &str,
+    ) -> Result<Vec<YahooDividend>, MarketDataError> {
+        use std::collections::HashMap;
+
+        let crumb_data = self.ensure_crumb().await?;
+
+        let now = chrono::Utc::now().timestamp();
+        let two_years_ago = now - 2 * 365 * 24 * 60 * 60;
+        let encoded = urlencoding::encode(symbol);
+        let url = format!(
+            "https://query1.finance.yahoo.com/v8/finance/chart/{}?interval=1d&period1={}&period2={}&events=div&crumb={}",
+            encoded,
+            two_years_ago,
+            now,
+            urlencoding::encode(&crumb_data.crumb)
+        );
+
+        let client = reqwest::Client::new();
+        let resp = client
+            .get(&url)
+            .header(header::ACCEPT, "application/json")
+            .header(
+                header::USER_AGENT,
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            )
+            .header(header::COOKIE, &crumb_data.cookie)
+            .send()
+            .await
+            .map_err(|e| MarketDataError::ProviderError {
+                provider: "YAHOO".to_string(),
+                message: format!("Failed to fetch dividends: {}", e),
+            })?;
+
+        let status = resp.status();
+        if status == reqwest::StatusCode::UNAUTHORIZED {
+            self.clear_crumb();
+        }
+        if !status.is_success() {
+            return Err(MarketDataError::ProviderError {
+                provider: "YAHOO".to_string(),
+                message: format!("Yahoo returned {}", status),
+            });
+        }
+
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| MarketDataError::ProviderError {
+                provider: "YAHOO".to_string(),
+                message: format!("Failed to read dividends response: {}", e),
+            })?;
+
+        #[derive(serde::Deserialize)]
+        struct DivItem {
+            amount: f64,
+            date: i64,
+        }
+        #[derive(serde::Deserialize)]
+        struct Events {
+            dividends: Option<HashMap<String, DivItem>>,
+        }
+        #[derive(serde::Deserialize)]
+        struct ChartResult {
+            events: Option<Events>,
+        }
+        #[derive(serde::Deserialize)]
+        struct ChartError {
+            code: String,
+            description: Option<String>,
+        }
+        #[derive(serde::Deserialize)]
+        struct Chart {
+            result: Option<Vec<ChartResult>>,
+            error: Option<ChartError>,
+        }
+        #[derive(serde::Deserialize)]
+        struct Root {
+            chart: Option<Chart>,
+        }
+
+        let parsed: Root =
+            serde_json::from_str(&text).map_err(|e| MarketDataError::ProviderError {
+                provider: "YAHOO".to_string(),
+                message: format!("Failed to parse dividends: {}", e),
+            })?;
+
+        // Detect Yahoo application-level errors (HTTP 200 with result: null + error object).
+        // Without this check, the .and_then chain below silently returns Ok([]) for
+        // invalid/delisted symbols and auth failures, masking real errors from callers.
+        if let Some(chart_error) = parsed.chart.as_ref().and_then(|c| c.error.as_ref()) {
+            let code = chart_error.code.to_ascii_lowercase();
+            let description = chart_error.description.as_deref().unwrap_or("");
+
+            // "Bad Request" + date-range description → no data in range
+            if description.contains("Data doesn't exist for startDate") {
+                return Err(MarketDataError::NoDataForRange);
+            }
+
+            // "Not Found" → symbol doesn't exist or is delisted
+            if code.contains("not found") || code.contains("no data") {
+                return Err(MarketDataError::SymbolNotFound(symbol.to_string()));
+            }
+
+            let display_description = if description.is_empty() {
+                &chart_error.code
+            } else {
+                description
+            };
+            return Err(MarketDataError::ProviderError {
+                provider: "YAHOO".to_string(),
+                message: format!("chart error {}: {}", chart_error.code, display_description),
+            });
+        }
+
+        let divs = parsed
+            .chart
+            .and_then(|c| c.result)
+            .and_then(|r| r.into_iter().next())
+            .and_then(|r| r.events)
+            .and_then(|e| e.dividends)
+            .unwrap_or_default();
+
+        let mut result: Vec<YahooDividend> = divs
+            .into_values()
+            .map(|d| YahooDividend {
+                amount: d.amount,
+                date: d.date,
+            })
+            .collect();
+        result.sort_by_key(|d| d.date);
+        Ok(result)
     }
 
     // ========================================================================
@@ -1273,5 +1420,105 @@ mod tests {
 
         let mapped = provider.convert_yahoo_error(err, "TEST");
         assert!(matches!(mapped, MarketDataError::NoDataForRange));
+    }
+
+    /// Parsing tests for the inline chart-error detection added to `fetch_dividends`.
+    /// These replicate the JSON shapes Yahoo returns on HTTP 200 with application-level errors.
+    mod fetch_dividends_error_detection {
+        use super::*;
+
+        // Mirrors the inline structs in fetch_dividends so we can drive them in tests.
+        #[allow(dead_code)]
+        #[derive(serde::Deserialize)]
+        struct DivItem {
+            amount: f64,
+            date: i64,
+        }
+        #[allow(dead_code)]
+        #[derive(serde::Deserialize)]
+        struct Events {
+            dividends: Option<std::collections::HashMap<String, DivItem>>,
+        }
+        #[allow(dead_code)]
+        #[derive(serde::Deserialize)]
+        struct ChartResult {
+            events: Option<Events>,
+        }
+        #[derive(serde::Deserialize)]
+        struct ChartError {
+            code: String,
+            description: Option<String>,
+        }
+        #[allow(dead_code)]
+        #[derive(serde::Deserialize)]
+        struct Chart {
+            result: Option<Vec<ChartResult>>,
+            error: Option<ChartError>,
+        }
+        #[derive(serde::Deserialize)]
+        struct Root {
+            chart: Option<Chart>,
+        }
+
+        fn classify(text: &str) -> Result<(), MarketDataError> {
+            let parsed: Root = serde_json::from_str(text).unwrap();
+            if let Some(e) = parsed.chart.as_ref().and_then(|c| c.error.as_ref()) {
+                let code = e.code.to_ascii_lowercase();
+                let description = e.description.as_deref().unwrap_or("");
+                if description.contains("Data doesn't exist for startDate") {
+                    return Err(MarketDataError::NoDataForRange);
+                }
+                if code.contains("not found") || code.contains("no data") {
+                    return Err(MarketDataError::SymbolNotFound("SYM".to_string()));
+                }
+                let display = if description.is_empty() {
+                    &e.code
+                } else {
+                    description
+                };
+                return Err(MarketDataError::ProviderError {
+                    provider: "YAHOO".to_string(),
+                    message: format!("chart error {}: {}", e.code, display),
+                });
+            }
+            Ok(())
+        }
+
+        #[test]
+        fn not_found_error_maps_to_symbol_not_found() {
+            // Real Yahoo v8/finance/chart response for an invalid/delisted symbol
+            let json = r#"{"chart":{"result":null,"error":{"code":"Not Found","description":"No data found, symbol may be delisted"}}}"#;
+            assert!(matches!(
+                classify(json),
+                Err(MarketDataError::SymbolNotFound(_))
+            ));
+        }
+
+        #[test]
+        fn bad_request_date_range_maps_to_no_data_for_range() {
+            // Real Yahoo v8/finance/chart response when the requested date range has no data
+            let json = r#"{"chart":{"result":null,"error":{"code":"Bad Request","description":"Data doesn't exist for startDate = 1577836800, endDate = 1578009600"}}}"#;
+            assert!(matches!(
+                classify(json),
+                Err(MarketDataError::NoDataForRange)
+            ));
+        }
+
+        #[test]
+        fn generic_chart_error_maps_to_provider_error() {
+            let json = r#"{"chart":{"result":null,"error":{"code":"Unauthorized","description":"Invalid crumb"}}}"#;
+            match classify(json) {
+                Err(MarketDataError::ProviderError { message, .. }) => {
+                    assert!(message.contains("Unauthorized"));
+                }
+                other => panic!("unexpected: {:?}", other),
+            }
+        }
+
+        #[test]
+        fn valid_result_with_no_dividends_returns_ok() {
+            let json = r#"{"chart":{"result":[{"events":null}],"error":null}}"#;
+            assert!(classify(json).is_ok());
+        }
     }
 }

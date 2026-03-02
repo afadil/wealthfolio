@@ -1,5 +1,6 @@
 import type { AddonContext, SidebarItemHandle } from "@wealthfolio/addon-sdk";
 import React from "react";
+import { toast } from "sonner";
 import { createSDKHostAPIBridge } from "./type-bridge";
 
 // Import all command functions
@@ -41,6 +42,7 @@ import {
   listenFileDropHover as listenImportFileDropHover,
 } from "@/adapters";
 import {
+  fetchYahooDividends,
   getAssetProfile,
   getMarketDataProviders,
   getQuoteHistory,
@@ -240,6 +242,7 @@ export function createAddonContext(addonId: string): AddonContext {
 
           // Market data
           searchTicker,
+          fetchYahooDividends,
           syncHistoryQuotes,
           getAssetProfile,
           updateAssetProfile,
@@ -329,7 +332,7 @@ export function createAddonContext(addonId: string): AddonContext {
           },
           invalidateQueries: (queryKey: string | string[]) => {
             interface QueryClientLike {
-              invalidateQueries: (opts: { queryKey: string[] }) => unknown;
+              invalidateQueries: (opts: { queryKey: string[]; exact?: boolean }) => unknown;
             }
             const queryClient = (
               window as unknown as { __wealthfolio_query_client__?: QueryClientLike }
@@ -337,12 +340,13 @@ export function createAddonContext(addonId: string): AddonContext {
             if (queryClient) {
               queryClient.invalidateQueries({
                 queryKey: Array.isArray(queryKey) ? queryKey : [queryKey],
+                exact: false,
               });
             }
           },
           refetchQueries: (queryKey: string | string[]) => {
             interface QueryClientLike {
-              refetchQueries: (opts: { queryKey: string[] }) => unknown;
+              refetchQueries: (opts: { queryKey: string[]; exact?: boolean }) => unknown;
             }
             const queryClient = (
               window as unknown as { __wealthfolio_query_client__?: QueryClientLike }
@@ -350,9 +354,16 @@ export function createAddonContext(addonId: string): AddonContext {
             if (queryClient) {
               queryClient.refetchQueries({
                 queryKey: Array.isArray(queryKey) ? queryKey : [queryKey],
+                exact: false,
               });
             }
           },
+
+          // Toast functions (backed by host's sonner instance)
+          toastSuccess: (message: string) => toast.success(message),
+          toastError: (message: string) => toast.error(message),
+          toastWarning: (message: string) => toast.warning(message),
+          toastInfo: (message: string) => toast.info(message),
         },
         addonId,
       );

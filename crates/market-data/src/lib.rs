@@ -81,7 +81,7 @@ pub use provider::alpha_vantage::AlphaVantageProvider;
 pub use provider::finnhub::FinnhubProvider;
 pub use provider::marketdata_app::MarketDataAppProvider;
 pub use provider::metal_price_api::MetalPriceApiProvider;
-pub use provider::yahoo::YahooProvider;
+pub use provider::yahoo::{YahooDividend, YahooProvider};
 pub use provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
 
 // Re-export registry types

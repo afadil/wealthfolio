@@ -199,6 +199,17 @@ export const getExchanges = async (): Promise<ExchangeInfo[]> => {
   }
 };
 
+export const fetchYahooDividends = async (
+  symbol: string,
+): Promise<{ amount: number; date: number }[]> => {
+  try {
+    return await invoke<{ amount: number; date: number }[]>("fetch_yahoo_dividends", { symbol });
+  } catch (error) {
+    logger.error(`Error fetching dividends for ${symbol}.`);
+    throw error;
+  }
+};
+
 export const importManualQuotes = async (quotes: QuoteImport[]): Promise<QuoteImport[]> => {
   try {
     // Internal transformation: hardcode overwriteExisting flag

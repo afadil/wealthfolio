@@ -69,6 +69,7 @@ export interface InternalHostAPI {
 
   // Market data
   searchTicker(query: string): Promise<SymbolSearchResult[]>;
+  fetchYahooDividends(symbol: string): Promise<{ amount: number; date: number }[]>;
   syncHistoryQuotes(): Promise<void>;
   getAssetProfile(assetId: string): Promise<Asset>;
   updateAssetProfile(payload: UpdateAssetProfile): Promise<Asset>;
@@ -167,6 +168,12 @@ export interface InternalHostAPI {
   getQueryClient(): unknown;
   invalidateQueries(queryKey: string | string[]): void;
   refetchQueries(queryKey: string | string[]): void;
+
+  // Toast functions
+  toastSuccess(message: string): void;
+  toastError(message: string): void;
+  toastWarning(message: string): void;
+  toastInfo(message: string): void;
 }
 
 /**
@@ -218,6 +225,7 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: s
       syncHistory: internalAPI.syncHistoryQuotes,
       sync: internalAPI.syncMarketData,
       getProviders: internalAPI.getMarketDataProviders,
+      fetchDividends: internalAPI.fetchYahooDividends,
     },
     assets: {
       getProfile: internalAPI.getAssetProfile,
@@ -288,6 +296,13 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: s
       getClient: internalAPI.getQueryClient,
       invalidateQueries: internalAPI.invalidateQueries,
       refetchQueries: internalAPI.refetchQueries,
+    },
+
+    toast: {
+      success: internalAPI.toastSuccess,
+      error: internalAPI.toastError,
+      warning: internalAPI.toastWarning,
+      info: internalAPI.toastInfo,
     },
   } as unknown as SDKHostAPI;
 }
