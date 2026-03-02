@@ -1,11 +1,29 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { useState, useCallback } from "react";
 
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Checkbox } from "@wealthfolio/ui/components/ui/checkbox";
 
+import { newAccountSchema } from "@/lib/schemas";
+import {
+  CurrencyInput,
+  RadioGroup,
+  RadioGroupItem,
+  ResponsiveSelect,
+  type ResponsiveSelectOption,
+} from "@wealthfolio/ui";
+import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@wealthfolio/ui/components/ui/alert-dialog";
 import {
   DialogDescription,
   DialogFooter,
@@ -23,24 +41,6 @@ import {
 } from "@wealthfolio/ui/components/ui/form";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Input } from "@wealthfolio/ui/components/ui/input";
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@wealthfolio/ui/components/ui/alert-dialog";
-import { newAccountSchema } from "@/lib/schemas";
-import {
-  CurrencyInput,
-  RadioGroup,
-  RadioGroupItem,
-  ResponsiveSelect,
-  type ResponsiveSelectOption,
-} from "@wealthfolio/ui";
-import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 
 import { useAccountMutations } from "./use-account-mutations";
 
@@ -367,19 +367,53 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
 
       {/* Mode Switch Confirmation Dialog */}
       <AlertDialog open={showModeConfirmation} onOpenChange={setShowModeConfirmation}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <Icons.AlertTriangle className="h-5 w-5 text-amber-500" />
-              Switch to Transactions tracking?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Your existing holdings snapshots will be replaced when Wealthfolio calculates history
-              from transactions. This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleCancelModeSwitch}>Cancel</AlertDialogCancel>
+        <AlertDialogContent className="max-w-105 gap-0 overflow-hidden p-0">
+          <div className="px-5 pb-4 pt-5">
+            <AlertDialogHeader className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-100/30 dark:bg-orange-100/20">
+                  <Icons.ArrowRightLeft className="h-4 w-4 text-orange-500 dark:text-orange-300" />
+                </div>
+                <AlertDialogTitle className="text-base font-semibold">
+                  Switch to Transactions mode
+                </AlertDialogTitle>
+              </div>
+              <AlertDialogDescription>
+                  Your account value and performance history will be rebuilt entirely from
+                  transactions. Holdings snapshots will no longer be used.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+
+            {/* Checklist */}
+            <div className="mt-4 rounded-lg border border-orange-100/40 bg-orange-100/30 p-3 dark:border-orange-100/20 dark:bg-orange-100/20">
+              <p className="mb-2 text-xs font-medium text-orange-600 dark:text-orange-200">
+                Make sure your transactions are complete
+              </p>
+              <ul className="space-y-2 text-[13px]">
+                <li className="flex items-start gap-2">
+                  <Icons.Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-500 dark:text-orange-300" />
+                  <span className="text-orange-500 dark:text-orange-200">
+                    All buys, sells, deposits &amp; withdrawals are recorded
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Icons.Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-500 dark:text-orange-300" />
+                  <span className="text-orange-500 dark:text-orange-200">
+                    Dates, quantities &amp; prices are accurate
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Icons.AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-600 dark:text-orange-300" />
+                  <span className="text-orange-500 dark:text-orange-200">
+                    Gaps in history will lead to incorrect balances &amp; returns
+                  </span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <AlertDialogFooter className="bg-muted/30 border-t px-5 py-3">
+            <AlertDialogCancel onClick={handleCancelModeSwitch}>Keep Holdings</AlertDialogCancel>
             <Button onClick={handleConfirmModeSwitch}>Switch to Transactions</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
