@@ -36,16 +36,27 @@ const ActivityPage = () => {
   const [showActionPalette, setShowActionPalette] = useState(false);
 
   // Filter and search state
-  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
-  const [selectedActivityTypes, setSelectedActivityTypes] = useState<ActivityType[]>([]);
-  const [statusFilter, setStatusFilter] = useState<ActivityStatusFilter>("all");
-  const [searchInput, setSearchInput] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedAccounts, setSelectedAccounts] = usePersistentState<string[]>(
+    "activity-filter-accounts",
+    [],
+  );
+  const [selectedActivityTypes, setSelectedActivityTypes] = usePersistentState<ActivityType[]>(
+    "activity-filter-types",
+    [],
+  );
+  const [statusFilter, setStatusFilter] = usePersistentState<ActivityStatusFilter>(
+    "activity-filter-status",
+    "all",
+  );
+  const [searchInput, setSearchInput] = usePersistentState<string>("activity-filter-search", "");
+  const [searchQuery, setSearchQuery] = useState(searchInput);
   const [viewMode, setViewMode] = usePersistentState<ActivityViewMode>(
     "activity-view-mode",
     "table",
   );
-  const [sorting, setSorting] = useState<SortingState>([{ id: "date", desc: true }]);
+  const [sorting, setSorting] = usePersistentState<SortingState>("activity-filter-sorting", [
+    { id: "date", desc: true },
+  ]);
   const [isCompactView, setIsCompactView] = usePersistentState(
     "activity-mobile-view-compact",
     true,
