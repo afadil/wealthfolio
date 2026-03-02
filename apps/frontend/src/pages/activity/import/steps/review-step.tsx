@@ -7,11 +7,9 @@ import {
 } from "@/lib/constants";
 import type { ActivityImport, SymbolSearchResult } from "@/lib/types";
 import { tryParseDate } from "@/lib/utils";
-import { parse, parseISO, isValid } from "date-fns";
-import { getDateFnsPattern } from "../utils/date-format-options";
-import { findMappedActivityType } from "../utils/activity-type-mapping";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { ProgressIndicator } from "@wealthfolio/ui/components/ui/progress-indicator";
+import { isValid, parse, parseISO } from "date-fns";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ImportAlert } from "../components/import-alert";
 import { ImportReviewGrid, type ImportReviewFilter } from "../components/import-review-grid";
@@ -31,6 +29,8 @@ import {
   type DraftActivity,
   type DraftActivityStatus,
 } from "../context";
+import { findMappedActivityType } from "../utils/activity-type-mapping";
+import { getDateFnsPattern } from "../utils/date-format-options";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
