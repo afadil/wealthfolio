@@ -9,6 +9,22 @@ use wealthfolio_core::health::HealthServiceTrait;
 use wealthfolio_core::quotes::MarketSyncMode;
 use wealthfolio_core::settings::{Settings, SettingsUpdate};
 
+fn recalculate_mode_for_settings_change(
+    base_currency_changed: bool,
+    timezone_changed: bool,
+) -> Option<MarketSyncMode> {
+    if base_currency_changed {
+        Some(MarketSyncMode::BackfillHistory {
+            asset_ids: None,
+            days: wealthfolio_core::quotes::DEFAULT_HISTORY_DAYS,
+        })
+    } else if timezone_changed {
+        Some(MarketSyncMode::None)
+    } else {
+        None
+    }
+}
+
 #[tauri::command]
 pub async fn get_settings(state: State<'_, Arc<ServiceContext>>) -> Result<Settings, String> {
     debug!("Fetching active settings...");
@@ -89,21 +105,6 @@ pub async fn update_settings(
             previous_base_currency, &updated_settings.base_currency
         );
         state.update_base_currency(updated_settings.base_currency.clone());
-
-        let handle = handle.clone();
-        tauri::async_runtime::spawn(async move {
-            // Emit event to trigger portfolio update using the builder
-            // Base currency change needs BackfillHistory mode to ensure FX pairs
-            // have sufficient quote coverage from earliest activity date (US-006)
-            let payload = PortfolioRequestPayload::builder()
-                .account_ids(None) // Base currency change affects all accounts
-                .market_sync_mode(MarketSyncMode::BackfillHistory {
-                    asset_ids: None,
-                    days: wealthfolio_core::quotes::DEFAULT_HISTORY_DAYS,
-                })
-                .build();
-            emit_portfolio_trigger_recalculate(&handle, payload);
-        });
     }
 
     if timezone_changed {
@@ -113,11 +114,14 @@ pub async fn update_settings(
         );
         state.update_timezone(updated_settings.timezone.clone());
         state.health_service().clear_cache().await;
+    }
 
-        // Timezone changes require full holdings/valuation recalculation but no market sync.
+    if let Some(market_sync_mode) =
+        recalculate_mode_for_settings_change(base_currency_changed, timezone_changed)
+    {
         let payload = PortfolioRequestPayload::builder()
             .account_ids(None)
-            .market_sync_mode(MarketSyncMode::None)
+            .market_sync_mode(market_sync_mode)
             .build();
         emit_portfolio_trigger_recalculate(&handle, payload);
     }
@@ -209,4 +213,44 @@ pub async fn delete_exchange_rate(
         emit_portfolio_trigger_recalculate(&handle, payload);
     });
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn recalculate_mode_none_when_nothing_changed() {
+        assert_eq!(recalculate_mode_for_settings_change(false, false), None);
+    }
+
+    #[test]
+    fn recalculate_mode_none_for_timezone_only_change() {
+        assert_eq!(
+            recalculate_mode_for_settings_change(false, true),
+            Some(MarketSyncMode::None)
+        );
+    }
+
+    #[test]
+    fn recalculate_mode_backfill_for_base_currency_only_change() {
+        assert_eq!(
+            recalculate_mode_for_settings_change(true, false),
+            Some(MarketSyncMode::BackfillHistory {
+                asset_ids: None,
+                days: wealthfolio_core::quotes::DEFAULT_HISTORY_DAYS,
+            })
+        );
+    }
+
+    #[test]
+    fn recalculate_mode_prefers_base_currency_when_both_changed() {
+        assert_eq!(
+            recalculate_mode_for_settings_change(true, true),
+            Some(MarketSyncMode::BackfillHistory {
+                asset_ids: None,
+                days: wealthfolio_core::quotes::DEFAULT_HISTORY_DAYS,
+            })
+        );
+    }
 }
