@@ -752,7 +752,11 @@ impl ValuationRepositoryTrait for MockValuationRepository {
         Ok(latest)
     }
 
-    async fn delete_valuations_for_account(&self, _account_id: &str) -> Result<()> {
+    async fn delete_valuations_for_account(
+        &self,
+        _account_id: &str,
+        _since_date: Option<NaiveDate>,
+    ) -> Result<()> {
         Ok(())
     }
 

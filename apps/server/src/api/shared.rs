@@ -12,7 +12,10 @@ use anyhow::anyhow;
 use chrono::NaiveDate;
 use serde_json::json;
 use wealthfolio_core::{
-    accounts::AccountServiceTrait, constants::PORTFOLIO_TOTAL_ACCOUNT_ID, quotes::MarketSyncMode,
+    accounts::AccountServiceTrait,
+    constants::PORTFOLIO_TOTAL_ACCOUNT_ID,
+    portfolio::{snapshot::SnapshotRecalcMode, valuation::ValuationRecalcMode},
+    quotes::MarketSyncMode,
 };
 
 // ============================================================================
@@ -48,10 +51,19 @@ pub struct PortfolioRequestBody {
 
 impl PortfolioRequestBody {
     pub fn into_config(self, force_full_recalculation: bool) -> PortfolioJobConfig {
+        let (snapshot_mode, valuation_mode) = if force_full_recalculation {
+            (SnapshotRecalcMode::Full, ValuationRecalcMode::Full)
+        } else {
+            (
+                SnapshotRecalcMode::IncrementalFromLast,
+                ValuationRecalcMode::IncrementalFromLast,
+            )
+        };
         PortfolioJobConfig {
             account_ids: self.account_ids,
             market_sync_mode: self.market_sync_mode,
-            force_full_recalculation,
+            snapshot_mode,
+            valuation_mode,
         }
     }
 }
@@ -59,7 +71,8 @@ impl PortfolioRequestBody {
 pub struct PortfolioJobConfig {
     pub account_ids: Option<Vec<String>>,
     pub market_sync_mode: MarketSyncMode,
-    pub force_full_recalculation: bool,
+    pub snapshot_mode: SnapshotRecalcMode,
+    pub valuation_mode: ValuationRecalcMode,
 }
 
 /// Enqueue a background portfolio job that will publish SSE events as it runs.
@@ -79,7 +92,8 @@ pub fn trigger_lightweight_portfolio_update(state: Arc<AppState>) {
         PortfolioJobConfig {
             account_ids: None,
             market_sync_mode: MarketSyncMode::None,
-            force_full_recalculation: false,
+            snapshot_mode: SnapshotRecalcMode::IncrementalFromLast,
+            valuation_mode: ValuationRecalcMode::IncrementalFromLast,
         },
     );
 }
@@ -92,7 +106,8 @@ pub fn trigger_full_portfolio_recalc(state: Arc<AppState>) {
         PortfolioJobConfig {
             account_ids: None,
             market_sync_mode: MarketSyncMode::None,
-            force_full_recalculation: true,
+            snapshot_mode: SnapshotRecalcMode::Full,
+            valuation_mode: ValuationRecalcMode::Full,
         },
     );
 }
@@ -174,19 +189,11 @@ pub async fn process_portfolio_job(
 
     if !account_ids.is_empty() {
         let ids_slice = account_ids.as_slice();
-        let snapshot_result = if config.force_full_recalculation {
-            state
-                .snapshot_service
-                .force_recalculate_holdings_snapshots(Some(ids_slice))
-                .await
-        } else {
-            state
-                .snapshot_service
-                .calculate_holdings_snapshots(Some(ids_slice))
-                .await
-        };
-
-        if let Err(err) = snapshot_result {
+        if let Err(err) = state
+            .snapshot_service
+            .recalculate_holdings_snapshots(Some(ids_slice), config.snapshot_mode.clone())
+            .await
+        {
             let err_msg = format!(
                 "Holdings snapshot calculation failed for targeted accounts: {}",
                 err
@@ -199,18 +206,11 @@ pub async fn process_portfolio_job(
         }
     }
 
-    let total_result = if config.force_full_recalculation {
-        state
-            .snapshot_service
-            .force_recalculate_total_portfolio_snapshots()
-            .await
-    } else {
-        state
-            .snapshot_service
-            .calculate_total_portfolio_snapshots()
-            .await
-    };
-    if let Err(err) = total_result {
+    if let Err(err) = state
+        .snapshot_service
+        .recalculate_total_portfolio_snapshots(config.snapshot_mode)
+        .await
+    {
         let err_msg = format!("Failed to calculate TOTAL portfolio snapshot: {}", err);
         tracing::error!("{}", err_msg);
         event_bus.publish(ServerEvent::with_payload(
@@ -256,7 +256,7 @@ pub async fn process_portfolio_job(
     for account_id in account_ids {
         if let Err(err) = state
             .valuation_service
-            .calculate_valuation_history(&account_id, config.force_full_recalculation)
+            .calculate_valuation_history(&account_id, config.valuation_mode.clone())
             .await
         {
             let err_msg = format!(

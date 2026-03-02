@@ -100,7 +100,7 @@ pub mod test_env {
         },
         secrets::SecretStore,
         settings::{Settings, SettingsServiceTrait, SettingsUpdate},
-        valuation::{DailyAccountValuation, ValuationServiceTrait},
+        valuation::{DailyAccountValuation, ValuationRecalcMode, ValuationServiceTrait},
         Error as CoreError, Result as CoreResult,
     };
 
@@ -452,7 +452,7 @@ pub mod test_env {
         async fn calculate_valuation_history(
             &self,
             _account_id: &str,
-            _force_full_recalc: bool,
+            _mode: ValuationRecalcMode,
         ) -> CoreResult<()> {
             Ok(())
         }

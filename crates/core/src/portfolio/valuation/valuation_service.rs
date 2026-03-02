@@ -16,23 +16,33 @@ use std::time::Instant;
 
 use super::DailyFxRateMap;
 
+/// Controls the scope of a valuation history recalculation.
+#[derive(Clone, Debug)]
+pub enum ValuationRecalcMode {
+    /// Delete all valuations and recalculate from the first snapshot.
+    Full,
+    /// Resume from the latest saved valuation date, only computing new dates forward.
+    IncrementalFromLast,
+    /// Delete valuations from `date` forward and recalculate from that date.
+    SinceDate(NaiveDate),
+}
+
 #[async_trait]
 pub trait ValuationServiceTrait: Send + Sync {
     /// Ensures the valuation history for the account is calculated and stored.
-    /// If `recalculate_all` is true, existing valuation data is deleted and fully recalculated.
-    /// Otherwise, it calculates incrementally from the last stored date (inclusive)
-    /// up to the latest available snapshot date.
+    ///
+    /// The `mode` controls how much history is recomputed:
+    /// - `Full`: delete all valuations and recalculate from the first snapshot.
+    /// - `IncrementalFromLast`: resume from the latest saved valuation date.
+    /// - `SinceDate(date)`: delete valuations from `date` forward and recalculate from that date.
     ///
     /// Args:
     ///     account_id: The ID of the account ("TOTAL" for portfolio aggregate).
-    ///     recalculate_all: Whether to force recalculation of the entire valuation data.
-    ///
-    /// Returns:
-    ///     A `Result` indicating success or an error.
+    ///     mode: Controls the recalculation scope.
     async fn calculate_valuation_history(
         &self,
         account_id: &str,
-        recalculate_all: bool,
+        mode: ValuationRecalcMode,
     ) -> CoreResult<()>;
 
     /// Loads the valuation data for the account within the specified date range.
@@ -143,27 +153,36 @@ impl ValuationServiceTrait for ValuationService {
     async fn calculate_valuation_history(
         &self,
         account_id: &str,
-        recalculate_all: bool,
+        mode: ValuationRecalcMode,
     ) -> CoreResult<()> {
         let total_start_time = Instant::now();
         debug!(
-            "Starting valuation data update/recalculation for account '{}', recalculate_all: {}",
-            account_id, recalculate_all
+            "Starting valuation data update/recalculation for account '{}', mode: {:?}",
+            account_id, mode
         );
 
         let mut calculation_start_date: Option<NaiveDate> = None;
 
-        if recalculate_all {
-            self.valuation_repository
-                .delete_valuations_for_account(account_id)
-                .await?;
-        } else {
-            let last_saved_date_opt = self
-                .valuation_repository
-                .load_latest_valuation_date(account_id)?;
+        match &mode {
+            ValuationRecalcMode::Full => {
+                self.valuation_repository
+                    .delete_valuations_for_account(account_id, None)
+                    .await?;
+            }
+            ValuationRecalcMode::SinceDate(date) => {
+                self.valuation_repository
+                    .delete_valuations_for_account(account_id, Some(*date))
+                    .await?;
+                calculation_start_date = Some(*date);
+            }
+            ValuationRecalcMode::IncrementalFromLast => {
+                let last_saved_date_opt = self
+                    .valuation_repository
+                    .load_latest_valuation_date(account_id)?;
 
-            if let Some(last_saved) = last_saved_date_opt {
-                calculation_start_date = Some(last_saved);
+                if let Some(last_saved) = last_saved_date_opt {
+                    calculation_start_date = Some(last_saved);
+                }
             }
         }
 

@@ -293,17 +293,11 @@ async fn run_portfolio_job(
 
     if !account_ids.is_empty() {
         let ids_slice = account_ids.as_slice();
-        let snapshot_result = if config.force_full_recalculation {
-            deps.snapshot_service
-                .force_recalculate_holdings_snapshots(Some(ids_slice))
-                .await
-        } else {
-            deps.snapshot_service
-                .calculate_holdings_snapshots(Some(ids_slice))
-                .await
-        };
-
-        if let Err(err) = snapshot_result {
+        if let Err(err) = deps
+            .snapshot_service
+            .recalculate_holdings_snapshots(Some(ids_slice), config.snapshot_mode.clone())
+            .await
+        {
             let err_msg = format!(
                 "Holdings snapshot calculation failed for targeted accounts: {}",
                 err
@@ -318,7 +312,7 @@ async fn run_portfolio_job(
 
     if let Err(err) = deps
         .snapshot_service
-        .calculate_total_portfolio_snapshots()
+        .recalculate_total_portfolio_snapshots(config.snapshot_mode)
         .await
     {
         let err_msg = format!("Failed to calculate TOTAL portfolio snapshot: {}", err);
@@ -364,7 +358,7 @@ async fn run_portfolio_job(
     for account_id in account_ids {
         if let Err(err) = deps
             .valuation_service
-            .calculate_valuation_history(&account_id, config.force_full_recalculation)
+            .calculate_valuation_history(&account_id, config.valuation_mode.clone())
             .await
         {
             let err_msg = format!(

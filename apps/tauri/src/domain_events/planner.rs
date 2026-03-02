@@ -5,6 +5,7 @@
 
 use std::collections::HashSet;
 
+use chrono::NaiveDate;
 use wealthfolio_core::accounts::TrackingMode;
 use wealthfolio_core::events::DomainEvent;
 
@@ -26,17 +27,24 @@ pub fn plan_portfolio_job(events: &[DomainEvent]) -> Option<PortfolioRequestPayl
     let mut account_ids: HashSet<String> = HashSet::new();
     let mut asset_ids: HashSet<String> = HashSet::new();
     let mut has_recalc_events = false;
+    let mut min_activity_date: Option<NaiveDate> = None;
 
     for event in events {
         match event {
             DomainEvent::ActivitiesChanged {
                 account_ids: acc_ids,
                 asset_ids: a_ids,
+                earliest_activity_date,
                 ..
             } => {
                 has_recalc_events = true;
                 account_ids.extend(acc_ids.iter().cloned());
                 asset_ids.extend(a_ids.iter().cloned());
+                min_activity_date = match (min_activity_date, earliest_activity_date) {
+                    (Some(current), Some(new)) => Some(current.min(*new)),
+                    (None, Some(new)) => Some(*new),
+                    (current, None) => current,
+                };
             }
             DomainEvent::HoldingsChanged {
                 account_ids: acc_ids,
@@ -101,6 +109,7 @@ pub fn plan_portfolio_job(events: &[DomainEvent]) -> Option<PortfolioRequestPayl
         }
     };
     builder = builder.market_sync_mode(sync_mode);
+    builder = builder.since_date(min_activity_date);
 
     Some(builder.build())
 }
@@ -183,6 +192,7 @@ mod tests {
             account_ids: vec!["acc1".to_string()],
             asset_ids: vec!["AAPL".to_string()],
             currencies: vec!["USD".to_string()],
+            earliest_activity_date: None,
         }];
 
         let result = plan_portfolio_job(&events);
@@ -226,6 +236,7 @@ mod tests {
                 account_ids: vec!["acc1".to_string()],
                 asset_ids: vec!["equity-uuid".to_string()],
                 currencies: vec!["USD".to_string()],
+                earliest_activity_date: None,
             },
             DomainEvent::AssetsCreated {
                 asset_ids: vec!["fx-uuid".to_string()],

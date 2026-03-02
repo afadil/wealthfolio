@@ -111,15 +111,33 @@ impl ValuationRepositoryTrait for ValuationRepository {
         Ok(latest_date)
     }
 
-    async fn delete_valuations_for_account(&self, input_account_id: &str) -> Result<()> {
+    async fn delete_valuations_for_account(
+        &self,
+        input_account_id: &str,
+        since_date: Option<NaiveDate>,
+    ) -> Result<()> {
         let account_id_owned = input_account_id.to_string();
         self.writer
             .exec(move |conn| {
-                diesel::delete(
-                    daily_account_valuation::table.filter(account_id.eq(account_id_owned)),
-                )
-                .execute(conn)
-                .map_err(StorageError::from)?;
+                match since_date {
+                    None => {
+                        diesel::delete(
+                            daily_account_valuation::table.filter(account_id.eq(account_id_owned)),
+                        )
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
+                    }
+                    Some(date) => {
+                        let date_str = date.to_string();
+                        diesel::delete(
+                            daily_account_valuation::table
+                                .filter(account_id.eq(account_id_owned))
+                                .filter(valuation_date.ge(date_str)),
+                        )
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
+                    }
+                }
                 Ok(())
             })
             .await

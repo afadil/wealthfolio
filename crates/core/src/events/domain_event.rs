@@ -1,5 +1,6 @@
 //! Domain event types.
 
+use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
 use crate::accounts::TrackingMode;
@@ -18,6 +19,8 @@ pub enum DomainEvent {
         asset_ids: Vec<String>,
         /// Currencies observed in affected activities (for FX sync planning)
         currencies: Vec<String>,
+        /// Earliest activity date in this change, if known. Used to limit recalculation range.
+        earliest_activity_date: Option<NaiveDate>,
     },
 
     /// Holdings snapshots were created or updated.
@@ -81,11 +84,13 @@ impl DomainEvent {
         account_ids: Vec<String>,
         asset_ids: Vec<String>,
         currencies: Vec<String>,
+        earliest_activity_date: Option<NaiveDate>,
     ) -> Self {
         Self::ActivitiesChanged {
             account_ids,
             asset_ids,
             currencies,
+            earliest_activity_date,
         }
     }
 
@@ -160,10 +165,12 @@ mod tests {
 
     #[test]
     fn test_domain_event_serialization() {
+        let date = NaiveDate::from_ymd_opt(2024, 6, 15).unwrap();
         let event = DomainEvent::activities_changed(
             vec!["acc1".to_string()],
             vec!["AAPL".to_string()],
             vec!["USD".to_string()],
+            Some(date),
         );
 
         let json = serde_json::to_string(&event).unwrap();
@@ -175,10 +182,12 @@ mod tests {
                 account_ids,
                 asset_ids,
                 currencies,
+                earliest_activity_date,
             } => {
                 assert_eq!(account_ids, vec!["acc1"]);
                 assert_eq!(asset_ids, vec!["AAPL"]);
                 assert_eq!(currencies, vec!["USD"]);
+                assert_eq!(earliest_activity_date, Some(date));
             }
             _ => panic!("Expected ActivitiesChanged"),
         }

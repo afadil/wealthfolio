@@ -1,3 +1,4 @@
+use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use tauri::Emitter;
 use wealthfolio_core::quotes::MarketSyncMode;
@@ -54,6 +55,9 @@ pub struct PortfolioRequestPayload {
     /// Controls market data sync behavior for this portfolio job.
     #[serde(default)]
     pub market_sync_mode: MarketSyncMode,
+    /// Earliest date affected by the triggering change. When set, recalculation
+    /// starts from this date rather than the beginning of account history.
+    pub since_date: Option<NaiveDate>,
 }
 
 impl PortfolioRequestPayload {
@@ -68,6 +72,7 @@ impl PortfolioRequestPayload {
 pub struct PortfolioRequestPayloadBuilder {
     account_ids: Option<Vec<String>>,
     market_sync_mode: MarketSyncMode,
+    since_date: Option<NaiveDate>,
 }
 
 impl PortfolioRequestPayloadBuilder {
@@ -91,11 +96,18 @@ impl PortfolioRequestPayloadBuilder {
         self
     }
 
+    /// Sets the earliest affected date for targeted recalculation.
+    pub fn since_date(mut self, date: Option<NaiveDate>) -> Self {
+        self.since_date = date;
+        self
+    }
+
     /// Builds the PortfolioRequestPayload.
     pub fn build(self) -> PortfolioRequestPayload {
         PortfolioRequestPayload {
             account_ids: self.account_ids,
             market_sync_mode: self.market_sync_mode,
+            since_date: self.since_date,
         }
     }
 }

@@ -30,6 +30,7 @@ use wealthfolio_core::{
         UpdateAssetDetailsRequest as CoreUpdateDetailsRequest,
         UpdateValuationRequest as CoreValuationRequest,
     },
+    portfolio::{snapshot::SnapshotRecalcMode, valuation::ValuationRecalcMode},
     quotes::MarketSyncMode,
 };
 
@@ -185,7 +186,8 @@ async fn create_alternative_asset(
         PortfolioJobConfig {
             account_ids: None,
             market_sync_mode: MarketSyncMode::None,
-            force_full_recalculation: false,
+            snapshot_mode: SnapshotRecalcMode::IncrementalFromLast,
+            valuation_mode: ValuationRecalcMode::IncrementalFromLast,
         },
     );
 
@@ -229,7 +231,8 @@ async fn update_alternative_asset_valuation(
         PortfolioJobConfig {
             account_ids: None,
             market_sync_mode: MarketSyncMode::None,
-            force_full_recalculation: false,
+            snapshot_mode: SnapshotRecalcMode::IncrementalFromLast,
+            valuation_mode: ValuationRecalcMode::IncrementalFromLast,
         },
     );
 
@@ -293,7 +296,8 @@ async fn delete_alternative_asset(
         PortfolioJobConfig {
             account_ids: None,
             market_sync_mode: MarketSyncMode::None,
-            force_full_recalculation: false,
+            snapshot_mode: SnapshotRecalcMode::IncrementalFromLast,
+            valuation_mode: ValuationRecalcMode::IncrementalFromLast,
         },
     );
 

@@ -18,6 +18,7 @@ use semver::Version;
 use serde::Deserialize;
 use tokio::{fs, task};
 use wealthfolio_core::{
+    portfolio::{snapshot::SnapshotRecalcMode, valuation::ValuationRecalcMode},
     quotes::MarketSyncMode,
     settings::{Settings, SettingsServiceTrait, SettingsUpdate},
 };
@@ -55,7 +56,8 @@ async fn update_settings(
                     asset_ids: None,
                     days: wealthfolio_core::quotes::DEFAULT_HISTORY_DAYS,
                 },
-                force_full_recalculation: true,
+                snapshot_mode: SnapshotRecalcMode::Full,
+                valuation_mode: ValuationRecalcMode::Full,
             };
 
             if let Err(err) = process_portfolio_job(state_for_job, job_config).await {
@@ -68,7 +70,8 @@ async fn update_settings(
             let job_config = PortfolioJobConfig {
                 account_ids: None,
                 market_sync_mode: MarketSyncMode::None,
-                force_full_recalculation: true,
+                snapshot_mode: SnapshotRecalcMode::Full,
+                valuation_mode: ValuationRecalcMode::Full,
             };
 
             if let Err(err) = process_portfolio_job(state_for_job, job_config).await {

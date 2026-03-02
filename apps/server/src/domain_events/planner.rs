@@ -5,7 +5,12 @@
 
 use std::collections::HashSet;
 
-use wealthfolio_core::{accounts::TrackingMode, events::DomainEvent, quotes::MarketSyncMode};
+use wealthfolio_core::{
+    accounts::TrackingMode,
+    events::DomainEvent,
+    portfolio::{snapshot::SnapshotRecalcMode, valuation::ValuationRecalcMode},
+    quotes::MarketSyncMode,
+};
 
 use crate::api::shared::PortfolioJobConfig;
 
@@ -113,7 +118,8 @@ pub fn plan_portfolio_job(events: &[DomainEvent]) -> Option<PortfolioJobConfig> 
                 Some(asset_ids.into_iter().collect())
             },
         },
-        force_full_recalculation: true,
+        snapshot_mode: SnapshotRecalcMode::Full,
+        valuation_mode: ValuationRecalcMode::Full,
     })
 }
 
@@ -191,11 +197,13 @@ mod tests {
                 account_ids: vec!["acc1".to_string()],
                 asset_ids: vec!["AAPL".to_string()],
                 currencies: vec!["USD".to_string()],
+                earliest_activity_date: None,
             },
             DomainEvent::ActivitiesChanged {
                 account_ids: vec!["acc2".to_string()],
                 asset_ids: vec!["MSFT".to_string()],
                 currencies: vec!["CAD".to_string()],
+                earliest_activity_date: None,
             },
         ];
 
@@ -245,6 +253,7 @@ mod tests {
                 account_ids: vec!["acc1".to_string()],
                 asset_ids: vec!["equity-uuid".to_string()],
                 currencies: vec!["USD".to_string()],
+                earliest_activity_date: None,
             },
             DomainEvent::AssetsCreated {
                 asset_ids: vec!["fx-uuid".to_string()],

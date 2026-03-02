@@ -14,9 +14,9 @@ use wealthfolio_core::{
         holdings::Holding,
         snapshot::{
             CashBalanceInput, ManualHoldingInput, ManualSnapshotRequest, ManualSnapshotService,
-            SnapshotSource,
+            SnapshotRecalcMode, SnapshotSource,
         },
-        valuation::DailyAccountValuation,
+        valuation::{DailyAccountValuation, ValuationRecalcMode},
     },
 };
 
@@ -252,7 +252,7 @@ pub async fn delete_snapshot_handler(
     // Recalculate valuations for the affected account
     if let Err(e) = state
         .valuation_service
-        .calculate_valuation_history(&q.account_id, false)
+        .calculate_valuation_history(&q.account_id, ValuationRecalcMode::IncrementalFromLast)
         .await
     {
         tracing::warn!(
@@ -264,7 +264,7 @@ pub async fn delete_snapshot_handler(
     // Force recalculate TOTAL portfolio snapshots (force needed because deletion invalidates existing TOTAL)
     if let Err(e) = state
         .snapshot_service
-        .force_recalculate_total_portfolio_snapshots()
+        .recalculate_total_portfolio_snapshots(SnapshotRecalcMode::Full)
         .await
     {
         tracing::warn!("Failed to recalculate TOTAL snapshots after delete: {}", e);
@@ -297,7 +297,7 @@ pub async fn delete_snapshot_handler(
     // Recalculate valuations for the TOTAL portfolio
     if let Err(e) = state
         .valuation_service
-        .calculate_valuation_history("TOTAL", false)
+        .calculate_valuation_history("TOTAL", ValuationRecalcMode::IncrementalFromLast)
         .await
     {
         tracing::warn!(
