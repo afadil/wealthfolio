@@ -30,6 +30,7 @@ import {
 import { ActivityType, getExchangeDisplayName } from "@/lib/constants";
 import { ActivityDetails } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
+import { useSettingsContext } from "@/lib/settings-provider";
 import {
   type OnChangeFn,
   type VisibilityState,
@@ -64,6 +65,8 @@ export const ActivityTable = ({
   handleDelete,
 }: ActivityTableProps) => {
   const { duplicateActivityMutation } = useActivityMutations();
+  const { settings } = useSettingsContext();
+  const appTimezone = settings?.timezone?.trim() || undefined;
 
   const handleDuplicate = React.useCallback(
     async (activity: ActivityDetails) => duplicateActivityMutation.mutateAsync(activity),
@@ -130,12 +133,11 @@ export const ActivityTable = ({
         enableHiding: false,
         header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
         cell: ({ row }) => {
-          const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
           const dateVal = row.getValue("date");
           const formattedDate =
             typeof dateVal === "string" || dateVal instanceof Date
-              ? formatDateTime(dateVal, userTimezone)
-              : formatDateTime(String(dateVal), userTimezone);
+              ? formatDateTime(dateVal, appTimezone)
+              : formatDateTime(String(dateVal), appTimezone);
           return (
             <div className="ml-2 flex flex-col">
               <span>{formattedDate.date}</span>

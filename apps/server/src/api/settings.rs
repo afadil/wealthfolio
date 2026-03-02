@@ -33,10 +33,16 @@ async fn update_settings(
     Json(payload): Json<SettingsUpdate>,
 ) -> ApiResult<Json<Settings>> {
     let previous_base_currency = state.base_currency.read().unwrap().clone();
+    let previous_timezone = state.timezone.read().unwrap().clone();
     state.settings_service.update_settings(&payload).await?;
     let updated_settings = state.settings_service.get_settings()?;
+    *state.timezone.write().unwrap() = updated_settings.timezone.clone();
+    state.health_service.clear_cache().await;
 
-    if updated_settings.base_currency != previous_base_currency {
+    let base_currency_changed = updated_settings.base_currency != previous_base_currency;
+    let timezone_changed = updated_settings.timezone != previous_timezone;
+
+    if base_currency_changed {
         *state.base_currency.write().unwrap() = updated_settings.base_currency.clone();
 
         let state_for_job = state.clone();
@@ -54,6 +60,19 @@ async fn update_settings(
 
             if let Err(err) = process_portfolio_job(state_for_job, job_config).await {
                 tracing::warn!("Base currency change recalculation failed: {}", err);
+            }
+        });
+    } else if timezone_changed {
+        let state_for_job = state.clone();
+        tokio::spawn(async move {
+            let job_config = PortfolioJobConfig {
+                account_ids: None,
+                market_sync_mode: MarketSyncMode::None,
+                force_full_recalculation: true,
+            };
+
+            if let Err(err) = process_portfolio_job(state_for_job, job_config).await {
+                tracing::warn!("Timezone change recalculation failed: {}", err);
             }
         });
     }

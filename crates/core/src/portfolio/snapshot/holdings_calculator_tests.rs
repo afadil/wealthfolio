@@ -493,6 +493,20 @@ mod tests {
         HoldingsCalculator::new(fx_service, base_currency, asset_repository)
     }
 
+    fn create_calculator_with_timezone(
+        fx_service: Arc<dyn FxServiceTrait>,
+        base_currency: Arc<RwLock<String>>,
+        timezone: &str,
+    ) -> HoldingsCalculator {
+        let asset_repository = Arc::new(MockAssetRepository::new());
+        HoldingsCalculator::new_with_timezone(
+            fx_service,
+            base_currency,
+            Arc::new(RwLock::new(timezone.to_string())),
+            asset_repository,
+        )
+    }
+
     // --- Tests ---
     #[test]
     fn test_buy_activity_updates_holdings_and_cash() {
@@ -551,6 +565,76 @@ mod tests {
 
         assert_eq!(next_state.cost_basis, dec!(1505));
         assert_eq!(next_state.net_contribution, dec!(0));
+    }
+
+    #[test]
+    fn test_activity_buckets_to_user_local_day_boundary() {
+        let calculator = create_calculator_with_timezone(
+            Arc::new(MockFxService::new()),
+            Arc::new(RwLock::new("USD".to_string())),
+            "America/Los_Angeles",
+        );
+
+        let previous_snapshot = create_initial_snapshot("acc_1", "USD", "2024-12-30");
+        let mut buy_activity = create_default_activity(
+            "act_tz_boundary",
+            ActivityType::Buy,
+            "AAPL",
+            dec!(1),
+            dec!(100),
+            dec!(0),
+            "USD",
+            "2025-01-01",
+        );
+        // 2025-01-01T07:30:00Z == 2024-12-31T23:30:00-08:00
+        buy_activity.activity_date = Utc.with_ymd_and_hms(2025, 1, 1, 7, 30, 0).unwrap();
+
+        let result = calculator
+            .calculate_next_holdings(
+                &previous_snapshot,
+                &[buy_activity],
+                NaiveDate::from_ymd_opt(2024, 12, 31).unwrap(),
+            )
+            .unwrap();
+
+        assert!(result.warnings.is_empty());
+        assert_eq!(result.snapshot.positions.len(), 1);
+        // Guard #596 path: buy can produce negative cash that must remain booked.
+        assert_eq!(result.snapshot.cash_balances.get("USD"), Some(&dec!(-100)));
+    }
+
+    #[test]
+    fn test_activity_not_processed_when_target_date_is_wrong_for_user_timezone() {
+        let calculator = create_calculator_with_timezone(
+            Arc::new(MockFxService::new()),
+            Arc::new(RwLock::new("USD".to_string())),
+            "America/Los_Angeles",
+        );
+
+        let previous_snapshot = create_initial_snapshot("acc_1", "USD", "2024-12-30");
+        let mut buy_activity = create_default_activity(
+            "act_tz_mismatch",
+            ActivityType::Buy,
+            "AAPL",
+            dec!(1),
+            dec!(100),
+            dec!(0),
+            "USD",
+            "2025-01-01",
+        );
+        // 2025-01-01T07:30:00Z maps to 2024-12-31 in America/Los_Angeles.
+        buy_activity.activity_date = Utc.with_ymd_and_hms(2025, 1, 1, 7, 30, 0).unwrap();
+
+        let result = calculator
+            .calculate_next_holdings(
+                &previous_snapshot,
+                &[buy_activity],
+                NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+            )
+            .unwrap();
+
+        assert_eq!(result.warnings.len(), 1);
+        assert!(result.snapshot.positions.is_empty());
     }
 
     #[test]

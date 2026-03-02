@@ -105,6 +105,7 @@ pub async fn initialize_context(
     let settings = settings_service.get_settings()?;
     let base_currency_string = settings.base_currency.clone();
     let base_currency = Arc::new(RwLock::new(base_currency_string.clone()));
+    let timezone = Arc::new(RwLock::new(settings.timezone.clone()));
     let instance_id = Arc::new(settings.instance_id.clone());
 
     let secret_store = shared_secret_store();
@@ -167,21 +168,24 @@ pub async fn initialize_context(
         .with_event_sink(domain_event_sink.clone()),
     );
     let goal_service = Arc::new(GoalService::new(goal_repo.clone()));
-    let limits_service = Arc::new(ContributionLimitService::new(
+    let limits_service = Arc::new(ContributionLimitService::new_with_timezone(
         fx_service.clone(),
         limit_repository.clone(),
         activity_repository.clone(),
+        timezone.clone(),
     ));
 
-    let income_service = Arc::new(IncomeService::new(
+    let income_service = Arc::new(IncomeService::new_with_timezone(
         fx_service.clone(),
         activity_repository.clone(),
         base_currency.clone(),
+        timezone.clone(),
     ));
 
     let snapshot_service = Arc::new(
-        SnapshotService::new(
+        SnapshotService::new_with_timezone(
             base_currency.clone(),
+            timezone.clone(),
             account_repository.clone(),
             activity_repository.clone(),
             snapshot_repository.clone(),
@@ -191,9 +195,10 @@ pub async fn initialize_context(
         .with_event_sink(domain_event_sink.clone()),
     );
 
-    let holdings_valuation_service = Arc::new(HoldingsValuationService::new(
+    let holdings_valuation_service = Arc::new(HoldingsValuationService::new_with_timezone(
         fx_service.clone(),
         quote_service.clone(),
+        timezone.clone(),
     ));
 
     let valuation_service = Arc::new(ValuationService::new(
@@ -204,18 +209,20 @@ pub async fn initialize_context(
         fx_service.clone(),
     ));
 
-    let performance_service = Arc::new(PerformanceService::new(
+    let performance_service = Arc::new(PerformanceService::new_with_timezone(
         valuation_service.clone(),
         quote_service.clone(),
+        timezone.clone(),
     ));
 
     let classification_service =
         Arc::new(AssetClassificationService::new(taxonomy_service.clone()));
-    let holdings_service = Arc::new(HoldingsService::new(
+    let holdings_service = Arc::new(HoldingsService::new_with_timezone(
         asset_service.clone(),
         snapshot_service.clone(),
         holdings_valuation_service.clone(),
         classification_service.clone(),
+        timezone.clone(),
     ));
 
     let allocation_service = Arc::new(AllocationService::new(
@@ -313,6 +320,7 @@ pub async fn initialize_context(
     Ok(ContextInitResult {
         context: ServiceContext {
             base_currency,
+            timezone,
             instance_id,
             domain_event_sink,
             settings_service,

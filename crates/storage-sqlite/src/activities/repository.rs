@@ -1,4 +1,4 @@
-use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use diesel::expression_methods::ExpressionMethods;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -671,8 +671,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
     fn get_contribution_activities(
         &self,
         account_ids: &[String],
-        start_date: NaiveDateTime,
-        end_date: NaiveDateTime,
+        start_utc: chrono::DateTime<Utc>,
+        end_exclusive_utc: chrono::DateTime<Utc>,
     ) -> Result<Vec<ContributionActivity>> {
         let mut conn = get_connection(&self.pool)?;
 
@@ -683,10 +683,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .filter(accounts::id.eq_any(account_ids))
             .filter(accounts::is_archived.eq(false))
             .filter(activities::activity_type.eq_any(CONTRIBUTION_TYPES))
-            .filter(activities::activity_date.between(
-                Utc.from_utc_datetime(&start_date).to_rfc3339(),
-                Utc.from_utc_datetime(&end_date).to_rfc3339(),
-            ))
+            .filter(activities::activity_date.ge(start_utc.to_rfc3339()))
+            .filter(activities::activity_date.lt(end_exclusive_utc.to_rfc3339()))
             .select((
                 activities::account_id,
                 activities::activity_type,
@@ -720,10 +718,16 @@ impl ActivityRepositoryTrait for ActivityRepository {
                     metadata,
                     source_group_id,
                 )| {
-                    // Parse date - try RFC3339 first, then date-only format
-                    let activity_date = chrono::DateTime::parse_from_rfc3339(&activity_date_str)
-                        .map(|dt| dt.naive_utc().date())
-                        .or_else(|_| NaiveDate::parse_from_str(&activity_date_str, "%Y-%m-%d"))
+                    // Parse activity instant as UTC; fallback date-only values to UTC midnight.
+                    let activity_instant = chrono::DateTime::parse_from_rfc3339(&activity_date_str)
+                        .map(|dt| dt.with_timezone(&Utc))
+                        .or_else(|_| {
+                            NaiveDate::parse_from_str(&activity_date_str, "%Y-%m-%d").map(|date| {
+                                date.and_hms_opt(0, 0, 0)
+                                    .expect("midnight is always valid")
+                                    .and_utc()
+                            })
+                        })
                         .ok()?;
 
                     let amount = amount_str.and_then(|s| Decimal::from_str(&s).ok());
@@ -731,7 +735,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
                     Some(ContributionActivity {
                         account_id,
                         activity_type,
-                        activity_date,
+                        activity_instant,
                         amount,
                         currency,
                         metadata,

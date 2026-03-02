@@ -28,6 +28,7 @@ fn arb_category() -> impl Strategy<Value = HealthCategory> {
         Just(HealthCategory::FxIntegrity),
         Just(HealthCategory::Classification),
         Just(HealthCategory::DataConsistency),
+        Just(HealthCategory::SettingsConfiguration),
     ]
 }
 

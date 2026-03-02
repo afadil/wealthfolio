@@ -625,6 +625,7 @@ export interface Settings {
   theme: string;
   font: string;
   baseCurrency: string;
+  timezone: string;
   instanceId: string;
   onboardingCompleted: boolean;
   autoUpdateCheckEnabled: boolean;
@@ -1599,7 +1600,8 @@ export type HealthCategory =
   | "FX_INTEGRITY"
   | "CLASSIFICATION"
   | "DATA_CONSISTENCY"
-  | "ACCOUNT_CONFIGURATION";
+  | "ACCOUNT_CONFIGURATION"
+  | "SETTINGS_CONFIGURATION";
 
 /**
  * Navigation action for health issue resolution.

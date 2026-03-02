@@ -2,10 +2,7 @@ use super::activities_model::*;
 use crate::limits::ContributionActivity;
 use crate::Result;
 use async_trait::async_trait;
-use chrono::DateTime;
-use chrono::NaiveDate;
-use chrono::NaiveDateTime;
-use chrono::Utc;
+use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 
@@ -23,8 +20,8 @@ pub trait ActivityRepositoryTrait: Send + Sync {
     fn get_contribution_activities(
         &self,
         account_ids: &[String],
-        start_date: NaiveDateTime,
-        end_date: NaiveDateTime,
+        start_utc: DateTime<Utc>,
+        end_exclusive_utc: DateTime<Utc>,
     ) -> Result<Vec<ContributionActivity>>;
     #[allow(clippy::too_many_arguments)]
     fn search_activities(

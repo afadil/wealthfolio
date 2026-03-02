@@ -175,8 +175,9 @@ export const formatDateTime = (date: string | Date, timezone?: string) => {
     return { date: "-", time: "-" };
   }
 
-  // Determine the effective timezone: use provided timezone or default to user's local timezone
-  const effectiveTimezone = timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Determine the effective timezone: use configured app timezone when valid,
+  // otherwise fall back to the browser timezone.
+  const effectiveTimezone = resolveDisplayTimezone(timezone);
 
   const dateOptions: Intl.DateTimeFormatOptions = {
     year: "numeric",
@@ -200,6 +201,22 @@ export const formatDateTime = (date: string | Date, timezone?: string) => {
     time: timeFormatter.format(dateObj),
   };
 };
+
+export function resolveDisplayTimezone(timezone?: string | null): string {
+  const fallback = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const candidate = timezone?.trim();
+  if (!candidate) {
+    return fallback;
+  }
+
+  try {
+    // Validate timezone string before passing it to formatters.
+    new Intl.DateTimeFormat("en-US", { timeZone: candidate }).format(new Date());
+    return candidate;
+  } catch {
+    return fallback;
+  }
+}
 
 /**
  * Formats a date for use with HTML datetime-local input elements.

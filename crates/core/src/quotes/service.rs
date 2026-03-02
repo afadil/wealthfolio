@@ -1757,7 +1757,6 @@ mod tests {
     };
     use crate::secrets::SecretStore;
     use async_trait::async_trait;
-    use chrono::NaiveDateTime;
     use rust_decimal_macros::dec;
     use std::collections::HashMap;
     use std::sync::Arc;
@@ -2058,8 +2057,8 @@ mod tests {
         fn get_contribution_activities(
             &self,
             _account_ids: &[String],
-            _start_date: NaiveDateTime,
-            _end_date: NaiveDateTime,
+            _start_date: chrono::DateTime<chrono::Utc>,
+            _end_date: chrono::DateTime<chrono::Utc>,
         ) -> Result<Vec<ContributionActivity>> {
             unimplemented!("unused in this test")
         }

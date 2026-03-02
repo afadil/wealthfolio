@@ -13,7 +13,9 @@ use crate::portfolio::performance::{classify_flow_for_scope, FlowType, Performan
 use crate::portfolio::snapshot::{
     AccountStateSnapshot, HoldingsCalculationWarning, Lot, Position, SnapshotSource,
 };
-use crate::utils::time_utils::{get_days_between, valuation_date_today};
+use crate::utils::time_utils::{
+    activity_date_in_tz, get_days_between, parse_user_timezone_or_default, user_today,
+};
 
 use async_trait::async_trait;
 use chrono::{Months, NaiveDate, Utc};
@@ -105,6 +107,7 @@ pub trait SnapshotServiceTrait: Send + Sync {
 #[derive(Clone)]
 pub struct SnapshotService {
     base_currency: Arc<RwLock<String>>,
+    timezone: Arc<RwLock<String>>,
     account_repository: Arc<dyn AccountRepositoryTrait>,
     activity_repository: Arc<dyn ActivityRepositoryTrait>,
     snapshot_repository: Arc<dyn SnapshotRepositoryTrait>,
@@ -128,19 +131,51 @@ impl SnapshotService {
         asset_repository: Arc<dyn AssetRepositoryTrait>,
         fx_service: Arc<dyn FxServiceTrait>,
     ) -> Self {
-        let holdings_calculator = HoldingsCalculator::new(
+        Self::new_with_timezone(
+            base_currency,
+            Arc::new(RwLock::new(String::new())),
+            account_repository,
+            activity_repository,
+            snapshot_repository,
+            asset_repository,
+            fx_service,
+        )
+    }
+
+    pub fn new_with_timezone(
+        base_currency: Arc<RwLock<String>>,
+        timezone: Arc<RwLock<String>>,
+        account_repository: Arc<dyn AccountRepositoryTrait>,
+        activity_repository: Arc<dyn ActivityRepositoryTrait>,
+        snapshot_repository: Arc<dyn SnapshotRepositoryTrait>,
+        asset_repository: Arc<dyn AssetRepositoryTrait>,
+        fx_service: Arc<dyn FxServiceTrait>,
+    ) -> Self {
+        let holdings_calculator = HoldingsCalculator::new_with_timezone(
             fx_service.clone(),
             base_currency.clone(),
+            timezone.clone(),
             asset_repository.clone(),
         );
         Self {
             base_currency: base_currency.clone(),
+            timezone,
             account_repository,
             activity_repository,
             snapshot_repository,
             holdings_calculator,
             event_sink: Arc::new(NoOpDomainEventSink),
         }
+    }
+
+    fn user_date(&self, instant: chrono::DateTime<Utc>) -> NaiveDate {
+        let tz = parse_user_timezone_or_default(&self.timezone.read().unwrap());
+        activity_date_in_tz(instant, tz)
+    }
+
+    fn user_today(&self) -> NaiveDate {
+        let tz = parse_user_timezone_or_default(&self.timezone.read().unwrap());
+        user_today(tz)
     }
 
     /// Sets the domain event sink for emitting HoldingsChanged events.
@@ -371,11 +406,11 @@ impl SnapshotService {
         // unchanged: compute min_activity_date & calculation_end_date …
         let min_activity_date = all_activities
             .iter()
-            .map(|a| a.activity_date.naive_utc().date())
+            .map(|a| self.user_date(a.activity_date))
             .min()
-            .unwrap_or_else(valuation_date_today);
+            .unwrap_or_else(|| self.user_today());
 
-        let calculation_end_date = valuation_date_today();
+        let calculation_end_date = self.user_today();
 
         Ok((
             accounts_to_process,
@@ -417,7 +452,7 @@ impl SnapshotService {
             activities_by_account_date
                 .entry(activity.account_id.clone())
                 .or_default()
-                .entry(activity.activity_date.naive_utc().date())
+                .entry(self.user_date(activity.activity_date))
                 .or_default()
                 .push(activity.clone());
             account_ids_with_activity.insert(activity.account_id.clone());
@@ -429,7 +464,7 @@ impl SnapshotService {
             for activity in &adjusted_activities {
                 // Use adjusted activities here
                 total_activities_by_date
-                    .entry(activity.activity_date.naive_utc().date())
+                    .entry(self.user_date(activity.activity_date))
                     .or_default()
                     .push(activity.clone());
             }
@@ -957,7 +992,7 @@ impl SnapshotService {
                     continue;
                 }
 
-                let activity_date = activity.activity_date.naive_utc().date();
+                let activity_date = self.user_date(activity.activity_date);
                 let amount_base = if activity.currency == base_currency {
                     amount
                 } else {
@@ -1030,8 +1065,8 @@ impl SnapshotService {
         let mut split_factors: HashMap<String, Vec<(NaiveDate, Decimal)>> = HashMap::new();
         for activity in activities.iter().filter(|a| {
             a.activity_type == ACTIVITY_TYPE_SPLIT
-                && a.activity_date.naive_utc().date() >= start_date
-                && a.activity_date.naive_utc().date() <= end_date
+                && self.user_date(a.activity_date) >= start_date
+                && self.user_date(a.activity_date) <= end_date
         }) {
             // Check if the activity amount exists and represents a valid positive split ratio
             let asset_id = match &activity.asset_id {
@@ -1050,7 +1085,7 @@ impl SnapshotService {
                     split_factors
                         .entry(asset_id.clone())
                         .or_default() // Get the Vec, create if needed
-                        .push((activity.activity_date.naive_utc().date(), split_ratio));
+                        .push((self.user_date(activity.activity_date), split_ratio));
                 // Push (date, ratio) tuple
                 } else {
                     // Log warning for invalid ratio (e.g., zero or negative)
@@ -1101,7 +1136,7 @@ impl SnapshotService {
                     // Apply splits that happened *after* the activity date
                     for (split_date, split_ratio) in splits.iter() {
                         // Iterate chronologically
-                        if *split_date > adj_activity.activity_date.naive_utc().date() {
+                        if *split_date > self.user_date(activity.activity_date) {
                             // Split happened after this activity, need to adjust past quantity/price
                             cumulative_factor *= split_ratio;
                         }
@@ -1110,7 +1145,7 @@ impl SnapshotService {
                     if cumulative_factor != Decimal::ONE {
                         debug!(
                             "Adjusting activity {} on {} for asset {} due to future splits. Factor: {}",
-                            adj_activity.id, adj_activity.activity_date.naive_utc().date(), asset_id, cumulative_factor
+                            adj_activity.id, self.user_date(activity.activity_date), asset_id, cumulative_factor
                         );
                         // Adjust quantity
                         // Use correct field name 'quantity'
@@ -1209,7 +1244,7 @@ impl SnapshotService {
             calculation_start_date = None; // Calculate all dates
         } else {
             // Check if TOTAL is already up-to-date
-            let today = valuation_date_today();
+            let today = self.user_today();
             let tomorrow = today.succ_opt().unwrap_or(today);
             let latest_total_snapshot = self
                 .snapshot_repository
@@ -1426,7 +1461,7 @@ impl SnapshotServiceTrait for SnapshotService {
             None => {
                 // Get the latest snapshot to ensure we include all available data
                 // Use a far future date to get the absolute latest snapshot
-                let today = valuation_date_today();
+                let today = self.user_today();
                 let far_future = today + chrono::Duration::days(365);
                 match self
                     .snapshot_repository
@@ -1523,7 +1558,7 @@ impl SnapshotServiceTrait for SnapshotService {
         &self,
         account_id: &str,
     ) -> Result<Option<AccountStateSnapshot>> {
-        let today = valuation_date_today();
+        let today = self.user_today();
         // The date passed to get_latest_snapshot_before_date is exclusive, so use tomorrow to include today.
         let tomorrow = today.succ_opt().unwrap_or(today);
         match self

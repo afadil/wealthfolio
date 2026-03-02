@@ -3056,7 +3056,7 @@ impl ActivityService {
 
         fn parse_activity_date(date_str: &str) -> Option<NaiveDate> {
             if let Ok(dt) = DateTime::parse_from_rfc3339(date_str) {
-                return Some(dt.naive_utc().date());
+                return Some(dt.date_naive());
             }
             NaiveDate::parse_from_str(date_str, "%Y-%m-%d").ok()
         }

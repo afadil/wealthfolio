@@ -11,6 +11,7 @@ import {
   isSplitActivity,
 } from "@/lib/activity-utils";
 import { ActivityType, ActivityTypeNames } from "@/lib/constants";
+import { useSettingsContext } from "@/lib/settings-provider";
 import { ActivityDetails } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 import { formatAmount, Separator } from "@wealthfolio/ui";
@@ -33,6 +34,9 @@ export const ActivityTableMobile = ({
   handleDelete,
   onDuplicate,
 }: ActivityTableMobileProps) => {
+  const { settings } = useSettingsContext();
+  const appTimezone = settings?.timezone?.trim() || undefined;
+
   if (activities.length === 0) {
     return (
       <div className="flex h-48 flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
@@ -62,8 +66,7 @@ export const ActivityTableMobile = ({
           : isCashActivity(activityType) && !isAssetBackedIncome;
         const displaySymbol = isCash ? "Cash" : symbol;
         const avatarSymbol = isCash ? "$CASH" : symbol;
-        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const formattedDate = formatDateTime(activity.date, userTimezone);
+        const formattedDate = formatDateTime(activity.date, appTimezone);
         const displayValue = calculateActivityValue(activity);
 
         // Compact View

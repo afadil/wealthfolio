@@ -6,6 +6,7 @@ use crate::portfolio::snapshot::AccountStateSnapshot;
 use crate::portfolio::snapshot::HoldingsCalculationResult;
 use crate::portfolio::snapshot::HoldingsCalculationWarning;
 use crate::portfolio::snapshot::Position;
+use crate::utils::time_utils::{activity_date_in_tz, parse_user_timezone_or_default};
 
 use chrono::{DateTime, NaiveDate, Utc};
 use log::{debug, error, warn};
@@ -30,6 +31,7 @@ fn add_cash(state: &mut AccountStateSnapshot, currency: &str, delta: Decimal) {
 pub struct HoldingsCalculator {
     pub fx_service: Arc<dyn FxServiceTrait>, // only deals with activity/account currency adjustments
     pub base_currency: Arc<RwLock<String>>,
+    pub timezone: Arc<RwLock<String>>,
     pub asset_repository: Arc<dyn AssetRepositoryTrait>,
 }
 impl HoldingsCalculator {
@@ -38,11 +40,31 @@ impl HoldingsCalculator {
         base_currency: Arc<RwLock<String>>,
         asset_repository: Arc<dyn AssetRepositoryTrait>,
     ) -> Self {
+        Self::new_with_timezone(
+            fx_service,
+            base_currency,
+            Arc::new(RwLock::new(String::new())),
+            asset_repository,
+        )
+    }
+
+    pub fn new_with_timezone(
+        fx_service: Arc<dyn FxServiceTrait>,
+        base_currency: Arc<RwLock<String>>,
+        timezone: Arc<RwLock<String>>,
+        asset_repository: Arc<dyn AssetRepositoryTrait>,
+    ) -> Self {
         Self {
             fx_service,
             base_currency,
+            timezone,
             asset_repository,
         }
+    }
+
+    fn activity_local_date(&self, activity: &Activity) -> NaiveDate {
+        let tz = parse_user_timezone_or_default(&self.timezone.read().unwrap());
+        activity_date_in_tz(activity.activity_date, tz)
     }
 
     /// Calculates the next day's holding state based on the previous state and today's activities.
@@ -78,14 +100,14 @@ impl HoldingsCalculator {
         let mut asset_currency_cache: HashMap<String, (String, bool)> = HashMap::new();
 
         for activity in activities_today {
-            if activity.activity_date.naive_utc().date() != target_date {
+            if self.activity_local_date(activity) != target_date {
                 let warning = HoldingsCalculationWarning {
                     activity_id: activity.id.clone(),
                     account_id: next_state.account_id.clone(),
                     date: target_date,
                     message: format!(
                         "Activity date {} does not match target snapshot date {}. Skipped.",
-                        activity.activity_date.naive_utc().date(),
+                        self.activity_local_date(activity),
                         target_date
                     ),
                 };
@@ -342,7 +364,7 @@ impl HoldingsCalculator {
         account_currency: &str,
     ) -> Result<()> {
         let activity_currency = &activity.currency;
-        let activity_date = activity.activity_date.naive_utc().date();
+        let activity_date = self.activity_local_date(activity);
         let activity_amount = activity.amt();
 
         // Book cash in ACTIVITY currency (amount - fee)
@@ -390,7 +412,7 @@ impl HoldingsCalculator {
         account_currency: &str,
     ) -> Result<()> {
         let activity_currency = &activity.currency;
-        let activity_date = activity.activity_date.naive_utc().date();
+        let activity_date = self.activity_local_date(activity);
         // Use absolute value - activity type dictates direction
         let activity_amount = -activity.amt().abs();
 
@@ -456,7 +478,7 @@ impl HoldingsCalculator {
         if activity.effective_type() == ACTIVITY_TYPE_CREDIT
             && activity.subtype.as_deref() == Some(ACTIVITY_SUBTYPE_BONUS)
         {
-            let activity_date = activity.activity_date.naive_utc().date();
+            let activity_date = self.activity_local_date(activity);
 
             // Convert to account currency for net_contribution
             let amount_acct = self.convert_to_account_currency(
@@ -544,7 +566,7 @@ impl HoldingsCalculator {
             let net_amount = activity_amount - activity.fee_amt();
             add_cash(state, activity_currency, net_amount);
 
-            let activity_date = activity.activity_date.naive_utc().date();
+            let activity_date = self.activity_local_date(activity);
             let amount_acct = self.convert_to_account_currency(
                 activity_amount,
                 activity,
@@ -573,7 +595,7 @@ impl HoldingsCalculator {
             state.net_contribution_base += amount_base;
         } else {
             // Asset transfer
-            let activity_date = activity.activity_date.naive_utc().date();
+            let activity_date = self.activity_local_date(activity);
 
             let position = self.get_or_create_position_mut_cached(
                 state,
@@ -656,7 +678,7 @@ impl HoldingsCalculator {
         _asset_currency_cache: &mut HashMap<String, (String, bool)>,
     ) -> Result<()> {
         let activity_currency = &activity.currency;
-        let activity_date = activity.activity_date.naive_utc().date();
+        let activity_date = self.activity_local_date(activity);
         // Use absolute value - activity type dictates direction
         let activity_amount = -activity.amt().abs();
         let asset_id = activity.asset_id.as_deref().unwrap_or("");
@@ -694,7 +716,7 @@ impl HoldingsCalculator {
             state.net_contribution_base += amount_base;
         } else {
             // Asset transfer
-            let activity_date = activity.activity_date.naive_utc().date();
+            let activity_date = self.activity_local_date(activity);
 
             // Book fee in ACTIVITY currency
             add_cash(state, activity_currency, -activity.fee_amt());
@@ -781,7 +803,7 @@ impl HoldingsCalculator {
         }
 
         // Fall back to FxService for conversion
-        let activity_date = activity.activity_date.naive_utc().date();
+        let activity_date = self.activity_local_date(activity);
         match self.fx_service.convert_currency_for_date(
             amount,
             activity_currency,
@@ -849,7 +871,7 @@ impl HoldingsCalculator {
         }
 
         // Fall back to FxService for conversion
-        let activity_date = activity.activity_date.naive_utc().date();
+        let activity_date = self.activity_local_date(activity);
         match self.fx_service.convert_currency_for_date(
             amount,
             position_currency,
@@ -925,7 +947,7 @@ impl HoldingsCalculator {
         position_currency: &str,
         account_currency: &str,
     ) -> Result<(Decimal, Decimal, Option<Decimal>)> {
-        let activity_date = activity.activity_date.naive_utc().date();
+        let activity_date = self.activity_local_date(activity);
 
         // Determine when we can use the activity's fx_rate for position currency conversion
         let can_use_fx_rate =

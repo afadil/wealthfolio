@@ -73,6 +73,7 @@ pub struct AppState {
     pub allocation_service: Arc<dyn AllocationServiceTrait + Send + Sync>,
     pub quote_service: Arc<dyn QuoteServiceTrait + Send + Sync>,
     pub base_currency: Arc<RwLock<String>>,
+    pub timezone: Arc<RwLock<String>>,
     pub snapshot_service: Arc<dyn SnapshotServiceTrait + Send + Sync>,
     pub snapshot_repository: Arc<SnapshotRepository>,
     pub performance_service:
@@ -167,6 +168,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     ));
     let settings = settings_service.get_settings()?;
     let base_currency = Arc::new(RwLock::new(settings.base_currency));
+    let timezone = Arc::new(RwLock::new(settings.timezone.clone()));
 
     let account_repo = Arc::new(AccountRepository::new(pool.clone(), writer.clone()));
 
@@ -212,8 +214,9 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         .with_event_sink(domain_event_sink.clone()),
     );
     let snapshot_service = Arc::new(
-        SnapshotService::new(
+        SnapshotService::new_with_timezone(
             base_currency.clone(),
+            timezone.clone(),
             account_repo.clone(),
             activity_repository.clone(),
             snapshot_repository.clone(),
@@ -243,17 +246,19 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             fx_service.clone(),
         ));
 
-    let holdings_valuation_service = Arc::new(HoldingsValuationService::new(
+    let holdings_valuation_service = Arc::new(HoldingsValuationService::new_with_timezone(
         fx_service.clone(),
         quote_service.clone(),
+        timezone.clone(),
     ));
     let classification_service =
         Arc::new(AssetClassificationService::new(taxonomy_service.clone()));
-    let holdings_service = Arc::new(HoldingsService::new(
+    let holdings_service = Arc::new(HoldingsService::new_with_timezone(
         asset_service.clone(),
         snapshot_service.clone(),
         holdings_valuation_service.clone(),
         classification_service.clone(),
+        timezone.clone(),
     ));
 
     let allocation_service: Arc<dyn AllocationServiceTrait + Send + Sync> = Arc::new(
@@ -261,16 +266,18 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     );
 
     let performance_service = Arc::new(
-        wealthfolio_core::portfolio::performance::PerformanceService::new(
+        wealthfolio_core::portfolio::performance::PerformanceService::new_with_timezone(
             valuation_service.clone(),
             quote_service.clone(),
+            timezone.clone(),
         ),
     );
 
-    let income_service = Arc::new(IncomeService::new(
+    let income_service = Arc::new(IncomeService::new_with_timezone(
         fx_service.clone(),
         activity_repository.clone(),
         base_currency.clone(),
+        timezone.clone(),
     ));
 
     let goal_repository = Arc::new(GoalRepository::new(pool.clone(), writer.clone()));
@@ -281,10 +288,11 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         writer.clone(),
     ));
     let limits_service: Arc<dyn ContributionLimitServiceTrait + Send + Sync> =
-        Arc::new(ContributionLimitService::new(
+        Arc::new(ContributionLimitService::new_with_timezone(
             fx_service.clone(),
             limits_repository.clone(),
             activity_repository.clone(),
+            timezone.clone(),
         ));
 
     // Import run repository for tracking CSV imports
@@ -432,6 +440,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         allocation_service,
         quote_service,
         base_currency,
+        timezone,
         snapshot_service,
         snapshot_repository,
         performance_service,
