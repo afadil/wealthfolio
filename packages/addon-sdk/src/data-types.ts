@@ -619,6 +619,7 @@ export interface Settings {
   theme: string;
   font: string;
   baseCurrency: string;
+  timezone?: string;
   instanceId: string;
   onboardingCompleted: boolean;
   autoUpdateCheckEnabled: boolean;

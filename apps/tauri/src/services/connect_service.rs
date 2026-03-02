@@ -3,16 +3,14 @@
 //! This service wraps the ConnectApiClient with keyring token retrieval,
 //! providing a simple interface for cloud API operations.
 
-use log::{debug, error};
+use log::debug;
+use std::sync::Arc;
 
-use crate::secret_store::KeyringSecretStore;
-use wealthfolio_connect::ConnectApiClient;
-use wealthfolio_connect::DEFAULT_CLOUD_API_URL;
+use wealthfolio_connect::{
+    ensure_valid_access_token, ConnectApiClient, TokenLifecycleConfig, TokenLifecycleState,
+    DEFAULT_CLOUD_API_URL,
+};
 use wealthfolio_core::secrets::SecretStore;
-
-/// Secret key for storing the cloud API access token.
-/// Note: SecretStore adds "wealthfolio_" prefix automatically.
-const CLOUD_ACCESS_TOKEN_KEY: &str = "sync_access_token";
 
 /// Returns true when broker/connect sync was compiled in.
 pub fn is_connect_sync_enabled() -> bool {
@@ -41,17 +39,60 @@ pub fn cloud_api_base_url() -> Option<String> {
         .or_else(|| Some(DEFAULT_CLOUD_API_URL.to_string()))
 }
 
+fn connect_auth_url() -> Option<String> {
+    option_env!("CONNECT_AUTH_URL")
+        .map(|v| v.trim().trim_end_matches('/').to_string())
+        .filter(|v| !v.is_empty())
+}
+
+fn connect_auth_publishable_key() -> Option<String> {
+    option_env!("CONNECT_AUTH_PUBLISHABLE_KEY")
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
+
+fn token_lifecycle_config() -> Option<TokenLifecycleConfig> {
+    let auth_url = connect_auth_url()?;
+    let publishable_key = connect_auth_publishable_key()?;
+    Some(TokenLifecycleConfig::new(auth_url, publishable_key))
+}
+
 /// Service for interacting with Wealthfolio Connect cloud API.
 ///
 /// This service handles keyring token retrieval and provides
 /// convenient methods for common cloud API operations.
-#[derive(Debug, Default)]
-pub struct ConnectService;
+pub struct ConnectService {
+    secret_store: Arc<dyn SecretStore>,
+    token_lifecycle: Arc<TokenLifecycleState>,
+}
 
 impl ConnectService {
     /// Create a new ConnectService instance.
-    pub fn new() -> Self {
-        Self
+    pub fn new(secret_store: Arc<dyn SecretStore>) -> Self {
+        Self {
+            secret_store,
+            token_lifecycle: Arc::new(TokenLifecycleState::new()),
+        }
+    }
+
+    /// Returns a valid access token, refreshing it through Supabase when needed.
+    pub async fn get_valid_access_token(&self) -> Result<String, String> {
+        if !is_cloud_sync_enabled() {
+            return Err("Cloud sync feature is disabled in this build.".to_string());
+        }
+
+        let config = token_lifecycle_config();
+        ensure_valid_access_token(
+            self.secret_store.as_ref(),
+            self.token_lifecycle.as_ref(),
+            config.as_ref(),
+        )
+        .await
+        .map_err(|err| err.to_string())
+    }
+
+    pub async fn clear_cached_token(&self) {
+        self.token_lifecycle.clear_cache().await;
     }
 
     /// Get an authenticated API client using the stored access token.
@@ -60,7 +101,7 @@ impl ConnectService {
     ///
     /// Returns `Ok(ConnectApiClient)` if a valid token is found and the client
     /// can be created, or `Err(String)` if no token is configured or an error occurs.
-    pub fn get_api_client(&self) -> Result<ConnectApiClient, String> {
+    pub async fn get_api_client(&self) -> Result<ConnectApiClient, String> {
         if !is_connect_sync_enabled() {
             return Err("Connect sync feature is disabled in this build.".to_string());
         }
@@ -69,17 +110,10 @@ impl ConnectService {
             "Cloud API base URL is unavailable. Connect API operations are disabled.".to_string()
         })?;
 
-        let access_token = match KeyringSecretStore.get_secret(CLOUD_ACCESS_TOKEN_KEY) {
-            Ok(Some(token)) => token,
-            Ok(None) => {
-                debug!("ConnectService: no access token found in keyring");
-                return Err("No access token configured. Please sign in first.".to_string());
-            }
-            Err(e) => {
-                error!("ConnectService: error reading from keyring: {}", e);
-                return Err(format!("Failed to get access token: {}", e));
-            }
-        };
+        let access_token = self.get_valid_access_token().await.map_err(|e| {
+            debug!("ConnectService: failed to get valid access token: {}", e);
+            e
+        })?;
 
         ConnectApiClient::new(&cloud_api_base_url, &access_token).map_err(|e| e.to_string())
     }
@@ -92,7 +126,7 @@ impl ConnectService {
     /// - `Ok(false)` if the user does not have an active subscription
     /// - `Err(String)` if there's an authentication or API error
     pub async fn has_active_subscription(&self) -> Result<bool, String> {
-        let client = self.get_api_client()?;
+        let client = self.get_api_client().await?;
         client
             .has_active_subscription()
             .await

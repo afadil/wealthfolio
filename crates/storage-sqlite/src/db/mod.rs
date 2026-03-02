@@ -376,12 +376,13 @@ impl r2d2::CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for Connec
         &self,
         conn: &mut SqliteConnection,
     ) -> std::result::Result<(), diesel::r2d2::Error> {
-        use diesel::RunQueryDsl;
-
-        diesel::sql_query(
-            "\n            PRAGMA foreign_keys = ON;\n            PRAGMA busy_timeout = 30000;\n            PRAGMA synchronous = NORMAL;\n        ",
+        // IMPORTANT: Use batch_execute (sqlite3_exec) instead of sql_query (sqlite3_prepare_v2).
+        // sql_query only executes the FIRST statement; subsequent PRAGMAs are silently ignored.
+        conn.batch_execute(
+            "PRAGMA foreign_keys = ON;
+             PRAGMA busy_timeout = 30000;
+             PRAGMA synchronous = NORMAL;",
         )
-        .execute(conn)
         .map_err(diesel::r2d2::Error::QueryError)?;
 
         Ok(())

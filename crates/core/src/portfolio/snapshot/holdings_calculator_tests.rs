@@ -493,6 +493,20 @@ mod tests {
         HoldingsCalculator::new(fx_service, base_currency, asset_repository)
     }
 
+    fn create_calculator_with_timezone(
+        fx_service: Arc<dyn FxServiceTrait>,
+        base_currency: Arc<RwLock<String>>,
+        timezone: &str,
+    ) -> HoldingsCalculator {
+        let asset_repository = Arc::new(MockAssetRepository::new());
+        HoldingsCalculator::new_with_timezone(
+            fx_service,
+            base_currency,
+            Arc::new(RwLock::new(timezone.to_string())),
+            asset_repository,
+        )
+    }
+
     // --- Tests ---
     #[test]
     fn test_buy_activity_updates_holdings_and_cash() {
@@ -551,6 +565,76 @@ mod tests {
 
         assert_eq!(next_state.cost_basis, dec!(1505));
         assert_eq!(next_state.net_contribution, dec!(0));
+    }
+
+    #[test]
+    fn test_activity_buckets_to_user_local_day_boundary() {
+        let calculator = create_calculator_with_timezone(
+            Arc::new(MockFxService::new()),
+            Arc::new(RwLock::new("USD".to_string())),
+            "America/Los_Angeles",
+        );
+
+        let previous_snapshot = create_initial_snapshot("acc_1", "USD", "2024-12-30");
+        let mut buy_activity = create_default_activity(
+            "act_tz_boundary",
+            ActivityType::Buy,
+            "AAPL",
+            dec!(1),
+            dec!(100),
+            dec!(0),
+            "USD",
+            "2025-01-01",
+        );
+        // 2025-01-01T07:30:00Z == 2024-12-31T23:30:00-08:00
+        buy_activity.activity_date = Utc.with_ymd_and_hms(2025, 1, 1, 7, 30, 0).unwrap();
+
+        let result = calculator
+            .calculate_next_holdings(
+                &previous_snapshot,
+                &[buy_activity],
+                NaiveDate::from_ymd_opt(2024, 12, 31).unwrap(),
+            )
+            .unwrap();
+
+        assert!(result.warnings.is_empty());
+        assert_eq!(result.snapshot.positions.len(), 1);
+        // Guard #596 path: buy can produce negative cash that must remain booked.
+        assert_eq!(result.snapshot.cash_balances.get("USD"), Some(&dec!(-100)));
+    }
+
+    #[test]
+    fn test_activity_not_processed_when_target_date_is_wrong_for_user_timezone() {
+        let calculator = create_calculator_with_timezone(
+            Arc::new(MockFxService::new()),
+            Arc::new(RwLock::new("USD".to_string())),
+            "America/Los_Angeles",
+        );
+
+        let previous_snapshot = create_initial_snapshot("acc_1", "USD", "2024-12-30");
+        let mut buy_activity = create_default_activity(
+            "act_tz_mismatch",
+            ActivityType::Buy,
+            "AAPL",
+            dec!(1),
+            dec!(100),
+            dec!(0),
+            "USD",
+            "2025-01-01",
+        );
+        // 2025-01-01T07:30:00Z maps to 2024-12-31 in America/Los_Angeles.
+        buy_activity.activity_date = Utc.with_ymd_and_hms(2025, 1, 1, 7, 30, 0).unwrap();
+
+        let result = calculator
+            .calculate_next_holdings(
+                &previous_snapshot,
+                &[buy_activity],
+                NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+            )
+            .unwrap();
+
+        assert_eq!(result.warnings.len(), 1);
+        assert!(result.snapshot.positions.is_empty());
     }
 
     #[test]
@@ -795,7 +879,58 @@ mod tests {
 
         // Cost basis should remain unchanged as it's a cash activity
         assert_eq!(next_state.cost_basis, previous_snapshot.cost_basis);
-        assert!(next_state.positions.is_empty()); // No positions involved
+        assert!(next_state.positions.is_empty());
+    }
+
+    #[test]
+    fn test_withdrawal_with_negative_amount_from_csv_import() {
+        let mock_fx_service = Arc::new(MockFxService::new());
+        let target_date_str = "2025-03-10";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+        let account_currency = "CNY";
+
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = create_calculator(mock_fx_service, base_currency);
+
+        let mut previous_snapshot =
+            create_initial_snapshot("acc_csv_import", account_currency, "2025-03-07");
+        previous_snapshot
+            .cash_balances
+            .insert(account_currency.to_string(), dec!(20135.50));
+        previous_snapshot.net_contribution = dec!(20208.24);
+        previous_snapshot.net_contribution_base = dec!(20208.24);
+
+        let withdrawal_negative_activity = create_cash_activity(
+            "act_withdraw_csv",
+            ActivityType::Withdrawal,
+            dec!(-10118), // Negative amount from CSV import
+            dec!(0),
+            "CNY",
+            target_date_str,
+        );
+
+        let activities_today = vec![withdrawal_negative_activity];
+
+        let result =
+            calculator.calculate_next_holdings(&previous_snapshot, &activities_today, target_date);
+        assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
+        let next_state = result.unwrap().snapshot;
+
+        // Cash should DECREASE by 10118 (not increase!)
+        // Previous: 20135.50, After withdrawal: 20135.50 - 10118 = 10017.50
+        assert_eq!(
+            next_state.cash_balances.get(account_currency),
+            Some(&dec!(10017.50)),
+            "Cash should decrease by withdrawal amount, not increase"
+        );
+
+        // Net contribution should DECREASE (not increase!)
+        // Previous: 20208.24 - 10118 = 10090.24
+        assert_eq!(
+            next_state.net_contribution,
+            dec!(10090.24),
+            "Net contribution should decrease by withdrawal amount"
+        );
     }
 
     #[test]
@@ -871,6 +1006,153 @@ mod tests {
 
         assert_eq!(next_state.cost_basis, previous_snapshot.cost_basis);
         assert!(next_state.positions.is_empty());
+    }
+
+    #[test]
+    fn test_deposit_with_positive_amount_from_csv_import() {
+        let mock_fx_service = Arc::new(MockFxService::new());
+        let target_date_str = "2025-02-13";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+        let account_currency = "CNY";
+
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = create_calculator(mock_fx_service, base_currency);
+
+        let mut previous_snapshot =
+            create_initial_snapshot("acc_deposit", account_currency, "2025-02-12");
+        previous_snapshot
+            .cash_balances
+            .insert(account_currency.to_string(), dec!(1000.00));
+        previous_snapshot.net_contribution = dec!(1000.00);
+        previous_snapshot.net_contribution_base = dec!(1000.00);
+
+        let deposit_positive_activity = create_cash_activity(
+            "act_deposit_csv",
+            ActivityType::Deposit,
+            dec!(10000), // Positive amount from CSV import
+            dec!(0),
+            "CNY",
+            target_date_str,
+        );
+
+        let activities_today = vec![deposit_positive_activity];
+
+        let result =
+            calculator.calculate_next_holdings(&previous_snapshot, &activities_today, target_date);
+        assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
+        let next_state = result.unwrap().snapshot;
+
+        // Cash should INCREASE by 10000
+        assert_eq!(
+            next_state.cash_balances.get(account_currency),
+            Some(&dec!(11000.00)),
+            "Cash should increase by deposit amount"
+        );
+
+        // Net contribution should INCREASE
+        assert_eq!(
+            next_state.net_contribution,
+            dec!(11000.00),
+            "Net contribution should increase by deposit amount"
+        );
+    }
+
+    #[test]
+    fn test_fee_with_negative_amount_from_csv_import() {
+        let mock_fx_service = Arc::new(MockFxService::new());
+        let target_date_str = "2025-03-07";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+        let account_currency = "CNY";
+
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = create_calculator(mock_fx_service, base_currency);
+
+        let mut previous_snapshot =
+            create_initial_snapshot("acc_fee", account_currency, "2025-03-06");
+        previous_snapshot
+            .cash_balances
+            .insert(account_currency.to_string(), dec!(1000.00));
+        previous_snapshot.net_contribution = dec!(500.00);
+        previous_snapshot.net_contribution_base = dec!(500.00);
+
+        let fee_negative_activity = create_cash_activity(
+            "act_fee_csv",
+            ActivityType::Fee,
+            dec!(-5.21), // Negative fee from CSV import
+            dec!(-5.21), // Also in fee field
+            "CNY",
+            target_date_str,
+        );
+
+        let activities_today = vec![fee_negative_activity];
+
+        let result =
+            calculator.calculate_next_holdings(&previous_snapshot, &activities_today, target_date);
+        assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
+        let next_state = result.unwrap().snapshot;
+
+        // Cash should DECREASE by 5.21 (fee)
+        assert_eq!(
+            next_state.cash_balances.get(account_currency),
+            Some(&dec!(994.79)),
+            "Cash should decrease by fee amount (abs value)"
+        );
+
+        // Net contribution should NOT change for fees
+        assert_eq!(
+            next_state.net_contribution,
+            dec!(500.00),
+            "Net contribution should not change for fees"
+        );
+    }
+
+    #[test]
+    fn test_transfer_out_with_negative_amount_from_csv_import() {
+        let mock_fx_service = Arc::new(MockFxService::new());
+        let target_date_str = "2025-03-10";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+        let account_currency = "CNY";
+
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = create_calculator(mock_fx_service, base_currency);
+
+        let mut previous_snapshot =
+            create_initial_snapshot("acc_transfer_out", account_currency, "2025-03-09");
+        previous_snapshot
+            .cash_balances
+            .insert(account_currency.to_string(), dec!(10000.00));
+        previous_snapshot.net_contribution = dec!(8000.00);
+        previous_snapshot.net_contribution_base = dec!(8000.00);
+
+        let transfer_out_negative_activity = create_cash_activity(
+            "act_transfer_out_csv",
+            ActivityType::TransferOut,
+            dec!(-5000), // Negative amount from CSV import
+            dec!(0),
+            "CNY",
+            target_date_str,
+        );
+
+        let activities_today = vec![transfer_out_negative_activity];
+
+        let result =
+            calculator.calculate_next_holdings(&previous_snapshot, &activities_today, target_date);
+        assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
+        let next_state = result.unwrap().snapshot;
+
+        // Cash should DECREASE by 5000 (not increase!)
+        assert_eq!(
+            next_state.cash_balances.get(account_currency),
+            Some(&dec!(5000.00)),
+            "Cash should decrease by transfer out amount, not increase"
+        );
+
+        // Net contribution should DECREASE (not increase!)
+        assert_eq!(
+            next_state.net_contribution,
+            dec!(3000.00),
+            "Net contribution should decrease by transfer out amount"
+        );
     }
 
     #[test]
@@ -957,6 +1239,49 @@ mod tests {
 
         assert_eq!(next_state.cost_basis, previous_snapshot.cost_basis);
         assert!(next_state.positions.is_empty());
+    }
+
+    #[test]
+    fn test_zero_price_buy_lot_adds_quantity_without_cash_or_cost_basis_change() {
+        let mock_fx_service = Arc::new(MockFxService::new());
+        let account_currency = "USD";
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+        let calculator = create_calculator(mock_fx_service, base_currency);
+
+        let target_date_str = "2023-01-07";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+        let previous_snapshot = create_initial_snapshot("acc_1", account_currency, "2023-01-06");
+
+        // Mirrors staking BUY-leg behavior when broker sends quantity but FMV is zero.
+        let zero_price_buy = create_default_activity(
+            "act_staking_buy_leg_1",
+            ActivityType::Buy,
+            "AAPL",
+            dec!(0.000000329),
+            dec!(0),
+            dec!(0),
+            account_currency,
+            target_date_str,
+        );
+
+        let result =
+            calculator.calculate_next_holdings(&previous_snapshot, &[zero_price_buy], target_date);
+        assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
+        let next_state = result.unwrap().snapshot;
+
+        let position = next_state.positions.get("AAPL").unwrap();
+        assert_eq!(position.quantity, dec!(0.000000329));
+        assert_eq!(position.average_cost, dec!(0));
+        assert_eq!(position.total_cost_basis, dec!(0));
+
+        // Zero-FMV lot should not move cash or contributions.
+        assert_eq!(
+            next_state.cash_balances.get(account_currency),
+            Some(&dec!(0))
+        );
+        assert_eq!(next_state.cost_basis, dec!(0));
+        assert_eq!(next_state.net_contribution, dec!(0));
+        assert_eq!(next_state.net_contribution_base, dec!(0));
     }
 
     #[test]
@@ -2535,23 +2860,27 @@ mod tests {
         assert_eq!(position.quantity, dec!(10));
         assert_eq!(position.currency, "USD");
 
-        // Cash is booked in ACTIVITY currency (USD) per design spec, not converted to account currency
+        // With fx_rate provided, cash is booked in ACCOUNT currency (CAD) using the activity's fx_rate
         // Cost in USD: (10 * 100) + 5 = 1005 USD
+        // Cost in CAD: 1005 * 1.35 (activity fx_rate) = 1356.75 CAD
         let expected_cost_usd = dec!(10) * dec!(100) + dec!(5);
+        let expected_cost_cad = expected_cost_usd * activity_fx_rate;
 
         assert_eq!(
             next_state.cash_balances.get(activity_currency),
-            Some(&(-expected_cost_usd)), // -1005 USD
-            "Cash should be booked in activity currency (USD)"
+            None,
+            "No USD cash bucket when fx_rate is provided"
+        );
+        assert_eq!(
+            next_state.cash_balances.get(account_currency),
+            Some(&(-expected_cost_cad)),
+            "Cash booked in account currency using activity fx_rate"
         );
 
-        // cash_total_account_currency uses FxService rate for cash conversion
-        // Note: activity.fx_rate is used for position calculations, not cash total
-        // Total: -1005 USD * 1.30 (service rate) = -1306.50 CAD
-        let expected_cash_total_cad = -expected_cost_usd * service_rate;
+        // cash_total_account_currency should match since it's all in CAD now
         assert_eq!(
-            next_state.cash_total_account_currency, expected_cash_total_cad,
-            "cash_total_account_currency uses FxService rate"
+            next_state.cash_total_account_currency, -expected_cost_cad,
+            "cash_total_account_currency uses activity fx_rate"
         );
     }
 
@@ -2830,22 +3159,26 @@ mod tests {
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
         let next_state = result.unwrap().snapshot;
 
-        // Cash is booked in ACTIVITY currency (USD) per design spec
+        // With fx_rate provided, sell proceeds are booked in ACCOUNT currency (CAD)
         // Proceeds in USD: (10 * 120) - 5 = 1195 USD
+        // Proceeds in CAD: 1195 * 1.38 (activity fx_rate) = 1649.10 CAD
         let proceeds_usd = dec!(10) * dec!(120) - dec!(5);
+        let expected_proceeds_cad = proceeds_usd * activity_fx_rate;
 
         assert_eq!(
             next_state.cash_balances.get(activity_currency),
-            Some(&proceeds_usd), // 1195 USD
-            "Sell proceeds should be booked in activity currency (USD)"
+            None,
+            "No USD cash bucket when fx_rate is provided"
+        );
+        assert_eq!(
+            next_state.cash_balances.get(account_currency),
+            Some(&expected_proceeds_cad),
+            "Sell proceeds booked in account currency using activity fx_rate"
         );
 
-        // cash_total_account_currency uses FxService rate for cash conversion
-        // 1195 USD * 1.30 = 1553.50 CAD
-        let expected_cash_total_cad = proceeds_usd * service_rate;
         assert_eq!(
-            next_state.cash_total_account_currency, expected_cash_total_cad,
-            "cash_total_account_currency uses FxService rate"
+            next_state.cash_total_account_currency, expected_proceeds_cad,
+            "cash_total_account_currency uses activity fx_rate"
         );
     }
 
@@ -3607,13 +3940,327 @@ mod tests {
         // Cost basis in position currency (USD): (10 * 150) + 5 = 1505 USD
         assert_eq!(position.total_cost_basis, dec!(1505));
 
-        // Cash is booked in ACTIVITY currency (USD) per design spec
+        // With fx_rate provided, cash is booked in ACCOUNT currency (CAD)
         // Cost in USD: (10 * 150) + 5 = 1505 USD
-        let expected_usd_cash = -dec!(1505);
+        // Cost in CAD: 1505 * 1.35 = 2031.75 CAD
+        let expected_cad_cash = -dec!(1505) * activity_fx_rate;
         assert_eq!(
             next_state.cash_balances.get(activity_currency),
-            Some(&expected_usd_cash), // -1505 USD
-            "Cash should be booked in activity currency (USD)"
+            None,
+            "No USD cash bucket when fx_rate is provided"
+        );
+        assert_eq!(
+            next_state.cash_balances.get(account_currency),
+            Some(&expected_cad_cash),
+            "Cash booked in account currency using activity fx_rate"
+        );
+    }
+
+    // =========================================================================
+    // FX cash booking: When activity has fx_rate, cash should be booked in
+    // account currency (broker already converted), not activity currency.
+    // =========================================================================
+
+    #[test]
+    fn test_buy_fx_cash_booked_in_account_currency_when_fx_rate_provided() {
+        // EUR account deposits 10,000 EUR, then buys USD asset with fx_rate.
+        // The broker converted EUR→USD, so cash should be deducted in EUR.
+
+        let mut mock_fx_service = MockFxService::new();
+        let account_currency = "EUR";
+        let base_currency = Arc::new(RwLock::new("EUR".to_string()));
+
+        let deposit_date_str = "2024-01-10";
+        let buy_date_str = "2024-01-15";
+        let deposit_date = NaiveDate::from_str(deposit_date_str).unwrap();
+        let buy_date = NaiveDate::from_str(buy_date_str).unwrap();
+
+        // FxService market rate differs from activity fx_rate — shouldn't matter
+        mock_fx_service.add_bidirectional_rate("USD", "EUR", buy_date, dec!(0.92));
+
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
+
+        // Deposit 10,000 EUR
+        let prev = create_initial_snapshot("acc_eur", account_currency, "2024-01-09");
+        let deposit = create_cash_activity_with_fx_rate(
+            "dep_1",
+            ActivityType::Deposit,
+            dec!(10000),
+            dec!(0),
+            "EUR",
+            deposit_date_str,
+            None,
+        );
+        let after_deposit = calculator
+            .calculate_next_holdings(&prev, &[deposit], deposit_date)
+            .unwrap()
+            .snapshot;
+
+        // Buy 4 AAPL @ $145 + $7.03 fee in USD, fx_rate = 0.93 (USD→EUR)
+        let activity_fx_rate = dec!(0.93);
+        let buy = create_activity_with_fx_rate(
+            "buy_1",
+            ActivityType::Buy,
+            "AAPL",
+            dec!(4),
+            dec!(145),
+            dec!(7.03),
+            "USD",
+            buy_date_str,
+            Some(activity_fx_rate),
+        );
+
+        let after_buy = calculator
+            .calculate_next_holdings(&after_deposit, &[buy], buy_date)
+            .unwrap()
+            .snapshot;
+
+        // Total cost in USD: 4 * 145 + 7.03 = 587.03
+        // EUR deduction: 587.03 * 0.93 = 545.9379
+        let total_cost_usd = dec!(587.03);
+        let expected_cost_eur = total_cost_usd * activity_fx_rate;
+        let expected_cash_eur = dec!(10000) - expected_cost_eur;
+
+        // No USD cash bucket should exist — broker converted at transaction time
+        assert_eq!(
+            after_buy.cash_balances.get("USD"),
+            None,
+            "No USD cash bucket — broker converted at fx_rate"
+        );
+        assert_eq!(
+            after_buy.cash_balances.get("EUR"),
+            Some(&expected_cash_eur),
+            "EUR cash = 10000 - (587.03 * 0.93)"
+        );
+        assert_eq!(
+            after_buy.cash_total_account_currency, expected_cash_eur,
+            "cash_total should equal EUR cash (single-currency)"
+        );
+    }
+
+    #[test]
+    fn test_sell_fx_cash_booked_in_account_currency_when_fx_rate_provided() {
+        // EUR account sells a USD asset with fx_rate.
+        // Broker converts proceeds to EUR, so cash should be credited in EUR.
+
+        let mut mock_fx_service = MockFxService::new();
+        let account_currency = "EUR";
+        let base_currency = Arc::new(RwLock::new("EUR".to_string()));
+
+        let sell_date_str = "2024-03-10";
+        let sell_date = NaiveDate::from_str(sell_date_str).unwrap();
+
+        mock_fx_service.add_bidirectional_rate("USD", "EUR", sell_date, dec!(0.92));
+
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
+
+        // Start with existing position and EUR cash
+        let mut prev = create_initial_snapshot("acc_eur_sell", account_currency, "2024-02-28");
+        prev.cash_balances.insert("EUR".to_string(), dec!(5000));
+        prev.cash_total_account_currency = dec!(5000);
+        prev.cash_total_base_currency = dec!(5000);
+        prev.positions.insert(
+            "AAPL".to_string(),
+            Position {
+                id: "pos_aapl".to_string(),
+                account_id: "acc_eur_sell".to_string(),
+                asset_id: "AAPL".to_string(),
+                quantity: dec!(10),
+                average_cost: dec!(150),
+                total_cost_basis: dec!(1500),
+                currency: "USD".to_string(),
+                inception_date: Utc::now(),
+                lots: VecDeque::from(vec![Lot {
+                    id: "lot_1".to_string(),
+                    position_id: "pos_aapl".to_string(),
+                    acquisition_date: Utc::now(),
+                    quantity: dec!(10),
+                    cost_basis: dec!(1500),
+                    acquisition_price: dec!(150),
+                    acquisition_fees: dec!(0),
+                    fx_rate_to_position: None,
+                }]),
+                created_at: Utc::now(),
+                last_updated: Utc::now(),
+                is_alternative: false,
+            },
+        );
+
+        // Sell 5 AAPL @ $160 with $5 fee, fx_rate = 0.93 (USD→EUR)
+        let activity_fx_rate = dec!(0.93);
+        let sell = create_activity_with_fx_rate(
+            "sell_1",
+            ActivityType::Sell,
+            "AAPL",
+            dec!(5),
+            dec!(160),
+            dec!(5),
+            "USD",
+            sell_date_str,
+            Some(activity_fx_rate),
+        );
+
+        let after_sell = calculator
+            .calculate_next_holdings(&prev, &[sell], sell_date)
+            .unwrap()
+            .snapshot;
+
+        // Proceeds in USD: 5 * 160 - 5 = 795
+        // EUR credit: 795 * 0.93 = 739.35
+        let expected_proceeds_eur = dec!(795) * activity_fx_rate;
+        let expected_cash_eur = dec!(5000) + expected_proceeds_eur;
+
+        assert_eq!(
+            after_sell.cash_balances.get("USD"),
+            None,
+            "No USD cash bucket — broker converted at fx_rate"
+        );
+        assert_eq!(
+            after_sell.cash_balances.get("EUR"),
+            Some(&expected_cash_eur),
+            "EUR cash = 5000 + (795 * 0.93)"
+        );
+        assert_eq!(after_sell.cash_total_account_currency, expected_cash_eur,);
+    }
+
+    #[test]
+    fn test_buy_sell_roundtrip_fx_cash_uses_respective_fx_rates() {
+        // Deposit EUR → buy USD asset → sell USD asset.
+        // Each transaction uses its own fx_rate for cash booking.
+        // No residual USD cash should exist.
+
+        let mut mock_fx_service = MockFxService::new();
+        let account_currency = "EUR";
+        let base_currency = Arc::new(RwLock::new("EUR".to_string()));
+
+        let deposit_date_str = "2024-06-01";
+        let buy_date_str = "2024-06-05";
+        let sell_date_str = "2024-06-10";
+        let deposit_date = NaiveDate::from_str(deposit_date_str).unwrap();
+        let buy_date = NaiveDate::from_str(buy_date_str).unwrap();
+        let sell_date = NaiveDate::from_str(sell_date_str).unwrap();
+
+        // Market rates (shouldn't be used for cash when fx_rate is provided)
+        mock_fx_service.add_bidirectional_rate("USD", "EUR", buy_date, dec!(0.91));
+        mock_fx_service.add_bidirectional_rate("USD", "EUR", sell_date, dec!(0.89));
+
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
+
+        // Step 1: Deposit 10,000 EUR
+        let prev = create_initial_snapshot("acc_roundtrip", account_currency, "2024-05-31");
+        let deposit = create_cash_activity_with_fx_rate(
+            "dep_rt",
+            ActivityType::Deposit,
+            dec!(10000),
+            dec!(0),
+            "EUR",
+            deposit_date_str,
+            None,
+        );
+        let after_deposit = calculator
+            .calculate_next_holdings(&prev, &[deposit], deposit_date)
+            .unwrap()
+            .snapshot;
+
+        // Step 2: Buy 10 AAPL @ $100 + $5 fee, fx_rate = 0.93
+        let buy_fx = dec!(0.93);
+        let buy = create_activity_with_fx_rate(
+            "buy_rt",
+            ActivityType::Buy,
+            "AAPL",
+            dec!(10),
+            dec!(100),
+            dec!(5),
+            "USD",
+            buy_date_str,
+            Some(buy_fx),
+        );
+        let after_buy = calculator
+            .calculate_next_holdings(&after_deposit, &[buy], buy_date)
+            .unwrap()
+            .snapshot;
+
+        // Step 3: Sell all 10 AAPL @ $100 + $5 fee, fx_rate = 0.95
+        let sell_fx = dec!(0.95);
+        let sell = create_activity_with_fx_rate(
+            "sell_rt",
+            ActivityType::Sell,
+            "AAPL",
+            dec!(10),
+            dec!(100),
+            dec!(5),
+            "USD",
+            sell_date_str,
+            Some(sell_fx),
+        );
+        let after_sell = calculator
+            .calculate_next_holdings(&after_buy, &[sell], sell_date)
+            .unwrap()
+            .snapshot;
+
+        // Buy cost EUR: 1005 * 0.93 = 934.65
+        // Sell proceeds EUR: 995 * 0.95 = 945.25
+        // Expected EUR cash: 10000 - 934.65 + 945.25 = 10010.60
+        let expected_eur = dec!(10000) - dec!(1005) * buy_fx + dec!(995) * sell_fx;
+
+        assert_eq!(
+            after_sell.cash_balances.get("USD"),
+            None,
+            "No residual USD cash — all converted at respective fx_rates"
+        );
+        assert_eq!(after_sell.cash_balances.get("EUR"), Some(&expected_eur),);
+        assert_eq!(after_sell.cash_total_account_currency, expected_eur,);
+    }
+
+    #[test]
+    fn test_buy_without_fx_rate_still_books_in_activity_currency() {
+        // When no fx_rate is provided, cash should still be booked in
+        // activity currency (multi-currency account behavior is preserved).
+
+        let mut mock_fx_service = MockFxService::new();
+        let account_currency = "EUR";
+        let base_currency = Arc::new(RwLock::new("EUR".to_string()));
+
+        let buy_date_str = "2024-04-15";
+        let buy_date = NaiveDate::from_str(buy_date_str).unwrap();
+
+        mock_fx_service.add_bidirectional_rate("USD", "EUR", buy_date, dec!(0.92));
+
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
+
+        let mut prev = create_initial_snapshot("acc_no_fx", account_currency, "2024-04-14");
+        prev.cash_balances.insert("EUR".to_string(), dec!(10000));
+        prev.cash_total_account_currency = dec!(10000);
+        prev.cash_total_base_currency = dec!(10000);
+
+        // Buy with NO fx_rate
+        let buy = create_activity_with_fx_rate(
+            "buy_no_fx",
+            ActivityType::Buy,
+            "AAPL",
+            dec!(10),
+            dec!(100),
+            dec!(0),
+            "USD",
+            buy_date_str,
+            None,
+        );
+
+        let result = calculator
+            .calculate_next_holdings(&prev, &[buy], buy_date)
+            .unwrap();
+        let state = result.snapshot;
+
+        // Without fx_rate: cash booked in USD (existing behavior)
+        assert_eq!(
+            state.cash_balances.get("USD"),
+            Some(&dec!(-1000)),
+            "Without fx_rate, cash is booked in activity currency"
+        );
+        assert_eq!(
+            state.cash_balances.get("EUR"),
+            Some(&dec!(10000)),
+            "EUR cash unchanged"
         );
     }
 }

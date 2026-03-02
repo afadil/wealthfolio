@@ -109,7 +109,7 @@ export interface InternalHostAPI {
 
   // Settings
   getSettings(): Promise<Settings>;
-  updateSettings(settingsUpdate: Settings): Promise<Settings>;
+  updateSettings(settingsUpdate: Partial<Settings>): Promise<Settings>;
   backupDatabase(): Promise<{ filename: string; data: Uint8Array }>;
 
   // Account management

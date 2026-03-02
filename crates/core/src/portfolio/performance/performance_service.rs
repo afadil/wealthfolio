@@ -3,13 +3,13 @@ use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
 use crate::errors::{self, Result, ValidationError};
 use crate::performance::ReturnData;
 use crate::quotes::QuoteServiceTrait;
-use crate::utils::time_utils::valuation_date_today;
+use crate::utils::time_utils::{parse_user_timezone_or_default, user_today};
 use crate::valuation::ValuationServiceTrait;
 
 use async_trait::async_trait;
 use chrono::{Duration, NaiveDate};
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use log::{debug, warn};
 use rust_decimal::Decimal;
@@ -51,6 +51,7 @@ pub trait PerformanceServiceTrait: Send + Sync {
 pub struct PerformanceService {
     valuation_service: Arc<dyn ValuationServiceTrait + Send + Sync>,
     quote_service: Arc<dyn QuoteServiceTrait + Send + Sync>,
+    timezone: Arc<RwLock<String>>,
 }
 
 const TRADING_DAYS_PER_YEAR: u32 = 252;
@@ -62,10 +63,28 @@ impl PerformanceService {
         valuation_service: Arc<dyn ValuationServiceTrait + Send + Sync>,
         quote_service: Arc<dyn QuoteServiceTrait + Send + Sync>,
     ) -> Self {
+        Self::new_with_timezone(
+            valuation_service,
+            quote_service,
+            Arc::new(RwLock::new(String::new())),
+        )
+    }
+
+    pub fn new_with_timezone(
+        valuation_service: Arc<dyn ValuationServiceTrait + Send + Sync>,
+        quote_service: Arc<dyn QuoteServiceTrait + Send + Sync>,
+        timezone: Arc<RwLock<String>>,
+    ) -> Self {
         Self {
             valuation_service,
             quote_service,
+            timezone,
         }
+    }
+
+    fn today_in_user_timezone(&self) -> NaiveDate {
+        let tz = parse_user_timezone_or_default(&self.timezone.read().unwrap());
+        user_today(tz)
     }
 
     fn get_account_boundary_data(
@@ -465,7 +484,7 @@ impl PerformanceService {
         start_date_opt: Option<NaiveDate>,
         end_date_opt: Option<NaiveDate>,
     ) -> Result<PerformanceMetrics> {
-        let effective_end_date = end_date_opt.unwrap_or_else(valuation_date_today);
+        let effective_end_date = end_date_opt.unwrap_or_else(|| self.today_in_user_timezone());
         let effective_start_date =
             start_date_opt.unwrap_or_else(|| effective_end_date - chrono::Duration::days(365));
 

@@ -39,6 +39,7 @@ impl SettingsRepositoryTrait for SettingsRepository {
                 "theme" => settings.theme = value,
                 "font" => settings.font = value,
                 "base_currency" => settings.base_currency = value,
+                "timezone" => settings.timezone = value,
                 "instance_id" => settings.instance_id = value,
                 "onboarding_completed" => {
                     settings.onboarding_completed = value.parse().unwrap_or(false);
@@ -88,6 +89,16 @@ impl SettingsRepositoryTrait for SettingsRepository {
                         .values(&AppSettingDB {
                             setting_key: "base_currency".to_string(),
                             setting_value: base_currency.clone(),
+                        })
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
+                }
+
+                if let Some(ref timezone) = settings.timezone {
+                    diesel::replace_into(app_settings)
+                        .values(&AppSettingDB {
+                            setting_key: "timezone".to_string(),
+                            setting_value: timezone.clone(),
                         })
                         .execute(conn)
                         .map_err(StorageError::from)?;
@@ -152,6 +163,7 @@ impl SettingsRepositoryTrait for SettingsRepository {
                 let default_value = match setting_key_param {
                     "theme" => "light",
                     "font" => "font-mono",
+                    "timezone" => "",
                     "onboarding_completed" => "false",
                     "auto_update_check_enabled" => "true",
                     "menu_bar_visible" => "true",

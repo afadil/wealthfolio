@@ -56,7 +56,9 @@ tsconfig.node.tsbuildinfo
 .stylelintcache
 
 # Database
-db/*
+./db/*
+apps/db/*
+apps/tauri/db/*
 
 # Rust/Cargo
 target/
@@ -86,4 +88,6 @@ Thumbs.db
 .kiro/
 .conductor/
 db/
+apps/db/
+apps/tauri/db/
 tasks

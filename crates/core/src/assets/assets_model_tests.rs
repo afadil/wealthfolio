@@ -341,7 +341,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_quote_ccy_precedence_prefers_explicit_hint() {
+    fn test_resolve_quote_ccy_precedence_prefers_explicit_quote_ccy() {
         let resolved = resolve_quote_ccy_precedence(
             Some("GBp"),
             Some("GBP"),
@@ -352,7 +352,7 @@ mod tests {
 
         assert_eq!(
             resolved,
-            Some(("GBp".to_string(), QuoteCcyResolutionSource::ExplicitHint))
+            Some(("GBp".to_string(), QuoteCcyResolutionSource::ExplicitInput))
         );
     }
 

@@ -123,7 +123,7 @@ pub async fn perform_broker_sync(
 ) -> Result<SyncResult, String> {
     info!("Starting broker data sync...");
 
-    let client = context.connect_service().get_api_client()?;
+    let client = context.connect_service().get_api_client().await?;
 
     // Create progress reporter and orchestrator
     // Use TauriProgressReporter if we have an AppHandle, otherwise use NoOp
@@ -175,7 +175,7 @@ pub async fn list_broker_connections(
 ) -> Result<Vec<BrokerConnection>, String> {
     debug!("Fetching broker connections from cloud API...");
 
-    let client = state.connect_service().get_api_client()?;
+    let client = state.connect_service().get_api_client().await?;
     let connections = client.list_connections().await.map_err(|e| e.to_string())?;
 
     Ok(connections)
@@ -189,7 +189,7 @@ pub async fn list_broker_accounts(
 ) -> Result<Vec<BrokerAccount>, String> {
     debug!("Fetching broker accounts from cloud API...");
 
-    let client = state.connect_service().get_api_client()?;
+    let client = state.connect_service().get_api_client().await?;
     let accounts = client
         .list_accounts(None)
         .await
@@ -209,7 +209,7 @@ pub async fn get_subscription_plans(
 ) -> Result<PlansResponse, String> {
     debug!("Fetching subscription plans from cloud API...");
 
-    let client = state.connect_service().get_api_client()?;
+    let client = state.connect_service().get_api_client().await?;
     match client.get_subscription_plans().await {
         Ok(response) => Ok(response),
         Err(e) => {
@@ -245,7 +245,7 @@ pub async fn get_subscription_plans_public() -> Result<PlansResponse, String> {
 pub async fn get_user_info(state: State<'_, Arc<ServiceContext>>) -> Result<UserInfo, String> {
     debug!("Fetching user info from cloud API...");
 
-    let client = state.connect_service().get_api_client()?;
+    let client = state.connect_service().get_api_client().await?;
     match client.get_user_info().await {
         Ok(user_info) => Ok(user_info),
         Err(e) => {

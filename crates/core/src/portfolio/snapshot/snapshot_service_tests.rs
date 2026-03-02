@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use async_trait::async_trait;
-    use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+    use chrono::{DateTime, NaiveDate, Utc};
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
     use std::collections::{HashMap, HashSet, VecDeque};
@@ -359,8 +359,8 @@ mod tests {
         fn get_contribution_activities(
             &self,
             _account_ids: &[String],
-            _start_date: NaiveDateTime,
-            _end_date: NaiveDateTime,
+            _start_date: DateTime<Utc>,
+            _end_date: DateTime<Utc>,
         ) -> AppResult<Vec<crate::limits::ContributionActivity>> {
             unimplemented!()
         }
@@ -510,8 +510,8 @@ mod tests {
         fn get_contribution_activities(
             &self,
             _ids: &[String],
-            _s: NaiveDateTime,
-            _e: NaiveDateTime,
+            _s: DateTime<Utc>,
+            _e: DateTime<Utc>,
         ) -> AppResult<Vec<crate::limits::ContributionActivity>> {
             unimplemented!()
         }
@@ -2656,10 +2656,10 @@ mod tests {
         assert_eq!(pos.currency, "USD");
         assert_eq!(pos.total_cost_basis, dec!(1500)); // USD cost basis
 
-        // Cash is debited in activity currency (USD)
-        // CAD cash unchanged by USD activity, USD cash debited
-        assert_eq!(frame.cash_balances.get("CAD"), Some(&dec!(10000)));
-        assert_eq!(frame.cash_balances.get("USD"), Some(&dec!(-1500)));
+        // With fx_rate provided, cash is debited in account currency (CAD)
+        // CAD cash: 10000 - (1500 * 1.35) = 10000 - 2025 = 7975
+        assert_eq!(frame.cash_balances.get("CAD"), Some(&dec!(7975)));
+        assert_eq!(frame.cash_balances.get("USD"), None);
     }
 
     // ==================== MULTI-ACCOUNT TESTS ====================

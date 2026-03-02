@@ -3,7 +3,7 @@
 //! Loads `exchanges.json` at compile time via `include_str!` and builds
 //! reverse-lookup indexes once via `lazy_static`.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use lazy_static::lazy_static;
 use serde::Deserialize;
@@ -141,22 +141,40 @@ impl ExchangeRegistry {
         // yahoo_code_to_mic: codes → mic
         let mut yahoo_code_to_mic = HashMap::new();
         for entry in &catalog.exchanges {
+            yahoo_code_to_mic
+                .entry(entry.mic.trim().to_uppercase())
+                .or_insert_with(|| entry.mic.clone());
             if let Some(ref yahoo) = entry.yahoo {
                 for code in &yahoo.codes {
-                    yahoo_code_to_mic.insert(code.clone(), entry.mic.clone());
+                    let key = code.trim().to_uppercase();
+                    if !key.is_empty() {
+                        yahoo_code_to_mic.insert(key, entry.mic.clone());
+                    }
                 }
             }
         }
 
-        // yahoo_suffix_to_mic: suffix (without dot, uppercased) → leaked mic
+        // yahoo_suffix_to_mic: suffix (without dot, uppercased) → leaked mic.
+        // Ambiguous suffixes (same suffix used by multiple MICs) are excluded.
         // Also collect suffixes for the whitelist
-        let mut suffix_to_mic = HashMap::new();
+        let mut suffix_to_mic: HashMap<String, &'static str> = HashMap::new();
+        let mut ambiguous_suffixes: HashSet<String> = HashSet::new();
         let mut suffix_set = Vec::new();
         for entry in &catalog.exchanges {
             if let Some(ref yahoo) = entry.yahoo {
                 if !yahoo.suffix.is_empty() {
                     let without_dot = yahoo.suffix.trim_start_matches('.');
-                    suffix_to_mic.insert(without_dot.to_uppercase(), leak_str(entry.mic.clone()));
+                    let suffix_key = without_dot.to_uppercase();
+                    if !ambiguous_suffixes.contains(&suffix_key) {
+                        if let Some(existing_mic) = suffix_to_mic.get(&suffix_key) {
+                            if !existing_mic.eq_ignore_ascii_case(&entry.mic) {
+                                suffix_to_mic.remove(&suffix_key);
+                                ambiguous_suffixes.insert(suffix_key.clone());
+                            }
+                        } else {
+                            suffix_to_mic.insert(suffix_key.clone(), leak_str(entry.mic.clone()));
+                        }
+                    }
                     suffix_set.push(yahoo.suffix.clone());
                 }
             }

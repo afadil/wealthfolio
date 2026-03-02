@@ -2,6 +2,7 @@ use super::SettingsRepositoryTrait;
 use crate::errors::{DatabaseError, Error, Result};
 use crate::fx::FxServiceTrait;
 use crate::settings::{Settings, SettingsUpdate};
+use crate::utils::time_utils::canonicalize_timezone;
 use async_trait::async_trait;
 use log::{debug, error};
 use std::sync::Arc;
@@ -42,16 +43,21 @@ impl SettingsServiceTrait for SettingsService {
 
     async fn update_settings(&self, new_settings: &SettingsUpdate) -> Result<()> {
         let current_base_currency = self.get_base_currency()?;
+        let mut normalized_settings = new_settings.clone();
 
-        if let Some(ref new_base_currency_val) = new_settings.base_currency {
+        if let Some(ref new_base_currency_val) = normalized_settings.base_currency {
             if current_base_currency.as_deref() != Some(new_base_currency_val.as_str()) {
                 self.update_base_currency(new_base_currency_val.as_str())
                     .await?;
             }
         }
 
+        if let Some(ref timezone_raw) = normalized_settings.timezone {
+            normalized_settings.timezone = Some(canonicalize_timezone(timezone_raw)?);
+        }
+
         self.settings_repository
-            .update_settings(new_settings)
+            .update_settings(&normalized_settings)
             .await?;
         Ok(())
     }

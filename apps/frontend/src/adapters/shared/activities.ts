@@ -137,6 +137,8 @@ export const deleteActivity = async (activityId: string): Promise<Activity> => {
 
 /**
  * Import activities into the system.
+ * Expects activities that already passed backend check/preview resolution.
+ * Apply is persistence-only and rejects missing resolved symbol fields.
  * Extracts accountId from the first activity for the backend call.
  * Returns ImportActivitiesResult with activities, import_run_id, and summary.
  */

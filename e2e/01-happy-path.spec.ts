@@ -308,11 +308,9 @@ test.describe("Onboarding And Main Flow", () => {
       // Fill date using direct input (spread deposits over different days)
       await fillDateField(page, 30 - i); // 30, 29, 28, 27 days ago
 
-      // Fill in amount using click, clear, type (more reliable with MoneyInput component)
+      // Fill amount
       const amountInput = page.getByTestId("amount-input");
-      await amountInput.click();
-      await amountInput.press("Control+a");
-      await amountInput.type(String(deposit.amount), { delay: 50 });
+      await amountInput.fill(String(deposit.amount));
       await amountInput.blur();
       await page.waitForTimeout(200);
 

@@ -1,17 +1,18 @@
-import { useMemo } from "react";
-import { useForm, FormProvider, type Resolver } from "react-hook-form";
+import { useSettings } from "@/hooks/use-settings";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { useSettings } from "@/hooks/use-settings";
+import { useMemo } from "react";
+import { FormProvider, useForm, type Resolver } from "react-hook-form";
+import { z } from "zod";
 import {
   AccountSelect,
-  DatePicker,
-  AmountInput,
-  NotesInput,
   AdvancedOptionsSection,
+  AmountInput,
+  createValidatedSubmit,
+  DatePicker,
+  NotesInput,
   type AccountSelectOption,
 } from "./fields";
 
@@ -89,7 +90,7 @@ export function DepositForm({
   );
   const accountCurrency = selectedAccount?.currency;
 
-  const handleSubmit = form.handleSubmit(async (data) => {
+  const handleSubmit = createValidatedSubmit(form, async (data) => {
     await onSubmit(data);
   });
 

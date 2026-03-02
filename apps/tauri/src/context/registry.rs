@@ -17,6 +17,7 @@ use crate::services::ConnectService;
 
 pub struct ServiceContext {
     pub base_currency: Arc<RwLock<String>>,
+    pub timezone: Arc<RwLock<String>>,
     pub instance_id: Arc<String>,
 
     /// Domain event sink for emitting events after mutations.
@@ -61,8 +62,16 @@ impl ServiceContext {
         self.base_currency.read().unwrap().clone()
     }
 
+    pub fn get_timezone(&self) -> String {
+        self.timezone.read().unwrap().clone()
+    }
+
     pub fn update_base_currency(&self, new_currency: String) {
         *self.base_currency.write().unwrap() = new_currency;
+    }
+
+    pub fn update_timezone(&self, new_timezone: String) {
+        *self.timezone.write().unwrap() = new_timezone;
     }
 
     pub fn settings_service(&self) -> Arc<dyn settings::SettingsServiceTrait> {

@@ -364,6 +364,35 @@ mod tests {
     }
 
     #[test]
+    fn test_compile_staking_reward_with_zero_fmv_keeps_buy_quantity() {
+        let compiler = DefaultActivityCompiler::new();
+        let mut activity = create_test_activity();
+        activity.activity_type = ACTIVITY_TYPE_INTEREST.to_string();
+        activity.subtype = Some(ACTIVITY_SUBTYPE_STAKING_REWARD.to_string());
+        activity.asset_id = Some("SOL".to_string());
+        activity.quantity = Some(dec!(0.000000329));
+        activity.unit_price = Some(dec!(0));
+        activity.amount = Some(dec!(0));
+
+        let result = compiler.compile(&activity).unwrap();
+
+        assert_eq!(result.len(), 2);
+
+        // INTEREST leg keeps income amount semantics.
+        assert_eq!(result[0].activity_type, ACTIVITY_TYPE_INTEREST);
+        assert_eq!(result[0].amount, Some(dec!(0)));
+        assert!(result[0].quantity.is_none());
+        assert!(result[0].unit_price.is_none());
+
+        // BUY leg preserves quantity even when FMV is zero.
+        assert_eq!(result[1].activity_type, ACTIVITY_TYPE_BUY);
+        assert_eq!(result[1].quantity, Some(dec!(0.000000329)));
+        assert_eq!(result[1].unit_price, Some(dec!(0)));
+        assert!(result[1].amount.is_none());
+        assert_eq!(result[1].fee, Some(dec!(0)));
+    }
+
+    #[test]
     fn test_compile_dividend_in_kind_produces_two_legs() {
         let compiler = DefaultActivityCompiler::new();
         let mut activity = create_test_activity();

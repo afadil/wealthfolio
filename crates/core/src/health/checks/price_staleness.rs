@@ -562,7 +562,9 @@ mod tests {
     #[test]
     fn test_fresh_price_no_issues() {
         let check = PriceStalenessCheck::new();
-        let ctx = HealthContext::new(HealthConfig::default(), "USD", 100_000.0);
+        // Fixed timestamp avoids boundary flakiness around UTC midnight.
+        let now = Utc.with_ymd_and_hms(2024, 1, 17, 15, 0, 0).unwrap();
+        let ctx = HealthContext::with_timestamp(HealthConfig::default(), "USD", 100_000.0, now);
 
         let holdings = vec![AssetHoldingInfo {
             asset_id: "SEC:AAPL:XNAS".to_string(),
@@ -573,9 +575,9 @@ mod tests {
             uses_market_pricing: true,
         }];
 
-        // Quote from 1 hour ago (fresh - same day, 0 trading days)
+        // Quote from 1 hour ago on the same day (0 trading days stale).
         let mut quote_times = HashMap::new();
-        quote_times.insert("SEC:AAPL:XNAS".to_string(), ctx.now - Duration::hours(1));
+        quote_times.insert("SEC:AAPL:XNAS".to_string(), now - Duration::hours(1));
 
         let issues = check.analyze(&holdings, &quote_times, &ctx);
         assert!(issues.is_empty());

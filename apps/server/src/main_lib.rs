@@ -1,17 +1,17 @@
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
-use std::time::Instant;
 
 use crate::{
     ai_environment::ServerAiEnvironment, auth::AuthManager, config::Config,
     domain_events::WebDomainEventSink, events::EventBus, secrets::build_secret_store,
 };
+use tracing::error;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, EnvFilter};
 use wealthfolio_ai::{AiProviderService, AiProviderServiceTrait, ChatConfig, ChatService};
 use wealthfolio_connect::{
     BrokerSyncService, BrokerSyncServiceTrait, CoreImportRunRepositoryAdapter,
-    ImportRunRepositoryTrait,
+    ImportRunRepositoryTrait, TokenLifecycleState,
 };
 use wealthfolio_core::addons::{AddonService, AddonServiceTrait};
 use wealthfolio_core::{
@@ -60,12 +60,6 @@ use wealthfolio_storage_sqlite::{
     taxonomies::TaxonomyRepository,
 };
 
-/// In-memory cache for the current access token to avoid hitting the auth provider on every request.
-pub struct CachedAccessToken {
-    pub token: String,
-    pub expires_at: Instant,
-}
-
 pub struct AppState {
     /// Domain event sink for emitting events after mutations.
     /// Note: The sink is used by services injected at construction time; this field
@@ -79,6 +73,7 @@ pub struct AppState {
     pub allocation_service: Arc<dyn AllocationServiceTrait + Send + Sync>,
     pub quote_service: Arc<dyn QuoteServiceTrait + Send + Sync>,
     pub base_currency: Arc<RwLock<String>>,
+    pub timezone: Arc<RwLock<String>>,
     pub snapshot_service: Arc<dyn SnapshotServiceTrait + Send + Sync>,
     pub snapshot_repository: Arc<SnapshotRepository>,
     pub performance_service:
@@ -106,7 +101,7 @@ pub struct AppState {
     pub app_sync_repository: Arc<AppSyncRepository>,
     pub device_sync_runtime: Arc<DeviceSyncRuntimeState>,
     pub health_service: Arc<dyn HealthServiceTrait + Send + Sync>,
-    pub token_cache: tokio::sync::RwLock<Option<CachedAccessToken>>,
+    pub token_lifecycle: Arc<TokenLifecycleState>,
 }
 
 pub fn init_tracing() {
@@ -153,7 +148,10 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     db::run_migrations(&db_path)?;
 
     let pool = db::create_pool(&db_path)?;
-    let writer = write_actor::spawn_writer((*pool).clone());
+    let writer = write_actor::spawn_writer((*pool).clone()).map_err(|e| {
+        error!("Failed to initialize writer actor: {}", e);
+        e
+    })?;
 
     // Domain event sink - two-phase initialization to handle circular dependencies
     // Phase 1: Create the sink (can receive events immediately, buffers until worker starts)
@@ -170,6 +168,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     ));
     let settings = settings_service.get_settings()?;
     let base_currency = Arc::new(RwLock::new(settings.base_currency));
+    let timezone = Arc::new(RwLock::new(settings.timezone.clone()));
 
     let account_repo = Arc::new(AccountRepository::new(pool.clone(), writer.clone()));
 
@@ -215,8 +214,9 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         .with_event_sink(domain_event_sink.clone()),
     );
     let snapshot_service = Arc::new(
-        SnapshotService::new(
+        SnapshotService::new_with_timezone(
             base_currency.clone(),
+            timezone.clone(),
             account_repo.clone(),
             activity_repository.clone(),
             snapshot_repository.clone(),
@@ -246,17 +246,19 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             fx_service.clone(),
         ));
 
-    let holdings_valuation_service = Arc::new(HoldingsValuationService::new(
+    let holdings_valuation_service = Arc::new(HoldingsValuationService::new_with_timezone(
         fx_service.clone(),
         quote_service.clone(),
+        timezone.clone(),
     ));
     let classification_service =
         Arc::new(AssetClassificationService::new(taxonomy_service.clone()));
-    let holdings_service = Arc::new(HoldingsService::new(
+    let holdings_service = Arc::new(HoldingsService::new_with_timezone(
         asset_service.clone(),
         snapshot_service.clone(),
         holdings_valuation_service.clone(),
         classification_service.clone(),
+        timezone.clone(),
     ));
 
     let allocation_service: Arc<dyn AllocationServiceTrait + Send + Sync> = Arc::new(
@@ -264,16 +266,18 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     );
 
     let performance_service = Arc::new(
-        wealthfolio_core::portfolio::performance::PerformanceService::new(
+        wealthfolio_core::portfolio::performance::PerformanceService::new_with_timezone(
             valuation_service.clone(),
             quote_service.clone(),
+            timezone.clone(),
         ),
     );
 
-    let income_service = Arc::new(IncomeService::new(
+    let income_service = Arc::new(IncomeService::new_with_timezone(
         fx_service.clone(),
         activity_repository.clone(),
         base_currency.clone(),
+        timezone.clone(),
     ));
 
     let goal_repository = Arc::new(GoalRepository::new(pool.clone(), writer.clone()));
@@ -284,10 +288,11 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         writer.clone(),
     ));
     let limits_service: Arc<dyn ContributionLimitServiceTrait + Send + Sync> =
-        Arc::new(ContributionLimitService::new(
+        Arc::new(ContributionLimitService::new_with_timezone(
             fx_service.clone(),
             limits_repository.clone(),
             activity_repository.clone(),
+            timezone.clone(),
         ));
 
     // Import run repository for tracking CSV imports
@@ -397,6 +402,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
 
     let event_bus = EventBus::new(256);
     let device_sync_runtime = Arc::new(DeviceSyncRuntimeState::new());
+    let token_lifecycle = Arc::new(TokenLifecycleState::new());
 
     // Domain event sink - Phase 2: Start the worker now that all services are ready
     domain_event_sink.start_worker(
@@ -410,6 +416,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         account_service.clone(),
         fx_service.clone(),
         secret_store.clone(),
+        token_lifecycle.clone(),
     );
 
     let addon_service: Arc<dyn AddonServiceTrait + Send + Sync> = Arc::new(AddonService::new(
@@ -433,6 +440,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         allocation_service,
         quote_service,
         base_currency,
+        timezone,
         snapshot_service,
         snapshot_repository,
         performance_service,
@@ -459,6 +467,6 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         app_sync_repository,
         device_sync_runtime,
         health_service,
-        token_cache: tokio::sync::RwLock::new(None),
+        token_lifecycle,
     }))
 }

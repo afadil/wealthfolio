@@ -250,13 +250,17 @@ export function DeviceSyncSection() {
             <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
               <Icons.Smartphone className="text-muted-foreground h-4 w-4" />
             </div>
-            <h3 className="text-base font-semibold">Device Sync</h3>
+            <h3 className="text-base font-semibold">Connected Devices</h3>
           </div>
 
-          <UntrustedDevicePrompt
-            onStartPairing={() => setIsPairingOpen(true)}
-            trustedDeviceCount={state.trustedDevices.length}
-          />
+          <div className="mt-4">
+            <ConnectedDevicesList
+              onResetSync={actions.resetSync}
+              onLinkDevice={() => setIsPairingOpen(true)}
+              mode="unpaired"
+              trustedDeviceCount={state.trustedDevices.length}
+            />
+          </div>
         </CardContent>
 
         {/* Pairing Dialog */}
@@ -492,7 +496,12 @@ export function DeviceSyncSection() {
             {!state.device ? (
               <Skeleton className="h-16 w-full rounded-lg" />
             ) : !isTrusted ? (
-              <UntrustedDevicePrompt onStartPairing={() => setIsPairingOpen(true)} />
+              <ConnectedDevicesList
+                onResetSync={actions.resetSync}
+                onLinkDevice={() => setIsPairingOpen(true)}
+                mode="unpaired"
+                trustedDeviceCount={state.trustedDevices.length}
+              />
             ) : (
               <ConnectedDevicesList
                 onResetSync={actions.resetSync}
@@ -734,9 +743,13 @@ function formatLastSeen(lastSeenAt: string | null): string {
 function ConnectedDevicesList({
   onResetSync,
   onLinkDevice,
+  mode = "trusted",
+  trustedDeviceCount,
 }: {
   onResetSync: () => Promise<void>;
   onLinkDevice: () => void;
+  mode?: "trusted" | "unpaired";
+  trustedDeviceCount?: number;
 }) {
   const { data: devices, isLoading, error } = useDevices("my");
 
@@ -761,6 +774,15 @@ function ConnectedDevicesList({
     );
   }
 
+  if (mode === "unpaired" && devices.length === 0) {
+    return (
+      <UntrustedDevicePrompt
+        onStartPairing={onLinkDevice}
+        trustedDeviceCount={trustedDeviceCount}
+      />
+    );
+  }
+
   // Sort: current device first, then by lastSeenAt (most recent first)
   const sortedDevices = [...devices].sort((a, b) => {
     if (a.isCurrent && !b.isCurrent) return -1;
@@ -772,16 +794,19 @@ function ConnectedDevicesList({
 
   const trustedDevices = devices.filter((d: Device) => d.trustState === "trusted");
   const isLastTrustedDevice = trustedDevices.length <= 1;
+  const visibleDevices =
+    mode === "unpaired" ? sortedDevices.filter((device) => !device.isCurrent) : sortedDevices;
 
   return (
     <div>
       {/* Devices list */}
       <div className="space-y-2">
-        {sortedDevices.map((device) => (
+        {mode === "unpaired" && <PairThisDeviceItem onPair={onLinkDevice} />}
+        {visibleDevices.map((device) => (
           <DeviceCard
             key={device.id}
             device={device}
-            isLastTrustedDevice={isLastTrustedDevice && !!device.isCurrent}
+            isLastTrustedDevice={isLastTrustedDevice && device.trustState === "trusted"}
             onResetSync={onResetSync}
             onPair={onLinkDevice}
           />
@@ -789,12 +814,47 @@ function ConnectedDevicesList({
       </div>
 
       {/* Link Device button - matches "Sync to Local" pattern */}
-      <div className="mt-4">
-        <Button onClick={onLinkDevice} size="sm">
-          <Icons.Link className="mr-2 h-4 w-4" />
-          Link Device
-        </Button>
+      {mode === "trusted" && (
+        <div className="mt-4">
+          <Button onClick={onLinkDevice} size="sm">
+            <Icons.Link className="mr-2 h-4 w-4" />
+            Link Device
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PairThisDeviceItem({ onPair }: { onPair: () => void }) {
+  return (
+    <div className="bg-muted/30 flex items-center justify-between gap-3 rounded-lg border border-dashed p-3">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <Avatar className="h-9 w-9 shrink-0 rounded-lg">
+          <AvatarFallback className="rounded-lg">
+            <Icons.Smartphone className="text-muted-foreground h-4 w-4" />
+          </AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-sm font-medium">This device</span>
+            <Badge
+              variant="outline"
+              className="text-warning border-warning/20 bg-warning/20 h-5 shrink-0 text-[10px]"
+            >
+              Not paired
+            </Badge>
+          </div>
+          <div className="text-muted-foreground flex items-center gap-1 text-xs">
+            <Icons.ShieldAlert className="h-3 w-3 text-amber-600 dark:text-amber-500" />
+            Pair this device to start syncing.
+          </div>
+        </div>
       </div>
+      <Button variant="outline" size="sm" onClick={onPair}>
+        <Icons.Link className="mr-2 h-4 w-4" />
+        Pair this device
+      </Button>
     </div>
   );
 }

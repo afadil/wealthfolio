@@ -1,6 +1,7 @@
 import { useIsMobileViewport } from "@/hooks";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { Icons } from "@wealthfolio/ui";
+import { createPortal } from "react-dom";
 
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 
@@ -18,7 +19,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
     theme = "system";
   }
 
-  return (
+  const content = (
     <Sonner
       theme={theme}
       position={isMobile ? "top-center" : undefined}
@@ -40,6 +41,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }}
       style={
         {
+          zIndex: 2147483647,
           "--normal-bg": "var(--toast-bg)",
           "--normal-text": "var(--toast-fg)",
           "--normal-border": "var(--toast-border)",
@@ -61,6 +63,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
       {...props}
     />
   );
+
+  if (typeof document === "undefined") return content;
+
+  return createPortal(content, document.body);
 };
 
 export { Toaster };

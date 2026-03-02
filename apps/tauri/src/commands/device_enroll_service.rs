@@ -20,6 +20,7 @@ pub use wealthfolio_device_sync::{EnableSyncResult, SyncState, SyncStateResult};
 pub async fn get_device_sync_state(
     context: State<'_, Arc<ServiceContext>>,
 ) -> Result<SyncStateResult, String> {
+    context.connect_service().get_valid_access_token().await?;
     context
         .device_enroll_service()
         .get_sync_state()
@@ -33,6 +34,7 @@ pub async fn get_device_sync_state(
 pub async fn enable_device_sync(
     context: State<'_, Arc<ServiceContext>>,
 ) -> Result<EnableSyncResult, String> {
+    context.connect_service().get_valid_access_token().await?;
     let result = context
         .device_enroll_service()
         .enable_sync()
@@ -71,6 +73,7 @@ pub async fn clear_device_sync_data(context: State<'_, Arc<ServiceContext>>) -> 
 pub async fn reinitialize_device_sync(
     context: State<'_, Arc<ServiceContext>>,
 ) -> Result<EnableSyncResult, String> {
+    context.connect_service().get_valid_access_token().await?;
     let result = context
         .device_enroll_service()
         .reinitialize_sync()

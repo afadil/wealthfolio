@@ -7,6 +7,7 @@ use std::hash::{Hash, Hasher};
 
 use crate::health::model::{AffectedItem, HealthCategory, HealthIssue, NavigateAction, Severity};
 use crate::health::traits::HealthContext;
+use crate::utils::time_utils::parse_user_timezone;
 
 /// Information about an account missing tracking mode configuration.
 #[derive(Debug, Clone)]
@@ -30,45 +31,130 @@ impl AccountConfigurationCheck {
     pub fn analyze(
         &self,
         unconfigured_accounts: &[UnconfiguredAccountInfo],
+        configured_timezone: Option<&str>,
+        client_timezone: Option<&str>,
         _ctx: &HealthContext,
     ) -> Vec<HealthIssue> {
-        if unconfigured_accounts.is_empty() {
+        let mut issues = Vec::new();
+
+        if !unconfigured_accounts.is_empty() {
+            let count = unconfigured_accounts.len();
+            let account_ids: Vec<String> = unconfigured_accounts
+                .iter()
+                .map(|a| a.account_id.clone())
+                .collect();
+            let data_hash = compute_data_hash(&account_ids);
+
+            let affected_items: Vec<AffectedItem> = unconfigured_accounts
+                .iter()
+                .map(|a| AffectedItem::account(&a.account_id, &a.account_name))
+                .collect();
+
+            let title = if count == 1 {
+                "1 account needs setup".to_string()
+            } else {
+                format!("{} accounts need setup", count)
+            };
+
+            let message = if count == 1 {
+                "Choose a tracking mode to start syncing data.".to_string()
+            } else {
+                "Choose tracking modes to start syncing data.".to_string()
+            };
+
+            issues.push(
+                HealthIssue::builder()
+                    .id(format!("unconfigured_accounts:{}", data_hash))
+                    .severity(Severity::Warning)
+                    .category(HealthCategory::AccountConfiguration)
+                    .title(title)
+                    .message(message)
+                    .affected_count(count as u32)
+                    .navigate_action(NavigateAction::to_connect())
+                    .affected_items(affected_items)
+                    .data_hash(data_hash)
+                    .build(),
+            );
+        }
+
+        issues.extend(self.analyze_timezone(configured_timezone, client_timezone));
+        issues
+    }
+
+    fn analyze_timezone(
+        &self,
+        configured_timezone: Option<&str>,
+        client_timezone: Option<&str>,
+    ) -> Vec<HealthIssue> {
+        let configured_timezone = configured_timezone.unwrap_or("").trim();
+
+        if configured_timezone.is_empty() {
+            let data_hash = compute_data_hash(&["MISSING".to_string()]);
+            return vec![HealthIssue::builder()
+                .id(format!("timezone_missing:{}", data_hash))
+                .severity(Severity::Warning)
+                .category(HealthCategory::SettingsConfiguration)
+                .title("Timezone not configured".to_string())
+                .message(
+                    "Set your timezone in General settings to ensure dates match your locale."
+                        .to_string(),
+                )
+                .affected_count(1)
+                .navigate_action(NavigateAction::to_general_settings())
+                .data_hash(data_hash)
+                .build()];
+        }
+
+        let configured_tz = match parse_user_timezone(configured_timezone) {
+            Ok(tz) => tz,
+            Err(_) => {
+                let data_hash = compute_data_hash(&[configured_timezone.to_string()]);
+                return vec![HealthIssue::builder()
+                    .id(format!("timezone_invalid:{}", data_hash))
+                    .severity(Severity::Error)
+                    .category(HealthCategory::SettingsConfiguration)
+                    .title("Configured timezone is invalid".to_string())
+                    .message(format!(
+                        "The configured timezone \"{}\" is invalid. Update it in General settings.",
+                        configured_timezone
+                    ))
+                    .affected_count(1)
+                    .navigate_action(NavigateAction::to_general_settings())
+                    .data_hash(data_hash)
+                    .build()];
+            }
+        };
+
+        let client_timezone = client_timezone.unwrap_or("").trim();
+        if client_timezone.is_empty() {
             return Vec::new();
         }
 
-        let count = unconfigured_accounts.len();
-        let account_ids: Vec<String> = unconfigured_accounts
-            .iter()
-            .map(|a| a.account_id.clone())
-            .collect();
-        let data_hash = compute_data_hash(&account_ids);
-
-        let affected_items: Vec<AffectedItem> = unconfigured_accounts
-            .iter()
-            .map(|a| AffectedItem::account(&a.account_id, &a.account_name))
-            .collect();
-
-        let title = if count == 1 {
-            "1 account needs setup".to_string()
-        } else {
-            format!("{} accounts need setup", count)
+        let client_tz = match parse_user_timezone(client_timezone) {
+            Ok(tz) => tz,
+            Err(_) => return Vec::new(),
         };
 
-        let message = if count == 1 {
-            "Choose a tracking mode to start syncing data.".to_string()
-        } else {
-            "Choose tracking modes to start syncing data.".to_string()
-        };
+        if configured_tz.name() == client_tz.name() {
+            return Vec::new();
+        }
 
+        let data_hash = compute_data_hash(&[
+            configured_tz.name().to_string(),
+            client_tz.name().to_string(),
+        ]);
         vec![HealthIssue::builder()
-            .id(format!("unconfigured_accounts:{}", data_hash))
+            .id(format!("timezone_mismatch:{}", data_hash))
             .severity(Severity::Warning)
-            .category(HealthCategory::AccountConfiguration)
-            .title(title)
-            .message(message)
-            .affected_count(count as u32)
-            .navigate_action(NavigateAction::to_connect())
-            .affected_items(affected_items)
+            .category(HealthCategory::SettingsConfiguration)
+            .title("Browser and app timezones differ".to_string())
+            .message(format!(
+                "Configured timezone is \"{}\" but browser timezone is \"{}\". Dates follow the configured timezone.",
+                configured_tz.name(),
+                client_tz.name()
+            ))
+            .affected_count(1)
+            .navigate_action(NavigateAction::to_general_settings())
             .data_hash(data_hash)
             .build()]
     }
@@ -101,7 +187,7 @@ mod tests {
         let check = AccountConfigurationCheck::new();
         let ctx = HealthContext::new(HealthConfig::default(), "USD", 100_000.0);
 
-        let issues = check.analyze(&[], &ctx);
+        let issues = check.analyze(&[], Some("UTC"), None, &ctx);
         assert!(issues.is_empty());
     }
 
@@ -115,7 +201,7 @@ mod tests {
             account_name: "My Brokerage".to_string(),
         }];
 
-        let issues = check.analyze(&accounts, &ctx);
+        let issues = check.analyze(&accounts, Some("UTC"), None, &ctx);
         assert_eq!(issues.len(), 1);
         assert_eq!(issues[0].severity, Severity::Warning);
         assert_eq!(issues[0].category, HealthCategory::AccountConfiguration);
@@ -148,11 +234,60 @@ mod tests {
             },
         ];
 
-        let issues = check.analyze(&accounts, &ctx);
+        let issues = check.analyze(&accounts, Some("UTC"), None, &ctx);
         assert_eq!(issues.len(), 1);
         assert_eq!(issues[0].affected_count, 3);
         assert!(issues[0].title.contains("3 accounts"));
         assert!(issues[0].affected_items.is_some());
         assert_eq!(issues[0].affected_items.as_ref().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn test_missing_timezone_emits_warning_issue() {
+        let check = AccountConfigurationCheck::new();
+        let ctx = HealthContext::new(HealthConfig::default(), "USD", 100_000.0);
+
+        let issues = check.analyze(&[], Some(""), None, &ctx);
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].category, HealthCategory::SettingsConfiguration);
+        assert_eq!(issues[0].severity, Severity::Warning);
+        assert!(issues[0].title.contains("Timezone"));
+        assert_eq!(
+            issues[0].navigate_action.as_ref().map(|a| a.route.as_str()),
+            Some("/settings/general")
+        );
+    }
+
+    #[test]
+    fn test_invalid_configured_timezone_emits_error_issue() {
+        let check = AccountConfigurationCheck::new();
+        let ctx = HealthContext::new(HealthConfig::default(), "USD", 100_000.0);
+
+        let issues = check.analyze(&[], Some("Mars/Phobos"), None, &ctx);
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].category, HealthCategory::SettingsConfiguration);
+        assert_eq!(issues[0].severity, Severity::Error);
+        assert!(issues[0].title.contains("invalid"));
+    }
+
+    #[test]
+    fn test_timezone_mismatch_emits_warning_issue() {
+        let check = AccountConfigurationCheck::new();
+        let ctx = HealthContext::new(HealthConfig::default(), "USD", 100_000.0);
+
+        let issues = check.analyze(&[], Some("UTC"), Some("Europe/Paris"), &ctx);
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].category, HealthCategory::SettingsConfiguration);
+        assert_eq!(issues[0].severity, Severity::Warning);
+        assert!(issues[0].title.contains("timezones differ"));
+    }
+
+    #[test]
+    fn test_timezone_match_emits_no_issue() {
+        let check = AccountConfigurationCheck::new();
+        let ctx = HealthContext::new(HealthConfig::default(), "USD", 100_000.0);
+
+        let issues = check.analyze(&[], Some("Europe/Paris"), Some("Europe/Paris"), &ctx);
+        assert!(issues.is_empty());
     }
 }

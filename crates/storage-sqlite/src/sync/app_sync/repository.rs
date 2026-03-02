@@ -1639,7 +1639,7 @@ mod tests {
         let db_path = init(&app_data).expect("init db");
         run_migrations(&db_path).expect("migrate db");
         let pool = create_pool(&db_path).expect("create pool");
-        let writer = spawn_writer(pool.as_ref().clone());
+        let writer = spawn_writer(pool.as_ref().clone()).expect("spawn writer");
         (pool, writer)
     }
 

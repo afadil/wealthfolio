@@ -210,7 +210,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             // We need to find the platform that matches this broker account's connection
             let platform_id = self.find_platform_for_account(broker_account)?;
 
-            // Create new account with trackingMode=NOT_SET (requires user to choose before sync)
+            // Create new broker account with HOLDINGS tracking mode by default
             let new_account = NewAccount {
                 id: None, // Let the repository generate a UUID
                 name: broker_account.display_name(),
@@ -225,7 +225,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 provider: Some("SNAPTRADE".to_string()),
                 provider_account_id: Some(provider_account_id.clone()),
                 is_archived: false,
-                tracking_mode: TrackingMode::NotSet,
+                tracking_mode: TrackingMode::Holdings,
             };
 
             // Create the account via AccountService (handles FX rate registration)
@@ -329,10 +329,10 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             return Ok((0, 0, Vec::new(), 0));
         }
 
-        // 2. Use prepare_activities for asset creation + FX registration
+        // 2. Use sync preparation for asset creation + FX registration
         let prepare_result = self
             .activity_service
-            .prepare_activities(new_activities, &account)
+            .prepare_activities_for_sync(new_activities, &account)
             .await?;
         let new_asset_ids = prepare_result.created_asset_ids.clone();
 
@@ -457,6 +457,22 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 account_id,
                 DEFAULT_BROKERAGE_PROVIDER.to_string(),
                 error,
+                import_run_id,
+            )
+            .await
+    }
+
+    async fn finalize_activity_sync_needs_review(
+        &self,
+        account_id: String,
+        warning: String,
+        import_run_id: Option<String>,
+    ) -> Result<()> {
+        self.brokers_sync_state_repository
+            .upsert_needs_review(
+                account_id,
+                DEFAULT_BROKERAGE_PROVIDER.to_string(),
+                warning,
                 import_run_id,
             )
             .await
@@ -617,7 +633,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 instrument_exchange_mic: exchange_mic,
                 instrument_type: Some(instrument_type),
                 quote_ccy: currency.clone(),
-                quote_ccy_hint: Some(currency.clone()),
+                requested_quote_ccy: Some(currency.clone()),
                 kind: AssetKind::Investment,
                 quote_mode: None,
                 name: asset_name,
