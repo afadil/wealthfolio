@@ -534,6 +534,10 @@
   padding-left: var(--inset-left);
 }
 
+[data-sonner-toaster] {
+  z-index: 2147483647 !important;
+}
+
 /* QR scanning transparency overrides */
 body.qr-scan-active,
 body.qr-scan-active #root,

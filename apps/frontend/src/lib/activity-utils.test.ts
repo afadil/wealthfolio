@@ -3,6 +3,7 @@ import {
   isCashActivity,
   isCashTransfer,
   isIncomeActivity,
+  isAssetBackedIncomeActivity,
   calculateActivityValue,
   formatSplitRatio,
 } from "./activity-utils";
@@ -45,6 +46,25 @@ describe("Activity Utilities", () => {
       expect(isCashTransfer(ActivityType.TRANSFER_IN, "CASH:XTSE")).toBe(false);
       expect(isCashTransfer(ActivityType.TRANSFER_IN, "CASH.TO")).toBe(false);
       expect(isCashTransfer(ActivityType.DEPOSIT, "CASH:USD")).toBe(false);
+    });
+  });
+
+  describe("isAssetBackedIncomeActivity", () => {
+    it("should identify asset-backed income when symbol/id is non-cash", () => {
+      expect(isAssetBackedIncomeActivity(ActivityType.INTEREST, "SOL", "")).toBe(true);
+      expect(isAssetBackedIncomeActivity(ActivityType.INTEREST, "", "CRYPTO:SOL:CAD")).toBe(true);
+      expect(isAssetBackedIncomeActivity(ActivityType.DIVIDEND, "AAPL", "AAPL")).toBe(true);
+    });
+
+    it("should treat cash-like income identifiers as non-asset-backed", () => {
+      expect(isAssetBackedIncomeActivity(ActivityType.INTEREST, "CASH", "")).toBe(false);
+      expect(isAssetBackedIncomeActivity(ActivityType.INTEREST, "CASH:USD", "")).toBe(false);
+      expect(isAssetBackedIncomeActivity(ActivityType.INTEREST, "$CASH-CAD", "")).toBe(false);
+    });
+
+    it("should return false for non-income types", () => {
+      expect(isAssetBackedIncomeActivity(ActivityType.BUY, "AAPL", "AAPL")).toBe(false);
+      expect(isAssetBackedIncomeActivity(ActivityType.DEPOSIT, "SOL", "SOL")).toBe(false);
     });
   });
 

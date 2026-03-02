@@ -45,6 +45,7 @@ mod tests {
         assert_eq!(mic_to_exchange_name("XNAS"), Some("NASDAQ"));
         assert_eq!(mic_to_exchange_name("XTSE"), Some("TSX"));
         assert_eq!(mic_to_exchange_name("XLON"), Some("LSE"));
+        assert_eq!(mic_to_exchange_name("CXE"), Some("Cboe UK"));
         assert_eq!(mic_to_exchange_name("XETR"), Some("XETRA"));
         assert_eq!(mic_to_exchange_name("UNKNOWN"), None);
     }
@@ -55,6 +56,7 @@ mod tests {
         assert_eq!(mic_to_currency("XNAS"), Some("USD"));
         assert_eq!(mic_to_currency("XTSE"), Some("CAD"));
         assert_eq!(mic_to_currency("XLON"), Some("GBp")); // LSE quotes in pence
+        assert_eq!(mic_to_currency("CXE"), Some("GBP"));
         assert_eq!(mic_to_currency("XETR"), Some("EUR"));
         assert_eq!(mic_to_currency("XTKS"), Some("JPY"));
         assert_eq!(mic_to_currency("UNKNOWN"), None);

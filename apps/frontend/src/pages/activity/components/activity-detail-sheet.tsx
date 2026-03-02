@@ -211,24 +211,6 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
 
           {/* Metadata */}
           <DetailSection title="Record Info" icon={<Icons.Info className="h-4 w-4" />}>
-            <DetailRow
-              label="ID"
-              value={
-                <code className="bg-muted max-w-[200px] truncate rounded px-1.5 py-0.5 text-xs">
-                  {activity.id}
-                </code>
-              }
-            />
-            {activity.assetId && (
-              <DetailRow
-                label="Asset ID"
-                value={
-                  <code className="bg-muted max-w-[200px] truncate rounded px-1.5 py-0.5 text-xs">
-                    {activity.assetId}
-                  </code>
-                }
-              />
-            )}
             {activity.assetQuoteMode && (
               <DetailRow
                 label="Quote Mode"

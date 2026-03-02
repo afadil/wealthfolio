@@ -118,6 +118,14 @@ pub trait BrokerSyncServiceTrait: Send + Sync {
         import_run_id: Option<String>,
     ) -> Result<()>;
 
+    /// Finalize an activity sync as needs-review (partial success) for an account.
+    async fn finalize_activity_sync_needs_review(
+        &self,
+        account_id: String,
+        warning: String,
+        import_run_id: Option<String>,
+    ) -> Result<()>;
+
     /// Get all broker sync states.
     fn get_all_sync_states(&self) -> Result<Vec<BrokerSyncState>>;
 

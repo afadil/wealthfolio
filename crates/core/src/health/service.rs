@@ -103,6 +103,8 @@ impl HealthService {
         consistency_issues: &[ConsistencyIssueInfo],
         legacy_migration_info: &Option<LegacyMigrationInfo>,
         unconfigured_accounts: &[UnconfiguredAccountInfo],
+        configured_timezone: Option<&str>,
+        client_timezone: Option<&str>,
     ) -> Result<HealthStatus> {
         let config = self.config.read().await.clone();
         let ctx = HealthContext::new(config, base_currency, total_portfolio_value);
@@ -175,9 +177,12 @@ impl HealthService {
             "Running account configuration check on {} unconfigured accounts",
             unconfigured_accounts.len()
         );
-        let account_config_issues = self
-            .account_config_check
-            .analyze(unconfigured_accounts, &ctx);
+        let account_config_issues = self.account_config_check.analyze(
+            unconfigured_accounts,
+            configured_timezone,
+            client_timezone,
+            &ctx,
+        );
         debug!(
             "Account configuration check found {} issues",
             account_config_issues.len()
@@ -209,6 +214,7 @@ impl HealthService {
     /// Runs all health checks by gathering data from the provided services.
     ///
     /// This is the main entry point for health checks that handles all data gathering.
+    #[allow(clippy::too_many_arguments)]
     pub async fn run_full_checks(
         &self,
         base_currency: &str,
@@ -217,6 +223,8 @@ impl HealthService {
         quote_service: Arc<dyn QuoteServiceTrait>,
         asset_service: Arc<dyn AssetServiceTrait>,
         taxonomy_service: Arc<dyn TaxonomyServiceTrait>,
+        configured_timezone: Option<&str>,
+        client_timezone: Option<&str>,
     ) -> Result<HealthStatus> {
         // Gather holdings data from all accounts
         let accounts = account_service.get_active_accounts()?;
@@ -321,6 +329,8 @@ impl HealthService {
             &consistency_issues,
             &legacy_migration_info,
             &unconfigured_accounts,
+            configured_timezone,
+            client_timezone,
         )
         .await
     }
@@ -379,6 +389,8 @@ impl HealthServiceTrait for HealthService {
         consistency_issues: &[ConsistencyIssueInfo],
         legacy_migration_info: &Option<LegacyMigrationInfo>,
         unconfigured_accounts: &[UnconfiguredAccountInfo],
+        configured_timezone: Option<&str>,
+        client_timezone: Option<&str>,
     ) -> Result<HealthStatus> {
         // Call the inherent method
         HealthService::run_checks_with_data(
@@ -393,6 +405,8 @@ impl HealthServiceTrait for HealthService {
             consistency_issues,
             legacy_migration_info,
             unconfigured_accounts,
+            configured_timezone,
+            client_timezone,
         )
         .await
     }
@@ -518,6 +532,8 @@ impl HealthServiceTrait for HealthService {
         quote_service: Arc<dyn QuoteServiceTrait>,
         asset_service: Arc<dyn AssetServiceTrait>,
         taxonomy_service: Arc<dyn TaxonomyServiceTrait>,
+        configured_timezone: Option<&str>,
+        client_timezone: Option<&str>,
     ) -> Result<HealthStatus> {
         HealthService::run_full_checks(
             self,
@@ -527,6 +543,8 @@ impl HealthServiceTrait for HealthService {
             quote_service,
             asset_service,
             taxonomy_service,
+            configured_timezone,
+            client_timezone,
         )
         .await
     }
@@ -597,6 +615,8 @@ mod tests {
                 &[],
                 &None,
                 &[],
+                Some("UTC"),
+                None,
             )
             .await
             .unwrap();
@@ -672,6 +692,8 @@ mod tests {
                 &[],
                 &None,
                 &[],
+                Some("UTC"),
+                None,
             )
             .await
             .unwrap();
@@ -708,6 +730,8 @@ mod tests {
                 &[],
                 &None,
                 &[],
+                Some("UTC"),
+                None,
             )
             .await
             .unwrap();
@@ -734,6 +758,8 @@ mod tests {
                 &[],
                 &None,
                 &[],
+                Some("UTC"),
+                None,
             )
             .await
             .unwrap();

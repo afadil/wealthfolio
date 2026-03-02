@@ -1,8 +1,9 @@
-import { useCallback, useMemo } from "react";
 import { logger } from "@/adapters";
 import { ActivityType } from "@/lib/constants";
 import { generateId } from "@/lib/id";
 import type { ActivityCreate, ActivityDetails } from "@/lib/types";
+import { useCallback, useMemo } from "react";
+import { toast } from "sonner";
 import type { AccountSelectOption } from "../components/forms/fields";
 import type { NewActivityFormValues } from "../components/forms/schemas";
 import type { TransferFormValues } from "../components/forms/transfer-form";
@@ -11,11 +12,21 @@ import {
   type ActivityFormValues,
   type PickerActivityType,
 } from "../config/activity-form-config";
-import { isPureCashActivity } from "../utils/activity-form-utils";
 import { useActivityMutations } from "./use-activity-mutations";
 
 function generateSourceGroupId(): string {
   return generateId("wf-transfer");
+}
+
+function extractErrorMessage(error: unknown): string {
+  if (typeof error === "string" && error.trim()) return error;
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (error && typeof error === "object") {
+    const raw = error as Record<string, unknown>;
+    if (typeof raw.error === "string" && raw.error.trim()) return raw.error;
+    if (typeof raw.message === "string" && raw.message.trim()) return raw.message;
+  }
+  return "Failed to save activity. Please check your inputs and try again.";
 }
 
 export interface UseActivityFormParams {
@@ -136,7 +147,6 @@ export function useActivityForm({
           const submitData: NewActivityFormValues = {
             ...basePayload,
             activityType,
-            currency: account?.currency,
           } as NewActivityFormValues;
 
           if (!submitData.currency?.trim() && account?.currency) {
@@ -146,8 +156,9 @@ export function useActivityForm({
           if (isEditing && activity?.id) {
             await updateActivityMutation.mutateAsync({
               id: activity.id,
+              existingAssetId: activity.assetId,
               ...submitData,
-            });
+            } as NewActivityFormValues & { id: string; existingAssetId?: string });
           } else {
             await addActivityMutation.mutateAsync(submitData);
           }
@@ -164,10 +175,6 @@ export function useActivityForm({
         const submitData: NewActivityFormValues = {
           ...basePayload,
           activityType: config.activityType as NewActivityFormValues["activityType"],
-          // For pure cash activities, include account currency
-          ...(isPureCashActivity(config.activityType) && account
-            ? { currency: account.currency }
-            : {}),
         } as NewActivityFormValues;
 
         if (!submitData.currency?.trim() && account?.currency) {
@@ -177,12 +184,15 @@ export function useActivityForm({
         if (isEditing && activity?.id) {
           await updateActivityMutation.mutateAsync({
             id: activity.id,
+            existingAssetId: activity.assetId,
             ...submitData,
-          });
+          } as NewActivityFormValues & { id: string; existingAssetId?: string });
         } else {
           await addActivityMutation.mutateAsync(submitData);
         }
       } catch (err) {
+        const message = extractErrorMessage(err);
+        toast.error("Failed to save activity", { description: message });
         logger.error(`Activity Form Submit Error: ${JSON.stringify({ error: err, formData })}`);
       }
     },

@@ -421,6 +421,9 @@ impl CredentialStore for ServerEnginePorts {
     }
 
     async fn get_sync_state(&self) -> Result<SyncState, String> {
+        crate::api::connect::mint_access_token(&self.state)
+            .await
+            .map_err(|e| e.to_string())?;
         self.state
             .device_enroll_service
             .get_sync_state()
@@ -539,6 +542,9 @@ struct ServerReadyReconcileRunner {
 #[async_trait]
 impl ReadyReconcileStore for ServerReadyReconcileRunner {
     async fn get_sync_state(&self) -> Result<SyncState, String> {
+        crate::api::connect::mint_access_token(&self.state)
+            .await
+            .map_err(|e| e.to_string())?;
         self.state
             .device_enroll_service
             .get_sync_state()

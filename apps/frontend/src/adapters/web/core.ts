@@ -1206,6 +1206,16 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
+  if (command === "get_health_status" || command === "run_health_checks") {
+    const payloadTimezone =
+      typeof payload === "object" && payload !== null && "clientTimezone" in payload
+        ? String((payload as { clientTimezone?: string }).clientTimezone ?? "").trim()
+        : "";
+    const clientTimezone = payloadTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (clientTimezone) {
+      headers["X-Client-Timezone"] = clientTimezone;
+    }
+  }
 
   const res = await fetch(url, {
     method: config.method,

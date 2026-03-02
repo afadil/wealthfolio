@@ -68,6 +68,42 @@ export const isCashTransfer = (activityType: string, assetSymbol: string): boole
   return false;
 };
 
+const isCanonicalCashIdentifier = (identifier: string): boolean => {
+  const upper = identifier.toUpperCase();
+  if (upper === "CASH") {
+    return true;
+  }
+  if (upper.startsWith("CASH:")) {
+    const currency = upper.slice("CASH:".length);
+    return /^[A-Z]{3}$/.test(currency);
+  }
+  return false;
+};
+
+/**
+ * Income activities can still be asset-backed (e.g. in-kind staking rewards).
+ * Returns true when an income activity carries a non-cash asset identifier.
+ */
+export const isAssetBackedIncomeActivity = (
+  activityType: string,
+  assetSymbol?: string,
+  assetId?: string,
+): boolean => {
+  if (!isIncomeActivity(activityType)) {
+    return false;
+  }
+
+  const identifiers = [assetSymbol, assetId]
+    .map((value) => value?.trim() ?? "")
+    .filter((value) => value.length > 0);
+
+  if (identifiers.length === 0) {
+    return false;
+  }
+
+  return identifiers.some((value) => !isCashSymbol(value) && !isCanonicalCashIdentifier(value));
+};
+
 // Helper to check if activity is a trade type
 export const isTradeActivity = (type: string): boolean => {
   return type === ActivityType.BUY || type === ActivityType.SELL;

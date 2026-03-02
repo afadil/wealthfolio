@@ -25,7 +25,8 @@ use super::sync_state::{QuoteSyncState, SymbolSyncPlan, SyncMode, SyncStateStore
 use super::types::{quote_id, AssetId, Day, QuoteSource};
 use crate::activities::ActivityRepositoryTrait;
 use crate::assets::{
-    Asset, AssetKind, AssetRepositoryTrait, InstrumentType, ProviderProfile, QuoteMode,
+    symbol_resolution_candidates, Asset, AssetKind, AssetRepositoryTrait, InstrumentType,
+    ProviderProfile, QuoteMode,
 };
 use crate::errors::Result;
 use crate::fx::currency::{get_normalization_rule, normalize_currency_code};
@@ -86,6 +87,12 @@ fn reconcile_quote_currency(quote: &mut Quote, asset: &Asset) {
     if let Some(effective) = resolve_effective_quote_currency(&asset.quote_ccy, &quote.currency) {
         quote.currency = effective;
     }
+}
+
+fn extract_provider_id_from_sync_error(error: &str) -> Option<&'static str> {
+    super::constants::MARKET_DATA_PROVIDER_IDS
+        .into_iter()
+        .find(|provider_id| error.contains(provider_id))
 }
 
 /// Latest quote payload enriched with backend freshness computation.
@@ -923,49 +930,52 @@ where
             trimmed_symbol
         };
 
-        let temp_asset = Asset {
-            id: format!("_QUOTE_RESOLVE_{}", clean_symbol),
-            kind: AssetKind::Investment,
-            quote_mode: QuoteMode::Market,
-            quote_ccy: String::new(),
-            instrument_type: instrument_type.cloned().or(Some(InstrumentType::Equity)),
-            instrument_symbol: Some(clean_symbol.to_string()),
-            display_code: Some(clean_symbol.to_string()),
-            instrument_exchange_mic: exchange_mic.map(str::to_string),
-            ..Default::default()
-        };
+        for attempt_symbol in symbol_resolution_candidates(clean_symbol) {
+            let temp_asset = Asset {
+                id: format!("_QUOTE_RESOLVE_{}", attempt_symbol),
+                kind: AssetKind::Investment,
+                quote_mode: QuoteMode::Market,
+                quote_ccy: String::new(),
+                instrument_type: instrument_type.cloned().or(Some(InstrumentType::Equity)),
+                instrument_symbol: Some(attempt_symbol.clone()),
+                display_code: Some(attempt_symbol.clone()),
+                instrument_exchange_mic: exchange_mic.map(str::to_string),
+                ..Default::default()
+            };
 
-        match self
-            .client
-            .read()
-            .await
-            .fetch_latest_quote(&temp_asset)
-            .await
-        {
-            Ok(quote) => {
-                let currency = {
-                    let c = quote.currency.trim();
-                    if c.is_empty() {
+            match self
+                .client
+                .read()
+                .await
+                .fetch_latest_quote(&temp_asset)
+                .await
+            {
+                Ok(quote) => {
+                    let currency = {
+                        let c = quote.currency.trim();
+                        if c.is_empty() {
+                            None
+                        } else {
+                            Some(c.to_string())
+                        }
+                    };
+                    let price = if quote.close.is_zero() {
                         None
                     } else {
-                        Some(c.to_string())
-                    }
-                };
-                let price = if quote.close.is_zero() {
-                    None
-                } else {
-                    Some(quote.close)
-                };
-                Ok(ResolvedQuote { currency, price })
-            }
-            Err(err) => {
-                debug!(
-                    "resolve_symbol_quote: provider lookup failed for symbol='{}' mic={:?}: {}",
-                    clean_symbol, exchange_mic, err
-                );
-                Ok(ResolvedQuote::default())
+                        Some(quote.close)
+                    };
+                    return Ok(ResolvedQuote { currency, price });
+                }
+                Err(err) => {
+                    debug!(
+                        "resolve_symbol_quote: provider lookup failed for symbol='{}' mic={:?}: {}",
+                        attempt_symbol, exchange_mic, err
+                    );
+                }
             }
         }
+
+        Ok(ResolvedQuote::default())
     }
 
     async fn get_asset_profile(&self, asset: &Asset) -> Result<ProviderProfile> {
@@ -1180,6 +1190,43 @@ where
             .into_iter()
             .map(|s| (s.provider_id.clone(), s))
             .collect();
+        let sync_states_with_errors = self.get_sync_states_with_errors()?;
+
+        #[derive(Default)]
+        struct ProviderErrorStats {
+            error_count: i64,
+            last_sync_error: Option<String>,
+            last_error_at_millis: Option<i64>,
+            unique_errors: HashSet<String>,
+        }
+
+        let mut error_stats_map: HashMap<String, ProviderErrorStats> = HashMap::new();
+        for state in sync_states_with_errors {
+            let Some(last_error) = state.last_error else {
+                continue;
+            };
+
+            let provider_id = extract_provider_id_from_sync_error(&last_error)
+                .map(|id| id.to_string())
+                .unwrap_or_else(|| state.data_source.clone());
+            if provider_id.is_empty() {
+                continue;
+            }
+
+            let entry = error_stats_map.entry(provider_id).or_default();
+            entry.error_count += 1;
+            entry.unique_errors.insert(last_error.clone());
+
+            let updated_at_millis = state.updated_at.timestamp_millis();
+            if entry
+                .last_error_at_millis
+                .map(|current| updated_at_millis > current)
+                .unwrap_or(true)
+            {
+                entry.last_error_at_millis = Some(updated_at_millis);
+                entry.last_sync_error = Some(last_error);
+            }
+        }
 
         let mut infos = Vec::new();
         for setting in settings {
@@ -1206,12 +1253,16 @@ where
             // Get sync stats for this provider
             let stats = stats_map.get(&setting.id);
             let asset_count = stats.map(|s| s.asset_count).unwrap_or(0);
-            let error_count = stats.map(|s| s.error_count).unwrap_or(0);
+            let error_stats = error_stats_map.get(&setting.id);
+            let error_count = error_stats.map(|s| s.error_count).unwrap_or(0);
             let last_synced_at = stats
                 .and_then(|s| s.last_synced_at)
                 .map(|dt| dt.to_rfc3339());
-            let last_sync_error = stats.and_then(|s| s.last_error.clone());
-            let unique_errors = stats.map(|s| s.unique_errors.clone()).unwrap_or_default();
+            let last_sync_error = error_stats.and_then(|s| s.last_sync_error.clone());
+            let mut unique_errors: Vec<String> = error_stats
+                .map(|s| s.unique_errors.iter().cloned().collect())
+                .unwrap_or_default();
+            unique_errors.sort();
 
             infos.push(ProviderInfo {
                 id: setting.id.clone(),
@@ -1690,9 +1741,553 @@ fn fill_missing_quotes(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::activities::{
+        Activity, ActivityBulkMutationResult, ActivityRepositoryTrait, ActivityUpdate,
+        ImportMapping, IncomeData, NewActivity, Sort,
+    };
     use crate::assets::QuoteMode;
+    use crate::assets::{AssetRepositoryTrait, NewAsset, UpdateAssetProfile};
+    use crate::limits::ContributionActivity;
     use crate::quotes::model::DataSource;
+    use crate::quotes::store::ProviderSettingsStore;
+    use crate::quotes::types::{AssetId, Day, QuoteSource};
+    use crate::quotes::{
+        LatestQuotePair, MarketDataProviderSetting, ProviderSyncStats, QuoteService, QuoteStore,
+        QuoteSyncState,
+    };
+    use crate::secrets::SecretStore;
+    use async_trait::async_trait;
     use rust_decimal_macros::dec;
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    #[derive(Default)]
+    struct NoopQuoteStore;
+
+    #[async_trait]
+    impl QuoteStore for NoopQuoteStore {
+        async fn save_quote(&self, _quote: &Quote) -> Result<Quote> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn delete_quote(&self, _quote_id: &str) -> Result<()> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn upsert_quotes(&self, _quotes: &[Quote]) -> Result<usize> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn delete_quotes_for_asset(&self, _asset_id: &AssetId) -> Result<usize> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn delete_provider_quotes_for_asset(&self, _asset_id: &AssetId) -> Result<usize> {
+            unimplemented!("unused in this test")
+        }
+
+        fn latest(
+            &self,
+            _asset_id: &AssetId,
+            _source: Option<&QuoteSource>,
+        ) -> Result<Option<Quote>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn range(
+            &self,
+            _asset_id: &AssetId,
+            _start: Day,
+            _end: Day,
+            _source: Option<&QuoteSource>,
+        ) -> Result<Vec<Quote>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn latest_batch(
+            &self,
+            _asset_ids: &[AssetId],
+            _source: Option<&QuoteSource>,
+        ) -> Result<HashMap<AssetId, Quote>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn latest_with_previous(
+            &self,
+            _asset_ids: &[AssetId],
+        ) -> Result<HashMap<AssetId, LatestQuotePair>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_quote_bounds_for_assets(
+            &self,
+            _asset_ids: &[String],
+            _source: &str,
+        ) -> Result<HashMap<String, (NaiveDate, NaiveDate)>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_latest_quote(&self, _symbol: &str) -> Result<Quote> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_latest_quotes(&self, _symbols: &[String]) -> Result<HashMap<String, Quote>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_latest_quotes_pair(
+            &self,
+            _symbols: &[String],
+        ) -> Result<HashMap<String, LatestQuotePair>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_historical_quotes(&self, _symbol: &str) -> Result<Vec<Quote>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_all_historical_quotes(&self) -> Result<Vec<Quote>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_quotes_in_range(
+            &self,
+            _symbol: &str,
+            _start: NaiveDate,
+            _end: NaiveDate,
+        ) -> Result<Vec<Quote>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn find_duplicate_quotes(&self, _symbol: &str, _date: NaiveDate) -> Result<Vec<Quote>> {
+            unimplemented!("unused in this test")
+        }
+    }
+
+    struct MockSyncStateStore {
+        provider_sync_stats: Vec<ProviderSyncStats>,
+        with_errors: Vec<QuoteSyncState>,
+    }
+
+    #[async_trait]
+    impl crate::quotes::SyncStateStore for MockSyncStateStore {
+        fn get_provider_sync_stats(&self) -> Result<Vec<ProviderSyncStats>> {
+            Ok(self.provider_sync_stats.clone())
+        }
+
+        fn get_all(&self) -> Result<Vec<QuoteSyncState>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_by_asset_id(&self, _asset_id: &str) -> Result<Option<QuoteSyncState>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_by_asset_ids(
+            &self,
+            _asset_ids: &[String],
+        ) -> Result<HashMap<String, QuoteSyncState>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_active_assets(&self) -> Result<Vec<QuoteSyncState>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_assets_needing_sync(&self, _grace_period_days: i64) -> Result<Vec<QuoteSyncState>> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn upsert(&self, _state: &QuoteSyncState) -> Result<QuoteSyncState> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn upsert_batch(&self, _states: &[QuoteSyncState]) -> Result<usize> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn update_after_sync(&self, _asset_id: &str) -> Result<()> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn update_after_failure(&self, _asset_id: &str, _error: &str) -> Result<()> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn mark_inactive(&self, _asset_id: &str, _closed_date: NaiveDate) -> Result<()> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn mark_active(&self, _asset_id: &str) -> Result<()> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn delete(&self, _asset_id: &str) -> Result<()> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn delete_all(&self) -> Result<usize> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn mark_profile_enriched(&self, _asset_id: &str) -> Result<()> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_assets_needing_profile_enrichment(&self) -> Result<Vec<QuoteSyncState>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_with_errors(&self) -> Result<Vec<QuoteSyncState>> {
+            Ok(self.with_errors.clone())
+        }
+    }
+
+    struct MockProviderSettingsStore {
+        providers: Vec<MarketDataProviderSetting>,
+    }
+
+    impl ProviderSettingsStore for MockProviderSettingsStore {
+        fn get_all_providers(&self) -> Result<Vec<MarketDataProviderSetting>> {
+            Ok(self.providers.clone())
+        }
+
+        fn get_provider(&self, id: &str) -> Result<MarketDataProviderSetting> {
+            self.providers
+                .iter()
+                .find(|p| p.id == id)
+                .cloned()
+                .ok_or_else(|| crate::Error::Unexpected(format!("Provider not found: {}", id)))
+        }
+
+        fn update_provider(
+            &self,
+            _id: &str,
+            _changes: crate::quotes::UpdateMarketDataProviderSetting,
+        ) -> Result<MarketDataProviderSetting> {
+            unimplemented!("unused in this test")
+        }
+    }
+
+    #[derive(Default)]
+    struct NoopAssetRepository;
+
+    #[async_trait]
+    impl AssetRepositoryTrait for NoopAssetRepository {
+        async fn create(&self, _new_asset: NewAsset) -> Result<Asset> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn create_batch(&self, _new_assets: Vec<NewAsset>) -> Result<Vec<Asset>> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn update_profile(
+            &self,
+            _asset_id: &str,
+            _payload: UpdateAssetProfile,
+        ) -> Result<Asset> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn update_quote_mode(&self, _asset_id: &str, _quote_mode: &str) -> Result<Asset> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_by_id(&self, _asset_id: &str) -> Result<Asset> {
+            unimplemented!("unused in this test")
+        }
+
+        fn list(&self) -> Result<Vec<Asset>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn list_by_asset_ids(&self, _asset_ids: &[String]) -> Result<Vec<Asset>> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn delete(&self, _asset_id: &str) -> Result<()> {
+            unimplemented!("unused in this test")
+        }
+
+        fn search_by_symbol(&self, _query: &str) -> Result<Vec<Asset>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn find_by_instrument_key(&self, _instrument_key: &str) -> Result<Option<Asset>> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn cleanup_legacy_metadata(&self, _asset_id: &str) -> Result<()> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn deactivate(&self, _asset_id: &str) -> Result<()> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn reactivate(&self, _asset_id: &str) -> Result<()> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn copy_user_metadata(&self, _source_id: &str, _target_id: &str) -> Result<()> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn deactivate_orphaned_investments(&self) -> Result<Vec<String>> {
+            unimplemented!("unused in this test")
+        }
+    }
+
+    #[derive(Default)]
+    struct NoopActivityRepository;
+
+    #[async_trait]
+    impl ActivityRepositoryTrait for NoopActivityRepository {
+        fn get_activity(&self, _activity_id: &str) -> Result<Activity> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_activities(&self) -> Result<Vec<Activity>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_activities_by_account_id(&self, _account_id: &str) -> Result<Vec<Activity>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_activities_by_account_ids(&self, _account_ids: &[String]) -> Result<Vec<Activity>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_trading_activities(&self) -> Result<Vec<Activity>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_income_activities(&self) -> Result<Vec<Activity>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_contribution_activities(
+            &self,
+            _account_ids: &[String],
+            _start_date: chrono::DateTime<chrono::Utc>,
+            _end_date: chrono::DateTime<chrono::Utc>,
+        ) -> Result<Vec<ContributionActivity>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn search_activities(
+            &self,
+            _page: i64,
+            _page_size: i64,
+            _account_id_filter: Option<Vec<String>>,
+            _activity_type_filter: Option<Vec<String>>,
+            _asset_id_keyword: Option<String>,
+            _sort: Option<Sort>,
+            _needs_review_filter: Option<bool>,
+            _date_from: Option<NaiveDate>,
+            _date_to: Option<NaiveDate>,
+        ) -> Result<crate::activities::ActivitySearchResponse> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn create_activity(&self, _new_activity: NewActivity) -> Result<Activity> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn update_activity(&self, _activity_update: ActivityUpdate) -> Result<Activity> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn delete_activity(&self, _activity_id: String) -> Result<Activity> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn bulk_mutate_activities(
+            &self,
+            _creates: Vec<NewActivity>,
+            _updates: Vec<ActivityUpdate>,
+            _delete_ids: Vec<String>,
+        ) -> Result<ActivityBulkMutationResult> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn create_activities(&self, _activities: Vec<NewActivity>) -> Result<usize> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_first_activity_date(
+            &self,
+            _account_ids: Option<&[String]>,
+        ) -> Result<Option<chrono::DateTime<Utc>>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_import_mapping(&self, _account_id: &str) -> Result<Option<ImportMapping>> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn save_import_mapping(&self, _mapping: &ImportMapping) -> Result<()> {
+            unimplemented!("unused in this test")
+        }
+
+        fn calculate_average_cost(
+            &self,
+            _account_id: &str,
+            _asset_id: &str,
+        ) -> Result<rust_decimal::Decimal> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_income_activities_data(&self) -> Result<Vec<IncomeData>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_first_activity_date_overall(&self) -> Result<chrono::DateTime<Utc>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_activity_bounds_for_assets(
+            &self,
+            _asset_ids: &[String],
+        ) -> Result<HashMap<String, (Option<NaiveDate>, Option<NaiveDate>)>> {
+            unimplemented!("unused in this test")
+        }
+
+        fn check_existing_duplicates(
+            &self,
+            _idempotency_keys: &[String],
+        ) -> Result<HashMap<String, String>> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn bulk_upsert(
+            &self,
+            _activities: Vec<crate::activities::ActivityUpsert>,
+        ) -> Result<crate::activities::BulkUpsertResult> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn reassign_asset(&self, _old_asset_id: &str, _new_asset_id: &str) -> Result<u32> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn get_activity_accounts_and_currencies_by_asset_id(
+            &self,
+            _asset_id: &str,
+        ) -> Result<(Vec<String>, Vec<String>)> {
+            unimplemented!("unused in this test")
+        }
+    }
+
+    #[derive(Default)]
+    struct MockSecretStore;
+
+    impl SecretStore for MockSecretStore {
+        fn set_secret(&self, _service: &str, _secret: &str) -> Result<()> {
+            Ok(())
+        }
+
+        fn get_secret(&self, _service: &str) -> Result<Option<String>> {
+            Ok(None)
+        }
+
+        fn delete_secret(&self, _service: &str) -> Result<()> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_providers_info_attributes_error_to_provider_from_error_message() {
+        let now = Utc::now();
+        let finnhub_error = "Market data operation failed: Provider error: FINNHUB: Access forbidden - check API key: {\"error\":\"You don't have access to this resource.\"}".to_string();
+
+        let provider_settings = Arc::new(MockProviderSettingsStore {
+            providers: vec![
+                MarketDataProviderSetting {
+                    id: "YAHOO".to_string(),
+                    name: "Yahoo Finance".to_string(),
+                    description: "Yahoo provider".to_string(),
+                    url: Some("https://finance.yahoo.com".to_string()),
+                    priority: 1,
+                    enabled: false,
+                    logo_filename: None,
+                    last_synced_at: None,
+                    last_sync_status: None,
+                    last_sync_error: None,
+                    capabilities: None,
+                },
+                MarketDataProviderSetting {
+                    id: "FINNHUB".to_string(),
+                    name: "Finnhub".to_string(),
+                    description: "Finnhub provider".to_string(),
+                    url: Some("https://finnhub.io".to_string()),
+                    priority: 2,
+                    enabled: false,
+                    logo_filename: None,
+                    last_synced_at: None,
+                    last_sync_status: None,
+                    last_sync_error: None,
+                    capabilities: None,
+                },
+            ],
+        });
+
+        let sync_state_store = Arc::new(MockSyncStateStore {
+            provider_sync_stats: vec![ProviderSyncStats {
+                provider_id: "YAHOO".to_string(),
+                asset_count: 1,
+                error_count: 1,
+                last_synced_at: Some(now),
+                last_error: Some("old yahoo error".to_string()),
+                unique_errors: vec!["old yahoo error".to_string()],
+            }],
+            with_errors: vec![QuoteSyncState {
+                asset_id: "asset_1".to_string(),
+                is_active: true,
+                position_closed_date: None,
+                last_synced_at: Some(now),
+                data_source: "YAHOO".to_string(),
+                sync_priority: 100,
+                error_count: 1,
+                last_error: Some(finnhub_error.clone()),
+                profile_enriched_at: None,
+                created_at: now,
+                updated_at: now,
+            }],
+        });
+
+        let service = QuoteService::new(
+            Arc::new(NoopQuoteStore),
+            sync_state_store,
+            provider_settings,
+            Arc::new(NoopAssetRepository),
+            Arc::new(NoopActivityRepository),
+            Arc::new(MockSecretStore),
+        )
+        .await
+        .unwrap();
+
+        let providers = QuoteServiceTrait::get_providers_info(&service)
+            .await
+            .unwrap();
+
+        let yahoo = providers.iter().find(|p| p.id == "YAHOO").unwrap();
+        let finnhub = providers.iter().find(|p| p.id == "FINNHUB").unwrap();
+
+        assert_eq!(yahoo.asset_count, 1);
+        assert_eq!(yahoo.error_count, 0);
+        assert!(yahoo.last_sync_error.is_none());
+
+        assert_eq!(finnhub.asset_count, 0);
+        assert_eq!(finnhub.error_count, 1);
+        assert_eq!(
+            finnhub.last_sync_error.as_deref(),
+            Some(finnhub_error.as_str())
+        );
+        assert_eq!(finnhub.unique_errors, vec![finnhub_error]);
+    }
 
     #[test]
     fn test_resolve_effective_quote_currency_prefers_minor_unit() {
@@ -1739,5 +2334,26 @@ mod tests {
 
         reconcile_quote_currency(&mut quote, &asset);
         assert_eq!(quote.currency, "GBp");
+    }
+
+    #[test]
+    fn test_extract_provider_id_from_sync_error_provider_error_format() {
+        let error = "Market data operation failed: Provider error: FINNHUB: Access forbidden";
+        assert_eq!(extract_provider_id_from_sync_error(error), Some("FINNHUB"));
+    }
+
+    #[test]
+    fn test_extract_provider_id_from_sync_error_timeout_format() {
+        let error = "Market data operation failed: Timeout: ALPHA_VANTAGE";
+        assert_eq!(
+            extract_provider_id_from_sync_error(error),
+            Some("ALPHA_VANTAGE")
+        );
+    }
+
+    #[test]
+    fn test_extract_provider_id_from_sync_error_unknown_format() {
+        let error = "Market data operation failed: All providers failed";
+        assert_eq!(extract_provider_id_from_sync_error(error), None);
     }
 }

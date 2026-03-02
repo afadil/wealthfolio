@@ -1,7 +1,6 @@
-import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { ActivityType, QuoteMode } from "@/lib/constants";
-import { Account, ActivityBulkMutationRequest, ActivityCreate } from "@/lib/types";
 import { useSettingsContext } from "@/lib/settings-provider";
+import { Account, ActivityBulkMutationRequest, ActivityCreate } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Button,
@@ -13,7 +12,8 @@ import {
   DialogTitle,
   Form,
 } from "@wealthfolio/ui";
-import { useCallback, useEffect, useState } from "react";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
+import { useCallback, useEffect } from "react";
 import { FormProvider, useForm, type Resolver, type SubmitHandler } from "react-hook-form";
 import { z } from "zod";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
@@ -26,10 +26,15 @@ interface BulkHoldingsModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  defaultAccount?: Account;
 }
 
-export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModalProps) => {
-  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+export const BulkHoldingsModal = ({
+  open,
+  onClose,
+  onSuccess,
+  defaultAccount,
+}: BulkHoldingsModalProps) => {
   const { saveActivitiesMutation } = useActivityMutations();
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
@@ -66,26 +71,29 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
   useEffect(() => {
     if (!open) {
       form.reset();
-      setSelectedAccount(null);
-    } else {
-      if (!form.getValues("currency")) {
-        form.setValue("currency", baseCurrency, { shouldValidate: false });
-      }
-      // When modal opens, focus the account field with proper timing
-      // Use a longer delay to ensure modal is fully rendered
-      const timeoutId = setTimeout(() => {
-        form.setFocus("accountId");
-      }, 150);
-
-      return () => clearTimeout(timeoutId);
+      return;
     }
-    return; // Explicit return for all code paths
-  }, [baseCurrency, form, open]);
+
+    if (defaultAccount) {
+      form.setValue("accountId", defaultAccount.id, { shouldValidate: true });
+      form.setValue("currency", defaultAccount.currency, { shouldValidate: true });
+    } else if (!form.getValues("currency")) {
+      form.setValue("currency", baseCurrency, { shouldValidate: false });
+    }
+
+    // When modal opens, focus the account field with proper timing (only if no default)
+    const timeoutId = setTimeout(() => {
+      if (!defaultAccount) {
+        form.setFocus("accountId");
+      }
+    }, 150);
+
+    return () => clearTimeout(timeoutId);
+  }, [open, baseCurrency, defaultAccount, form]);
 
   // Account change handler
   const handleAccountChange = useCallback(
     (account: Account | null) => {
-      setSelectedAccount(account);
       form.setValue("accountId", account?.id || "", {
         shouldValidate: true,
         shouldDirty: true,
@@ -120,17 +128,20 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
 
       const activityDate =
         data.activityDate instanceof Date ? data.activityDate : new Date(data.activityDate);
-      const currency = data.currency || selectedAccount?.currency || baseCurrency;
+      const currency = data.currency || baseCurrency;
 
       const creates: ActivityCreate[] = validHoldings.map((holding) => ({
         accountId: data.accountId,
         activityType: ActivityType.TRANSFER_IN,
         activityDate: activityDate.toISOString(),
-        // Nest asset fields in asset object (required by backend)
-        asset: {
+        symbol: {
           symbol: (holding.assetId || holding.ticker || "").toUpperCase().trim(),
           exchangeMic: holding.exchangeMic,
+          name: holding.name?.trim() || undefined,
+          kind: holding.assetKind?.trim() || undefined,
           quoteMode: holding.quoteMode ?? QuoteMode.MARKET,
+          quoteCcy: holding.symbolQuoteCcy,
+          instrumentType: holding.symbolInstrumentType,
         },
         quantity: Number(holding.sharesOwned),
         unitPrice: Number(holding.averageCost),
@@ -145,27 +156,69 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
       const request: ActivityBulkMutationRequest = { creates };
 
       try {
-        await saveActivitiesMutation.mutateAsync(request);
+        const result = await saveActivitiesMutation.mutateAsync(request);
+
+        const hasErrors = (result.errors?.length ?? 0) > 0;
+        const hasSuccesses = (result.created?.length ?? 0) > 0;
+
+        if (hasErrors) {
+          const description = result.errors
+            .slice(0, 3)
+            .map((err) => err.message)
+            .join("\n");
+
+          toast({
+            title: hasSuccesses ? "Some holdings failed to save" : "Failed to save holdings",
+            description,
+            variant: "destructive",
+          });
+
+          if (!hasSuccesses) {
+            return;
+          }
+        }
+
         toast({
           title: "Holdings saved",
           description: "Your holdings have been added to this account.",
           variant: "success",
         });
         form.reset();
-        setSelectedAccount(null);
         onSuccess?.();
         onClose();
       } catch {
         // Error handling is managed by the mutation hook toast.
       }
     },
-    [baseCurrency, form, onClose, onSuccess, saveActivitiesMutation, selectedAccount],
+    [baseCurrency, form, onClose, onSuccess, saveActivitiesMutation],
   );
 
   const handleFormError = useCallback((errors: Record<string, any>) => {
-    // Get the first error message to display
-    const firstError = Object.values(errors)[0];
-    const errorMessage = firstError?.message || "Please check the form for errors.";
+    const findFirstMessage = (value: unknown): string | null => {
+      if (!value || typeof value !== "object") return null;
+
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          const msg = findFirstMessage(item);
+          if (msg) return msg;
+        }
+        return null;
+      }
+
+      const record = value as Record<string, unknown>;
+      if (typeof record.message === "string" && record.message.trim()) {
+        return record.message;
+      }
+
+      for (const nested of Object.values(record)) {
+        const msg = findFirstMessage(nested);
+        if (msg) return msg;
+      }
+
+      return null;
+    };
+
+    const errorMessage = findFirstMessage(errors) || "Please check the form for errors.";
 
     toast({
       title: "Form validation failed",
@@ -177,12 +230,12 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
   const isSubmitDisabled =
     saveActivitiesMutation.isPending ||
     !hasValidHoldings ||
-    !selectedAccount ||
+    !form.watch("accountId") ||
     !form.formState.isValid;
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <DialogContent className="max-h-[90vh] w-full overflow-y-auto sm:max-w-6xl">
         <DialogHeader>
           <DialogTitle>Add Existing Holdings</DialogTitle>
           <DialogDescription>
@@ -195,7 +248,10 @@ export const BulkHoldingsModal = ({ open, onClose, onSuccess }: BulkHoldingsModa
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit, handleFormError)} className="space-y-6">
               <div className="py-4">
-                <BulkHoldingsForm onAccountChange={handleAccountChange} />
+                <BulkHoldingsForm
+                  onAccountChange={handleAccountChange}
+                  defaultAccount={defaultAccount}
+                />
               </div>
 
               {/* Display validation errors */}

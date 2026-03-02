@@ -56,6 +56,12 @@ pub enum MarketDataClientError {
     InvalidData(String),
 }
 
+#[derive(Debug)]
+pub struct HistoricalQuoteFetchError {
+    pub error: crate::Error,
+    pub provider_id: Option<String>,
+}
+
 impl From<MarketDataClientError> for crate::Error {
     fn from(e: MarketDataClientError) -> Self {
         use crate::quotes::MarketDataError;
@@ -229,8 +235,24 @@ impl MarketDataClient {
         start: DateTime<Utc>,
         end: DateTime<Utc>,
     ) -> Result<Vec<Quote>> {
+        self.fetch_historical_quotes_with_context(asset, start, end)
+            .await
+            .map_err(|ctx| ctx.error)
+    }
+
+    pub async fn fetch_historical_quotes_with_context(
+        &self,
+        asset: &Asset,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+    ) -> std::result::Result<Vec<Quote>, HistoricalQuoteFetchError> {
         // Convert Asset to QuoteContext
-        let context = self.build_quote_context(asset)?;
+        let context =
+            self.build_quote_context(asset)
+                .map_err(|error| HistoricalQuoteFetchError {
+                    error,
+                    provider_id: None,
+                })?;
 
         debug!(
             "Fetching quotes for {:?} from {} to {}",
@@ -239,12 +261,25 @@ impl MarketDataClient {
             end.format("%Y-%m-%d")
         );
 
-        // Fetch from registry
-        let market_quotes = self
+        let (market_result, diagnostics) = self
             .registry
-            .fetch_quotes(&context, start, end)
-            .await
-            .map_err(MarketDataClientError::from)?;
+            .fetch_quotes_with_diagnostics(&context, start, end)
+            .await;
+
+        let market_quotes = match market_result {
+            Ok(quotes) => quotes,
+            Err(error) => {
+                let provider_id = diagnostics
+                    .errors()
+                    .into_iter()
+                    .last()
+                    .map(|(provider_id, _)| provider_id.to_string());
+                return Err(HistoricalQuoteFetchError {
+                    error: MarketDataClientError::MarketData(error).into(),
+                    provider_id,
+                });
+            }
+        };
 
         // Convert to core Quote format
         let core_quotes: Vec<Quote> = market_quotes
@@ -769,6 +804,27 @@ mod tests {
         assert_eq!(result.exchange_mic.as_deref(), Some("XLON"));
         assert_eq!(result.currency.as_deref(), Some("GBp"));
         assert_eq!(result.currency_source.as_deref(), Some("exchange_inferred"));
+    }
+
+    #[test]
+    fn test_convert_search_result_maps_cxe_to_cboe_mic() {
+        let provider_result =
+            MarketSearchResult::new("VWRPL.XC", "Vanguard ETF", "CXE", "ETF").with_score(20001.0);
+
+        let result = MarketDataClient::convert_search_result(provider_result);
+        assert_eq!(result.symbol, "VWRPL.XC");
+        assert_eq!(result.exchange_mic.as_deref(), Some("CXE"));
+        assert_eq!(result.currency.as_deref(), Some("GBP"));
+        assert_eq!(result.currency_source.as_deref(), Some("exchange_inferred"));
+    }
+
+    #[test]
+    fn test_convert_search_result_maps_lowercase_exchange_code() {
+        let provider_result =
+            MarketSearchResult::new("VWRPL.XC", "Vanguard ETF", "cxe", "ETF").with_score(20001.0);
+
+        let result = MarketDataClient::convert_search_result(provider_result);
+        assert_eq!(result.exchange_mic.as_deref(), Some("CXE"));
     }
 
     // =========================================================================

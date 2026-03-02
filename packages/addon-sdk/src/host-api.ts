@@ -435,7 +435,7 @@ export interface SettingsAPI {
    * @param settingsUpdate Updated settings data
    * @returns Promise resolving to updated settings
    */
-  update(settingsUpdate: Settings): Promise<Settings>;
+  update(settingsUpdate: Partial<Settings>): Promise<Settings>;
 
   /**
    * Create database backup

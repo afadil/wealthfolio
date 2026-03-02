@@ -9,6 +9,7 @@ use wealthfolio_core::quotes::SyncMode;
 /// Get current health status (cached or fresh check).
 #[tauri::command]
 pub async fn get_health_status(
+    client_timezone: Option<String>,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<HealthStatus, String> {
     debug!("Getting health status...");
@@ -24,24 +25,27 @@ pub async fn get_health_status(
 
     // Run fresh checks
     let base_currency = state.get_base_currency();
-    run_health_checks_internal(&state, &base_currency).await
+    run_health_checks_internal(&state, &base_currency, client_timezone.as_deref()).await
 }
 
 /// Run health checks and return fresh status.
 #[tauri::command]
 pub async fn run_health_checks(
+    client_timezone: Option<String>,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<HealthStatus, String> {
     debug!("Running health checks...");
     let base_currency = state.get_base_currency();
-    run_health_checks_internal(&state, &base_currency).await
+    run_health_checks_internal(&state, &base_currency, client_timezone.as_deref()).await
 }
 
 /// Internal function to run health checks.
 async fn run_health_checks_internal(
     state: &State<'_, Arc<ServiceContext>>,
     base_currency: &str,
+    client_timezone: Option<&str>,
 ) -> Result<HealthStatus, String> {
+    let configured_timezone = state.get_timezone();
     state
         .health_service()
         .run_full_checks(
@@ -51,6 +55,8 @@ async fn run_health_checks_internal(
             state.quote_service(),
             state.asset_service(),
             state.taxonomy_service(),
+            Some(configured_timezone.as_str()),
+            client_timezone,
         )
         .await
         .map_err(|e| e.to_string())

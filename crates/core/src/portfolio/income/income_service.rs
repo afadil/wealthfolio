@@ -1,5 +1,5 @@
 use crate::constants::DISPLAY_DECIMAL_PRECISION;
-use crate::utils::time_utils::valuation_date_today;
+use crate::utils::time_utils::{parse_user_timezone_or_default, user_today};
 use crate::{
     activities::{ActivityError, ActivityRepositoryTrait, IncomeData},
     Error, Result,
@@ -21,6 +21,7 @@ pub struct IncomeService {
     fx_service: Arc<dyn FxServiceTrait>,
     activity_repository: Arc<dyn ActivityRepositoryTrait>,
     base_currency: Arc<RwLock<String>>,
+    timezone: Arc<RwLock<String>>,
 }
 
 impl IncomeService {
@@ -29,11 +30,31 @@ impl IncomeService {
         activity_repository: Arc<dyn ActivityRepositoryTrait>,
         base_currency: Arc<RwLock<String>>,
     ) -> Self {
+        Self::new_with_timezone(
+            fx_service,
+            activity_repository,
+            base_currency,
+            Arc::new(RwLock::new(String::new())),
+        )
+    }
+
+    pub fn new_with_timezone(
+        fx_service: Arc<dyn FxServiceTrait>,
+        activity_repository: Arc<dyn ActivityRepositoryTrait>,
+        base_currency: Arc<RwLock<String>>,
+        timezone: Arc<RwLock<String>>,
+    ) -> Self {
         IncomeService {
             fx_service,
             activity_repository,
             base_currency,
+            timezone,
         }
+    }
+
+    fn today_in_user_timezone(&self) -> NaiveDate {
+        let tz = parse_user_timezone_or_default(&self.timezone.read().unwrap());
+        user_today(tz)
     }
 
     fn calculate_yoy_growth(current: Decimal, previous: Decimal) -> Decimal {
@@ -63,7 +84,7 @@ impl IncomeServiceTrait for IncomeService {
         }
 
         let base_currency = self.base_currency.read().unwrap().clone();
-        let current_date = valuation_date_today();
+        let current_date = self.today_in_user_timezone();
         let current_year = current_date.year();
         let last_year = current_year - 1;
         let two_years_ago = current_year - 2;

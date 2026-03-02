@@ -6,14 +6,16 @@ import { invoke } from "./platform";
  * Get current health status (cached or fresh check).
  */
 export const getHealthStatus = async (): Promise<HealthStatus> => {
-  return invoke<HealthStatus>("get_health_status");
+  const clientTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return invoke<HealthStatus>("get_health_status", { clientTimezone });
 };
 
 /**
  * Run health checks and return fresh status.
  */
 export const runHealthChecks = async (): Promise<HealthStatus> => {
-  return invoke<HealthStatus>("run_health_checks");
+  const clientTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return invoke<HealthStatus>("run_health_checks", { clientTimezone });
 };
 
 /**

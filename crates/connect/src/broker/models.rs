@@ -422,6 +422,9 @@ pub struct SyncActivitiesResponse {
     pub activities_upserted: usize,
     pub assets_inserted: usize,
     pub accounts_failed: usize,
+    /// Accounts with soft warnings (e.g., reference-only activity sync issues).
+    #[serde(default)]
+    pub accounts_warned: usize,
     /// IDs of newly created assets (for background enrichment)
     #[serde(default)]
     pub new_asset_ids: Vec<String>,

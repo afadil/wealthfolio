@@ -28,6 +28,10 @@ const STATUS_DISPLAY: Record<
   [ActivityStatus.VOID]: { label: "Void", variant: "destructive" },
 };
 
+const isTransferActivity = (activityType: string | undefined): boolean => {
+  return activityType === ActivityType.TRANSFER_IN || activityType === ActivityType.TRANSFER_OUT;
+};
+
 interface UseActivityColumnsOptions {
   accounts: Account[];
   onEditActivity: (activity: ActivityDetails) => void;
@@ -224,7 +228,9 @@ export function useActivityColumns({
             variant: "symbol",
             isDisabled: (rowData: unknown) => {
               const row = rowData as LocalTransaction;
-              return isCashActivity(row.activityType ?? "");
+              return (
+                isCashActivity(row.activityType ?? "") && !isTransferActivity(row.activityType)
+              );
             },
             getDisplayContext: (rowData: unknown) => {
               const row = rowData as LocalTransaction;

@@ -1,5 +1,6 @@
 use super::assets_model::{
-    Asset, AssetMetadata, AssetSpec, EnsureAssetsResult, NewAsset, UpdateAssetProfile,
+    normalize_quote_ccy_code, Asset, AssetMetadata, AssetSpec, EnsureAssetsResult, InstrumentType,
+    NewAsset, QuoteMode, UpdateAssetProfile,
 };
 use crate::errors::Result;
 
@@ -19,15 +20,15 @@ pub trait AssetServiceTrait: Send + Sync {
     async fn create_asset(&self, new_asset: NewAsset) -> Result<Asset>;
     /// Creates a minimal asset without network calls.
     /// Returns the existing asset if found, or creates a new minimal one.
-    /// Accepts optional metadata hints from the caller (e.g., user-provided asset details).
-    /// If `quote_mode_hint` is provided, it overrides the default quote mode for the asset kind.
+    /// Accepts optional metadata inputs from the caller (e.g., user-provided asset details).
+    /// If `quote_mode` is provided, it overrides the default for the asset kind.
     /// Should be followed by an enrichment event for full profile data.
     async fn get_or_create_minimal_asset(
         &self,
         asset_id: &str,
         context_currency: Option<String>,
         metadata: Option<AssetMetadata>,
-        quote_mode_hint: Option<String>,
+        quote_mode: Option<String>,
     ) -> Result<Asset>;
     async fn update_quote_mode(&self, asset_id: &str, quote_mode: &str) -> Result<Asset>;
     /// Updates quote mode without emitting domain events.
@@ -74,6 +75,106 @@ pub trait AssetServiceTrait: Send + Sync {
         specs: Vec<AssetSpec>,
         activity_repository: &dyn crate::activities::ActivityRepositoryTrait,
     ) -> Result<EnsureAssetsResult>;
+
+    /// Finds an existing asset quote currency by market identity.
+    /// Uses symbol + optional MIC/type and returns normalized quote currency when found.
+    fn existing_quote_ccy_by_symbol(
+        &self,
+        symbol: &str,
+        exchange_mic: Option<&str>,
+        instrument_type: Option<&InstrumentType>,
+    ) -> Option<String> {
+        let symbol = symbol.trim();
+        if symbol.is_empty() {
+            return None;
+        }
+        let upper_symbol = symbol.to_uppercase();
+        let upper_mic = exchange_mic
+            .map(str::trim)
+            .filter(|mic| !mic.is_empty())
+            .map(str::to_uppercase);
+
+        self.get_assets().ok()?.into_iter().find_map(|asset| {
+            let asset_symbol = asset.instrument_symbol.as_deref()?.trim().to_uppercase();
+            if asset_symbol != upper_symbol {
+                return None;
+            }
+
+            if let Some(expected_type) = instrument_type {
+                if asset.instrument_type.as_ref() != Some(expected_type) {
+                    return None;
+                }
+            }
+
+            match (
+                upper_mic.as_deref(),
+                asset.instrument_exchange_mic.as_deref(),
+            ) {
+                (Some(expected), Some(actual)) if actual.eq_ignore_ascii_case(expected) => {}
+                (Some(_), _) => return None,
+                (None, Some(_)) => return None,
+                (None, None) => {}
+            }
+
+            normalize_quote_ccy_code(Some(asset.quote_ccy.as_str()))
+        })
+    }
+
+    /// Validates symbol metadata required for persistence-only user save flows.
+    fn validate_persisted_symbol_metadata(
+        &self,
+        symbol: &str,
+        symbol_id: Option<&str>,
+        exchange_mic: Option<&str>,
+        instrument_type: Option<&InstrumentType>,
+        quote_mode: Option<QuoteMode>,
+        requested_quote_ccy: Option<&str>,
+    ) -> Result<()> {
+        let symbol_id = symbol_id.map(str::trim).filter(|s| !s.is_empty());
+        let is_non_security = matches!(
+            instrument_type,
+            Some(InstrumentType::Crypto | InstrumentType::Fx)
+        );
+        let is_equity = instrument_type == Some(&InstrumentType::Equity);
+        let is_manual_quote = quote_mode == Some(QuoteMode::Manual);
+        let has_explicit_requested_quote_ccy =
+            normalize_quote_ccy_code(requested_quote_ccy).is_some();
+
+        let existing_quote_ccy = symbol_id
+            .and_then(|id| self.get_asset_by_id(id).ok())
+            .and_then(|asset| normalize_quote_ccy_code(Some(asset.quote_ccy.as_str())))
+            .or_else(|| self.existing_quote_ccy_by_symbol(symbol, exchange_mic, instrument_type));
+
+        if !is_non_security && !has_explicit_requested_quote_ccy && existing_quote_ccy.is_none() {
+            return Err(crate::activities::ActivityError::InvalidData(
+                "Quote currency is required. Please re-select the symbol.".to_string(),
+            )
+            .into());
+        }
+
+        if is_equity && !is_manual_quote && exchange_mic.is_none() && symbol_id.is_none() {
+            let has_existing_without_mic = self.get_assets().ok().is_some_and(|assets| {
+                let upper_symbol = symbol.to_uppercase();
+                assets.into_iter().any(|asset| {
+                    asset
+                        .instrument_symbol
+                        .as_deref()
+                        .is_some_and(|s| s.eq_ignore_ascii_case(&upper_symbol))
+                        && asset.instrument_type.as_ref() == Some(&InstrumentType::Equity)
+                        && asset.instrument_exchange_mic.is_none()
+                })
+            });
+            if !has_existing_without_mic {
+                return Err(crate::activities::ActivityError::InvalidData(
+                    "Exchange MIC is required for market equity symbols. Please re-select the symbol."
+                        .to_string(),
+                )
+                .into());
+            }
+        }
+
+        Ok(())
+    }
 }
 
 /// Trait defining the contract for Asset repository operations.

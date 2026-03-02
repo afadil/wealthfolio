@@ -105,12 +105,18 @@ export const ACTIVITY_FORM_CONFIG: Record<
         fee: d.fee,
         comment: d.comment,
         quoteMode: d.quoteMode,
-        exchangeMic: d.exchangeMic,
-        symbolQuoteCcy: d.symbolQuoteCcy,
-        symbolInstrumentType: d.symbolInstrumentType,
+        exchangeMic: d.exchangeMic ?? undefined,
+        symbolQuoteCcy: d.symbolQuoteCcy ?? undefined,
+        symbolInstrumentType: d.symbolInstrumentType ?? undefined,
         currency: d.currency,
         fxRate: d.fxRate,
-        assetMetadata: d.assetMetadata,
+        assetMetadata: d.assetMetadata
+          ? {
+              name: d.assetMetadata.name ?? undefined,
+              kind: d.assetMetadata.kind ?? undefined,
+              exchangeMic: d.assetMetadata.exchangeMic ?? undefined,
+            }
+          : undefined,
       };
     },
   },
@@ -142,12 +148,18 @@ export const ACTIVITY_FORM_CONFIG: Record<
         fee: d.fee,
         comment: d.comment,
         quoteMode: d.quoteMode,
-        exchangeMic: d.exchangeMic,
-        symbolQuoteCcy: d.symbolQuoteCcy,
-        symbolInstrumentType: d.symbolInstrumentType,
+        exchangeMic: d.exchangeMic ?? undefined,
+        symbolQuoteCcy: d.symbolQuoteCcy ?? undefined,
+        symbolInstrumentType: d.symbolInstrumentType ?? undefined,
         currency: d.currency,
         fxRate: d.fxRate,
-        assetMetadata: d.assetMetadata,
+        assetMetadata: d.assetMetadata
+          ? {
+              name: d.assetMetadata.name ?? undefined,
+              kind: d.assetMetadata.kind ?? undefined,
+              exchangeMic: d.assetMetadata.exchangeMic ?? undefined,
+            }
+          : undefined,
       };
     },
   },
@@ -219,12 +231,12 @@ export const ACTIVITY_FORM_CONFIG: Record<
         assetId: d.symbol,
         amount: d.amount,
         comment: d.comment,
-        subtype: d.subtype,
+        subtype: d.subtype ?? undefined,
         currency: d.currency,
         fxRate: d.fxRate,
-        exchangeMic: d.exchangeMic,
-        symbolQuoteCcy: d.symbolQuoteCcy,
-        symbolInstrumentType: d.symbolInstrumentType,
+        exchangeMic: d.exchangeMic ?? undefined,
+        symbolQuoteCcy: d.symbolQuoteCcy ?? undefined,
+        symbolInstrumentType: d.symbolInstrumentType ?? undefined,
       };
     },
   },
@@ -263,24 +275,28 @@ export const ACTIVITY_FORM_CONFIG: Record<
     },
     toPayload: (data) => {
       const d = data as TransferFormValues;
-      // For external transfers, use accountId; for internal, use fromAccountId
       const accountId = d.isExternal ? d.accountId : d.fromAccountId;
       return {
         accountId,
         activityDate: d.activityDate,
-        amount: d.amount,
+        amount: d.amount ?? undefined,
         assetId: d.assetId ?? undefined,
         quantity: d.quantity ?? undefined,
-        comment: d.comment,
-        subtype: d.subtype,
+        comment: d.comment ?? undefined,
+        subtype: d.subtype ?? undefined,
         currency: d.currency,
         fxRate: d.fxRate,
         quoteMode: d.quoteMode,
-        exchangeMic: d.exchangeMic,
-        symbolQuoteCcy: d.symbolQuoteCcy,
-        symbolInstrumentType: d.symbolInstrumentType,
-        assetMetadata: d.assetMetadata,
-        // Include external transfer metadata
+        exchangeMic: d.exchangeMic ?? undefined,
+        symbolQuoteCcy: d.symbolQuoteCcy ?? undefined,
+        symbolInstrumentType: d.symbolInstrumentType ?? undefined,
+        assetMetadata: d.assetMetadata
+          ? {
+              name: d.assetMetadata.name ?? undefined,
+              kind: d.assetMetadata.kind ?? undefined,
+              exchangeMic: d.assetMetadata.exchangeMic ?? undefined,
+            }
+          : undefined,
         ...(d.isExternal && { metadata: { flow: { is_external: true } } }),
       };
     },
@@ -306,11 +322,11 @@ export const ACTIVITY_FORM_CONFIG: Record<
         assetId: d.symbol,
         amount: d.splitRatio,
         comment: d.comment,
-        subtype: d.subtype,
+        subtype: d.subtype ?? undefined,
         currency: d.currency,
-        exchangeMic: d.exchangeMic,
-        symbolQuoteCcy: d.symbolQuoteCcy,
-        symbolInstrumentType: d.symbolInstrumentType,
+        exchangeMic: d.exchangeMic ?? undefined,
+        symbolQuoteCcy: d.symbolQuoteCcy ?? undefined,
+        symbolInstrumentType: d.symbolInstrumentType ?? undefined,
       };
     },
   },
