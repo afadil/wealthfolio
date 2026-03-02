@@ -147,6 +147,7 @@ export {
 // Market Data Commands
 export {
   searchTicker,
+  fetchYahooDividends,
   syncHistoryQuotes,
   getAssetProfile,
   getAssets,
