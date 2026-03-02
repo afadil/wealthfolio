@@ -85,7 +85,7 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
       - name: Test
-        run: cargo test --workspace
+        run: cargo test --workspace --all-features
         env:
           # Required for outbox tests in storage-sqlite
           CONNECT_API_URL: http://test.local
