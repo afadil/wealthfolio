@@ -21,6 +21,8 @@ export function E2EESetupCard() {
   const { state, actions } = useDeviceSync();
   const [isEnabling, setIsEnabling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasTrustedDevices = state.trustedDevices.length > 0;
+  const trustedDevicePreview = state.trustedDevices.slice(0, 3);
 
   const handleEnable = async () => {
     setIsEnabling(true);
@@ -54,10 +56,30 @@ export function E2EESetupCard() {
           <div className="bg-muted/50 mb-4 rounded-full p-3">
             <Icons.CloudSync className="h-6 w-6 opacity-60" />
           </div>
-          <p className="text-foreground font-medium">Keep your devices in sync</p>
-          <p className="text-muted-foreground mt-1 max-w-xs text-xs">
-            Your data is end-to-end encrypted. Only your devices can read it.
+          <p className="text-foreground font-medium">
+            {hasTrustedDevices ? "Connect this device to sync" : "Keep your devices in sync"}
           </p>
+          <p className="text-muted-foreground mt-1 max-w-xs text-xs">
+            {hasTrustedDevices
+              ? "Trusted devices were found on your account. Continue to pair this device."
+              : "Your data is end-to-end encrypted. Only your devices can read it."}
+          </p>
+
+          {hasTrustedDevices && (
+            <div className="bg-muted/40 mt-3 w-full max-w-xs rounded-lg border px-3 py-2 text-left">
+              <p className="text-xs font-medium">Trusted devices</p>
+              <ul className="text-muted-foreground mt-1 space-y-0.5 text-xs">
+                {trustedDevicePreview.map((device) => (
+                  <li key={device.id} className="truncate">
+                    {device.displayName}
+                  </li>
+                ))}
+                {state.trustedDevices.length > trustedDevicePreview.length && (
+                  <li>+{state.trustedDevices.length - trustedDevicePreview.length} more</li>
+                )}
+              </ul>
+            </div>
+          )}
 
           {error && (
             <Alert variant="destructive" className="mt-4">
@@ -74,7 +96,7 @@ export function E2EESetupCard() {
             ) : (
               <>
                 <Icons.Shield className="mr-2 h-4 w-4" />
-                Enable Device Sync
+                {hasTrustedDevices ? "Connect This Device" : "Enable Device Sync"}
               </>
             )}
           </Button>

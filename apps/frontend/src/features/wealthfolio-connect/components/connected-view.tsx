@@ -141,14 +141,14 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
     connection?.brokerage?.aws_s3_square_logo_url ?? connection?.brokerage?.aws_s3_logo_url;
 
   const lastSyncedText = lastSyncDate
-    ? `Last synced ${formatDistanceToNow(new Date(lastSyncDate), { addSuffix: false })} ago`
+    ? `Synced ${formatDistanceToNow(new Date(lastSyncDate), { addSuffix: false })} ago`
     : "Never synced";
 
   return (
     <div className="bg-muted/30 rounded-lg border p-3">
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3">
         {/* Logo */}
-        <Avatar className="h-9 w-9 shrink-0 rounded-lg">
+        <Avatar className="mt-0.5 h-9 w-9 shrink-0 rounded-lg">
           <AvatarImage
             src={logoUrl}
             alt={account.institution_name || "Broker"}
@@ -161,7 +161,8 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
 
         {/* Main info - takes remaining space */}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          {/* Row 1: name + badges + sync icon */}
+          <div className="flex items-center gap-1.5">
             <span className="truncate text-sm font-medium">{account.name || "Account"}</span>
             {account.is_paper && (
               <Badge variant="outline" className="h-5 shrink-0 text-[10px]">
@@ -171,9 +172,9 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
             <Tooltip>
               <TooltipTrigger>
                 {account.sync_enabled ? (
-                  <Icons.Eye className="h-4 w-4 shrink-0 text-blue-500" />
+                  <Icons.Eye className="h-3.5 w-3.5 shrink-0 text-blue-500" />
                 ) : (
-                  <Icons.EyeOff className="text-muted-foreground h-4 w-4 shrink-0" />
+                  <Icons.EyeOff className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
                 )}
               </TooltipTrigger>
               <TooltipContent>
@@ -181,21 +182,29 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
               </TooltipContent>
             </Tooltip>
           </div>
-          <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-xs">
+          {/* Row 2: institution · account number · shared */}
+          <div className="text-muted-foreground flex flex-wrap items-center gap-x-1.5 text-xs">
             <span className="truncate">{account.institution_name}</span>
-            {account.number && <span>{maskAccountNumber(account.number)}</span>}
+            {account.number && (
+              <>
+                <span className="shrink-0 opacity-40">·</span>
+                <span className="shrink-0">{maskAccountNumber(account.number)}</span>
+              </>
+            )}
+            {account.shared_with_household && (
+              <>
+                <span className="shrink-0 opacity-40">·</span>
+                <span className="flex shrink-0 items-center gap-0.5">
+                  <Icons.Users className="h-3 w-3" />
+                  Shared
+                </span>
+              </>
+            )}
+            {/* Sync time inline on sm+ */}
+            <span className="ml-auto hidden shrink-0 pl-2 sm:inline">{lastSyncedText}</span>
           </div>
-        </div>
-
-        {/* Status - sync time and shared info */}
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          {account.shared_with_household && (
-            <span className="text-muted-foreground flex items-center gap-1 text-xs">
-              <Icons.Users className="h-3 w-3" />
-              Shared
-            </span>
-          )}
-          <span className="text-muted-foreground text-xs">{lastSyncedText}</span>
+          {/* Row 3: Sync time on its own line on mobile */}
+          <p className="text-muted-foreground mt-0.5 text-[11px] sm:hidden">{lastSyncedText}</p>
         </div>
       </div>
     </div>
