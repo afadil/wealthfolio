@@ -23,6 +23,7 @@ export function useActivityMutations(
 
   const buildSymbolInput = ({
     assetId,
+    symbolId,
     exchangeMic,
     quoteMode,
     assetKind,
@@ -32,6 +33,7 @@ export function useActivityMutations(
     includeId,
   }: {
     assetId?: string;
+    symbolId?: string;
     exchangeMic?: string;
     quoteMode?: string;
     assetKind?: string;
@@ -41,8 +43,9 @@ export function useActivityMutations(
     includeId: boolean;
   }): ActivityCreate["symbol"] => {
     const normalizedAssetId = normalizeOptionalString(assetId);
+    const normalizedSymbolId = normalizeOptionalString(symbolId);
     const symbol = {
-      id: includeId ? normalizedAssetId : undefined,
+      id: includeId ? normalizedSymbolId ?? normalizedAssetId : undefined,
       symbol: normalizedAssetId,
       exchangeMic: normalizeOptionalString(exchangeMic),
       kind: normalizeOptionalString(assetKind) ?? normalizeOptionalString(assetMetadata?.kind),
@@ -141,6 +144,7 @@ export function useActivityMutations(
       // Extract asset-related fields from form data
       const {
         assetId,
+        existingAssetId,
         exchangeMic,
         metadata,
         assetMetadata,
@@ -152,6 +156,7 @@ export function useActivityMutations(
       } = data as NewActivityFormValues & {
         id: string;
         assetId?: string;
+        existingAssetId?: string;
         exchangeMic?: string;
         metadata?: Record<string, unknown>;
         assetMetadata?: { name?: string; kind?: string; exchangeMic?: string };
@@ -176,6 +181,7 @@ export function useActivityMutations(
         fxRate: toDecimalPayload(fxRate),
         symbol: buildSymbolInput({
           assetId,
+          symbolId: existingAssetId,
           exchangeMic,
           quoteMode,
           assetKind,
@@ -188,7 +194,18 @@ export function useActivityMutations(
         metadata: metadata ? JSON.stringify(metadata) : undefined,
       };
       // Backend handles quote creation for MANUAL pricing mode
-      return await updateActivity(updatePayload);
+      const result = await updateActivity(updatePayload);
+
+      if (!result || typeof result !== "object" || !("id" in result)) {
+        throw new Error("Failed updating activity");
+      }
+
+      const serverError = (result as unknown as Record<string, unknown>).error;
+      if (typeof serverError === "string" && serverError.trim()) {
+        throw new Error(serverError);
+      }
+
+      return result;
     },
     ...createMutationOptions("updating"),
   });

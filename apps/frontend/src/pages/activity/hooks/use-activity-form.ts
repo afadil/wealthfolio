@@ -156,6 +156,7 @@ export function useActivityForm({
           if (isEditing && activity?.id) {
             await updateActivityMutation.mutateAsync({
               id: activity.id,
+              existingAssetId: activity.assetId,
               ...submitData,
             });
           } else {
@@ -183,6 +184,7 @@ export function useActivityForm({
         if (isEditing && activity?.id) {
           await updateActivityMutation.mutateAsync({
             id: activity.id,
+            existingAssetId: activity.assetId,
             ...submitData,
           });
         } else {

@@ -16,15 +16,16 @@ import {
   QuantityInput,
   NotesInput,
   AdvancedOptionsSection,
+  createValidatedSubmit,
   type AccountSelectOption,
 } from "./fields";
 
 // Asset metadata schema for custom assets
 const assetMetadataSchema = z
   .object({
-    name: z.string().optional(),
-    kind: z.string().optional(),
-    exchangeMic: z.string().optional(),
+    name: z.string().nullable().optional(),
+    kind: z.string().nullable().optional(),
+    exchangeMic: z.string().nullable().optional(),
   })
   .optional();
 
@@ -62,9 +63,9 @@ export const buyFormSchema = z.object({
     .optional(),
   // Internal fields
   quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).default(QuoteMode.MARKET),
-  exchangeMic: z.string().optional(),
-  symbolQuoteCcy: z.string().optional(),
-  symbolInstrumentType: z.string().optional(),
+  exchangeMic: z.string().nullable().optional(),
+  symbolQuoteCcy: z.string().nullable().optional(),
+  symbolInstrumentType: z.string().nullable().optional(),
   // Asset metadata for custom assets (name, etc.)
   assetMetadata: assetMetadataSchema,
 });
@@ -138,9 +139,9 @@ export function BuyForm({
     [accounts, accountId],
   );
   const accountCurrency = selectedAccount?.currency;
-  const assetCurrencyFromSymbol = normalizeCurrency(symbolQuoteCcy)?.toUpperCase();
+  const assetCurrencyFromSymbol = normalizeCurrency(symbolQuoteCcy ?? undefined)?.toUpperCase();
 
-  const handleSubmit = form.handleSubmit(async (data) => {
+  const handleSubmit = createValidatedSubmit(form, async (data) => {
     await onSubmit(data);
   });
 

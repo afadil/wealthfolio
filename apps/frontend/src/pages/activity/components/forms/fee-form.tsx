@@ -13,6 +13,7 @@ import {
   AmountInput,
   NotesInput,
   AdvancedOptionsSection,
+  createValidatedSubmit,
   type AccountSelectOption,
 } from "./fields";
 
@@ -85,7 +86,7 @@ export function FeeForm({
   );
   const accountCurrency = selectedAccount?.currency;
 
-  const handleSubmit = form.handleSubmit(async (data) => {
+  const handleSubmit = createValidatedSubmit(form, async (data) => {
     await onSubmit(data);
   });
 

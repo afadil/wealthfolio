@@ -14,6 +14,7 @@ import {
   QuantityInput,
   NotesInput,
   AdvancedOptionsSection,
+  createValidatedSubmit,
   type AccountSelectOption,
 } from "./fields";
 
@@ -21,7 +22,7 @@ import {
 export const splitFormSchema = z.object({
   accountId: z.string().min(1, { message: "Please select an account." }),
   symbol: z.string().min(1, { message: "Please enter a symbol." }),
-  exchangeMic: z.string().optional(),
+  exchangeMic: z.string().nullable().optional(),
   activityDate: z.date({ required_error: "Please select a date." }),
   splitRatio: z.coerce
     .number({
@@ -33,8 +34,8 @@ export const splitFormSchema = z.object({
   // Advanced options
   currency: z.string().min(1, { message: "Currency is required." }),
   subtype: z.string().optional().nullable(),
-  symbolQuoteCcy: z.string().optional(),
-  symbolInstrumentType: z.string().optional(),
+  symbolQuoteCcy: z.string().nullable().optional(),
+  symbolInstrumentType: z.string().nullable().optional(),
 });
 
 export type SplitFormValues = z.infer<typeof splitFormSchema>;
@@ -97,7 +98,7 @@ export function SplitForm({
   );
   const accountCurrency = selectedAccount?.currency;
 
-  const handleSubmit = form.handleSubmit(async (data) => {
+  const handleSubmit = createValidatedSubmit(form, async (data) => {
     await onSubmit(data);
   });
 

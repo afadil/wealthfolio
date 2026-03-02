@@ -20,6 +20,7 @@ import {
   QuantityInput,
   NotesInput,
   AdvancedOptionsSection,
+  createValidatedSubmit,
   type AccountSelectOption,
 } from "./fields";
 
@@ -29,9 +30,9 @@ export type TransferDirection = "in" | "out";
 // Asset metadata schema for custom assets
 const assetMetadataSchema = z
   .object({
-    name: z.string().optional(),
-    kind: z.string().optional(),
-    exchangeMic: z.string().optional(),
+    name: z.string().nullable().optional(),
+    kind: z.string().nullable().optional(),
+    exchangeMic: z.string().nullable().optional(),
   })
   .optional();
 
@@ -80,9 +81,9 @@ export const transferFormSchema = z
     subtype: z.string().optional().nullable(),
     // Internal field for manual quote mode
     quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).default(QuoteMode.MARKET),
-    exchangeMic: z.string().optional(),
-    symbolQuoteCcy: z.string().optional(),
-    symbolInstrumentType: z.string().optional(),
+    exchangeMic: z.string().nullable().optional(),
+    symbolQuoteCcy: z.string().nullable().optional(),
+    symbolInstrumentType: z.string().nullable().optional(),
     // Asset metadata for custom assets (name, etc.)
     assetMetadata: assetMetadataSchema,
   })
@@ -353,7 +354,7 @@ export function TransferForm({
   // Filter destination accounts to exclude source account (for internal transfers)
   const toAccountOptions = accounts.filter((acc) => acc.value !== fromAccountId);
 
-  const handleSubmit = form.handleSubmit(async (data) => {
+  const handleSubmit = createValidatedSubmit(form, async (data) => {
     await onSubmit(data);
   });
 
