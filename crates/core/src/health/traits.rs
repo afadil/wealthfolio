@@ -313,6 +313,7 @@ pub trait HealthServiceTrait: Send + Sync {
     /// * `taxonomy_service` - Service for accessing taxonomy data
     /// * `configured_timezone` - App-configured timezone from settings
     /// * `client_timezone` - Client/browser timezone from request context
+    #[allow(clippy::too_many_arguments)]
     async fn run_full_checks(
         &self,
         base_currency: &str,

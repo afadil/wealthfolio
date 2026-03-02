@@ -31,9 +31,7 @@ vi.mock("@wealthfolio/ui", () => ({
     <div data-value={value}>{children}</div>
   ),
   SelectTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  SelectValue: ({ placeholder }: { placeholder?: string }) => (
-    <span>{placeholder}</span>
-  ),
+  SelectValue: ({ placeholder }: { placeholder?: string }) => <span>{placeholder}</span>,
 }));
 
 interface FormValues {

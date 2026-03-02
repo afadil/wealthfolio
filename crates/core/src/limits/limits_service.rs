@@ -1223,8 +1223,8 @@ mod tests {
             },
         ];
         let service = make_service_with_timezone(activities, "America/Sao_Paulo");
-        let (start_utc, end_exclusive_utc) = local_year_utc_bounds(2025, service.user_timezone())
-            .expect("timezone bounds");
+        let (start_utc, end_exclusive_utc) =
+            local_year_utc_bounds(2025, service.user_timezone()).expect("timezone bounds");
 
         let result = service
             .calculate_contributions_by_period(
@@ -1273,8 +1273,8 @@ mod tests {
             },
         ];
         let service = make_service_with_timezone(activities, "Pacific/Kiritimati");
-        let (start_utc, end_exclusive_utc) = local_year_utc_bounds(2025, service.user_timezone())
-            .expect("timezone bounds");
+        let (start_utc, end_exclusive_utc) =
+            local_year_utc_bounds(2025, service.user_timezone()).expect("timezone bounds");
 
         let result = service
             .calculate_contributions_by_period(

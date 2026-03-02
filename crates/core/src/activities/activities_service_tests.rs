@@ -455,10 +455,9 @@ mod tests {
             exchange_mic: Option<&str>,
             _instrument_type: Option<&InstrumentType>,
         ) -> Result<ResolvedQuote> {
-            let is_uk_vwrp =
-                (exchange_mic == Some("XLON") || exchange_mic == Some("CXE"))
-                    && (symbol.eq_ignore_ascii_case("VWRPL")
-                        || symbol.eq_ignore_ascii_case("VWRPL.XC"));
+            let is_uk_vwrp = (exchange_mic == Some("XLON") || exchange_mic == Some("CXE"))
+                && (symbol.eq_ignore_ascii_case("VWRPL")
+                    || symbol.eq_ignore_ascii_case("VWRPL.XC"));
             if is_uk_vwrp {
                 return Ok(ResolvedQuote {
                     currency: Some("GBP".to_string()),
@@ -1533,11 +1532,16 @@ mod tests {
             delete_ids: vec![],
         };
 
-        let result = activity_service.bulk_mutate_activities(request).await.unwrap();
+        let result = activity_service
+            .bulk_mutate_activities(request)
+            .await
+            .unwrap();
         assert_eq!(result.errors.len(), 1);
         assert_eq!(result.errors[0].action, "create");
         assert!(
-            result.errors[0].message.contains("Quote currency is required"),
+            result.errors[0]
+                .message
+                .contains("Quote currency is required"),
             "unexpected error: {}",
             result.errors[0].message
         );
@@ -2569,7 +2573,10 @@ mod tests {
         assert_eq!(result.summary.skipped, 1);
         assert_eq!(result.activities.len(), 1);
         assert!(!result.activities[0].is_valid);
-        let errors = result.activities[0].errors.as_ref().expect("expected import errors");
+        let errors = result.activities[0]
+            .errors
+            .as_ref()
+            .expect("expected import errors");
         assert!(errors.contains_key("quoteCcy"));
         assert!(errors.contains_key("instrumentType"));
         assert!(!errors.contains_key("exchangeMic"));
@@ -2947,8 +2954,7 @@ mod tests {
             "transfer out should be linked"
         );
         assert_eq!(
-            transfer_out_stored.source_group_id,
-            transfer_in_stored.source_group_id,
+            transfer_out_stored.source_group_id, transfer_in_stored.source_group_id,
             "paired transfers should share the same source_group_id"
         );
     }

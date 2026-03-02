@@ -101,9 +101,7 @@ export const isAssetBackedIncomeActivity = (
     return false;
   }
 
-  return identifiers.some(
-    (value) => !isCashSymbol(value) && !isCanonicalCashIdentifier(value),
-  );
+  return identifiers.some((value) => !isCashSymbol(value) && !isCanonicalCashIdentifier(value));
 };
 
 // Helper to check if activity is a trade type

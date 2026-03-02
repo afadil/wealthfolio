@@ -68,13 +68,11 @@ impl ActivityService {
         ActivityError::InvalidData(message).into()
     }
 
-    fn map_duplicate_idempotency_violation(
-        err: crate::errors::Error,
-    ) -> crate::errors::Error {
+    fn map_duplicate_idempotency_violation(err: crate::errors::Error) -> crate::errors::Error {
         match err {
-            crate::errors::Error::Database(crate::errors::DatabaseError::UniqueViolation(message))
-                if message.contains("activities.idempotency_key") =>
-            {
+            crate::errors::Error::Database(crate::errors::DatabaseError::UniqueViolation(
+                message,
+            )) if message.contains("activities.idempotency_key") => {
                 Self::duplicate_activity_error(None)
             }
             crate::errors::Error::Database(crate::errors::DatabaseError::Internal(message))
@@ -398,10 +396,10 @@ impl ActivityService {
                     } else if is_equity
                         && !is_manual_quote
                         && activity
-                        .exchange_mic
-                        .as_deref()
-                        .map(str::trim)
-                        .is_none_or(str::is_empty)
+                            .exchange_mic
+                            .as_deref()
+                            .map(str::trim)
+                            .is_none_or(str::is_empty)
                     {
                         Self::add_activity_error(
                             &mut activity,
@@ -736,8 +734,7 @@ impl ActivityService {
         let exchange_mic = activity.get_exchange_mic().map(|s| s.to_string());
         let asset_kind_input = activity.get_kind().map(|s| s.to_string());
         let quote_ccy_input = Self::normalize_quote_ccy(activity.get_quote_ccy());
-        let instrument_type_input =
-            Self::parse_instrument_type(activity.get_instrument_type());
+        let instrument_type_input = Self::parse_instrument_type(activity.get_instrument_type());
         let asset_name = activity.get_name().map(|s| s.to_string());
         let quote_mode = activity.get_quote_mode().map(|s| s.to_string());
         let parsed_quote_mode =
@@ -749,9 +746,9 @@ impl ActivityService {
                     _ => None,
                 });
 
-        let inferred = symbol
-            .as_deref()
-            .map(|s| self.infer_asset_kind(s, exchange_mic.as_deref(), asset_kind_input.as_deref()));
+        let inferred = symbol.as_deref().map(|s| {
+            self.infer_asset_kind(s, exchange_mic.as_deref(), asset_kind_input.as_deref())
+        });
         let inferred_instrument_type = inferred.as_ref().and_then(|(_, it)| it.clone());
         let effective_instrument_type = instrument_type_input
             .clone()
@@ -799,7 +796,9 @@ impl ActivityService {
                 }
 
                 self.asset_service.validate_persisted_symbol_metadata(
-                    normalized_symbol_for_lookup.as_deref().unwrap_or(raw_symbol),
+                    normalized_symbol_for_lookup
+                        .as_deref()
+                        .unwrap_or(raw_symbol),
                     activity.get_symbol_id(),
                     exchange_mic.as_deref(),
                     effective_instrument_type.as_ref(),
@@ -807,7 +806,10 @@ impl ActivityService {
                     quote_ccy_input.as_deref(),
                 )?;
             }
-            None if activity.get_symbol_id().filter(|id| !id.trim().is_empty()).is_none()
+            None if activity
+                .get_symbol_id()
+                .filter(|id| !id.trim().is_empty())
+                .is_none()
                 && requires_symbol(&activity.activity_type) =>
             {
                 return Err(ActivityError::InvalidData(
@@ -833,18 +835,21 @@ impl ActivityService {
         } else if is_non_security_instrument {
             quote_ccy_input.clone().unwrap_or(currency.clone())
         } else {
-            let existing_asset_quote_ccy = self.existing_asset_quote_ccy_by_id(
-                activity.get_symbol_id().filter(|id| !id.trim().is_empty()),
-            )
-            .or_else(|| {
-                normalized_symbol_for_lookup.as_deref().and_then(|resolved_symbol| {
-                    self.asset_service.existing_quote_ccy_by_symbol(
-                        resolved_symbol,
-                        exchange_mic.as_deref(),
-                        effective_instrument_type.as_ref(),
-                    )
-                })
-            });
+            let existing_asset_quote_ccy = self
+                .existing_asset_quote_ccy_by_id(
+                    activity.get_symbol_id().filter(|id| !id.trim().is_empty()),
+                )
+                .or_else(|| {
+                    normalized_symbol_for_lookup
+                        .as_deref()
+                        .and_then(|resolved_symbol| {
+                            self.asset_service.existing_quote_ccy_by_symbol(
+                                resolved_symbol,
+                                exchange_mic.as_deref(),
+                                effective_instrument_type.as_ref(),
+                            )
+                        })
+                });
             let (resolved_quote_ccy, resolution_source) = self
                 .resolve_quote_ccy(
                     quote_lookup_symbol.as_str(),
@@ -1083,8 +1088,7 @@ impl ActivityService {
         let exchange_mic = activity.get_exchange_mic().map(|s| s.to_string());
         let asset_kind_input = activity.get_kind().map(|s| s.to_string());
         let quote_ccy_input = Self::normalize_quote_ccy(activity.get_quote_ccy());
-        let instrument_type_input =
-            Self::parse_instrument_type(activity.get_instrument_type());
+        let instrument_type_input = Self::parse_instrument_type(activity.get_instrument_type());
         let asset_name = activity.get_name().map(|s| s.to_string());
         let quote_mode = activity.get_quote_mode().map(|s| s.to_string());
         let parsed_quote_mode =
@@ -1096,9 +1100,9 @@ impl ActivityService {
                     _ => None,
                 });
 
-        let inferred = symbol
-            .as_deref()
-            .map(|s| self.infer_asset_kind(s, exchange_mic.as_deref(), asset_kind_input.as_deref()));
+        let inferred = symbol.as_deref().map(|s| {
+            self.infer_asset_kind(s, exchange_mic.as_deref(), asset_kind_input.as_deref())
+        });
         let inferred_instrument_type = inferred.as_ref().and_then(|(_, it)| it.clone());
         let effective_instrument_type = instrument_type_input
             .clone()
@@ -1146,7 +1150,9 @@ impl ActivityService {
                 }
 
                 self.asset_service.validate_persisted_symbol_metadata(
-                    normalized_symbol_for_lookup.as_deref().unwrap_or(raw_symbol),
+                    normalized_symbol_for_lookup
+                        .as_deref()
+                        .unwrap_or(raw_symbol),
                     activity.get_symbol_id(),
                     exchange_mic.as_deref(),
                     effective_instrument_type.as_ref(),
@@ -1154,7 +1160,10 @@ impl ActivityService {
                     quote_ccy_input.as_deref(),
                 )?;
             }
-            None if activity.get_symbol_id().filter(|id| !id.trim().is_empty()).is_none()
+            None if activity
+                .get_symbol_id()
+                .filter(|id| !id.trim().is_empty())
+                .is_none()
                 && requires_symbol(&activity.activity_type) =>
             {
                 return Err(ActivityError::InvalidData(
@@ -1177,18 +1186,21 @@ impl ActivityService {
         } else if is_non_security_instrument {
             quote_ccy_input.clone().unwrap_or(currency.clone())
         } else {
-            let existing_asset_quote_ccy = self.existing_asset_quote_ccy_by_id(
-                activity.get_symbol_id().filter(|id| !id.trim().is_empty()),
-            )
-            .or_else(|| {
-                normalized_symbol_for_lookup.as_deref().and_then(|resolved_symbol| {
-                    self.asset_service.existing_quote_ccy_by_symbol(
-                        resolved_symbol,
-                        exchange_mic.as_deref(),
-                        effective_instrument_type.as_ref(),
-                    )
-                })
-            });
+            let existing_asset_quote_ccy = self
+                .existing_asset_quote_ccy_by_id(
+                    activity.get_symbol_id().filter(|id| !id.trim().is_empty()),
+                )
+                .or_else(|| {
+                    normalized_symbol_for_lookup
+                        .as_deref()
+                        .and_then(|resolved_symbol| {
+                            self.asset_service.existing_quote_ccy_by_symbol(
+                                resolved_symbol,
+                                exchange_mic.as_deref(),
+                                effective_instrument_type.as_ref(),
+                            )
+                        })
+                });
             let (resolved_quote_ccy, resolution_source) = self
                 .resolve_quote_ccy(
                     quote_lookup_symbol.as_str(),
@@ -1384,16 +1396,15 @@ impl ActivityService {
                 if let Some(asset_id) = activity.get_symbol_id() {
                     if !asset_id.is_empty() {
                         // asset_id is a UUID; look up the existing asset to build spec
-                        let currency =
-                            Self::normalize_quote_ccy(activity.get_quote_ccy())
-                                .or_else(|| {
-                                    if !activity.currency.is_empty() {
-                                        Some(activity.currency.clone())
-                                    } else {
-                                        None
-                                    }
-                                })
-                                .unwrap_or_else(|| account_currency.clone());
+                        let currency = Self::normalize_quote_ccy(activity.get_quote_ccy())
+                            .or_else(|| {
+                                if !activity.currency.is_empty() {
+                                    Some(activity.currency.clone())
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap_or_else(|| account_currency.clone());
 
                         let quote_mode = activity.get_quote_mode().and_then(|s| {
                             match s.to_uppercase().as_str() {
@@ -1459,15 +1470,11 @@ impl ActivityService {
             account_currency.clone()
         };
 
-        let instrument_type_input =
-            Self::parse_instrument_type(activity.get_instrument_type());
+        let instrument_type_input = Self::parse_instrument_type(activity.get_instrument_type());
 
         // Infer asset kind and instrument type using base symbol
-        let (inferred_kind, inferred_instrument_type) = self.infer_asset_kind(
-            base_symbol,
-            exchange_mic.as_deref(),
-            activity.get_kind(),
-        );
+        let (inferred_kind, inferred_instrument_type) =
+            self.infer_asset_kind(base_symbol, exchange_mic.as_deref(), activity.get_kind());
         let instrument_type = instrument_type_input.clone().or(inferred_instrument_type);
         let kind = instrument_type_input
             .as_ref()
@@ -1505,7 +1512,7 @@ impl ActivityService {
                 activity.get_symbol_id(),
                 exchange_mic.as_deref(),
                 instrument_type.as_ref(),
-                quote_mode.clone(),
+                quote_mode,
                 quote_ccy_input.as_deref(),
             )?;
         }
@@ -1518,16 +1525,17 @@ impl ActivityService {
                 .or_else(|| quote_ccy_input.clone())
                 .unwrap_or_else(|| currency.clone())
         } else {
-            let existing_asset_quote_ccy = self.existing_asset_quote_ccy_by_id(
-                activity.get_symbol_id().filter(|id| !id.trim().is_empty()),
-            )
-            .or_else(|| {
-                self.asset_service.existing_quote_ccy_by_symbol(
-                    normalized_symbol.as_str(),
-                    exchange_mic.as_deref(),
-                    instrument_type.as_ref(),
+            let existing_asset_quote_ccy = self
+                .existing_asset_quote_ccy_by_id(
+                    activity.get_symbol_id().filter(|id| !id.trim().is_empty()),
                 )
-            });
+                .or_else(|| {
+                    self.asset_service.existing_quote_ccy_by_symbol(
+                        normalized_symbol.as_str(),
+                        exchange_mic.as_deref(),
+                        instrument_type.as_ref(),
+                    )
+                });
             let allow_provider_lookup = allow_live_resolution
                 && quote_mode != Some(QuoteMode::Manual)
                 && !matches!(
@@ -2137,8 +2145,7 @@ impl ActivityServiceTrait for ActivityService {
                 } else {
                     activity.currency.as_str()
                 };
-                let explicit_quote_ccy =
-                    Self::normalize_quote_ccy(activity.quote_ccy.as_deref());
+                let explicit_quote_ccy = Self::normalize_quote_ccy(activity.quote_ccy.as_deref());
 
                 let (resolved_quote_ccy, resolution_source) = if matches!(
                     effective_instrument_type,
@@ -2367,7 +2374,10 @@ impl ActivityServiceTrait for ActivityService {
                     let activity = &mut validated_activities[import_idx];
                     activity.is_valid = false;
                     let mut errors = activity.errors.take().unwrap_or_default();
-                    errors.entry("symbol".to_string()).or_default().push(error.clone());
+                    errors
+                        .entry("symbol".to_string())
+                        .or_default()
+                        .push(error.clone());
                     activity.errors = Some(errors);
                 }
             }

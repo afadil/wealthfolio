@@ -54,7 +54,10 @@ export function TimezoneInput({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("h-input-height w-full justify-between rounded-md", !value && "text-muted-foreground")}
+          className={cn(
+            "h-input-height w-full justify-between rounded-md",
+            !value && "text-muted-foreground",
+          )}
         >
           <span className="truncate">{buttonLabel}</span>
           <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -73,9 +76,18 @@ export function TimezoneInput({
             <CommandGroup>
               <ScrollArea className="max-h-72 overflow-y-auto">
                 {filteredTimezones.map((timezone) => (
-                  <CommandItem key={timezone} value={timezone} onSelect={() => handleSelect(timezone)}>
+                  <CommandItem
+                    key={timezone}
+                    value={timezone}
+                    onSelect={() => handleSelect(timezone)}
+                  >
                     {timezone}
-                    <Icons.Check className={cn("ml-auto h-4 w-4", timezone === value ? "opacity-100" : "opacity-0")} />
+                    <Icons.Check
+                      className={cn(
+                        "ml-auto h-4 w-4",
+                        timezone === value ? "opacity-100" : "opacity-0",
+                      )}
+                    />
                   </CommandItem>
                 ))}
               </ScrollArea>

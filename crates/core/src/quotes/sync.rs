@@ -121,8 +121,8 @@ fn should_treat_backfill_error_as_non_fatal(category: &SyncCategory, error: &Err
 
 fn error_message_contains_provider_id(message: &str) -> bool {
     super::constants::MARKET_DATA_PROVIDER_IDS
-    .iter()
-    .any(|provider_id| message.contains(provider_id))
+        .iter()
+        .any(|provider_id| message.contains(provider_id))
 }
 
 fn format_sync_failure_message(error: &Error, provider_id: Option<&str>) -> String {

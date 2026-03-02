@@ -58,7 +58,8 @@ const CATEGORY_LABELS: Record<HealthCategory, { label: string; description: stri
   },
   SETTINGS_CONFIGURATION: {
     label: "Settings",
-    description: "Some application settings need attention to ensure data is interpreted correctly.",
+    description:
+      "Some application settings need attention to ensure data is interpreted correctly.",
   },
 };
 
@@ -111,7 +112,10 @@ export function IssueDetailSheet({
     ? `${issue.navigateAction.route}${
         issue.navigateAction.query
           ? `?${new URLSearchParams(
-              Object.entries(issue.navigateAction.query).map(([key, value]) => [key, String(value)]),
+              Object.entries(issue.navigateAction.query).map(([key, value]) => [
+                key,
+                String(value),
+              ]),
             ).toString()}`
           : ""
       }`

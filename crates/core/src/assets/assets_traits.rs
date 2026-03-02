@@ -106,7 +106,10 @@ pub trait AssetServiceTrait: Send + Sync {
                 }
             }
 
-            match (upper_mic.as_deref(), asset.instrument_exchange_mic.as_deref()) {
+            match (
+                upper_mic.as_deref(),
+                asset.instrument_exchange_mic.as_deref(),
+            ) {
                 (Some(expected), Some(actual)) if actual.eq_ignore_ascii_case(expected) => {}
                 (Some(_), _) => return None,
                 (None, Some(_)) => return None,
@@ -134,7 +137,8 @@ pub trait AssetServiceTrait: Send + Sync {
         );
         let is_equity = instrument_type == Some(&InstrumentType::Equity);
         let is_manual_quote = quote_mode == Some(QuoteMode::Manual);
-        let has_explicit_requested_quote_ccy = normalize_quote_ccy_code(requested_quote_ccy).is_some();
+        let has_explicit_requested_quote_ccy =
+            normalize_quote_ccy_code(requested_quote_ccy).is_some();
 
         let existing_quote_ccy = symbol_id
             .and_then(|id| self.get_asset_by_id(id).ok())
@@ -149,20 +153,17 @@ pub trait AssetServiceTrait: Send + Sync {
         }
 
         if is_equity && !is_manual_quote && exchange_mic.is_none() && symbol_id.is_none() {
-            let has_existing_without_mic = self
-                .get_assets()
-                .ok()
-                .is_some_and(|assets| {
-                    let upper_symbol = symbol.to_uppercase();
-                    assets.into_iter().any(|asset| {
-                        asset
-                            .instrument_symbol
-                            .as_deref()
-                            .is_some_and(|s| s.eq_ignore_ascii_case(&upper_symbol))
-                            && asset.instrument_type.as_ref() == Some(&InstrumentType::Equity)
-                            && asset.instrument_exchange_mic.is_none()
-                    })
-                });
+            let has_existing_without_mic = self.get_assets().ok().is_some_and(|assets| {
+                let upper_symbol = symbol.to_uppercase();
+                assets.into_iter().any(|asset| {
+                    asset
+                        .instrument_symbol
+                        .as_deref()
+                        .is_some_and(|s| s.eq_ignore_ascii_case(&upper_symbol))
+                        && asset.instrument_type.as_ref() == Some(&InstrumentType::Equity)
+                        && asset.instrument_exchange_mic.is_none()
+                })
+            });
             if !has_existing_without_mic {
                 return Err(crate::activities::ActivityError::InvalidData(
                     "Exchange MIC is required for market equity symbols. Please re-select the symbol."

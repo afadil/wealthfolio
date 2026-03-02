@@ -39,7 +39,7 @@ export function useActivityMutations(
     symbolQuoteCcy?: string;
     symbolInstrumentType?: string;
     includeId: boolean;
-  }): ActivityCreate["symbol"] | ActivityUpdate["symbol"] => {
+  }): ActivityCreate["symbol"] => {
     const normalizedAssetId = normalizeOptionalString(assetId);
     const symbol = {
       id: includeId ? normalizedAssetId : undefined,

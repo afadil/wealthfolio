@@ -177,14 +177,12 @@ impl HealthService {
             "Running account configuration check on {} unconfigured accounts",
             unconfigured_accounts.len()
         );
-        let account_config_issues = self
-            .account_config_check
-            .analyze(
-                unconfigured_accounts,
-                configured_timezone,
-                client_timezone,
-                &ctx,
-            );
+        let account_config_issues = self.account_config_check.analyze(
+            unconfigured_accounts,
+            configured_timezone,
+            client_timezone,
+            &ctx,
+        );
         debug!(
             "Account configuration check found {} issues",
             account_config_issues.len()
@@ -216,6 +214,7 @@ impl HealthService {
     /// Runs all health checks by gathering data from the provided services.
     ///
     /// This is the main entry point for health checks that handles all data gathering.
+    #[allow(clippy::too_many_arguments)]
     pub async fn run_full_checks(
         &self,
         base_currency: &str,

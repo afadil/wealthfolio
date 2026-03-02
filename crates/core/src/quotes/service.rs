@@ -1742,18 +1742,18 @@ fn fill_missing_quotes(
 mod tests {
     use super::*;
     use crate::activities::{
-        Activity, ActivityBulkMutationResult, ActivityRepositoryTrait, ActivityUpdate, ImportMapping,
-        IncomeData, NewActivity, Sort,
+        Activity, ActivityBulkMutationResult, ActivityRepositoryTrait, ActivityUpdate,
+        ImportMapping, IncomeData, NewActivity, Sort,
     };
-    use crate::assets::{AssetRepositoryTrait, NewAsset, UpdateAssetProfile};
     use crate::assets::QuoteMode;
+    use crate::assets::{AssetRepositoryTrait, NewAsset, UpdateAssetProfile};
     use crate::limits::ContributionActivity;
     use crate::quotes::model::DataSource;
     use crate::quotes::store::ProviderSettingsStore;
     use crate::quotes::types::{AssetId, Day, QuoteSource};
     use crate::quotes::{
-        LatestQuotePair, MarketDataProviderSetting, ProviderSyncStats, QuoteSyncState, QuoteStore,
-        QuoteService,
+        LatestQuotePair, MarketDataProviderSetting, ProviderSyncStats, QuoteService, QuoteStore,
+        QuoteSyncState,
     };
     use crate::secrets::SecretStore;
     use async_trait::async_trait;
@@ -1786,7 +1786,11 @@ mod tests {
             unimplemented!("unused in this test")
         }
 
-        fn latest(&self, _asset_id: &AssetId, _source: Option<&QuoteSource>) -> Result<Option<Quote>> {
+        fn latest(
+            &self,
+            _asset_id: &AssetId,
+            _source: Option<&QuoteSource>,
+        ) -> Result<Option<Quote>> {
             unimplemented!("unused in this test")
         }
 
@@ -1831,7 +1835,10 @@ mod tests {
             unimplemented!("unused in this test")
         }
 
-        fn get_latest_quotes_pair(&self, _symbols: &[String]) -> Result<HashMap<String, LatestQuotePair>> {
+        fn get_latest_quotes_pair(
+            &self,
+            _symbols: &[String],
+        ) -> Result<HashMap<String, LatestQuotePair>> {
             unimplemented!("unused in this test")
         }
 
@@ -1876,7 +1883,10 @@ mod tests {
             unimplemented!("unused in this test")
         }
 
-        fn get_by_asset_ids(&self, _asset_ids: &[String]) -> Result<HashMap<String, QuoteSyncState>> {
+        fn get_by_asset_ids(
+            &self,
+            _asset_ids: &[String],
+        ) -> Result<HashMap<String, QuoteSyncState>> {
             unimplemented!("unused in this test")
         }
 
@@ -1972,7 +1982,11 @@ mod tests {
             unimplemented!("unused in this test")
         }
 
-        async fn update_profile(&self, _asset_id: &str, _payload: UpdateAssetProfile) -> Result<Asset> {
+        async fn update_profile(
+            &self,
+            _asset_id: &str,
+            _payload: UpdateAssetProfile,
+        ) -> Result<Asset> {
             unimplemented!("unused in this test")
         }
 
@@ -2118,7 +2132,11 @@ mod tests {
             unimplemented!("unused in this test")
         }
 
-        fn calculate_average_cost(&self, _account_id: &str, _asset_id: &str) -> Result<rust_decimal::Decimal> {
+        fn calculate_average_cost(
+            &self,
+            _account_id: &str,
+            _asset_id: &str,
+        ) -> Result<rust_decimal::Decimal> {
             unimplemented!("unused in this test")
         }
 
@@ -2251,7 +2269,9 @@ mod tests {
         .await
         .unwrap();
 
-        let providers = QuoteServiceTrait::get_providers_info(&service).await.unwrap();
+        let providers = QuoteServiceTrait::get_providers_info(&service)
+            .await
+            .unwrap();
 
         let yahoo = providers.iter().find(|p| p.id == "YAHOO").unwrap();
         let finnhub = providers.iter().find(|p| p.id == "FINNHUB").unwrap();
@@ -2262,7 +2282,10 @@ mod tests {
 
         assert_eq!(finnhub.asset_count, 0);
         assert_eq!(finnhub.error_count, 1);
-        assert_eq!(finnhub.last_sync_error.as_deref(), Some(finnhub_error.as_str()));
+        assert_eq!(
+            finnhub.last_sync_error.as_deref(),
+            Some(finnhub_error.as_str())
+        );
         assert_eq!(finnhub.unique_errors, vec![finnhub_error]);
     }
 

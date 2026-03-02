@@ -9,8 +9,8 @@ use futures::stream::{self, StreamExt};
 
 use super::assets_model::{
     canonicalize_market_identity, normalize_quote_ccy_code, resolve_quote_ccy_precedence, Asset,
-    AssetKind, AssetSpec, EnsureAssetsResult, InstrumentType, NewAsset,
-    QuoteCcyResolutionSource, QuoteMode, UpdateAssetProfile,
+    AssetKind, AssetSpec, EnsureAssetsResult, InstrumentType, NewAsset, QuoteCcyResolutionSource,
+    QuoteMode, UpdateAssetProfile,
 };
 use super::assets_traits::{AssetRepositoryTrait, AssetServiceTrait};
 use super::auto_classification::{AutoClassificationService, ClassificationInput};
@@ -488,7 +488,9 @@ impl AssetServiceTrait for AssetService {
         let symbol_for_resolution = metadata
             .as_ref()
             .and_then(|m| m.instrument_symbol.as_deref().or(m.display_code.as_deref()));
-        let explicit_requested_quote_ccy = metadata.as_ref().and_then(|m| m.requested_quote_ccy.as_deref());
+        let explicit_requested_quote_ccy = metadata
+            .as_ref()
+            .and_then(|m| m.requested_quote_ccy.as_deref());
         let (currency, _) = self
             .resolve_quote_ccy(
                 symbol_for_resolution,

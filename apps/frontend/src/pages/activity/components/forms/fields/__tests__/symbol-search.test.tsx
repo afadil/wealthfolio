@@ -98,8 +98,6 @@ describe("SymbolSearch", () => {
 
     expect(screen.getByTestId("asset-id")).toHaveTextContent("VWRPL");
     expect(screen.getByTestId("exchange-mic")).toHaveTextContent("CXE");
-    expect(screen.getByTestId("asset-name")).toHaveTextContent(
-      "Vanguard FTSE All-World UCITS ETF",
-    );
+    expect(screen.getByTestId("asset-name")).toHaveTextContent("Vanguard FTSE All-World UCITS ETF");
   });
 });

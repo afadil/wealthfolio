@@ -4,8 +4,8 @@ use crate::context::ServiceContext;
 use crate::events::{emit_portfolio_trigger_recalculate, PortfolioRequestPayload};
 use log::debug;
 use tauri::{AppHandle, State};
-use wealthfolio_core::health::HealthServiceTrait;
 use wealthfolio_core::fx::{ExchangeRate, NewExchangeRate};
+use wealthfolio_core::health::HealthServiceTrait;
 use wealthfolio_core::quotes::MarketSyncMode;
 use wealthfolio_core::settings::{Settings, SettingsUpdate};
 

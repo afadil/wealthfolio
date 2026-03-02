@@ -160,7 +160,11 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
       const base = popularTimezones.includes(detectedTimezone)
         ? [detectedTimezone, ...popularTimezones.filter((tz) => tz !== detectedTimezone)]
         : [detectedTimezone, ...popularTimezones.slice(0, -1)];
-      if (currentTimezone && currentTimezone !== detectedTimezone && !base.includes(currentTimezone)) {
+      if (
+        currentTimezone &&
+        currentTimezone !== detectedTimezone &&
+        !base.includes(currentTimezone)
+      ) {
         return [...base.slice(0, -1), currentTimezone];
       }
       return base;
@@ -289,7 +293,9 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                                 }`}
                               >
                                 <div className="flex flex-col items-start gap-1">
-                                  <span className="whitespace-nowrap font-semibold">{formatTimezoneLabel(tz)}</span>
+                                  <span className="whitespace-nowrap font-semibold">
+                                    {formatTimezoneLabel(tz)}
+                                  </span>
                                 </div>
                               </button>
                             ))}
@@ -423,9 +429,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                     </button>
                   ))}
                   {filteredTimezones.length === 0 && (
-                    <div className="text-muted-foreground py-8 text-center">
-                      No timezones found
-                    </div>
+                    <div className="text-muted-foreground py-8 text-center">No timezones found</div>
                   )}
                 </div>
               </div>

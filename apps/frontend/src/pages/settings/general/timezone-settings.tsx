@@ -50,9 +50,7 @@ function getSupportedTimezones(): string[] {
   ).supportedValuesOf;
 
   const rawValues: string[] =
-    typeof supportedValuesOf === "function"
-      ? supportedValuesOf("timeZone")
-      : TIMEZONE_FALLBACKS;
+    typeof supportedValuesOf === "function" ? supportedValuesOf("timeZone") : TIMEZONE_FALLBACKS;
 
   const merged = rawValues.includes("UTC") ? rawValues : ["UTC", ...rawValues];
   return Array.from(new Set(merged)).sort((a, b) => a.localeCompare(b));
@@ -130,7 +128,11 @@ export function TimezoneSettings() {
               render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <FormControl className="w-full max-w-[360px]">
-                    <TimezoneInput value={field.value} onChange={field.onChange} timezones={timezones} />
+                    <TimezoneInput
+                      value={field.value}
+                      onChange={field.onChange}
+                      timezones={timezones}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

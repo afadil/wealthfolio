@@ -237,11 +237,19 @@ export const ActivityTable = ({
             return <div className="pr-4 text-right">-</div>;
           }
 
-          if (quantity == null || String(quantity).trim() === "") {
+          if (
+            quantity == null ||
+            (typeof quantity !== "number" && typeof quantity !== "string") ||
+            String(quantity).trim() === ""
+          ) {
             return <div className="pr-4 text-right">-</div>;
           }
 
-          return <div className="pr-4 text-right">{String(quantity)}</div>;
+          return (
+            <div className="pr-4 text-right">
+              {typeof quantity === "number" ? quantity : String(quantity)}
+            </div>
+          );
         },
       },
       {

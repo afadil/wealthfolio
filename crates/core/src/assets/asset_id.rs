@@ -166,7 +166,10 @@ mod tests {
 
     #[test]
     fn test_symbol_resolution_candidates() {
-        assert_eq!(symbol_resolution_candidates("VWRPL.XC"), vec!["VWRPL.XC".to_string()]);
+        assert_eq!(
+            symbol_resolution_candidates("VWRPL.XC"),
+            vec!["VWRPL.XC".to_string()]
+        );
         assert_eq!(
             symbol_resolution_candidates("SHOP.TO"),
             vec!["SHOP.TO".to_string()]

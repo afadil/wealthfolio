@@ -247,12 +247,12 @@ impl MarketDataClient {
         end: DateTime<Utc>,
     ) -> std::result::Result<Vec<Quote>, HistoricalQuoteFetchError> {
         // Convert Asset to QuoteContext
-        let context = self
-            .build_quote_context(asset)
-            .map_err(|error| HistoricalQuoteFetchError {
-                error,
-                provider_id: None,
-            })?;
+        let context =
+            self.build_quote_context(asset)
+                .map_err(|error| HistoricalQuoteFetchError {
+                    error,
+                    provider_id: None,
+                })?;
 
         debug!(
             "Fetching quotes for {:?} from {} to {}",
@@ -808,8 +808,8 @@ mod tests {
 
     #[test]
     fn test_convert_search_result_maps_cxe_to_cboe_mic() {
-        let provider_result = MarketSearchResult::new("VWRPL.XC", "Vanguard ETF", "CXE", "ETF")
-            .with_score(20001.0);
+        let provider_result =
+            MarketSearchResult::new("VWRPL.XC", "Vanguard ETF", "CXE", "ETF").with_score(20001.0);
 
         let result = MarketDataClient::convert_search_result(provider_result);
         assert_eq!(result.symbol, "VWRPL.XC");
@@ -820,8 +820,8 @@ mod tests {
 
     #[test]
     fn test_convert_search_result_maps_lowercase_exchange_code() {
-        let provider_result = MarketSearchResult::new("VWRPL.XC", "Vanguard ETF", "cxe", "ETF")
-            .with_score(20001.0);
+        let provider_result =
+            MarketSearchResult::new("VWRPL.XC", "Vanguard ETF", "cxe", "ETF").with_score(20001.0);
 
         let result = MarketDataClient::convert_search_result(provider_result);
         assert_eq!(result.exchange_mic.as_deref(), Some("CXE"));

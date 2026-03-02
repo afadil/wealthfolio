@@ -1,6 +1,6 @@
+use crate::errors::{Error, Result, ValidationError};
 use chrono::{DateTime, Datelike, Duration, LocalResult, NaiveDate, TimeZone, Utc, Weekday};
 use chrono_tz::Tz;
-use crate::errors::{Error, Result, ValidationError};
 use wealthfolio_market_data::resolver::exchange_metadata;
 
 /// Default timezone for valuation dates.
@@ -240,7 +240,10 @@ mod tests {
     fn local_year_utc_bounds_match_local_midnight_boundaries() {
         let tz = chrono_tz::Pacific::Kiritimati; // UTC+14 edge case
         let (start_utc, end_exclusive_utc) = local_year_utc_bounds(2026, tz).unwrap();
-        assert_eq!(start_utc, Utc.with_ymd_and_hms(2025, 12, 31, 10, 0, 0).unwrap());
+        assert_eq!(
+            start_utc,
+            Utc.with_ymd_and_hms(2025, 12, 31, 10, 0, 0).unwrap()
+        );
         assert_eq!(
             end_exclusive_utc,
             Utc.with_ymd_and_hms(2026, 12, 31, 10, 0, 0).unwrap()

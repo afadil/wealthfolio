@@ -927,7 +927,8 @@ mod tests {
         // Net contribution should DECREASE (not increase!)
         // Previous: 20208.24 - 10118 = 10090.24
         assert_eq!(
-            next_state.net_contribution, dec!(10090.24),
+            next_state.net_contribution,
+            dec!(10090.24),
             "Net contribution should decrease by withdrawal amount"
         );
     }
@@ -1050,7 +1051,8 @@ mod tests {
 
         // Net contribution should INCREASE
         assert_eq!(
-            next_state.net_contribution, dec!(11000.00),
+            next_state.net_contribution,
+            dec!(11000.00),
             "Net contribution should increase by deposit amount"
         );
     }
@@ -1098,7 +1100,8 @@ mod tests {
 
         // Net contribution should NOT change for fees
         assert_eq!(
-            next_state.net_contribution, dec!(500.00),
+            next_state.net_contribution,
+            dec!(500.00),
             "Net contribution should not change for fees"
         );
     }
@@ -1146,7 +1149,8 @@ mod tests {
 
         // Net contribution should DECREASE (not increase!)
         assert_eq!(
-            next_state.net_contribution, dec!(3000.00),
+            next_state.net_contribution,
+            dec!(3000.00),
             "Net contribution should decrease by transfer out amount"
         );
     }
@@ -3988,7 +3992,7 @@ mod tests {
             None,
         );
         let after_deposit = calculator
-            .calculate_next_holdings(&prev, &vec![deposit], deposit_date)
+            .calculate_next_holdings(&prev, &[deposit], deposit_date)
             .unwrap()
             .snapshot;
 
@@ -4007,7 +4011,7 @@ mod tests {
         );
 
         let after_buy = calculator
-            .calculate_next_holdings(&after_deposit, &vec![buy], buy_date)
+            .calculate_next_holdings(&after_deposit, &[buy], buy_date)
             .unwrap()
             .snapshot;
 
@@ -4097,7 +4101,7 @@ mod tests {
         );
 
         let after_sell = calculator
-            .calculate_next_holdings(&prev, &vec![sell], sell_date)
+            .calculate_next_holdings(&prev, &[sell], sell_date)
             .unwrap()
             .snapshot;
 
@@ -4154,7 +4158,7 @@ mod tests {
             None,
         );
         let after_deposit = calculator
-            .calculate_next_holdings(&prev, &vec![deposit], deposit_date)
+            .calculate_next_holdings(&prev, &[deposit], deposit_date)
             .unwrap()
             .snapshot;
 
@@ -4172,7 +4176,7 @@ mod tests {
             Some(buy_fx),
         );
         let after_buy = calculator
-            .calculate_next_holdings(&after_deposit, &vec![buy], buy_date)
+            .calculate_next_holdings(&after_deposit, &[buy], buy_date)
             .unwrap()
             .snapshot;
 
@@ -4190,7 +4194,7 @@ mod tests {
             Some(sell_fx),
         );
         let after_sell = calculator
-            .calculate_next_holdings(&after_buy, &vec![sell], sell_date)
+            .calculate_next_holdings(&after_buy, &[sell], sell_date)
             .unwrap()
             .snapshot;
 
@@ -4243,7 +4247,7 @@ mod tests {
         );
 
         let result = calculator
-            .calculate_next_holdings(&prev, &vec![buy], buy_date)
+            .calculate_next_holdings(&prev, &[buy], buy_date)
             .unwrap();
         let state = result.snapshot;
 

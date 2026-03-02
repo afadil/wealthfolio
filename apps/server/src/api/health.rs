@@ -24,7 +24,8 @@ async fn get_health_status(
     // Run fresh checks
     let base_currency = state.base_currency.read().unwrap().clone();
     let client_timezone = extract_client_timezone(&headers);
-    let status = run_health_checks_internal(&state, &base_currency, client_timezone.as_deref()).await?;
+    let status =
+        run_health_checks_internal(&state, &base_currency, client_timezone.as_deref()).await?;
     Ok(Json(status))
 }
 
@@ -35,7 +36,8 @@ async fn run_health_checks(
 ) -> ApiResult<Json<HealthStatus>> {
     let base_currency = state.base_currency.read().unwrap().clone();
     let client_timezone = extract_client_timezone(&headers);
-    let status = run_health_checks_internal(&state, &base_currency, client_timezone.as_deref()).await?;
+    let status =
+        run_health_checks_internal(&state, &base_currency, client_timezone.as_deref()).await?;
     Ok(Json(status))
 }
 
