@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use log::{debug, info, warn};
+use log::{debug, warn};
 
 use super::{
     CircuitBreaker, FetchDiagnostics, QuoteValidator, RateLimitConfig, RateLimiter, SkipReason,
@@ -716,11 +716,6 @@ impl ProviderRegistry {
                     }
 
                     diagnostics.record_success(provider_id);
-                    info!(
-                        "Successfully fetched {} valid quotes. Diagnostics: {}",
-                        valid_quotes.len(),
-                        diagnostics.summary()
-                    );
                     return (Ok(valid_quotes), diagnostics);
                 }
                 Err(e) => {

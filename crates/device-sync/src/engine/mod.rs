@@ -17,7 +17,7 @@ pub use ports::{
 pub use runtime::DeviceSyncRuntimeState;
 
 /// Foreground pull cadence in seconds.
-pub const DEVICE_SYNC_FOREGROUND_INTERVAL_SECS: u64 = 45;
+pub const DEVICE_SYNC_FOREGROUND_INTERVAL_SECS: u64 = 5 * 60;
 /// Maximum jitter (seconds) added to periodic cycle intervals.
 pub const DEVICE_SYNC_INTERVAL_JITTER_SECS: u64 = 5;
 

@@ -564,10 +564,11 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
     const result = await syncService.completePairing(state.pairingSession);
     dispatch({ type: "REMOTE_SEED_STATUS", remoteSeedPresent: result.remoteSeedPresent });
     dispatch({ type: "CLEAR_PAIRING_STATE" });
+    await runReconcileReadyState({ bypassOverwriteGuard: false });
     // NOTE: Don't call refreshState() here - it sets isDetecting=true which
     // causes DeviceSyncSection to render loading skeleton, unmounting the
     // pairing dialog and causing it to restart. Refresh happens when dialog closes.
-  }, [state.pairingSession]);
+  }, [state.pairingSession, runReconcileReadyState]);
 
   const cancelPairing = useCallback(async () => {
     if (state.pairingSession) {

@@ -828,7 +828,7 @@ function ConnectedDevicesList({
 
 function PairThisDeviceItem({ onPair }: { onPair: () => void }) {
   return (
-    <div className="bg-muted/30 flex items-center justify-between gap-3 rounded-lg border border-dashed p-3">
+    <div className="bg-muted/30 flex flex-col gap-3 rounded-lg border border-dashed p-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <Avatar className="h-9 w-9 shrink-0 rounded-lg">
           <AvatarFallback className="rounded-lg">
@@ -851,7 +851,7 @@ function PairThisDeviceItem({ onPair }: { onPair: () => void }) {
           </div>
         </div>
       </div>
-      <Button variant="outline" size="sm" onClick={onPair}>
+      <Button variant="outline" size="sm" className="w-full shrink-0 sm:w-auto" onClick={onPair}>
         <Icons.Link className="mr-2 h-4 w-4" />
         Pair this device
       </Button>
