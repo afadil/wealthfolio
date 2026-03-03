@@ -61,6 +61,12 @@ impl Coverage {
             InstrumentId::Metal { quote, .. } => self
                 .metal_quote_ccy_allow
                 .is_none_or(|a| slice_contains(a, quote.as_ref())),
+
+            // Options: No geographic filtering (OCC symbols are US-only for now)
+            InstrumentId::Option { .. } => true,
+
+            // Bonds: No geographic filtering (ISIN-based routing handled by resolver)
+            InstrumentId::Bond { .. } => true,
         }
     }
 

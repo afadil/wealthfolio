@@ -32,6 +32,9 @@ pub enum ProviderInstrument {
         symbol: ProviderSymbol,
         quote: Currency,
     },
+
+    /// Bond identified by ISIN
+    BondIsin { isin: ProviderSymbol },
 }
 
 impl ProviderInstrument {
@@ -47,6 +50,7 @@ impl ProviderInstrument {
             ProviderInstrument::FxSymbol { symbol } => symbol.to_string(),
             ProviderInstrument::FxPair { from, to } => format!("{}{}=X", from, to),
             ProviderInstrument::MetalSymbol { symbol, .. } => symbol.to_string(),
+            ProviderInstrument::BondIsin { isin } => isin.to_string(),
         }
     }
 }

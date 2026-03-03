@@ -984,6 +984,11 @@ impl MarketDataProvider for AlphaVantageProvider {
                     "Alpha Vantage does not support metals".to_string(),
                 ));
             }
+            ProviderInstrument::BondIsin { .. } => {
+                return Err(MarketDataError::UnsupportedAssetType(
+                    "Alpha Vantage does not support bonds".to_string(),
+                ));
+            }
         };
 
         // Return the most recent quote
@@ -1037,6 +1042,11 @@ impl MarketDataProvider for AlphaVantageProvider {
             ProviderInstrument::MetalSymbol { .. } => {
                 return Err(MarketDataError::UnsupportedAssetType(
                     "Alpha Vantage does not support metals".to_string(),
+                ));
+            }
+            ProviderInstrument::BondIsin { .. } => {
+                return Err(MarketDataError::UnsupportedAssetType(
+                    "Alpha Vantage does not support bonds".to_string(),
                 ));
             }
         };

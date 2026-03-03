@@ -509,6 +509,7 @@ where
             Some(InstrumentType::Crypto) => "CRYPTOCURRENCY",
             Some(InstrumentType::Metal) => "COMMODITY",
             Some(InstrumentType::Option) => "OPTION",
+            Some(InstrumentType::Bond) => "BOND",
             Some(InstrumentType::Fx) => "FOREX",
             None => "OTHER",
         };

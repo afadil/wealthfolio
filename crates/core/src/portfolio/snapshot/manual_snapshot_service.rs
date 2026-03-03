@@ -175,6 +175,7 @@ impl ManualSnapshotService {
                 created_at: Utc::now(),
                 last_updated: Utc::now(),
                 is_alternative: false,
+                contract_multiplier: Decimal::ONE,
             };
             positions.insert(asset.id, position);
         }

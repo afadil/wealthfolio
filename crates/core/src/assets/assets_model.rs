@@ -2,6 +2,7 @@
 
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use chrono::NaiveDateTime;
@@ -45,11 +46,12 @@ pub enum AssetKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum InstrumentType {
-    Equity, // Stocks, ETFs, bonds, funds, commodity ETFs
+    Equity, // Stocks, ETFs, funds
     Crypto, // Cryptocurrencies
     Fx,     // Currency exchange rates
     Option, // Options contracts
     Metal,  // Precious metal spot prices (XAU, XAG)
+    Bond,   // Fixed-income instruments (bonds, T-bills, notes)
 }
 
 /// How the asset is priced/quoted
@@ -80,6 +82,7 @@ impl InstrumentType {
             InstrumentType::Fx => "FX",
             InstrumentType::Option => "OPTION",
             InstrumentType::Metal => "METAL",
+            InstrumentType::Bond => "BOND",
         }
     }
 
@@ -91,6 +94,7 @@ impl InstrumentType {
             "FX" => Some(InstrumentType::Fx),
             "OPTION" => Some(InstrumentType::Option),
             "METAL" => Some(InstrumentType::Metal),
+            "BOND" => Some(InstrumentType::Bond),
             _ => None,
         }
     }
@@ -106,6 +110,39 @@ pub struct OptionSpec {
     pub strike: Decimal,
     pub multiplier: Decimal,
     pub occ_symbol: Option<String>,
+}
+
+/// Bond specification stored in Asset.metadata["bond"]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BondSpec {
+    pub maturity_date: Option<chrono::NaiveDate>,
+    pub coupon_rate: Option<Decimal>,    // Annual coupon rate (e.g., 0.04375 = 4.375%)
+    pub face_value: Option<Decimal>,     // Par value per bond (typically 1000.0)
+    pub coupon_frequency: Option<String>, // ANNUAL, SEMI_ANNUAL, QUARTERLY, MONTHLY
+    pub isin: Option<String>,
+}
+
+/// Parse a metal weight-in-troy-ounces from a symbol weight suffix.
+///
+/// Symbol format: BASE[-SUFFIX] e.g. "XAU", "XAU-1KG", "XAG-100G"
+/// Returns 1.0 (one troy oz) for symbols with no suffix or unknown suffix.
+pub fn parse_metal_weight_oz(symbol: &str) -> Decimal {
+    let suffix = symbol
+        .split_once('-')
+        .map(|(_, s)| s.to_uppercase())
+        .unwrap_or_default();
+    match suffix.as_str() {
+        "1KG" => Decimal::from_str("32.1507").unwrap_or(Decimal::ONE),
+        "500G" => Decimal::from_str("16.0754").unwrap_or(Decimal::ONE),
+        "250G" => Decimal::from_str("8.03768").unwrap_or(Decimal::ONE),
+        "100G" => Decimal::from_str("3.21507").unwrap_or(Decimal::ONE),
+        "10OZ" => Decimal::from(10),
+        "5OZ" => Decimal::from(5),
+        "2OZ" => Decimal::from(2),
+        "1OZ" | "" => Decimal::ONE,
+        _ => Decimal::ONE,
+    }
 }
 
 /// Domain model representing an asset in the system.
@@ -265,14 +302,61 @@ impl Asset {
         self.kind.is_liability()
     }
 
+    /// Returns true if this asset is an options contract.
+    pub fn is_option(&self) -> bool {
+        self.instrument_type == Some(InstrumentType::Option)
+    }
+
+    /// Returns true if this asset is a bond / fixed-income instrument.
+    pub fn is_bond(&self) -> bool {
+        self.instrument_type == Some(InstrumentType::Bond)
+    }
+
+    /// Returns true if this asset is a precious metal.
+    pub fn is_metal(&self) -> bool {
+        self.instrument_type == Some(InstrumentType::Metal)
+    }
+
+    /// Returns the contract multiplier for this asset.
+    ///
+    /// For options, this is the number of shares per contract (typically 100).
+    /// For all other instruments it is 1.
+    pub fn contract_multiplier(&self) -> Decimal {
+        self.option_spec()
+            .map(|s| s.multiplier)
+            .unwrap_or(Decimal::ONE)
+    }
+
+    /// Returns the weight in troy ounces for a precious metal position.
+    ///
+    /// Derived from the weight suffix in `instrument_symbol` (e.g. "XAU-1KG").
+    /// Returns 1.0 for symbols without a weight suffix.
+    pub fn metal_weight_oz(&self) -> Decimal {
+        match &self.instrument_symbol {
+            Some(sym) => parse_metal_weight_oz(sym),
+            None => Decimal::ONE,
+        }
+    }
+
     /// Get option metadata if this is an option (instrument_type = OPTION)
     pub fn option_spec(&self) -> Option<OptionSpec> {
-        if self.instrument_type.as_ref() != Some(&InstrumentType::Option) {
+        if !self.is_option() {
             return None;
         }
         self.metadata
             .as_ref()
             .and_then(|m| m.get("option"))
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+    }
+
+    /// Get bond metadata if this is a bond (instrument_type = BOND)
+    pub fn bond_spec(&self) -> Option<BondSpec> {
+        if !self.is_bond() {
+            return None;
+        }
+        self.metadata
+            .as_ref()
+            .and_then(|m| m.get("bond"))
             .and_then(|v| serde_json::from_value(v.clone()).ok())
     }
 
@@ -302,7 +386,18 @@ impl Asset {
                 code: Arc::from(symbol.as_str()),
                 quote: Cow::Owned(self.quote_ccy.clone()),
             }),
-            InstrumentType::Option => None, // Options not resolvable to market data yet
+            InstrumentType::Option => {
+                // OCC symbol is stored as instrument_symbol
+                Some(InstrumentId::Option {
+                    occ_symbol: Arc::from(symbol.as_str()),
+                })
+            }
+            InstrumentType::Bond => {
+                // ISIN is stored as instrument_symbol
+                Some(InstrumentId::Bond {
+                    isin: Arc::from(symbol.as_str()),
+                })
+            }
         }
     }
 
@@ -476,6 +571,95 @@ impl NewAsset {
             instrument_exchange_mic: None,
             provider_config,
             notes: None,
+            is_active: true,
+            ..Default::default()
+        }
+    }
+
+    /// Creates a new option contract asset from an OptionSpec.
+    ///
+    /// The OCC symbol is used as `instrument_symbol`.
+    /// Metadata stores the full OptionSpec under the "option" key.
+    pub fn new_option_contract(spec: &OptionSpec, currency: &str) -> Self {
+        let occ = spec.occ_symbol.clone().unwrap_or_else(|| {
+            // Build from components if OCC symbol not provided
+            spec.underlying_asset_id.clone()
+        });
+        let name = format!(
+            "{} {} ${} {}",
+            spec.underlying_asset_id,
+            spec.right,
+            spec.strike,
+            spec.expiration.format("%Y-%m-%d")
+        );
+
+        Self {
+            kind: AssetKind::Investment,
+            name: Some(name.clone()),
+            display_code: Some(occ.clone()),
+            quote_mode: QuoteMode::Market,
+            quote_ccy: currency.to_uppercase(),
+            instrument_type: Some(InstrumentType::Option),
+            instrument_symbol: Some(occ),
+            metadata: Some(serde_json::json!({ "option": spec })),
+            is_active: true,
+            ..Default::default()
+        }
+    }
+
+    /// Creates a new bond asset from a BondSpec and ISIN.
+    ///
+    /// Bonds use Manual quote mode by default — prices are fetched via the
+    /// US_TREASURY_CALC or BOERSE_FRANKFURT providers and stored as quotes,
+    /// but the asset itself is not priced live like equities.
+    pub fn new_bond(isin: &str, name: Option<String>, spec: BondSpec, currency: &str) -> Self {
+        let display = name.clone().unwrap_or_else(|| isin.to_uppercase());
+
+        Self {
+            kind: AssetKind::Investment,
+            name,
+            display_code: Some(display),
+            quote_mode: QuoteMode::Market,
+            quote_ccy: currency.to_uppercase(),
+            instrument_type: Some(InstrumentType::Bond),
+            instrument_symbol: Some(isin.to_uppercase()),
+            metadata: Some(serde_json::json!({ "bond": spec })),
+            is_active: true,
+            ..Default::default()
+        }
+    }
+
+    /// Creates a new precious metal asset.
+    ///
+    /// `base_code` is the ISO 4217 metal code (XAU, XAG, XPT, XPD).
+    /// `weight_suffix` is the optional weight descriptor (e.g. "1KG", "100G", "2OZ").
+    /// The symbol is formed as `{base_code}[-{weight_suffix}]`.
+    pub fn new_metal(base_code: &str, weight_suffix: Option<&str>, currency: &str) -> Self {
+        let code = base_code.to_uppercase();
+        let symbol = match weight_suffix {
+            Some(s) if !s.is_empty() => format!("{}-{}", code, s.to_uppercase()),
+            _ => code.clone(),
+        };
+        let metal_name = match code.as_str() {
+            "XAU" => "Gold",
+            "XAG" => "Silver",
+            "XPT" => "Platinum",
+            "XPD" => "Palladium",
+            _ => base_code,
+        };
+        let name = match weight_suffix {
+            Some(s) if !s.is_empty() => format!("{} ({})", metal_name, s.to_uppercase()),
+            _ => metal_name.to_string(),
+        };
+
+        Self {
+            kind: AssetKind::PreciousMetal,
+            name: Some(name.clone()),
+            display_code: Some(symbol.clone()),
+            quote_mode: QuoteMode::Market,
+            quote_ccy: currency.to_uppercase(),
+            instrument_type: Some(InstrumentType::Metal),
+            instrument_symbol: Some(symbol),
             is_active: true,
             ..Default::default()
         }
@@ -746,6 +930,18 @@ pub fn canonicalize_market_identity(
 
             CanonicalMarketIdentity {
                 display_code,
+                instrument_symbol,
+                instrument_exchange_mic: None,
+                quote_ccy: normalized_quote,
+            }
+        }
+        Some(InstrumentType::Bond) => {
+            // Bonds use ISIN as symbol (uppercase, no exchange suffix)
+            if let Some(raw) = instrument_symbol.as_deref() {
+                instrument_symbol = Some(raw.to_uppercase());
+            }
+            CanonicalMarketIdentity {
+                display_code: instrument_symbol.clone(),
                 instrument_symbol,
                 instrument_exchange_mic: None,
                 quote_ccy: normalized_quote,

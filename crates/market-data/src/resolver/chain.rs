@@ -108,6 +108,8 @@ impl SymbolResolver for ResolverChain {
             InstrumentId::Fx { quote, .. } => Some(quote.clone()),
             InstrumentId::Crypto { quote, .. } => Some(quote.clone()),
             InstrumentId::Metal { quote, .. } => Some(quote.clone()),
+            InstrumentId::Option { .. } => None,
+            InstrumentId::Bond { .. } => None,
         }
     }
 }

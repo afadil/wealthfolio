@@ -223,6 +223,10 @@ pub const ACTIVITY_SUBTYPE_REBATE: &str = "REBATE";
 /// Examples: erroneous fee refund, service credit.
 pub const ACTIVITY_SUBTYPE_REFUND: &str = "REFUND";
 
+/// Option expiry: option contract expired worthless.
+/// Removes lots via FIFO with no cash effect.
+pub const ACTIVITY_SUBTYPE_OPTION_EXPIRY: &str = "OPTION_EXPIRY";
+
 #[cfg(test)]
 mod tests {
     use super::*;
