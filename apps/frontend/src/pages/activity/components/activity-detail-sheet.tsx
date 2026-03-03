@@ -2,6 +2,7 @@ import { ActivityStatus, ActivityTypeNames, SUBTYPE_DISPLAY_NAMES } from "@/lib/
 import type { ActivityDetails } from "@/lib/types";
 import {
   Badge,
+  Button,
   Icons,
   Separator,
   Sheet,
@@ -110,7 +111,7 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
           <div className="from-primary/5 to-primary/10 rounded-xl border bg-gradient-to-br p-4">
             <div className="flex items-start justify-between">
               <div>
-                <div className="text-muted-foreground mb-1 text-xs uppercase tracking-wide">
+                <div className="text-muted-foreground mb-1 text-xs tracking-wide uppercase">
                   {ActivityTypeNames[activity.activityType] || activity.activityType}
                 </div>
                 {activity.assetSymbol && (
@@ -205,7 +206,7 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
           {/* Comment */}
           {activity.comment && (
             <DetailSection title="Notes" icon={<Icons.FileText className="h-4 w-4" />}>
-              <p className="whitespace-pre-wrap text-sm">{activity.comment}</p>
+              <p className="text-sm whitespace-pre-wrap">{activity.comment}</p>
             </DetailSection>
           )}
 
@@ -218,12 +219,9 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
 
         {/* Mobile close button */}
         <div className="bg-background border-t p-4 md:hidden">
-          <button
-            onClick={() => onOpenChange(false)}
-            className="bg-primary text-primary-foreground w-full rounded-lg py-3 font-medium"
-          >
+          <Button className="w-full" onClick={() => onOpenChange(false)}>
             Close
-          </button>
+          </Button>
         </div>
       </SheetContent>
     </Sheet>
