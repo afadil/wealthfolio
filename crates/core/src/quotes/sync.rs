@@ -606,7 +606,8 @@ where
     /// Fetch and upsert split activities for a single asset over the given date range.
     ///
     /// Non-fatal: any failure is logged as a warning and does not affect quote sync.
-    async fn sync_splits(&self, asset: &Asset, start: NaiveDate, end: NaiveDate) {
+    /// NOT USED FOR NOW - Yahoo returns weird splits for some assets, need to investigate further before enabling this.
+    async fn _sync_splits(&self, asset: &Asset, start: NaiveDate, end: NaiveDate) {
         use crate::activities::compute_idempotency_key;
 
         let start_dt = Utc.from_utc_datetime(&start.and_hms_opt(0, 0, 0).unwrap());
@@ -762,9 +763,9 @@ where
                         Ok(_) => {
                             debug!("Saved {} quotes for {}", quotes_count, asset.id);
 
-                            // Sync splits for this asset over the same date range.
-                            self.sync_splits(asset, plan.start_date, plan.end_date)
-                                .await;
+                            // Sync splits for this asset over the same date range. Disabled for Now Yahoo Returns weired splits for some assets
+                            // self.sync_splits(asset, plan.start_date, plan.end_date)
+                            //     .await;
 
                             // Update sync state after a successful sync attempt.
                             if let Err(e) = self.sync_state_store.update_after_sync(&asset.id).await

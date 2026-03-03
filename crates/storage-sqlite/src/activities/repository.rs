@@ -142,7 +142,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 query = query.filter(
                     assets::id
                         .like(pattern.clone())
-                        .or(assets::name.like(pattern)),
+                        .or(assets::name.like(pattern.clone()))
+                        .or(assets::display_code.like(pattern)),
                 );
             }
             // Map needs_review_filter to status filter (DRAFT status means needs review)

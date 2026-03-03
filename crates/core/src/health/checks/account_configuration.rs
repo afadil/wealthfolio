@@ -2,6 +2,7 @@
 //!
 //! Detects accounts that need tracking mode configuration.
 
+use chrono::{Datelike, TimeZone, Utc};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
@@ -135,7 +136,7 @@ impl AccountConfigurationCheck {
             Err(_) => return Vec::new(),
         };
 
-        if configured_tz.name() == client_tz.name() {
+        if are_effectively_same_timezone(configured_tz, client_tz) {
             return Vec::new();
         }
 
@@ -164,6 +165,40 @@ impl Default for AccountConfigurationCheck {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn are_effectively_same_timezone(configured_tz: chrono_tz::Tz, client_tz: chrono_tz::Tz) -> bool {
+    if configured_tz.name() == client_tz.name() {
+        return true;
+    }
+
+    let current_year = Utc::now().year();
+    [current_year, current_year + 1]
+        .into_iter()
+        .all(|year| offsets_match_for_year(configured_tz, client_tz, year))
+}
+
+fn offsets_match_for_year(
+    configured_tz: chrono_tz::Tz,
+    client_tz: chrono_tz::Tz,
+    year: i32,
+) -> bool {
+    (1..=12).all(|month| {
+        let sample_utc = match Utc.with_ymd_and_hms(year, month, 1, 12, 0, 0).single() {
+            Some(sample) => sample,
+            None => return false,
+        };
+
+        let configured_offset = sample_utc
+            .with_timezone(&configured_tz)
+            .format("%z")
+            .to_string();
+        let client_offset = sample_utc
+            .with_timezone(&client_tz)
+            .format("%z")
+            .to_string();
+        configured_offset == client_offset
+    })
 }
 
 /// Computes a data hash for issue identity and change detection.
@@ -289,5 +324,35 @@ mod tests {
 
         let issues = check.analyze(&[], Some("Europe/Paris"), Some("Europe/Paris"), &ctx);
         assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn test_effectively_same_timezones_emit_no_issue() {
+        let check = AccountConfigurationCheck::new();
+        let ctx = HealthContext::new(HealthConfig::default(), "USD", 100_000.0);
+
+        let issues = check.analyze(
+            &[],
+            Some("Australia/Melbourne"),
+            Some("Australia/Sydney"),
+            &ctx,
+        );
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn test_effectively_different_timezones_still_emit_warning() {
+        let check = AccountConfigurationCheck::new();
+        let ctx = HealthContext::new(HealthConfig::default(), "USD", 100_000.0);
+
+        let issues = check.analyze(
+            &[],
+            Some("Australia/Melbourne"),
+            Some("Australia/Perth"),
+            &ctx,
+        );
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].severity, Severity::Warning);
+        assert_eq!(issues[0].category, HealthCategory::SettingsConfiguration);
     }
 }
