@@ -105,7 +105,7 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
           </SheetTitle>
         </SheetHeader>
 
-        <div className="space-y-6 pb-8">
+        <div className="space-y-6 pb-6 md:pb-8">
           {/* Header Summary */}
           <div className="from-primary/5 to-primary/10 rounded-xl border bg-gradient-to-br p-4">
             <div className="flex items-start justify-between">
@@ -211,70 +211,19 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
 
           {/* Metadata */}
           <DetailSection title="Record Info" icon={<Icons.Info className="h-4 w-4" />}>
-            {activity.assetQuoteMode && (
-              <DetailRow
-                label="Quote Mode"
-                value={
-                  <Badge variant="secondary" className="text-xs">
-                    {activity.assetQuoteMode}
-                  </Badge>
-                }
-              />
-            )}
             <DetailRow label="Created" value={formatDate(activity.createdAt)} />
             <DetailRow label="Updated" value={formatDate(activity.updatedAt)} />
           </DetailSection>
+        </div>
 
-          {/* Sync & Source Info - only show for synced activities */}
-          {activity.sourceSystem && (
-            <DetailSection title="Sync Information" icon={<Icons.RefreshCw className="h-4 w-4" />}>
-              {activity.sourceRecordId && (
-                <DetailRow
-                  label="Source Record ID"
-                  value={
-                    <code className="bg-muted rounded px-1.5 py-0.5 text-xs">
-                      {activity.sourceRecordId}
-                    </code>
-                  }
-                />
-              )}
-              {activity.idempotencyKey && (
-                <DetailRow
-                  label="Idempotency Key"
-                  value={
-                    <code className="bg-muted block max-w-[200px] truncate rounded px-1.5 py-0.5 text-xs">
-                      {activity.idempotencyKey}
-                    </code>
-                  }
-                />
-              )}
-              {activity.importRunId && (
-                <DetailRow
-                  label="Import Run"
-                  value={
-                    <code className="bg-muted rounded px-1.5 py-0.5 text-xs">
-                      {activity.importRunId}
-                    </code>
-                  }
-                />
-              )}
-              {activity.isUserModified !== undefined && (
-                <DetailRow
-                  label="User Modified"
-                  value={
-                    activity.isUserModified ? (
-                      <Badge variant="outline" className="text-xs">
-                        <Icons.User className="mr-1 h-3 w-3" />
-                        Yes
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">No</span>
-                    )
-                  }
-                />
-              )}
-            </DetailSection>
-          )}
+        {/* Mobile close button */}
+        <div className="bg-background border-t p-4 md:hidden">
+          <button
+            onClick={() => onOpenChange(false)}
+            className="bg-primary text-primary-foreground w-full rounded-lg py-3 font-medium"
+          >
+            Close
+          </button>
         </div>
       </SheetContent>
     </Sheet>
