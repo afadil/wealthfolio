@@ -12,7 +12,7 @@ use crate::health::model::{
 };
 use crate::health::traits::{HealthCheck, HealthContext};
 use crate::taxonomies::TaxonomyServiceTrait;
-use log::{debug, error};
+use log::debug;
 
 /// Data about an unclassified asset.
 #[derive(Debug, Clone)]
