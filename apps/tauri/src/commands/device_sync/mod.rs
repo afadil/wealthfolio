@@ -1125,15 +1125,27 @@ pub async fn confirm_pairing(
         .map_err(|e| e.to_string())?;
 
     if let Some(min_created_at) = min_snapshot_created_at.as_deref() {
-        if let Ok(parsed_min) = chrono::DateTime::parse_from_rfc3339(min_created_at) {
+        if let Ok(parsed_min) = wealthfolio_device_sync::parse_sync_datetime_to_utc(min_created_at)
+        {
             let max_allowed = chrono::Utc::now() + chrono::Duration::minutes(10);
-            if parsed_min.with_timezone(&chrono::Utc) > max_allowed {
+            if parsed_min > max_allowed {
                 log::warn!(
                     "[DeviceSync] Ignoring minSnapshotCreatedAt too far in the future: {}",
                     min_created_at
                 );
             } else {
-                set_min_snapshot_created_at_in_store(&device_id, min_created_at);
+                match wealthfolio_device_sync::normalize_sync_datetime(min_created_at) {
+                    Ok(normalized) => {
+                        set_min_snapshot_created_at_in_store(&device_id, &normalized);
+                    }
+                    Err(err) => {
+                        log::warn!(
+                            "[DeviceSync] Ignoring invalid minSnapshotCreatedAt value after normalization: {} ({})",
+                            min_created_at,
+                            err
+                        );
+                    }
+                }
             }
         } else {
             log::warn!(

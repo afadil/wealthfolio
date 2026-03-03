@@ -618,20 +618,34 @@ async fn confirm_pairing_endpoint(
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     if let Some(min_created_at) = body.min_snapshot_created_at.as_deref() {
-        if let Ok(parsed_min) = chrono::DateTime::parse_from_rfc3339(min_created_at) {
+        if let Ok(parsed_min) = wealthfolio_device_sync::parse_sync_datetime_to_utc(min_created_at)
+        {
             let max_allowed = chrono::Utc::now() + chrono::Duration::minutes(10);
-            if parsed_min.with_timezone(&chrono::Utc) > max_allowed {
+            if parsed_min > max_allowed {
                 warn!(
                     "[DeviceSync] Ignoring minSnapshotCreatedAt too far in the future: {}",
                     min_created_at
                 );
-            } else if let Err(err) =
-                device_sync_engine::set_min_snapshot_created_at_in_store(&device_id, min_created_at)
-            {
-                warn!(
-                    "[DeviceSync] Failed to persist min snapshot freshness gate after confirm_pairing: {}",
-                    err
-                );
+            } else {
+                match wealthfolio_device_sync::normalize_sync_datetime(min_created_at) {
+                    Ok(normalized) => {
+                        if let Err(err) = device_sync_engine::set_min_snapshot_created_at_in_store(
+                            &device_id,
+                            &normalized,
+                        ) {
+                            warn!(
+                                "[DeviceSync] Failed to persist min snapshot freshness gate after confirm_pairing: {}",
+                                err
+                            );
+                        }
+                    }
+                    Err(err) => {
+                        warn!(
+                            "[DeviceSync] Ignoring invalid minSnapshotCreatedAt value after normalization: {} ({})",
+                            min_created_at, err
+                        );
+                    }
+                }
             }
         } else {
             warn!(

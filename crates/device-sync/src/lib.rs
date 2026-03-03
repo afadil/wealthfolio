@@ -39,6 +39,7 @@ pub mod crypto;
 pub mod engine;
 mod enroll_service;
 mod error;
+mod time;
 mod types;
 
 pub use client::DeviceSyncClient;
@@ -47,4 +48,5 @@ pub use enroll_service::{
     SyncStateResult,
 };
 pub use error::{ApiRetryClass, DeviceSyncError, Result};
+pub use time::{normalize_sync_datetime, parse_sync_datetime_to_utc};
 pub use types::*;
