@@ -99,7 +99,7 @@ impl<E: AiEnvironment + 'static> Tool for SearchActivitiesTool<E> {
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
             name: Self::NAME.to_string(),
-            description: "Search investment activities (transactions) such as buys, sells, dividends, deposits, and withdrawals. Supports filtering, date ranges, and pagination. Returns paginated results with totalPages so you can request more pages if needed.".to_string(),
+            description: "Search and get investment activities (transactions) such as buys, sells, dividends, deposits, and withdrawals. Supports filtering, date ranges, and pagination. Returns paginated results with totalPages so you can request more pages if needed.".to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
