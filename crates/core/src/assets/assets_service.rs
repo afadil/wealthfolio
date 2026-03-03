@@ -1083,6 +1083,12 @@ impl AssetServiceTrait for AssetService {
 
         let new_assets: Vec<NewAsset> = specs_for_create
             .iter()
+            .filter(|(spec, _)| {
+                spec.id
+                    .as_ref()
+                    .map(|id| !existing_ids.contains(id))
+                    .unwrap_or(true)
+            })
             .map(|(spec, _)| self.new_asset_from_spec(spec))
             .collect();
 
