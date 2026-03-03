@@ -1,3 +1,4 @@
+use crate::commands::device_sync::clear_min_snapshot_created_at_from_store;
 use crate::context::ServiceContext;
 use crate::secret_store::KeyringSecretStore;
 use log::{error, info};
@@ -66,6 +67,7 @@ pub async fn clear_sync_session(state: State<'_, Arc<ServiceContext>>) -> Result
     }
 
     state.connect_service().clear_cached_token().await;
+    clear_min_snapshot_created_at_from_store();
 
     if errors.is_empty() {
         info!("Sync session cleared from keyring");

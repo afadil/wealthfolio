@@ -18,6 +18,7 @@ import {
   createPairing as createPairingApi,
   deleteDevice as deleteDeviceApi,
   deviceSyncBootstrapOverwriteCheck as deviceSyncBootstrapOverwriteCheckApi,
+  deviceSyncGenerateSnapshotNow as deviceSyncGenerateSnapshotNowApi,
   deviceSyncReconcileReadyState as deviceSyncReconcileReadyStateApi,
   deviceSyncStartBackgroundEngine as deviceSyncStartBackgroundEngineApi,
   deviceSyncStopBackgroundEngine as deviceSyncStopBackgroundEngineApi,
@@ -235,6 +236,15 @@ class SyncService {
     return deviceSyncStopBackgroundEngineApi();
   }
 
+  async generateSnapshotNow(): Promise<{
+    status: string;
+    snapshotId: string | null;
+    oplogSeq: number | null;
+    message: string;
+  }> {
+    return deviceSyncGenerateSnapshotNowApi();
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // PAIRING: ISSUER (Trusted Device)
   // ═══════════════════════════════════════════════════════════════════════════
@@ -407,6 +417,7 @@ class SyncService {
   async pollForKeyBundle(session: ClaimerSession): Promise<{
     received: boolean;
     keyBundle?: KeyBundlePayload;
+    keyBundleCreatedAt?: string;
     status: string;
   }> {
     const result = await getPairingMessagesApi(session.pairingId);
@@ -444,6 +455,7 @@ class SyncService {
         return {
           received: true,
           keyBundle,
+          keyBundleCreatedAt: keyBundleMsg.createdAt,
           status: result.sessionStatus,
         };
       } catch (err) {
@@ -461,6 +473,7 @@ class SyncService {
   async confirmPairingAsClaimer(
     session: ClaimerSession,
     keyBundle: KeyBundlePayload,
+    minSnapshotCreatedAt?: string,
   ): Promise<{ keyVersion: number; remoteSeedPresent: boolean | null }> {
     if (new Date() > session.expiresAt) {
       throw new SyncError(SyncErrorCodes.PAIRING_EXPIRED, "Pairing session expired");
@@ -471,7 +484,8 @@ class SyncService {
     const proof = await crypto.hashPairingCode(proofData);
 
     // Confirm with server
-    const result = await confirmPairingApi(session.pairingId, proof);
+    const freshnessGate = minSnapshotCreatedAt ?? session.keyBundleCreatedAt;
+    const result = await confirmPairingApi(session.pairingId, proof, freshnessGate);
 
     if (!result.success) {
       throw new SyncError(SyncErrorCodes.KEYS_INIT_FAILED, "Failed to confirm pairing");
@@ -488,13 +502,6 @@ class SyncService {
       keyVersion: keyBundle.keyVersion,
       remoteSeedPresent: extractRemoteSeedPresent(result),
     };
-  }
-
-  /**
-   * Get SAS (Short Authentication String) for verification.
-   */
-  async getSASForSession(sessionKey: string): Promise<string> {
-    return crypto.computeSAS(sessionKey);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

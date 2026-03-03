@@ -1079,7 +1079,7 @@ impl DeviceSyncClient {
         device_id: &str,
         pairing_id: &str,
         req: CompletePairingRequest,
-    ) -> Result<SuccessResponse> {
+    ) -> Result<CompletePairingResponse> {
         let url = format!(
             "{}/api/v1/sync/team/devices/{}/pairings/{}/complete",
             self.base_url, device_id, pairing_id

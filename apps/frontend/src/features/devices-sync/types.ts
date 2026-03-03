@@ -16,7 +16,11 @@ export type PairingRole = "issuer" | "claimer";
 export type PairingStatus = "open" | "claimed" | "approved" | "completed" | "cancelled" | "expired";
 export type KeyState = "ACTIVE" | "PENDING";
 export type EnrollmentMode = "BOOTSTRAP" | "PAIR" | "READY";
-export type BootstrapAction = "PULL_REMOTE_OVERWRITE" | "NO_REMOTE_PULL" | "NO_BOOTSTRAP";
+export type BootstrapAction =
+  | "PULL_REMOTE_OVERWRITE"
+  | "NO_REMOTE_PULL"
+  | "WAIT_REMOTE_SNAPSHOT"
+  | "NO_BOOTSTRAP";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Device Sync State Machine
@@ -335,6 +339,8 @@ export interface ClaimerSession {
   requireSas: boolean;
   expiresAt: Date;
   status: PairingStatus;
+  /** Server timestamp when RK bundle was generated; used as snapshot freshness gate. */
+  keyBundleCreatedAt?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

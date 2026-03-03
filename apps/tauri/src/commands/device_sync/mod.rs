@@ -8,9 +8,10 @@ mod snapshot;
 
 use async_trait::async_trait;
 use log::{debug, info};
+use std::collections::HashMap;
 use std::process::Command;
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, OnceLock};
 use tauri::{AppHandle, State};
 
 use crate::context::ServiceContext;
@@ -20,10 +21,11 @@ use wealthfolio_device_sync::engine as shared_sync_engine;
 use wealthfolio_device_sync::{
     ClaimPairingRequest, ClaimPairingResponse, CommitInitializeKeysRequest,
     CommitInitializeKeysResponse, CommitRotateKeysRequest, CommitRotateKeysResponse,
-    CompletePairingRequest, ConfirmPairingRequest, ConfirmPairingResponse, CreatePairingRequest,
-    CreatePairingResponse, Device, DevicePlatform, DeviceSyncClient, EnrollDeviceResponse,
-    GetPairingResponse, InitializeKeysResult, PairingMessagesResponse, RegisterDeviceRequest,
-    ResetTeamSyncResponse, RotateKeysResponse, SuccessResponse, UpdateDeviceRequest,
+    CompletePairingRequest, CompletePairingResponse, ConfirmPairingRequest, ConfirmPairingResponse,
+    CreatePairingRequest, CreatePairingResponse, Device, DevicePlatform, DeviceSyncClient,
+    EnrollDeviceResponse, GetPairingResponse, InitializeKeysResult, PairingMessagesResponse,
+    RegisterDeviceRequest, ResetTeamSyncResponse, RotateKeysResponse, SuccessResponse,
+    UpdateDeviceRequest,
 };
 use wealthfolio_storage_sqlite::sync::SyncTableRowCount;
 
@@ -92,6 +94,41 @@ fn get_sync_identity_from_store() -> Option<SyncIdentity> {
 
 fn get_device_id_from_store() -> Option<String> {
     get_sync_identity_from_store().and_then(|identity| identity.device_id)
+}
+
+static MIN_SNAPSHOT_CREATED_AT: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+
+fn min_snapshot_created_at_state() -> &'static Mutex<HashMap<String, String>> {
+    MIN_SNAPSHOT_CREATED_AT.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+pub(super) fn get_min_snapshot_created_at_from_store(device_id: &str) -> Option<String> {
+    min_snapshot_created_at_state()
+        .lock()
+        .ok()
+        .and_then(|map| map.get(device_id).cloned())
+}
+
+fn set_min_snapshot_created_at_in_store(device_id: &str, value: &str) {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+    if let Ok(mut guard) = min_snapshot_created_at_state().lock() {
+        guard.insert(device_id.to_string(), trimmed.to_string());
+    }
+}
+
+pub(super) fn remove_min_snapshot_created_at_from_store(device_id: &str) {
+    if let Ok(mut guard) = min_snapshot_created_at_state().lock() {
+        guard.remove(device_id);
+    }
+}
+
+pub(super) fn clear_min_snapshot_created_at_from_store() {
+    if let Ok(mut guard) = min_snapshot_created_at_state().lock() {
+        guard.clear();
+    }
 }
 
 async fn persist_device_config_from_identity(
@@ -958,7 +995,7 @@ pub async fn complete_pairing(
     sas_proof: serde_json::Value,
     signature: String,
     state: State<'_, Arc<ServiceContext>>,
-) -> Result<SuccessResponse, String> {
+) -> Result<CompletePairingResponse, String> {
     debug!("[DeviceSync] Completing pairing session: {}", pairing_id);
 
     let token = get_access_token(state.inner()).await?;
@@ -1068,6 +1105,7 @@ pub async fn get_pairing_messages(
 pub async fn confirm_pairing(
     pairing_id: String,
     proof: Option<String>,
+    min_snapshot_created_at: Option<String>,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ConfirmPairingResponse, String> {
     info!("[DeviceSync] Confirming pairing: {}", pairing_id);
@@ -1076,7 +1114,7 @@ pub async fn confirm_pairing(
     let device_id =
         get_device_id_from_store().ok_or_else(|| "No device ID configured".to_string())?;
 
-    create_client()?
+    let result = create_client()?
         .confirm_pairing(
             &token,
             &device_id,
@@ -1084,7 +1122,28 @@ pub async fn confirm_pairing(
             ConfirmPairingRequest { proof },
         )
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    if let Some(min_created_at) = min_snapshot_created_at.as_deref() {
+        if let Ok(parsed_min) = chrono::DateTime::parse_from_rfc3339(min_created_at) {
+            let max_allowed = chrono::Utc::now() + chrono::Duration::minutes(10);
+            if parsed_min.with_timezone(&chrono::Utc) > max_allowed {
+                log::warn!(
+                    "[DeviceSync] Ignoring minSnapshotCreatedAt too far in the future: {}",
+                    min_created_at
+                );
+            } else {
+                set_min_snapshot_created_at_in_store(&device_id, min_created_at);
+            }
+        } else {
+            log::warn!(
+                "[DeviceSync] Ignoring invalid minSnapshotCreatedAt value: {}",
+                min_created_at
+            );
+        }
+    }
+
+    Ok(result)
 }
 
 #[cfg(test)]

@@ -221,8 +221,13 @@ export const getPairingMessages = async (pairingId: string): Promise<PairingMess
 export const confirmPairing = async (
   pairingId: string,
   proof?: string,
+  minSnapshotCreatedAt?: string,
 ): Promise<ConfirmPairingResponse> => {
-  return invoke<ConfirmPairingResponse>("confirm_pairing", { pairingId, proof });
+  return invoke<ConfirmPairingResponse>("confirm_pairing", {
+    pairingId,
+    proof,
+    minSnapshotCreatedAt,
+  });
 };
 
 // ============================================================================

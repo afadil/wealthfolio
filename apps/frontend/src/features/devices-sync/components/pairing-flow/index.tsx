@@ -11,7 +11,6 @@ import { SASVerification } from "./sas-verification";
 import { WaitingState } from "./waiting-state";
 import { PairingResult } from "./pairing-result";
 import { EnterCode } from "./enter-code";
-import type { KeyBundlePayload } from "../../types";
 
 interface PairingFlowProps {
   onComplete?: () => void;
@@ -19,13 +18,7 @@ interface PairingFlowProps {
 }
 
 // Claimer flow steps
-type ClaimerStep =
-  | "enter_code"
-  | "connecting"
-  | "waiting_keys"
-  | "verify_sas"
-  | "success"
-  | "error";
+type ClaimerStep = "enter_code" | "connecting" | "waiting_keys" | "success" | "error";
 
 export function PairingFlow({ onComplete, onCancel }: PairingFlowProps) {
   const { state } = useDeviceSync();
@@ -42,7 +35,6 @@ export function PairingFlow({ onComplete, onCancel }: PairingFlowProps) {
 
 // Issuer Flow (trusted device - displays QR code)
 function IssuerFlow({ onComplete, onCancel }: PairingFlowProps) {
-  const { state } = useDeviceSync();
   const {
     step,
     error,
@@ -102,14 +94,7 @@ function IssuerFlow({ onComplete, onCancel }: PairingFlowProps) {
 
     case "verify_sas":
       if (sas) {
-        return (
-          <SASVerification
-            sas={sas}
-            role={state.pairingRole ?? "issuer"}
-            onConfirm={confirmSAS}
-            onReject={rejectSAS}
-          />
-        );
+        return <SASVerification sas={sas} onConfirm={confirmSAS} onReject={rejectSAS} />;
       }
       return <WaitingState title="Computing security code..." onCancel={handleCancel} />;
 
@@ -145,9 +130,7 @@ function ClaimerFlow({ onComplete, onCancel }: PairingFlowProps) {
   const [step, setStep] = useState<ClaimerStep>("enter_code");
   const [error, setError] = useState<string | null>(null);
   const [sas, setSas] = useState<string | null>(null);
-  const [keyBundle, setKeyBundle] = useState<KeyBundlePayload | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const sasConfirmedRef = useRef(false);
 
   // Use ref to always access latest actions (avoids stale closure in setInterval)
   const actionsRef = useRef(actions);
@@ -202,7 +185,10 @@ function ClaimerFlow({ onComplete, onCancel }: PairingFlowProps) {
           // This follows Signal/WhatsApp UX pattern where only the authorizing device confirms
           logger.info("[ClaimerFlow] Key bundle received, auto-completing pairing...");
           setStep("waiting_keys"); // Show spinner while completing
-          await actionsRef.current.confirmPairingAsClaimer(result.keyBundle);
+          await actionsRef.current.confirmPairingAsClaimer(
+            result.keyBundle,
+            result.keyBundleCreatedAt,
+          );
           logger.info("[ClaimerFlow] Pairing confirmed, setting success");
           setStep("success");
         }
@@ -243,43 +229,6 @@ function ClaimerFlow({ onComplete, onCancel }: PairingFlowProps) {
     [startPolling],
   );
 
-  // Handle SAS confirmation
-  const handleConfirmSAS = useCallback(async () => {
-    logger.info(`[ClaimerFlow] SAS confirmed by user, keyBundle=${keyBundle ? "present" : "null"}`);
-    sasConfirmedRef.current = true;
-
-    // If key bundle already received, complete now
-    if (keyBundle) {
-      try {
-        logger.info("[ClaimerFlow] Key bundle present, completing pairing...");
-        setStep("waiting_keys"); // Show spinner while confirming
-        await actionsRef.current.confirmPairingAsClaimer(keyBundle);
-        logger.info("[ClaimerFlow] Pairing confirmed via SAS confirm");
-        setStep("success");
-      } catch (err) {
-        logger.error(`[ClaimerFlow] Confirm error: ${err}`);
-        setError(err instanceof Error ? err.message : String(err));
-        setStep("error");
-      }
-    } else {
-      // Key bundle not yet received, show waiting state
-      // The polling callback will complete once key bundle arrives
-      logger.info("[ClaimerFlow] Key bundle not yet received, waiting...");
-      setStep("waiting_keys");
-    }
-  }, [keyBundle]);
-
-  // Handle SAS rejection
-  const handleRejectSAS = useCallback(async () => {
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = null;
-    sasConfirmedRef.current = false;
-    await actionsRef.current.cancelPairing();
-    setStep("enter_code");
-    setError(null);
-    setKeyBundle(null);
-  }, []);
-
   // Handle cancel
   const handleCancel = useCallback(async () => {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -296,10 +245,8 @@ function ClaimerFlow({ onComplete, onCancel }: PairingFlowProps) {
   const handleRetry = useCallback(() => {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = null;
-    sasConfirmedRef.current = false;
     setStep("enter_code");
     setError(null);
-    setKeyBundle(null);
   }, []);
 
   switch (step) {
@@ -313,19 +260,6 @@ function ClaimerFlow({ onComplete, onCancel }: PairingFlowProps) {
       return (
         <WaitingState title="Verify Security Code" securityCode={sas} onCancel={handleCancel} />
       );
-
-    case "verify_sas":
-      if (sas) {
-        return (
-          <SASVerification
-            sas={sas}
-            role="claimer"
-            onConfirm={handleConfirmSAS}
-            onReject={handleRejectSAS}
-          />
-        );
-      }
-      return <WaitingState title="Computing security code..." onCancel={handleCancel} />;
 
     case "success":
       return <PairingResult success onDone={handleDone} />;
