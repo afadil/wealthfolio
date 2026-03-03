@@ -23,6 +23,7 @@ You have access to these tools:
    - Use dateFrom/dateTo for specific date ranges (e.g., "transactions in March 2024")
    - Use page/pageSize to paginate through large result sets
    - If totalPages > 1, you can call again with a higher page number to get more results
+  - IMPORTANT: The only valid activity search tool is `search_activities`. use it to get activities and transactions (do not call `get_activities`)
 
 4. get_goals - Get investment goals with progress
    - No parameters required

@@ -1,6 +1,7 @@
 //! AI provider service - merges catalog with user settings.
 
 use async_trait::async_trait;
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use wealthfolio_core::errors::{Result, ValidationError};
@@ -215,7 +216,7 @@ impl AiProviderServiceTrait for AiProviderService {
                     }
                 });
 
-                // Convert models map to sorted vec, applying capability overrides
+                // Convert catalog models to sorted vec, applying capability overrides
                 let mut models: Vec<MergedModel> = catalog_provider
                     .models
                     .iter()
@@ -238,6 +239,51 @@ impl AiProviderServiceTrait for AiProviderService {
                         }
                     })
                     .collect();
+
+                // Add non-catalog models referenced by user settings (selected/favorites/overrides).
+                // This ensures overrides are represented and applied even for models fetched at runtime.
+                let mut non_catalog_model_ids: HashSet<String> = HashSet::new();
+                if let Some(selected_model) = &user.selected_model {
+                    if !catalog_provider.models.contains_key(selected_model) {
+                        non_catalog_model_ids.insert(selected_model.clone());
+                    }
+                }
+                for favorite_model in &user.favorite_models {
+                    if !catalog_provider.models.contains_key(favorite_model) {
+                        non_catalog_model_ids.insert(favorite_model.clone());
+                    }
+                }
+                for model_id in user.model_capability_overrides.keys() {
+                    if !catalog_provider.models.contains_key(model_id) {
+                        non_catalog_model_ids.insert(model_id.clone());
+                    }
+                }
+
+                for model_id in non_catalog_model_ids {
+                    let has_overrides = user.model_capability_overrides.contains_key(&model_id);
+                    let base_capabilities = ModelCapabilities {
+                        tools: false,
+                        thinking: false,
+                        vision: false,
+                        streaming: true,
+                    };
+                    let capabilities =
+                        if let Some(overrides) = user.model_capability_overrides.get(&model_id) {
+                            Self::apply_capability_overrides(&base_capabilities, overrides)
+                        } else {
+                            base_capabilities
+                        };
+
+                    models.push(MergedModel {
+                        id: model_id.clone(),
+                        name: Some(model_id.clone()),
+                        capabilities,
+                        is_catalog: false,
+                        is_favorite: user.favorite_models.contains(&model_id),
+                        has_capability_overrides: has_overrides,
+                    });
+                }
+
                 // Sort models alphabetically for consistent ordering
                 models.sort_by(|a, b| a.id.cmp(&b.id));
 
@@ -257,7 +303,7 @@ impl AiProviderServiceTrait for AiProviderService {
                     documentation_url: catalog_provider.documentation_url.clone(),
                     enabled: user.enabled,
                     favorite: user.favorite,
-                    selected_model: user.selected_model,
+                    selected_model: user.selected_model.clone(),
                     custom_url: user.custom_url,
                     // Use catalog priority if user hasn't explicitly set one
                     priority: if user.priority == 0 || user.priority == default_priority() {
