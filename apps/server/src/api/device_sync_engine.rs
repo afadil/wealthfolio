@@ -704,15 +704,16 @@ pub async fn sync_bootstrap_snapshot_if_needed(
         .map_err(|e| e.to_string())?;
     let min_snapshot_created_at =
         get_min_snapshot_created_at_from_store(&device_id).and_then(|value| {
-            if chrono::DateTime::parse_from_rfc3339(&value).is_ok() {
-                Some(value)
-            } else {
-                tracing::warn!(
-                    "[DeviceSync] Dropping invalid min snapshot freshness gate: {}",
-                    value
-                );
-                remove_min_snapshot_created_at_from_store(&device_id);
-                None
+            match wealthfolio_device_sync::normalize_sync_datetime(&value) {
+                Ok(normalized) => Some(normalized),
+                Err(_) => {
+                    tracing::warn!(
+                        "[DeviceSync] Dropping invalid min snapshot freshness gate: {}",
+                        value
+                    );
+                    remove_min_snapshot_created_at_from_store(&device_id);
+                    None
+                }
             }
         });
 
@@ -843,9 +844,10 @@ pub async fn sync_bootstrap_snapshot_if_needed(
 
     let snapshot_oplog_seq = latest.oplog_seq;
     if let Some(min_created_at) = min_snapshot_created_at.as_deref() {
-        let latest_created_at = chrono::DateTime::parse_from_rfc3339(&latest.created_at)
-            .map_err(|e| format!("Invalid snapshot created_at in metadata: {}", e))?;
-        let min_created_at = chrono::DateTime::parse_from_rfc3339(min_created_at)
+        let latest_created_at =
+            wealthfolio_device_sync::parse_sync_datetime_to_utc(&latest.created_at)
+                .map_err(|e| format!("Invalid snapshot created_at in metadata: {}", e))?;
+        let min_created_at = wealthfolio_device_sync::parse_sync_datetime_to_utc(min_created_at)
             .map_err(|e| format!("Invalid min snapshot freshness gate: {}", e))?;
         if latest_created_at <= min_created_at {
             return Ok(SyncBootstrapResult {
@@ -1013,7 +1015,17 @@ pub async fn generate_snapshot_now(
         key_version,
     )?;
 
-    let base_seq = state.app_sync_repository.get_cursor().ok();
+    let local_cursor = state.app_sync_repository.get_cursor().ok();
+    let remote_cursor = create_client()
+        .get_events_cursor(&token, &device_id)
+        .await
+        .map(|cursor| cursor.cursor)
+        .ok();
+    let base_seq = match (local_cursor, remote_cursor) {
+        (Some(local), Some(remote)) => Some(local.min(remote)),
+        (None, Some(remote)) => Some(remote),
+        _ => None,
+    };
     let upload_headers = wealthfolio_device_sync::SnapshotUploadHeaders {
         event_id: Some(Uuid::now_v7().to_string()),
         schema_version: 1,

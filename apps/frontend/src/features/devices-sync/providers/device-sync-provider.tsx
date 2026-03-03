@@ -640,7 +640,7 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
     // NOTE: Don't call refreshState() here - it sets isDetecting=true which
     // causes DeviceSyncSection to render loading skeleton, unmounting the
     // pairing dialog and causing it to restart. Refresh happens when dialog closes.
-  }, [state.pairingSession, runReconcileReadyState]);
+  }, [runReconcileReadyState, state.pairingSession]);
 
   const cancelPairing = useCallback(async () => {
     if (state.pairingSession) {
