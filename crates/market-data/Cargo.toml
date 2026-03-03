@@ -1,6 +1,6 @@
 [package]
 name = "wealthfolio-market-data"
-version = "3.0.1"
+version.workspace = true
 edition = "2021"
 
 [dependencies]
