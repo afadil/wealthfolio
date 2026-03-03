@@ -1,12 +1,17 @@
 // useGlobalEventListener.ts
 import {
-  updatePortfolio,
+  isDesktop,
+  listenBrokerSyncComplete,
+  listenBrokerSyncError,
+  listenDatabaseRestored,
   listenMarketSyncComplete,
   listenMarketSyncError,
   listenMarketSyncStart,
   listenPortfolioUpdateComplete,
   listenPortfolioUpdateError,
   listenPortfolioUpdateStart,
+  logger,
+  updatePortfolio,
 } from "@/adapters";
 import { usePortfolioSyncOptional } from "@/context/portfolio-sync-context";
 import { useIsMobileViewport } from "@/hooks/use-platform";
@@ -15,13 +20,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import {
-  isDesktop,
-  listenBrokerSyncComplete,
-  listenBrokerSyncError,
-  listenDatabaseRestored,
-  logger,
-} from "@/adapters";
 
 const TOAST_IDS = {
   marketSyncStart: "market-sync-start",
