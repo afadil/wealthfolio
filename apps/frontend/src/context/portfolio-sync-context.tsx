@@ -1,10 +1,11 @@
 import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from "react";
 
-export type SyncStatus = "idle" | "syncing-market" | "calculating-portfolio";
+export type SyncStatus = "idle" | "enriching-assets" | "syncing-market" | "calculating-portfolio";
 
 interface PortfolioSyncContextType {
   status: SyncStatus;
   message: string;
+  setEnrichingAssets: () => void;
   setMarketSyncing: () => void;
   setPortfolioCalculating: () => void;
   setIdle: () => void;
@@ -14,12 +15,17 @@ const PortfolioSyncContext = createContext<PortfolioSyncContextType | undefined>
 
 const STATUS_MESSAGES: Record<SyncStatus, string> = {
   idle: "",
+  "enriching-assets": "Fetching asset metadata...",
   "syncing-market": "Syncing market data...",
   "calculating-portfolio": "Calculating portfolio...",
 };
 
 export function PortfolioSyncProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<SyncStatus>("idle");
+
+  const setEnrichingAssets = useCallback(() => {
+    setStatus("enriching-assets");
+  }, []);
 
   const setMarketSyncing = useCallback(() => {
     setStatus("syncing-market");
@@ -37,11 +43,12 @@ export function PortfolioSyncProvider({ children }: { children: ReactNode }) {
     () => ({
       status,
       message: STATUS_MESSAGES[status],
+      setEnrichingAssets,
       setMarketSyncing,
       setPortfolioCalculating,
       setIdle,
     }),
-    [status, setMarketSyncing, setPortfolioCalculating, setIdle],
+    [status, setEnrichingAssets, setMarketSyncing, setPortfolioCalculating, setIdle],
   );
 
   return <PortfolioSyncContext.Provider value={value}>{children}</PortfolioSyncContext.Provider>;

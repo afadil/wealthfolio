@@ -1,6 +1,10 @@
 // useGlobalEventListener.ts
 import {
   isDesktop,
+  listenAssetEnrichmentComplete,
+  listenAssetEnrichmentError,
+  listenAssetEnrichmentProgress,
+  listenAssetEnrichmentStart,
   listenBrokerSyncComplete,
   listenBrokerSyncError,
   listenDatabaseRestored,
@@ -25,6 +29,7 @@ const TOAST_IDS = {
   marketSyncStart: "market-sync-start",
   portfolioUpdateStart: "portfolio-update-start",
   portfolioUpdateError: "portfolio-update-error",
+  assetEnrichmentStart: "asset-enrichment-start",
   brokerSyncStart: "broker-sync-start",
 } as const;
 
@@ -173,6 +178,39 @@ const useGlobalEventListener = () => {
       });
     };
 
+    const handleAssetEnrichmentStart = () => {
+      syncContextRef.current?.setEnrichingAssets();
+      toast.loading("Fetching asset metadata...", {
+        id: TOAST_IDS.assetEnrichmentStart,
+        duration: 30000,
+      });
+    };
+
+    const handleAssetEnrichmentComplete = () => {
+      toast.dismiss(TOAST_IDS.assetEnrichmentStart);
+    };
+
+    const handleAssetEnrichmentProgress = (event: {
+      payload: { completed: number; total: number };
+    }) => {
+      const { completed, total } = event.payload;
+      toast.loading(`Fetching asset metadata... (${completed}/${total})`, {
+        id: TOAST_IDS.assetEnrichmentStart,
+        duration: 30000,
+      });
+    };
+
+    const handleAssetEnrichmentError = (event: { payload: string }) => {
+      const errorMsg = event.payload || "Unknown error";
+      syncContextRef.current?.setIdle();
+      toast.dismiss(TOAST_IDS.assetEnrichmentStart);
+      toast.error("Asset Metadata Fetch Failed", {
+        description: `${errorMsg}. Portfolio values may be incomplete.`,
+        duration: 10000,
+      });
+      logger.error("Asset enrichment error: " + errorMsg);
+    };
+
     const handleDatabaseRestored = () => {
       queryClientRef.current.invalidateQueries();
       toast.success("Database restored successfully", {
@@ -294,6 +332,18 @@ const useGlobalEventListener = () => {
       const unlistenMarketStart = await listenMarketSyncStart(handleMarketSyncStart);
       const unlistenMarketComplete = await listenMarketSyncComplete(handleMarketSyncComplete);
       const unlistenMarketError = await listenMarketSyncError(handleMarketSyncError);
+      const unlistenAssetEnrichmentStart = await listenAssetEnrichmentStart(
+        handleAssetEnrichmentStart,
+      );
+      const unlistenAssetEnrichmentComplete = await listenAssetEnrichmentComplete(
+        handleAssetEnrichmentComplete,
+      );
+      const unlistenAssetEnrichmentError = await listenAssetEnrichmentError(
+        handleAssetEnrichmentError,
+      );
+      const unlistenAssetEnrichmentProgress = await listenAssetEnrichmentProgress(
+        handleAssetEnrichmentProgress,
+      );
       const unlistenDatabaseRestored = await listenDatabaseRestored(handleDatabaseRestored);
       const unlistenBrokerSyncComplete = await listenBrokerSyncComplete(handleBrokerSyncComplete);
       const unlistenBrokerSyncError = await listenBrokerSyncError(handleBrokerSyncError);
@@ -305,6 +355,10 @@ const useGlobalEventListener = () => {
         unlistenMarketStart();
         unlistenMarketComplete();
         unlistenMarketError();
+        unlistenAssetEnrichmentStart();
+        unlistenAssetEnrichmentComplete();
+        unlistenAssetEnrichmentError();
+        unlistenAssetEnrichmentProgress();
         unlistenDatabaseRestored();
         unlistenBrokerSyncComplete();
         unlistenBrokerSyncError();
