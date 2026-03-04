@@ -3251,4 +3251,481 @@ mod tests {
         );
         assert_eq!(created.fee, Some(dec!(5)), "Fee should not change for GBP");
     }
+
+    // --- Bond instrument type tests ---
+
+    #[tokio::test]
+    async fn test_check_import_recognizes_bond_instrument_type() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let import = ActivityImport {
+            id: None,
+            date: "2024-06-01".to_string(),
+            symbol: "US912828ZT58".to_string(),
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(10)),
+            unit_price: Some(dec!(99.5)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(995)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: None,
+            exchange_mic: None,
+            quote_ccy: Some("USD".to_string()),
+            instrument_type: Some("BOND".to_string()),
+            quote_mode: None,
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+        };
+
+        let result = activity_service
+            .check_activities_import("acc-1".to_string(), vec![import])
+            .await
+            .expect("import check should succeed");
+
+        assert_eq!(result.len(), 1);
+        let checked = &result[0];
+        assert_eq!(
+            checked.instrument_type.as_deref(),
+            Some("BOND"),
+            "BOND instrument type should be preserved through check"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_import_apply_accepts_bond_instrument_type() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let resolved = ActivityImport {
+            id: None,
+            date: "2024-06-01".to_string(),
+            symbol: "US912828ZT58".to_string(),
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(10)),
+            unit_price: Some(dec!(99.5)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(995)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: Some("US Treasury Note 2.5% 2025".to_string()),
+            exchange_mic: None,
+            quote_ccy: Some("USD".to_string()),
+            instrument_type: Some("BOND".to_string()),
+            quote_mode: Some("MANUAL".to_string()),
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+        };
+
+        let result = activity_service
+            .import_activities("acc-1".to_string(), vec![resolved])
+            .await
+            .expect("import should succeed for bond");
+
+        assert!(
+            result.summary.success,
+            "bond import should succeed, got errors: {:?}",
+            result.activities.first().and_then(|a| a.errors.as_ref())
+        );
+        assert_eq!(result.summary.imported, 1);
+    }
+
+    #[tokio::test]
+    async fn test_import_apply_recognizes_bond_aliases() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        for alias in &["FIXEDINCOME", "FIXED_INCOME", "DEBT"] {
+            let resolved = ActivityImport {
+                id: None,
+                date: "2024-06-01".to_string(),
+                symbol: "US912828ZT58".to_string(),
+                activity_type: "BUY".to_string(),
+                quantity: Some(dec!(10)),
+                unit_price: Some(dec!(99.5)),
+                currency: "USD".to_string(),
+                fee: Some(dec!(0)),
+                amount: Some(dec!(995)),
+                comment: None,
+                account_id: Some("acc-1".to_string()),
+                account_name: None,
+                symbol_name: Some("US Treasury Note".to_string()),
+                exchange_mic: None,
+                quote_ccy: Some("USD".to_string()),
+                instrument_type: Some(alias.to_string()),
+                quote_mode: Some("MANUAL".to_string()),
+                errors: None,
+                warnings: None,
+                duplicate_of_id: None,
+                duplicate_of_line_number: None,
+                is_draft: false,
+                is_valid: true,
+                line_number: Some(1),
+                fx_rate: None,
+                subtype: None,
+            };
+
+            let result = activity_service
+                .import_activities("acc-1".to_string(), vec![resolved])
+                .await
+                .unwrap_or_else(|_| panic!("import should succeed for alias '{}'", alias));
+
+            assert!(
+                result.summary.success,
+                "bond alias '{}' should be accepted, got errors: {:?}",
+                alias,
+                result.activities.first().and_then(|a| a.errors.as_ref())
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_check_import_bond_with_existing_asset_enriches_name_and_ccy() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        // Existing bond asset in the system
+        let mut bond_asset = create_test_asset_with_instrument(
+            "bond-uuid",
+            "US912828ZT58",
+            None,
+            Some(InstrumentType::Bond),
+            "USD",
+        );
+        bond_asset.name = Some("US Treasury Note 2.5% 2025".to_string());
+        asset_service.add_asset(bond_asset);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        // Import with explicit BOND instrument_type; name/ccy should be enriched from asset
+        let import = ActivityImport {
+            id: None,
+            date: "2024-06-01".to_string(),
+            symbol: "US912828ZT58".to_string(),
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(5)),
+            unit_price: Some(dec!(100)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(500)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: None,
+            exchange_mic: None,
+            quote_ccy: None,
+            instrument_type: Some("BOND".to_string()),
+            quote_mode: None,
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+        };
+
+        let result = activity_service
+            .check_activities_import("acc-1".to_string(), vec![import])
+            .await
+            .expect("import check should succeed");
+
+        assert_eq!(result.len(), 1);
+        let checked = &result[0];
+        assert_eq!(
+            checked.instrument_type.as_deref(),
+            Some("BOND"),
+            "BOND instrument type should be preserved"
+        );
+        assert_eq!(
+            checked.symbol_name.as_deref(),
+            Some("US Treasury Note 2.5% 2025"),
+            "symbol_name should be enriched from existing bond asset"
+        );
+        assert_eq!(
+            checked.quote_ccy.as_deref(),
+            Some("USD"),
+            "quote_ccy should be enriched from existing bond asset"
+        );
+    }
+
+    // --- Option instrument type tests ---
+
+    #[tokio::test]
+    async fn test_check_import_recognizes_option_instrument_type() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        // AAPL Sep 18, 2026 $200 Call (OCC format)
+        let import = ActivityImport {
+            id: None,
+            date: "2026-03-01".to_string(),
+            symbol: "AAPL260918C00200000".to_string(),
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(1)),
+            unit_price: Some(dec!(5.50)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0.65)),
+            amount: Some(dec!(550)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: None,
+            exchange_mic: None,
+            quote_ccy: Some("USD".to_string()),
+            instrument_type: Some("OPTION".to_string()),
+            quote_mode: None,
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+        };
+
+        let result = activity_service
+            .check_activities_import("acc-1".to_string(), vec![import])
+            .await
+            .expect("import check should succeed");
+
+        assert_eq!(result.len(), 1);
+        let checked = &result[0];
+        assert_eq!(
+            checked.instrument_type.as_deref(),
+            Some("OPTION"),
+            "OPTION instrument type should be preserved through check"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_import_apply_accepts_option_instrument_type() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        // SPY June 19, 2026 $580 Put (OCC format)
+        let resolved = ActivityImport {
+            id: None,
+            date: "2026-03-01".to_string(),
+            symbol: "SPY260619P00580000".to_string(),
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(2)),
+            unit_price: Some(dec!(8.35)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(1.30)),
+            amount: Some(dec!(1670)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: Some("SPY Jun 19 2026 580 Put".to_string()),
+            exchange_mic: None,
+            quote_ccy: Some("USD".to_string()),
+            instrument_type: Some("OPTION".to_string()),
+            quote_mode: Some("MARKET".to_string()),
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+        };
+
+        let result = activity_service
+            .import_activities("acc-1".to_string(), vec![resolved])
+            .await
+            .expect("import should succeed for option");
+
+        assert!(
+            result.summary.success,
+            "option import should succeed, got errors: {:?}",
+            result.activities.first().and_then(|a| a.errors.as_ref())
+        );
+        assert_eq!(result.summary.imported, 1);
+    }
+
+    #[tokio::test]
+    async fn test_check_import_existing_option_asset_enriches_name() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        // Existing option asset
+        let mut option_asset = create_test_asset_with_instrument(
+            "opt-uuid",
+            "AAPL260918C00200000",
+            None,
+            Some(InstrumentType::Option),
+            "USD",
+        );
+        option_asset.name = Some("AAPL Sep 18 2026 200 Call".to_string());
+        asset_service.add_asset(option_asset);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let import = ActivityImport {
+            id: None,
+            date: "2026-04-01".to_string(),
+            symbol: "AAPL260918C00200000".to_string(),
+            activity_type: "SELL".to_string(),
+            quantity: Some(dec!(1)),
+            unit_price: Some(dec!(8.00)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0.65)),
+            amount: Some(dec!(800)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: None,
+            exchange_mic: None,
+            quote_ccy: None,
+            instrument_type: Some("OPTION".to_string()),
+            quote_mode: None,
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+        };
+
+        let result = activity_service
+            .check_activities_import("acc-1".to_string(), vec![import])
+            .await
+            .expect("import check should succeed");
+
+        assert_eq!(result.len(), 1);
+        let checked = &result[0];
+        assert_eq!(
+            checked.instrument_type.as_deref(),
+            Some("OPTION"),
+            "OPTION instrument type should be preserved"
+        );
+        assert_eq!(
+            checked.symbol_name.as_deref(),
+            Some("AAPL Sep 18 2026 200 Call"),
+            "symbol_name should be enriched from existing option asset"
+        );
+    }
 }

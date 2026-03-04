@@ -382,4 +382,234 @@ describe("validation-utils", () => {
       expect(activity.errors).toBeUndefined();
     });
   });
+
+  describe("validateActivityImport with instrument types", () => {
+    const baseMapping = {
+      accountId: "test-account",
+      name: "Test Mapping",
+      fieldMappings: {
+        [ImportFormat.DATE]: "date",
+        [ImportFormat.SYMBOL]: "symbol",
+        [ImportFormat.ACTIVITY_TYPE]: "activityType",
+        [ImportFormat.QUANTITY]: "quantity",
+        [ImportFormat.UNIT_PRICE]: "unitPrice",
+        [ImportFormat.AMOUNT]: "amount",
+        [ImportFormat.FEE]: "fee",
+        [ImportFormat.CURRENCY]: "currency",
+        [ImportFormat.INSTRUMENT_TYPE]: "instrumentType",
+      },
+      activityMappings: {
+        [ActivityType.BUY]: ["BUY"],
+        [ActivityType.SELL]: ["SELL"],
+      },
+      symbolMappings: {},
+      accountMappings: {},
+    };
+
+    const mappingWithoutInstrumentType = {
+      ...baseMapping,
+      fieldMappings: {
+        ...baseMapping.fieldMappings,
+        [ImportFormat.INSTRUMENT_TYPE]: undefined,
+      },
+    };
+
+    it("should parse BOND instrument type from CSV column", () => {
+      const testData = [
+        {
+          lineNumber: "1",
+          date: "2024-06-01T00:00:00.000Z",
+          symbol: "US912828ZT58",
+          activityType: "BUY",
+          quantity: "10",
+          unitPrice: "99.50",
+          amount: "995.00",
+          fee: "0",
+          currency: "USD",
+          instrumentType: "BOND",
+        },
+      ];
+
+      const result = validateActivityImport(testData, baseMapping, "test-account", "USD");
+
+      expect(result.activities).toHaveLength(1);
+      expect(result.activities[0].instrumentType).toBe("BOND");
+      expect(result.activities[0].symbol).toBe("US912828ZT58");
+      expect(result.activities[0].isValid).toBe(true);
+    });
+
+    it("should normalize bond aliases from CSV column", () => {
+      for (const alias of ["FIXEDINCOME", "FIXED_INCOME", "DEBT", "Fixed Income"]) {
+        const testData = [
+          {
+            lineNumber: "1",
+            date: "2024-06-01T00:00:00.000Z",
+            symbol: "US912828ZT58",
+            activityType: "BUY",
+            quantity: "10",
+            unitPrice: "99.50",
+            amount: "995.00",
+            fee: "0",
+            currency: "USD",
+            instrumentType: alias,
+          },
+        ];
+
+        const result = validateActivityImport(testData, baseMapping, "test-account", "USD");
+
+        expect(result.activities[0].instrumentType).toBe("BOND");
+      }
+    });
+
+    it("should parse OPTION instrument type from CSV column", () => {
+      const testData = [
+        {
+          lineNumber: "1",
+          date: "2026-03-01T00:00:00.000Z",
+          symbol: "AAPL260918C00200000",
+          activityType: "BUY",
+          quantity: "1",
+          unitPrice: "5.50",
+          amount: "550.00",
+          fee: "0.65",
+          currency: "USD",
+          instrumentType: "OPTION",
+        },
+      ];
+
+      const result = validateActivityImport(testData, baseMapping, "test-account", "USD");
+
+      expect(result.activities).toHaveLength(1);
+      expect(result.activities[0].instrumentType).toBe("OPTION");
+      expect(result.activities[0].symbol).toBe("AAPL260918C00200000");
+      expect(result.activities[0].isValid).toBe(true);
+    });
+
+    it("should extract instrument type from bond: prefix when no column mapped", () => {
+      const testData = [
+        {
+          lineNumber: "1",
+          date: "2024-06-01T00:00:00.000Z",
+          symbol: "bond:US912828ZT58",
+          activityType: "BUY",
+          quantity: "10",
+          unitPrice: "99.50",
+          amount: "995.00",
+          fee: "0",
+          currency: "USD",
+        },
+      ];
+
+      const result = validateActivityImport(
+        testData,
+        mappingWithoutInstrumentType,
+        "test-account",
+        "USD",
+      );
+
+      expect(result.activities).toHaveLength(1);
+      expect(result.activities[0].instrumentType).toBe("BOND");
+      expect(result.activities[0].symbol).toBe("US912828ZT58");
+    });
+
+    it("should extract instrument type from option: prefix when no column mapped", () => {
+      const testData = [
+        {
+          lineNumber: "1",
+          date: "2026-03-01T00:00:00.000Z",
+          symbol: "option:AAPL260918C00200000",
+          activityType: "BUY",
+          quantity: "1",
+          unitPrice: "5.50",
+          amount: "550.00",
+          fee: "0.65",
+          currency: "USD",
+        },
+      ];
+
+      const result = validateActivityImport(
+        testData,
+        mappingWithoutInstrumentType,
+        "test-account",
+        "USD",
+      );
+
+      expect(result.activities).toHaveLength(1);
+      expect(result.activities[0].instrumentType).toBe("OPTION");
+      expect(result.activities[0].symbol).toBe("AAPL260918C00200000");
+    });
+
+    it("should prefer CSV column over typed prefix", () => {
+      const testData = [
+        {
+          lineNumber: "1",
+          date: "2024-06-01T00:00:00.000Z",
+          symbol: "option:AAPL260918C00200000",
+          activityType: "BUY",
+          quantity: "1",
+          unitPrice: "5.50",
+          amount: "550.00",
+          fee: "0",
+          currency: "USD",
+          instrumentType: "EQUITY",
+        },
+      ];
+
+      const result = validateActivityImport(testData, baseMapping, "test-account", "USD");
+
+      expect(result.activities).toHaveLength(1);
+      // CSV column value takes precedence over prefix
+      expect(result.activities[0].instrumentType).toBe("EQUITY");
+    });
+
+    it("should parse METAL instrument type from CSV column", () => {
+      const testData = [
+        {
+          lineNumber: "1",
+          date: "2024-06-01T00:00:00.000Z",
+          symbol: "XAUUSD",
+          activityType: "BUY",
+          quantity: "1",
+          unitPrice: "2350.00",
+          amount: "2350.00",
+          fee: "0",
+          currency: "USD",
+          instrumentType: "METAL",
+        },
+      ];
+
+      const result = validateActivityImport(testData, baseMapping, "test-account", "USD");
+
+      expect(result.activities).toHaveLength(1);
+      expect(result.activities[0].instrumentType).toBe("METAL");
+      expect(result.activities[0].isValid).toBe(true);
+    });
+
+    it("should handle rows with no instrument type gracefully", () => {
+      const testData = [
+        {
+          lineNumber: "1",
+          date: "2024-06-01T00:00:00.000Z",
+          symbol: "AAPL",
+          activityType: "BUY",
+          quantity: "10",
+          unitPrice: "190.00",
+          amount: "1900.00",
+          fee: "0",
+          currency: "USD",
+        },
+      ];
+
+      const result = validateActivityImport(
+        testData,
+        mappingWithoutInstrumentType,
+        "test-account",
+        "USD",
+      );
+
+      expect(result.activities).toHaveLength(1);
+      expect(result.activities[0].instrumentType).toBeUndefined();
+      expect(result.activities[0].isValid).toBe(true);
+    });
+  });
 });
