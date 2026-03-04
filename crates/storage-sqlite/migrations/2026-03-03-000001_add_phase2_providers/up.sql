@@ -1,5 +1,5 @@
 -- Add market data providers for bonds and precious metals
-INSERT INTO market_data_providers (id, name, description, url, priority, enabled, logo_filename, last_synced_at, last_sync_status, last_sync_error)
+INSERT OR IGNORE INTO market_data_providers (id, name, description, url, priority, enabled, logo_filename, last_synced_at, last_sync_status, last_sync_error)
 VALUES
     ('US_TREASURY_CALC', 'US Treasury (Calculated)', 'Calculates US Treasury bond prices from yield curve data published by the US Treasury Department.', 'https://home.treasury.gov/', 10, FALSE, NULL, NULL, NULL, NULL),
     ('BOERSE_FRANKFURT', 'Börse Frankfurt', 'Börse Frankfurt provides bond and security pricing data for European markets.', 'https://www.boerse-frankfurt.de/', 11, FALSE, NULL, NULL, NULL, NULL),

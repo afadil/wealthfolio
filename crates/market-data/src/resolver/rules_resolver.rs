@@ -235,6 +235,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         }
     }
 
@@ -247,6 +248,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         }
     }
 
@@ -259,6 +261,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         }
     }
 
@@ -271,6 +274,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         }
     }
 

@@ -982,6 +982,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         };
 
         let ordered = registry.ordered_providers(&context, true);
@@ -1010,6 +1011,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: Some(Cow::Borrowed("PROVIDER_C")),
+            bond_metadata: None,
         };
 
         let ordered = registry.ordered_providers(&context, true);
@@ -1081,6 +1083,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         };
 
         let equity_providers = registry.ordered_providers(&equity_context, true);
@@ -1096,6 +1099,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         };
 
         let crypto_providers = registry.ordered_providers(&crypto_context, true);
@@ -1157,6 +1161,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         };
         assert_eq!(registry.ordered_providers(&us_context, true).len(), 1);
 
@@ -1169,6 +1174,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         };
         assert_eq!(registry.ordered_providers(&ca_context, true).len(), 0);
 
@@ -1181,6 +1187,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         };
         assert_eq!(registry.ordered_providers(&unknown_context, true).len(), 0);
     }
@@ -1210,6 +1217,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         };
 
         let ordered = registry.ordered_providers(&context, true);
@@ -1246,6 +1254,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: Some(Cow::Borrowed("PROVIDER_C")),
+            bond_metadata: None,
         };
 
         let ordered = registry.ordered_providers(&context, true);

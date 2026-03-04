@@ -343,6 +343,7 @@ impl MarketDataClient {
             overrides,
             currency_hint,
             preferred_provider,
+            bond_metadata: None,
         })
     }
 

@@ -1122,6 +1122,7 @@ mod tests {
             overrides: None,
             currency_hint: currency_hint.map(Cow::Borrowed),
             preferred_provider: None,
+            bond_metadata: None,
         }
     }
 
