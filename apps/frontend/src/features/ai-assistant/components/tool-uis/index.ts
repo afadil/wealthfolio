@@ -14,6 +14,7 @@ import { ImportCsvToolUI } from "./import-csv-tool-ui";
 import { IncomeToolUI } from "./income-tool-ui";
 import { PerformanceToolUI } from "./performance-tool-ui";
 import { RecordActivityToolUI } from "./record-activity-tool-ui";
+import { RecordActivitiesToolUI } from "./record-activities-tool-ui";
 import { ValuationToolUI } from "./valuation-tool-ui";
 
 /**
@@ -30,6 +31,7 @@ export const toolUIs = {
   get_valuation_history: ValuationToolUI,
   import_csv: ImportCsvToolUI,
   record_activity: RecordActivityToolUI,
+  record_activities: RecordActivitiesToolUI,
   search_activities: ActivitiesToolUI,
 } as const;
 
@@ -46,6 +48,7 @@ export {
   IncomeToolUI,
   PerformanceToolUI,
   RecordActivityToolUI,
+  RecordActivitiesToolUI,
   ValuationToolUI,
 };
 

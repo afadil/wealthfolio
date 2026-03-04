@@ -296,6 +296,7 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
             "get_asset_allocation".to_string(),
             "get_performance".to_string(),
             "record_activity".to_string(),
+            "record_activities".to_string(),
             "import_csv".to_string(),
         ]
     }
@@ -583,6 +584,9 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
             }
             if is_allowed("record_activity") {
                 allowed_tools.push(Box::new(tool_set.record_activity));
+            }
+            if is_allowed("record_activities") {
+                allowed_tools.push(Box::new(tool_set.record_activities));
             }
             if is_allowed("import_csv") {
                 allowed_tools.push(Box::new(tool_set.import_csv));

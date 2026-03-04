@@ -237,6 +237,177 @@ impl<E: AiEnvironment> RecordActivityTool<E> {
         Self { env }
     }
 
+    /// Build normalized tool output without side effects.
+    ///
+    /// Used by `record_activity` and the batch `record_activities` tool.
+    pub(crate) async fn build_output(
+        &self,
+        args: RecordActivityArgs,
+    ) -> Result<RecordActivityOutput, AiError> {
+        // Fetch accounts, then delegate to the shared implementation.
+        let accounts = self
+            .env
+            .account_service()
+            .get_active_accounts()
+            .map_err(|e| AiError::ToolExecutionFailed(e.to_string()))?;
+
+        self.build_output_with_accounts(args, &accounts).await
+    }
+
+    /// Build normalized tool output using pre-fetched accounts.
+    ///
+    /// Avoids redundant DB calls when processing a batch.
+    pub(crate) async fn build_output_with_accounts(
+        &self,
+        args: RecordActivityArgs,
+        accounts: &[wealthfolio_core::accounts::Account],
+    ) -> Result<RecordActivityOutput, AiError> {
+        debug!(
+            "record_activity called: type={}, symbol={:?}, account={:?}, date={}",
+            args.activity_type, args.symbol, args.account, args.activity_date
+        );
+
+        // 1. Validate activity type
+        let activity_type = self
+            .validate_activity_type(&args.activity_type)
+            .unwrap_or_else(|| "UNKNOWN".to_string());
+
+        // 2. Build account options from pre-fetched accounts
+        debug!("Found {} active accounts", accounts.len());
+
+        let available_accounts: Vec<AccountOption> = accounts
+            .iter()
+            .map(|a| AccountOption {
+                id: a.id.clone(),
+                name: a.name.clone(),
+                currency: a.currency.clone(),
+            })
+            .collect();
+
+        // 3. Resolve account
+        // Treat empty string as None for auto-selection
+        let account_hint = args.account.as_deref().filter(|s| !s.is_empty());
+        debug!(
+            "Account resolution: hint={:?}, num_accounts={}",
+            account_hint,
+            accounts.len()
+        );
+        let (account_id, account_name) = self.resolve_account(account_hint, accounts);
+        debug!(
+            "Account resolved: id={:?}, name={:?}",
+            account_id, account_name
+        );
+
+        // Get currency from resolved account, or use base currency as fallback
+        let currency = account_id
+            .as_ref()
+            .and_then(|id| accounts.iter().find(|a| &a.id == id))
+            .map(|a| a.currency.clone())
+            .unwrap_or_else(|| self.env.base_currency());
+
+        // 4. Handle symbol/asset resolution using quote_service
+        let (resolved_asset, asset_id, asset_name, is_custom_asset) =
+            if let Some(symbol) = &args.symbol {
+                // Search for the symbol using quote_service
+                let search_results = self
+                    .env
+                    .quote_service()
+                    .search_symbol_with_currency(symbol, Some(&currency))
+                    .await
+                    .unwrap_or_default();
+
+                if let Some(top_result) = search_results.first() {
+                    // Found a match - use the top result
+                    let asset = ResolvedAsset {
+                        asset_id: top_result.existing_asset_id.clone().unwrap_or_else(|| {
+                            // Construct asset ID from symbol and exchange
+                            format!(
+                                "{}:{}",
+                                top_result.symbol,
+                                top_result.exchange_mic.as_deref().unwrap_or("UNKNOWN")
+                            )
+                        }),
+                        symbol: top_result.symbol.clone(),
+                        name: top_result.long_name.clone(),
+                        currency: top_result
+                            .currency
+                            .clone()
+                            .unwrap_or_else(|| currency.clone()),
+                        exchange: top_result.exchange_name.clone(),
+                        exchange_mic: top_result.exchange_mic.clone(),
+                    };
+                    (
+                        Some(asset.clone()),
+                        Some(asset.asset_id.clone()),
+                        Some(asset.name.clone()),
+                        false,
+                    )
+                } else {
+                    // No match found - treat as custom asset
+                    (
+                        None,
+                        None,
+                        Some(symbol.clone()),
+                        true, // Mark as custom asset so user can create it
+                    )
+                }
+            } else {
+                (None, None, None, false)
+            };
+
+        // 5. Determine price source
+        let price_source = if args.unit_price.is_some() {
+            "user"
+        } else {
+            "none"
+        };
+
+        // 6. Compute amount if not provided
+        let amount = self.compute_amount(args.quantity, args.unit_price, args.fee, args.amount);
+
+        // 7. Build draft
+        // Use asset's currency for trading activities, otherwise use account currency
+        let draft_currency = resolved_asset
+            .as_ref()
+            .map(|a| a.currency.clone())
+            .unwrap_or(currency);
+
+        let draft = ActivityDraft {
+            activity_type: activity_type.clone(),
+            activity_date: args.activity_date,
+            symbol: args.symbol.clone(),
+            asset_id,
+            asset_name,
+            quantity: args.quantity,
+            unit_price: args.unit_price,
+            amount,
+            fee: args.fee,
+            currency: draft_currency,
+            account_id,
+            account_name,
+            subtype: args.subtype,
+            notes: args.notes,
+            price_source: price_source.to_string(),
+            pricing_mode: "MARKET".to_string(),
+            is_custom_asset,
+            asset_kind: None,
+        };
+
+        // 8. Validate the draft
+        let validation = self.validate_draft(&draft);
+
+        // 9. Get available subtypes
+        let available_subtypes = get_subtypes_for_activity_type(&activity_type);
+
+        Ok(RecordActivityOutput {
+            draft,
+            validation,
+            available_accounts,
+            resolved_asset,
+            available_subtypes,
+        })
+    }
+
     /// Resolve account by name or ID with fuzzy matching.
     /// Auto-selects if there's only one account and no hint provided.
     fn resolve_account(
@@ -472,156 +643,7 @@ impl<E: AiEnvironment + 'static> Tool for RecordActivityTool<E> {
     }
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        debug!(
-            "record_activity called: type={}, symbol={:?}, account={:?}, date={}",
-            args.activity_type, args.symbol, args.account, args.activity_date
-        );
-
-        // 1. Validate activity type
-        let activity_type = self
-            .validate_activity_type(&args.activity_type)
-            .unwrap_or_else(|| "UNKNOWN".to_string());
-
-        // 2. Get all active accounts
-        let accounts = self
-            .env
-            .account_service()
-            .get_active_accounts()
-            .map_err(|e| AiError::ToolExecutionFailed(e.to_string()))?;
-
-        debug!("Found {} active accounts", accounts.len());
-
-        let available_accounts: Vec<AccountOption> = accounts
-            .iter()
-            .map(|a| AccountOption {
-                id: a.id.clone(),
-                name: a.name.clone(),
-                currency: a.currency.clone(),
-            })
-            .collect();
-
-        // 3. Resolve account
-        // Treat empty string as None for auto-selection
-        let account_hint = args.account.as_deref().filter(|s| !s.is_empty());
-        debug!(
-            "Account resolution: hint={:?}, num_accounts={}",
-            account_hint,
-            accounts.len()
-        );
-        let (account_id, account_name) = self.resolve_account(account_hint, &accounts);
-        debug!(
-            "Account resolved: id={:?}, name={:?}",
-            account_id, account_name
-        );
-
-        // Get currency from resolved account, or use base currency as fallback
-        let currency = account_id
-            .as_ref()
-            .and_then(|id| accounts.iter().find(|a| &a.id == id))
-            .map(|a| a.currency.clone())
-            .unwrap_or_else(|| self.env.base_currency());
-
-        // 4. Handle symbol/asset resolution using quote_service
-        let (resolved_asset, asset_id, asset_name, is_custom_asset) =
-            if let Some(symbol) = &args.symbol {
-                // Search for the symbol using quote_service
-                let search_results = self
-                    .env
-                    .quote_service()
-                    .search_symbol_with_currency(symbol, Some(&currency))
-                    .await
-                    .unwrap_or_default();
-
-                if let Some(top_result) = search_results.first() {
-                    // Found a match - use the top result
-                    let asset = ResolvedAsset {
-                        asset_id: top_result.existing_asset_id.clone().unwrap_or_else(|| {
-                            // Construct asset ID from symbol and exchange
-                            format!(
-                                "{}:{}",
-                                top_result.symbol,
-                                top_result.exchange_mic.as_deref().unwrap_or("UNKNOWN")
-                            )
-                        }),
-                        symbol: top_result.symbol.clone(),
-                        name: top_result.long_name.clone(),
-                        currency: top_result
-                            .currency
-                            .clone()
-                            .unwrap_or_else(|| currency.clone()),
-                        exchange: top_result.exchange_name.clone(),
-                        exchange_mic: top_result.exchange_mic.clone(),
-                    };
-                    (
-                        Some(asset.clone()),
-                        Some(asset.asset_id.clone()),
-                        Some(asset.name.clone()),
-                        false,
-                    )
-                } else {
-                    // No match found - treat as custom asset
-                    (
-                        None,
-                        None,
-                        Some(symbol.clone()),
-                        true, // Mark as custom asset so user can create it
-                    )
-                }
-            } else {
-                (None, None, None, false)
-            };
-
-        // 5. Determine price source
-        let price_source = if args.unit_price.is_some() {
-            "user"
-        } else {
-            "none"
-        };
-
-        // 6. Compute amount if not provided
-        let amount = self.compute_amount(args.quantity, args.unit_price, args.fee, args.amount);
-
-        // 7. Build draft
-        // Use asset's currency for trading activities, otherwise use account currency
-        let draft_currency = resolved_asset
-            .as_ref()
-            .map(|a| a.currency.clone())
-            .unwrap_or(currency);
-
-        let draft = ActivityDraft {
-            activity_type: activity_type.clone(),
-            activity_date: args.activity_date,
-            symbol: args.symbol.clone(),
-            asset_id,
-            asset_name,
-            quantity: args.quantity,
-            unit_price: args.unit_price,
-            amount,
-            fee: args.fee,
-            currency: draft_currency,
-            account_id,
-            account_name,
-            subtype: args.subtype,
-            notes: args.notes,
-            price_source: price_source.to_string(),
-            pricing_mode: "MARKET".to_string(),
-            is_custom_asset,
-            asset_kind: None,
-        };
-
-        // 8. Validate the draft
-        let validation = self.validate_draft(&draft);
-
-        // 9. Get available subtypes
-        let available_subtypes = get_subtypes_for_activity_type(&activity_type);
-
-        Ok(RecordActivityOutput {
-            draft,
-            validation,
-            available_accounts,
-            resolved_asset,
-            available_subtypes,
-        })
+        self.build_output(args).await
     }
 }
 
