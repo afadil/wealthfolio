@@ -987,7 +987,8 @@ pub async fn approve_pairing(
 }
 
 /// Complete a pairing session with key bundle.
-/// On success, triggers a background snapshot generation so the new device can bootstrap.
+/// Uploads snapshot BEFORE sending the key bundle so the claimer can bootstrap
+/// immediately upon receiving it — no polling/retry gap.
 #[tauri::command(rename_all = "camelCase")]
 pub async fn complete_pairing(
     pairing_id: String,
@@ -997,6 +998,11 @@ pub async fn complete_pairing(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<CompletePairingResponse, String> {
     debug!("[DeviceSync] Completing pairing session: {}", pairing_id);
+
+    // Upload snapshot FIRST so it exists before the claimer receives the key bundle.
+    snapshot::generate_snapshot_now_internal(None, Arc::clone(state.inner()))
+        .await
+        .map_err(|err| format!("Failed to prepare data for new device: {}", err))?;
 
     let token = get_access_token(state.inner()).await?;
     let device_id =
@@ -1015,17 +1021,6 @@ pub async fn complete_pairing(
         )
         .await
         .map_err(|e| e.to_string())?;
-
-    // Generate a snapshot in the background so the newly paired device can bootstrap.
-    let snapshot_context = Arc::clone(state.inner());
-    tauri::async_runtime::spawn(async move {
-        if let Err(err) = snapshot::generate_snapshot_now_internal(None, snapshot_context).await {
-            log::warn!(
-                "[DeviceSync] Post-pairing snapshot generation failed: {}",
-                err
-            );
-        }
-    });
 
     // Ensure the background sync engine is running (may be a no-op if already started).
     let engine_context = Arc::clone(state.inner());

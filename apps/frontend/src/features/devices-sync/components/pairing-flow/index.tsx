@@ -18,7 +18,7 @@ interface PairingFlowProps {
 }
 
 // Claimer flow steps
-type ClaimerStep = "enter_code" | "connecting" | "waiting_keys" | "success" | "error";
+type ClaimerStep = "enter_code" | "connecting" | "waiting_keys" | "syncing" | "success" | "error";
 
 export function PairingFlow({ onComplete, onCancel }: PairingFlowProps) {
   const { state } = useDeviceSync();
@@ -99,7 +99,12 @@ function IssuerFlow({ onComplete, onCancel }: PairingFlowProps) {
       return <WaitingState title="Computing security code..." onCancel={handleCancel} />;
 
     case "transferring":
-      return <WaitingState title="Transferring key..." />;
+      return (
+        <WaitingState
+          title="Finishing setup..."
+          description="Preparing your data for the new device"
+        />
+      );
 
     case "success":
       return <PairingResult success onDone={handleDone} />;
@@ -182,9 +187,8 @@ function ClaimerFlow({ onComplete, onCancel }: PairingFlowProps) {
 
           // Auto-complete when key bundle is received
           // The issuer (trusted device) already verified SAS, so claimer can auto-complete
-          // This follows Signal/WhatsApp UX pattern where only the authorizing device confirms
           logger.info("[ClaimerFlow] Key bundle received, auto-completing pairing...");
-          setStep("waiting_keys"); // Show spinner while completing
+          setStep("syncing");
           await actionsRef.current.confirmPairingAsClaimer(
             result.keyBundle,
             result.keyBundleCreatedAt,
@@ -259,6 +263,11 @@ function ClaimerFlow({ onComplete, onCancel }: PairingFlowProps) {
     case "waiting_keys":
       return (
         <WaitingState title="Verify Security Code" securityCode={sas} onCancel={handleCancel} />
+      );
+
+    case "syncing":
+      return (
+        <WaitingState title="Syncing your data..." description="This may take a few seconds" />
       );
 
     case "success":

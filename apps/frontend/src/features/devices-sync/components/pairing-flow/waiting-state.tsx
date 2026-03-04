@@ -48,8 +48,8 @@ export function WaitingState({
           </div>
         </div>
       ) : (
-        <div className="bg-muted/50 mb-6 flex h-20 w-20 items-center justify-center rounded-full">
-          <Icons.Spinner className="text-primary h-8 w-8 animate-spin" />
+        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
+          <Icons.Spinner className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400" />
         </div>
       )}
 

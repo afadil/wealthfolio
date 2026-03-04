@@ -17,6 +17,8 @@ function formatError(error: string | null | undefined): string {
   if (!error) return "Something went wrong. Please try again.";
   const e = error.toLowerCase();
 
+  if (e.includes("snapshot") && e.includes("failed"))
+    return "Devices paired but data sync failed. Please try pairing again.";
   if (e.includes("invalid") && e.includes("code")) return "Invalid code. Check and try again.";
   if (e.includes("expired")) return "Session expired. Please start again.";
   if (e.includes("cancel")) return "Pairing was canceled.";
