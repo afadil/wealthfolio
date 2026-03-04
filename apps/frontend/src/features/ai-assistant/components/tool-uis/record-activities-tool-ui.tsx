@@ -63,7 +63,7 @@ function countStatuses(statuses: RecordActivitiesSubmissionStatus[]): {
   };
 }
 
-function RecordActivitiesLoadingSkeleton(): JSX.Element {
+function RecordActivitiesLoadingSkeleton() {
   return (
     <Card className="bg-muted/40 border-primary/10 w-full overflow-hidden">
       <CardHeader className="pb-2">
@@ -127,7 +127,7 @@ function RecordActivitiesToolUIContent({
   result,
   status,
   toolCallId,
-}: RecordActivitiesToolUIContentProps): JSX.Element {
+}: RecordActivitiesToolUIContentProps) {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const { isBalanceHidden } = useBalancePrivacy();
