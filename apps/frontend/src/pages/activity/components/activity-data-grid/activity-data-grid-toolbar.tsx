@@ -25,6 +25,7 @@ const COLUMN_DISPLAY_NAMES: Record<string, string> = {
   fxRate: "FX Rate",
   accountName: "Account",
   currency: "Currency",
+  instrumentType: "Instrument",
   comment: "Comment",
 };
 
@@ -32,6 +33,7 @@ const COLUMN_DISPLAY_NAMES: Record<string, string> = {
 const TOGGLEABLE_COLUMNS = [
   "activityType",
   "subtype",
+  "instrumentType",
   "activityStatus",
   "date",
   "assetSymbol",

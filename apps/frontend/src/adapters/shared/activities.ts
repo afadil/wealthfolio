@@ -21,6 +21,7 @@ interface ActivityFilters {
   needsReview?: boolean;
   dateFrom?: string; // YYYY-MM-DD format
   dateTo?: string; // YYYY-MM-DD format
+  instrumentTypes?: string | string[];
 }
 
 interface ActivitySort {
@@ -61,6 +62,7 @@ export const searchActivities = async (
 ): Promise<ActivitySearchResponse> => {
   const accountIdFilter = normalizeStringArray(filters?.accountIds);
   const activityTypeFilter = normalizeStringArray(filters?.activityTypes);
+  const instrumentTypeFilter = normalizeStringArray(filters?.instrumentTypes);
   const assetIdKeywordRaw = filters?.symbol ?? searchKeyword;
   const assetIdKeyword = assetIdKeywordRaw?.trim() ? assetIdKeywordRaw.trim() : undefined;
   const sortOption = sort?.id
@@ -81,6 +83,7 @@ export const searchActivities = async (
       needsReviewFilter,
       dateFrom,
       dateTo,
+      instrumentTypeFilter,
     });
   } catch (err) {
     logger.error("Error fetching activities.");
