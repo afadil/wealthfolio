@@ -94,6 +94,7 @@ impl ActivityService {
             "FX" | "FOREX" | "CURRENCY" => Some(InstrumentType::Fx),
             "OPTION" => Some(InstrumentType::Option),
             "METAL" | "COMMODITY" => Some(InstrumentType::Metal),
+            "BOND" | "FIXEDINCOME" | "FIXED_INCOME" | "DEBT" => Some(InstrumentType::Bond),
             _ => None,
         }
     }

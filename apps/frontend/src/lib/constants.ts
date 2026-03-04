@@ -114,6 +114,7 @@ export const ImportFormat = {
   COMMENT: "comment",
   FX_RATE: "fxRate",
   SUBTYPE: "subtype",
+  INSTRUMENT_TYPE: "instrumentType",
 } as const;
 
 export type ImportFormat = (typeof ImportFormat)[keyof typeof ImportFormat];
@@ -131,6 +132,7 @@ export const importFormatSchema = z.enum([
   ImportFormat.COMMENT,
   ImportFormat.FX_RATE,
   ImportFormat.SUBTYPE,
+  ImportFormat.INSTRUMENT_TYPE,
 ]);
 
 export const IMPORT_REQUIRED_FIELDS = [
