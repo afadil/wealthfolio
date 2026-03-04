@@ -8,7 +8,7 @@ import {
 } from "@wealthfolio/ui/components/ui/table";
 import { Lot } from "@/lib/types";
 import { formatAmount } from "@wealthfolio/ui";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatQuantity } from "@/lib/utils";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { GainAmount } from "@wealthfolio/ui";
 import { GainPercent } from "@wealthfolio/ui";
@@ -53,7 +53,7 @@ export const AssetLotsTable = ({ lots, currency, marketPrice }: AssetLotsTablePr
                 return (
                   <TableRow key={lot.id}>
                     <TableCell className="font-medium">{formatDate(lot.acquisitionDate)}</TableCell>
-                    <TableCell className="text-right">{lot.quantity.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{formatQuantity(lot.quantity)}</TableCell>
                     <TableCell className="text-right">
                       {formatAmount(lot.acquisitionPrice, currency)}
                     </TableCell>

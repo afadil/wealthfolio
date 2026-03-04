@@ -1,4 +1,5 @@
 use crate::quotes::{DataSource, Quote};
+use crate::utils::decimal_serde::decimal_serde;
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -9,7 +10,7 @@ pub struct ExchangeRate {
     pub id: String,
     pub from_currency: String,
     pub to_currency: String,
-    #[serde(serialize_with = "serialize_decimal_6")]
+    #[serde(serialize_with = "decimal_serde::serialize")]
     pub rate: Decimal,
     pub source: DataSource,
     pub timestamp: DateTime<Utc>,
@@ -75,20 +76,12 @@ impl ExchangeRate {
     }
 }
 
-fn serialize_decimal_6<S>(decimal: &Decimal, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    let rounded = decimal.round_dp(6);
-    serializer.serialize_str(&rounded.to_string())
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NewExchangeRate {
     pub from_currency: String,
     pub to_currency: String,
-    #[serde(serialize_with = "serialize_decimal_6")]
+    #[serde(serialize_with = "decimal_serde::serialize")]
     pub rate: Decimal,
     pub source: DataSource,
 }
