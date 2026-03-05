@@ -31,10 +31,7 @@ import {
 } from "../context";
 import { findMappedActivityType } from "../utils/activity-type-mapping";
 import { getDateFnsPattern } from "../utils/date-format-options";
-import {
-  normalizeInstrumentType,
-  splitInstrumentPrefixedSymbol,
-} from "../utils/instrument-type";
+import { normalizeInstrumentType, splitInstrumentPrefixedSymbol } from "../utils/instrument-type";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types

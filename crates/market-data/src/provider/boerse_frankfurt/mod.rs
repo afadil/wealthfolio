@@ -184,9 +184,7 @@ impl BoerseFrankfurtProvider {
 
         // x-security: MD5 of timestamp truncated to minute (YYYYMMDDHHmm)
         let minute_str = timestamp
-            .replace('-', "")
-            .replace(':', "")
-            .replace('T', "")
+            .replace(['-', ':', 'T'], "")
             .chars()
             .take(12) // YYYYMMDDHHmm
             .collect::<String>();

@@ -683,7 +683,7 @@ mod tests {
             created_at: Utc::now(),
             last_updated: Utc::now(),
             is_alternative: false,
-                contract_multiplier: Decimal::ONE,
+            contract_multiplier: Decimal::ONE,
         };
         previous_snapshot
             .positions
@@ -3135,7 +3135,7 @@ mod tests {
             created_at: Utc::now(),
             last_updated: Utc::now(),
             is_alternative: false,
-                contract_multiplier: Decimal::ONE,
+            contract_multiplier: Decimal::ONE,
         };
         previous_snapshot
             .positions

@@ -83,7 +83,7 @@ pub use provider::finnhub::FinnhubProvider;
 pub use provider::marketdata_app::MarketDataAppProvider;
 pub use provider::metal_price_api::MetalPriceApiProvider;
 pub use provider::openfigi::OpenFigiProvider;
-pub use provider::us_treasury_calc::{UsTreasuryCalcProvider, TreasuryBondDetails};
+pub use provider::us_treasury_calc::{TreasuryBondDetails, UsTreasuryCalcProvider};
 pub use provider::yahoo::{YahooDividend, YahooProvider};
 pub use provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
 

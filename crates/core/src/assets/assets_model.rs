@@ -117,8 +117,8 @@ pub struct OptionSpec {
 #[serde(rename_all = "camelCase")]
 pub struct BondSpec {
     pub maturity_date: Option<chrono::NaiveDate>,
-    pub coupon_rate: Option<Decimal>,    // Annual coupon rate (e.g., 0.04375 = 4.375%)
-    pub face_value: Option<Decimal>,     // Par value per bond (typically 1000.0)
+    pub coupon_rate: Option<Decimal>, // Annual coupon rate (e.g., 0.04375 = 4.375%)
+    pub face_value: Option<Decimal>,  // Par value per bond (typically 1000.0)
     pub coupon_frequency: Option<String>, // ANNUAL, SEMI_ANNUAL, QUARTERLY, MONTHLY
     pub isin: Option<String>,
 }

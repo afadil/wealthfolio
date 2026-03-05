@@ -408,10 +408,11 @@ describe("validation-utils", () => {
 
     const mappingWithoutInstrumentType = {
       ...baseMapping,
-      fieldMappings: {
-        ...baseMapping.fieldMappings,
-        [ImportFormat.INSTRUMENT_TYPE]: undefined,
-      },
+      fieldMappings: Object.fromEntries(
+        Object.entries(baseMapping.fieldMappings).filter(
+          ([key]) => key !== ImportFormat.INSTRUMENT_TYPE,
+        ),
+      ),
     };
 
     it("should parse BOND instrument type from CSV column", () => {

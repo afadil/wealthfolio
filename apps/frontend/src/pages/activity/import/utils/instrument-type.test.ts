@@ -115,8 +115,8 @@ describe("splitInstrumentPrefixedSymbol", () => {
 
   it("does not split on colons that are part of the symbol", () => {
     // A very long prefix (>20 chars) should not match
-    expect(
-      splitInstrumentPrefixedSymbol("thisisaverylongprefixthatisover20:XYZ"),
-    ).toEqual({ symbol: "thisisaverylongprefixthatisover20:XYZ" });
+    expect(splitInstrumentPrefixedSymbol("thisisaverylongprefixthatisover20:XYZ")).toEqual({
+      symbol: "thisisaverylongprefixthatisover20:XYZ",
+    });
   });
 });

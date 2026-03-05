@@ -140,7 +140,14 @@ const ActivityPage = () => {
       setPageIndex(0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAccounts, selectedActivityTypes, selectedInstrumentTypes, statusFilter, searchQuery, sorting]);
+  }, [
+    selectedAccounts,
+    selectedActivityTypes,
+    selectedInstrumentTypes,
+    statusFilter,
+    searchQuery,
+    sorting,
+  ]);
 
   // Use appropriate data based on view mode
   const tableActivities = infiniteSearch.data;

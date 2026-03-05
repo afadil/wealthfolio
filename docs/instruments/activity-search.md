@@ -7,18 +7,18 @@
 
 ## Parameters
 
-| Parameter              | Type               | Default         | Description                                      |
-| ---------------------- | ------------------ | --------------- | ------------------------------------------------ |
-| `page`                 | `i64`              | 0               | Page number, **0-based**                          |
-| `pageSize`             | `i64`              | 50              | Number of items per page                          |
-| `accountIdFilter`      | `string[]` / null  | null            | Filter by account IDs                             |
-| `activityTypeFilter`   | `string[]` / null  | null            | Filter by activity type (BUY, SELL, etc.)         |
-| `assetIdKeyword`       | `string` / null    | null            | Search by asset ID or ticker symbol               |
-| `sort`                 | `Sort` / null      | `{id:"date",desc:true}` | Sort field and direction                 |
-| `needsReviewFilter`    | `bool` / null      | null            | Filter for draft/review activities                |
-| `dateFrom`             | `string` / null    | null            | Start date filter, inclusive (YYYY-MM-DD)         |
-| `dateTo`               | `string` / null    | null            | End date filter, inclusive (YYYY-MM-DD)           |
-| `instrumentTypeFilter` | `string[]` / null  | null            | Filter by instrument type (EQUITY, BOND, etc.)    |
+| Parameter              | Type              | Default                 | Description                                    |
+| ---------------------- | ----------------- | ----------------------- | ---------------------------------------------- |
+| `page`                 | `i64`             | 0                       | Page number, **0-based**                       |
+| `pageSize`             | `i64`             | 50                      | Number of items per page                       |
+| `accountIdFilter`      | `string[]` / null | null                    | Filter by account IDs                          |
+| `activityTypeFilter`   | `string[]` / null | null                    | Filter by activity type (BUY, SELL, etc.)      |
+| `assetIdKeyword`       | `string` / null   | null                    | Search by asset ID or ticker symbol            |
+| `sort`                 | `Sort` / null     | `{id:"date",desc:true}` | Sort field and direction                       |
+| `needsReviewFilter`    | `bool` / null     | null                    | Filter for draft/review activities             |
+| `dateFrom`             | `string` / null   | null                    | Start date filter, inclusive (YYYY-MM-DD)      |
+| `dateTo`               | `string` / null   | null                    | End date filter, inclusive (YYYY-MM-DD)        |
+| `instrumentTypeFilter` | `string[]` / null | null                    | Filter by instrument type (EQUITY, BOND, etc.) |
 
 ## Pagination
 
@@ -51,8 +51,8 @@ they will not match any `instrumentTypeFilter` value.
 ## Instrument type filter
 
 The filter accepts canonical type strings: `EQUITY`, `CRYPTO`, `FX`, `OPTION`,
-`METAL`, `BOND`. The SQL `WHERE` clause uses `IN (...)` on the
-`instrument_type` column from the joined assets table.
+`METAL`, `BOND`. The SQL `WHERE` clause uses `IN (...)` on the `instrument_type`
+column from the joined assets table.
 
 Activities with NULL assets are excluded when an instrument type filter is
 active, since they have no associated instrument type.

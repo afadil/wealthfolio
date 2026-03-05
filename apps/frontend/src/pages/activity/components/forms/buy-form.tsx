@@ -193,9 +193,6 @@ export function BuyForm({
 
   const quantityLabel = isOption ? "Contracts" : assetType === "bond" ? "Bonds" : "Quantity";
   const priceLabel = isOption ? "Premium/Share" : "Price";
-  const symbolPlaceholder =
-    assetType === "bond" ? "Enter ISIN (e.g. US0378331005) or name" : "Enter symbol";
-
   // Get account currency from selected account
   const selectedAccount = useMemo(
     () => accounts.find((a) => a.value === accountId),
@@ -266,7 +263,6 @@ export function BuyForm({
                 <SymbolSearch
                   name="assetId"
                   isManualAsset={isManualAsset}
-                  placeholder={symbolPlaceholder}
                   exchangeMicName="exchangeMic"
                   quoteModeName="quoteMode"
                   currencyName="currency"
