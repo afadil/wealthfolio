@@ -13,8 +13,10 @@ import {
 } from "@wealthfolio/ui/components/ui/alert-dialog";
 import { RefreshQuotesConfirmDialog } from "./refresh-quotes-confirm-dialog";
 
+import { useHoldings } from "@/hooks/use-holdings";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { useSyncMarketDataMutation } from "@/hooks/use-sync-market-data";
+import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { SettingsHeader } from "../settings/settings-header";
 import { AssetEditSheet } from "./asset-edit-sheet";
 import { ParsedAsset, toParsedAsset } from "./asset-utils";
@@ -30,6 +32,17 @@ export default function AssetsPage() {
   const refetchQuotesMutation = useSyncMarketDataMutation(true);
   const updateQuotesMutation = useSyncMarketDataMutation(false);
   const isMobileViewport = useIsMobileViewport();
+  const { holdings } = useHoldings(PORTFOLIO_ACCOUNT_ID);
+
+  const heldAssetIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const h of holdings) {
+      if (h.instrument?.id) {
+        ids.add(h.instrument.id);
+      }
+    }
+    return ids;
+  }, [holdings]);
 
   const parsedAssets = useMemo(() => assets.map(toParsedAsset), [assets]);
   const assetIds = useMemo(() => parsedAssets.map((asset) => asset.id), [parsedAssets]);
@@ -57,6 +70,7 @@ export default function AssetsPage() {
           <AssetsTableMobile
             assets={parsedAssets}
             latestQuotes={latestQuotes}
+            heldAssetIds={heldAssetIds}
             isLoading={isLoading || isQuotesLoading}
             onEdit={(asset) => setEditingAsset(asset)}
             onDelete={(asset) => setAssetPendingDelete(asset)}
@@ -69,6 +83,7 @@ export default function AssetsPage() {
           <AssetsTable
             assets={parsedAssets}
             latestQuotes={latestQuotes}
+            heldAssetIds={heldAssetIds}
             isLoading={isLoading || isQuotesLoading}
             onEdit={(asset) => setEditingAsset(asset)}
             onDelete={(asset) => setAssetPendingDelete(asset)}
