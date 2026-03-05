@@ -136,7 +136,8 @@ fn calculate_investment_market_value_acct(
                 )? // Propagate error if FX rate is missing
             };
 
-            let market_value = position.quantity * normalized_price * quote_fx_rate;
+            let market_value =
+                position.quantity * normalized_price * position.contract_multiplier * quote_fx_rate;
             total_position_market_value += market_value;
 
             // Only include non-alternative assets in performance-eligible value
