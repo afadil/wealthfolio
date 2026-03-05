@@ -906,7 +906,8 @@ fn create_ollama_client(
 ) -> Result<ollama::Client<HttpClient>, AiError> {
     let mut builder = ollama::Client::builder().api_key(Nothing);
     if let Some(url) = provider_url {
-        builder = builder.base_url(&url);
+        let normalized = url.trim_end_matches('/').trim_end_matches("/v1");
+        builder = builder.base_url(normalized);
     }
     builder
         .build()

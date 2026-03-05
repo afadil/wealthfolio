@@ -37,6 +37,7 @@ struct EncryptedSecrets {
 }
 
 impl FileSecretStore {
+    #[cfg(test)]
     pub fn new(path: PathBuf, encryption_key: Option<&str>) -> Result<Self> {
         let key = match encryption_key {
             Some(value) if !value.trim().is_empty() => Some(decode_encryption_key(value)?),
@@ -48,6 +49,23 @@ impl FileSecretStore {
             encryption_key: key,
             lock: Mutex::new(()),
         })
+    }
+
+    pub fn new_from_bytes(path: PathBuf, encryption_key: Option<[u8; 32]>) -> Result<Self> {
+        Ok(Self {
+            path,
+            encryption_key,
+            lock: Mutex::new(()),
+        })
+    }
+
+    /// Re-encrypt and persist a set of secrets (used during key migration).
+    pub fn persist_migrated(&self, secrets: &HashMap<String, String>) -> Result<()> {
+        let _guard = self
+            .lock
+            .lock()
+            .map_err(|_| Error::Secret("Secret store lock poisoned".into()))?;
+        self.persist_store_locked(secrets)
     }
 
     fn with_store<F>(&self, mut op: F) -> Result<()>
@@ -168,10 +186,51 @@ impl SecretStore for FileSecretStore {
     }
 }
 
-pub fn build_secret_store(path: PathBuf, encryption_key: Option<&str>) -> Result<FileSecretStore> {
-    FileSecretStore::new(path, encryption_key)
+/// Build a secret store with a derived encryption key, migrating from the old raw key if needed.
+pub fn build_secret_store(
+    path: PathBuf,
+    derived_key: Option<[u8; 32]>,
+    raw_key_for_migration: Option<&[u8]>,
+) -> Result<FileSecretStore> {
+    if let (Some(new_key), Some(old_raw)) = (derived_key, raw_key_for_migration) {
+        // Try loading with the new derived key first
+        let store = FileSecretStore::new_from_bytes(path.clone(), Some(new_key))?;
+        if path.exists() {
+            match store.read_store() {
+                Ok(_) => return Ok(store),
+                Err(_) => {
+                    // Derived key failed — try the old raw key to migrate
+                    let mut old_key = [0u8; 32];
+                    if old_raw.len() == 32 {
+                        old_key.copy_from_slice(old_raw);
+                    } else {
+                        // Can't migrate, just return the new store (will fail on decrypt)
+                        return Ok(store);
+                    }
+                    let old_store = FileSecretStore::new_from_bytes(path.clone(), Some(old_key))?;
+                    match old_store.read_store() {
+                        Ok(secrets) => {
+                            // Re-encrypt with derived key
+                            tracing::info!("Migrating secrets file to derived encryption key");
+                            let new_store = FileSecretStore::new_from_bytes(path, Some(new_key))?;
+                            new_store.persist_migrated(&secrets)?;
+                            return Ok(new_store);
+                        }
+                        Err(_) => {
+                            // Neither key works — return the new store
+                            return Ok(store);
+                        }
+                    }
+                }
+            }
+        }
+        Ok(store)
+    } else {
+        FileSecretStore::new_from_bytes(path, derived_key)
+    }
 }
 
+#[cfg(test)]
 fn decode_encryption_key(raw: &str) -> Result<[u8; 32]> {
     let trimmed = raw.trim();
     let decoded = match BASE64.decode(trimmed) {

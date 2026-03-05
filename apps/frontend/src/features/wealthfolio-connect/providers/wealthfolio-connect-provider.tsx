@@ -7,6 +7,7 @@ import {
   openUrlInBrowser,
   setSecret,
 } from "@/adapters";
+import { useAuth } from "@/context/auth-context";
 import { getPlatform } from "@/hooks/use-platform";
 import { CONNECT_ENABLED } from "@/lib/connect-config";
 import { createClient, Session, SupabaseClient, User } from "@supabase/supabase-js";
@@ -214,6 +215,7 @@ const createSupabaseClient = () => {
 
 // Internal provider used when Connect is enabled
 function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useAuth();
   const [isInitializing, setIsInitializing] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingUserInfo, setIsLoadingUserInfo] = useState(false);
@@ -421,7 +423,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, [supabase, storeTokens, retrieveRefreshToken]);
+  }, [supabase, storeTokens, retrieveRefreshToken, isAuthenticated]);
 
   // Listen for deep link events on desktop
   useEffect(() => {

@@ -51,6 +51,7 @@ export const parseCsv = async (file: File, config: ParseConfig): Promise<ParsedC
       method: "POST",
       headers,
       body: formData,
+      credentials: "same-origin",
     });
 
     if (!response.ok) {

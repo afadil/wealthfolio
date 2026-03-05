@@ -31,6 +31,7 @@ export async function* streamAiChat(
     headers,
     body: JSON.stringify(request),
     signal,
+    credentials: "same-origin",
   });
 
   if (!response.ok) {

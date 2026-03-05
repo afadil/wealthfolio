@@ -3,16 +3,16 @@ import { resolveInitialTimezone } from "./timezone-settings";
 
 describe("resolveInitialTimezone", () => {
   it("uses configured timezone when present", () => {
-    expect(resolveInitialTimezone("Europe/Paris", "America/Toronto")).toBe("Europe/Paris");
+    expect(resolveInitialTimezone("Europe/Paris")).toBe("Europe/Paris");
   });
 
-  it("uses detected timezone when configured timezone is missing", () => {
-    expect(resolveInitialTimezone("", "America/Toronto")).toBe("America/Toronto");
-    expect(resolveInitialTimezone("   ", "America/Toronto")).toBe("America/Toronto");
-    expect(resolveInitialTimezone(undefined, "America/Toronto")).toBe("America/Toronto");
+  it("returns empty string when configured timezone is missing", () => {
+    expect(resolveInitialTimezone("")).toBe("");
+    expect(resolveInitialTimezone("   ")).toBe("");
+    expect(resolveInitialTimezone(undefined)).toBe("");
   });
 
   it("keeps UTC when explicitly configured", () => {
-    expect(resolveInitialTimezone("UTC", "America/Toronto")).toBe("UTC");
+    expect(resolveInitialTimezone("UTC")).toBe("UTC");
   });
 });
