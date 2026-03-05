@@ -312,11 +312,12 @@ fn extract_token(request: &Request<Body>) -> Result<String, AuthError> {
     // 2. HttpOnly cookie (for SSE and page-refresh scenarios)
     if let Some(cookie_header) = request.headers().get(COOKIE).and_then(|v| v.to_str().ok()) {
         for pair in cookie_header.split(';') {
-            let pair = pair.trim();
-            if let Some(value) = pair.strip_prefix(SESSION_COOKIE_NAME) {
-                let value = value.strip_prefix('=').unwrap_or(value).trim();
-                if !value.is_empty() {
-                    return Ok(value.to_string());
+            if let Some((name, value)) = pair.trim().split_once('=') {
+                if name.trim() == SESSION_COOKIE_NAME {
+                    let value = value.trim();
+                    if !value.is_empty() {
+                        return Ok(value.to_string());
+                    }
                 }
             }
         }
