@@ -24,10 +24,13 @@ Key environment variables
   - 32-byte ASCII string: Must be exactly 32 characters (less secure if contains only printable characters)
   Example: `WF_SECRET_KEY=$(openssl rand -base64 32)`.
 - `WF_AUTH_PASSWORD_HASH`: Enables password-only authentication for web mode when set to an Argon2id PHC string.
-  Generate via online tools like [argon2.online](https://argon2.online/) or the following command:
+  Generate via online tools like [argon2.online](https://argon2.online/) or the CLI (`argon2-utils` package):
   ```bash
-  argon2 "your-password" -id -e
+  printf 'your-password' | argon2 yoursalt16chars! -id -e
   ```
+  The first argument is the **salt** (use 16+ characters); the password is read from stdin.
+  Use `printf` instead of `echo -n` to avoid hidden newline issues.
+  For Docker Compose, double every `$` in the hash (`$$argon2id$$...`).
   When unset, authentication is disabled.
 - `WF_AUTH_TOKEN_TTL_MINUTES`: Optional JWT access token lifetime (minutes). Defaults to `60`.
 - `WF_SECRET_FILE`: Optional override for where encrypted secrets are stored. Defaults to `<data-root>/secrets.json`.
