@@ -70,30 +70,25 @@ export function detectBrowserTimezone(): string {
   }
 }
 
-export function resolveInitialTimezone(
-  configuredTimezone: string | null | undefined,
-  detectedTimezone: string,
-): string {
+export function resolveInitialTimezone(configuredTimezone: string | null | undefined): string {
   const configured = configuredTimezone?.trim();
   if (configured && configured.length > 0) {
     return configured;
   }
 
-  return detectedTimezone;
+  return "";
 }
 
 export function TimezoneSettings() {
   const { settings, updateSettings } = useSettingsContext();
   const browserTimezone = useMemo(() => detectBrowserTimezone(), []);
-  const initialTimezone = resolveInitialTimezone(settings?.timezone, browserTimezone);
+  const initialTimezone = resolveInitialTimezone(settings?.timezone);
   const timezones = useMemo(() => {
     const supported = getSupportedTimezones();
-    if (supported.includes(initialTimezone)) {
-      return supported;
-    }
-
-    return Array.from(new Set([initialTimezone, ...supported])).sort((a, b) => a.localeCompare(b));
-  }, [initialTimezone]);
+    // Put detected browser timezone first for easy access
+    const filtered = supported.filter((tz) => tz !== browserTimezone);
+    return [browserTimezone, ...filtered];
+  }, [browserTimezone]);
 
   const form = useForm<TimezoneFormValues>({
     resolver: zodResolver(timezoneFormSchema),
