@@ -233,12 +233,11 @@ pub async fn login(
 }
 
 pub async fn logout(State(state): State<Arc<AppState>>) -> Response {
-    let secure_attr = state
-        .auth
-        .as_ref()
-        .map_or(false, |a| a.secure_cookie())
-        .then_some("; Secure")
-        .unwrap_or("");
+    let secure_attr = if state.auth.as_ref().is_some_and(|a| a.secure_cookie()) {
+        "; Secure"
+    } else {
+        ""
+    };
     let clear_cookie = format!(
         "{SESSION_COOKIE_NAME}=; HttpOnly; SameSite=Strict; Path=/api; Max-Age=0{secure_attr}"
     );
