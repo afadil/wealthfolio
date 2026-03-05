@@ -1,5 +1,6 @@
 import * as React from "react";
 import { NumericFormat } from "react-number-format";
+import { DECIMAL_PRECISION } from "../../lib/constants";
 import { cn } from "../../lib/utils";
 import { Input } from "../ui/input";
 
@@ -17,7 +18,7 @@ export interface MoneyInputProps {
    * @deprecated Use onValueChange instead
    */
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  /** Maximum decimal places (default: 6) */
+  /** Maximum decimal places (default: 8) */
   maxDecimalPlaces?: number;
   /** Use thousand separators (default: false) */
   thousandSeparator?: boolean;
@@ -47,7 +48,7 @@ const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
       value,
       onValueChange,
       onChange,
-      maxDecimalPlaces = 6,
+      maxDecimalPlaces = DECIMAL_PRECISION,
       thousandSeparator = false,
       placeholder = "0.00",
       className,

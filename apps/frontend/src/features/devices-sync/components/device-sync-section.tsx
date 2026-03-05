@@ -961,7 +961,7 @@ function PairThisDeviceItem({ onPair }: { onPair: () => void }) {
           </div>
         </div>
       </div>
-      <Button variant="outline" size="sm" className="w-full shrink-0 sm:w-auto" onClick={onPair}>
+      <Button size="default" className="w-full shrink-0 sm:w-auto" onClick={onPair}>
         <Icons.Link className="mr-2 h-4 w-4" />
         Pair this device
       </Button>
@@ -1073,112 +1073,109 @@ function DeviceCard({
 
   return (
     <>
-      <div className="bg-muted/30 flex items-center justify-between gap-3 rounded-lg border p-3">
-        {/* Left: Device icon + info */}
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <Avatar className="h-9 w-9 shrink-0 rounded-lg">
-            <AvatarFallback className="rounded-lg">
-              <Icon className="text-muted-foreground h-4 w-4" />
-            </AvatarFallback>
-          </Avatar>
-
-          <div className="min-w-0 flex-1">
-            {isRenaming ? (
-              <div className="flex items-center gap-2">
-                <Input
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  className="h-7 w-full max-w-40 text-sm"
-                  maxLength={64}
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleRename();
-                    if (e.key === "Escape") handleCancelRename();
-                  }}
-                />
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7 shrink-0"
-                  onClick={handleRename}
-                  disabled={renameDevice.isPending}
-                >
-                  {renameDevice.isPending ? (
-                    <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Icons.Check className="h-3.5 w-3.5" />
-                  )}
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7 shrink-0"
-                  onClick={handleCancelRename}
-                >
-                  <Icons.Close className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-2">
-                  <span className="truncate text-sm font-medium">{device.displayName}</span>
-                  {device.isCurrent && (
-                    <Badge variant="outline" className="h-5 shrink-0 text-[10px]">
-                      This device
-                    </Badge>
-                  )}
-                </div>
-                <div className="text-muted-foreground flex items-center gap-2 text-xs">
-                  {isTrusted && (
-                    <span className="flex items-center gap-1">
-                      <Icons.ShieldCheck className="h-3 w-3 text-green-600 dark:text-green-500" />
-                      Trusted
-                    </span>
-                  )}
-                  {isUntrusted && (
-                    <span className="flex items-center gap-1 text-amber-600 dark:text-amber-500">
-                      <Icons.ShieldAlert className="h-3 w-3" />
-                      Needs pairing
-                    </span>
-                  )}
-                  {isRevoked && (
-                    <span className="text-muted-foreground flex items-center gap-1">
-                      <Icons.XCircle className="h-3 w-3" />
-                      Revoked
-                    </span>
-                  )}
-                </div>
-              </>
-            )}
+      <div className="hover:bg-muted/40 group flex items-center gap-4 rounded-xl border px-4 py-3 transition-colors">
+        {/* Device icon with online indicator */}
+        <div className="relative shrink-0">
+          <div className="bg-muted/60 flex h-10 w-10 items-center justify-center rounded-full">
+            <Icon className="text-foreground/70 h-[18px] w-[18px]" />
           </div>
+          {lastSeenText === "Online" && (
+            <span className="border-background absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 bg-green-500" />
+          )}
         </div>
 
-        {/* Right: Status + Actions - single row */}
+        {/* Info */}
+        <div className="min-w-0 flex-1">
+          {isRenaming ? (
+            <div className="flex items-center gap-2">
+              <Input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                className="h-7 w-full max-w-40 text-sm"
+                maxLength={64}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleRename();
+                  if (e.key === "Escape") handleCancelRename();
+                }}
+              />
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 shrink-0"
+                onClick={handleRename}
+                disabled={renameDevice.isPending}
+              >
+                {renameDevice.isPending ? (
+                  <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Icons.Check className="h-3.5 w-3.5" />
+                )}
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 shrink-0"
+                onClick={handleCancelRename}
+              >
+                <Icons.Close className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-baseline gap-1.5">
+                <span className="truncate text-sm font-medium">{device.displayName}</span>
+                {device.isCurrent && (
+                  <span className="text-muted-foreground shrink-0 text-xs font-normal">
+                    · This device
+                  </span>
+                )}
+              </div>
+              <div className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
+                {isTrusted && (
+                  <>
+                    <Icons.ShieldCheck className="h-3 w-3 text-green-600 dark:text-green-500" />
+                    <span>Trusted</span>
+                  </>
+                )}
+                {isUntrusted && (
+                  <>
+                    <Icons.ShieldAlert className="h-3 w-3 text-amber-600 dark:text-amber-500" />
+                    <span className="text-amber-600 dark:text-amber-500">Needs pairing</span>
+                  </>
+                )}
+                {isRevoked && (
+                  <>
+                    <Icons.XCircle className="h-3 w-3" />
+                    <span>Revoked</span>
+                  </>
+                )}
+                {lastSeenText !== "Online" && !device.isCurrent && (
+                  <>
+                    <span className="text-muted-foreground/30 mx-0.5">·</span>
+                    <span>{lastSeenText}</span>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Right actions */}
         {!isRenaming && (
           <div className="flex shrink-0 items-center gap-2">
-            {/* Pair button for untrusted remote devices */}
             {isUntrusted && !device.isCurrent && (
               <Button variant="outline" size="sm" onClick={onPair}>
                 Pair
               </Button>
             )}
 
-            {/* Last seen / Online status */}
-            {lastSeenText === "Online" ? (
-              <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                Online
-              </Badge>
-            ) : (
-              <span className="text-muted-foreground text-xs">{lastSeenText}</span>
-            )}
-
-            {/* Actions menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-muted-foreground h-7 w-7 shrink-0"
+                  className="text-muted-foreground h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
                 >
                   <Icons.MoreVertical className="h-4 w-4" />
                   <span className="sr-only">Device actions</span>

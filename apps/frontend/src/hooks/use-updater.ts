@@ -11,6 +11,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 const UPDATE_QUERY_KEY = ["app-update"];
+export const UPDATE_DISMISSED_KEY = "update-dismissed";
+
+/** Clear the snooze state so the update dialog can reappear. */
+function clearUpdateSnooze() {
+  window.localStorage.removeItem(UPDATE_DISMISSED_KEY);
+  // Notify usePersistentState instances on the same page
+  window.dispatchEvent(
+    new CustomEvent("persistent-state-change", {
+      detail: { key: UPDATE_DISMISSED_KEY, value: null },
+    }),
+  );
+}
 
 /**
  * Hook to check for updates on app startup.
@@ -29,6 +41,7 @@ export function useCheckUpdateOnStartup() {
     // Dynamic import for Tauri-specific functionality
     import("@tauri-apps/api/event").then(({ listen }) => {
       listen<UpdateInfo>("app:update-available", (event) => {
+        clearUpdateSnooze();
         queryClient.setQueryData(UPDATE_QUERY_KEY, event.payload);
       }).then((fn) => {
         unlisten = fn;
@@ -62,8 +75,11 @@ export function useCheckForUpdates() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: checkForUpdates,
+    mutationFn: () => checkForUpdates({ force: true }),
     onSuccess: (updateInfo: UpdateInfo | null) => {
+      // Clear snooze so the dialog shows for manual checks
+      clearUpdateSnooze();
+
       // Update the query cache so dialog can show
       queryClient.setQueryData(UPDATE_QUERY_KEY, updateInfo);
 

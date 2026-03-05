@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+// Decimal precision constants (must match Rust crates/core/src/constants.rs)
+export const DECIMAL_PRECISION = 8;
+export const DISPLAY_DECIMAL_PRECISION = 2;
+
 // Wealthfolio Connect Portal URL - centralized configuration
 export const WEALTHFOLIO_CONNECT_PORTAL_URL = "https://connect.wealthfolio.app";
 

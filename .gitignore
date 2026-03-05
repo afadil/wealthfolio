@@ -64,8 +64,9 @@ apps/tauri/db/*
 target/
 **/*.rs.bk
 
-# Tauri generated (schemas are auto-generated; apple project is manually maintained)
+# Tauri generated
 apps/tauri/gen/schemas/
+apps/tauri/gen/apple/wealthfolio-app_iOS/Info.plist
 
 # OS generated files
 .DS_Store

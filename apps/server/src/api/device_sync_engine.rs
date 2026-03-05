@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use async_trait::async_trait;
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use uuid::Uuid;
 
 use crate::main_lib::AppState;
@@ -34,6 +34,7 @@ use wealthfolio_storage_sqlite::sync::{SqliteSyncEngineDbPorts, SyncTableRowCoun
 
 const SYNC_IDENTITY_KEY: &str = "sync_identity";
 static MIN_SNAPSHOT_CREATED_AT: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+const SNAPSHOT_FRESHNESS_CLOCK_SKEW_LEEWAY_SECS: i64 = 120;
 
 #[derive(Debug, Clone)]
 pub struct SyncEngineStatusResult {
@@ -733,31 +734,39 @@ pub async fn sync_bootstrap_snapshot_if_needed(
     persist_device_config_from_identity(&state, &identity, "trusted").await;
 
     let sync_repo = Arc::clone(&state.app_sync_repository);
-    if !sync_repo
-        .needs_bootstrap(&device_id)
-        .map_err(|e| e.to_string())?
-    {
-        clear_min_snapshot_created_at_from_store();
-        return Ok(SyncBootstrapResult {
-            status: "skipped".to_string(),
-            message: "Snapshot bootstrap already completed".to_string(),
-            snapshot_id: None,
-            cursor: Some(sync_repo.get_cursor().map_err(|e| e.to_string())?),
-        });
-    }
-
-    let reconcile = create_client()
+    let reconcile_action = create_client()
         .get_reconcile_ready_state(&token, &device_id)
-        .await;
-    if let Ok(reconcile) = reconcile {
-        if reconcile.action == "WAIT_SNAPSHOT" {
+        .await
+        .ok()
+        .map(|reconcile| reconcile.action);
+
+    let needs_bootstrap = sync_repo
+        .needs_bootstrap(&device_id)
+        .map_err(|e| e.to_string())?;
+    if !needs_bootstrap && min_snapshot_created_at.is_none() {
+        let reconcile_requires_snapshot = matches!(
+            reconcile_action.as_deref(),
+            Some("WAIT_SNAPSHOT") | Some("BOOTSTRAP_SNAPSHOT")
+        );
+        if !reconcile_requires_snapshot {
+            clear_min_snapshot_created_at_from_store();
             return Ok(SyncBootstrapResult {
-                status: "requested".to_string(),
-                message: "Waiting for a trusted device to upload a fresh snapshot".to_string(),
+                status: "skipped".to_string(),
+                message: "Snapshot bootstrap already completed".to_string(),
                 snapshot_id: None,
                 cursor: Some(sync_repo.get_cursor().map_err(|e| e.to_string())?),
             });
         }
+
+        tracing::debug!(
+            "[DeviceSync] Local bootstrap marked complete but reconcile still requires snapshot; re-checking latest snapshot metadata"
+        );
+    }
+
+    if reconcile_action.as_deref() == Some("WAIT_SNAPSHOT") {
+        tracing::debug!(
+            "[DeviceSync] Reconcile indicates WAIT_SNAPSHOT; checking latest snapshot metadata for race-safe bootstrap"
+        );
     }
 
     let latest = match create_client()
@@ -767,6 +776,18 @@ pub async fn sync_bootstrap_snapshot_if_needed(
         Ok(value) => value,
         Err(err) => {
             if err.status_code() == Some(404) {
+                if min_snapshot_created_at.is_some() {
+                    tracing::debug!(
+                        "[DeviceSync] No snapshot found (404) while freshness gate is active; waiting for trusted device upload"
+                    );
+                    return Ok(SyncBootstrapResult {
+                        status: "requested".to_string(),
+                        message: "Waiting for a snapshot generated after pairing confirmation"
+                            .to_string(),
+                        snapshot_id: None,
+                        cursor: Some(sync_repo.get_cursor().map_err(|e| e.to_string())?),
+                    });
+                }
                 let client = create_client();
                 match classify_missing_snapshot_disposition(&client, &token, &device_id).await {
                     MissingSnapshotDisposition::CompleteNoBootstrap { message } => {
@@ -799,6 +820,18 @@ pub async fn sync_bootstrap_snapshot_if_needed(
     let latest = match latest {
         Some(value) => value,
         None => {
+            if min_snapshot_created_at.is_some() {
+                tracing::debug!(
+                    "[DeviceSync] Snapshot metadata is empty while freshness gate is active; waiting for trusted device upload"
+                );
+                return Ok(SyncBootstrapResult {
+                    status: "requested".to_string(),
+                    message: "Waiting for a snapshot generated after pairing confirmation"
+                        .to_string(),
+                    snapshot_id: None,
+                    cursor: Some(sync_repo.get_cursor().map_err(|e| e.to_string())?),
+                });
+            }
             let client = create_client();
             match classify_missing_snapshot_disposition(&client, &token, &device_id).await {
                 MissingSnapshotDisposition::CompleteNoBootstrap { message } => {
@@ -849,7 +882,16 @@ pub async fn sync_bootstrap_snapshot_if_needed(
                 .map_err(|e| format!("Invalid snapshot created_at in metadata: {}", e))?;
         let min_created_at = wealthfolio_device_sync::parse_sync_datetime_to_utc(min_created_at)
             .map_err(|e| format!("Invalid min snapshot freshness gate: {}", e))?;
-        if latest_created_at <= min_created_at {
+        if latest_created_at + Duration::seconds(SNAPSHOT_FRESHNESS_CLOCK_SKEW_LEEWAY_SECS)
+            <= min_created_at
+        {
+            tracing::debug!(
+                "[DeviceSync] Snapshot {} is older than required freshness gate beyond leeway (latest_created_at={}, min_created_at={}, leeway_secs={})",
+                latest.snapshot_id,
+                latest_created_at,
+                min_created_at,
+                SNAPSHOT_FRESHNESS_CLOCK_SKEW_LEEWAY_SECS
+            );
             return Ok(SyncBootstrapResult {
                 status: "requested".to_string(),
                 message: "Waiting for a snapshot generated after pairing confirmation".to_string(),

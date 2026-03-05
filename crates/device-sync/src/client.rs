@@ -44,6 +44,13 @@ fn is_retryable_snapshot_status(status: u16) -> bool {
     matches!(status, 408 | 429 | 500..=599)
 }
 
+fn is_retryable_snapshot_error(status: u16, code: Option<&str>) -> bool {
+    if is_retryable_snapshot_status(status) {
+        return true;
+    }
+    matches!(code, Some("SYNC_TRANSACTION_FAILED"))
+}
+
 fn is_retryable_transport_error(err: &reqwest::Error) -> bool {
     err.is_timeout() || err.is_connect() || err.is_request() || err.is_body()
 }
@@ -939,6 +946,7 @@ impl DeviceSyncClient {
 
                     let body = response.text().await?;
                     Self::log_response(status, &body);
+                    let mut parsed_error_code: Option<String> = None;
                     let error = if let Ok(api_error) =
                         serde_json::from_str::<ApiErrorResponse>(&body)
                     {
@@ -947,6 +955,7 @@ impl DeviceSyncClient {
                         } else {
                             api_error.code
                         };
+                        parsed_error_code = Some(code.clone());
                         DeviceSyncError::api_structured(
                             status.as_u16(),
                             code,
@@ -957,15 +966,16 @@ impl DeviceSyncClient {
                         DeviceSyncError::api(status.as_u16(), format!("Request failed: {}", body))
                     };
 
-                    if is_retryable_snapshot_status(status.as_u16())
+                    if is_retryable_snapshot_error(status.as_u16(), parsed_error_code.as_deref())
                         && attempt < SNAPSHOT_UPLOAD_MAX_ATTEMPTS
                     {
                         let backoff = snapshot_backoff_with_jitter(attempt);
                         debug!(
-                            "Snapshot upload retry attempt {}/{} after HTTP {} (event_id={})",
+                            "Snapshot upload retry attempt {}/{} after HTTP {} code={:?} (event_id={})",
                             attempt + 1,
                             SNAPSHOT_UPLOAD_MAX_ATTEMPTS,
                             status.as_u16(),
+                            parsed_error_code.as_deref(),
                             upload_headers.event_id.as_deref().unwrap_or("none")
                         );
                         sleep(backoff).await;
@@ -1545,6 +1555,47 @@ mod tests {
             requests[1].event_id.as_deref(),
             Some(stable_event_id.as_str())
         );
+
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn snapshot_upload_retries_sync_transaction_failed_code() {
+        let (base_url, captured, server) = start_mock_upload_server(vec![
+            MockUploadOutcome::Respond {
+                status: 400,
+                body: api_error_body("SYNC_TRANSACTION_FAILED", "retryable transaction failure"),
+                delay_ms: 0,
+            },
+            MockUploadOutcome::Respond {
+                status: 201,
+                body: success_upload_body("snap-transaction-retry"),
+                delay_ms: 0,
+            },
+        ])
+        .await;
+
+        let client = DeviceSyncClient::new(&base_url);
+        let payload = b"snapshot-payload-transaction-retry".to_vec();
+        let result = client
+            .upload_snapshot(
+                "token",
+                "019bb9fe-f707-71e9-a40d-733575f4f246",
+                build_upload_headers(None, &payload),
+                payload,
+            )
+            .await
+            .expect("upload success after retry");
+
+        assert_eq!(result.snapshot_id, "snap-transaction-retry");
+        let requests = captured.lock().await.clone();
+        assert_eq!(requests.len(), 2);
+        let first_id = requests[0].event_id.clone().expect("first event id");
+        let second_id = requests[1].event_id.clone().expect("second event id");
+        assert_eq!(first_id, second_id);
+        assert!(Uuid::parse_str(&first_id).is_ok());
+        assert_eq!(requests[0].content_length, requests[0].snapshot_size_bytes);
+        assert_eq!(requests[1].content_length, requests[1].snapshot_size_bytes);
 
         server.abort();
     }

@@ -515,7 +515,7 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
         bypassOverwriteGuard: false,
         isCancelled: () => cancelled,
       });
-    }, 30_000);
+    }, 5_000);
 
     return () => {
       cancelled = true;
@@ -532,8 +532,8 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
   ]);
 
   // Actions
-  const refreshState = useCallback(async () => {
-    dispatch({ type: "DETECT_START" });
+  const refreshState = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) dispatch({ type: "DETECT_START" });
     try {
       const result = await syncService.detectState();
       dispatch({
@@ -576,8 +576,7 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
       const result = await syncService.enableSync();
 
       backgroundPausedRef.current = false;
-      // Refresh state from backend to get authoritative state
-      await refreshState();
+      await refreshState({ silent: true });
       return result;
     } catch (err) {
       throw SyncError.from(err);
@@ -690,9 +689,12 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
       );
       dispatch({ type: "REMOTE_SEED_STATUS", remoteSeedPresent: result.remoteSeedPresent });
       dispatch({ type: "CLEAR_PAIRING_STATE" });
-      // NOTE: Don't call refreshState() here - same issue as completePairing
+      // Drive the state machine: reconcile will detect READY and trigger bootstrap.
+      // This mirrors what the issuer does in completePairing.
+      // NOTE: Don't call refreshState() — it sets isDetecting=true causing skeleton flicker.
+      await runReconcileReadyState({ bypassOverwriteGuard: false });
     },
-    [], // No dependencies - uses ref for latest session
+    [runReconcileReadyState],
   );
 
   const handleRecovery = useCallback(async () => {

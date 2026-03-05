@@ -21,7 +21,7 @@ import {
   type ReactNode,
 } from "react";
 import { authenticate as authenticateWithASWebAuth } from "tauri-plugin-web-auth-api";
-import { clearSyncSession, storeSyncSession } from "../services/auth-service";
+import { clearSyncSession, restoreSyncSession, storeSyncSession } from "../services/auth-service";
 import { getUserInfo } from "../services/broker-service";
 import type { UserInfo } from "../types";
 
@@ -347,23 +347,44 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
 
     const restoreSession = async () => {
       try {
-        const refreshToken = await retrieveRefreshToken();
+        if (!isDesktop) {
+          // Web mode: ask the backend for fresh tokens to avoid stale refresh token race.
+          // The backend holds the canonical RT and can mint a fresh AT.
+          try {
+            const { accessToken, refreshToken } = await restoreSyncSession();
+            const { data, error: setErr } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            if (setErr) {
+              logger.debug("Failed to set session from backend tokens.");
+              await storeTokens(null);
+            } else if (data.session && !cancelled) {
+              await storeTokens(data.session);
+              setSession(data.session);
+              setUser(data.session.user);
+            }
+          } catch (_err) {
+            // No backend session (not logged in or backend unreachable) — that's fine
+            logger.debug("No backend session to restore.");
+          }
+        } else {
+          // Desktop mode: restore from keyring (no backend RT race on desktop)
+          const refreshToken = await retrieveRefreshToken();
 
-        if (refreshToken) {
-          // Use the refresh token to get a new session
-          const { data, error: refreshError } = await supabase.auth.refreshSession({
-            refresh_token: refreshToken,
-          });
+          if (refreshToken) {
+            const { data, error: refreshError } = await supabase.auth.refreshSession({
+              refresh_token: refreshToken,
+            });
 
-          if (refreshError) {
-            logger.debug("Failed to refresh session.");
-            // Clear invalid tokens
-            await storeTokens(null);
-          } else if (data.session && !cancelled) {
-            // Store tokens BEFORE setting session to avoid race condition
-            await storeTokens(data.session);
-            setSession(data.session);
-            setUser(data.session.user);
+            if (refreshError) {
+              logger.debug("Failed to refresh session.");
+              await storeTokens(null);
+            } else if (data.session && !cancelled) {
+              await storeTokens(data.session);
+              setSession(data.session);
+              setUser(data.session.user);
+            }
           }
         }
       } catch (_err) {

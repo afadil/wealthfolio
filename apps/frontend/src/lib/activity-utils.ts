@@ -1,7 +1,12 @@
-import { ActivityType, INCOME_ACTIVITY_TYPES, SYMBOL_REQUIRED_TYPES } from "./constants";
+import {
+  ActivityType,
+  DECIMAL_PRECISION,
+  INCOME_ACTIVITY_TYPES,
+  SYMBOL_REQUIRED_TYPES,
+} from "./constants";
 import { ActivityDetails } from "./types";
 
-const roundCurrency = (value: number, precision = 6) => {
+const roundCurrency = (value: number, precision = DECIMAL_PRECISION) => {
   if (!Number.isFinite(value)) {
     return 0;
   }

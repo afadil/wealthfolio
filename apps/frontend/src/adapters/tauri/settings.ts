@@ -82,7 +82,9 @@ export const getAppInfo = async (): Promise<AppInfo> => {
  * Check for updates. Returns update info if available, null if up-to-date.
  * Desktop implementation uses Tauri invoke command.
  */
-export const checkForUpdates = async (): Promise<UpdateInfo | null> => {
+export const checkForUpdates = async (_options?: {
+  force?: boolean;
+}): Promise<UpdateInfo | null> => {
   return await invoke<UpdateInfo | null>("check_for_updates");
 };
 
