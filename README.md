@@ -262,11 +262,18 @@ All configuration is done via environment variables in `.env.web`.
   before accessing the Web App.
 
   You can generate the hash with online tools like
-  [argon2.online](argon2.online) or the following command:
+  [argon2.online](https://argon2.online) or the CLI (`argon2-utils` package):
 
   ```bash
-  argon2 "your-password" -id -e
+  printf 'your-password' | argon2 yoursalt16chars! -id -e
   ```
+
+  > **Tips:**
+  >
+  > - The first argument is the **salt** (use 16+ characters); the password is
+  >   read from stdin.
+  > - Use `printf` instead of `echo -n` to avoid hidden newline issues.
+  > - For Docker Compose, double every `$` in the hash (`$$argon2id$$...`).
 
   Copy the full output (starting with `$argon2id$...`) into `.env.web`.
 
