@@ -1,5 +1,5 @@
 use crate::quotes::{DataSource, Quote};
-use crate::utils::decimal_serde::decimal_serde;
+use crate::utils::decimal_serde;
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
