@@ -55,7 +55,9 @@ export function DataTable<TData, TValue>({
   const [columnFilters, setColumnFilters] = storageKey
     ? usePersistentState<ColumnFiltersState>(`${storageKey}:column-filters`, [])
     : React.useState<ColumnFiltersState>([]);
-  const [sorting, setSorting] = React.useState<SortingState>(defaultSorting || []);
+  const [sorting, setSorting] = storageKey
+    ? usePersistentState<SortingState>(`${storageKey}:sorting`, defaultSorting || [])
+    : React.useState<SortingState>(defaultSorting || []);
 
   const table = useReactTable({
     data,
