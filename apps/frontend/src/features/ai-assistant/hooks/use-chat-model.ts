@@ -103,11 +103,21 @@ export function useChatModel(): ChatModelState {
     return enabledProviders.find((p) => p.id === currentProviderId);
   }, [enabledProviders, currentProviderId]);
 
+  // Ensure resolved model is accessible in the provider's favorites.
+  // ModelPicker filters by favorites — if the resolved model isn't among them,
+  // the picker shows "No model" while the hook sends a different model to the backend.
+  const adjustedModelId = useMemo(() => {
+    if (!currentModelId) return currentModelId;
+    if (!currentProvider?.favoriteModels?.length) return currentModelId;
+    if (currentProvider.favoriteModels.includes(currentModelId)) return currentModelId;
+    return currentProvider.favoriteModels[0];
+  }, [currentProvider, currentModelId]);
+
   // Get current model object
   const currentModel = useMemo(() => {
-    if (!currentProvider || !currentModelId) return undefined;
-    return currentProvider.models.find((m) => m.id === currentModelId);
-  }, [currentProvider, currentModelId]);
+    if (!currentProvider || !adjustedModelId) return undefined;
+    return currentProvider.models.find((m) => m.id === adjustedModelId);
+  }, [currentProvider, adjustedModelId]);
 
   // Check if current model supports thinking
   const supportsThinking = useMemo(() => {
@@ -149,7 +159,7 @@ export function useChatModel(): ChatModelState {
     settings,
     enabledProviders,
     currentProviderId,
-    currentModelId,
+    currentModelId: adjustedModelId,
     currentProvider,
     currentModel,
     selectModel,
