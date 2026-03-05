@@ -117,7 +117,7 @@ export function PerformanceChartMobile({ data }: PerformanceChartMobileProps) {
               tickMargin={4}
               domain={[-0.12, "auto"]}
               tick={{ fontSize: 10 }}
-              width={40}
+              width={50}
             />
             <ChartTooltip
               cursor={false}
@@ -138,6 +138,7 @@ export function PerformanceChartMobile({ data }: PerformanceChartMobileProps) {
                 strokeWidth={2}
                 dot={false}
                 name={series.name}
+                isAnimationActive={false}
               />
             ))}
           </LineChart>
