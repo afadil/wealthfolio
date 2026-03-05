@@ -25,7 +25,9 @@ impl Config {
             .expect("Invalid WF_LISTEN_ADDR");
         let db_path = std::env::var("WF_DB_PATH").unwrap_or_else(|_| "./db/app.db".into());
         let cors_allow: Vec<String> = std::env::var("WF_CORS_ALLOW_ORIGINS")
-            .unwrap_or_else(|_| "*".into())
+            .ok()
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| "*".into())
             .split(',')
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
