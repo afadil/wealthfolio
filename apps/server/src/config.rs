@@ -1,6 +1,6 @@
 use std::{net::SocketAddr, time::Duration};
 
-use crate::auth::{decode_secret_key, AuthConfig};
+use crate::auth::{decode_secret_key, derive_keys, AuthConfig};
 
 pub struct Config {
     pub listen_addr: SocketAddr,
@@ -9,7 +9,10 @@ pub struct Config {
     pub request_timeout: Duration,
     pub static_dir: String,
     pub addons_root: String,
-    pub secret_key: String,
+    /// Raw master key (used only for secret-store migration from old raw key)
+    pub raw_secret_key: Vec<u8>,
+    /// HKDF-derived key for secrets encryption
+    pub secrets_encryption_key: [u8; 32],
     pub auth: Option<AuthConfig>,
 }
 
@@ -21,7 +24,7 @@ impl Config {
             .parse()
             .expect("Invalid WF_LISTEN_ADDR");
         let db_path = std::env::var("WF_DB_PATH").unwrap_or_else(|_| "./db/app.db".into());
-        let cors_allow = std::env::var("WF_CORS_ALLOW_ORIGINS")
+        let cors_allow: Vec<String> = std::env::var("WF_CORS_ALLOW_ORIGINS")
             .unwrap_or_else(|_| "*".into())
             .split(',')
             .map(|s| s.trim().to_string())
@@ -39,8 +42,9 @@ impl Config {
         if secret_key.is_empty() {
             panic!("WF_SECRET_KEY must not be empty");
         }
-        let secret_key_bytes = decode_secret_key(&secret_key)
+        let raw_secret_key = decode_secret_key(&secret_key)
             .unwrap_or_else(|e| panic!("Failed to decode WF_SECRET_KEY: {e}"));
+        let (jwt_key, secrets_encryption_key) = derive_keys(&raw_secret_key);
         let addons_root = std::env::var("WF_ADDONS_DIR").unwrap_or_else(|_| {
             std::path::Path::new(&db_path)
                 .parent()
@@ -60,10 +64,34 @@ impl Config {
                     .unwrap_or(60);
                 AuthConfig {
                     password_hash,
-                    jwt_secret: secret_key_bytes.clone(),
+                    jwt_secret: jwt_key.to_vec(),
                     access_token_ttl: Duration::from_secs(ttl_minutes.saturating_mul(60)),
+                    secure_cookie: !listen_addr.ip().is_loopback(),
                 }
             });
+        // When auth is enabled, wildcard CORS is incompatible with credentials
+        if auth.is_some() && cors_allow.iter().any(|o| o == "*") {
+            panic!(
+                "WF_CORS_ALLOW_ORIGINS cannot be \"*\" when authentication is enabled. \
+                 Set explicit origins, e.g. WF_CORS_ALLOW_ORIGINS=https://my.domain.com"
+            );
+        }
+
+        // Fail-closed: refuse to start on non-loopback without auth,
+        // unless explicitly opted out via WF_AUTH_REQUIRED=false.
+        if auth.is_none() && !listen_addr.ip().is_loopback() {
+            let auth_required = std::env::var("WF_AUTH_REQUIRED")
+                .map(|v| !v.eq_ignore_ascii_case("false"))
+                .unwrap_or(true);
+            if auth_required {
+                panic!(
+                    "Refusing to start: listening on non-loopback address {listen_addr} without \
+                     authentication. Set WF_AUTH_PASSWORD_HASH to enable auth, or set \
+                     WF_AUTH_REQUIRED=false if a reverse proxy handles authentication."
+                );
+            }
+        }
+
         Self {
             listen_addr,
             db_path,
@@ -71,7 +99,8 @@ impl Config {
             request_timeout: Duration::from_millis(timeout_ms),
             static_dir,
             addons_root,
-            secret_key,
+            raw_secret_key,
+            secrets_encryption_key,
             auth,
         }
     }

@@ -110,6 +110,10 @@ async fn main() -> anyhow::Result<()> {
     let router = app_router(state, &config).fallback_service(static_service);
     tracing::info!("Listening on {}", config.listen_addr);
     let listener = tokio::net::TcpListener::bind(config.listen_addr).await?;
-    axum::serve(listener, router).await?;
+    axum::serve(
+        listener,
+        router.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .await?;
     Ok(())
 }

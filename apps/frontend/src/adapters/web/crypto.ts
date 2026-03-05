@@ -19,6 +19,7 @@ async function cryptoPost<T>(endpoint: string, body?: Record<string, unknown>): 
     method: "POST",
     headers,
     body: body ? JSON.stringify(body) : undefined,
+    credentials: "same-origin",
   });
 
   if (!res.ok) {

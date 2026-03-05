@@ -1229,6 +1229,7 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     method: config.method,
     headers,
     body,
+    credentials: "same-origin",
   });
 
   // Only notify unauthorized for app auth failures, not for connect cloud token issues

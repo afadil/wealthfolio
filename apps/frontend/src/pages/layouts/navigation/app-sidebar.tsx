@@ -21,7 +21,7 @@ interface AppSidebarProps {
 
 export function AppSidebar({ navigation }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(true);
-  const { logout } = useAuth();
+  const { logout, requiresAuth } = useAuth();
 
   return (
     <div
@@ -127,7 +127,7 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
                 <NavItem key={item.title} item={item} collapsed={collapsed} />
               ))}
               <ConnectNavItem collapsed={collapsed} />
-              {isWeb && (
+              {isWeb && requiresAuth && (
                 <Button
                   type="button"
                   variant="ghost"
