@@ -115,6 +115,13 @@ pub struct SyncSessionStatus {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct RestoreSyncSessionResponse {
+    pub access_token: String,
+    pub refresh_token: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct DeviceSyncEngineStatusResponse {
     cursor: i64,
     last_push_at: Option<String>,
@@ -312,6 +319,23 @@ async fn get_sync_session_status(
         .unwrap_or(false);
 
     Ok(Json(SyncSessionStatus { is_configured }))
+}
+
+async fn restore_sync_session(
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<RestoreSyncSessionResponse>> {
+    ensure_cloud_sync_enabled()?;
+    let access_token = mint_access_token(&state).await?;
+    let refresh_token = state
+        .secret_store
+        .get_secret(CLOUD_REFRESH_TOKEN_KEY)
+        .map_err(|e| ApiError::Internal(format!("Failed to read refresh token: {}", e)))?
+        .ok_or_else(|| ApiError::Unauthorized("No sync session configured".to_string()))?;
+
+    Ok(Json(RestoreSyncSessionResponse {
+        access_token,
+        refresh_token,
+    }))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1095,6 +1119,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/connect/session", post(store_sync_session))
         .route("/connect/session", delete(clear_sync_session))
         .route("/connect/session/status", get(get_sync_session_status))
+        .route("/connect/session/restore", get(restore_sync_session))
         // List operations (fetch from cloud without syncing)
         .route("/connect/connections", get(list_broker_connections))
         .route("/connect/accounts", get(list_broker_accounts))

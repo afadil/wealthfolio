@@ -233,6 +233,7 @@ export {
   listDevices,
   reinitializeDeviceSync,
   resetTeamSync,
+  restoreSyncSession,
   revokeDevice,
   storeSyncSession,
   syncBootstrapSnapshotIfNeeded,
