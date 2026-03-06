@@ -405,6 +405,8 @@ pub fn run() {
             commands::wealthfolio_connect::store_sync_session,
             #[cfg(any(feature = "connect-sync", feature = "device-sync"))]
             commands::wealthfolio_connect::clear_sync_session,
+            #[cfg(any(feature = "connect-sync", feature = "device-sync"))]
+            commands::wealthfolio_connect::restore_sync_session,
             #[cfg(feature = "connect-sync")]
             commands::brokers_sync::sync_broker_data,
             #[cfg(feature = "connect-sync")]
