@@ -4328,7 +4328,7 @@ mod tests {
             a
         };
         let result_a_buy = calculator
-            .calculate_next_holdings(&prev_a, &[buy.clone()], buy_date)
+            .calculate_next_holdings(&prev_a, std::slice::from_ref(&buy), buy_date)
             .unwrap();
 
         // Now transfer out
@@ -4438,11 +4438,11 @@ mod tests {
 
         // Process buys
         let snap_after_buy1 = calculator
-            .calculate_next_holdings(&prev_a, &[buy1.clone()], buy1_date)
+            .calculate_next_holdings(&prev_a, std::slice::from_ref(&buy1), buy1_date)
             .unwrap()
             .snapshot;
         let snap_after_buy2 = calculator
-            .calculate_next_holdings(&snap_after_buy1, &[buy2.clone()], buy2_date)
+            .calculate_next_holdings(&snap_after_buy1, std::slice::from_ref(&buy2), buy2_date)
             .unwrap()
             .snapshot;
 
@@ -4594,7 +4594,7 @@ mod tests {
             .unwrap();
 
         // No position created, just fee deducted
-        assert!(result.snapshot.positions.get("AAPL").is_none());
+        assert!(!result.snapshot.positions.contains_key("AAPL"));
         assert_eq!(result.snapshot.cash_balances.get("USD"), Some(&dec!(-2)));
     }
 
