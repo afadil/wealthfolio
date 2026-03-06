@@ -335,6 +335,29 @@ impl SnapshotService {
             }
         }
 
+        // Clean up stale snapshots for accounts that were explicitly requested but
+        // had no remaining activities (e.g., last activity deleted). These accounts
+        // were skipped by determine_calculation_range_and_initial_state, so their
+        // old snapshots must be removed here.
+        if let SnapshotRecalcMode::SinceDate(since) = &mode {
+            for acc_id in accounts_to_process.keys() {
+                if !accounts_needing_calculation.contains_key(acc_id) {
+                    debug!(
+                        "Cleaning up stale snapshots for account {} (no remaining activities)",
+                        acc_id
+                    );
+                    self.snapshot_repository
+                        .overwrite_snapshots_for_account_in_range(
+                            acc_id,
+                            *since,
+                            calculation_end_date,
+                            &[], // empty = delete old snapshots, insert nothing
+                        )
+                        .await?;
+                }
+            }
+        }
+
         Ok(keyframes_to_save.len())
     }
 
