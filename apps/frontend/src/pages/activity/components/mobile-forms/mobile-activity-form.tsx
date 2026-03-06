@@ -74,7 +74,7 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
     unitPrice: activity?.unitPrice ? Number(activity.unitPrice) : undefined,
     fee: activity?.fee ? Number(activity.fee) : 0,
     comment: activity?.comment ?? null,
-    assetId: activity?.assetId,
+    assetId: activity?.assetSymbol ?? activity?.assetId,
     activityDate: activity?.date
       ? new Date(activity.date)
       : (() => {
@@ -84,6 +84,7 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
         })(),
     currency: activity?.currency ?? "",
     quoteMode: activity?.assetQuoteMode === "MANUAL" ? "MANUAL" : "MARKET",
+    exchangeMic: activity?.exchangeMic,
     showCurrencySelect: false,
   };
 
