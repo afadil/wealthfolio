@@ -374,7 +374,7 @@ impl Position {
                 position_id: self.id.clone(),
                 acquisition_date: src_lot.acquisition_date, // Preserve original date
                 quantity: src_lot.quantity,
-                cost_basis: cost_basis,
+                cost_basis,
                 acquisition_price: price,
                 acquisition_fees: fee,
                 fx_rate_to_position: rate_used,
