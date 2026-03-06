@@ -96,7 +96,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     id: 'market-data',
     name: 'Market Data',
     description: 'Access to market prices, quotes, and financial data',
-    functions: ['searchTicker', 'syncHistory', 'sync', 'getProviders'],
+    functions: ['searchTicker', 'syncHistory', 'sync', 'getProviders', 'fetchDividends'],
     riskLevel: 'low',
   },
   {

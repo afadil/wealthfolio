@@ -1,7 +1,7 @@
 import { logger } from "@/adapters";
 import { ActivityType } from "@/lib/constants";
 import { generateId } from "@/lib/id";
-import type { ActivityCreate, ActivityDetails } from "@/lib/types";
+import type { ActivityCreate, ActivityDetails, SymbolInput } from "@/lib/types";
 import { useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import type { AccountSelectOption } from "../components/forms/fields";
@@ -102,13 +102,38 @@ export function useActivityForm({
             const fromAccount = accounts.find((a) => a.value === transferData.fromAccountId);
             const toAccount = accounts.find((a) => a.value === transferData.toAccountId);
 
-            // Extract assetId and fxRate from payload
-            // - assetId: converted to symbol (ActivityCreate uses symbol, not assetId)
-            // - fxRate: only applies to IN leg (converts activity currency to destination account currency)
-            const { assetId, fxRate, ...sharedFields } = formPayload as {
+            // Extract symbol-related and fxRate fields from payload
+            const {
+              assetId,
+              fxRate,
+              exchangeMic,
+              quoteMode,
+              symbolQuoteCcy,
+              symbolInstrumentType,
+              assetMetadata,
+              ...sharedFields
+            } = formPayload as {
               assetId?: string;
               fxRate?: number;
+              exchangeMic?: string;
+              quoteMode?: string;
+              symbolQuoteCcy?: string;
+              symbolInstrumentType?: string;
+              assetMetadata?: { name?: string; kind?: string; exchangeMic?: string };
             } & Record<string, unknown>;
+
+            // Build the nested symbol object with all metadata
+            const symbolInput: ActivityCreate["symbol"] = assetId
+              ? {
+                  symbol: assetId,
+                  exchangeMic,
+                  quoteMode: quoteMode as SymbolInput["quoteMode"],
+                  quoteCcy: symbolQuoteCcy,
+                  instrumentType: symbolInstrumentType,
+                  name: assetMetadata?.name,
+                  kind: assetMetadata?.kind,
+                }
+              : undefined;
 
             // Create TRANSFER_OUT on source account (no fxRate - activity currency = account currency)
             const transferOutActivity: ActivityCreate = {
@@ -117,7 +142,7 @@ export function useActivityForm({
               activityType: ActivityType.TRANSFER_OUT,
               currency: fromAccount?.currency,
               sourceGroupId,
-              symbol: assetId ? { symbol: assetId } : undefined,
+              symbol: symbolInput,
             } as ActivityCreate;
 
             // Create TRANSFER_IN on destination account (fxRate applies if currencies differ)
@@ -127,7 +152,7 @@ export function useActivityForm({
               activityType: ActivityType.TRANSFER_IN,
               currency: toAccount?.currency,
               sourceGroupId,
-              symbol: assetId ? { symbol: assetId } : undefined,
+              symbol: symbolInput,
               fxRate,
             } as ActivityCreate;
 

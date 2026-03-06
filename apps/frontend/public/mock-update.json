@@ -1,9 +1,9 @@
 {
   "updateAvailable": true,
-  "latestVersion": "3.0.4",
-  "notes": "v3.0.4 brings performance improvements, bug fixes, and a refreshed dashboard experience.",
+  "latestVersion": "3.0.5",
+  "notes": "v3.0.5 brings performance improvements, bug fixes, and a refreshed dashboard experience.",
   "pubDate": "2026-03-04T10:00:00.000Z",
-  "downloadUrl": "https://github.com/afadil/wealthfolio/releases/tag/v3.0.4",
+  "downloadUrl": "https://github.com/afadil/wealthfolio/releases/tag/v3.0.5",
   "changelogUrl": "https://wealthfolio.app/changelog/",
   "screenshots": [
     "https://assets.wealthfolio.app/screenshots/v300-wealthfolio-connect.png",

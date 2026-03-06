@@ -80,6 +80,19 @@ pub struct Lot {
     pub fx_rate_to_position: Option<Decimal>,
 }
 
+/// Result of a FIFO lot reduction, containing both aggregate values
+/// and the individual lots that were removed (for transfer carry-over).
+#[derive(Debug, Clone)]
+pub struct FifoReductionResult {
+    /// Total quantity actually reduced.
+    pub quantity_reduced: Decimal,
+    /// Total cost basis removed in the position's currency.
+    pub cost_basis_removed: Decimal,
+    /// The lots that were fully or partially removed, with their removed quantities.
+    /// Each lot preserves the original acquisition date, price, and fee data.
+    pub removed_lots: Vec<Lot>,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CashHolding {
@@ -315,12 +328,78 @@ impl Position {
         Ok(cost_basis)
     }
 
+    /// Adds transferred lots to this position, preserving original acquisition dates and prices.
+    /// Used for internal transfers where lots carry over from the source account.
+    ///
+    /// If the position has no currency set, it will be inferred from the first lot's fx context.
+    /// Lots are re-keyed with a new lot_id (the TRANSFER_IN activity ID) but retain original
+    /// acquisition dates and cost basis. When currencies differ, prices are converted using
+    /// the provided fx_rate.
+    ///
+    /// Returns the total cost basis added in the position's currency.
+    pub fn add_transferred_lots(
+        &mut self,
+        lot_id_prefix: &str,
+        lots: &[Lot],
+        fx_rate: Option<Decimal>,
+    ) -> Result<Decimal> {
+        let mut total_cost_basis_added = Decimal::ZERO;
+
+        for (i, src_lot) in lots.iter().enumerate() {
+            if !src_lot.quantity.is_sign_positive() {
+                continue;
+            }
+
+            // Apply FX conversion if needed
+            let (price, fee, cost_basis, rate_used) = if let Some(rate) = fx_rate {
+                let p = src_lot.acquisition_price * rate;
+                let f = src_lot.acquisition_fees * rate;
+                let cb = src_lot.cost_basis * rate;
+                (p, f, cb, Some(rate))
+            } else {
+                (
+                    src_lot.acquisition_price,
+                    src_lot.acquisition_fees,
+                    src_lot.cost_basis,
+                    src_lot.fx_rate_to_position,
+                )
+            };
+
+            let new_lot = Lot {
+                id: if lots.len() == 1 {
+                    lot_id_prefix.to_string()
+                } else {
+                    format!("{}_lot{}", lot_id_prefix, i)
+                },
+                position_id: self.id.clone(),
+                acquisition_date: src_lot.acquisition_date, // Preserve original date
+                quantity: src_lot.quantity,
+                cost_basis,
+                acquisition_price: price,
+                acquisition_fees: fee,
+                fx_rate_to_position: rate_used,
+            };
+
+            total_cost_basis_added += new_lot.cost_basis;
+            self.lots.push_back(new_lot);
+        }
+
+        // Sort by acquisition_date
+        let mut vec_lots: Vec<_> = self.lots.drain(..).collect();
+        vec_lots.sort_by_key(|lot| lot.acquisition_date);
+        self.lots = vec_lots.into();
+
+        self.recalculate_aggregates();
+        Ok(total_cost_basis_added)
+    }
+
     /// Reduces position quantity using FIFO lot relief.
-    /// Returns (actual_quantity_reduced, cost_basis_of_sold_lots_in_asset_currency).
+    /// Returns a `FifoReductionResult` containing the quantity reduced, cost basis removed,
+    /// and the individual lots that were removed (for use in transfer carry-over).
     pub fn reduce_lots_fifo(
         &mut self,
         quantity_to_reduce_input: Decimal,
-    ) -> Result<(Decimal, Decimal)> {
+    ) -> Result<FifoReductionResult> {
         if !quantity_to_reduce_input.is_sign_positive() {
             return Err(CalculatorError::InvalidActivity(
                 "Quantity to reduce must be positive".to_string(),
@@ -332,7 +411,11 @@ impl Position {
 
         if !is_quantity_significant(&available_quantity) || available_quantity <= Decimal::ZERO {
             warn!("Attempting to reduce position {} which has zero/insignificant quantity {}. Skipping reduction.", self.id, available_quantity);
-            return Ok((Decimal::ZERO, Decimal::ZERO));
+            return Ok(FifoReductionResult {
+                quantity_reduced: Decimal::ZERO,
+                cost_basis_removed: Decimal::ZERO,
+                removed_lots: Vec::new(),
+            });
         }
 
         let mut quantity_to_reduce = quantity_to_reduce_input;
@@ -349,10 +432,12 @@ impl Position {
         vec_lots.sort_by_key(|lot| lot.acquisition_date); // Ensure FIFO order
 
         let mut lot_indices_to_remove = Vec::new();
-        let mut lot_updates = Vec::new(); // (index, new_quantity, new_cost_basis)
+        let mut lot_updates = Vec::new(); // (index, new_quantity, new_cost_basis, new_fees)
         let mut actual_quantity_reduced = Decimal::ZERO;
         // Cost basis sum will be in the Position's currency
         let mut cost_basis_of_sold_lots_asset_currency = Decimal::ZERO;
+        // Track removed lots for transfer carry-over
+        let mut removed_lots: Vec<Lot> = Vec::new();
 
         // Iterate over the sorted Vec
         for (index, lot) in vec_lots.iter().enumerate() {
@@ -373,6 +458,25 @@ impl Position {
                 lot.cost_basis * qty_from_this_lot / lot.quantity
             };
 
+            // Calculate proportional fees removed
+            let fees_removed = if lot.quantity.is_zero() {
+                Decimal::ZERO
+            } else {
+                lot.acquisition_fees * qty_from_this_lot / lot.quantity
+            };
+
+            // Record the removed portion as a lot (preserving original acquisition data)
+            removed_lots.push(Lot {
+                id: lot.id.clone(),
+                position_id: lot.position_id.clone(),
+                acquisition_date: lot.acquisition_date,
+                quantity: qty_from_this_lot,
+                cost_basis: cost_basis_removed,
+                acquisition_price: lot.acquisition_price,
+                acquisition_fees: fees_removed,
+                fx_rate_to_position: lot.fx_rate_to_position,
+            });
+
             actual_quantity_reduced += qty_from_this_lot;
             cost_basis_of_sold_lots_asset_currency += cost_basis_removed;
             quantity_to_reduce -= qty_from_this_lot;
@@ -382,17 +486,24 @@ impl Position {
             if remaining_lot_qty <= Decimal::ZERO || !is_quantity_significant(&remaining_lot_qty) {
                 lot_indices_to_remove.push(index);
             } else {
-                // Calculate remaining cost basis (asset currency)
+                // Calculate remaining cost basis and fees (asset currency)
                 let remaining_lot_basis = lot.cost_basis - cost_basis_removed;
-                lot_updates.push((index, remaining_lot_qty, remaining_lot_basis));
+                let remaining_fees = lot.acquisition_fees - fees_removed;
+                lot_updates.push((
+                    index,
+                    remaining_lot_qty,
+                    remaining_lot_basis,
+                    remaining_fees,
+                ));
             }
         }
 
         // Apply updates to the Vec
-        for (index, new_quantity, new_cost_basis) in lot_updates {
+        for (index, new_quantity, new_cost_basis, new_fees) in lot_updates {
             if let Some(lot) = vec_lots.get_mut(index) {
                 lot.quantity = new_quantity;
                 lot.cost_basis = new_cost_basis; // Update with asset currency value
+                lot.acquisition_fees = new_fees;
             } else {
                 error!(
                     "Failed to get mutable lot at index {} for position {} during update",
@@ -414,10 +525,11 @@ impl Position {
 
         self.recalculate_aggregates();
 
-        Ok((
-            actual_quantity_reduced, // Keep original precision from calculation
-            cost_basis_of_sold_lots_asset_currency, // Return cost basis in asset currency
-        ))
+        Ok(FifoReductionResult {
+            quantity_reduced: actual_quantity_reduced,
+            cost_basis_removed: cost_basis_of_sold_lots_asset_currency,
+            removed_lots,
+        })
     }
 
     /// Applies stock split.

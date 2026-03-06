@@ -1,6 +1,5 @@
 import {
   deleteSecret,
-  getSecret,
   isDesktop,
   listenDeepLink,
   logger,
@@ -26,10 +25,12 @@ import { clearSyncSession, restoreSyncSession, storeSyncSession } from "../servi
 import { getUserInfo } from "../services/broker-service";
 import type { UserInfo } from "../types";
 
-// Auth configuration - these are public keys (safe for client-side)
-// Set via environment variables: CONNECT_AUTH_URL and CONNECT_AUTH_PUBLISHABLE_KEY
-const SUPABASE_URL = import.meta.env.CONNECT_AUTH_URL as string;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.CONNECT_AUTH_PUBLISHABLE_KEY as string;
+// Auth configuration - these are public/publishable keys (safe for client-side)
+// Can be overridden via environment variables: CONNECT_AUTH_URL and CONNECT_AUTH_PUBLISHABLE_KEY
+const AUTH_URL = (import.meta.env.CONNECT_AUTH_URL as string) || "https://auth.wealthfolio.app";
+const AUTH_PUBLISHABLE_KEY =
+  (import.meta.env.CONNECT_AUTH_PUBLISHABLE_KEY as string) ||
+  "sb_publishable_ZSZbXNtWtnh9i2nqJ2UL4A_NV8ZVutd";
 
 // Key for storing refresh token in keyring/localStorage (for session restoration)
 // Note: For keyring (Tauri), the "wealthfolio_" prefix is added automatically by SecretStore
@@ -197,13 +198,13 @@ function createHybridPkceStorage(storageKey: string) {
 
 // Create a Supabase client with custom storage for persistent auth
 const createSupabaseClient = () => {
-  const storageKey = getAuthStorageKey(SUPABASE_URL);
-  return createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  const storageKey = getAuthStorageKey(AUTH_URL);
+  return createClient(AUTH_URL, AUTH_PUBLISHABLE_KEY, {
     auth: {
       storageKey,
       storage: createHybridPkceStorage(storageKey),
       flowType: "pkce",
-      autoRefreshToken: true,
+      autoRefreshToken: false,
       // Must be true for auth-js to use the provided `storage` (PKCE code_verifier lives there).
       // Our custom storage keeps sessions in-memory (non-persistent) while allowing PKCE to work
       // across full-page redirects.
@@ -274,21 +275,6 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
     }
   }, []);
 
-  // Retrieve refresh token from secret store (keyring on desktop, FileSecretStore on web)
-  const retrieveRefreshToken = useCallback(async (): Promise<string | null> => {
-    try {
-      const token = await getSecret(REFRESH_TOKEN_KEY);
-      if (token) return token;
-    } catch (err) {
-      logger.debug(`getSecret failed: ${err}`);
-    }
-    // Fallback to localStorage for desktop (legacy tokens or keyring failures)
-    if (isDesktop) {
-      return localStorage.getItem(REFRESH_TOKEN_KEY);
-    }
-    return null;
-  }, []);
-
   // Handle auth callback from URL (deep link or web redirect)
   const handleAuthCallback = useCallback(
     async (url: string) => {
@@ -349,45 +335,26 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
 
     const restoreSession = async () => {
       try {
-        if (!isDesktop) {
-          // Web mode: ask the backend for fresh tokens to avoid stale refresh token race.
-          // The backend holds the canonical RT and can mint a fresh AT.
-          try {
-            const { accessToken, refreshToken } = await restoreSyncSession();
-            const { data, error: setErr } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
-            if (setErr) {
-              logger.debug("Failed to set session from backend tokens.");
-              await storeTokens(null);
-            } else if (data.session && !cancelled) {
-              await storeTokens(data.session);
-              setSession(data.session);
-              setUser(data.session.user);
-            }
-          } catch (_err) {
-            // No backend session (not logged in or backend unreachable) — that's fine
-            logger.debug("No backend session to restore.");
+        // Ask the backend for fresh tokens. The backend is the single owner of
+        // the refresh token and will rotate it via Supabase when needed, avoiding
+        // the race condition where both the JS client and backend independently
+        // rotate the same refresh token.
+        try {
+          const { accessToken, refreshToken } = await restoreSyncSession();
+          const { data, error: setErr } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (setErr) {
+            logger.debug("Failed to set session from backend tokens.");
+            await storeTokens(null);
+          } else if (data.session && !cancelled) {
+            setSession(data.session);
+            setUser(data.session.user);
           }
-        } else {
-          // Desktop mode: restore from keyring (no backend RT race on desktop)
-          const refreshToken = await retrieveRefreshToken();
-
-          if (refreshToken) {
-            const { data, error: refreshError } = await supabase.auth.refreshSession({
-              refresh_token: refreshToken,
-            });
-
-            if (refreshError) {
-              logger.debug("Failed to refresh session.");
-              await storeTokens(null);
-            } else if (data.session && !cancelled) {
-              await storeTokens(data.session);
-              setSession(data.session);
-              setUser(data.session.user);
-            }
-          }
+        } catch (_err) {
+          // No backend session (not logged in or backend unreachable) — that's fine
+          logger.debug("No backend session to restore.");
         }
       } catch (_err) {
         logger.error("Error restoring session.");
@@ -423,7 +390,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, [supabase, storeTokens, retrieveRefreshToken, isAuthenticated]);
+  }, [supabase, storeTokens, isAuthenticated]);
 
   // Listen for deep link events on desktop
   useEffect(() => {
@@ -712,16 +679,22 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
     setError(null);
 
     try {
+      // Server-side invalidation may fail if the access token expired (since
+      // autoRefreshToken is off). That's acceptable — the session will expire
+      // naturally on the server. Always clear local state regardless.
       const { error: signOutError } = await supabase.auth.signOut();
-
       if (signOutError) {
-        throw signOutError;
+        logger.warn(`Server-side sign out failed (token may be expired): ${signOutError.message}`);
       }
 
       setSession(null);
       setUser(null);
       await storeTokens(null);
     } catch (err) {
+      // Still clear local state even on unexpected errors
+      setSession(null);
+      setUser(null);
+      await storeTokens(null).catch(() => {});
       const message = err instanceof Error ? err.message : "Sign out failed";
       setError(message);
       throw err;

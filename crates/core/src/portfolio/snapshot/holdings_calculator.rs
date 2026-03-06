@@ -13,7 +13,7 @@ use log::{debug, error, warn};
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
 /// Helper function for cash mutations.
 /// Books cash in the specified currency (should be activity.currency per design spec).
@@ -33,6 +33,11 @@ pub struct HoldingsCalculator {
     pub base_currency: Arc<RwLock<String>>,
     pub timezone: Arc<RwLock<String>>,
     pub asset_repository: Arc<dyn AssetRepositoryTrait>,
+    /// Cache for lots removed during TRANSFER_OUT, keyed by source_group_id.
+    /// When a paired TRANSFER_IN is processed (possibly on a different account),
+    /// the lots are consumed from this cache and added to the destination position,
+    /// preserving original acquisition dates and cost basis.
+    transfer_lots_cache: Arc<Mutex<HashMap<String, Vec<super::Lot>>>>,
 }
 impl HoldingsCalculator {
     pub fn new(
@@ -59,6 +64,15 @@ impl HoldingsCalculator {
             base_currency,
             timezone,
             asset_repository,
+            transfer_lots_cache: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    /// Clears the transfer lots cache. Should be called at the start of each
+    /// recalculation run to prevent stale data from previous runs.
+    pub fn clear_transfer_lots_cache(&self) {
+        if let Ok(mut cache) = self.transfer_lots_cache.lock() {
+            cache.clear();
         }
     }
 
@@ -342,9 +356,7 @@ impl HoldingsCalculator {
         }
 
         if let Some(position) = state.positions.get_mut(asset_id) {
-            // reduce_lots_fifo only needs quantity, not price
-            let (_qty_reduced, _cost_basis_sold_asset_curr) =
-                position.reduce_lots_fifo(activity.qty())?;
+            let _reduction = position.reduce_lots_fifo(activity.qty())?;
         } else {
             warn!(
                 "Attempted to Sell non-existent/zero position {} via activity {}. Applying cash effect only.",
@@ -609,29 +621,51 @@ impl HoldingsCalculator {
             let needs_conversion =
                 !position_currency.is_empty() && position_currency != activity.currency;
 
-            // Get values for lot, converting if needed
-            let (unit_price_for_lot, fee_for_lot, fx_rate_used) = if needs_conversion {
-                let (converted_price, converted_fee, fx_rate) = self.convert_to_position_currency(
-                    activity.price(),
-                    activity.fee_amt(),
-                    activity,
-                    &position_currency,
-                    account_currency,
-                )?;
-                (converted_price, converted_fee, fx_rate)
-            } else {
-                (activity.price(), activity.fee_amt(), None)
-            };
+            // Try lot-level transfer: look up cached lots from paired TRANSFER_OUT
+            let cached_lots = activity.source_group_id.as_ref().and_then(|group_id| {
+                self.transfer_lots_cache
+                    .lock()
+                    .ok()
+                    .and_then(|mut cache| cache.remove(group_id))
+            });
 
-            // Use add_lot_values to avoid cloning Activity
-            let cost_basis_asset_curr = position.add_lot_values(
-                activity.id.clone(),
-                activity.qty(),
-                unit_price_for_lot,
-                fee_for_lot,
-                activity.activity_date,
-                fx_rate_used,
-            )?;
+            let cost_basis_asset_curr = if let Some(lots) = cached_lots {
+                // Lot-level transfer: lots are already in the asset's position currency
+                // (same asset = same listing currency), so no FX conversion needed.
+                position.add_transferred_lots(&activity.id, &lots, None)?
+            } else {
+                // Fallback: no cached lots (external transfer or no source_group_id).
+                // Use the activity's unit_price as the acquisition price.
+                if activity.source_group_id.is_some() {
+                    warn!(
+                        "TransferIn {} has source_group_id but no cached lots from paired TransferOut. \
+                         Using unit_price fallback (cost basis may be inaccurate).",
+                        activity.id
+                    );
+                }
+                let (unit_price_for_lot, fee_for_lot, fx_rate_used) = if needs_conversion {
+                    let (converted_price, converted_fee, fx_rate) = self
+                        .convert_to_position_currency(
+                            activity.price(),
+                            activity.fee_amt(),
+                            activity,
+                            &position_currency,
+                            account_currency,
+                        )?;
+                    (converted_price, converted_fee, fx_rate)
+                } else {
+                    (activity.price(), activity.fee_amt(), None)
+                };
+
+                position.add_lot_values(
+                    activity.id.clone(),
+                    activity.qty(),
+                    unit_price_for_lot,
+                    fee_for_lot,
+                    activity.activity_date,
+                    fx_rate_used,
+                )?
+            };
 
             // Book fee in ACTIVITY currency
             add_cash(state, activity_currency, -activity.fee_amt());
@@ -730,8 +764,17 @@ impl HoldingsCalculator {
                     );
                 }
 
-                let (_qty_reduced, cost_basis_removed) =
-                    position.reduce_lots_fifo(activity.qty())?;
+                let reduction = position.reduce_lots_fifo(activity.qty())?;
+                let cost_basis_removed = reduction.cost_basis_removed;
+
+                // Cache removed lots for paired TRANSFER_IN (lot-level transfer)
+                if let Some(ref group_id) = activity.source_group_id {
+                    if !reduction.removed_lots.is_empty() {
+                        if let Ok(mut cache) = self.transfer_lots_cache.lock() {
+                            cache.insert(group_id.clone(), reduction.removed_lots);
+                        }
+                    }
+                }
 
                 if !position_currency.is_empty() && cost_basis_removed != Decimal::ZERO {
                     let cost_basis_removed_acct = self.convert_position_amount_to_account_currency(

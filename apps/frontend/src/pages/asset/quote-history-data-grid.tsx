@@ -1,9 +1,18 @@
-import { Button, DataGrid, Icons, useDataGrid } from "@wealthfolio/ui";
+import {
+  Button,
+  DataGrid,
+  DatePickerInput,
+  Icons,
+  Input,
+  useDataGrid,
+  formatAmount,
+} from "@wealthfolio/ui";
 import { useCallback, useMemo, useState } from "react";
 import { createColumnHelper } from "@tanstack/react-table";
 import type { AssetKind, Quote } from "@/lib/types";
 import { QuoteHistoryToolbar } from "./quote-history-toolbar";
 import { format } from "date-fns";
+import { useIsMobileViewport } from "@/hooks/use-platform";
 
 // Helper to normalize date values (handles both Date objects and strings from DateCell)
 const normalizeDate = (value: Date | string): Date => {
@@ -109,6 +118,9 @@ const createDraftEntry = (currency: string): QuoteEntry => ({
   isNew: true,
 });
 
+// Pagination constants
+const MOBILE_PAGE_SIZE = 20;
+
 export function QuoteHistoryDataGrid({
   data,
   assetId,
@@ -119,6 +131,7 @@ export function QuoteHistoryDataGrid({
   onDeleteQuote,
   onChangeDataSource,
 }: QuoteHistoryDataGridProps) {
+  const isMobile = useIsMobileViewport();
   // Get decimal precision based on asset kind
   const decimalPrecision = getDecimalPrecision(assetKind);
 
@@ -392,6 +405,261 @@ export function QuoteHistoryDataGrid({
     setDeletedIds(new Set());
     dataGrid.table.resetRowSelection();
   }, [initialEntries, dataGrid.table]);
+
+  // Mobile state
+  const [mobilePage, setMobilePage] = useState(0);
+  const [mobileEditingId, setMobileEditingId] = useState<string | null>(null);
+  const sortedEntries = useMemo(
+    () => [...localEntries].sort((a, b) => b.date.getTime() - a.date.getTime()),
+    [localEntries],
+  );
+  const mobilePageCount = Math.max(1, Math.ceil(sortedEntries.length / MOBILE_PAGE_SIZE));
+  const mobilePageEntries = sortedEntries.slice(
+    mobilePage * MOBILE_PAGE_SIZE,
+    (mobilePage + 1) * MOBILE_PAGE_SIZE,
+  );
+
+  // Mobile: add a new row and open it for editing
+  const handleMobileAdd = useCallback(() => {
+    const draft = createDraftEntry(currency);
+    setLocalEntries((prev) => [draft, ...prev]);
+    setDirtyIds((prev) => new Set(prev).add(draft.id));
+    setMobilePage(0);
+    setMobileEditingId(draft.id);
+  }, [currency]);
+
+  // Mobile: update a field on a specific entry
+  const handleMobileFieldChange = useCallback(
+    (id: string, field: keyof QuoteEntry, value: number | Date) => {
+      setLocalEntries((prev) => prev.map((e) => (e.id === id ? { ...e, [field]: value } : e)));
+      setDirtyIds((prev) => new Set(prev).add(id));
+    },
+    [],
+  );
+
+  if (isMobile) {
+    return (
+      <div className="flex flex-col space-y-3">
+        <QuoteHistoryToolbar
+          selectedRowCount={0}
+          hasUnsavedChanges={hasUnsavedChanges}
+          dirtyCount={dirtyIds.size}
+          deletedCount={deletedIds.size}
+          isManualDataSource={isManualDataSource}
+          onAddRow={handleMobileAdd}
+          onDeleteSelected={handleDeleteSelected}
+          onSave={handleSave}
+          onCancel={handleCancel}
+          onChangeDataSource={onChangeDataSource}
+        />
+
+        <div className="divide-y rounded-md border">
+          {mobilePageEntries.length === 0 ? (
+            <p className="text-muted-foreground p-6 text-center text-sm">No quotes available.</p>
+          ) : (
+            mobilePageEntries.map((entry) => {
+              const isEditing = mobileEditingId === entry.id;
+
+              if (isEditing && isManualDataSource) {
+                return (
+                  <div key={entry.id} className="bg-muted/30 space-y-3 p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium uppercase tracking-wide">
+                        {entry.isNew ? "New Quote" : "Edit Quote"}
+                      </span>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => setMobileEditingId(null)}
+                        >
+                          <Icons.Check className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="text-muted-foreground mb-1 block text-xs">Date</label>
+                        <DatePickerInput
+                          value={entry.date}
+                          onChange={(date) =>
+                            date && handleMobileFieldChange(entry.id, "date", date)
+                          }
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-muted-foreground mb-1 block text-xs">Close</label>
+                          <Input
+                            type="number"
+                            value={entry.close || ""}
+                            step={stepValue}
+                            placeholder="0"
+                            onChange={(e) =>
+                              handleMobileFieldChange(
+                                entry.id,
+                                "close",
+                                parseFloat(e.target.value) || 0,
+                              )
+                            }
+                          />
+                        </div>
+                        <div>
+                          <label className="text-muted-foreground mb-1 block text-xs">Open</label>
+                          <Input
+                            type="number"
+                            value={entry.open || ""}
+                            step={stepValue}
+                            placeholder="0"
+                            onChange={(e) =>
+                              handleMobileFieldChange(
+                                entry.id,
+                                "open",
+                                parseFloat(e.target.value) || 0,
+                              )
+                            }
+                          />
+                        </div>
+                        <div>
+                          <label className="text-muted-foreground mb-1 block text-xs">High</label>
+                          <Input
+                            type="number"
+                            value={entry.high || ""}
+                            step={stepValue}
+                            placeholder="0"
+                            onChange={(e) =>
+                              handleMobileFieldChange(
+                                entry.id,
+                                "high",
+                                parseFloat(e.target.value) || 0,
+                              )
+                            }
+                          />
+                        </div>
+                        <div>
+                          <label className="text-muted-foreground mb-1 block text-xs">Low</label>
+                          <Input
+                            type="number"
+                            value={entry.low || ""}
+                            step={stepValue}
+                            placeholder="0"
+                            onChange={(e) =>
+                              handleMobileFieldChange(
+                                entry.id,
+                                "low",
+                                parseFloat(e.target.value) || 0,
+                              )
+                            }
+                          />
+                        </div>
+                        <div>
+                          <label className="text-muted-foreground mb-1 block text-xs">Volume</label>
+                          <Input
+                            type="number"
+                            value={entry.volume || ""}
+                            placeholder="0"
+                            onChange={(e) =>
+                              handleMobileFieldChange(
+                                entry.id,
+                                "volume",
+                                parseInt(e.target.value) || 0,
+                              )
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div
+                  key={entry.id}
+                  className={`space-y-1.5 p-3 ${isManualDataSource ? "active:bg-muted/40 cursor-pointer" : ""}`}
+                  onClick={isManualDataSource ? () => setMobileEditingId(entry.id) : undefined}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">{format(entry.date, "yyyy-MM-dd")}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold">
+                        {formatAmount(entry.close, entry.currency, false)}
+                      </span>
+                      {isManualDataSource && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground hover:text-destructive h-7 w-7"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteRow(entry);
+                          }}
+                        >
+                          <Icons.X className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-muted-foreground grid grid-cols-4 gap-x-2 text-xs">
+                    <div>
+                      <span className="block">Open</span>
+                      <span className="text-foreground">
+                        {formatAmount(entry.open, entry.currency, false)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block">High</span>
+                      <span className="text-foreground">
+                        {formatAmount(entry.high, entry.currency, false)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block">Low</span>
+                      <span className="text-foreground">
+                        {formatAmount(entry.low, entry.currency, false)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block">Vol</span>
+                      <span className="text-foreground">{entry.volume.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Pagination */}
+        {mobilePageCount > 1 && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">
+              Page {mobilePage + 1} of {mobilePageCount}
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setMobilePage((p) => p - 1)}
+                disabled={mobilePage === 0}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setMobilePage((p) => p + 1)}
+                disabled={mobilePage >= mobilePageCount - 1}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col space-y-3">

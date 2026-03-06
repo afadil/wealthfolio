@@ -95,6 +95,10 @@ export function useActivityMutations(
         assetKind,
         symbolQuoteCcy,
         symbolInstrumentType,
+        transferMode: _transferMode,
+        isExternal: _isExternal,
+        direction: _direction,
+        toAccountId: _toAccountId,
         ...rest
       } = data as NewActivityFormValues & {
         assetId?: string;
@@ -105,6 +109,10 @@ export function useActivityMutations(
         assetKind?: string;
         symbolQuoteCcy?: string;
         symbolInstrumentType?: string;
+        transferMode?: string;
+        isExternal?: boolean;
+        direction?: string;
+        toAccountId?: string;
       };
       const quantity = "quantity" in rest ? rest.quantity : undefined;
       const unitPrice = "unitPrice" in rest ? rest.unitPrice : undefined;
@@ -152,6 +160,10 @@ export function useActivityMutations(
         assetKind,
         symbolQuoteCcy,
         symbolInstrumentType,
+        transferMode: _transferMode2,
+        isExternal: _isExternal2,
+        direction: _direction2,
+        toAccountId: _toAccountId2,
         ...rest
       } = data as NewActivityFormValues & {
         id: string;
@@ -164,6 +176,10 @@ export function useActivityMutations(
         assetKind?: string;
         symbolQuoteCcy?: string;
         symbolInstrumentType?: string;
+        transferMode?: string;
+        isExternal?: boolean;
+        direction?: string;
+        toAccountId?: string;
       };
       const quantity = "quantity" in rest ? rest.quantity : undefined;
       const unitPrice = "unitPrice" in rest ? rest.unitPrice : undefined;
@@ -287,6 +303,14 @@ export function useActivityMutations(
     },
     onSuccess: (result: ActivityBulkMutationResult) => {
       queryClient.invalidateQueries();
+
+      // Show errors from partial failures
+      if (result.errors?.length > 0) {
+        const messages = result.errors.map((e) => e.message).join("; ");
+        toast.error("Some activities failed to save", { description: messages });
+        logger.error(`Bulk save partial failure: ${JSON.stringify(result.errors)}`);
+      }
+
       // Call onSuccess with first created activity for sheet close callback
       if (onSuccess && result.created.length > 0) {
         onSuccess({ accountId: result.created[0].accountId });
