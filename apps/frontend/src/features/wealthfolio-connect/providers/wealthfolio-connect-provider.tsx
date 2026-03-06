@@ -26,10 +26,12 @@ import { clearSyncSession, restoreSyncSession, storeSyncSession } from "../servi
 import { getUserInfo } from "../services/broker-service";
 import type { UserInfo } from "../types";
 
-// Auth configuration - these are public keys (safe for client-side)
-// Set via environment variables: CONNECT_AUTH_URL and CONNECT_AUTH_PUBLISHABLE_KEY
-const SUPABASE_URL = import.meta.env.CONNECT_AUTH_URL as string;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.CONNECT_AUTH_PUBLISHABLE_KEY as string;
+// Auth configuration - these are public/publishable keys (safe for client-side)
+// Can be overridden via environment variables: CONNECT_AUTH_URL and CONNECT_AUTH_PUBLISHABLE_KEY
+const AUTH_URL = (import.meta.env.CONNECT_AUTH_URL as string) || "https://auth.wealthfolio.app";
+const AUTH_PUBLISHABLE_KEY =
+  (import.meta.env.CONNECT_AUTH_PUBLISHABLE_KEY as string) ||
+  "sb_publishable_ZSZbXNtWtnh9i2nqJ2UL4A_NV8ZVutd";
 
 // Key for storing refresh token in keyring/localStorage (for session restoration)
 // Note: For keyring (Tauri), the "wealthfolio_" prefix is added automatically by SecretStore
@@ -197,8 +199,8 @@ function createHybridPkceStorage(storageKey: string) {
 
 // Create a Supabase client with custom storage for persistent auth
 const createSupabaseClient = () => {
-  const storageKey = getAuthStorageKey(SUPABASE_URL);
-  return createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  const storageKey = getAuthStorageKey(AUTH_URL);
+  return createClient(AUTH_URL, AUTH_PUBLISHABLE_KEY, {
     auth: {
       storageKey,
       storage: createHybridPkceStorage(storageKey),
