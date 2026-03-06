@@ -683,16 +683,19 @@ impl SnapshotService {
         let mut all_warnings: Vec<HoldingsCalculationWarning> = Vec::new();
         let date_range = get_days_between(calculation_min_date, calculation_end_date);
 
+        // Clear lot-level transfer cache from any previous run
+        self.holdings_calculator.clear_transfer_lots_cache();
+
         for current_date in date_range {
-            // Process only accounts whose effective start date is today or earlier
-            let accounts_to_process_today: Vec<_> = accounts_needing_calculation
-                .iter()
-                .filter(|(id, _)| {
-                    effective_start_dates
-                        .get(*id)
-                        .is_some_and(|start_date| *start_date <= current_date)
-                })
-                .collect();
+            // Process only accounts whose effective start date is today or earlier.
+            // Order accounts so TRANSFER_OUT sources are processed before paired
+            // TRANSFER_IN destinations (topological sort on source_group_id edges).
+            let accounts_to_process_today = order_accounts_by_transfer_deps(
+                accounts_needing_calculation,
+                activities_by_account_date,
+                effective_start_dates,
+                current_date,
+            );
 
             if accounts_to_process_today.is_empty() {
                 // This shouldn't happen if calculation_min_date was determined correctly, but handle defensively.
@@ -1827,4 +1830,103 @@ impl SnapshotServiceTrait for SnapshotService {
 
         Ok(())
     }
+}
+
+/// Orders accounts for a given day so that TRANSFER_OUT sources are processed
+/// before their paired TRANSFER_IN destinations. Uses topological sort (Kahn's
+/// algorithm) on edges derived from `source_group_id` to handle chains (A→B→C).
+/// Accounts without transfer dependencies retain their original order.
+fn order_accounts_by_transfer_deps<'a>(
+    accounts: &'a AccountsMap,
+    activities_by_account_date: &ActivitiesByAccount,
+    effective_start_dates: &StartDatesMap,
+    current_date: NaiveDate,
+) -> Vec<(&'a String, &'a Account)> {
+    let eligible: Vec<(&String, &Account)> = accounts
+        .iter()
+        .filter(|(id, _)| {
+            effective_start_dates
+                .get(*id)
+                .is_some_and(|start| *start <= current_date)
+        })
+        .collect();
+
+    let n = eligible.len();
+    if n <= 1 {
+        return eligible;
+    }
+
+    // Map account_id → index
+    let idx_of: HashMap<&str, usize> = eligible
+        .iter()
+        .enumerate()
+        .map(|(i, (id, _))| (id.as_str(), i))
+        .collect();
+
+    // Scan today's activities to find source_group_id → (OUT account, IN account) pairs
+    let mut out_idx_for_group: HashMap<String, usize> = HashMap::new();
+    let mut in_idx_for_group: HashMap<String, usize> = HashMap::new();
+
+    for (account_id, _) in &eligible {
+        if let Some(activities) = activities_by_account_date
+            .get(account_id.as_str())
+            .and_then(|dates| dates.get(&current_date))
+        {
+            let acct_idx = idx_of[account_id.as_str()];
+            for a in activities {
+                if let Some(ref gid) = a.source_group_id {
+                    if a.activity_type == "TRANSFER_OUT" {
+                        out_idx_for_group.insert(gid.clone(), acct_idx);
+                    } else if a.activity_type == "TRANSFER_IN" {
+                        in_idx_for_group.insert(gid.clone(), acct_idx);
+                    }
+                }
+            }
+        }
+    }
+
+    // Build adjacency: out_account must be processed before in_account
+    let mut successors: Vec<Vec<usize>> = vec![vec![]; n];
+    let mut in_degree: Vec<u32> = vec![0; n];
+    let mut has_edges = false;
+
+    for (gid, &out_idx) in &out_idx_for_group {
+        if let Some(&in_idx) = in_idx_for_group.get(gid) {
+            if out_idx != in_idx {
+                successors[out_idx].push(in_idx);
+                in_degree[in_idx] += 1;
+                has_edges = true;
+            }
+        }
+    }
+
+    if !has_edges {
+        return eligible;
+    }
+
+    // Kahn's algorithm
+    let mut queue: VecDeque<usize> = (0..n).filter(|&i| in_degree[i] == 0).collect();
+    let mut order: Vec<usize> = Vec::with_capacity(n);
+
+    while let Some(idx) = queue.pop_front() {
+        order.push(idx);
+        for &succ in &successors[idx] {
+            in_degree[succ] -= 1;
+            if in_degree[succ] == 0 {
+                queue.push_back(succ);
+            }
+        }
+    }
+
+    // Append any remaining (would indicate a cycle — shouldn't happen in practice)
+    if order.len() < n {
+        let in_order: HashSet<usize> = order.iter().copied().collect();
+        for i in 0..n {
+            if !in_order.contains(&i) {
+                order.push(i);
+            }
+        }
+    }
+
+    order.into_iter().map(|i| eligible[i]).collect()
 }

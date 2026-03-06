@@ -32,24 +32,20 @@ export const baseActivitySchema = z.object({
   symbolInstrumentType: z.string().optional(),
 });
 
-// Holdings schema: TRANSFER_IN/OUT with is_external=true represents add/remove holding
-export const holdingsActivitySchema = baseActivitySchema.extend({
+// Transfer schema: TRANSFER_IN/OUT supports both cash (amount) and securities (assetId + quantity + unitPrice)
+// Field-level validation is handled by the form component based on transferMode
+export const transferActivitySchema = baseActivitySchema.extend({
   activityType: z.enum([ActivityType.TRANSFER_IN, ActivityType.TRANSFER_OUT]),
-  assetId: z.string().min(1, { message: "Please select a security" }),
-  quantity: z.coerce
-    .number({
-      required_error: "Please enter a valid quantity.",
-      invalid_type_error: "Quantity must be a number.",
-    })
-    .positive(),
-  unitPrice: z.coerce
-    .number({
-      required_error: "Please enter a valid average cost.",
-      invalid_type_error: "Average cost must be a number.",
-    })
-    .positive(),
+  transferMode: z.enum(["cash", "securities"]).default("cash"),
+  isExternal: z.boolean().default(false),
+  direction: z.enum(["in", "out"]).default("out"),
+  toAccountId: z.string().optional(),
+  amount: z.coerce.number().positive().optional().nullable(),
+  fee: z.coerce.number().min(0).default(0).optional(),
+  assetId: z.string().optional().nullable(),
+  quantity: z.coerce.number().positive().optional().nullable(),
+  unitPrice: z.coerce.number().positive().optional().nullable(),
   quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).default(QuoteMode.MARKET),
-  // Metadata to mark as external transfer (affects net_contribution)
   metadata: z
     .object({
       flow: z.object({
@@ -128,7 +124,7 @@ export const tradeActivitySchema = baseActivitySchema.extend({
 });
 
 // Cash activity schema - DEPOSIT/WITHDRAWAL only
-// TRANSFER_IN/TRANSFER_OUT are handled by holdingsActivitySchema with metadata
+// TRANSFER_IN/TRANSFER_OUT are handled by transferActivitySchema
 export const cashActivitySchema = baseActivitySchema.extend({
   activityType: z.enum([ActivityType.DEPOSIT, ActivityType.WITHDRAWAL]),
   assetId: z.string().optional(),
@@ -187,7 +183,7 @@ export const newActivitySchema = z
     cashActivitySchema,
     incomeActivitySchema,
     otherActivitySchema,
-    holdingsActivitySchema,
+    transferActivitySchema,
   ])
   .and(
     z.object({

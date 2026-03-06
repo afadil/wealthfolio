@@ -4263,4 +4263,541 @@ mod tests {
             "EUR cash unchanged"
         );
     }
+
+    // =========================================================================
+    // Lot-Level Transfer Tests
+    // =========================================================================
+
+    /// Helper: create a transfer activity with source_group_id and optional account override
+    #[allow(clippy::too_many_arguments)]
+    fn create_transfer_activity(
+        id: &str,
+        activity_type: ActivityType,
+        asset_id: &str,
+        quantity: Decimal,
+        unit_price: Decimal,
+        fee: Decimal,
+        currency: &str,
+        date_str: &str,
+        account_id: &str,
+        source_group_id: Option<&str>,
+    ) -> Activity {
+        let mut a = create_default_activity(
+            id,
+            activity_type,
+            asset_id,
+            quantity,
+            unit_price,
+            fee,
+            currency,
+            date_str,
+        );
+        a.account_id = account_id.to_string();
+        a.source_group_id = source_group_id.map(|s| s.to_string());
+        a
+    }
+
+    #[test]
+    fn test_internal_transfer_preserves_lot_acquisition_data() {
+        // Scenario: Buy 10 AAPL @ $100, then transfer all 10 from acc_a to acc_b.
+        // The lots in acc_b should have the original acquisition date and price.
+        let mock_fx_service = MockFxService::new();
+        let base_currency = Arc::new(RwLock::new("USD".to_string()));
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
+
+        let buy_date_str = "2023-01-01";
+        let transfer_date_str = "2023-06-01";
+        let buy_date = NaiveDate::from_str(buy_date_str).unwrap();
+        let transfer_date = NaiveDate::from_str(transfer_date_str).unwrap();
+
+        // --- Account A: Buy then Transfer Out ---
+        let prev_a = create_initial_snapshot("acc_a", "USD", "2022-12-31");
+
+        let buy = {
+            let mut a = create_default_activity(
+                "buy1",
+                ActivityType::Buy,
+                "AAPL",
+                dec!(10),
+                dec!(100),
+                dec!(5),
+                "USD",
+                buy_date_str,
+            );
+            a.account_id = "acc_a".to_string();
+            a
+        };
+        let result_a_buy = calculator
+            .calculate_next_holdings(&prev_a, &[buy.clone()], buy_date)
+            .unwrap();
+
+        // Now transfer out
+        let transfer_out = create_transfer_activity(
+            "xfer_out",
+            ActivityType::TransferOut,
+            "AAPL",
+            dec!(10),
+            dec!(0),
+            dec!(0),
+            "USD",
+            transfer_date_str,
+            "acc_a",
+            Some("grp_1"),
+        );
+        let result_a_xfer = calculator
+            .calculate_next_holdings(&result_a_buy.snapshot, &[transfer_out], transfer_date)
+            .unwrap();
+
+        // Account A should have no AAPL position
+        let pos_a = result_a_xfer.snapshot.positions.get("AAPL");
+        assert!(
+            pos_a.is_none() || pos_a.unwrap().quantity == dec!(0),
+            "Account A should have 0 AAPL after transfer out"
+        );
+
+        // --- Account B: Transfer In (same calculator instance, cache populated) ---
+        let prev_b = create_initial_snapshot("acc_b", "USD", "2023-05-31");
+        let transfer_in = create_transfer_activity(
+            "xfer_in",
+            ActivityType::TransferIn,
+            "AAPL",
+            dec!(10),
+            dec!(0),
+            dec!(0),
+            "USD",
+            transfer_date_str,
+            "acc_b",
+            Some("grp_1"),
+        );
+        let result_b = calculator
+            .calculate_next_holdings(&prev_b, &[transfer_in], transfer_date)
+            .unwrap();
+
+        let pos_b = result_b
+            .snapshot
+            .positions
+            .get("AAPL")
+            .expect("Account B should have AAPL");
+        assert_eq!(pos_b.quantity, dec!(10));
+        // Cost basis should match original: 10 * $100 + $5 fee = $1005
+        assert_eq!(pos_b.total_cost_basis, dec!(1005));
+        // Average cost: $1005 / 10 = $100.50
+        assert_eq!(pos_b.average_cost, dec!(100.5));
+
+        // Verify lot preserves original acquisition date
+        assert_eq!(pos_b.lots.len(), 1);
+        let lot = &pos_b.lots[0];
+        assert_eq!(lot.acquisition_date, buy.activity_date);
+        assert_eq!(lot.acquisition_price, dec!(100));
+        assert_eq!(lot.quantity, dec!(10));
+    }
+
+    #[test]
+    fn test_internal_transfer_partial_lot_fifo() {
+        // Scenario: Buy 10 AAPL @ $100, then Buy 5 AAPL @ $200.
+        // Transfer out 12 shares. FIFO removes all 10 from lot1, 2 from lot2.
+        // Transfer in should recreate those exact lots.
+        let mock_fx_service = MockFxService::new();
+        let base_currency = Arc::new(RwLock::new("USD".to_string()));
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
+
+        let prev_a = create_initial_snapshot("acc_a", "USD", "2022-12-31");
+
+        let buy1 = {
+            let mut a = create_default_activity(
+                "buy1",
+                ActivityType::Buy,
+                "AAPL",
+                dec!(10),
+                dec!(100),
+                dec!(10),
+                "USD",
+                "2023-01-01",
+            );
+            a.account_id = "acc_a".to_string();
+            a
+        };
+        let buy2 = {
+            let mut a = create_default_activity(
+                "buy2",
+                ActivityType::Buy,
+                "AAPL",
+                dec!(5),
+                dec!(200),
+                dec!(5),
+                "USD",
+                "2023-02-01",
+            );
+            a.account_id = "acc_a".to_string();
+            a
+        };
+
+        let buy1_date = NaiveDate::from_str("2023-01-01").unwrap();
+        let buy2_date = NaiveDate::from_str("2023-02-01").unwrap();
+        let transfer_date = NaiveDate::from_str("2023-06-01").unwrap();
+
+        // Process buys
+        let snap_after_buy1 = calculator
+            .calculate_next_holdings(&prev_a, &[buy1.clone()], buy1_date)
+            .unwrap()
+            .snapshot;
+        let snap_after_buy2 = calculator
+            .calculate_next_holdings(&snap_after_buy1, &[buy2.clone()], buy2_date)
+            .unwrap()
+            .snapshot;
+
+        // Verify 2 lots exist
+        let pos = snap_after_buy2.positions.get("AAPL").unwrap();
+        assert_eq!(pos.lots.len(), 2);
+        assert_eq!(pos.quantity, dec!(15));
+
+        // Transfer out 12 shares
+        let transfer_out = create_transfer_activity(
+            "xfer_out",
+            ActivityType::TransferOut,
+            "AAPL",
+            dec!(12),
+            dec!(0),
+            dec!(0),
+            "USD",
+            "2023-06-01",
+            "acc_a",
+            Some("grp_partial"),
+        );
+        let snap_after_xfer_out = calculator
+            .calculate_next_holdings(&snap_after_buy2, &[transfer_out], transfer_date)
+            .unwrap()
+            .snapshot;
+
+        // Account A should have 3 remaining (from lot2)
+        let pos_a = snap_after_xfer_out.positions.get("AAPL").unwrap();
+        assert_eq!(pos_a.quantity, dec!(3));
+
+        // Transfer in on account B
+        let prev_b = create_initial_snapshot("acc_b", "USD", "2023-05-31");
+        let transfer_in = create_transfer_activity(
+            "xfer_in",
+            ActivityType::TransferIn,
+            "AAPL",
+            dec!(12),
+            dec!(0),
+            dec!(0),
+            "USD",
+            "2023-06-01",
+            "acc_b",
+            Some("grp_partial"),
+        );
+        let result_b = calculator
+            .calculate_next_holdings(&prev_b, &[transfer_in], transfer_date)
+            .unwrap();
+
+        let pos_b = result_b
+            .snapshot
+            .positions
+            .get("AAPL")
+            .expect("Account B should have AAPL");
+        assert_eq!(pos_b.quantity, dec!(12));
+
+        // Should have 2 lots: full lot1 (10 shares) and partial lot2 (2 shares)
+        assert_eq!(pos_b.lots.len(), 2);
+
+        let lot1 = &pos_b.lots[0];
+        assert_eq!(lot1.quantity, dec!(10));
+        assert_eq!(lot1.acquisition_price, dec!(100));
+        assert_eq!(lot1.acquisition_fees, dec!(10)); // Full fee from lot1
+        assert_eq!(lot1.acquisition_date, buy1.activity_date);
+
+        let lot2 = &pos_b.lots[1];
+        assert_eq!(lot2.quantity, dec!(2));
+        assert_eq!(lot2.acquisition_price, dec!(200));
+        assert_eq!(lot2.acquisition_fees, dec!(2)); // Proportional: 5 * 2/5 = 2
+        assert_eq!(lot2.acquisition_date, buy2.activity_date);
+
+        // Cost basis: lot1 = 10*100 + 10 fee = 1010, lot2 partial = 2*200 + 2/5*5 = 402
+        // Total = 1412
+        assert_eq!(pos_b.total_cost_basis, dec!(1412));
+
+        // Verify source account remaining lot has correct proportional fee
+        let pos_a_remaining = snap_after_xfer_out.positions.get("AAPL").unwrap();
+        assert_eq!(pos_a_remaining.lots.len(), 1);
+        assert_eq!(pos_a_remaining.lots[0].quantity, dec!(3));
+        assert_eq!(pos_a_remaining.lots[0].acquisition_fees, dec!(3)); // Remaining: 5 - 2 = 3
+    }
+
+    #[test]
+    fn test_external_transfer_in_uses_unit_price_fallback() {
+        // Scenario: Transfer in without source_group_id (external).
+        // Should use the activity's unit_price as acquisition price.
+        let mock_fx_service = MockFxService::new();
+        let base_currency = Arc::new(RwLock::new("USD".to_string()));
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
+
+        let prev = create_initial_snapshot("acc_b", "USD", "2023-05-31");
+        let transfer_date = NaiveDate::from_str("2023-06-01").unwrap();
+
+        // External transfer in: no source_group_id, unit_price = $150
+        let transfer_in = create_transfer_activity(
+            "ext_xfer_in",
+            ActivityType::TransferIn,
+            "AAPL",
+            dec!(10),
+            dec!(150),
+            dec!(5),
+            "USD",
+            "2023-06-01",
+            "acc_b",
+            None, // No source_group_id = external
+        );
+
+        let result = calculator
+            .calculate_next_holdings(&prev, &[transfer_in], transfer_date)
+            .unwrap();
+
+        let pos = result
+            .snapshot
+            .positions
+            .get("AAPL")
+            .expect("Should have AAPL");
+        assert_eq!(pos.quantity, dec!(10));
+        // Cost basis: 10 * $150 + $5 fee = $1505
+        assert_eq!(pos.total_cost_basis, dec!(1505));
+        assert_eq!(pos.lots.len(), 1);
+        assert_eq!(pos.lots[0].acquisition_price, dec!(150));
+    }
+
+    #[test]
+    fn test_transfer_out_with_no_existing_position_is_graceful() {
+        // Scenario: Transfer out from an account that has no position.
+        // Should not panic; fee is still applied.
+        let mock_fx_service = MockFxService::new();
+        let base_currency = Arc::new(RwLock::new("USD".to_string()));
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
+
+        let prev = create_initial_snapshot("acc_a", "USD", "2023-05-31");
+        let transfer_date = NaiveDate::from_str("2023-06-01").unwrap();
+
+        let transfer_out = create_transfer_activity(
+            "xfer_out_empty",
+            ActivityType::TransferOut,
+            "AAPL",
+            dec!(10),
+            dec!(0),
+            dec!(2),
+            "USD",
+            "2023-06-01",
+            "acc_a",
+            Some("grp_empty"),
+        );
+
+        let result = calculator
+            .calculate_next_holdings(&prev, &[transfer_out], transfer_date)
+            .unwrap();
+
+        // No position created, just fee deducted
+        assert!(result.snapshot.positions.get("AAPL").is_none());
+        assert_eq!(result.snapshot.cash_balances.get("USD"), Some(&dec!(-2)));
+    }
+
+    #[test]
+    fn test_internal_transfer_cross_currency_accounts() {
+        // Scenario: Transfer AAPL (listed in USD) from CAD account to EUR account.
+        // Lots should transfer with FX conversion applied to cost basis.
+        let mut mock_fx_service = MockFxService::new();
+        let transfer_date = NaiveDate::from_str("2023-06-01").unwrap();
+        let buy_date = NaiveDate::from_str("2023-01-01").unwrap();
+
+        // AAPL is listed in USD. CAD account buys in CAD.
+        // When buying in CAD account, activity currency is CAD, position currency is USD.
+        mock_fx_service.add_bidirectional_rate("CAD", "USD", buy_date, dec!(0.75));
+        mock_fx_service.add_bidirectional_rate("CAD", "USD", transfer_date, dec!(0.80));
+        mock_fx_service.add_bidirectional_rate("EUR", "USD", transfer_date, dec!(1.10));
+
+        let base_currency = Arc::new(RwLock::new("CAD".to_string()));
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
+
+        // Account A (CAD): Buy 10 AAPL @ 100 CAD
+        let prev_a = create_initial_snapshot("acc_a", "CAD", "2022-12-31");
+        let buy = {
+            let mut a = create_default_activity(
+                "buy1",
+                ActivityType::Buy,
+                "AAPL",
+                dec!(10),
+                dec!(100),
+                dec!(0),
+                "CAD",
+                "2023-01-01",
+            );
+            a.account_id = "acc_a".to_string();
+            a
+        };
+        let snap_after_buy = calculator
+            .calculate_next_holdings(&prev_a, &[buy], buy_date)
+            .unwrap()
+            .snapshot;
+
+        // Position should be in USD (AAPL's listing currency)
+        let pos_a = snap_after_buy.positions.get("AAPL").unwrap();
+        assert_eq!(pos_a.currency, "USD");
+        // 100 CAD * 0.75 = 75 USD per share
+        assert_eq!(pos_a.average_cost, dec!(75));
+
+        // Transfer out from CAD account
+        let transfer_out = create_transfer_activity(
+            "xfer_out",
+            ActivityType::TransferOut,
+            "AAPL",
+            dec!(10),
+            dec!(0),
+            dec!(0),
+            "CAD",
+            "2023-06-01",
+            "acc_a",
+            Some("grp_fx"),
+        );
+        let _snap_after_xfer = calculator
+            .calculate_next_holdings(&snap_after_buy, &[transfer_out], transfer_date)
+            .unwrap();
+
+        // Transfer in to EUR account — lots carry over in USD (position currency)
+        // Since AAPL is listed in USD and EUR account also prices in USD for position,
+        // no FX conversion needed on the lots themselves.
+        let prev_b = create_initial_snapshot("acc_b", "EUR", "2023-05-31");
+        let transfer_in = create_transfer_activity(
+            "xfer_in",
+            ActivityType::TransferIn,
+            "AAPL",
+            dec!(10),
+            dec!(0),
+            dec!(0),
+            "EUR",
+            "2023-06-01",
+            "acc_b",
+            Some("grp_fx"),
+        );
+        let result_b = calculator
+            .calculate_next_holdings(&prev_b, &[transfer_in], transfer_date)
+            .unwrap();
+
+        let pos_b = result_b
+            .snapshot
+            .positions
+            .get("AAPL")
+            .expect("Account B should have AAPL");
+        assert_eq!(pos_b.quantity, dec!(10));
+        assert_eq!(pos_b.currency, "USD");
+        // Lots should preserve the original USD cost basis: 75 USD per share
+        assert_eq!(pos_b.average_cost, dec!(75));
+        assert_eq!(pos_b.total_cost_basis, dec!(750));
+    }
+
+    #[test]
+    fn test_transfer_cache_consumed_only_once() {
+        // Scenario: Two separate transfers with different source_group_ids.
+        // Each TRANSFER_IN should only consume its own cached lots.
+        let mock_fx_service = MockFxService::new();
+        let base_currency = Arc::new(RwLock::new("USD".to_string()));
+        let calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
+
+        let buy_date = NaiveDate::from_str("2023-01-01").unwrap();
+        let transfer_date = NaiveDate::from_str("2023-06-01").unwrap();
+
+        // Buy 20 AAPL in acc_a
+        let prev_a = create_initial_snapshot("acc_a", "USD", "2022-12-31");
+        let buy = {
+            let mut a = create_default_activity(
+                "buy1",
+                ActivityType::Buy,
+                "AAPL",
+                dec!(20),
+                dec!(100),
+                dec!(0),
+                "USD",
+                "2023-01-01",
+            );
+            a.account_id = "acc_a".to_string();
+            a
+        };
+        let snap = calculator
+            .calculate_next_holdings(&prev_a, &[buy], buy_date)
+            .unwrap()
+            .snapshot;
+
+        // Transfer out 8 shares (grp_a)
+        let xfer_out_1 = create_transfer_activity(
+            "xfer_out_1",
+            ActivityType::TransferOut,
+            "AAPL",
+            dec!(8),
+            dec!(0),
+            dec!(0),
+            "USD",
+            "2023-06-01",
+            "acc_a",
+            Some("grp_a"),
+        );
+        // Transfer out 5 shares (grp_b)
+        let xfer_out_2 = create_transfer_activity(
+            "xfer_out_2",
+            ActivityType::TransferOut,
+            "AAPL",
+            dec!(5),
+            dec!(0),
+            dec!(0),
+            "USD",
+            "2023-06-01",
+            "acc_a",
+            Some("grp_b"),
+        );
+        let snap = calculator
+            .calculate_next_holdings(&snap, &[xfer_out_1, xfer_out_2], transfer_date)
+            .unwrap()
+            .snapshot;
+
+        // acc_a should have 7 remaining
+        let pos_a = snap.positions.get("AAPL").unwrap();
+        assert_eq!(pos_a.quantity, dec!(7));
+
+        // Transfer in 8 to acc_b (grp_a)
+        let prev_b = create_initial_snapshot("acc_b", "USD", "2023-05-31");
+        let xfer_in_1 = create_transfer_activity(
+            "xfer_in_1",
+            ActivityType::TransferIn,
+            "AAPL",
+            dec!(8),
+            dec!(0),
+            dec!(0),
+            "USD",
+            "2023-06-01",
+            "acc_b",
+            Some("grp_a"),
+        );
+        let result_b = calculator
+            .calculate_next_holdings(&prev_b, &[xfer_in_1], transfer_date)
+            .unwrap();
+        let pos_b = result_b.snapshot.positions.get("AAPL").unwrap();
+        assert_eq!(pos_b.quantity, dec!(8));
+        assert_eq!(pos_b.total_cost_basis, dec!(800)); // 8 * $100
+
+        // Transfer in 5 to acc_c (grp_b)
+        let prev_c = create_initial_snapshot("acc_c", "USD", "2023-05-31");
+        let xfer_in_2 = create_transfer_activity(
+            "xfer_in_2",
+            ActivityType::TransferIn,
+            "AAPL",
+            dec!(5),
+            dec!(0),
+            dec!(0),
+            "USD",
+            "2023-06-01",
+            "acc_c",
+            Some("grp_b"),
+        );
+        let result_c = calculator
+            .calculate_next_holdings(&prev_c, &[xfer_in_2], transfer_date)
+            .unwrap();
+        let pos_c = result_c.snapshot.positions.get("AAPL").unwrap();
+        assert_eq!(pos_c.quantity, dec!(5));
+        assert_eq!(pos_c.total_cost_basis, dec!(500)); // 5 * $100
+    }
 }

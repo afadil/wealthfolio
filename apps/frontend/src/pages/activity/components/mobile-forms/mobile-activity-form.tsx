@@ -10,9 +10,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@wealthfolio/ui/components/ui/sheet";
-import { QuoteMode } from "@/lib/constants";
+import { ActivityType, QuoteMode } from "@/lib/constants";
 import { isSymbolRequired } from "@/lib/activity-utils";
-import type { ActivityDetails } from "@/lib/types";
+import { generateId } from "@/lib/id";
+import type { ActivityCreate, ActivityDetails, SymbolInput } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm, type Resolver, type SubmitHandler } from "react-hook-form";
@@ -29,6 +30,63 @@ interface MobileActivityFormProps {
   onClose?: () => void;
 }
 
+export interface TransferValidationInput {
+  activityType: string;
+  transferMode?: string;
+  isExternal?: boolean;
+  direction?: string;
+  toAccountId?: string;
+  amount?: number | null;
+  assetId?: string | null;
+  quantity?: number | null;
+  unitPrice?: number | null;
+}
+
+export interface TransferValidationError {
+  field: string;
+  message: string;
+}
+
+/**
+ * Validates transfer-specific fields that the Zod schema can't enforce
+ * (transferActivitySchema lives inside a discriminatedUnion which doesn't support superRefine).
+ * Returns null if valid, or the first error found.
+ */
+export function validateTransferFields(
+  input: TransferValidationInput,
+): TransferValidationError | null {
+  const isTransfer = ["TRANSFER_IN", "TRANSFER_OUT"].includes(input.activityType);
+  if (!isTransfer) return null;
+
+  const mode = input.transferMode ?? "cash";
+  const isExternal = input.isExternal ?? false;
+  const direction = input.direction ?? "out";
+  const isCash = mode === "cash";
+  const isSecurities = mode === "securities";
+
+  if (isCash && (!input.amount || input.amount <= 0)) {
+    return { field: "amount", message: "Please enter an amount." };
+  }
+
+  if (isSecurities) {
+    if (!input.assetId?.trim()) {
+      return { field: "assetId", message: "Please select a symbol." };
+    }
+    if (!input.quantity || input.quantity <= 0) {
+      return { field: "quantity", message: "Please enter a quantity." };
+    }
+    if (isExternal && direction === "in" && (!input.unitPrice || input.unitPrice <= 0)) {
+      return { field: "unitPrice", message: "Please enter a cost basis." };
+    }
+  }
+
+  if (!isExternal && !input.toAccountId) {
+    return { field: "toAccountId", message: "Please select a destination account." };
+  }
+
+  return null;
+}
+
 function extractErrorMessage(error: unknown): string {
   if (typeof error === "string" && error.trim()) return error;
   if (error instanceof Error && error.message.trim()) return error.message;
@@ -42,7 +100,8 @@ function extractErrorMessage(error: unknown): string {
 
 export function MobileActivityForm({ accounts, activity, open, onClose }: MobileActivityFormProps) {
   const [currentStep, setCurrentStep] = useState(activity?.id ? 2 : 1);
-  const { addActivityMutation, updateActivityMutation } = useActivityMutations(onClose);
+  const { addActivityMutation, updateActivityMutation, saveActivitiesMutation } =
+    useActivityMutations(onClose);
 
   const isValidActivityType = (
     type: string | undefined,
@@ -65,6 +124,12 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
       : false;
   };
 
+  // Derive transfer mode from existing activity data
+  const isTransferType =
+    activity?.activityType === "TRANSFER_IN" || activity?.activityType === "TRANSFER_OUT";
+  const hasSecurityData = !!(activity?.assetSymbol || activity?.assetId);
+  const initialTransferMode = isTransferType && hasSecurityData ? "securities" : "cash";
+
   const defaultValues: Partial<NewActivityFormValues> = {
     id: activity?.id,
     accountId: activity?.accountId ?? "",
@@ -86,6 +151,12 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
     quoteMode: activity?.assetQuoteMode === "MANUAL" ? "MANUAL" : "MARKET",
     exchangeMic: activity?.exchangeMic,
     showCurrencySelect: false,
+    ...(isTransferType && {
+      transferMode: initialTransferMode,
+      isExternal: true,
+      direction: activity?.activityType === "TRANSFER_IN" ? "in" : "out",
+      toAccountId: "",
+    }),
   };
 
   const form = useForm<NewActivityFormValues>({
@@ -105,22 +176,119 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
     onClose?.();
   };
 
-  const isLoading = addActivityMutation.isPending || updateActivityMutation.isPending;
+  const isLoading =
+    addActivityMutation.isPending ||
+    updateActivityMutation.isPending ||
+    saveActivitiesMutation.isPending;
 
   const onSubmit: SubmitHandler<NewActivityFormValues> = async (data) => {
     try {
-      const { showCurrencySelect: _showCurrencySelect, id, ...submitData } = data;
+      const {
+        showCurrencySelect: _,
+        transferMode: _tm,
+        isExternal: _isExternal,
+        direction: _direction,
+        toAccountId: _toAccountId,
+        id,
+        ...submitData
+      } = data as any;
       const account = accounts.find((a) => a.value === submitData.accountId);
+      const isTransferActivity = ["TRANSFER_IN", "TRANSFER_OUT"].includes(submitData.activityType);
+      const isSecuritiesTransfer = isTransferActivity && (_tm ?? "cash") === "securities";
 
-      // For cash activities (DEPOSIT, WITHDRAWAL, INTEREST, FEE, TAX, TRANSFER_IN, TRANSFER_OUT):
-      // Don't send assetId - backend will generate CASH:{currency} from account currency
-      // Just ensure currency is set for the backend to use
-      if (!isSymbolRequired(submitData.activityType)) {
-        // Clear assetId - let backend generate it
-        if ("assetId" in submitData) {
-          delete (submitData as Record<string, unknown>).assetId;
+      // Validate transfer-specific required fields (schema can't use superRefine in discriminatedUnion)
+      const transferError = validateTransferFields({
+        activityType: submitData.activityType,
+        transferMode: _tm,
+        isExternal: _isExternal,
+        direction: _direction,
+        toAccountId: _toAccountId,
+        amount: submitData.amount,
+        assetId: submitData.assetId,
+        quantity: submitData.quantity,
+        unitPrice: submitData.unitPrice,
+      });
+      if (transferError) {
+        form.setError(transferError.field as any, { message: transferError.message });
+        return;
+      }
+
+      const transferIsExternal = isTransferActivity ? (_isExternal ?? false) : false;
+
+      // Internal transfer: create paired TRANSFER_OUT + TRANSFER_IN activities
+      if (isTransferActivity && !transferIsExternal && _toAccountId) {
+        const fromAccount = account;
+        const toAccount = accounts.find((a) => a.value === _toAccountId);
+        const sourceGroupId = generateId("wf-transfer");
+
+        // Extract symbol-related and fxRate fields from flat form data
+        const {
+          assetId,
+          fxRate,
+          exchangeMic,
+          quoteMode,
+          symbolQuoteCcy,
+          symbolInstrumentType,
+          assetMetadata,
+          ...sharedFields
+        } = submitData as Record<string, unknown>;
+
+        // Strip asset/amount fields based on transfer mode
+        if (!isSecuritiesTransfer) {
+          delete sharedFields.quantity;
+          delete sharedFields.unitPrice;
+        } else {
+          delete sharedFields.amount;
         }
-        // Ensure currency is set for backend to derive cash asset
+
+        // Build nested symbol object for securities transfers
+        const symbolInput: ActivityCreate["symbol"] =
+          isSecuritiesTransfer && assetId
+            ? {
+                symbol: assetId as string,
+                exchangeMic: exchangeMic as string | undefined,
+                quoteMode: quoteMode as SymbolInput["quoteMode"],
+                quoteCcy: symbolQuoteCcy as string | undefined,
+                instrumentType: symbolInstrumentType as string | undefined,
+                name: (assetMetadata as { name?: string })?.name,
+                kind: (assetMetadata as { kind?: string })?.kind,
+              }
+            : undefined;
+
+        const transferOutActivity: ActivityCreate = {
+          ...sharedFields,
+          accountId: submitData.accountId,
+          activityType: ActivityType.TRANSFER_OUT,
+          currency: fromAccount?.currency,
+          sourceGroupId,
+          symbol: symbolInput,
+        } as ActivityCreate;
+
+        const transferInActivity: ActivityCreate = {
+          ...sharedFields,
+          accountId: _toAccountId,
+          activityType: ActivityType.TRANSFER_IN,
+          currency: toAccount?.currency,
+          sourceGroupId,
+          symbol: symbolInput,
+          fxRate: fxRate as ActivityCreate["fxRate"],
+        } as ActivityCreate;
+
+        await saveActivitiesMutation.mutateAsync({
+          creates: [transferOutActivity, transferInActivity],
+        });
+
+        form.reset(defaultValues);
+        setCurrentStep(1);
+        return;
+      }
+
+      // For non-symbol activities (cash deposits, withdrawals, etc.) and cash transfers:
+      // Clear assetId so backend generates CASH:{currency}
+      if (!isSymbolRequired(submitData.activityType) && !isSecuritiesTransfer) {
+        delete (submitData as Record<string, unknown>).assetId;
+        delete (submitData as Record<string, unknown>).quantity;
+        delete (submitData as Record<string, unknown>).unitPrice;
         if (account && !submitData.currency) {
           submitData.currency = account.currency;
         }
