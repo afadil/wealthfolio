@@ -33,53 +33,64 @@ const assetMetadataSchema = z
   .optional();
 
 // Zod schema for BuyForm validation
-export const buyFormSchema = z.object({
-  assetType: z.enum(["stock", "option", "bond"]).default("stock"),
-  assetKind: z.string().optional(),
-  accountId: z.string().min(1, { message: "Please select an account." }),
-  assetId: z.string().default(""),
-  activityDate: z.date({ required_error: "Please select a date." }),
-  quantity: z.coerce
-    .number({
-      required_error: "Please enter a quantity.",
-      invalid_type_error: "Quantity must be a number.",
-    })
-    .positive({ message: "Quantity must be greater than 0." }),
-  unitPrice: z.coerce
-    .number({
-      required_error: "Please enter a price.",
-      invalid_type_error: "Price must be a number.",
-    })
-    .positive({ message: "Price must be greater than 0." }),
-  fee: z.coerce
-    .number({
-      invalid_type_error: "Fee must be a number.",
-    })
-    .min(0, { message: "Fee must be non-negative." })
-    .default(0),
-  comment: z.string().optional().nullable(),
-  // Advanced options
-  currency: z.string().min(1, { message: "Currency is required." }),
-  fxRate: z.coerce
-    .number({
-      invalid_type_error: "FX Rate must be a number.",
-    })
-    .positive({ message: "FX Rate must be positive." })
-    .optional(),
-  // Internal fields
-  quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).default(QuoteMode.MARKET),
-  exchangeMic: z.string().nullable().optional(),
-  symbolQuoteCcy: z.string().nullable().optional(),
-  symbolInstrumentType: z.string().nullable().optional(),
-  // Asset metadata for custom assets (name, etc.)
-  assetMetadata: assetMetadataSchema,
-  // Option-specific fields
-  underlyingSymbol: z.string().optional(),
-  strikePrice: z.coerce.number().positive().optional(),
-  expirationDate: z.string().optional(),
-  optionType: z.enum(["CALL", "PUT"]).optional(),
-  contractMultiplier: z.coerce.number().positive().default(100).optional(),
-});
+export const buyFormSchema = z
+  .object({
+    assetType: z.enum(["stock", "option", "bond"]).default("stock"),
+    assetKind: z.string().optional(),
+    accountId: z.string().min(1, { message: "Please select an account." }),
+    assetId: z.string().default(""),
+    activityDate: z.date({ required_error: "Please select a date." }),
+    quantity: z.coerce
+      .number({
+        required_error: "Please enter a quantity.",
+        invalid_type_error: "Quantity must be a number.",
+      })
+      .positive({ message: "Quantity must be greater than 0." }),
+    unitPrice: z.coerce
+      .number({
+        required_error: "Please enter a price.",
+        invalid_type_error: "Price must be a number.",
+      })
+      .positive({ message: "Price must be greater than 0." }),
+    fee: z.coerce
+      .number({
+        invalid_type_error: "Fee must be a number.",
+      })
+      .min(0, { message: "Fee must be non-negative." })
+      .default(0),
+    comment: z.string().optional().nullable(),
+    // Advanced options
+    currency: z.string().min(1, { message: "Currency is required." }),
+    fxRate: z.coerce
+      .number({
+        invalid_type_error: "FX Rate must be a number.",
+      })
+      .positive({ message: "FX Rate must be positive." })
+      .optional(),
+    // Internal fields
+    quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).default(QuoteMode.MARKET),
+    exchangeMic: z.string().nullable().optional(),
+    symbolQuoteCcy: z.string().nullable().optional(),
+    symbolInstrumentType: z.string().nullable().optional(),
+    // Asset metadata for custom assets (name, etc.)
+    assetMetadata: assetMetadataSchema,
+    // Option-specific fields
+    underlyingSymbol: z.string().optional(),
+    strikePrice: z.coerce.number().positive().optional(),
+    expirationDate: z.string().optional(),
+    optionType: z.enum(["CALL", "PUT"]).optional(),
+    contractMultiplier: z.coerce.number().positive().default(100).optional(),
+  })
+  .superRefine((data, ctx) => {
+    // Options build their symbol at submit time; stocks/bonds require it upfront
+    if (data.assetType !== "option" && (!data.assetId || data.assetId.trim() === "")) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please enter a symbol.",
+        path: ["assetId"],
+      });
+    }
+  });
 
 export type BuyFormValues = z.infer<typeof buyFormSchema>;
 

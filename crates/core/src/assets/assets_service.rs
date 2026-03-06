@@ -810,7 +810,7 @@ impl AssetServiceTrait for AssetService {
         let results: Vec<(String, Result<Asset>)> = stream::iter(ids_to_enrich)
             .map(|asset_id| async move {
                 let result = self.enrich_asset_profile(&asset_id).await;
-                if let Ok(_) = &result {
+                if result.is_ok() {
                     if let Err(e) = self.quote_service.mark_profile_enriched(&asset_id).await {
                         warn!("Failed to mark profile enriched for {}: {}", asset_id, e);
                     }
