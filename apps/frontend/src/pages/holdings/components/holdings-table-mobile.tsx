@@ -3,7 +3,7 @@ import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { Account, Holding } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { AmountDisplay, FacetedSearchInput, GainPercent, Separator } from "@wealthfolio/ui";
+import { AmountDisplay, GainPercent, Input, Separator } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -131,7 +131,12 @@ export const HoldingsTableMobile = ({
       {(showSearch || showFilterButton) && (
         <div className="flex items-center gap-2">
           {showSearch && (
-            <FacetedSearchInput value={searchQuery} onChange={setSearchQuery} className="flex-1" />
+            <Input
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-secondary/30 h-10 flex-1 rounded-full border-none"
+            />
           )}
           {showFilterButton && (
             <Button

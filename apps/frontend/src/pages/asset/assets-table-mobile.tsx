@@ -1,9 +1,13 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { Badge, Card, FacetedSearchInput } from "@wealthfolio/ui";
+import { Badge, Card, Input } from "@wealthfolio/ui";
 
 import { TickerAvatar } from "@/components/ticker-avatar";
+import { useSettingsContext } from "@/lib/settings-provider";
+import { ASSET_KIND_DISPLAY_NAMES, LatestQuoteSnapshot } from "@/lib/types";
+import { cn, formatAmount, formatDate } from "@/lib/utils";
+import { ScrollArea, Separator } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   DropdownMenu,
@@ -23,10 +27,6 @@ import {
 } from "@wealthfolio/ui/components/ui/sheet";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
-import { ASSET_KIND_DISPLAY_NAMES, LatestQuoteSnapshot } from "@/lib/types";
-import { cn, formatAmount, formatDate } from "@/lib/utils";
-import { useSettingsContext } from "@/lib/settings-provider";
-import { ScrollArea, Separator } from "@wealthfolio/ui";
 import { isStaleQuote, ParsedAsset } from "./asset-utils";
 
 interface AssetsTableMobileProps {
@@ -183,7 +183,12 @@ export function AssetsTableMobile({
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <FacetedSearchInput value={searchQuery} onChange={setSearchQuery} className="flex-1" />
+        <Input
+          placeholder="Search..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="bg-secondary/30 h-10 flex-1 rounded-full border-none"
+        />
         <Button
           variant="outline"
           size="icon"
@@ -280,7 +285,6 @@ export function AssetsTableMobile({
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => onClassify?.(asset)}>
-                      <Icons.Tag className="mr-2 h-4 w-4" />
                       Classify
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onEdit(asset)}>Edit</DropdownMenuItem>
