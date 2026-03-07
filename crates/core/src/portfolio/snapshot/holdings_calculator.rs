@@ -835,10 +835,13 @@ impl HoldingsCalculator {
                 let asset_id = activity.asset_id.as_deref().unwrap_or("");
                 if let Some(position) = state.positions.get_mut(asset_id) {
                     let qty = activity.qty();
-                    let (_qty_reduced, _cost_basis_removed) = position.reduce_lots_fifo(qty)?;
+                    let reduction = position.reduce_lots_fifo(qty)?;
                     debug!(
-                        "OPTION_EXPIRY: removed {} lots from position {} (activity {})",
-                        qty, asset_id, activity.id
+                        "OPTION_EXPIRY: removed qty={} cost_basis={} from {} (activity {})",
+                        reduction.quantity_reduced,
+                        reduction.cost_basis_removed,
+                        asset_id,
+                        activity.id
                     );
                 } else {
                     warn!(
