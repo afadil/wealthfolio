@@ -9,6 +9,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@wealthfolio/ui/components/ui/carousel";
+import { Progress } from "@wealthfolio/ui/components/ui/progress";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import {
   useCheckUpdateOnStartup,
@@ -25,6 +26,12 @@ interface DismissedUpdate {
 }
 
 const SNOOZE_DURATION_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 function isDismissed(dismissed: DismissedUpdate | null, version: string): boolean {
   if (!dismissed || dismissed.version !== version) return false;
@@ -52,7 +59,7 @@ export function UpdateDialog() {
   const { data: updateInfo } = useCheckUpdateOnStartup();
   const clearUpdate = useClearUpdate();
   const [isOpen, setIsOpen] = useState(false);
-  const installMutation = useInstallUpdate();
+  const { install, phase, progress, error, isPending, reset } = useInstallUpdate();
   const isDesktopEnv = isDesktop;
   const [dismissedUpdate, setDismissedUpdate] = usePersistentState<DismissedUpdate | null>(
     UPDATE_DISMISSED_KEY,
@@ -69,37 +76,36 @@ export function UpdateDialog() {
 
   // X button, Escape, backdrop — dismiss for current session only
   const handleDismiss = useCallback(() => {
-    if (installMutation.isPending) return;
+    if (isPending) return;
     setIsOpen(false);
     clearUpdate();
-  }, [installMutation.isPending, clearUpdate]);
+    reset();
+  }, [isPending, clearUpdate, reset]);
 
   // "Remind me later" — snooze for 3 days
   const handleSnooze = useCallback(() => {
-    if (installMutation.isPending) return;
+    if (isPending) return;
     if (updateInfo?.latestVersion) {
       setDismissedUpdate({ version: updateInfo.latestVersion, dismissedAt: Date.now() });
     }
     setIsOpen(false);
     clearUpdate();
-  }, [installMutation.isPending, updateInfo?.latestVersion, setDismissedUpdate, clearUpdate]);
+    reset();
+  }, [isPending, updateInfo?.latestVersion, setDismissedUpdate, clearUpdate, reset]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isOpen || installMutation.isPending) return;
+      if (!isOpen || isPending) return;
       if (e.key === "Escape") {
         handleDismiss();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, installMutation.isPending, handleDismiss]);
+  }, [isOpen, isPending, handleDismiss]);
 
   const handleInstall = () => {
-    // Close dialog - backend will handle everything with native dialogs
-    setIsOpen(false);
-    clearUpdate();
-    installMutation.mutate();
+    install();
   };
 
   const handleOpenStore = async () => {
@@ -210,36 +216,79 @@ export function UpdateDialog() {
         </div>
 
         {/* Footer actions */}
-        <div className="border-border bg-secondary/30 flex shrink-0 items-center justify-between gap-4 border-t px-6 py-4">
-          <Button variant="ghost" onClick={handleSnooze}>
-            Remind me later
-          </Button>
-          <div className="flex items-center gap-3">
-            {updateInfo.changelogUrl && (
-              <Button variant="outline" onClick={handleOpenChangelog}>
-                View Changelog
-              </Button>
-            )}
-            {isDesktopEnv ? (
-              // Desktop: Show App Store or direct install button
-              updateInfo.isAppStoreBuild ? (
-                <Button onClick={handleOpenStore} disabled={!updateInfo.storeUrl}>
-                  Open App Store
-                </Button>
+        <div className="border-border bg-secondary/30 flex shrink-0 flex-col gap-3 border-t px-6 py-4">
+          {isPending ? (
+            // Download / install progress
+            <div className="flex flex-col gap-2">
+              {phase === "downloading" ? (
+                <>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Downloading update...</span>
+                    <span className="text-muted-foreground tabular-nums">
+                      {progress.total
+                        ? `${formatBytes(progress.downloaded)} / ${formatBytes(progress.total)}`
+                        : formatBytes(progress.downloaded)}
+                    </span>
+                  </div>
+                  <Progress
+                    value={
+                      progress.total ? (progress.downloaded / progress.total) * 100 : undefined
+                    }
+                    className="h-2"
+                  />
+                </>
               ) : (
-                <Button onClick={handleInstall}>
-                  <Icons.Download className="mr-2 h-4 w-4" />
-                  Update Now
+                <div className="flex items-center gap-2 text-sm">
+                  <Icons.Spinner className="h-4 w-4 animate-spin" />
+                  <span className="text-muted-foreground">Installing update...</span>
+                </div>
+              )}
+            </div>
+          ) : phase === "error" ? (
+            // Error state with retry
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-destructive text-sm">
+                {error || "Update failed. Please try again."}
+              </p>
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" onClick={handleDismiss}>
+                  Close
                 </Button>
-              )
-            ) : (
-              // Web: Show download link (opens GitHub releases or Docker instructions)
-              <Button onClick={handleOpenStore} disabled={!updateInfo.storeUrl}>
-                <Icons.ExternalLink className="mr-2 h-4 w-4" />
-                View Release
+                <Button onClick={handleInstall}>Retry</Button>
+              </div>
+            </div>
+          ) : (
+            // Default actions
+            <div className="flex items-center justify-between gap-4">
+              <Button variant="ghost" onClick={handleSnooze}>
+                Remind me later
               </Button>
-            )}
-          </div>
+              <div className="flex items-center gap-3">
+                {updateInfo.changelogUrl && (
+                  <Button variant="outline" onClick={handleOpenChangelog}>
+                    View Changelog
+                  </Button>
+                )}
+                {isDesktopEnv ? (
+                  updateInfo.isAppStoreBuild ? (
+                    <Button onClick={handleOpenStore} disabled={!updateInfo.storeUrl}>
+                      Open App Store
+                    </Button>
+                  ) : (
+                    <Button onClick={handleInstall}>
+                      <Icons.Download className="mr-2 h-4 w-4" />
+                      Update Now
+                    </Button>
+                  )
+                ) : (
+                  <Button onClick={handleOpenStore} disabled={!updateInfo.storeUrl}>
+                    <Icons.ExternalLink className="mr-2 h-4 w-4" />
+                    View Release
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
