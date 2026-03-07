@@ -745,6 +745,18 @@ export function useChatRuntime(config?: ChatModelConfig) {
     abortControllerRef.current?.abort();
   }, []);
 
+  // Handle message edit - truncate history to parent, then re-run
+  const handleEdit = useCallback(
+    async (message: AppendMessage) => {
+      setMessages((prev) => {
+        const parentIndex = prev.findIndex((m) => m.id === message.parentId);
+        return parentIndex >= 0 ? prev.slice(0, parentIndex + 1) : [];
+      });
+      await handleNew(message);
+    },
+    [handleNew],
+  );
+
   const handleSwitchToNewThread = useCallback(async () => {
     await handleCancel();
     setCurrentThreadId(null);
@@ -818,6 +830,7 @@ export function useChatRuntime(config?: ChatModelConfig) {
       setMessages: handleSetMessages,
       convertMessage,
       onNew: handleNew,
+      onEdit: handleEdit,
       onCancel: handleCancel,
       adapters: {
         attachments: csvAttachmentAdapter,
@@ -837,6 +850,7 @@ export function useChatRuntime(config?: ChatModelConfig) {
       messages,
       handleSetMessages,
       handleNew,
+      handleEdit,
       handleCancel,
       currentThreadId,
       isThreadListLoading,
