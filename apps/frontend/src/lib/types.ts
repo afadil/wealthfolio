@@ -182,6 +182,7 @@ export interface ActivityDetails {
   assetQuoteMode?: QuoteMode;
   /** Canonical exchange MIC code for asset identification */
   exchangeMic?: string;
+  instrumentType?: string;
   // Sync/source metadata
   sourceSystem?: string;
   sourceRecordId?: string;

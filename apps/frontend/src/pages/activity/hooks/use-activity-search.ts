@@ -11,6 +11,7 @@ export type ActivityStatusFilter = "all" | "pending" | "validated";
 export interface ActivitySearchFilters {
   accountIds: string[];
   activityTypes: ActivityType[];
+  instrumentTypes?: string[];
   status?: ActivityStatusFilter;
 }
 
@@ -89,9 +90,10 @@ export function useActivitySearch(options: UseActivitySearchOptions): UseActivit
     return {
       accountIds: filters.accountIds.length > 0 ? filters.accountIds : undefined,
       activityTypes: filters.activityTypes.length > 0 ? filters.activityTypes : undefined,
+      instrumentTypes: filters.instrumentTypes?.length ? filters.instrumentTypes : undefined,
       needsReview,
     } as Record<string, unknown>;
-  }, [filters.accountIds, filters.activityTypes, filters.status]);
+  }, [filters.accountIds, filters.activityTypes, filters.instrumentTypes, filters.status]);
 
   const primarySort =
     sorting.length > 0 && sorting[0]?.id

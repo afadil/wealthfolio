@@ -14,6 +14,7 @@ import {
 import {
   ActivityType,
   ActivityTypeNames,
+  INSTRUMENT_TYPE_OPTIONS,
   SUBTYPES_BY_ACTIVITY_TYPE,
   SUBTYPE_DISPLAY_NAMES,
 } from "@/lib/constants";
@@ -364,9 +365,26 @@ function useImportReviewColumns({
           },
         },
       },
+      // 9. Instrument Type
+      {
+        id: "instrumentType",
+        accessorKey: "instrumentType",
+        header: "Instrument",
+        size: 120,
+        enableSorting: false,
+        enableHiding: true,
+        meta: {
+          cell: {
+            variant: "select",
+            options: [...INSTRUMENT_TYPE_OPTIONS],
+            allowEmpty: true,
+            emptyLabel: "Auto",
+          },
+        },
+      },
 
       // === Numbers (grouped, right-aligned) ===
-      // 8. Quantity
+      // 10. Quantity
       {
         id: "quantity",
         accessorKey: "quantity",
@@ -666,6 +684,7 @@ export function ImportReviewGrid({
             "activityDate",
             "activityType",
             "symbol",
+            "instrumentType",
             "quantity",
             "unitPrice",
             "amount",

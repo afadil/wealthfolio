@@ -63,9 +63,9 @@ pub mod resolver;
 
 // Re-export all public types from models
 pub use models::{
-    AssetKind, AssetProfile, Coverage, Currency, InstrumentId, InstrumentKind, Mic, ProviderId,
-    ProviderInstrument, ProviderOverrides, ProviderSymbol, Quote, QuoteContext, SearchResult,
-    SplitEvent,
+    AssetKind, AssetProfile, BondQuoteMetadata, Coverage, Currency, InstrumentId, InstrumentKind,
+    Mic, ProviderId, ProviderInstrument, ProviderOverrides, ProviderSymbol, Quote, QuoteContext,
+    SearchResult, SplitEvent,
 };
 
 // Re-export resolver types
@@ -78,9 +78,12 @@ pub use resolver::{
 
 // Re-export provider types
 pub use provider::alpha_vantage::AlphaVantageProvider;
+pub use provider::boerse_frankfurt::BoerseFrankfurtProvider;
 pub use provider::finnhub::FinnhubProvider;
 pub use provider::marketdata_app::MarketDataAppProvider;
 pub use provider::metal_price_api::MetalPriceApiProvider;
+pub use provider::openfigi::OpenFigiProvider;
+pub use provider::us_treasury_calc::{TreasuryBondDetails, UsTreasuryCalcProvider};
 pub use provider::yahoo::{YahooDividend, YahooProvider};
 pub use provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
 

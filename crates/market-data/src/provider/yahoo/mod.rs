@@ -115,6 +115,7 @@ impl YahooProvider {
             }
             ProviderInstrument::FxPair { from, to } => Ok(format!("{}{}=X", from, to)),
             ProviderInstrument::MetalSymbol { symbol, .. } => Ok(symbol.to_string()),
+            ProviderInstrument::BondIsin { isin } => Ok(isin.to_string()),
         }
     }
 
@@ -1212,6 +1213,7 @@ mod tests {
             overrides: None,
             currency_hint: Some(Cow::Borrowed("USD")),
             preferred_provider: None,
+            bond_metadata: None,
         }
     }
 
@@ -1229,6 +1231,7 @@ mod tests {
             overrides: None,
             currency_hint: currency_hint.map(Cow::Borrowed),
             preferred_provider: None,
+            bond_metadata: None,
         }
     }
 
@@ -1323,6 +1326,7 @@ mod tests {
             currency_hint: Some(Cow::Borrowed("GBP")),
             overrides: None,
             preferred_provider: None,
+            bond_metadata: None,
         };
         assert_eq!(provider.get_currency(&context), "GBp");
     }

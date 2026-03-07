@@ -31,6 +31,7 @@ import {
 } from "../context";
 import { findMappedActivityType } from "../utils/activity-type-mapping";
 import { getDateFnsPattern } from "../utils/date-format-options";
+import { normalizeInstrumentType, splitInstrumentPrefixedSymbol } from "../utils/instrument-type";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -493,18 +494,29 @@ function createDraftActivities(
     const rawAccount = getColumnValue(row, ImportFormat.ACCOUNT);
     const rawFxRate = getColumnValue(row, ImportFormat.FX_RATE);
     const rawSubtype = getColumnValue(row, ImportFormat.SUBTYPE);
+    const rawInstrumentType = getColumnValue(row, ImportFormat.INSTRUMENT_TYPE);
 
     // Parse and normalize values
     const activityDate = parseDateValue(rawDate, dateFormat);
     const activityType = mapActivityType(rawType, activityMappings);
     const {
-      symbol,
+      symbol: mappedSymbol,
       exchangeMic: mappedExchangeMic,
       symbolName: mappedSymbolName,
       quoteCcy: mappedQuoteCcy,
       instrumentType: mappedInstrumentType,
       quoteMode: mappedQuoteMode,
     } = mapSymbol(rawSymbol, symbolMappings, symbolMappingMeta);
+
+    // Parse typed symbol prefixes (e.g., "bond:US037833DU14")
+    const { symbol: prefixParsedSymbol, instrumentType: prefixInstrumentType } =
+      splitInstrumentPrefixedSymbol(mappedSymbol);
+    const symbol = prefixParsedSymbol;
+
+    // Normalize instrument type: explicit CSV column > prefix > symbol mapping meta
+    const normalizedCsvInstrumentType = normalizeInstrumentType(rawInstrumentType);
+    const resolvedInstrumentType =
+      normalizedCsvInstrumentType || prefixInstrumentType || mappedInstrumentType;
     const quantity = parseNumericValue(rawQuantity, decimalSeparator, thousandsSeparator);
     const unitPrice = parseNumericValue(rawUnitPrice, decimalSeparator, thousandsSeparator);
     const amount = parseNumericValue(rawAmount, decimalSeparator, thousandsSeparator);
@@ -536,7 +548,7 @@ function createDraftActivities(
       exchangeMic: mappedExchangeMic,
       symbolName: mappedSymbolName,
       quoteCcy: mappedQuoteCcy,
-      instrumentType: mappedInstrumentType,
+      instrumentType: resolvedInstrumentType,
       quoteMode: mappedQuoteMode,
       quantity,
       unitPrice,

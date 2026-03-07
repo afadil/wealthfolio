@@ -509,6 +509,7 @@ where
             Some(InstrumentType::Crypto) => "CRYPTOCURRENCY",
             Some(InstrumentType::Metal) => "COMMODITY",
             Some(InstrumentType::Option) => "OPTION",
+            Some(InstrumentType::Bond) => "BOND",
             Some(InstrumentType::Fx) => "FOREX",
             None => "OTHER",
         };
@@ -2088,6 +2089,7 @@ mod tests {
             _needs_review_filter: Option<bool>,
             _date_from: Option<NaiveDate>,
             _date_to: Option<NaiveDate>,
+            _instrument_type_filter: Option<Vec<String>>,
         ) -> Result<crate::activities::ActivitySearchResponse> {
             unimplemented!("unused in this test")
         }

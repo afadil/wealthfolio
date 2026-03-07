@@ -161,6 +161,8 @@ pub struct ActivityDetailsDB {
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub asset_pricing_mode: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub instrument_type: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub metadata: Option<String>,
 }
 
@@ -274,6 +276,7 @@ impl From<ActivityDetailsDB> for wealthfolio_core::activities::ActivityDetails {
             asset_pricing_mode: db
                 .asset_pricing_mode
                 .unwrap_or_else(|| "MARKET".to_string()),
+            instrument_type: db.instrument_type,
             source_system: db.source_system,
             source_record_id: db.source_record_id,
             idempotency_key: db.idempotency_key,

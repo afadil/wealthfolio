@@ -872,6 +872,7 @@ impl SnapshotService {
                         created_at: Utc::now(),
                         last_updated: Utc::now(),
                         is_alternative: pos.is_alternative, // Inherit from source position
+                        contract_multiplier: pos.contract_multiplier, // Inherit from source position
                     });
 
                 agg_pos.quantity += pos.quantity;

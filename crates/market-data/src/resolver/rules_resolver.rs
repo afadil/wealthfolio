@@ -131,6 +131,34 @@ impl RulesResolver {
         }
     }
 
+    /// Resolve a bond instrument by ISIN.
+    ///
+    /// Bonds use ISIN directly — no provider-specific symbol transformation needed.
+    /// Provider-specific ISIN filtering ensures bonds are routed to the correct provider:
+    /// - US_TREASURY_CALC: only US Treasury ISINs (US912*)
+    /// - BOERSE_FRANKFURT and others: all ISINs
+    fn resolve_bond(&self, isin: &Arc<str>, provider: &ProviderId) -> Option<ProviderInstrument> {
+        if provider.as_ref() == "US_TREASURY_CALC" && !isin.starts_with("US912") {
+            return None;
+        }
+        Some(ProviderInstrument::BondIsin { isin: isin.clone() })
+    }
+
+    /// Resolve an option instrument.
+    /// Yahoo Finance accepts OCC symbols directly as equity-like symbols.
+    fn resolve_option(
+        &self,
+        occ_symbol: &Arc<str>,
+        provider: &ProviderId,
+    ) -> Option<ProviderInstrument> {
+        match provider.as_ref() {
+            "YAHOO" => Some(ProviderInstrument::EquitySymbol {
+                symbol: occ_symbol.clone(),
+            }),
+            _ => None,
+        }
+    }
+
     /// Resolve a metal instrument.
     fn resolve_metal(
         &self,
@@ -181,6 +209,10 @@ impl Resolver for RulesResolver {
             InstrumentId::Fx { base, quote } => self.resolve_fx(base, quote, provider)?,
 
             InstrumentId::Metal { code, quote } => self.resolve_metal(code, quote, provider)?,
+
+            InstrumentId::Option { occ_symbol } => self.resolve_option(occ_symbol, provider)?,
+
+            InstrumentId::Bond { isin } => self.resolve_bond(isin, provider)?,
         };
 
         Some(Ok(ResolvedInstrument {
@@ -203,6 +235,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         }
     }
 
@@ -215,6 +248,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         }
     }
 
@@ -227,6 +261,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         }
     }
 
@@ -239,6 +274,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
         }
     }
 

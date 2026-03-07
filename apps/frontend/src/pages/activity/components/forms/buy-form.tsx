@@ -1,22 +1,25 @@
-import { useSettings } from "@/hooks/use-settings";
-import { ActivityType, QuoteMode } from "@/lib/constants";
+import { useEffect, useMemo } from "react";
 import { normalizeCurrency } from "@/lib/utils";
+import { useForm, FormProvider, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { useMemo } from "react";
-import { FormProvider, useForm, type Resolver } from "react-hook-form";
-import { z } from "zod";
+import { ActivityType, QuoteMode } from "@/lib/constants";
+import { buildOccSymbol } from "@/lib/occ-symbol";
+import { useSettings } from "@/hooks/use-settings";
 import {
   AccountSelect,
-  AdvancedOptionsSection,
-  AmountInput,
-  createValidatedSubmit,
-  DatePicker,
-  NotesInput,
-  QuantityInput,
   SymbolSearch,
+  DatePicker,
+  AmountInput,
+  QuantityInput,
+  NotesInput,
+  AdvancedOptionsSection,
+  AssetTypeSelector,
+  OptionContractFields,
+  type AssetType,
   type AccountSelectOption,
 } from "./fields";
 
@@ -30,45 +33,64 @@ const assetMetadataSchema = z
   .optional();
 
 // Zod schema for BuyForm validation
-export const buyFormSchema = z.object({
-  accountId: z.string().min(1, { message: "Please select an account." }),
-  assetId: z.string().min(1, { message: "Please enter a symbol." }),
-  activityDate: z.date({ required_error: "Please select a date." }),
-  quantity: z.coerce
-    .number({
-      required_error: "Please enter a quantity.",
-      invalid_type_error: "Quantity must be a number.",
-    })
-    .positive({ message: "Quantity must be greater than 0." }),
-  unitPrice: z.coerce
-    .number({
-      required_error: "Please enter a price.",
-      invalid_type_error: "Price must be a number.",
-    })
-    .positive({ message: "Price must be greater than 0." }),
-  fee: z.coerce
-    .number({
-      invalid_type_error: "Fee must be a number.",
-    })
-    .min(0, { message: "Fee must be non-negative." })
-    .default(0),
-  comment: z.string().optional().nullable(),
-  // Advanced options
-  currency: z.string().min(1, { message: "Currency is required." }),
-  fxRate: z.coerce
-    .number({
-      invalid_type_error: "FX Rate must be a number.",
-    })
-    .positive({ message: "FX Rate must be positive." })
-    .optional(),
-  // Internal fields
-  quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).default(QuoteMode.MARKET),
-  exchangeMic: z.string().nullable().optional(),
-  symbolQuoteCcy: z.string().nullable().optional(),
-  symbolInstrumentType: z.string().nullable().optional(),
-  // Asset metadata for custom assets (name, etc.)
-  assetMetadata: assetMetadataSchema,
-});
+export const buyFormSchema = z
+  .object({
+    assetType: z.enum(["stock", "option", "bond"]).default("stock"),
+    assetKind: z.string().optional(),
+    accountId: z.string().min(1, { message: "Please select an account." }),
+    assetId: z.string().default(""),
+    activityDate: z.date({ required_error: "Please select a date." }),
+    quantity: z.coerce
+      .number({
+        required_error: "Please enter a quantity.",
+        invalid_type_error: "Quantity must be a number.",
+      })
+      .positive({ message: "Quantity must be greater than 0." }),
+    unitPrice: z.coerce
+      .number({
+        required_error: "Please enter a price.",
+        invalid_type_error: "Price must be a number.",
+      })
+      .positive({ message: "Price must be greater than 0." }),
+    fee: z.coerce
+      .number({
+        invalid_type_error: "Fee must be a number.",
+      })
+      .min(0, { message: "Fee must be non-negative." })
+      .default(0),
+    comment: z.string().optional().nullable(),
+    // Advanced options
+    currency: z.string().min(1, { message: "Currency is required." }),
+    fxRate: z.coerce
+      .number({
+        invalid_type_error: "FX Rate must be a number.",
+      })
+      .positive({ message: "FX Rate must be positive." })
+      .optional(),
+    // Internal fields
+    quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).default(QuoteMode.MARKET),
+    exchangeMic: z.string().nullable().optional(),
+    symbolQuoteCcy: z.string().nullable().optional(),
+    symbolInstrumentType: z.string().nullable().optional(),
+    // Asset metadata for custom assets (name, etc.)
+    assetMetadata: assetMetadataSchema,
+    // Option-specific fields
+    underlyingSymbol: z.string().optional(),
+    strikePrice: z.coerce.number().positive().optional(),
+    expirationDate: z.string().optional(),
+    optionType: z.enum(["CALL", "PUT"]).optional(),
+    contractMultiplier: z.coerce.number().positive().default(100).optional(),
+  })
+  .superRefine((data, ctx) => {
+    // Options build their symbol at submit time; stocks/bonds require it upfront
+    if (data.assetType !== "option" && (!data.assetId || data.assetId.trim() === "")) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please enter a symbol.",
+        path: ["assetId"],
+      });
+    }
+  });
 
 export type BuyFormValues = z.infer<typeof buyFormSchema>;
 
@@ -105,13 +127,15 @@ export function BuyForm({
 
   const form = useForm<BuyFormValues>({
     resolver: zodResolver(buyFormSchema) as Resolver<BuyFormValues>,
-    mode: "onSubmit", // Validate only on submit - works correctly with default values
+    mode: "onSubmit",
     defaultValues: {
+      assetType: "stock",
+      assetKind: undefined,
       accountId: initialAccountId,
       assetId: "",
       activityDate: (() => {
         const date = new Date();
-        date.setHours(16, 0, 0, 0); // Market close time
+        date.setHours(16, 0, 0, 0);
         return date;
       })(),
       quantity: undefined,
@@ -121,18 +145,65 @@ export function BuyForm({
       fxRate: undefined,
       quoteMode: QuoteMode.MARKET,
       exchangeMic: undefined,
+      // Option defaults
+      underlyingSymbol: undefined,
+      strikePrice: undefined,
+      expirationDate: undefined,
+      optionType: "CALL",
+      contractMultiplier: 100,
       ...defaultValues,
       currency: defaultValues?.currency?.trim() || initialCurrency,
     },
   });
 
-  const { watch } = form;
+  const { watch, setValue } = form;
   const accountId = watch("accountId");
   const currency = watch("currency");
   const quoteMode = watch("quoteMode");
   const symbolQuoteCcy = watch("symbolQuoteCcy");
-  const isManualAsset = quoteMode === QuoteMode.MANUAL;
 
+  // Set currency from account when account changes and currency is not yet set
+  useEffect(() => {
+    if (!currency && accountId) {
+      const acct = accounts.find((a) => a.value === accountId);
+      if (acct?.currency) setValue("currency", acct.currency);
+    }
+  }, [accountId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const assetType = watch("assetType") ?? "stock";
+  const isManualAsset = quoteMode === QuoteMode.MANUAL;
+  const isOption = assetType === "option";
+
+  // Option total premium calculation
+  const optQuantity = watch("quantity");
+  const optUnitPrice = watch("unitPrice");
+  const optFee = watch("fee");
+  const optMultiplier = watch("contractMultiplier");
+
+  const optionTotal = useMemo(() => {
+    if (!isOption) return 0;
+    const q = Number(optQuantity) || 0;
+    const p = Number(optUnitPrice) || 0;
+    const f = Number(optFee) || 0;
+    const m = Number(optMultiplier) || 100;
+    return q * p * m + f;
+  }, [isOption, optQuantity, optUnitPrice, optFee, optMultiplier]);
+
+  const handleAssetTypeChange = (value: AssetType) => {
+    if (value === "option") {
+      setValue("quoteMode", QuoteMode.MARKET);
+      setValue("assetKind", "OPTION");
+    } else if (value === "bond") {
+      setValue("quoteMode", QuoteMode.MANUAL);
+      setValue("assetKind", "BOND");
+    } else {
+      setValue("quoteMode", QuoteMode.MARKET);
+      setValue("assetKind", undefined);
+    }
+    setValue("assetId", "");
+  };
+
+  const quantityLabel = isOption ? "Contracts" : assetType === "bond" ? "Bonds" : "Quantity";
+  const priceLabel = isOption ? "Premium/Share" : "Price";
   // Get account currency from selected account
   const selectedAccount = useMemo(
     () => accounts.find((a) => a.value === accountId),
@@ -141,7 +212,32 @@ export function BuyForm({
   const accountCurrency = selectedAccount?.currency;
   const assetCurrencyFromSymbol = normalizeCurrency(symbolQuoteCcy ?? undefined)?.toUpperCase();
 
-  const handleSubmit = createValidatedSubmit(form, async (data) => {
+  const handleSubmit = form.handleSubmit(async (data) => {
+    // Ensure currency is set (required by backend) — fall back to account currency
+    if (!data.currency && accountId) {
+      data.currency = accounts.find((a) => a.value === accountId)?.currency ?? data.currency;
+    }
+    // For options: build OCC symbol from structured fields
+    if (
+      data.assetType === "option" &&
+      data.underlyingSymbol &&
+      data.strikePrice &&
+      data.expirationDate &&
+      data.optionType
+    ) {
+      const occSymbol = buildOccSymbol(
+        data.underlyingSymbol,
+        data.expirationDate,
+        data.optionType,
+        data.strikePrice,
+      );
+      data.assetId = occSymbol;
+      data.assetMetadata = {
+        ...data.assetMetadata,
+        name: `${data.underlyingSymbol.toUpperCase()} ${data.expirationDate} ${data.optionType} ${data.strikePrice}`,
+        kind: "OPTION",
+      };
+    }
     await onSubmit(data);
   });
 
@@ -153,37 +249,77 @@ export function BuyForm({
             {/* Account Selection */}
             <AccountSelect name="accountId" accounts={accounts} currencyName="currency" />
 
-            {/* Symbol Search */}
-            <SymbolSearch
-              name="assetId"
-              isManualAsset={isManualAsset}
-              exchangeMicName="exchangeMic"
-              quoteModeName="quoteMode"
-              currencyName="currency"
-              quoteCcyName="symbolQuoteCcy"
-              instrumentTypeName="symbolInstrumentType"
-              assetMetadataName="assetMetadata"
-            />
-            {/* Hidden fields to register assetMetadata for react-hook-form */}
-            <input type="hidden" {...form.register("assetMetadata.name")} />
-            <input type="hidden" {...form.register("assetMetadata.kind")} />
-            <input type="hidden" {...form.register("symbolQuoteCcy")} />
-            <input type="hidden" {...form.register("symbolInstrumentType")} />
+            {/* Asset Type Selector */}
+            {!isEditing && (
+              <AssetTypeSelector
+                control={form.control}
+                name="assetType"
+                onValueChange={handleAssetTypeChange}
+              />
+            )}
+
+            {/* Symbol / Option Contract Fields */}
+            {isOption ? (
+              <OptionContractFields
+                underlyingName="underlyingSymbol"
+                strikePriceName="strikePrice"
+                expirationDateName="expirationDate"
+                optionTypeName="optionType"
+                contractMultiplierName="contractMultiplier"
+                currencyName="currency"
+                exchangeMicName="exchangeMic"
+              />
+            ) : (
+              <>
+                <SymbolSearch
+                  name="assetId"
+                  isManualAsset={isManualAsset}
+                  exchangeMicName="exchangeMic"
+                  quoteModeName="quoteMode"
+                  currencyName="currency"
+                  quoteCcyName="symbolQuoteCcy"
+                  instrumentTypeName="symbolInstrumentType"
+                  assetMetadataName="assetMetadata"
+                />
+                {/* Hidden fields to register assetMetadata for react-hook-form */}
+                <input type="hidden" {...form.register("assetMetadata.name")} />
+                <input type="hidden" {...form.register("assetMetadata.kind")} />
+                <input type="hidden" {...form.register("symbolQuoteCcy")} />
+                <input type="hidden" {...form.register("symbolInstrumentType")} />
+              </>
+            )}
 
             {/* Date Picker */}
             <DatePicker name="activityDate" label="Date" enableTime={true} />
 
             {/* Quantity, Price, Fee Row */}
+            {isOption && (
+              <h4 className="text-muted-foreground text-sm font-medium">Trade Details</h4>
+            )}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <QuantityInput name="quantity" label="Quantity" />
+              <QuantityInput name="quantity" label={quantityLabel} />
               <AmountInput
                 name="unitPrice"
-                label="Price"
+                label={priceLabel}
                 maxDecimalPlaces={4}
                 currency={currency}
               />
               <AmountInput name="fee" label="Fee" currency={currency} />
             </div>
+
+            {/* Option Total Premium */}
+            {isOption && optQuantity && optUnitPrice && (
+              <div className="bg-muted rounded-md p-3 text-sm">
+                <span className="text-muted-foreground">Total: </span>
+                <span className="font-medium">
+                  {new Intl.NumberFormat("en-US", {
+                    style: "decimal",
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  }).format(optionTotal)}
+                </span>
+              </div>
+            )}
 
             {/* Advanced Options */}
             <AdvancedOptionsSection
@@ -215,7 +351,7 @@ export function BuyForm({
             ) : (
               <Icons.Plus className="mr-2 h-4 w-4" />
             )}
-            {isEditing ? "Update" : "Add Buy"}
+            {isEditing ? "Update" : isOption ? "Buy to Open" : "Add Buy"}
           </Button>
         </div>
       </form>

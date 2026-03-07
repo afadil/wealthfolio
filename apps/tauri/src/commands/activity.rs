@@ -13,7 +13,7 @@ use wealthfolio_core::activities::{
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn search_activities(
-    page: i64,                                 // Page number, 1-based
+    page: i64,                                 // Page number, 0-based
     page_size: i64,                            // Number of items per page
     account_id_filter: Option<Vec<String>>,    // Optional account_id filter
     activity_type_filter: Option<Vec<String>>, // Optional activity_type filter
@@ -22,6 +22,7 @@ pub async fn search_activities(
     needs_review_filter: Option<bool>, // Optional needs_review filter for pending review
     date_from: Option<String>,         // Optional start date filter (YYYY-MM-DD, inclusive)
     date_to: Option<String>,           // Optional end date filter (YYYY-MM-DD, inclusive)
+    instrument_type_filter: Option<Vec<String>>, // Optional instrument_type filter
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ActivitySearchResponse, String> {
     debug!("Search activities... {}, {}", page, page_size);
@@ -46,6 +47,7 @@ pub async fn search_activities(
         needs_review_filter,
         date_from_parsed,
         date_to_parsed,
+        instrument_type_filter,
     )?)
 }
 

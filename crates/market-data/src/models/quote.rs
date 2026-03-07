@@ -1,10 +1,23 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 use super::instrument::InstrumentId;
 use super::provider_params::ProviderOverrides;
 use super::types::{Currency, ProviderId};
+
+/// Bond metadata needed for yield-curve-based price calculation.
+#[derive(Clone, Debug)]
+pub struct BondQuoteMetadata {
+    /// Annual coupon rate as a decimal (0.05 = 5%)
+    pub coupon_rate: Decimal,
+    /// Maturity date of the bond
+    pub maturity_date: NaiveDate,
+    /// Face/par value of the bond
+    pub face_value: Decimal,
+    /// Coupon payment frequency: "SEMI_ANNUAL", "ANNUAL", "QUARTERLY", "ZERO"
+    pub coupon_frequency: String,
+}
 
 /// Request context for quote fetching
 #[derive(Clone, Debug)]
@@ -20,6 +33,9 @@ pub struct QuoteContext {
 
     /// Preferred provider (from Asset.preferred_provider)
     pub preferred_provider: Option<ProviderId>,
+
+    /// Bond metadata for yield-curve-based pricing (coupon, maturity, face value)
+    pub bond_metadata: Option<BondQuoteMetadata>,
 }
 
 /// Market data quote

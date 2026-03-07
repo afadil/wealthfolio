@@ -78,6 +78,7 @@ export function ActivityDataGrid({
     {
       subtype: true,
       isExternal: true,
+      instrumentType: false,
       activityStatus: false,
     },
   );

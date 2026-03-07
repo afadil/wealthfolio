@@ -109,15 +109,16 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
     fn search_activities(
         &self,
-        page: i64,                                 // Page number, 1-based
-        page_size: i64,                            // Number of items per page
-        account_id_filter: Option<Vec<String>>,    // Optional account_id filter
-        activity_type_filter: Option<Vec<String>>, // Optional activity_type filter
-        asset_id_keyword: Option<String>,          // Optional asset_id keyword for search
-        sort: Option<Sort>,                        // Optional sort
+        page: i64,                                   // Page number, 0-based
+        page_size: i64,                              // Number of items per page
+        account_id_filter: Option<Vec<String>>,      // Optional account_id filter
+        activity_type_filter: Option<Vec<String>>,   // Optional activity_type filter
+        asset_id_keyword: Option<String>,            // Optional asset_id keyword for search
+        sort: Option<Sort>,                          // Optional sort
         needs_review_filter: Option<bool>, // Optional needs_review filter (maps to DRAFT status)
         date_from: Option<NaiveDate>,      // Optional start date filter (inclusive)
         date_to: Option<NaiveDate>,        // Optional end date filter (inclusive)
+        instrument_type_filter: Option<Vec<String>>, // Optional instrument_type filter
     ) -> Result<ActivitySearchResponse> {
         let mut conn = get_connection(&self.pool)?;
 
@@ -165,6 +166,9 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 // End of day in RFC3339 format for lexicographic comparison
                 let to_str = format!("{}T23:59:59", to_date);
                 query = query.filter(activities::activity_date.le(to_str));
+            }
+            if let Some(ref instrument_types) = instrument_type_filter {
+                query = query.filter(assets::instrument_type.eq_any(instrument_types));
             }
 
             // Apply sorting
@@ -258,6 +262,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 assets::name.nullable(),
                 assets::instrument_exchange_mic.nullable(),
                 assets::quote_mode.nullable(),
+                assets::instrument_type.nullable(),
                 activities::metadata,
             ))
             .limit(page_size)

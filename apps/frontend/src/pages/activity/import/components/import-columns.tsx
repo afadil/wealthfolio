@@ -4,6 +4,7 @@ import { Checkbox, type SymbolSearchResult } from "@wealthfolio/ui";
 import {
   ActivityType,
   ActivityTypeNames,
+  INSTRUMENT_TYPE_OPTIONS,
   SUBTYPES_BY_ACTIVITY_TYPE,
   SUBTYPE_DISPLAY_NAMES,
 } from "@/lib/constants";
@@ -29,6 +30,7 @@ export interface ImportRowData {
   subtype?: string;
   isExternal?: boolean;
   symbol?: string;
+  instrumentType?: string;
   assetSymbol?: string;
   quantity?: string | number | null;
   unitPrice?: string | number | null;
@@ -271,7 +273,25 @@ export function useImportColumns<T extends ImportRowData>({
       },
     });
 
-    // 9. Quantity
+    // 9. Instrument Type
+    columns.push({
+      id: "instrumentType",
+      accessorKey: "instrumentType",
+      header: "Instrument",
+      size: 120,
+      enableSorting: false,
+      enableHiding: true,
+      meta: {
+        cell: {
+          variant: "select",
+          options: [...INSTRUMENT_TYPE_OPTIONS],
+          allowEmpty: true,
+          emptyLabel: "Auto",
+        },
+      },
+    });
+
+    // 10. Quantity
     columns.push({
       id: "quantity",
       accessorKey: "quantity",

@@ -4,6 +4,7 @@ import {
   ActivityStatus,
   ActivityType,
   ActivityTypeNames,
+  INSTRUMENT_TYPE_OPTIONS,
   getExchangeDisplayName,
   SUBTYPE_DISPLAY_NAMES,
   SUBTYPES_BY_ACTIVITY_TYPE,
@@ -257,8 +258,28 @@ export function useActivityColumns({
         },
       },
 
+      // 9. Instrument Type (hidden by default)
+      {
+        id: "instrumentType",
+        accessorKey: "instrumentType",
+        header: "Instrument",
+        size: 110,
+        enableSorting: false,
+        enableHiding: true,
+        cell: ({ row }) => {
+          const value = row.original.instrumentType;
+          if (!value) return <span className="text-muted-foreground">—</span>;
+          const option = INSTRUMENT_TYPE_OPTIONS.find((o) => o.value === value);
+          return (
+            <Badge variant="outline" className="text-xs font-normal">
+              {option?.label ?? value}
+            </Badge>
+          );
+        },
+      },
+
       // === Numbers (grouped, right-aligned) ===
-      // 8. Quantity
+      // 10. Quantity
       {
         accessorKey: "quantity",
         header: "Quantity",
