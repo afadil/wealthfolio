@@ -867,6 +867,10 @@ pub struct SendMessageRequest {
     /// Tool allowlist for this request (uses all if not specified).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_tools: Option<Vec<String>>,
+    /// Parent message ID for edit operations.
+    /// When set, AI context is truncated to this message (inclusive).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_message_id: Option<String>,
 }
 
 impl SendMessageRequest {

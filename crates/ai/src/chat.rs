@@ -194,7 +194,15 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
         info!("Processing message for thread {}", thread_id);
 
         // Load previous messages for context (history)
-        let previous_messages = repo.get_messages_by_thread(&thread_id)?;
+        let mut previous_messages = repo.get_messages_by_thread(&thread_id)?;
+
+        // When editing a message, truncate context to the parent message (inclusive)
+        if let Some(ref parent_id) = request.parent_message_id {
+            if let Some(parent_pos) = previous_messages.iter().position(|m| m.id == *parent_id) {
+                previous_messages.truncate(parent_pos + 1);
+            }
+        }
+
         let history_messages: Vec<SimpleChatMessage> = previous_messages
             .iter()
             .filter_map(|msg| {
