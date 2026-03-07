@@ -91,7 +91,7 @@ export const ActivityTableMobile = ({
                         <p className="text-muted-foreground text-xs">{activityTypeLabel}</p>
                         <div className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-xs">
                           <span>{formattedDate.date}</span>
-                          {!(isCashActivity(activity.activityType) && !isAssetBackedIncome) &&
+                          {!isCash &&
                             !(isIncomeActivity(activity.activityType) && !isAssetBackedIncome) &&
                             !isSplitActivity(activity.activityType) &&
                             !isFeeActivity(activity.activityType) &&
@@ -183,7 +183,7 @@ export const ActivityTableMobile = ({
                 </div>
 
                 {/* Quantity (if applicable) */}
-                {!(isCashActivity(activity.activityType) && !isAssetBackedIncome) &&
+                {!isCash &&
                   !(isIncomeActivity(activity.activityType) && !isAssetBackedIncome) &&
                   !isSplitActivity(activity.activityType) &&
                   !isFeeActivity(activity.activityType) &&

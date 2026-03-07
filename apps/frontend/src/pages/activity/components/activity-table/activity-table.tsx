@@ -227,9 +227,15 @@ export const ActivityTable = ({
             assetSymbol,
             row.original.assetId,
           );
+          const isTransfer =
+            activityType === ActivityType.TRANSFER_IN || activityType === ActivityType.TRANSFER_OUT;
+          const hasAsset = Boolean(row.original.assetId?.trim());
+          const isCash = isTransfer
+            ? !hasAsset || isCashTransfer(activityType, assetSymbol)
+            : isCashActivity(activityType) && !isAssetBackedIncome;
 
           if (
-            (isCashActivity(activityType) && !isAssetBackedIncome) ||
+            isCash ||
             (isIncomeActivity(activityType) && !isAssetBackedIncome) ||
             isSplitActivity(activityType) ||
             isFeeActivity(activityType)
