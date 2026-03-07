@@ -1,9 +1,13 @@
 import { ScrollArea } from "@wealthfolio/ui/components/ui/scroll-area";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
+import { AnimatedToggleGroup } from "@wealthfolio/ui/components/ui/animated-toggle-group";
 import { QuoteMode, type ActivityType } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { AdvancedOptionsSection } from "../forms/fields/advanced-options-section";
 import { SymbolSearch } from "../forms/fields/symbol-search";
+import { Checkbox } from "@wealthfolio/ui/components/ui/checkbox";
+import { Label } from "@wealthfolio/ui/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@wealthfolio/ui/components/ui/radio-group";
 import {
   Button,
   DatePickerInput,
@@ -48,20 +52,26 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
   const assetCurrency = watch("currency");
   const [accountSheetOpen, setAccountSheetOpen] = useState(false);
 
+  // Transfer state
+  const isTransfer = ["TRANSFER_IN", "TRANSFER_OUT"].includes(activityType);
+  const transferMode = isTransfer ? ((watch("transferMode" as any) as string) ?? "cash") : null;
+  const isExternal = isTransfer ? ((watch("isExternal" as any) as boolean) ?? false) : false;
+  const direction = isTransfer ? ((watch("direction" as any) as string) ?? "out") : null;
+  const isSecuritiesTransfer = isTransfer && transferMode === "securities";
+  const isCashTransfer = isTransfer && transferMode === "cash";
+  const [toAccountSheetOpen, setToAccountSheetOpen] = useState(false);
+
   const isFeeActivity = activityType === "FEE";
   const isTaxActivity = activityType === "TAX";
-  const needsAssetSymbol = ["BUY", "SELL", "DIVIDEND", "SPLIT"].includes(activityType);
-  const needsQuantity = ["BUY", "SELL"].includes(activityType);
-  const needsUnitPrice = ["BUY", "SELL"].includes(activityType);
-  const needsAmount = [
-    "DEPOSIT",
-    "WITHDRAWAL",
-    "TRANSFER_IN",
-    "TRANSFER_OUT",
-    "DIVIDEND",
-    "INTEREST",
-    "TAX",
-  ].includes(activityType);
+  const needsAssetSymbol =
+    ["BUY", "SELL", "DIVIDEND", "SPLIT"].includes(activityType) || isSecuritiesTransfer;
+  const needsQuantity = ["BUY", "SELL"].includes(activityType) || isSecuritiesTransfer;
+  const needsUnitPrice =
+    ["BUY", "SELL"].includes(activityType) ||
+    (isSecuritiesTransfer && isExternal && direction === "in");
+  const needsAmount =
+    ["DEPOSIT", "WITHDRAWAL", "DIVIDEND", "INTEREST", "TAX"].includes(activityType) ||
+    isCashTransfer;
   const needsFee = [
     "BUY",
     "SELL",
@@ -73,6 +83,47 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
   ].includes(activityType);
 
   const needsSplitRatio = activityType === "SPLIT";
+
+  const transferModeItems = [
+    { value: "cash" as const, label: "Cash" },
+    { value: "securities" as const, label: "Securities" },
+  ];
+
+  const handleTransferModeChange = (mode: string) => {
+    setValue("transferMode" as any, mode, { shouldValidate: false });
+    if (mode === "cash") {
+      setValue("assetId" as any, null);
+      setValue("quantity" as any, null);
+      setValue("unitPrice" as any, null);
+    } else {
+      setValue("amount" as any, null);
+    }
+  };
+
+  const handleExternalChange = (checked: boolean) => {
+    setValue("isExternal" as any, checked, { shouldValidate: false });
+    if (checked) {
+      // Copy current account to accountId for external
+      if (accountId) {
+        setValue("accountId", accountId);
+      }
+      setValue("toAccountId" as any, "");
+    } else {
+      // Internal: use accountId as fromAccountId
+      setValue("toAccountId" as any, "");
+    }
+  };
+
+  const handleDirectionChange = (value: string) => {
+    setValue("direction" as any, value, { shouldValidate: false });
+    // Update activityType based on direction
+    setValue("activityType", value === "in" ? ("TRANSFER_IN" as any) : ("TRANSFER_OUT" as any), {
+      shouldValidate: false,
+    });
+  };
+
+  // Filter destination accounts to exclude source account (for internal transfers)
+  const toAccountOptions = filteredAccounts.filter((acc) => acc.value !== accountId);
 
   const selectedAccount = filteredAccounts.find((acc) => acc.value === accountId);
   const accountCurrency = selectedAccount?.currency;
@@ -103,13 +154,80 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
     <div className="flex h-full flex-col">
       <ScrollArea>
         <div className="form-mobile-spacing pb-4">
-          {/* Account */}
+          {/* Transfer Controls — shown first so user picks transfer type before accounts */}
+          {isTransfer && (
+            <>
+              {/* Cash / Securities toggle */}
+              <div className="flex justify-center">
+                <AnimatedToggleGroup
+                  items={transferModeItems}
+                  value={transferMode ?? "cash"}
+                  onValueChange={handleTransferModeChange}
+                  size="sm"
+                  rounded="lg"
+                />
+              </div>
+
+              {/* External checkbox + direction */}
+              <div className="flex items-center gap-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="isExternal"
+                    checked={isExternal}
+                    onCheckedChange={(checked) => handleExternalChange(!!checked)}
+                  />
+                  <Label htmlFor="isExternal" className="cursor-pointer text-sm font-normal">
+                    External transfer
+                  </Label>
+                </div>
+                {isExternal && (
+                  <>
+                    <span className="text-muted-foreground">|</span>
+                    <RadioGroup
+                      value={direction ?? "out"}
+                      onValueChange={handleDirectionChange}
+                      className="flex gap-3"
+                    >
+                      <div className="flex items-center space-x-1.5">
+                        <RadioGroupItem value="in" id="mobile-direction-in" />
+                        <Label
+                          htmlFor="mobile-direction-in"
+                          className="cursor-pointer text-sm font-normal"
+                        >
+                          In
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-1.5">
+                        <RadioGroupItem value="out" id="mobile-direction-out" />
+                        <Label
+                          htmlFor="mobile-direction-out"
+                          className="cursor-pointer text-sm font-normal"
+                        >
+                          Out
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Account — for transfers, label changes based on external/direction */}
           <FormField
             control={control}
             name="accountId"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-base font-medium">Account</FormLabel>
+                <FormLabel className="text-base font-medium">
+                  {isTransfer && isExternal
+                    ? direction === "in"
+                      ? "To Account"
+                      : "From Account"
+                    : isTransfer && !isExternal
+                      ? "From Account"
+                      : "Account"}
+                </FormLabel>
                 <FormControl>
                   <Button
                     variant="outline"
@@ -130,6 +248,41 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
             )}
           />
 
+          {/* To Account — internal transfers only */}
+          {isTransfer && !isExternal && (
+            <FormField
+              control={control}
+              name={"toAccountId" as any}
+              render={({ field }) => {
+                const toAccount = filteredAccounts.find((acc) => acc.value === field.value);
+                const toDisplayText = toAccount
+                  ? `${toAccount.label} (${toAccount.currency})`
+                  : "Select destination account";
+                return (
+                  <FormItem>
+                    <FormLabel className="text-base font-medium">To Account</FormLabel>
+                    <FormControl>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        size="lg"
+                        className="w-full justify-between rounded-md font-normal"
+                        onClick={() => setToAccountSheetOpen(true)}
+                        type="button"
+                      >
+                        <span className={!field.value ? "text-muted-foreground" : ""}>
+                          {toDisplayText}
+                        </span>
+                        <Icons.ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
+            />
+          )}
+
           {/* Date */}
           <FormField
             control={control}
@@ -148,6 +301,7 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
               </FormItem>
             )}
           />
+
           {/* Asset Symbol */}
           {needsAssetSymbol && (
             <SymbolSearch
@@ -165,8 +319,8 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
           )}
 
           {/* Quantity and Unit Price */}
-          {needsQuantity && needsUnitPrice && (
-            <div className="grid grid-cols-2 gap-3">
+          {needsQuantity && (
+            <div className={needsUnitPrice ? "grid grid-cols-2 gap-3" : ""}>
               <FormField
                 control={control}
                 name="quantity"
@@ -180,19 +334,23 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
                   </FormItem>
                 )}
               />
-              <FormField
-                control={control}
-                name="unitPrice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-base font-medium">Price</FormLabel>
-                    <FormControl>
-                      <MoneyInput {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {needsUnitPrice && (
+                <FormField
+                  control={control}
+                  name="unitPrice"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-base font-medium">
+                        {isSecuritiesTransfer ? "Cost Basis" : "Price"}
+                      </FormLabel>
+                      <FormControl>
+                        <MoneyInput {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
             </div>
           )}
 
@@ -307,7 +465,7 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
         </div>
       </ScrollArea>
 
-      {/* Hidden Account Sheet - Rendered outside scrollable area */}
+      {/* Hidden Account Sheets - Rendered outside scrollable area */}
       <div className="hidden">
         <MobileAccountSheet
           accounts={filteredAccounts}
@@ -327,6 +485,17 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
             setAccountSheetOpen(false);
           }}
         />
+        {isTransfer && !isExternal && (
+          <MobileAccountSheet
+            accounts={toAccountOptions}
+            open={toAccountSheetOpen}
+            onOpenChange={setToAccountSheetOpen}
+            onSelect={(accountValue) => {
+              setValue("toAccountId" as any, accountValue);
+              setToAccountSheetOpen(false);
+            }}
+          />
+        )}
       </div>
     </div>
   );

@@ -8,7 +8,7 @@ import {
 } from "@wealthfolio/ui/components/ui/table";
 import { Lot } from "@/lib/types";
 import { formatAmount } from "@wealthfolio/ui";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatQuantity } from "@/lib/utils";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { GainAmount } from "@wealthfolio/ui";
 import { GainPercent } from "@wealthfolio/ui";
@@ -31,7 +31,8 @@ export const AssetLotsTable = ({ lots, currency, marketPrice }: AssetLotsTablePr
   return (
     <Card className="mt-4">
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
+        {/* Desktop table */}
+        <div className="hidden overflow-x-auto md:block">
           <Table>
             <TableHeader className="bg-muted">
               <TableRow>
@@ -53,7 +54,7 @@ export const AssetLotsTable = ({ lots, currency, marketPrice }: AssetLotsTablePr
                 return (
                   <TableRow key={lot.id}>
                     <TableCell className="font-medium">{formatDate(lot.acquisitionDate)}</TableCell>
-                    <TableCell className="text-right">{lot.quantity.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{formatQuantity(lot.quantity)}</TableCell>
                     <TableCell className="text-right">
                       {formatAmount(lot.acquisitionPrice, currency)}
                     </TableCell>
@@ -81,6 +82,51 @@ export const AssetLotsTable = ({ lots, currency, marketPrice }: AssetLotsTablePr
               })}
             </TableBody>
           </Table>
+        </div>
+
+        {/* Mobile card list */}
+        <div className="divide-y md:hidden">
+          {sortedLots.map((lot) => {
+            const marketValue = lot.quantity * marketPrice;
+            const gainLossAmount = marketValue - lot.costBasis;
+            const gainLossPercent = lot.costBasis !== 0 ? gainLossAmount / lot.costBasis : 0;
+
+            return (
+              <div key={lot.id} className="space-y-2 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">{formatDate(lot.acquisitionDate)}</span>
+                  <div className="flex items-center space-x-2">
+                    <GainAmount
+                      value={gainLossAmount}
+                      currency={currency}
+                      displayCurrency={false}
+                    />
+                    <GainPercent value={gainLossPercent} variant="badge" />
+                  </div>
+                </div>
+                <div className="text-muted-foreground grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                  <span>Quantity</span>
+                  <span className="text-foreground text-right">{formatQuantity(lot.quantity)}</span>
+                  <span>Acq. Price</span>
+                  <span className="text-foreground text-right">
+                    {formatAmount(lot.acquisitionPrice, currency)}
+                  </span>
+                  <span>Fees</span>
+                  <span className="text-foreground text-right">
+                    {formatAmount(lot.acquisitionFees, currency)}
+                  </span>
+                  <span>Cost Basis</span>
+                  <span className="text-foreground text-right">
+                    {formatAmount(lot.costBasis, currency)}
+                  </span>
+                  <span>Market Value</span>
+                  <span className="text-foreground text-right">
+                    {formatAmount(marketValue, currency)}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </CardContent>
     </Card>

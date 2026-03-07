@@ -27,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@wealthfolio/ui/components/ui/select";
-import { useCallback, useEffect } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -128,19 +128,16 @@ export function CreateCustomAssetDialog({
     form.reset();
   };
 
-  const handleCreateClick = useCallback(() => {
+  const handleCreateClick = () => {
     void form.handleSubmit(handleSubmit)();
-  }, [form]);
+  };
 
-  const handleDialogKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLDivElement>) => {
-      if (e.key !== "Enter") return;
-      if ((e.target as HTMLElement).tagName === "TEXTAREA") return;
-      e.preventDefault();
-      void form.handleSubmit(handleSubmit)();
-    },
-    [form],
-  );
+  const handleDialogKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "Enter") return;
+    if ((e.target as HTMLElement).tagName === "TEXTAREA") return;
+    e.preventDefault();
+    void form.handleSubmit(handleSubmit)();
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

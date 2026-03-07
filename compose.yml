@@ -21,9 +21,11 @@ services:
       # Required — generate with: openssl rand -base64 32
       WF_SECRET_KEY: "${WF_SECRET_KEY:?Set WF_SECRET_KEY}"
       # Recommended for internet-facing deployments (Argon2id PHC hash)
+      # Set in .env (no quotes needed) or shell. If inlining in YAML, double every $: '$$argon2id$$...'
       WF_AUTH_PASSWORD_HASH: "${WF_AUTH_PASSWORD_HASH:-}"
       WF_AUTH_TOKEN_TTL_MINUTES: "${WF_AUTH_TOKEN_TTL_MINUTES:-60}"
-      WF_CORS_ALLOW_ORIGINS: "${WF_CORS_ALLOW_ORIGINS:-*}"
+      # Required when auth is enabled — set to your app's origin, e.g. https://wealthfolio.example.com
+      WF_CORS_ALLOW_ORIGINS: "${WF_CORS_ALLOW_ORIGINS}"
       WF_REQUEST_TIMEOUT_MS: "${WF_REQUEST_TIMEOUT_MS:-30000}"
     healthcheck:
       test:

@@ -4897,4 +4897,246 @@ mod tests {
             "Test helper should create active accounts"
         );
     }
+
+    // ==================== LOT-LEVEL TRANSFER ORDERING TESTS ====================
+
+    /// Integration test: internal security transfer between two accounts preserves
+    /// cost basis via lot-level transfer. This exercises the snapshot service's
+    /// account ordering (topological sort) to ensure TRANSFER_OUT is processed
+    /// before TRANSFER_IN regardless of HashMap iteration order.
+    #[tokio::test]
+    async fn test_internal_transfer_preserves_cost_basis_via_snapshot_service() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc_a = create_test_account("acc_a", "USD", "Account A");
+        let acc_b = create_test_account("acc_b", "USD", "Account B");
+        account_repo.add_account(acc_a.clone());
+        account_repo.add_account(acc_b.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+
+        // Day 1: Buy 10 AAPL @ $100 in Account A
+        let buy = create_test_activity(
+            "buy1",
+            "acc_a",
+            Some("AAPL"),
+            "BUY",
+            d1,
+            Some(dec!(10)),
+            Some(dec!(100)),
+            Some(dec!(1000)),
+            "USD",
+        );
+
+        // Day 2: Transfer 10 AAPL from A to B (paired via source_group_id)
+        let mut xfer_out = create_test_activity(
+            "xfer_out",
+            "acc_a",
+            Some("AAPL"),
+            "TRANSFER_OUT",
+            d2,
+            Some(dec!(10)),
+            None,
+            None,
+            "USD",
+        );
+        xfer_out.source_group_id = Some("grp_test".to_string());
+
+        let mut xfer_in = create_test_activity(
+            "xfer_in",
+            "acc_b",
+            Some("AAPL"),
+            "TRANSFER_IN",
+            d2,
+            Some(dec!(10)),
+            None,
+            None,
+            "USD",
+        );
+        xfer_in.source_group_id = Some("grp_test".to_string());
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![
+            buy, xfer_out, xfer_in,
+        ]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        svc.recalculate_holdings_snapshots(None, SnapshotRecalcMode::Full)
+            .await
+            .unwrap();
+
+        // Find Account B's final snapshot (latest date)
+        let acc_b_snaps = snapshot_repo
+            .get_snapshots_by_account("acc_b", None, None)
+            .unwrap();
+        let acc_b_snap = acc_b_snaps
+            .iter()
+            .max_by_key(|s| s.snapshot_date)
+            .expect("Account B should have a snapshot");
+
+        let pos = acc_b_snap
+            .positions
+            .get("AAPL")
+            .expect("Account B should have AAPL position after transfer");
+
+        assert_eq!(pos.quantity, dec!(10), "Should have 10 shares");
+        // Cost basis must be preserved from the original buy: 10 * $100 = $1000
+        // If ordering were wrong, this would be 0 (fallback with no unit_price)
+        assert_eq!(
+            pos.total_cost_basis,
+            dec!(1000),
+            "Cost basis must be preserved from original buy, not zero"
+        );
+
+        // Account A should have no position
+        let acc_a_snaps = snapshot_repo
+            .get_snapshots_by_account("acc_a", None, None)
+            .unwrap();
+        let acc_a_snap = acc_a_snaps
+            .iter()
+            .max_by_key(|s| s.snapshot_date)
+            .expect("Account A should have a snapshot");
+
+        let pos_a = acc_a_snap.positions.get("AAPL");
+        assert!(
+            pos_a.is_none() || pos_a.unwrap().quantity == dec!(0),
+            "Account A should have 0 AAPL after transfer out"
+        );
+    }
+
+    /// Integration test for transfer chain: A→B→C on the same day.
+    /// Tests that the topological sort handles multi-hop dependencies.
+    #[tokio::test]
+    async fn test_transfer_chain_a_to_b_to_c_same_day() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc_a = create_test_account("acc_a", "USD", "Account A");
+        let acc_b = create_test_account("acc_b", "USD", "Account B");
+        let acc_c = create_test_account("acc_c", "USD", "Account C");
+        account_repo.add_account(acc_a.clone());
+        account_repo.add_account(acc_b.clone());
+        account_repo.add_account(acc_c.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+
+        // Day 1: Buy 10 AAPL @ $50 in Account A
+        let buy = create_test_activity(
+            "buy1",
+            "acc_a",
+            Some("AAPL"),
+            "BUY",
+            d1,
+            Some(dec!(10)),
+            Some(dec!(50)),
+            Some(dec!(500)),
+            "USD",
+        );
+
+        // Day 2: A→B (grp1), then B→C (grp2), all same day
+        let mut xfer_out_a = create_test_activity(
+            "xo_a",
+            "acc_a",
+            Some("AAPL"),
+            "TRANSFER_OUT",
+            d2,
+            Some(dec!(10)),
+            None,
+            None,
+            "USD",
+        );
+        xfer_out_a.source_group_id = Some("grp1".to_string());
+
+        let mut xfer_in_b = create_test_activity(
+            "xi_b",
+            "acc_b",
+            Some("AAPL"),
+            "TRANSFER_IN",
+            d2,
+            Some(dec!(10)),
+            None,
+            None,
+            "USD",
+        );
+        xfer_in_b.source_group_id = Some("grp1".to_string());
+
+        let mut xfer_out_b = create_test_activity(
+            "xo_b",
+            "acc_b",
+            Some("AAPL"),
+            "TRANSFER_OUT",
+            d2,
+            Some(dec!(10)),
+            None,
+            None,
+            "USD",
+        );
+        xfer_out_b.source_group_id = Some("grp2".to_string());
+
+        let mut xfer_in_c = create_test_activity(
+            "xi_c",
+            "acc_c",
+            Some("AAPL"),
+            "TRANSFER_IN",
+            d2,
+            Some(dec!(10)),
+            None,
+            None,
+            "USD",
+        );
+        xfer_in_c.source_group_id = Some("grp2".to_string());
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![
+            buy, xfer_out_a, xfer_in_b, xfer_out_b, xfer_in_c,
+        ]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        svc.recalculate_holdings_snapshots(None, SnapshotRecalcMode::Full)
+            .await
+            .unwrap();
+
+        // Account C should end up with the original cost basis
+        let acc_c_snaps = snapshot_repo
+            .get_snapshots_by_account("acc_c", None, None)
+            .unwrap();
+        let acc_c_snap = acc_c_snaps
+            .iter()
+            .max_by_key(|s| s.snapshot_date)
+            .expect("Account C should have a snapshot");
+
+        let pos_c = acc_c_snap
+            .positions
+            .get("AAPL")
+            .expect("Account C should have AAPL");
+        assert_eq!(pos_c.quantity, dec!(10));
+        assert_eq!(
+            pos_c.total_cost_basis,
+            dec!(500),
+            "Cost basis must carry through A→B→C chain: 10 * $50 = $500"
+        );
+    }
 }

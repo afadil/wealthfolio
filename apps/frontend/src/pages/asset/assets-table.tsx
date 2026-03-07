@@ -34,6 +34,7 @@ import { isStaleQuote, ParsedAsset } from "./asset-utils";
 interface AssetsTableProps {
   assets: ParsedAsset[];
   latestQuotes?: Record<string, LatestQuoteSnapshot>;
+  heldAssetIds: Set<string>;
   isLoading?: boolean;
   onEdit: (asset: ParsedAsset) => void;
   onDelete: (asset: ParsedAsset) => void;
@@ -48,9 +49,15 @@ const PRICE_STALE_OPTIONS = [
   { label: "Stale", value: "true" },
 ];
 
+const HOLDING_STATUS_OPTIONS = [
+  { label: "Current", value: "true" },
+  { label: "Past", value: "false" },
+];
+
 export function AssetsTable({
   assets,
   latestQuotes = {},
+  heldAssetIds,
   isLoading,
   onEdit,
   onDelete,
@@ -153,6 +160,17 @@ export function AssetsTable({
       },
       {
         accessorKey: "isStale",
+        header: () => null,
+        cell: () => null,
+        enableHiding: false,
+        filterFn: (row, id, value) => {
+          const filterValue = value as string[];
+          const cellValue = row.getValue(id);
+          return filterValue.includes(cellValue as string);
+        },
+      },
+      {
+        accessorKey: "holdingStatus",
         header: () => null,
         cell: () => null,
         enableHiding: false,
@@ -289,6 +307,11 @@ export function AssetsTable({
   const filters: DataTableFacetedFilterProps<ParsedAsset, unknown>[] = useMemo(
     () => [
       {
+        id: "holdingStatus",
+        title: "Portfolio",
+        options: HOLDING_STATUS_OPTIONS,
+      },
+      {
         id: "kind",
         title: "Kind",
         options: kindOptions,
@@ -313,8 +336,9 @@ export function AssetsTable({
       assets.map((asset) => ({
         ...asset,
         isStale: isStaleQuote(latestQuotes[asset.id], asset) ? "true" : "false",
+        holdingStatus: heldAssetIds.has(asset.id) ? "true" : "false",
       })),
-    [assets, latestQuotes],
+    [assets, latestQuotes, heldAssetIds],
   );
 
   if (isLoading) {
@@ -380,12 +404,14 @@ export function AssetsTable({
       defaultColumnVisibility={{
         quoteCcy: false,
         isStale: false,
+        holdingStatus: false,
         assetSubClass: false,
         quoteMode: false,
         kind: false,
       }}
+      defaultColumnFilters={[{ id: "holdingStatus", value: ["true"] }]}
       defaultSorting={[{ id: "symbol", desc: false }]}
-      storageKey="securities-table-v2"
+      storageKey="securities-table-v5"
       scrollable
     />
   );

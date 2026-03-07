@@ -175,6 +175,7 @@ export const COMMANDS: CommandMap = {
   store_sync_session: { method: "POST", path: "/connect/session" },
   clear_sync_session: { method: "DELETE", path: "/connect/session" },
   get_sync_session_status: { method: "GET", path: "/connect/session/status" },
+  restore_sync_session: { method: "GET", path: "/connect/session/restore" },
   list_broker_connections: { method: "GET", path: "/connect/connections" },
   list_broker_accounts: { method: "GET", path: "/connect/accounts" },
   sync_broker_data: { method: "POST", path: "/connect/sync" },
@@ -463,15 +464,17 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     }
     case "check_update": {
-      const { currentVersion, target, arch } = (payload ?? {}) as {
+      const { currentVersion, target, arch, force } = (payload ?? {}) as {
         currentVersion?: string;
         target?: string;
         arch?: string;
+        force?: boolean;
       };
       const params = new URLSearchParams();
       if (currentVersion) params.set("currentVersion", currentVersion);
       if (target) params.set("target", target);
       if (arch) params.set("arch", arch);
+      if (force) params.set("force", "true");
       const qs = params.toString();
       if (qs) url += `?${qs}`;
       break;
@@ -1021,6 +1024,7 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "rotate_team_keys":
     case "clear_sync_session":
     case "get_sync_session_status":
+    case "restore_sync_session":
     case "list_broker_connections":
     case "list_broker_accounts":
     case "sync_broker_data":
@@ -1107,12 +1111,14 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     }
     case "update_alternative_asset_metadata": {
-      const { assetId, metadata } = payload as {
+      const { assetId, metadata, name, notes } = payload as {
         assetId: string;
         metadata: Record<string, string>;
+        name?: string;
+        notes?: string | null;
       };
       url += `/${encodeURIComponent(assetId)}/metadata`;
-      body = JSON.stringify(metadata);
+      body = JSON.stringify({ metadata, name, notes });
       break;
     }
     case "get_alternative_holdings":
@@ -1225,6 +1231,7 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     method: config.method,
     headers,
     body,
+    credentials: "same-origin",
   });
 
   // Only notify unauthorized for app auth failures, not for connect cloud token issues
@@ -1259,6 +1266,7 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     "store_sync_session",
     "clear_sync_session",
     "get_sync_session_status",
+    "restore_sync_session",
   ];
   if (res.status === 401 && !connectCommands.includes(command)) {
     notifyUnauthorized();

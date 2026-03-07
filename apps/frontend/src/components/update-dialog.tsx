@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { isDesktop, openUrlInBrowser } from "@/adapters";
 import { Button } from "@wealthfolio/ui/components/ui/button";
@@ -10,8 +10,26 @@ import {
   CarouselPrevious,
 } from "@wealthfolio/ui/components/ui/carousel";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
-import { useCheckUpdateOnStartup, useClearUpdate, useInstallUpdate } from "@/hooks/use-updater";
+import {
+  useCheckUpdateOnStartup,
+  useClearUpdate,
+  useInstallUpdate,
+  UPDATE_DISMISSED_KEY,
+} from "@/hooks/use-updater";
 import { Icons } from "@wealthfolio/ui";
+import { usePersistentState } from "@wealthfolio/ui/hooks/use-persistent-state";
+
+interface DismissedUpdate {
+  version: string;
+  dismissedAt: number;
+}
+
+const SNOOZE_DURATION_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
+
+function isDismissed(dismissed: DismissedUpdate | null, version: string): boolean {
+  if (!dismissed || dismissed.version !== version) return false;
+  return Date.now() - dismissed.dismissedAt < SNOOZE_DURATION_MS;
+}
 
 function formatReleaseDate(pubDate?: string) {
   if (!pubDate) {
@@ -36,32 +54,46 @@ export function UpdateDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const installMutation = useInstallUpdate();
   const isDesktopEnv = isDesktop;
+  const [dismissedUpdate, setDismissedUpdate] = usePersistentState<DismissedUpdate | null>(
+    UPDATE_DISMISSED_KEY,
+    null,
+  );
 
   const screenshots = updateInfo?.screenshots ?? [];
 
   useEffect(() => {
-    if (updateInfo) {
+    if (updateInfo && !isDismissed(dismissedUpdate, updateInfo.latestVersion)) {
       setIsOpen(true);
     }
-  }, [updateInfo]);
+  }, [updateInfo, dismissedUpdate]);
+
+  // X button, Escape, backdrop — dismiss for current session only
+  const handleDismiss = useCallback(() => {
+    if (installMutation.isPending) return;
+    setIsOpen(false);
+    clearUpdate();
+  }, [installMutation.isPending, clearUpdate]);
+
+  // "Remind me later" — snooze for 3 days
+  const handleSnooze = useCallback(() => {
+    if (installMutation.isPending) return;
+    if (updateInfo?.latestVersion) {
+      setDismissedUpdate({ version: updateInfo.latestVersion, dismissedAt: Date.now() });
+    }
+    setIsOpen(false);
+    clearUpdate();
+  }, [installMutation.isPending, updateInfo?.latestVersion, setDismissedUpdate, clearUpdate]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen || installMutation.isPending) return;
       if (e.key === "Escape") {
-        setIsOpen(false);
-        clearUpdate();
+        handleDismiss();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, installMutation.isPending, clearUpdate]);
-
-  const handleClose = () => {
-    if (installMutation.isPending) return;
-    setIsOpen(false);
-    clearUpdate();
-  };
+  }, [isOpen, installMutation.isPending, handleDismiss]);
 
   const handleInstall = () => {
     // Close dialog - backend will handle everything with native dialogs
@@ -109,7 +141,7 @@ export function UpdateDialog() {
       {/* Backdrop */}
       <div
         className="bg-background/80 animate-in fade-in absolute inset-0 backdrop-blur-sm duration-300"
-        onClick={handleClose}
+        onClick={handleDismiss}
       />
 
       {/* Dialog */}
@@ -119,7 +151,7 @@ export function UpdateDialog() {
           {/* Header */}
           <div className="relative px-6 pb-4 pt-6">
             <button
-              onClick={handleClose}
+              onClick={handleDismiss}
               className="bg-secondary/50 text-muted-foreground hover:bg-secondary hover:text-foreground absolute right-4 top-4 rounded-full p-2 transition-all duration-200 hover:scale-105"
               aria-label="Close dialog"
             >
@@ -179,7 +211,7 @@ export function UpdateDialog() {
 
         {/* Footer actions */}
         <div className="border-border bg-secondary/30 flex shrink-0 items-center justify-between gap-4 border-t px-6 py-4">
-          <Button variant="ghost" onClick={handleClose}>
+          <Button variant="ghost" onClick={handleSnooze}>
             Remind me later
           </Button>
           <div className="flex items-center gap-3">

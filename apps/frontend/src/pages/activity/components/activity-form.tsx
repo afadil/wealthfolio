@@ -70,7 +70,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent className="flex flex-col overflow-hidden sm:max-w-[625px]">
+      <SheetContent className="flex w-full flex-col overflow-hidden sm:max-w-[625px]">
         <SheetHeader>
           <SheetTitle>{isEditing ? "Update Activity" : "Add Activity"}</SheetTitle>
           <SheetDescription>

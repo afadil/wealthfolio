@@ -1,4 +1,10 @@
-use std::{collections::HashMap, path::Path as StdPath, sync::Arc};
+use std::{
+    collections::HashMap,
+    path::Path as StdPath,
+    sync::Arc,
+    time::{Duration, Instant},
+};
+use tokio::sync::Mutex;
 
 use crate::{
     api::shared::{normalize_file_path, process_portfolio_job, PortfolioJobConfig},
@@ -138,7 +144,7 @@ struct UpdateCheckResponseRaw {
     screenshots: Option<Vec<String>>,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct UpdateCheckResponse {
     update_available: bool,
@@ -149,6 +155,10 @@ struct UpdateCheckResponse {
     changelog_url: Option<String>,
     screenshots: Option<Vec<String>>,
 }
+
+static UPDATE_CACHE: std::sync::LazyLock<Mutex<Option<(Instant, UpdateCheckResponse)>>> =
+    std::sync::LazyLock::new(|| Mutex::new(None));
+const UPDATE_CACHE_TTL: Duration = Duration::from_secs(60 * 60); // 1 hour
 
 fn normalize_target(target: Option<String>) -> String {
     match target
@@ -178,7 +188,26 @@ fn normalize_arch(arch: Option<String>) -> String {
     }
 }
 
-async fn check_update(State(state): State<Arc<AppState>>) -> ApiResult<Json<UpdateCheckResponse>> {
+#[derive(Deserialize)]
+struct CheckUpdateQuery {
+    #[serde(default)]
+    force: bool,
+}
+
+async fn check_update(
+    State(state): State<Arc<AppState>>,
+    axum::extract::Query(query): axum::extract::Query<CheckUpdateQuery>,
+) -> ApiResult<Json<UpdateCheckResponse>> {
+    // Return cached response if still fresh (unless force refresh requested)
+    if !query.force {
+        let cache = UPDATE_CACHE.lock().await;
+        if let Some((cached_at, ref response)) = *cache {
+            if cached_at.elapsed() < UPDATE_CACHE_TTL {
+                return Ok(Json(response.clone()));
+            }
+        }
+    }
+
     let current_version_str = env!("CARGO_PKG_VERSION").to_string();
     let target = normalize_target(None);
     let arch = normalize_arch(None);
@@ -196,8 +225,8 @@ async fn check_update(State(state): State<Arc<AppState>>) -> ApiResult<Json<Upda
         .await
         .map_err(|e| anyhow::anyhow!("Failed to query update endpoint: {e}"))?;
 
-    if response.status() == HttpStatusCode::NOT_FOUND {
-        return Ok(Json(UpdateCheckResponse {
+    let result = if response.status() == HttpStatusCode::NOT_FOUND {
+        UpdateCheckResponse {
             update_available: false,
             latest_version: current_version_str,
             notes: None,
@@ -205,35 +234,43 @@ async fn check_update(State(state): State<Arc<AppState>>) -> ApiResult<Json<Upda
             download_url: None,
             changelog_url: None,
             screenshots: None,
-        }));
+        }
+    } else {
+        let payload: UpdateCheckResponseRaw = response
+            .json()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to parse update response: {e}"))?;
+
+        let current_version =
+            Version::parse(&current_version_str).unwrap_or_else(|_| Version::new(0, 0, 0));
+        let latest_version =
+            Version::parse(&payload.version).unwrap_or_else(|_| current_version.clone());
+        let update_available = latest_version > current_version;
+
+        let platform_key = format!("{}-{}", target, arch);
+        let download_url = payload
+            .platforms
+            .get(&platform_key)
+            .and_then(|p| p.url.clone());
+
+        UpdateCheckResponse {
+            update_available,
+            latest_version: payload.version,
+            notes: payload.notes,
+            pub_date: payload.pub_date,
+            download_url,
+            changelog_url: payload.changelog_url,
+            screenshots: payload.screenshots,
+        }
+    };
+
+    // Cache the response
+    {
+        let mut cache = UPDATE_CACHE.lock().await;
+        *cache = Some((Instant::now(), result.clone()));
     }
 
-    let payload: UpdateCheckResponseRaw = response
-        .json()
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to parse update response: {e}"))?;
-
-    let current_version =
-        Version::parse(&current_version_str).unwrap_or_else(|_| Version::new(0, 0, 0));
-    let latest_version =
-        Version::parse(&payload.version).unwrap_or_else(|_| current_version.clone());
-    let update_available = latest_version > current_version;
-
-    let platform_key = format!("{}-{}", target, arch);
-    let download_url = payload
-        .platforms
-        .get(&platform_key)
-        .and_then(|p| p.url.clone());
-
-    Ok(Json(UpdateCheckResponse {
-        update_available,
-        latest_version: payload.version,
-        notes: payload.notes,
-        pub_date: payload.pub_date,
-        download_url,
-        changelog_url: payload.changelog_url,
-        screenshots: payload.screenshots,
-    }))
+    Ok(Json(result))
 }
 
 #[derive(serde::Serialize)]

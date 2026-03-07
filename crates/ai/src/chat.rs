@@ -477,7 +477,7 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
             If the user asks for any of that personal portfolio data, your first sentence MUST \
             start with: \"I don't have access to your ...\" (for example: \
             \"I don't have access to your holdings with the current model.\").\n\
-            Then suggest switching to a model that supports tools (look for the wrench icon in \
+            Then suggest switching to a model that supports tools (look for the gear icon in \
             the model picker). Never guess, fabricate, or imply you retrieved that data.",
         );
     }
@@ -910,7 +910,8 @@ fn create_ollama_client(
 ) -> Result<ollama::Client<HttpClient>, AiError> {
     let mut builder = ollama::Client::builder().api_key(Nothing);
     if let Some(url) = provider_url {
-        builder = builder.base_url(&url);
+        let normalized = url.trim_end_matches('/').trim_end_matches("/v1");
+        builder = builder.base_url(normalized);
     }
     builder
         .build()

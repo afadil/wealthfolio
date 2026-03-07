@@ -232,18 +232,20 @@ All configuration is done via environment variables in `.env.web`.
 - `WF_DB_PATH` - SQLite database path or directory (default: `./db/app.db`)
   - If a directory is provided, `app.db` will be used inside it
 - `WF_CORS_ALLOW_ORIGINS` - Comma-separated list of allowed CORS origins
-  (default: `*`)
-  - Example: `http://localhost:1420,http://localhost:3000`
+  (default: `*`). **Required when auth is enabled** — wildcard `*` is rejected.
+  - Example: `https://wealthfolio.example.com`
 - `WF_REQUEST_TIMEOUT_MS` - Request timeout in milliseconds (default: `30000`)
 - `WF_STATIC_DIR` - Directory for serving static frontend assets (default:
   `dist`)
 - `WF_SECRET_KEY` - **Required** 32-byte key used for secrets encryption and JWT
   signing
+  - Generate with: `openssl rand -base64 32`
 - `WF_AUTH_PASSWORD_HASH` - Argon2id PHC string enabling password-only
   authentication for web mode
 - `WF_AUTH_TOKEN_TTL_MINUTES` - Optional JWT access token expiry in minutes
   (default `60`)
-  - Generate with: `openssl rand -base64 32`
+- `WF_AUTH_REQUIRED` - Set to `false` to allow starting on non-loopback
+  addresses without authentication (e.g. when a reverse proxy handles auth)
 - `WF_SECRET_FILE` - **Optional** path to secrets storage file (default:
   `<data-root>/secrets.json`)
 - `WF_ADDONS_DIR` - **Optional** path to addons directory (default: derived from
@@ -260,11 +262,18 @@ All configuration is done via environment variables in `.env.web`.
   before accessing the Web App.
 
   You can generate the hash with online tools like
-  [argon2.online](argon2.online) or the following command:
+  [argon2.online](https://argon2.online) or the CLI (`argon2-utils` package):
 
   ```bash
-  argon2 "your-password" -id -e
+  printf 'your-password' | argon2 yoursalt16chars! -id -e
   ```
+
+  > **Tips:**
+  >
+  > - The first argument is the **salt** (use 16+ characters); the password is
+  >   read from stdin.
+  > - Use `printf` instead of `echo -n` to avoid hidden newline issues.
+  > - For Docker Compose, double every `$` in the hash (`$$argon2id$$...`).
 
   Copy the full output (starting with `$argon2id$...`) into `.env.web`.
 
@@ -347,7 +356,7 @@ cat > .env.docker << 'EOF'
 WF_LISTEN_ADDR=0.0.0.0:8088
 WF_DB_PATH=/data/wealthfolio.db
 WF_SECRET_KEY=<generate-with-openssl-rand>
-WF_CORS_ALLOW_ORIGINS=*
+WF_CORS_ALLOW_ORIGINS=https://wealthfolio.example.com
 WF_REQUEST_TIMEOUT_MS=30000
 WF_STATIC_DIR=dist
 EOF

@@ -4,12 +4,14 @@ import {
   updateAiProviderSettings,
   setDefaultAiProvider,
   listAiModels,
+  logger,
   setSecret,
   getSecret,
   deleteSecret,
 } from "@/adapters";
 import type { UpdateProviderSettingsRequest, SetDefaultProviderRequest } from "@/lib/types";
 import { QueryKeys } from "@/lib/query-keys";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 
 const AI_PROVIDERS_KEY = [QueryKeys.AI_PROVIDERS] as const;
 
@@ -65,6 +67,19 @@ export function useAiProviderApiKey(providerId: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: AI_PROVIDERS_KEY });
+      toast({
+        title: "API key saved",
+        variant: "success",
+        duration: 1500,
+      });
+    },
+    onError: (error) => {
+      logger.error(`Failed to save API key for ${providerId}: ${error}`);
+      toast({
+        title: "Failed to save API key",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
     },
   });
 
@@ -74,6 +89,19 @@ export function useAiProviderApiKey(providerId: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: AI_PROVIDERS_KEY });
+      toast({
+        title: "API key deleted",
+        variant: "success",
+        duration: 1500,
+      });
+    },
+    onError: (error) => {
+      logger.error(`Failed to delete API key for ${providerId}: ${error}`);
+      toast({
+        title: "Failed to delete API key",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
     },
   });
 

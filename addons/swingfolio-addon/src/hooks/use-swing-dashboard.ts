@@ -133,12 +133,9 @@ export function useSwingDashboard(ctx: AddonContext, period: PeriodType) {
       // Calculate distribution for the selected period (historical analysis)
       const distribution = historicalCalculator.calculateDistribution(fxRateMap);
 
-      // Generate calendar data for current year (can be period-filtered)
-      const calendarCalculator =
-        period === "ALL"
-          ? new PerformanceCalculator(closedTrades) // All trades for 'ALL' period
-          : historicalCalculator; // Period-filtered for specific periods
-
+      // Generate calendar data from ALL closed trades — the calendar component
+      // handles year filtering internally via selectedYear navigation
+      const calendarCalculator = new PerformanceCalculator(closedTrades);
       const calendar = calendarCalculator.calculateCalendar(fxRateMap);
 
       // Calculate equity curve for the selected period (historical performance)

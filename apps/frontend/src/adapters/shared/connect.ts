@@ -234,6 +234,13 @@ export const confirmPairing = async (
 // Wealthfolio Connect Auth Commands
 // ============================================================================
 
+export const restoreSyncSession = async (): Promise<{
+  accessToken: string;
+  refreshToken: string;
+}> => {
+  return invoke<{ accessToken: string; refreshToken: string }>("restore_sync_session");
+};
+
 export const storeSyncSession = async (
   refreshToken: string,
   accessToken?: string,

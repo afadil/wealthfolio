@@ -2,6 +2,7 @@ import { logger } from "@/adapters";
 import { type ClassValue, clsx } from "clsx";
 import { format, isValid, parse, parseISO } from "date-fns";
 import { twMerge } from "tailwind-merge";
+import { DECIMAL_PRECISION, DISPLAY_DECIMAL_PRECISION } from "./constants";
 import { AccountValuation } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
@@ -246,8 +247,8 @@ export function formatDateTimeDisplay(date: Date | string | undefined): string {
   return format(value, "yyyy/MM/dd HH:mm");
 }
 const DECIMAL_FORMAT_OPTIONS: Intl.NumberFormatOptions = {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
+  minimumFractionDigits: DISPLAY_DECIMAL_PRECISION,
+  maximumFractionDigits: DISPLAY_DECIMAL_PRECISION,
 };
 
 const decimalFormatter = new Intl.NumberFormat("en-US", DECIMAL_FORMAT_OPTIONS);
@@ -426,7 +427,7 @@ export function calculatePerformanceMetrics(
  * @param precision The number of decimal places (default: 6)
  * @returns The rounded number, or 0 if the value is not finite
  */
-export function roundDecimal(value: number, precision = 6): number {
+export function roundDecimal(value: number, precision = DECIMAL_PRECISION): number {
   if (!Number.isFinite(value)) {
     return 0;
   }
@@ -440,7 +441,7 @@ export function roundDecimal(value: number, precision = 6): number {
  * @param precision The number of decimal places (default: 6)
  * @returns The parsed and rounded number, or 0 if parsing fails
  */
-export function parseDecimalInput(value: string | number, precision = 6): number {
+export function parseDecimalInput(value: string | number, precision = DECIMAL_PRECISION): number {
   const parsed =
     typeof value === "number" ? value : typeof value === "string" ? Number.parseFloat(value) : NaN;
   return Number.isFinite(parsed) ? roundDecimal(parsed, precision) : 0;
@@ -500,7 +501,7 @@ export function toFiniteNumberOrUndefined(value: unknown): number | undefined {
  * @param precision The number of decimal places (default: 6)
  * @returns A rounded number if valid, undefined otherwise
  */
-export function toPayloadNumber(value: unknown, precision = 6): number | undefined {
+export function toPayloadNumber(value: unknown, precision = DECIMAL_PRECISION): number | undefined {
   const parsed = toFiniteNumberOrUndefined(value);
   if (parsed === undefined) {
     return undefined;

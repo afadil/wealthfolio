@@ -28,13 +28,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [requiresAuth, setRequiresAuth] = useState(false);
   const [statusLoading, setStatusLoading] = useState(isWeb);
   const [token, setToken] = useState<string | null>(() => getAuthToken());
+  const [cookieSession, setCookieSession] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const tokenRef = useRef<string | null>(null);
+  const cookieSessionRef = useRef(false);
 
   useEffect(() => {
     tokenRef.current = token;
   }, [token]);
+
+  useEffect(() => {
+    cookieSessionRef.current = cookieSession;
+  }, [cookieSession]);
 
   useEffect(() => {
     if (!isWeb) {
@@ -44,13 +50,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     const loadStatus = async () => {
       try {
-        const response = await fetch("/api/v1/auth/status");
+        const response = await fetch("/api/v1/auth/status", {
+          credentials: "same-origin",
+        });
         if (!response.ok) {
           throw new Error(`Failed to check authentication status: ${response.status}`);
         }
         const data = (await response.json()) as { requiresPassword: boolean };
-        if (!cancelled) {
-          setRequiresAuth(Boolean(data?.requiresPassword));
+        if (cancelled) return;
+        const needsAuth = Boolean(data?.requiresPassword);
+        setRequiresAuth(needsAuth);
+
+        // If auth is required, check if we have a valid cookie session
+        if (needsAuth) {
+          try {
+            const meRes = await fetch("/api/v1/auth/me", {
+              credentials: "same-origin",
+            });
+            if (meRes.ok && !cancelled) {
+              setCookieSession(true);
+            }
+          } catch {
+            // No valid session, user will need to log in
+          }
         }
       } catch (error) {
         console.error("Failed to load authentication status", error);
@@ -72,10 +94,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const handler = () => {
-      const hadToken = Boolean(tokenRef.current);
+      const hadSession = Boolean(tokenRef.current) || cookieSessionRef.current;
       setToken(null);
       setAuthToken(null);
-      if (hadToken) {
+      setCookieSession(false);
+      if (hadSession) {
         setLoginError("Session expired. Please sign in again.");
       }
     };
@@ -93,6 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
+        credentials: "same-origin",
       });
       if (!response.ok) {
         if (response.status === 404) {
@@ -127,8 +151,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    // Clear server-side cookie session
+    if (isWeb) {
+      fetch("/api/v1/auth/logout", {
+        method: "POST",
+        credentials: "same-origin",
+      }).catch(() => {});
+    }
     setToken(null);
     setAuthToken(null);
+    setCookieSession(false);
     setLoginError(null);
   }, []);
 
@@ -137,7 +169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       requiresAuth,
-      isAuthenticated: !requiresAuth || Boolean(token),
+      isAuthenticated: !requiresAuth || Boolean(token) || cookieSession,
       statusLoading,
       loginLoading,
       loginError,
@@ -145,7 +177,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout,
       clearError,
     }),
-    [requiresAuth, token, statusLoading, loginLoading, loginError, login, logout, clearError],
+    [
+      requiresAuth,
+      token,
+      cookieSession,
+      statusLoading,
+      loginLoading,
+      loginError,
+      login,
+      logout,
+      clearError,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

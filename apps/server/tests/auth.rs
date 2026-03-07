@@ -1,6 +1,9 @@
+use std::net::SocketAddr;
+
 use argon2::{password_hash::SaltString, Argon2, PasswordHasher};
 use axum::{
     body::{to_bytes, Body},
+    extract::ConnectInfo,
     http::{header, Method, Request},
 };
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
@@ -24,6 +27,7 @@ async fn build_test_router(password: &str) -> axum::Router {
     OsRng.fill_bytes(&mut secret_bytes);
     let secret_b64 = BASE64.encode(secret_bytes);
     std::env::set_var("WF_SECRET_KEY", secret_b64);
+    std::env::set_var("WF_CORS_ALLOW_ORIGINS", "http://localhost:3000");
 
     let config = Config::from_env();
     let state = build_state(&config).await.unwrap();
@@ -31,7 +35,12 @@ async fn build_test_router(password: &str) -> axum::Router {
 }
 
 fn cleanup_env() {
-    for key in ["WF_DB_PATH", "WF_AUTH_PASSWORD_HASH", "WF_SECRET_KEY"] {
+    for key in [
+        "WF_DB_PATH",
+        "WF_AUTH_PASSWORD_HASH",
+        "WF_SECRET_KEY",
+        "WF_CORS_ALLOW_ORIGINS",
+    ] {
         std::env::remove_var(key);
     }
 }
@@ -74,19 +83,30 @@ async fn login_and_access_protected_route() {
 
     // Login with correct password
     let login_body = serde_json::json!({ "password": password });
-    let login_response = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method(Method::POST)
-                .uri("/api/v1/auth/login")
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(login_body.to_string()))
-                .unwrap(),
-        )
-        .await
+    let mut login_req = Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/auth/login")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(login_body.to_string()))
         .unwrap();
+    // Governor rate-limiter needs peer IP via ConnectInfo
+    login_req
+        .extensions_mut()
+        .insert(ConnectInfo(SocketAddr::from(([127, 0, 0, 1], 0))));
+    let login_response = app.clone().oneshot(login_req).await.unwrap();
     assert_eq!(login_response.status(), 200);
+    // Verify Set-Cookie header is present with HttpOnly session cookie
+    let set_cookie = login_response
+        .headers()
+        .get(header::SET_COOKIE)
+        .expect("login should set a cookie")
+        .to_str()
+        .unwrap();
+    assert!(
+        set_cookie.contains("wf_session="),
+        "cookie should contain wf_session"
+    );
+    assert!(set_cookie.contains("HttpOnly"), "cookie should be HttpOnly");
     let login_bytes = to_bytes(login_response.into_body(), usize::MAX)
         .await
         .unwrap();

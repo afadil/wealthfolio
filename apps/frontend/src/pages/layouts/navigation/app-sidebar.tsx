@@ -1,4 +1,5 @@
 import { isWeb } from "@/adapters";
+import { isAppleDevice } from "@/lib/device-utils";
 import { useAuth } from "@/context/auth-context";
 import { cn } from "@/lib/utils";
 import {
@@ -19,9 +20,11 @@ interface AppSidebarProps {
   navigation: NavigationProps;
 }
 
+const modKey = isAppleDevice() ? "⌘" : "Ctrl";
+
 export function AppSidebar({ navigation }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(true);
-  const { logout } = useAuth();
+  const { logout, requiresAuth } = useAuth();
 
   return (
     <div
@@ -91,7 +94,7 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
                       ? "justify-center rounded-md"
                       : "bg-muted/50 hover:bg-muted/80 justify-start rounded-full px-4 shadow-none",
                   )}
-                  title="Search (⌘K)"
+                  title={`Search (${modKey}+K)`}
                 >
                   <span aria-hidden="true">
                     <Icons.Search2 className="h-5 w-5 opacity-60" />
@@ -107,7 +110,7 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
                   </span>
                   {!collapsed && (
                     <kbd className="bg-background text-muted-foreground pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border px-1.5 font-mono text-[10px] font-medium opacity-100">
-                      <span className="text-xs">⌘</span>K
+                      <span className="text-xs">{modKey}</span>K
                     </kbd>
                   )}
                 </Button>
@@ -127,7 +130,7 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
                 <NavItem key={item.title} item={item} collapsed={collapsed} />
               ))}
               <ConnectNavItem collapsed={collapsed} />
-              {isWeb && (
+              {isWeb && requiresAuth && (
                 <Button
                   type="button"
                   variant="ghost"

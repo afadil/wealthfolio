@@ -136,7 +136,8 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         .unwrap_or_else(|| data_root_path.join("secrets.json"));
     let file_store = build_secret_store(
         resolved_secret_path.clone(),
-        Some(config.secret_key.as_str()),
+        Some(config.secrets_encryption_key),
+        Some(&config.raw_secret_key),
     )
     .map_err(anyhow::Error::new)?;
     let secret_store: Arc<dyn SecretStore> = Arc::new(file_store);

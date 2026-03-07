@@ -477,6 +477,24 @@ async fn complete_pairing(
 ) -> ApiResult<Json<CompletePairingResponse>> {
     debug!("Completing pairing session: {}", pairing_id);
 
+    // Upload snapshot FIRST so it exists before the claimer receives the key bundle.
+    let upload = device_sync_engine::generate_snapshot_now(Arc::clone(&state))
+        .await
+        .map_err(|err| {
+            ApiError::Internal(format!("Failed to prepare data for new device: {}", err))
+        })?;
+    if upload.status == "uploaded" {
+        info!(
+            "[DeviceSync] Post-pairing snapshot upload completed: snapshot_id={:?}",
+            upload.snapshot_id
+        );
+    } else {
+        debug!(
+            "[DeviceSync] Post-pairing snapshot upload skipped: status={} message={}",
+            upload.status, upload.message
+        );
+    }
+
     let token = get_access_token(&state).await?;
     let device_id = get_device_id(&state)
         .ok_or_else(|| ApiError::BadRequest("No device ID configured".to_string()))?;
@@ -494,29 +512,6 @@ async fn complete_pairing(
         )
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-
-    // Generate a snapshot in the background so newly paired devices can bootstrap.
-    let snapshot_state = Arc::clone(&state);
-    tokio::spawn(async move {
-        match device_sync_engine::generate_snapshot_now(Arc::clone(&snapshot_state)).await {
-            Ok(upload) => {
-                if upload.status == "uploaded" {
-                    info!(
-                        "[DeviceSync] Post-pairing snapshot upload completed: snapshot_id={:?}",
-                        upload.snapshot_id
-                    );
-                } else {
-                    debug!(
-                        "[DeviceSync] Post-pairing snapshot upload skipped: status={} message={}",
-                        upload.status, upload.message
-                    );
-                }
-            }
-            Err(err) => {
-                warn!("[DeviceSync] Post-pairing snapshot upload failed: {}", err);
-            }
-        }
-    });
 
     // Ensure the background sync engine is running (no-op if already active).
     let engine_state = Arc::clone(&state);

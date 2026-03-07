@@ -110,7 +110,18 @@ export function createValidatedSubmit<T extends FieldValues>(
   form: UseFormReturn<T>,
   onValidSubmit: SubmitHandler<T>,
 ): (event?: BaseSyntheticEvent) => Promise<void> {
-  return form.handleSubmit(onValidSubmit, (errors) => {
+  const handler = form.handleSubmit(onValidSubmit, (errors) => {
     showValidationToast(errors, form.getValues);
   });
+
+  return async (event?: BaseSyntheticEvent) => {
+    try {
+      await handler(event);
+    } catch (err) {
+      console.error("[ActivityForm] Unhandled submit error:", err);
+      toast.error("An unexpected error occurred", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  };
 }

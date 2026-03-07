@@ -359,20 +359,28 @@ export const ACTIVITY_FORM_CONFIG: Record<
     activityType: ActivityType.INTEREST,
     getDefaults: (activity, accounts) => ({
       ...getBaseDefaults(activity, accounts),
-      amount: activity?.amount,
+      symbol: activity?.assetSymbol ?? activity?.assetId ?? null,
+      amount: activity?.amount as unknown as number | undefined,
       // Advanced options
       currency: activity?.currency,
+      fxRate: (activity?.fxRate ?? undefined) as unknown as number | undefined,
       subtype: activity?.subtype ?? null,
+      exchangeMic: activity?.exchangeMic,
     }),
     toPayload: (data) => {
       const d = data as InterestFormValues;
       return {
         accountId: d.accountId,
         activityDate: d.activityDate,
+        assetId: d.symbol?.trim() || undefined,
         amount: d.amount,
         comment: d.comment,
         subtype: d.subtype,
         currency: d.currency,
+        fxRate: d.fxRate,
+        exchangeMic: d.exchangeMic ?? undefined,
+        symbolQuoteCcy: d.symbolQuoteCcy ?? undefined,
+        symbolInstrumentType: d.symbolInstrumentType ?? undefined,
       };
     },
   },
