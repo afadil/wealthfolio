@@ -6,3 +6,4 @@ export { DeleteConfirm } from "./delete-confirm";
 export { DonutChart } from "./donut-chart";
 export { SearchableSelect } from "./searchable-select";
 export { ErrorBoundary } from "./error-boundary";
+export { TickerAvatar } from "./ticker-avatar";
