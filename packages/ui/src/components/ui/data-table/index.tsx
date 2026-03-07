@@ -21,6 +21,9 @@ import { usePersistentState } from "../../../hooks/use-persistent-state";
 import type { DataTableFacetedFilterProps } from "./data-table-faceted-filter";
 import { DataTableToolbar } from "./data-table-toolbar";
 
+export { DataTableColumnHeader } from "./data-table-column-header";
+export type { DataTableFacetedFilterProps } from "./data-table-faceted-filter";
+
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   searchBy?: string;

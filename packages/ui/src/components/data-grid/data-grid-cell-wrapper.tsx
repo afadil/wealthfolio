@@ -160,6 +160,9 @@ export function DataGridCellWrapper<TData>({
     if (cellState.type === "warning") {
       return { backgroundColor: "color-mix(in oklab, var(--warning) 10%, transparent)" };
     }
+    if (cellState.type === "success") {
+      return { backgroundColor: "color-mix(in oklab, var(--success) 10%, transparent)" };
+    }
     return undefined;
   }, [cellState, isSelected, isSearchMatch]);
 
