@@ -17,8 +17,16 @@ import {
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
-import { format, parseISO } from "date-fns";
 import { useSettingsContext } from "@/lib/settings-provider";
+import {
+  createActivityAmountFormatter,
+  createActivityQuantityFormatter,
+  formatActivityAmount,
+  formatActivityDate,
+  formatActivityQuantity,
+  formatActivityType,
+  getActivityTypeBadge,
+} from "./shared";
 
 // ============================================================================
 // Types
@@ -52,62 +60,6 @@ interface SearchActivitiesOutput {
   accountScope: string;
   truncated?: boolean;
   totalAmount?: number | null;
-}
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-/**
- * Maps activity type to badge variant and color classes.
- */
-function getActivityTypeBadge(activityType: string): {
-  variant: "default" | "secondary" | "outline" | "destructive";
-  className: string;
-} {
-  const typeUpper = activityType.toUpperCase();
-  switch (typeUpper) {
-    case "BUY":
-      return { variant: "default", className: "bg-green-600 hover:bg-green-600 text-white" };
-    case "SELL":
-      return { variant: "destructive", className: "" };
-    case "DIVIDEND":
-      return { variant: "default", className: "bg-blue-600 hover:bg-blue-600 text-white" };
-    case "DEPOSIT":
-    case "TRANSFER_IN":
-      return { variant: "default", className: "bg-emerald-600 hover:bg-emerald-600 text-white" };
-    case "WITHDRAWAL":
-    case "TRANSFER_OUT":
-      return { variant: "default", className: "bg-orange-600 hover:bg-orange-600 text-white" };
-    case "INTEREST":
-      return { variant: "default", className: "bg-cyan-600 hover:bg-cyan-600 text-white" };
-    case "FEE":
-    case "TAX":
-      return { variant: "secondary", className: "" };
-    case "SPLIT":
-      return { variant: "outline", className: "" };
-    default:
-      return { variant: "secondary", className: "" };
-  }
-}
-
-/**
- * Formats activity type for display.
- */
-function formatActivityType(activityType: string): string {
-  return activityType.replace(/_/g, " ");
-}
-
-/**
- * Formats a date string for display.
- */
-function formatDate(dateString: string): string {
-  try {
-    const date = parseISO(dateString);
-    return format(date, "MMM d, yyyy");
-  } catch {
-    return dateString;
-  }
 }
 
 /**
@@ -229,25 +181,8 @@ function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
     });
   }, [parsed?.activities]);
 
-  const formatter = useMemo(
-    () =>
-      new Intl.NumberFormat(undefined, {
-        style: "decimal",
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }),
-    [],
-  );
-
-  const quantityFormatter = useMemo(
-    () =>
-      new Intl.NumberFormat(undefined, {
-        style: "decimal",
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 4,
-      }),
-    [],
-  );
+  const formatter = useMemo(() => createActivityAmountFormatter(), []);
+  const quantityFormatter = useMemo(() => createActivityQuantityFormatter(), []);
 
   const accountScope = parsed?.accountScope ?? args?.accountId ?? "all";
   // Show account name instead of ID when filtering a single account
@@ -257,22 +192,6 @@ function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
   const isComplete = status?.type === "complete" || status?.type === "incomplete";
   const hasError = status?.type === "incomplete" && status.reason === "error";
   const activitiesCount = sortedActivities.length;
-
-  // Format monetary value with privacy
-  const formatAmount = (value: number | null | undefined, currency?: string) => {
-    if (value == null) return "-";
-    if (isBalanceHidden) return "******";
-    const formatted = formatter.format(Math.abs(value));
-    return currency ? `${formatted} ${currency}` : formatted;
-  };
-
-  // Format quantity with privacy
-  const formatQuantity = (value: number | null | undefined) => {
-    if (value == null) return "-";
-    if (isBalanceHidden) return "***";
-    return quantityFormatter.format(value);
-  };
-
   // Loading skeleton
   if (isLoading) {
     return (
@@ -396,7 +315,7 @@ function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
                 return (
                   <TableRow key={activity.id} className="text-xs">
                     <TableCell className="py-2 pl-4 font-medium tabular-nums">
-                      {formatDate(activity.date)}
+                      {formatActivityDate(activity.date)}
                     </TableCell>
                     <TableCell className="py-2">
                       <Badge
@@ -414,13 +333,22 @@ function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
                       )}
                     </TableCell>
                     <TableCell className="py-2 text-right tabular-nums">
-                      {formatQuantity(activity.quantity)}
+                      {formatActivityQuantity(
+                        activity.quantity,
+                        quantityFormatter,
+                        isBalanceHidden,
+                      )}
                     </TableCell>
                     <TableCell className="py-2 text-right tabular-nums">
-                      {formatAmount(activity.unitPrice)}
+                      {formatActivityAmount(activity.unitPrice, formatter, isBalanceHidden)}
                     </TableCell>
                     <TableCell className="py-2 pr-4 text-right font-medium tabular-nums">
-                      {formatAmount(activity.amount, activity.currency)}
+                      {formatActivityAmount(
+                        activity.amount,
+                        formatter,
+                        isBalanceHidden,
+                        activity.currency,
+                      )}
                     </TableCell>
                   </TableRow>
                 );

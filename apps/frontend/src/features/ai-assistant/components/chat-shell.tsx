@@ -27,6 +27,7 @@ import {
   IncomeToolUI,
   PerformanceToolUI,
   RecordActivityToolUI,
+  RecordActivitiesToolUI,
   ValuationToolUI,
 } from "./tool-uis";
 import { ChatModelProvider, useChatModelContext } from "../hooks/use-chat-model-context";
@@ -219,6 +220,7 @@ function ChatShellInner({ className }: ChatShellProps) {
         <AllocationToolUI />
         <PerformanceToolUI />
         <RecordActivityToolUI />
+        <RecordActivitiesToolUI />
         <ImportCsvToolUI />
 
         <div className={cn("bg-background flex h-full min-h-0 w-full", className)}>
