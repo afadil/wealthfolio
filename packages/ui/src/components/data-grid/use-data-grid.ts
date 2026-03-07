@@ -419,7 +419,6 @@ function useDataGrid<TData>({
         selectionRange: null,
         isSelecting: false,
       });
-      store.setState("rowSelection", {});
     });
   }, [store]);
 
@@ -1910,7 +1909,6 @@ function useDataGrid<TData>({
             },
             isSelecting: true,
           });
-          store.setState("rowSelection", {});
         });
       }
     },

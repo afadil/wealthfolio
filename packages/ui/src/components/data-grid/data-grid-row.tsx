@@ -6,8 +6,14 @@ import * as React from "react";
 import { useComposedRefs } from "../../lib/compose-refs";
 import { cn } from "../../lib/utils";
 import { DataGridCell } from "./data-grid-cell";
-import type { CellPosition, Direction, RowHeightValue } from "./data-grid-types";
+import type { CellPosition, CellValidationState, Direction, RowHeightValue } from "./data-grid-types";
 import { flexRender, getCellKey, getCommonPinningStyles, getRowHeightValue } from "./data-grid-utils";
+
+const CELL_STATE_BG: Record<CellValidationState["type"], string> = {
+  error: "color-mix(in oklab, var(--destructive) 10%, transparent)",
+  warning: "color-mix(in oklab, var(--warning) 10%, transparent)",
+  success: "color-mix(in oklab, var(--success) 10%, transparent)",
+};
 
 interface DataGridRowProps<TData> extends React.ComponentProps<"div"> {
   row: Row<TData>;
@@ -212,9 +218,8 @@ function DataGridRowImpl<TData>({
           >
             {typeof cell.column.columnDef.header === "function" ? (
               <div
-                className={cn("size-full px-3 py-1.5", {
-                  "bg-primary/10": isRowSelected,
-                })}
+                className="size-full px-3 py-1.5"
+                style={cellState ? { backgroundColor: CELL_STATE_BG[cellState.type] } : undefined}
               >
                 {flexRender(cell.column.columnDef.cell, cell.getContext())}
               </div>
