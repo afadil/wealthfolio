@@ -1,5 +1,5 @@
 import { isWeb } from "@/adapters";
-import { getAuthToken, setAuthToken, setUnauthorizedHandler } from "@/lib/auth-token";
+import { setUnauthorizedHandler } from "@/lib/auth-token";
 import {
   createContext,
   useCallback,
@@ -27,16 +27,10 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [requiresAuth, setRequiresAuth] = useState(false);
   const [statusLoading, setStatusLoading] = useState(isWeb);
-  const [token, setToken] = useState<string | null>(() => getAuthToken());
   const [cookieSession, setCookieSession] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
-  const tokenRef = useRef<string | null>(null);
   const cookieSessionRef = useRef(false);
-
-  useEffect(() => {
-    tokenRef.current = token;
-  }, [token]);
 
   useEffect(() => {
     cookieSessionRef.current = cookieSession;
@@ -94,9 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const handler = () => {
-      const hadSession = Boolean(tokenRef.current) || cookieSessionRef.current;
-      setToken(null);
-      setAuthToken(null);
+      const hadSession = cookieSessionRef.current;
       setCookieSession(false);
       if (hadSession) {
         setLoginError("Session expired. Please sign in again.");
@@ -131,18 +123,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         throw new Error(message);
       }
-      const body = (await response.json()) as { accessToken: string };
-      const accessToken = body?.accessToken;
-      if (!accessToken) {
-        throw new Error("Login response did not contain an access token");
-      }
-      setToken(accessToken);
-      setAuthToken(accessToken);
+      // Cookie is set by the server via Set-Cookie header
+      setCookieSession(true);
       setLoginError(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Login failed";
-      setToken(null);
-      setAuthToken(null);
+      setCookieSession(false);
       setLoginError(message);
       throw error;
     } finally {
@@ -158,8 +144,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         credentials: "same-origin",
       }).catch(() => {});
     }
-    setToken(null);
-    setAuthToken(null);
     setCookieSession(false);
     setLoginError(null);
   }, []);
@@ -169,7 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       requiresAuth,
-      isAuthenticated: !requiresAuth || Boolean(token) || cookieSession,
+      isAuthenticated: !requiresAuth || cookieSession,
       statusLoading,
       loginLoading,
       loginError,
@@ -179,7 +163,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       requiresAuth,
-      token,
       cookieSession,
       statusLoading,
       loginLoading,

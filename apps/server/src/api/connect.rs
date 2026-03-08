@@ -330,7 +330,7 @@ async fn restore_sync_session(
         .secret_store
         .get_secret(CLOUD_REFRESH_TOKEN_KEY)
         .map_err(|e| ApiError::Internal(format!("Failed to read refresh token: {}", e)))?
-        .ok_or_else(|| ApiError::Unauthorized("No sync session configured".to_string()))?;
+        .ok_or_else(|| ApiError::Forbidden("No sync session configured".to_string()))?;
 
     Ok(Json(RestoreSyncSessionResponse {
         access_token,
@@ -356,7 +356,7 @@ pub(crate) async fn mint_access_token(state: &AppState) -> ApiResult<String> {
 
 fn map_token_lifecycle_error(err: TokenLifecycleError) -> ApiError {
     match err {
-        TokenLifecycleError::Unauthorized(message) => ApiError::Unauthorized(message),
+        TokenLifecycleError::Unauthorized(message) => ApiError::Forbidden(message),
         TokenLifecycleError::NotConfigured(message)
         | TokenLifecycleError::RefreshFailed(message)
         | TokenLifecycleError::Internal(message) => ApiError::Internal(message),
