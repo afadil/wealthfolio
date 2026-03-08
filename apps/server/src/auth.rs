@@ -10,7 +10,7 @@ use axum::{
     extract::State,
     http::{
         header::{AUTHORIZATION, COOKIE, SET_COOKIE},
-        HeaderValue, Request, StatusCode,
+        HeaderMap, HeaderValue, Request, StatusCode,
     },
     middleware::Next,
     response::{IntoResponse, Response},
@@ -22,12 +22,34 @@ use serde::{Deserialize, Serialize};
 
 use crate::main_lib::AppState;
 
+/// Controls when the `Secure` attribute is set on session cookies.
+///
+/// - `Auto`: set `Secure` only when `X-Forwarded-Proto: https` is present (default).
+/// - `Always`: always set `Secure` (use when TLS is guaranteed but the header is absent).
+/// - `Never`: never set `Secure` (plain HTTP without a reverse proxy).
+#[derive(Clone, Debug)]
+pub enum CookieSecurePolicy {
+    Auto,
+    Always,
+    Never,
+}
+
+impl std::fmt::Display for CookieSecurePolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Auto => write!(f, "auto (Secure only when X-Forwarded-Proto: https)"),
+            Self::Always => write!(f, "always (Secure flag always set)"),
+            Self::Never => write!(f, "never (Secure flag never set)"),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct AuthConfig {
     pub password_hash: String,
     pub jwt_secret: Vec<u8>,
     pub access_token_ttl: Duration,
-    pub secure_cookie: bool,
+    pub cookie_secure: CookieSecurePolicy,
 }
 
 pub struct AuthManager {
@@ -36,7 +58,7 @@ pub struct AuthManager {
     decoding_key: DecodingKey,
     validation: Validation,
     token_ttl: Duration,
-    secure_cookie: bool,
+    cookie_secure: CookieSecurePolicy,
 }
 
 #[derive(Debug)]
@@ -68,8 +90,7 @@ pub struct LoginRequest {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LoginResponse {
-    pub access_token: String,
-    pub token_type: String,
+    pub authenticated: bool,
     pub expires_in: u64,
 }
 
@@ -92,7 +113,7 @@ impl AuthManager {
             decoding_key,
             validation,
             token_ttl: config.access_token_ttl,
-            secure_cookie: config.secure_cookie,
+            cookie_secure: config.cookie_secure.clone(),
         })
     }
 
@@ -140,8 +161,20 @@ impl AuthManager {
         self.token_ttl
     }
 
-    pub fn secure_cookie(&self) -> bool {
-        self.secure_cookie
+    /// Resolve whether the `Secure` cookie attribute should be set for this request.
+    pub fn should_secure_cookie(&self, headers: &HeaderMap) -> bool {
+        match &self.cookie_secure {
+            CookieSecurePolicy::Always => true,
+            CookieSecurePolicy::Never => false,
+            CookieSecurePolicy::Auto => headers
+                .get("x-forwarded-proto")
+                .and_then(|v| v.to_str().ok())
+                .is_some_and(|v| {
+                    v.split(',')
+                        .next()
+                        .is_some_and(|p| p.trim().eq_ignore_ascii_case("https"))
+                }),
+        }
     }
 }
 
@@ -203,23 +236,26 @@ pub fn decode_secret_key(raw: &str) -> anyhow::Result<Vec<u8>> {
 
 const SESSION_COOKIE_NAME: &str = "wf_session";
 
+fn build_session_cookie(token: &str, max_age_secs: u64, secure: bool) -> String {
+    let secure_attr = if secure { "; Secure" } else { "" };
+    format!(
+        "{SESSION_COOKIE_NAME}={token}; HttpOnly; SameSite=Lax; Path=/api; Max-Age={max_age_secs}{secure_attr}"
+    )
+}
+
 pub async fn login(
     axum::extract::State(state): axum::extract::State<Arc<AppState>>,
+    headers: HeaderMap,
     Json(payload): Json<LoginRequest>,
 ) -> Result<Response, AuthError> {
     let auth = state.auth.as_ref().ok_or(AuthError::NotConfigured)?.clone();
     auth.verify_password(&payload.password)?;
     let token = auth.issue_token()?;
     let ttl_secs = auth.expires_in().as_secs();
-
-    let secure_attr = if auth.secure_cookie { "; Secure" } else { "" };
-    let cookie_value = format!(
-        "{SESSION_COOKIE_NAME}={token}; HttpOnly; SameSite=Strict; Path=/api; Max-Age={ttl_secs}{secure_attr}"
-    );
+    let cookie_value = build_session_cookie(&token, ttl_secs, auth.should_secure_cookie(&headers));
 
     let body = LoginResponse {
-        access_token: token,
-        token_type: "Bearer".to_string(),
+        authenticated: true,
         expires_in: ttl_secs,
     };
 
@@ -232,17 +268,14 @@ pub async fn login(
     Ok(response)
 }
 
-pub async fn logout(State(state): State<Arc<AppState>>) -> Response {
-    let secure_attr = if state.auth.as_ref().is_some_and(|a| a.secure_cookie()) {
-        "; Secure"
-    } else {
-        ""
-    };
-    let clear_cookie = format!(
-        "{SESSION_COOKIE_NAME}=; HttpOnly; SameSite=Strict; Path=/api; Max-Age=0{secure_attr}"
-    );
+pub async fn logout(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    let secure = state
+        .auth
+        .as_ref()
+        .is_some_and(|a| a.should_secure_cookie(&headers));
+    let cookie_value = build_session_cookie("", 0, secure);
     let mut response = StatusCode::NO_CONTENT.into_response();
-    if let Ok(val) = HeaderValue::from_str(&clear_cookie) {
+    if let Ok(val) = HeaderValue::from_str(&cookie_value) {
         response.headers_mut().insert(SET_COOKIE, val);
     }
     response
@@ -323,4 +356,85 @@ fn extract_token(request: &Request<Body>) -> Result<String, AuthError> {
     }
 
     Err(AuthError::Unauthorized)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_manager(policy: CookieSecurePolicy) -> AuthManager {
+        let config = AuthConfig {
+            password_hash: "$argon2i$v=19$m=16,t=2,p=1$MTIzMjMyMzIz$/5nvsvwbwLNOxDtDae5XMQ".into(),
+            jwt_secret: vec![0u8; 32],
+            access_token_ttl: Duration::from_secs(3600),
+            cookie_secure: policy,
+        };
+        AuthManager::new(&config).unwrap()
+    }
+
+    fn headers_with_proto(value: &str) -> HeaderMap {
+        let mut h = HeaderMap::new();
+        h.insert("x-forwarded-proto", HeaderValue::from_str(value).unwrap());
+        h
+    }
+
+    #[test]
+    fn auto_no_header_is_not_secure() {
+        let mgr = make_manager(CookieSecurePolicy::Auto);
+        assert!(!mgr.should_secure_cookie(&HeaderMap::new()));
+    }
+
+    #[test]
+    fn auto_http_is_not_secure() {
+        let mgr = make_manager(CookieSecurePolicy::Auto);
+        assert!(!mgr.should_secure_cookie(&headers_with_proto("http")));
+    }
+
+    #[test]
+    fn auto_https_is_secure() {
+        let mgr = make_manager(CookieSecurePolicy::Auto);
+        assert!(mgr.should_secure_cookie(&headers_with_proto("https")));
+    }
+
+    #[test]
+    fn auto_https_case_insensitive() {
+        let mgr = make_manager(CookieSecurePolicy::Auto);
+        assert!(mgr.should_secure_cookie(&headers_with_proto("HTTPS")));
+    }
+
+    #[test]
+    fn auto_multi_value_https_first() {
+        let mgr = make_manager(CookieSecurePolicy::Auto);
+        assert!(mgr.should_secure_cookie(&headers_with_proto("https, http")));
+    }
+
+    #[test]
+    fn auto_multi_value_http_first() {
+        let mgr = make_manager(CookieSecurePolicy::Auto);
+        assert!(!mgr.should_secure_cookie(&headers_with_proto("http, https")));
+    }
+
+    #[test]
+    fn always_without_header() {
+        let mgr = make_manager(CookieSecurePolicy::Always);
+        assert!(mgr.should_secure_cookie(&HeaderMap::new()));
+    }
+
+    #[test]
+    fn always_with_http_header() {
+        let mgr = make_manager(CookieSecurePolicy::Always);
+        assert!(mgr.should_secure_cookie(&headers_with_proto("http")));
+    }
+
+    #[test]
+    fn never_without_header() {
+        let mgr = make_manager(CookieSecurePolicy::Never);
+        assert!(!mgr.should_secure_cookie(&HeaderMap::new()));
+    }
+
+    #[test]
+    fn never_with_https_header() {
+        let mgr = make_manager(CookieSecurePolicy::Never);
+        assert!(!mgr.should_secure_cookie(&headers_with_proto("https")));
+    }
 }

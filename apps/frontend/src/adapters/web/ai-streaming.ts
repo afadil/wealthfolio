@@ -1,6 +1,5 @@
 // Web adapter - AI Chat Streaming (platform-specific HTTP implementation)
 
-import { getAuthToken } from "@/lib/auth-token";
 import { logger, AI_CHAT_STREAM_ENDPOINT } from "./core";
 import type { AiSendMessageRequest, AiStreamEvent } from "@/features/ai-assistant/types";
 
@@ -17,18 +16,9 @@ export async function* streamAiChat(
   request: AiSendMessageRequest,
   signal?: AbortSignal,
 ): AsyncGenerator<AiStreamEvent, void, undefined> {
-  const headers: HeadersInit = {
-    "Content-Type": "application/json",
-  };
-
-  const token = getAuthToken();
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
   const response = await fetch(AI_CHAT_STREAM_ENDPOINT, {
     method: "POST",
-    headers,
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
     signal,
     credentials: "same-origin",
