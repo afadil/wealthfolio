@@ -755,34 +755,13 @@ where
             all_quotes.extend(quotes);
         }
 
-        let mut symbols_with_seed_quotes: HashSet<String> = all_quotes
-            .iter()
-            .filter(|quote| quote.timestamp.date_naive() < start)
-            .map(|quote| quote.asset_id.clone())
-            .collect();
-
-        // Fall back to full history for symbols without a pre-start seed in the lookback
-        // window. This preserves manual quote carry-forward when the latest quote is stale.
-        for symbol in symbols {
-            if symbols_with_seed_quotes.contains(symbol) {
-                continue;
-            }
-
-            let maybe_seed_quote = self
-                .quote_store
-                .get_historical_quotes(symbol)?
-                .into_iter()
-                .filter(|quote| quote.timestamp.date_naive() < start)
-                .max_by_key(|quote| quote.timestamp);
-
-            if let Some(mut seed_quote) = maybe_seed_quote {
-                if let Some(asset) = assets_by_id.get(symbol) {
-                    reconcile_quote_currency(&mut seed_quote, asset);
-                }
-                all_quotes.push(seed_quote);
-                symbols_with_seed_quotes.insert(symbol.clone());
-            }
-        }
+        append_historical_seed_quotes(
+            self.quote_store.as_ref(),
+            symbols,
+            start,
+            &assets_by_id,
+            &mut all_quotes,
+        )?;
 
         // Fill missing quotes
         Ok(fill_missing_quotes(&all_quotes, symbols, start, end))
@@ -1680,6 +1659,44 @@ fn mic_to_yahoo_suffix(mic: &str) -> Option<&'static str> {
 // Gap Filling Helper
 // =============================================================================
 
+pub(crate) fn append_historical_seed_quotes<Q: QuoteStore>(
+    quote_store: &Q,
+    symbols: &HashSet<String>,
+    start: NaiveDate,
+    assets_by_id: &HashMap<String, Asset>,
+    all_quotes: &mut Vec<Quote>,
+) -> Result<()> {
+    let mut symbols_with_seed_quotes: HashSet<String> = all_quotes
+        .iter()
+        .filter(|quote| quote.timestamp.date_naive() < start)
+        .map(|quote| quote.asset_id.clone())
+        .collect();
+
+    // Fall back to full history for symbols without a pre-start seed in the lookback
+    // window. This preserves manual quote carry-forward when the latest quote is stale.
+    for symbol in symbols {
+        if symbols_with_seed_quotes.contains(symbol) {
+            continue;
+        }
+
+        let maybe_seed_quote = quote_store
+            .get_historical_quotes(symbol)?
+            .into_iter()
+            .filter(|quote| quote.timestamp.date_naive() < start)
+            .max_by_key(|quote| quote.timestamp);
+
+        if let Some(mut seed_quote) = maybe_seed_quote {
+            if let Some(asset) = assets_by_id.get(symbol) {
+                reconcile_quote_currency(&mut seed_quote, asset);
+            }
+            all_quotes.push(seed_quote);
+            symbols_with_seed_quotes.insert(symbol.clone());
+        }
+    }
+
+    Ok(())
+}
+
 /// Fills missing quotes for weekends and holidays by carrying forward the last known quote.
 ///
 /// This is critical for portfolio valuation which needs a quote for every day in the range.
@@ -1700,7 +1717,7 @@ fn mic_to_yahoo_suffix(mic: &str) -> Option<&'static str> {
 ///
 /// # Returns
 /// A Vec of quotes with one entry per symbol per day (filled from last known value)
-fn fill_missing_quotes(
+pub(crate) fn fill_missing_quotes(
     quotes: &[Quote],
     required_symbols: &HashSet<String>,
     start_date: NaiveDate,
@@ -1788,8 +1805,8 @@ mod tests {
     use crate::secrets::SecretStore;
     use async_trait::async_trait;
     use rust_decimal_macros::dec;
-    use std::collections::{HashMap, HashSet};
-    use std::sync::{Arc, Mutex};
+    use std::collections::HashMap;
+    use std::sync::Arc;
 
     #[derive(Default)]
     struct NoopQuoteStore;
@@ -1887,140 +1904,6 @@ mod tests {
             _end: NaiveDate,
         ) -> Result<Vec<Quote>> {
             unimplemented!("unused in this test")
-        }
-
-        fn find_duplicate_quotes(&self, _symbol: &str, _date: NaiveDate) -> Result<Vec<Quote>> {
-            unimplemented!("unused in this test")
-        }
-    }
-
-    struct FillTestQuoteStore {
-        quotes: Mutex<Vec<Quote>>,
-    }
-
-    impl FillTestQuoteStore {
-        fn new(quotes: Vec<Quote>) -> Self {
-            Self {
-                quotes: Mutex::new(quotes),
-            }
-        }
-    }
-
-    #[async_trait]
-    impl QuoteStore for FillTestQuoteStore {
-        async fn save_quote(&self, _quote: &Quote) -> Result<Quote> {
-            unimplemented!("unused in this test")
-        }
-
-        async fn delete_quote(&self, _quote_id: &str) -> Result<()> {
-            unimplemented!("unused in this test")
-        }
-
-        async fn upsert_quotes(&self, _quotes: &[Quote]) -> Result<usize> {
-            unimplemented!("unused in this test")
-        }
-
-        async fn delete_quotes_for_asset(&self, _asset_id: &AssetId) -> Result<usize> {
-            unimplemented!("unused in this test")
-        }
-
-        async fn delete_provider_quotes_for_asset(&self, _asset_id: &AssetId) -> Result<usize> {
-            unimplemented!("unused in this test")
-        }
-
-        fn latest(
-            &self,
-            _asset_id: &AssetId,
-            _source: Option<&QuoteSource>,
-        ) -> Result<Option<Quote>> {
-            unimplemented!("unused in this test")
-        }
-
-        fn range(
-            &self,
-            _asset_id: &AssetId,
-            _start: Day,
-            _end: Day,
-            _source: Option<&QuoteSource>,
-        ) -> Result<Vec<Quote>> {
-            unimplemented!("unused in this test")
-        }
-
-        fn latest_batch(
-            &self,
-            _asset_ids: &[AssetId],
-            _source: Option<&QuoteSource>,
-        ) -> Result<HashMap<AssetId, Quote>> {
-            unimplemented!("unused in this test")
-        }
-
-        fn latest_with_previous(
-            &self,
-            _asset_ids: &[AssetId],
-        ) -> Result<HashMap<AssetId, LatestQuotePair>> {
-            unimplemented!("unused in this test")
-        }
-
-        fn get_quote_bounds_for_assets(
-            &self,
-            _asset_ids: &[String],
-            _source: &str,
-        ) -> Result<HashMap<String, (NaiveDate, NaiveDate)>> {
-            unimplemented!("unused in this test")
-        }
-
-        fn get_latest_quote(&self, _symbol: &str) -> Result<Quote> {
-            unimplemented!("unused in this test")
-        }
-
-        fn get_latest_quotes(&self, _symbols: &[String]) -> Result<HashMap<String, Quote>> {
-            unimplemented!("unused in this test")
-        }
-
-        fn get_latest_quotes_pair(
-            &self,
-            _symbols: &[String],
-        ) -> Result<HashMap<String, LatestQuotePair>> {
-            unimplemented!("unused in this test")
-        }
-
-        fn get_historical_quotes(&self, symbol: &str) -> Result<Vec<Quote>> {
-            let mut quotes: Vec<Quote> = self
-                .quotes
-                .lock()
-                .expect("fill test quote store mutex poisoned")
-                .iter()
-                .filter(|quote| quote.asset_id == symbol)
-                .cloned()
-                .collect();
-            quotes.sort_by_key(|quote| quote.timestamp);
-            Ok(quotes)
-        }
-
-        fn get_all_historical_quotes(&self) -> Result<Vec<Quote>> {
-            unimplemented!("unused in this test")
-        }
-
-        fn get_quotes_in_range(
-            &self,
-            symbol: &str,
-            start: NaiveDate,
-            end: NaiveDate,
-        ) -> Result<Vec<Quote>> {
-            let mut quotes: Vec<Quote> = self
-                .quotes
-                .lock()
-                .expect("fill test quote store mutex poisoned")
-                .iter()
-                .filter(|quote| quote.asset_id == symbol)
-                .filter(|quote| {
-                    let day = quote.timestamp.date_naive();
-                    day >= start && day <= end
-                })
-                .cloned()
-                .collect();
-            quotes.sort_by_key(|quote| quote.timestamp);
-            Ok(quotes)
         }
 
         fn find_duplicate_quotes(&self, _symbol: &str, _date: NaiveDate) -> Result<Vec<Quote>> {
@@ -2167,7 +2050,7 @@ mod tests {
         }
 
         fn list_by_asset_ids(&self, _asset_ids: &[String]) -> Result<Vec<Asset>> {
-            Ok(Vec::new())
+            unimplemented!("unused in this test")
         }
 
         async fn delete(&self, _asset_id: &str) -> Result<()> {
@@ -2360,75 +2243,6 @@ mod tests {
 
         fn delete_secret(&self, _service: &str) -> Result<()> {
             Ok(())
-        }
-    }
-
-    fn create_test_quote(
-        asset_id: &str,
-        date: NaiveDate,
-        close: rust_decimal::Decimal,
-        source: DataSource,
-    ) -> Quote {
-        Quote {
-            id: format!("{}_{}", asset_id, date),
-            created_at: Utc::now(),
-            data_source: source,
-            timestamp: Utc.from_utc_datetime(&date.and_hms_opt(16, 0, 0).unwrap()),
-            asset_id: asset_id.to_string(),
-            open: close,
-            high: close,
-            low: close,
-            close,
-            adjclose: close,
-            volume: dec!(1000),
-            currency: "USD".to_string(),
-            notes: None,
-        }
-    }
-
-    #[tokio::test]
-    async fn test_get_quotes_in_range_filled_uses_stale_manual_quote_seed() {
-        let asset_id = "ETF:MANUAL";
-        let start = NaiveDate::from_ymd_opt(2026, 3, 1).unwrap();
-        let end = NaiveDate::from_ymd_opt(2026, 3, 3).unwrap();
-        let stale_quote_date = start - Duration::days(45);
-
-        let quote_store = Arc::new(FillTestQuoteStore::new(vec![create_test_quote(
-            asset_id,
-            stale_quote_date,
-            dec!(123.45),
-            DataSource::Manual,
-        )]));
-
-        let service = QuoteService::new(
-            quote_store,
-            Arc::new(MockSyncStateStore {
-                provider_sync_stats: Vec::new(),
-                with_errors: Vec::new(),
-            }),
-            Arc::new(MockProviderSettingsStore {
-                providers: Vec::new(),
-            }),
-            Arc::new(NoopAssetRepository),
-            Arc::new(NoopActivityRepository),
-            Arc::new(MockSecretStore),
-        )
-        .await
-        .unwrap();
-
-        let symbols = HashSet::from([asset_id.to_string()]);
-        let filled_quotes = service
-            .get_quotes_in_range_filled(&symbols, start, end)
-            .unwrap();
-
-        let expected_days = time_utils::get_days_between(start, end);
-        assert_eq!(filled_quotes.len(), expected_days.len());
-
-        for (quote, expected_day) in filled_quotes.iter().zip(expected_days.iter()) {
-            assert_eq!(quote.asset_id, asset_id);
-            assert_eq!(quote.close, dec!(123.45));
-            assert_eq!(quote.data_source, DataSource::Manual);
-            assert_eq!(quote.timestamp.date_naive(), *expected_day);
         }
     }
 
