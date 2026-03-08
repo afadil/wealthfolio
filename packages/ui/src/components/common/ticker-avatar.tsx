@@ -16,9 +16,7 @@ export const TickerAvatar = ({ symbol, className = "size-8" }: TickerAvatarProps
   const fallbackLogoUrl = baseSymbol ? `/ticker-logos/${baseSymbol}.png` : "";
 
   return (
-    <Avatar
-      className={cn("bg-primary/80 dark:bg-primary/20 border-white/20 backdrop-blur-md", className)}
-    >
+    <Avatar className={cn("bg-primary/80 dark:bg-primary/20 border-white/20 backdrop-blur-md", className)}>
       <AvatarImage src={primaryLogoUrl} alt={fullSymbol} className="object-contain p-2" />
       <AvatarFallback>
         <Avatar className="bg-primary/80 dark:bg-primary/20 border-white/20 text-white backdrop-blur-md">
