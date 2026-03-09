@@ -189,12 +189,8 @@ const useGlobalEventListener = () => {
     const handleAssetEnrichmentComplete = (event: {
       payload: { enriched: number; skipped: number; failed: number };
     }) => {
-      if (isMobileViewportRef.current && syncContextRef.current) {
-        syncContextRef.current.setIdle();
-      } else {
-        toast.dismiss(TOAST_IDS.assetEnrichmentStart);
-        syncContextRef.current?.setIdle();
-      }
+      toast.dismiss(TOAST_IDS.assetEnrichmentStart);
+      syncContextRef.current?.setIdle();
       if (event.payload?.failed > 0) {
         toast.warning("Some assets failed to enrich", {
           description: `${event.payload.failed} asset(s) could not be enriched. Portfolio values may be incomplete.`,

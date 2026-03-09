@@ -86,6 +86,9 @@ pub struct Holding {
     pub open_date: Option<DateTime<Utc>>,
     pub lots: Option<VecDeque<Lot>>,
 
+    /// Contract multiplier for derivatives (e.g., 100 for equity options). Defaults to 1.
+    pub contract_multiplier: Decimal,
+
     // Currency info
     pub local_currency: String,
     pub base_currency: String,

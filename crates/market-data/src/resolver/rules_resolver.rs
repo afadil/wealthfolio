@@ -145,14 +145,15 @@ impl RulesResolver {
     }
 
     /// Resolve an option instrument.
-    /// Yahoo Finance accepts OCC symbols directly as equity-like symbols.
+    /// Yahoo and Alpha Vantage accept OCC symbols as equity-like symbols.
+    /// Alpha Vantage internally routes to the REALTIME_OPTIONS endpoint.
     fn resolve_option(
         &self,
         occ_symbol: &Arc<str>,
         provider: &ProviderId,
     ) -> Option<ProviderInstrument> {
         match provider.as_ref() {
-            "YAHOO" => Some(ProviderInstrument::EquitySymbol {
+            "YAHOO" | "ALPHA_VANTAGE" => Some(ProviderInstrument::EquitySymbol {
                 symbol: occ_symbol.clone(),
             }),
             _ => None,

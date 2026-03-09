@@ -658,12 +658,7 @@ impl ActivityService {
             return (AssetKind::Investment, Some(InstrumentType::Option));
         }
 
-        // 6. ISIN heuristic (12-char alphanumeric with 2-letter country prefix)
-        if crate::utils::isin::looks_like_isin(&upper_symbol) {
-            return (AssetKind::Investment, Some(InstrumentType::Bond));
-        }
-
-        // 7. Default to equity (most common case)
+        // 6. Default to equity (most common case)
         (AssetKind::Investment, Some(InstrumentType::Equity))
     }
 
@@ -1166,12 +1161,18 @@ impl ActivityService {
         } else {
             exchange_mic.or_else(|| suffix_mic.map(|mic| mic.to_string()))
         };
+        let is_option = effective_instrument_type.as_ref() == Some(&InstrumentType::Option);
         let normalized_symbol_for_lookup = if base_symbol.is_empty() {
             None
         } else if is_crypto {
             Some(
                 parse_crypto_pair_symbol(base_symbol)
                     .map(|(base, _)| base)
+                    .unwrap_or_else(|| base_symbol.to_string()),
+            )
+        } else if is_option {
+            Some(
+                crate::utils::occ_symbol::normalize_option_symbol(base_symbol)
                     .unwrap_or_else(|| base_symbol.to_string()),
             )
         } else {

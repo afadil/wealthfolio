@@ -98,6 +98,11 @@ export const bulkHoldingsFormSchema = baseActivitySchema.extend({
   holdings: z.array(bulkHoldingRowSchema).min(1, { message: "At least one holding is required" }),
 });
 
+// NOTE: Option fields are `.optional()` here because Zod's `discriminatedUnion`
+// requires `ZodObject` branches — `.superRefine()` produces `ZodEffects` which
+// breaks the union. Option field validation is enforced at runtime:
+//   - Desktop: `buyFormSchema`/`sellFormSchema` have their own `.superRefine()`
+//   - Mobile: `validateTradeFields()` in the submit handler
 export const tradeActivitySchema = baseActivitySchema.extend({
   activityType: z.enum([ActivityType.BUY, ActivityType.SELL]),
   assetId: z.string().default(""), // Relaxed: options build OCC symbol at submit
