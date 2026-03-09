@@ -1,4 +1,5 @@
 import { openUrlInBrowser } from "@/adapters";
+import { ExternalLink } from "@/components/external-link";
 import { DeviceSyncSection } from "@/features/devices-sync";
 import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
@@ -593,14 +594,12 @@ export function ConnectedView() {
           Wealthfolio Connect doesn&apos;t store your brokerage credentials or financial data.
           Everything syncs securely via an aggregator to your local database. Device sync uses
           end-to-end encryption.{" "}
-          <a
+          <ExternalLink
             href="https://wealthfolio.app/privacy"
-            target="_blank"
-            rel="noopener noreferrer"
             className="text-muted-foreground hover:text-foreground underline underline-offset-2"
           >
             Learn more
-          </a>
+          </ExternalLink>
         </p>
       </footer>
     </div>

@@ -1,3 +1,4 @@
+import { ExternalLink } from "@/components/external-link";
 import type { AddonStoreListing } from "@/lib/types";
 import {
   Badge,
@@ -219,10 +220,10 @@ export function AddonStoreCard({
 
                   {listing.changelogUrl && (
                     <Button variant="outline" asChild>
-                      <a href={listing.changelogUrl} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink href={listing.changelogUrl}>
                         <Icons.ExternalLink className="mr-2 h-4 w-4" />
                         Changelog
-                      </a>
+                      </ExternalLink>
                     </Button>
                   )}
                 </div>

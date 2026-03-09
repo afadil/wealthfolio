@@ -1,4 +1,5 @@
 import { getAccounts } from "@/adapters";
+import { ExternalLink } from "@/components/external-link";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { useAssetProfile } from "@/pages/asset/hooks/use-asset-profile";
 import { ActivityType } from "@/lib/constants";
@@ -179,15 +180,13 @@ const ActivityManagerPage = () => {
         onBack={handleClose}
         actions={
           <Button variant="ghost" size="sm" asChild>
-            <a
+            <ExternalLink
               href="https://wealthfolio.app/docs/concepts/activity-types"
-              target="_blank"
-              rel="noopener noreferrer"
               className="flex items-center gap-1.5"
             >
               <Icons.HelpCircle className="h-4 w-4" />
               Learn more
-            </a>
+            </ExternalLink>
           </Button>
         }
       />

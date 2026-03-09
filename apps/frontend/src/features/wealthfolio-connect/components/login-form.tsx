@@ -1,4 +1,5 @@
 import { isDesktop } from "@/adapters";
+import { ExternalLink } from "@/components/external-link";
 import { getPreferredProvider, savePreferredProvider } from "@/lib/cookie-utils";
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { Button } from "@wealthfolio/ui/components/ui/button";
@@ -467,23 +468,19 @@ export function LoginForm() {
             <div className="pt-4">
               <p className="text-muted-foreground text-center text-xs">
                 By continuing, you agree to our{" "}
-                <a
+                <ExternalLink
                   href="https://wealthfolio.app/connect/legal/terms-of-use"
-                  target="_blank"
-                  rel="noreferrer noopener"
                   className="hover:text-foreground underline underline-offset-4"
                 >
                   Terms of Use
-                </a>{" "}
+                </ExternalLink>{" "}
                 and{" "}
-                <a
+                <ExternalLink
                   href="https://wealthfolio.app/connect/legal/privacy-policy"
-                  target="_blank"
-                  rel="noreferrer noopener"
                   className="hover:text-foreground underline underline-offset-4"
                 >
                   Privacy Policy
-                </a>
+                </ExternalLink>
                 .
               </p>
             </div>

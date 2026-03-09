@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { ExternalLink } from "@/components/external-link";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -336,15 +337,13 @@ export function ProviderSettingsCard({
                         API Key
                       </Label>
                       {provider.documentationUrl && (
-                        <a
+                        <ExternalLink
                           href={provider.documentationUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
                           className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs transition-colors"
                         >
                           Get API key
                           <Icons.ExternalLink className="h-3 w-3" />
-                        </a>
+                        </ExternalLink>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
@@ -676,15 +675,13 @@ export function ProviderSettingsCard({
                         {customUrlField.label}
                       </Label>
                       {customUrlField.helpUrl && (
-                        <a
+                        <ExternalLink
                           href={customUrlField.helpUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
                           className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs transition-colors"
                         >
                           Learn more
                           <Icons.ExternalLink className="h-3 w-3" />
-                        </a>
+                        </ExternalLink>
                       )}
                     </div>
                     <div className="flex items-center gap-2">

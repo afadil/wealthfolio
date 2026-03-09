@@ -12,6 +12,7 @@ import { Link } from "react-router-dom";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import remarkGfm from "remark-gfm";
 
+import { ExternalLink } from "@/components/external-link";
 import { cn } from "@/lib/utils";
 import { TooltipIconButton } from "./tooltip-icon-button";
 
@@ -88,17 +89,15 @@ const MarkdownLink: FC<React.AnchorHTMLAttributes<HTMLAnchorElement>> = ({
     );
   }
 
-  // External link - open in new tab
+  // External link - open via platform adapter
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
+    <ExternalLink
+      href={href ?? "#"}
       className={cn("text-primary hover:text-primary/80 underline underline-offset-2", className)}
       {...props}
     >
       {children}
-    </a>
+    </ExternalLink>
   );
 };
 
