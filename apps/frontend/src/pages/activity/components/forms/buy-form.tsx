@@ -19,6 +19,7 @@ import {
   AdvancedOptionsSection,
   AssetTypeSelector,
   OptionContractFields,
+  createValidatedSubmit,
   type AssetType,
   type AccountSelectOption,
 } from "./fields";
@@ -89,6 +90,37 @@ export const buyFormSchema = z
         message: "Please enter a symbol.",
         path: ["assetId"],
       });
+    }
+    // Option contracts require all 4 structured fields
+    if (data.assetType === "option") {
+      if (!data.underlyingSymbol?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Underlying symbol is required.",
+          path: ["underlyingSymbol"],
+        });
+      }
+      if (!data.strikePrice || data.strikePrice <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Strike price is required.",
+          path: ["strikePrice"],
+        });
+      }
+      if (!data.expirationDate?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Expiration date is required.",
+          path: ["expirationDate"],
+        });
+      }
+      if (!data.optionType) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Option type is required.",
+          path: ["optionType"],
+        });
+      }
     }
   });
 
@@ -168,7 +200,7 @@ export function BuyForm({
       const acct = accounts.find((a) => a.value === accountId);
       if (acct?.currency) setValue("currency", acct.currency);
     }
-  }, [accountId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [accountId, currency, accounts, setValue]);
   const assetType = watch("assetType") ?? "stock";
   const isManualAsset = quoteMode === QuoteMode.MANUAL;
   const isOption = assetType === "option";
@@ -193,7 +225,7 @@ export function BuyForm({
       setValue("quoteMode", QuoteMode.MARKET);
       setValue("assetKind", "OPTION");
     } else if (value === "bond") {
-      setValue("quoteMode", QuoteMode.MANUAL);
+      setValue("quoteMode", QuoteMode.MARKET);
       setValue("assetKind", "BOND");
     } else {
       setValue("quoteMode", QuoteMode.MARKET);
@@ -212,10 +244,14 @@ export function BuyForm({
   const accountCurrency = selectedAccount?.currency;
   const assetCurrencyFromSymbol = normalizeCurrency(symbolQuoteCcy ?? undefined)?.toUpperCase();
 
-  const handleSubmit = form.handleSubmit(async (data) => {
+  const handleSubmit = createValidatedSubmit(form, async (data) => {
     // Ensure currency is set (required by backend) — fall back to account currency
     if (!data.currency && accountId) {
       data.currency = accounts.find((a) => a.value === accountId)?.currency ?? data.currency;
+    }
+    // Ensure symbolQuoteCcy is set — manual/custom symbols leave it undefined
+    if (!data.symbolQuoteCcy && data.currency) {
+      data.symbolQuoteCcy = data.currency;
     }
     // For options: build OCC symbol from structured fields
     if (
@@ -232,11 +268,17 @@ export function BuyForm({
         data.strikePrice,
       );
       data.assetId = occSymbol;
+      data.symbolInstrumentType = "OPTION";
       data.assetMetadata = {
         ...data.assetMetadata,
         name: `${data.underlyingSymbol.toUpperCase()} ${data.expirationDate} ${data.optionType} ${data.strikePrice}`,
         kind: "OPTION",
       };
+    }
+    // For bonds: set instrument type and force manual pricing (no automated quote provider)
+    if (data.assetType === "bond") {
+      data.symbolInstrumentType = data.symbolInstrumentType ?? "BOND";
+      data.quoteMode = QuoteMode.MANUAL;
     }
     await onSubmit(data);
   });
@@ -246,9 +288,6 @@ export function BuyForm({
       <form onSubmit={handleSubmit} className="space-y-4">
         <Card>
           <CardContent className="space-y-6 pt-4">
-            {/* Account Selection */}
-            <AccountSelect name="accountId" accounts={accounts} currencyName="currency" />
-
             {/* Asset Type Selector */}
             {!isEditing && (
               <AssetTypeSelector
@@ -258,6 +297,12 @@ export function BuyForm({
               />
             )}
 
+            {/* Account Selection */}
+            <AccountSelect name="accountId" accounts={accounts} currencyName="currency" />
+
+            {/* Date Picker */}
+            <DatePicker name="activityDate" label="Date" enableTime={true} />
+
             {/* Symbol / Option Contract Fields */}
             {isOption ? (
               <OptionContractFields
@@ -265,9 +310,9 @@ export function BuyForm({
                 strikePriceName="strikePrice"
                 expirationDateName="expirationDate"
                 optionTypeName="optionType"
-                contractMultiplierName="contractMultiplier"
                 currencyName="currency"
                 exchangeMicName="exchangeMic"
+                quoteCcyName="symbolQuoteCcy"
               />
             ) : (
               <>
@@ -289,15 +334,28 @@ export function BuyForm({
               </>
             )}
 
-            {/* Date Picker */}
-            <DatePicker name="activityDate" label="Date" enableTime={true} />
-
             {/* Quantity, Price, Fee Row */}
             {isOption && (
               <h4 className="text-muted-foreground text-sm font-medium">Trade Details</h4>
             )}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <QuantityInput name="quantity" label={quantityLabel} />
+              <div>
+                <QuantityInput name="quantity" label={quantityLabel} />
+                {/* Shares breakdown with click-to-edit multiplier */}
+                {isOption && optQuantity && (
+                  <div className="text-muted-foreground mt-1.5 flex items-center gap-1 text-xs">
+                    <span>{Number(optQuantity) * (Number(optMultiplier) || 100)} shares</span>
+                    <span>·</span>
+                    <input
+                      type="number"
+                      {...form.register("contractMultiplier", { valueAsNumber: true })}
+                      className="hover:border-input focus:border-input focus:bg-background focus:ring-ring h-5 w-14 rounded border border-transparent bg-transparent px-1 text-center text-xs tabular-nums focus:outline-none focus:ring-1"
+                      aria-label="Contract Multiplier"
+                    />
+                    <span>x</span>
+                  </div>
+                )}
+              </div>
               <AmountInput
                 name="unitPrice"
                 label={priceLabel}
@@ -307,17 +365,45 @@ export function BuyForm({
               <AmountInput name="fee" label="Fee" currency={currency} />
             </div>
 
-            {/* Option Total Premium */}
+            {/* Option Total Premium with formula breakdown */}
             {isOption && optQuantity && optUnitPrice && (
-              <div className="bg-muted rounded-md p-3 text-sm">
-                <span className="text-muted-foreground">Total: </span>
-                <span className="font-medium">
-                  {new Intl.NumberFormat("en-US", {
-                    style: "decimal",
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  }).format(optionTotal)}
-                </span>
+              <div className="bg-muted/50 border-border rounded-md border p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-muted-foreground text-xs font-medium uppercase">
+                      Total Debit
+                    </span>
+                    <p className="text-muted-foreground mt-0.5 text-xs tabular-nums">
+                      {Number(optQuantity)} ×{" "}
+                      {currency
+                        ? new Intl.NumberFormat("en-US", { style: "currency", currency }).format(
+                            Number(optUnitPrice),
+                          )
+                        : Number(optUnitPrice)}{" "}
+                      × {Number(optMultiplier) || 100}
+                      {Number(optFee) > 0 && (
+                        <>
+                          {" "}
+                          +{" "}
+                          {currency
+                            ? new Intl.NumberFormat("en-US", {
+                                style: "currency",
+                                currency,
+                              }).format(Number(optFee))
+                            : Number(optFee)}
+                        </>
+                      )}
+                    </p>
+                  </div>
+                  <span className="text-lg font-semibold tabular-nums">
+                    {new Intl.NumberFormat("en-US", {
+                      style: currency ? "currency" : "decimal",
+                      currency: currency || undefined,
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    }).format(optionTotal)}
+                  </span>
+                </div>
               </div>
             )}
 

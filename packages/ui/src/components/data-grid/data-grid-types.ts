@@ -20,6 +20,10 @@ export interface SymbolSearchResult {
   exchangeMic?: string;
   /** Currency derived from exchange (e.g., "USD", "CAD") */
   currency?: string;
+  /** Provenance of currency: "provider" or "exchange_inferred" */
+  currencySource?: string;
+  /** Instrument type (e.g., "EQUITY", "ETF", "BOND", "OPTION") */
+  quoteType?: string;
   score: number;
   dataSource?: string;
   /** Asset kind for custom assets (e.g., "SECURITY", "CRYPTO", "OTHER") */
