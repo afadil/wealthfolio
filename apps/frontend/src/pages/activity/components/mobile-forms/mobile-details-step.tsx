@@ -3,8 +3,14 @@ import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
 import { AnimatedToggleGroup } from "@wealthfolio/ui/components/ui/animated-toggle-group";
 import { QuoteMode, type ActivityType } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
-import { AdvancedOptionsSection } from "../forms/fields/advanced-options-section";
-import { SymbolSearch } from "../forms/fields/symbol-search";
+import {
+  AdvancedOptionsSection,
+  SymbolSearch,
+  AssetTypeSelector,
+  OptionContractFields,
+  type AssetType,
+  type AccountSelectOption,
+} from "../forms/fields";
 import { Checkbox } from "@wealthfolio/ui/components/ui/checkbox";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@wealthfolio/ui/components/ui/radio-group";
@@ -28,16 +34,16 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { restrictionAllowsType } from "@/lib/activity-restrictions";
-import type { AccountSelectOption } from "../forms/fields";
 import type { NewActivityFormValues } from "../forms/schemas";
 
 interface MobileDetailsStepProps {
   accounts: AccountSelectOption[];
   activityType: string;
+  isEditing?: boolean;
 }
 
-export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepProps) {
-  const { control, getFieldState, getValues, watch, setValue } =
+export function MobileDetailsStep({ accounts, activityType, isEditing }: MobileDetailsStepProps) {
+  const { control, getFieldState, getValues, watch, setValue, register } =
     useFormContext<NewActivityFormValues>();
   const { settings } = useSettingsContext();
   const isManualAsset = watch("quoteMode") === QuoteMode.MANUAL;
@@ -51,6 +57,32 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
   );
   const assetCurrency = watch("currency");
   const [accountSheetOpen, setAccountSheetOpen] = useState(false);
+
+  // BUY/SELL asset type (stock/option/bond)
+  const isBuyOrSell = ["BUY", "SELL"].includes(activityType);
+  const assetType = isBuyOrSell
+    ? ((watch("assetType" as any) as string) ?? "stock")
+    : "stock";
+  const isOption = assetType === "option";
+  const isBond = assetType === "bond";
+  const isManualForType = isManualAsset && !isBond;
+
+  // Option fields for total calculation
+  const optQuantity = isBuyOrSell ? watch("quantity") : undefined;
+  const optUnitPrice = isBuyOrSell ? watch("unitPrice") : undefined;
+  const optFee = isBuyOrSell ? watch("fee") : undefined;
+  const optMultiplier = isOption
+    ? ((watch("contractMultiplier" as any) as number) ?? 100)
+    : 1;
+
+  const optionTotal = useMemo(() => {
+    if (!isOption || !optQuantity || !optUnitPrice) return 0;
+    const q = Number(optQuantity) || 0;
+    const p = Number(optUnitPrice) || 0;
+    const f = Number(optFee) || 0;
+    const m = Number(optMultiplier) || 100;
+    return activityType === "BUY" ? q * p * m + f : q * p * m - f;
+  }, [isOption, optQuantity, optUnitPrice, optFee, optMultiplier, activityType]);
 
   // Transfer state
   const isTransfer = ["TRANSFER_IN", "TRANSFER_OUT"].includes(activityType);
@@ -122,6 +154,20 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
     });
   };
 
+  const handleAssetTypeChange = (value: AssetType) => {
+    if (value === "option") {
+      setValue("quoteMode" as any, QuoteMode.MARKET);
+      setValue("assetKind" as any, "OPTION");
+    } else if (value === "bond") {
+      setValue("quoteMode" as any, QuoteMode.MANUAL);
+      setValue("assetKind" as any, "BOND");
+    } else {
+      setValue("quoteMode" as any, QuoteMode.MARKET);
+      setValue("assetKind" as any, undefined);
+    }
+    setValue("assetId" as any, "");
+  };
+
   // Filter destination accounts to exclude source account (for internal transfers)
   const toAccountOptions = filteredAccounts.filter((acc) => acc.value !== accountId);
 
@@ -149,6 +195,10 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
       shouldValidate: true,
     });
   }, [accountId, currency, filteredAccounts, getFieldState, setValue]);
+
+  // Quantity label adapts to asset type
+  const quantityLabel = isOption ? "Contracts" : isBond ? "Bonds" : "Shares";
+  const priceLabel = isOption ? "Premium/Share" : isSecuritiesTransfer ? "Cost Basis" : "Price";
 
   return (
     <div className="flex h-full flex-col">
@@ -211,6 +261,15 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
                 )}
               </div>
             </>
+          )}
+
+          {/* Asset Type Selector for BUY/SELL (hidden when editing, consistent with desktop) */}
+          {isBuyOrSell && !isEditing && (
+            <AssetTypeSelector
+              control={control as any}
+              name={"assetType" as any}
+              onValueChange={handleAssetTypeChange}
+            />
           )}
 
           {/* Account — for transfers, label changes based on external/direction */}
@@ -302,55 +361,114 @@ export function MobileDetailsStep({ accounts, activityType }: MobileDetailsStepP
             )}
           />
 
-          {/* Asset Symbol */}
+          {/* Asset Symbol / Option Contract Fields */}
           {needsAssetSymbol && (
-            <SymbolSearch
-              name="assetId"
-              label="Symbol"
-              isManualAsset={isManualAsset}
-              exchangeMicName="exchangeMic"
-              quoteModeName="quoteMode"
-              currencyName="currency"
-              quoteCcyName="symbolQuoteCcy"
-              instrumentTypeName="symbolInstrumentType"
-              assetMetadataName="assetMetadata"
-              defaultCurrency={accountCurrency}
-            />
+            isOption ? (
+              <OptionContractFields
+                underlyingName={"underlyingSymbol" as any}
+                strikePriceName={"strikePrice" as any}
+                expirationDateName={"expirationDate" as any}
+                optionTypeName={"optionType" as any}
+                currencyName="currency"
+                exchangeMicName={"exchangeMic" as any}
+                quoteCcyName={"symbolQuoteCcy" as any}
+              />
+            ) : (
+              <SymbolSearch
+                name="assetId"
+                label="Symbol"
+                isManualAsset={isManualForType}
+                exchangeMicName="exchangeMic"
+                quoteModeName="quoteMode"
+                currencyName="currency"
+                quoteCcyName="symbolQuoteCcy"
+                instrumentTypeName="symbolInstrumentType"
+                assetMetadataName="assetMetadata"
+                defaultCurrency={accountCurrency}
+              />
+            )
           )}
 
           {/* Quantity and Unit Price */}
           {needsQuantity && (
-            <div className={needsUnitPrice ? "grid grid-cols-2 gap-3" : ""}>
-              <FormField
-                control={control}
-                name="quantity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-base font-medium">Shares</FormLabel>
-                    <FormControl>
-                      <QuantityInput {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              {needsUnitPrice && (
+            <>
+              <div className={needsUnitPrice ? "grid grid-cols-2 gap-3" : ""}>
                 <FormField
                   control={control}
-                  name="unitPrice"
+                  name="quantity"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-base font-medium">
-                        {isSecuritiesTransfer ? "Cost Basis" : "Price"}
-                      </FormLabel>
+                      <FormLabel className="text-base font-medium">{quantityLabel}</FormLabel>
                       <FormControl>
-                        <MoneyInput {...field} />
+                        <QuantityInput {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                {needsUnitPrice && (
+                  <FormField
+                    control={control}
+                    name="unitPrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base font-medium">{priceLabel}</FormLabel>
+                        <FormControl>
+                          <MoneyInput {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </div>
+
+              {/* Shares breakdown for options */}
+              {isOption && optQuantity && (
+                <div className="text-muted-foreground -mt-2 flex items-center gap-1.5 px-1 text-xs">
+                  <span>
+                    {Number(optQuantity) * (Number(optMultiplier) || 100)} shares
+                  </span>
+                  <span>·</span>
+                  <input
+                    type="number"
+                    {...register("contractMultiplier" as any, { valueAsNumber: true })}
+                    className="hover:border-input focus:border-input focus:bg-background focus:ring-ring h-5 w-14 rounded border border-transparent bg-transparent px-1 text-center text-xs tabular-nums focus:outline-none focus:ring-1"
+                    aria-label="Contract Multiplier"
+                  />
+                  <span>x</span>
+                </div>
               )}
+            </>
+          )}
+
+          {/* Option Total Premium/Credit */}
+          {isOption && optQuantity && optUnitPrice && (
+            <div className="bg-muted/50 border-border rounded-lg border p-3">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                    {activityType === "BUY" ? "Total Debit" : "Total Credit"}
+                  </span>
+                  <p className="text-muted-foreground mt-0.5 truncate text-xs tabular-nums">
+                    {Number(optQuantity)} × {Number(optUnitPrice)} × {Number(optMultiplier) || 100}
+                    {Number(optFee) > 0 && (
+                      <>
+                        {" "}
+                        {activityType === "BUY" ? "+" : "−"} {Number(optFee)}
+                      </>
+                    )}
+                  </p>
+                </div>
+                <span className="text-lg font-semibold tabular-nums">
+                  {new Intl.NumberFormat("en-US", {
+                    style: currency ? "currency" : "decimal",
+                    currency: currency || undefined,
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  }).format(optionTotal)}
+                </span>
+              </div>
             </div>
           )}
 

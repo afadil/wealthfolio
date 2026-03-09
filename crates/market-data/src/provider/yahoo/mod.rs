@@ -855,6 +855,8 @@ impl MarketDataProvider for YahooProvider {
                 InstrumentKind::Equity,
                 InstrumentKind::Crypto,
                 InstrumentKind::Fx,
+                InstrumentKind::Option,
+                InstrumentKind::Metal,
             ],
             coverage: Coverage::global_best_effort(),
             supports_latest: true,
@@ -1338,6 +1340,8 @@ mod tests {
                 InstrumentKind::Equity,
                 InstrumentKind::Crypto,
                 InstrumentKind::Fx,
+                InstrumentKind::Option,
+                InstrumentKind::Metal,
             ],
             coverage: Coverage::global_best_effort(),
             supports_latest: true,
@@ -1353,6 +1357,12 @@ mod tests {
             .instrument_kinds
             .contains(&InstrumentKind::Crypto));
         assert!(capabilities.instrument_kinds.contains(&InstrumentKind::Fx));
+        assert!(capabilities
+            .instrument_kinds
+            .contains(&InstrumentKind::Option));
+        assert!(capabilities
+            .instrument_kinds
+            .contains(&InstrumentKind::Metal));
         assert!(capabilities.supports_latest);
         assert!(capabilities.supports_historical);
         assert!(capabilities.supports_search);

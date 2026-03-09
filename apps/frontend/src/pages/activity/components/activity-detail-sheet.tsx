@@ -1,4 +1,5 @@
 import { ActivityStatus, ActivityTypeNames, SUBTYPE_DISPLAY_NAMES } from "@/lib/constants";
+import { parseOccSymbol } from "@/lib/occ-symbol";
 import type { ActivityDetails } from "@/lib/types";
 import {
   Badge,
@@ -89,6 +90,15 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
     return format(d, "PP");
   };
 
+  // Parse OCC symbol for option activities
+  const isOption = activity.instrumentType === "OPTION";
+  const parsedOption = isOption ? parseOccSymbol(activity.assetSymbol ?? "") : null;
+
+  // Format option expiration for display (YYYY-MM-DD → "Mar 29, 2025")
+  const optionExpirationDisplay = parsedOption?.expiration
+    ? format(new Date(parsedOption.expiration + "T12:00:00"), "PP")
+    : undefined;
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
@@ -100,7 +110,7 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
             <div className="flex flex-col items-start">
               <span>Activity Details</span>
               <span className="text-muted-foreground text-xs font-normal">
-                {activity.assetSymbol || "Cash Transaction"}
+                {parsedOption ? parsedOption.underlying : activity.assetSymbol || "Cash Transaction"}
               </span>
             </div>
           </SheetTitle>
@@ -114,11 +124,22 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
                 <div className="text-muted-foreground mb-1 text-xs uppercase tracking-wide">
                   {ActivityTypeNames[activity.activityType] || activity.activityType}
                 </div>
-                {activity.assetSymbol && (
-                  <div className="text-xl font-bold">{activity.assetSymbol}</div>
-                )}
-                {activity.assetName && (
-                  <div className="text-muted-foreground text-sm">{activity.assetName}</div>
+                {parsedOption ? (
+                  <>
+                    <div className="text-xl font-bold">{parsedOption.underlying}</div>
+                    <div className="text-muted-foreground text-sm">
+                      {optionExpirationDisplay} ${parsedOption.strikePrice} {parsedOption.optionType}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {activity.assetSymbol && (
+                      <div className="text-xl font-bold">{activity.assetSymbol}</div>
+                    )}
+                    {activity.assetName && (
+                      <div className="text-muted-foreground text-sm">{activity.assetName}</div>
+                    )}
+                  </>
                 )}
               </div>
               <div className="flex flex-col items-end gap-2">
@@ -161,11 +182,34 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
             <DetailRow label="Account" value={activity.accountName} />
           </DetailSection>
 
+          {/* Option Contract Details */}
+          {parsedOption && (
+            <DetailSection title="Option Contract" icon={<Icons.BarChart className="h-4 w-4" />}>
+              <DetailRow label="Underlying" value={parsedOption.underlying} />
+              <DetailRow
+                label="Type"
+                value={
+                  <Badge variant="outline">
+                    {parsedOption.optionType}
+                  </Badge>
+                }
+              />
+              <DetailRow
+                label="Strike Price"
+                value={
+                  <AmountDisplay value={parsedOption.strikePrice} currency={activity.currency} />
+                }
+              />
+              <DetailRow label="Expiration" value={optionExpirationDisplay} />
+              <DetailRow label="OCC Symbol" value={activity.assetSymbol} />
+            </DetailSection>
+          )}
+
           {/* Financial Details */}
           <DetailSection title="Financial Details" icon={<Icons.DollarSign className="h-4 w-4" />}>
             {Number(activity.quantity) !== 0 && (
               <DetailRow
-                label="Quantity"
+                label={isOption ? "Contracts" : "Quantity"}
                 value={Number(activity.quantity).toLocaleString(undefined, {
                   maximumFractionDigits: 8,
                 })}
@@ -173,14 +217,14 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
             )}
             {Number(activity.unitPrice) !== 0 && (
               <DetailRow
-                label="Unit Price"
+                label={isOption ? "Premium/Share" : "Unit Price"}
                 value={
                   <AmountDisplay value={Number(activity.unitPrice)} currency={activity.currency} />
                 }
               />
             )}
             <DetailRow
-              label="Amount"
+              label={isOption ? "Total Premium" : "Amount"}
               value={<AmountDisplay value={Number(activity.amount)} currency={activity.currency} />}
             />
             {Number(activity.fee) !== 0 && (

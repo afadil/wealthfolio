@@ -513,6 +513,7 @@ impl AssetServiceTrait for AssetService {
         };
 
         let name = metadata.as_ref().and_then(|m| m.name.clone());
+        let asset_metadata_json = metadata.as_ref().and_then(|m| m.asset_metadata.clone());
         let canonical_identity = canonicalize_market_identity(
             instrument_type.clone(),
             metadata
@@ -535,6 +536,7 @@ impl AssetServiceTrait for AssetService {
                 .display_code
                 .or_else(|| metadata.as_ref().and_then(|m| m.display_code.clone())),
             provider_config,
+            metadata: asset_metadata_json,
             is_active: true,
             ..Default::default()
         };

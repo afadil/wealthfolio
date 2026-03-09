@@ -1171,6 +1171,7 @@ mod tests {
         assert!(caps.instrument_kinds.contains(&InstrumentKind::Equity));
         assert!(caps.instrument_kinds.contains(&InstrumentKind::Crypto));
         assert!(caps.instrument_kinds.contains(&InstrumentKind::Fx));
+        assert!(!caps.instrument_kinds.contains(&InstrumentKind::Option));
         assert!(caps.supports_latest);
         assert!(caps.supports_historical);
         assert!(caps.supports_search); // Via SYMBOL_SEARCH endpoint

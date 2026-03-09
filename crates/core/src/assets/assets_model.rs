@@ -322,9 +322,14 @@ impl Asset {
     /// For options, this is the number of shares per contract (typically 100).
     /// For all other instruments it is 1.
     pub fn contract_multiplier(&self) -> Decimal {
-        self.option_spec()
-            .map(|s| s.multiplier)
-            .unwrap_or(Decimal::ONE)
+        if let Some(spec) = self.option_spec() {
+            spec.multiplier
+        } else if self.is_option() {
+            // Option without metadata — default to standard 100 multiplier
+            Decimal::from(100)
+        } else {
+            Decimal::ONE
+        }
     }
 
     /// Returns the weight in troy ounces for a precious metal position.
@@ -609,9 +614,8 @@ impl NewAsset {
 
     /// Creates a new bond asset from a BondSpec and ISIN.
     ///
-    /// Bonds use Manual quote mode by default — prices are fetched via the
-    /// US_TREASURY_CALC or BOERSE_FRANKFURT providers and stored as quotes,
-    /// but the asset itself is not priced live like equities.
+    /// Bonds use Market quote mode — prices are fetched via the
+    /// US_TREASURY_CALC or BOERSE_FRANKFURT providers.
     pub fn new_bond(isin: &str, name: Option<String>, spec: BondSpec, currency: &str) -> Self {
         let display = name.clone().unwrap_or_else(|| isin.to_uppercase());
 
@@ -764,6 +768,8 @@ pub struct AssetMetadata {
     pub display_code: Option<String>,
     /// Input quote currency provided by caller/search/provider (e.g. "GBp").
     pub requested_quote_ccy: Option<String>,
+    /// Structured metadata (e.g. OptionSpec under "option", BondSpec under "bond").
+    pub asset_metadata: Option<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

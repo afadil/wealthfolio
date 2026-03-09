@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import { ActivityType, QuoteMode } from "@/lib/constants";
+import { parseOccSymbol } from "@/lib/occ-symbol";
 import type { ActivityDetails } from "@/lib/types";
 import { BuyForm, type BuyFormValues } from "../components/forms/buy-form";
 import { SellForm, type SellFormValues } from "../components/forms/sell-form";
@@ -81,19 +82,51 @@ export const ACTIVITY_FORM_CONFIG: Record<
   BUY: {
     component: BuyForm as ComponentType<ActivityFormComponentProps<ActivityFormValues>>,
     activityType: ActivityType.BUY,
-    getDefaults: (activity, accounts) => ({
-      ...getBaseDefaults(activity, accounts),
-      assetId: activity?.assetSymbol ?? activity?.assetId ?? "",
-      quantity: activity?.quantity,
-      unitPrice: activity?.unitPrice,
-      amount: activity?.amount,
-      fee: activity?.fee ?? "0",
-      quoteMode: activity?.assetQuoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
-      // Advanced options
-      currency: activity?.currency,
-      fxRate: activity?.fxRate ?? undefined,
-      exchangeMic: activity?.exchangeMic,
-    }),
+    getDefaults: (activity, accounts) => {
+      const base = {
+        ...getBaseDefaults(activity, accounts),
+        assetId: activity?.assetSymbol ?? activity?.assetId ?? "",
+        quantity: activity?.quantity,
+        unitPrice: activity?.unitPrice,
+        amount: activity?.amount,
+        fee: activity?.fee ?? "0",
+        quoteMode: activity?.assetQuoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
+        // Advanced options
+        currency: activity?.currency,
+        fxRate: activity?.fxRate ?? undefined,
+        exchangeMic: activity?.exchangeMic,
+      };
+
+      // Populate option-specific fields from OCC symbol when editing
+      if (activity?.instrumentType === "OPTION") {
+        const parsed = parseOccSymbol(activity.assetSymbol ?? "");
+        return {
+          ...base,
+          assetType: "option" as const,
+          assetKind: "OPTION",
+          symbolInstrumentType: "OPTION",
+          symbolQuoteCcy: activity?.currency ?? undefined,
+          underlyingSymbol: parsed?.underlying ?? "",
+          strikePrice: parsed?.strikePrice,
+          expirationDate: parsed?.expiration,
+          optionType: parsed?.optionType,
+          contractMultiplier: 100,
+        };
+      }
+
+      // Populate bond-specific fields when editing
+      if (activity?.instrumentType === "BOND") {
+        return {
+          ...base,
+          assetType: "bond" as const,
+          assetKind: "BOND",
+          symbolInstrumentType: "BOND",
+          symbolQuoteCcy: activity?.currency ?? undefined,
+        };
+      }
+
+      return base;
+    },
     toPayload: (data) => {
       const d = data as BuyFormValues;
       return {
@@ -108,6 +141,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
         exchangeMic: d.exchangeMic ?? undefined,
         symbolQuoteCcy: d.symbolQuoteCcy ?? undefined,
         symbolInstrumentType: d.symbolInstrumentType ?? undefined,
+        assetKind: d.assetKind ?? undefined,
         currency: d.currency,
         fxRate: d.fxRate,
         assetMetadata: d.assetMetadata
@@ -124,19 +158,51 @@ export const ACTIVITY_FORM_CONFIG: Record<
   SELL: {
     component: SellForm as ComponentType<ActivityFormComponentProps<ActivityFormValues>>,
     activityType: ActivityType.SELL,
-    getDefaults: (activity, accounts) => ({
-      ...getBaseDefaults(activity, accounts),
-      assetId: activity?.assetSymbol ?? activity?.assetId ?? "",
-      quantity: activity?.quantity,
-      unitPrice: activity?.unitPrice,
-      amount: activity?.amount,
-      fee: activity?.fee ?? "0",
-      quoteMode: activity?.assetQuoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
-      // Advanced options
-      currency: activity?.currency,
-      fxRate: activity?.fxRate ?? undefined,
-      exchangeMic: activity?.exchangeMic,
-    }),
+    getDefaults: (activity, accounts) => {
+      const base = {
+        ...getBaseDefaults(activity, accounts),
+        assetId: activity?.assetSymbol ?? activity?.assetId ?? "",
+        quantity: activity?.quantity,
+        unitPrice: activity?.unitPrice,
+        amount: activity?.amount,
+        fee: activity?.fee ?? "0",
+        quoteMode: activity?.assetQuoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
+        // Advanced options
+        currency: activity?.currency,
+        fxRate: activity?.fxRate ?? undefined,
+        exchangeMic: activity?.exchangeMic,
+      };
+
+      // Populate option-specific fields from OCC symbol when editing
+      if (activity?.instrumentType === "OPTION") {
+        const parsed = parseOccSymbol(activity.assetSymbol ?? "");
+        return {
+          ...base,
+          assetType: "option" as const,
+          assetKind: "OPTION",
+          symbolInstrumentType: "OPTION",
+          symbolQuoteCcy: activity?.currency ?? undefined,
+          underlyingSymbol: parsed?.underlying ?? "",
+          strikePrice: parsed?.strikePrice,
+          expirationDate: parsed?.expiration,
+          optionType: parsed?.optionType,
+          contractMultiplier: 100,
+        };
+      }
+
+      // Populate bond-specific fields when editing
+      if (activity?.instrumentType === "BOND") {
+        return {
+          ...base,
+          assetType: "bond" as const,
+          assetKind: "BOND",
+          symbolInstrumentType: "BOND",
+          symbolQuoteCcy: activity?.currency ?? undefined,
+        };
+      }
+
+      return base;
+    },
     toPayload: (data) => {
       const d = data as SellFormValues;
       return {
@@ -151,6 +217,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
         exchangeMic: d.exchangeMic ?? undefined,
         symbolQuoteCcy: d.symbolQuoteCcy ?? undefined,
         symbolInstrumentType: d.symbolInstrumentType ?? undefined,
+        assetKind: d.assetKind ?? undefined,
         currency: d.currency,
         fxRate: d.fxRate,
         assetMetadata: d.assetMetadata
@@ -282,6 +349,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
         amount: d.amount ?? undefined,
         assetId: d.assetId ?? undefined,
         quantity: d.quantity ?? undefined,
+        unitPrice: d.unitPrice ?? undefined,
         comment: d.comment ?? undefined,
         subtype: d.subtype ?? undefined,
         currency: d.currency,

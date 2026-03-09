@@ -6,6 +6,7 @@ use crate::portfolio::snapshot::AccountStateSnapshot;
 use crate::portfolio::snapshot::HoldingsCalculationResult;
 use crate::portfolio::snapshot::HoldingsCalculationWarning;
 use crate::portfolio::snapshot::Position;
+use crate::utils::occ_symbol::looks_like_occ_symbol;
 use crate::utils::time_utils::{activity_date_in_tz, parse_user_timezone_or_default};
 
 use chrono::{DateTime, NaiveDate, Utc};
@@ -236,6 +237,8 @@ impl HoldingsCalculator {
             ActivityType::TransferOut => {
                 self.handle_transfer_out(activity, state, account_currency, asset_cache)
             }
+            // Split activities are NO-OPs here: the snapshot service retroactively
+            // adjusts historical activity quantities/prices before the calculator runs.
             ActivityType::Split => Ok(()),
             ActivityType::Adjustment => self.handle_adjustment(activity, state, asset_cache),
             ActivityType::Unknown => {
@@ -646,10 +649,16 @@ impl HoldingsCalculator {
                         activity.id
                     );
                 }
+                // For options, price is per-share but each contract covers `multiplier` shares
+                let multiplier = asset_cache
+                    .get(asset_id)
+                    .map(|(_, _, m)| *m)
+                    .unwrap_or(Decimal::ONE);
+
                 let (unit_price_for_lot, fee_for_lot, fx_rate_used) = if needs_conversion {
                     let (converted_price, converted_fee, fx_rate) = self
                         .convert_to_position_currency(
-                            activity.price(),
+                            activity.price() * multiplier,
                             activity.fee_amt(),
                             activity,
                             &position_currency,
@@ -657,7 +666,7 @@ impl HoldingsCalculator {
                         )?;
                     (converted_price, converted_fee, fx_rate)
                 } else {
-                    (activity.price(), activity.fee_amt(), None)
+                    (activity.price() * multiplier, activity.fee_amt(), None)
                 };
 
                 position.add_lot_values(
@@ -868,11 +877,16 @@ impl HoldingsCalculator {
     ) {
         if !asset_id.is_empty() && !cache.contains_key(asset_id) {
             let (ccy, is_alt, multiplier) = self.get_position_info(asset_id).unwrap_or_else(|_| {
+                let fallback_multiplier = if looks_like_occ_symbol(asset_id) {
+                    Decimal::from(100)
+                } else {
+                    Decimal::ONE
+                };
                 warn!(
-                    "Failed to get asset info for {}, using activity currency {}",
-                    asset_id, activity_currency
+                    "Failed to get asset info for {}, using activity currency {} and multiplier {}",
+                    asset_id, activity_currency, fallback_multiplier
                 );
-                (activity_currency.to_string(), false, Decimal::ONE)
+                (activity_currency.to_string(), false, fallback_multiplier)
             });
             cache.insert(asset_id.to_string(), (ccy, is_alt, multiplier));
         }
@@ -1016,14 +1030,18 @@ impl HoldingsCalculator {
 
         // Ensure cache is populated for this asset
         if !cache.contains_key(asset_id) {
-            let (ccy, is_alt, multiplier) =
-                self.get_position_info(asset_id).unwrap_or_else(|_| {
-                    warn!(
-                        "Failed to get asset info for {}, using activity currency {} and is_alternative=false",
-                        asset_id, activity_currency
-                    );
-                    (activity_currency.to_string(), false, Decimal::ONE)
-                });
+            let (ccy, is_alt, multiplier) = self.get_position_info(asset_id).unwrap_or_else(|_| {
+                let fallback_multiplier = if looks_like_occ_symbol(asset_id) {
+                    Decimal::from(100)
+                } else {
+                    Decimal::ONE
+                };
+                warn!(
+                    "Failed to get asset info for {}, using activity currency {} and multiplier {}",
+                    asset_id, activity_currency, fallback_multiplier
+                );
+                (activity_currency.to_string(), false, fallback_multiplier)
+            });
             cache.insert(asset_id.to_string(), (ccy, is_alt, multiplier));
         }
 

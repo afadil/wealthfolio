@@ -19,7 +19,7 @@ export function MobileActivitySteps({
   const activityType = watch("activityType");
 
   if (isEditing) {
-    return <MobileDetailsStep activityType={activityType} accounts={accounts} />;
+    return <MobileDetailsStep activityType={activityType} accounts={accounts} isEditing />;
   }
 
   return (

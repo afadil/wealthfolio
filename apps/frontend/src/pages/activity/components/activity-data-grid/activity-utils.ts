@@ -289,6 +289,10 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
   } else if (field === "isExternal") {
     // isExternal flag for TRANSFER_IN/TRANSFER_OUT (stored in metadata.flow.is_external)
     updated = { ...updated, isExternal: Boolean(value) };
+  } else if (field === "instrumentType") {
+    // Instrument type (EQUITY, OPTION, BOND, etc.) — also set pendingInstrumentType for save payload
+    const instrumentType = typeof value === "string" && value ? value : undefined;
+    updated = { ...updated, instrumentType, pendingInstrumentType: instrumentType };
   }
 
   return { ...updated, updatedAt: new Date() };
@@ -513,6 +517,7 @@ export const TRACKED_FIELDS: (keyof LocalTransaction)[] = [
   "activityType",
   "subtype",
   "isExternal",
+  "instrumentType",
   "date",
   "assetSymbol",
   "quantity",

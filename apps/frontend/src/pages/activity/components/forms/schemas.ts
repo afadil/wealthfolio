@@ -100,7 +100,7 @@ export const bulkHoldingsFormSchema = baseActivitySchema.extend({
 
 export const tradeActivitySchema = baseActivitySchema.extend({
   activityType: z.enum([ActivityType.BUY, ActivityType.SELL]),
-  assetId: z.string().min(1, { message: "Please select a security" }),
+  assetId: z.string().default(""), // Relaxed: options build OCC symbol at submit
   quantity: z.coerce
     .number({
       required_error: "Please enter a valid quantity.",
@@ -121,6 +121,15 @@ export const tradeActivitySchema = baseActivitySchema.extend({
     .min(0, { message: "Fee must be a non-negative number." })
     .default(0),
   quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).default(QuoteMode.MARKET),
+  // Asset type selection (stock/option/bond)
+  assetType: z.enum(["stock", "option", "bond"]).default("stock"),
+  assetKind: z.string().optional(),
+  // Option-specific fields
+  underlyingSymbol: z.string().optional(),
+  strikePrice: z.coerce.number().positive().optional(),
+  expirationDate: z.string().optional(),
+  optionType: z.enum(["CALL", "PUT"]).optional(),
+  contractMultiplier: z.coerce.number().positive().default(100).optional(),
 });
 
 // Cash activity schema - DEPOSIT/WITHDRAWAL only
