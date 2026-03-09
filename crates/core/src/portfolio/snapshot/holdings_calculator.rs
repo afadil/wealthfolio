@@ -6,7 +6,6 @@ use crate::portfolio::snapshot::AccountStateSnapshot;
 use crate::portfolio::snapshot::HoldingsCalculationResult;
 use crate::portfolio::snapshot::HoldingsCalculationWarning;
 use crate::portfolio::snapshot::Position;
-use crate::utils::occ_symbol::looks_like_occ_symbol;
 use crate::utils::time_utils::{activity_date_in_tz, parse_user_timezone_or_default};
 
 use chrono::{DateTime, NaiveDate, Utc};
@@ -877,16 +876,11 @@ impl HoldingsCalculator {
     ) {
         if !asset_id.is_empty() && !cache.contains_key(asset_id) {
             let (ccy, is_alt, multiplier) = self.get_position_info(asset_id).unwrap_or_else(|_| {
-                let fallback_multiplier = if looks_like_occ_symbol(asset_id) {
-                    Decimal::from(100)
-                } else {
-                    Decimal::ONE
-                };
                 warn!(
-                    "Failed to get asset info for {}, using activity currency {} and multiplier {}",
-                    asset_id, activity_currency, fallback_multiplier
+                    "Failed to get asset info for {}, using activity currency {} and multiplier 1",
+                    asset_id, activity_currency
                 );
-                (activity_currency.to_string(), false, fallback_multiplier)
+                (activity_currency.to_string(), false, Decimal::ONE)
             });
             cache.insert(asset_id.to_string(), (ccy, is_alt, multiplier));
         }
@@ -1028,22 +1022,7 @@ impl HoldingsCalculator {
             )));
         }
 
-        // Ensure cache is populated for this asset
-        if !cache.contains_key(asset_id) {
-            let (ccy, is_alt, multiplier) = self.get_position_info(asset_id).unwrap_or_else(|_| {
-                let fallback_multiplier = if looks_like_occ_symbol(asset_id) {
-                    Decimal::from(100)
-                } else {
-                    Decimal::ONE
-                };
-                warn!(
-                    "Failed to get asset info for {}, using activity currency {} and multiplier {}",
-                    asset_id, activity_currency, fallback_multiplier
-                );
-                (activity_currency.to_string(), false, fallback_multiplier)
-            });
-            cache.insert(asset_id.to_string(), (ccy, is_alt, multiplier));
-        }
+        self.ensure_asset_cached(asset_id, activity_currency, cache);
 
         let (ref position_currency, is_alternative, multiplier) = cache[asset_id];
 

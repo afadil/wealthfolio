@@ -4871,14 +4871,15 @@ mod tests {
     }
 
     #[test]
-    fn test_option_asset_not_in_repo_defaults_multiplier_to_100() {
-        // When an option activity references an asset_id that is NOT in the repository,
-        // the fallback should detect the OCC symbol and use multiplier=100 (not 1).
+    fn test_asset_not_in_repo_falls_back_to_multiplier_1() {
+        // When an asset is NOT in the repository, the fallback uses multiplier=1.
+        // The proper multiplier comes from asset metadata (OptionSpec) in the success path.
+        // This degraded path logs a warning and uses safe defaults.
 
         let mock_fx_service = MockFxService::new();
         let base_currency = Arc::new(RwLock::new("USD".to_string()));
 
-        // Use a bare MockAssetRepository with NO option asset added
+        // Use a bare MockAssetRepository with NO assets
         let repo = MockAssetRepository::new();
 
         let calculator =
@@ -4886,7 +4887,6 @@ mod tests {
 
         let previous_snapshot = create_initial_snapshot("acc_1", "USD", "2023-12-31");
 
-        // OCC symbol that is NOT registered in the mock repo
         let occ_symbol = "TSLA  250321C00250000";
 
         let transfer_in = create_external_transfer_activity(
@@ -4909,15 +4909,13 @@ mod tests {
             .snapshot
             .positions
             .get(occ_symbol)
-            .expect("Option position should exist even when asset not in repo");
+            .expect("Position should exist even when asset not in repo");
 
         assert_eq!(pos.quantity, dec!(3));
-        // cost_basis = qty * price * multiplier = 3 * 10 * 100 = 3000
-        assert_eq!(pos.total_cost_basis, dec!(3000));
-        // average_cost = price * multiplier = 10 * 100 = 1000 per contract
-        assert_eq!(pos.average_cost, dec!(1000));
-        // multiplier should be 100
-        assert_eq!(pos.contract_multiplier, dec!(100));
+        // Fallback multiplier is 1 (asset missing from repo — degraded state)
+        assert_eq!(pos.total_cost_basis, dec!(30));
+        assert_eq!(pos.average_cost, dec!(10));
+        assert_eq!(pos.contract_multiplier, dec!(1));
     }
 
     #[test]
