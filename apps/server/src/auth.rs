@@ -76,7 +76,7 @@ struct AuthErrorBody {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Claims {
+pub(crate) struct Claims {
     sub: String,
     exp: usize,
     iat: usize,
@@ -143,9 +143,9 @@ impl AuthManager {
             .map_err(|e| AuthError::Internal(format!("Failed to sign token: {e}")))
     }
 
-    pub fn validate_token(&self, token: &str) -> Result<(), AuthError> {
+    pub(crate) fn validate_token(&self, token: &str) -> Result<Claims, AuthError> {
         decode::<Claims>(token, &self.decoding_key, &self.validation)
-            .map(|_| ())
+            .map(|data| data.claims)
             .map_err(|err| match err.kind() {
                 jsonwebtoken::errors::ErrorKind::ExpiredSignature
                 | jsonwebtoken::errors::ErrorKind::InvalidToken
@@ -155,6 +155,15 @@ impl AuthManager {
                 }
                 other => AuthError::Internal(format!("Failed to validate token: {other:?}")),
             })
+    }
+
+    /// Returns `true` if the token is past 50% of its TTL and should be refreshed.
+    pub(crate) fn should_refresh(&self, claims: &Claims) -> bool {
+        let Ok(now) = SystemTime::now().duration_since(UNIX_EPOCH) else {
+            return false;
+        };
+        let elapsed = now.as_secs().saturating_sub(claims.iat as u64);
+        elapsed > self.token_ttl.as_secs() / 2
     }
 
     pub fn expires_in(&self) -> Duration {
@@ -289,7 +298,7 @@ pub async fn auth_me(
         return Ok(Json(serde_json::json!({"authenticated": true})));
     };
     let token = extract_token(&request)?;
-    auth.validate_token(&token)?;
+    auth.validate_token(&token).map(|_| ())?;
     Ok(Json(serde_json::json!({"authenticated": true})))
 }
 
@@ -313,8 +322,25 @@ pub async fn require_jwt(
     };
 
     let token = extract_token(&request)?;
-    auth.validate_token(&token)?;
-    Ok(next.run(request).await)
+    let claims = auth.validate_token(&token)?;
+
+    // Sliding session: refresh the cookie when past 50% of TTL
+    let needs_refresh = auth.should_refresh(&claims);
+    let secure = needs_refresh.then(|| auth.should_secure_cookie(request.headers()));
+
+    let mut response = next.run(request).await;
+
+    if needs_refresh {
+        if let Ok(new_token) = auth.issue_token() {
+            let ttl_secs = auth.expires_in().as_secs();
+            let cookie = build_session_cookie(&new_token, ttl_secs, secure.unwrap_or(false));
+            if let Ok(val) = HeaderValue::from_str(&cookie) {
+                response.headers_mut().insert(SET_COOKIE, val);
+            }
+        }
+    }
+
+    Ok(response)
 }
 
 fn extract_token(request: &Request<Body>) -> Result<String, AuthError> {
