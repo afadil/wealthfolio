@@ -205,6 +205,15 @@ impl AssetService {
             QuoteMode::Manual => None,
         };
 
+        let resolved_symbol = canonical
+            .instrument_symbol
+            .clone()
+            .or(spec.instrument_symbol.clone());
+        let metadata = super::build_asset_metadata(
+            spec.instrument_type.as_ref(),
+            resolved_symbol.as_deref().unwrap_or(""),
+        );
+
         NewAsset {
             id: spec.id.clone(),
             kind: spec.kind.clone(),
@@ -213,12 +222,11 @@ impl AssetService {
             quote_mode,
             quote_ccy: resolved_quote_ccy,
             instrument_type: spec.instrument_type.clone(),
-            instrument_symbol: canonical
-                .instrument_symbol
-                .or(spec.instrument_symbol.clone()),
+            instrument_symbol: resolved_symbol,
             instrument_exchange_mic: resolved_mic,
             provider_config,
             is_active: true,
+            metadata,
             ..Default::default()
         }
     }

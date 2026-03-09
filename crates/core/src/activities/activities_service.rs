@@ -20,7 +20,7 @@ use crate::activities::{
 use crate::assets::{
     normalize_quote_ccy_code, parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix,
     resolve_quote_ccy_precedence, symbol_resolution_candidates, AssetKind, AssetServiceTrait,
-    BondSpec, InstrumentType, OptionSpec, QuoteCcyResolutionSource, QuoteMode,
+    InstrumentType, QuoteCcyResolutionSource, QuoteMode,
 };
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::fx::currency::{get_normalization_rule, normalize_amount, resolve_currency};
@@ -583,36 +583,12 @@ impl ActivityService {
 
 impl ActivityService {
     /// Builds structured asset metadata (OptionSpec, BondSpec) for the given instrument type.
-    ///
-    /// Returns `Some(Value)` when the instrument type is Option, Bond, or Metal and metadata
-    /// can be constructed from the symbol. Returns `None` for other instrument types or
-    /// when the symbol cannot be parsed.
+    /// Delegates to the shared `build_asset_metadata` in assets_model.
     fn build_asset_metadata(
         instrument_type: Option<&InstrumentType>,
         symbol: &str,
     ) -> Option<serde_json::Value> {
-        match instrument_type? {
-            InstrumentType::Option => {
-                let parsed = crate::utils::occ_symbol::parse_occ_symbol(symbol).ok()?;
-                let spec = OptionSpec {
-                    underlying_asset_id: parsed.underlying.clone(),
-                    expiration: parsed.expiration,
-                    right: parsed.option_type.as_str().to_string(),
-                    strike: parsed.strike_price,
-                    multiplier: rust_decimal::Decimal::from(100),
-                    occ_symbol: Some(parsed.to_occ_symbol()),
-                };
-                Some(serde_json::json!({ "option": spec }))
-            }
-            InstrumentType::Bond => {
-                let spec = BondSpec {
-                    isin: Some(symbol.to_uppercase()),
-                    ..Default::default()
-                };
-                Some(serde_json::json!({ "bond": spec }))
-            }
-            _ => None,
-        }
+        crate::assets::build_asset_metadata(instrument_type, symbol)
     }
 
     /// Infers the asset kind and instrument type from symbol, exchange, and input values.
@@ -682,7 +658,12 @@ impl ActivityService {
             return (AssetKind::Investment, Some(InstrumentType::Option));
         }
 
-        // 6. Default to equity (most common case)
+        // 6. ISIN heuristic (12-char alphanumeric with 2-letter country prefix)
+        if crate::utils::isin::looks_like_isin(&upper_symbol) {
+            return (AssetKind::Investment, Some(InstrumentType::Bond));
+        }
+
+        // 7. Default to equity (most common case)
         (AssetKind::Investment, Some(InstrumentType::Equity))
     }
 
@@ -1561,9 +1542,13 @@ impl ActivityService {
             Some(InstrumentType::Crypto | InstrumentType::Fx)
         );
         let exchange_mic = if is_non_security { None } else { exchange_mic };
+        let is_option = instrument_type.as_ref() == Some(&InstrumentType::Option);
         let normalized_symbol = if is_crypto {
             parse_crypto_pair_symbol(base_symbol)
                 .map(|(base, _)| base)
+                .unwrap_or_else(|| base_symbol.to_string())
+        } else if is_option {
+            crate::utils::occ_symbol::normalize_option_symbol(base_symbol)
                 .unwrap_or_else(|| base_symbol.to_string())
         } else {
             base_symbol.to_string()

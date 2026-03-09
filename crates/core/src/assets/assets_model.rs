@@ -123,6 +123,38 @@ pub struct BondSpec {
     pub isin: Option<String>,
 }
 
+/// Builds structured asset metadata (OptionSpec, BondSpec) for the given instrument type.
+///
+/// Returns `Some(Value)` when the instrument type is Option or Bond and metadata
+/// can be constructed from the symbol. Returns `None` for other types or unparseable symbols.
+pub fn build_asset_metadata(
+    instrument_type: Option<&InstrumentType>,
+    symbol: &str,
+) -> Option<serde_json::Value> {
+    match instrument_type? {
+        InstrumentType::Option => {
+            let parsed = crate::utils::occ_symbol::parse_occ_symbol(symbol).ok()?;
+            let spec = OptionSpec {
+                underlying_asset_id: parsed.underlying.clone(),
+                expiration: parsed.expiration,
+                right: parsed.option_type.as_str().to_string(),
+                strike: parsed.strike_price,
+                multiplier: Decimal::from(100),
+                occ_symbol: Some(parsed.to_occ_symbol()),
+            };
+            Some(serde_json::json!({ "option": spec }))
+        }
+        InstrumentType::Bond => {
+            let spec = BondSpec {
+                isin: Some(symbol.to_uppercase()),
+                ..Default::default()
+            };
+            Some(serde_json::json!({ "bond": spec }))
+        }
+        _ => None,
+    }
+}
+
 /// Parse a metal weight-in-troy-ounces from a symbol weight suffix.
 ///
 /// Symbol format: BASE[-SUFFIX] e.g. "XAU", "XAU-1KG", "XAG-100G"
