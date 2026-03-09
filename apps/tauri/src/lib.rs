@@ -56,7 +56,6 @@ mod desktop {
     /// Initializes desktop-specific plugins.
     pub fn init_plugins(handle: &AppHandle) {
         let _ = handle.plugin(tauri_plugin_updater::Builder::new().build());
-        let _ = handle.plugin(tauri_plugin_window_state::Builder::new().build());
     }
 
     /// Performs synchronous setup on desktop: initializes context, menu, and registers listeners.
@@ -187,7 +186,7 @@ fn get_app_data_dir(handle: &AppHandle) -> Result<String, Box<dyn std::error::Er
 pub fn run() {
     dotenv().ok();
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(if cfg!(debug_assertions) {
@@ -205,7 +204,12 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_deep_link::init());
+
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
+
+    builder
         .setup(|app| {
             let handle = app.handle().clone();
 

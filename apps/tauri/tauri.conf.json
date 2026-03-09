@@ -65,8 +65,7 @@
         "hiddenTitle": true,
         "title": "Wealthfolio",
         "width": 1440,
-        "height": 960,
-        "center": true
+        "height": 960
       }
     ],
     "security": {
