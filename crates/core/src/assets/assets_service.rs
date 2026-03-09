@@ -209,10 +209,12 @@ impl AssetService {
             .instrument_symbol
             .clone()
             .or(spec.instrument_symbol.clone());
-        let metadata = super::build_asset_metadata(
-            spec.instrument_type.as_ref(),
-            resolved_symbol.as_deref().unwrap_or(""),
-        );
+        let metadata = spec.metadata.clone().or_else(|| {
+            super::build_asset_metadata(
+                spec.instrument_type.as_ref(),
+                resolved_symbol.as_deref().unwrap_or(""),
+            )
+        });
 
         NewAsset {
             id: spec.id.clone(),
@@ -452,6 +454,7 @@ impl AssetServiceTrait for AssetService {
                         kind: meta.kind.clone().unwrap_or(AssetKind::Investment),
                         quote_mode: None,
                         name: meta.name.clone(),
+                        metadata: None,
                     };
                     if let Some(key) = spec.instrument_key() {
                         if let Ok(Some(existing)) =

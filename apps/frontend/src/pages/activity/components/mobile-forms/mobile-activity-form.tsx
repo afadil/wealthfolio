@@ -10,7 +10,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@wealthfolio/ui/components/ui/sheet";
-import { ActivityType, QuoteMode } from "@/lib/constants";
+import { ActivityType, METADATA_CONTRACT_MULTIPLIER, QuoteMode } from "@/lib/constants";
 import { isSymbolRequired } from "@/lib/activity-utils";
 import { buildOccSymbol, parseOccSymbol } from "@/lib/occ-symbol";
 import { generateId } from "@/lib/id";
@@ -92,9 +92,7 @@ export function validateTransferFields(
  * Validates trade fields that the Zod schema can't enforce in a discriminatedUnion.
  * For options: requires all structured fields. For stocks/bonds: requires assetId.
  */
-function validateTradeFields(
-  data: Record<string, unknown>,
-): TransferValidationError | null {
+function validateTradeFields(data: Record<string, unknown>): TransferValidationError | null {
   const activityType = data.activityType as string;
   if (!["BUY", "SELL"].includes(activityType)) return null;
 
@@ -168,9 +166,7 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
   // Detect option/bond activities for editing
   const isOptionActivity = activity?.instrumentType === "OPTION";
   const isBondActivity = activity?.instrumentType === "BOND";
-  const parsedOcc = isOptionActivity
-    ? parseOccSymbol(activity?.assetSymbol ?? "")
-    : null;
+  const parsedOcc = isOptionActivity ? parseOccSymbol(activity?.assetSymbol ?? "") : null;
 
   const defaultValues: Partial<NewActivityFormValues> = {
     id: activity?.id,
@@ -278,6 +274,12 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
           name: `${_underlying.toUpperCase()} ${_expiration} ${_optType} ${_strike}`,
           kind: "OPTION",
         };
+        if (_multiplier != null && _multiplier !== 100) {
+          submitData.metadata = {
+            ...submitData.metadata,
+            [METADATA_CONTRACT_MULTIPLIER]: _multiplier,
+          };
+        }
       }
 
       // For bonds: set instrument type

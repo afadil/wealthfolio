@@ -127,6 +127,10 @@ pub struct BondSpec {
 ///
 /// Returns `Some(Value)` when the instrument type is Option or Bond and metadata
 /// can be constructed from the symbol. Returns `None` for other types or unparseable symbols.
+///
+/// For options, uses the standard contract multiplier of 100. Callers that need
+/// a different multiplier (e.g. mini options) should build the metadata directly
+/// and pass it via `AssetSpec.metadata`.
 pub fn build_asset_metadata(
     instrument_type: Option<&InstrumentType>,
     symbol: &str,
@@ -153,6 +157,23 @@ pub fn build_asset_metadata(
         }
         _ => None,
     }
+}
+
+/// Builds option metadata with a specific contract multiplier.
+///
+/// Used by broker sync when the API provides `is_mini_option` to override
+/// the standard 100 multiplier.
+pub fn build_option_metadata(symbol: &str, multiplier: Decimal) -> Option<serde_json::Value> {
+    let parsed = crate::utils::occ_symbol::parse_occ_symbol(symbol).ok()?;
+    let spec = OptionSpec {
+        underlying_asset_id: parsed.underlying.clone(),
+        expiration: parsed.expiration,
+        right: parsed.option_type.as_str().to_string(),
+        strike: parsed.strike_price,
+        multiplier,
+        occ_symbol: Some(parsed.to_occ_symbol()),
+    };
+    Some(serde_json::json!({ "option": spec }))
 }
 
 /// Parse a metal weight-in-troy-ounces from a symbol weight suffix.
@@ -1025,6 +1046,20 @@ pub struct AssetSpec {
     pub quote_mode: Option<QuoteMode>,
     /// User-provided name
     pub name: Option<String>,
+    /// Pre-built asset metadata (e.g. OptionSpec with custom multiplier).
+    /// When set, `new_asset_from_spec` uses this instead of calling `build_asset_metadata`.
+    pub metadata: Option<serde_json::Value>,
+}
+
+impl AssetSpec {
+    /// Extracts the option contract multiplier from pre-built metadata, if present.
+    pub fn option_multiplier(&self) -> Option<Decimal> {
+        self.metadata
+            .as_ref()?
+            .get("option")?
+            .get("multiplier")
+            .and_then(|v| v.as_str().and_then(|s| s.parse::<Decimal>().ok()))
+    }
 }
 
 impl AssetSpec {

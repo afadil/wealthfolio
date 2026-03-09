@@ -267,9 +267,12 @@ pub fn normalize_option_symbol(symbol: &str) -> Option<String> {
         return None;
     }
 
-    // Already a standard OCC symbol? Leave it alone.
+    // Already a standard OCC symbol? Re-emit in compact (no spaces) form
+    // to prevent identity fragmentation between space-padded ("AAPL  261218C00240000")
+    // and compact ("AAPL261218C00240000") formats.
     if looks_like_occ_symbol(s) {
-        return None;
+        // Parse and rebuild to strip spaces and normalize case
+        return parse_occ_symbol(s).ok().map(|p| p.to_occ_symbol());
     }
 
     // Find the boundary where alpha prefix (underlying) ends and digits begin.
@@ -576,8 +579,20 @@ mod tests {
 
     #[test]
     fn test_normalize_already_standard_occ() {
-        // Standard OCC symbol should return None
-        assert_eq!(normalize_option_symbol("MU270115C00600000"), None);
+        // Standard OCC symbol should return the compact form
+        assert_eq!(
+            normalize_option_symbol("MU270115C00600000"),
+            Some("MU270115C00600000".to_string())
+        );
+    }
+
+    #[test]
+    fn test_normalize_space_padded_occ() {
+        // Space-padded OCC symbol should be normalized to compact form
+        assert_eq!(
+            normalize_option_symbol("AAPL  261218C00240000"),
+            Some("AAPL261218C00240000".to_string())
+        );
     }
 
     #[test]

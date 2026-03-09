@@ -582,13 +582,16 @@ impl ActivityService {
 }
 
 impl ActivityService {
-    /// Builds structured asset metadata (OptionSpec, BondSpec) for the given instrument type.
-    /// Delegates to the shared `build_asset_metadata` in assets_model.
-    fn build_asset_metadata(
-        instrument_type: Option<&InstrumentType>,
-        symbol: &str,
-    ) -> Option<serde_json::Value> {
-        crate::assets::build_asset_metadata(instrument_type, symbol)
+    /// JSON metadata key for a non-standard option contract multiplier (e.g. mini options = 10).
+    const METADATA_CONTRACT_MULTIPLIER: &'static str = "contract_multiplier";
+
+    /// Extracts a custom contract multiplier from the activity metadata JSON, if present.
+    fn custom_option_multiplier(activity_metadata: Option<&str>) -> Option<Decimal> {
+        activity_metadata
+            .and_then(|m| serde_json::from_str::<serde_json::Value>(m).ok())
+            .and_then(|v| v.get(Self::METADATA_CONTRACT_MULTIPLIER)?.as_f64())
+            .and_then(Decimal::from_f64_retain)
+            .filter(|d| d.is_sign_positive() && !d.is_zero())
     }
 
     /// Infers the asset kind and instrument type from symbol, exchange, and input values.
@@ -915,10 +918,16 @@ impl ActivityService {
                 let new_id = Uuid::new_v4().to_string();
 
                 // Build structured metadata for option/bond/metal assets
-                let structured_metadata = Self::build_asset_metadata(
-                    effective_instrument_type.as_ref(),
-                    normalized_symbol,
-                );
+                let structured_metadata = if let Some(mult) =
+                    Self::custom_option_multiplier(activity.metadata.as_deref())
+                {
+                    crate::assets::build_option_metadata(normalized_symbol, mult)
+                } else {
+                    crate::assets::build_asset_metadata(
+                        effective_instrument_type.as_ref(),
+                        normalized_symbol,
+                    )
+                };
 
                 let metadata = crate::assets::AssetMetadata {
                     name: asset_name.clone(),
@@ -1280,10 +1289,16 @@ impl ActivityService {
                 Some(id)
             } else {
                 let new_id = Uuid::new_v4().to_string();
-                let structured_metadata = Self::build_asset_metadata(
-                    effective_instrument_type.as_ref(),
-                    normalized_symbol,
-                );
+                let structured_metadata = if let Some(mult) =
+                    Self::custom_option_multiplier(activity.metadata.as_deref())
+                {
+                    crate::assets::build_option_metadata(normalized_symbol, mult)
+                } else {
+                    crate::assets::build_asset_metadata(
+                        effective_instrument_type.as_ref(),
+                        normalized_symbol,
+                    )
+                };
                 let metadata = crate::assets::AssetMetadata {
                     name: asset_name.clone(),
                     kind: effective_kind.clone(),
@@ -1483,6 +1498,7 @@ impl ActivityService {
                             kind: AssetKind::Investment,
                             quote_mode,
                             name: activity.get_name().map(|s| s.to_string()),
+                            metadata: None,
                         }));
                     }
                 }
@@ -1554,8 +1570,13 @@ impl ActivityService {
             instrument_type.as_ref(),
             Some(InstrumentType::Crypto | InstrumentType::Fx)
         );
-        let exchange_mic = if is_non_security { None } else { exchange_mic };
         let is_option = instrument_type.as_ref() == Some(&InstrumentType::Option);
+        // OCC option symbols are globally unique — exchange MIC would fragment identity
+        let exchange_mic = if is_non_security || is_option {
+            None
+        } else {
+            exchange_mic
+        };
         let normalized_symbol = if is_crypto {
             parse_crypto_pair_symbol(base_symbol)
                 .map(|(base, _)| base)
@@ -1643,6 +1664,7 @@ impl ActivityService {
             kind,
             quote_mode,
             name: activity.get_name().map(|s| s.to_string()),
+            metadata: None,
         }))
     }
 

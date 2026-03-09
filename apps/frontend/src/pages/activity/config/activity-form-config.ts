@@ -1,5 +1,10 @@
 import type { ComponentType } from "react";
-import { ActivityType, QuoteMode } from "@/lib/constants";
+import {
+  ActivityType,
+  InstrumentType,
+  METADATA_CONTRACT_MULTIPLIER,
+  QuoteMode,
+} from "@/lib/constants";
 import { parseOccSymbol } from "@/lib/occ-symbol";
 import type { ActivityDetails } from "@/lib/types";
 import { BuyForm, type BuyFormValues } from "../components/forms/buy-form";
@@ -158,6 +163,11 @@ export const ACTIVITY_FORM_CONFIG: Record<
               exchangeMic: d.assetMetadata.exchangeMic ?? undefined,
             }
           : undefined,
+        ...(d.symbolInstrumentType === InstrumentType.OPTION &&
+          d.contractMultiplier != null &&
+          d.contractMultiplier !== 100 && {
+            metadata: { [METADATA_CONTRACT_MULTIPLIER]: d.contractMultiplier },
+          }),
       };
     },
   },
@@ -234,6 +244,11 @@ export const ACTIVITY_FORM_CONFIG: Record<
               exchangeMic: d.assetMetadata.exchangeMic ?? undefined,
             }
           : undefined,
+        ...(d.symbolInstrumentType === InstrumentType.OPTION &&
+          d.contractMultiplier != null &&
+          d.contractMultiplier !== 100 && {
+            metadata: { [METADATA_CONTRACT_MULTIPLIER]: d.contractMultiplier },
+          }),
       };
     },
   },
