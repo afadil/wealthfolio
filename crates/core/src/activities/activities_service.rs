@@ -1042,6 +1042,12 @@ impl ActivityService {
             }
         }
 
+        // Normalize amounts to absolute values (direction is determined by activity type)
+        activity.quantity = activity.quantity.map(|v| v.abs());
+        activity.unit_price = activity.unit_price.map(|v| v.abs());
+        activity.amount = activity.amount.map(|v| v.abs());
+        activity.fee = activity.fee.map(|v| v.abs());
+
         // Normalize minor currency units (e.g., GBp -> GBP) and convert amounts
         if get_normalization_rule(&activity.currency).is_some() {
             if let Some(unit_price) = activity.unit_price {
@@ -1394,6 +1400,12 @@ impl ActivityService {
                     .await?;
             }
         }
+
+        // Normalize amounts to absolute values (direction is determined by activity type)
+        activity.quantity = activity.quantity.map(|v| v.map(|d| d.abs()));
+        activity.unit_price = activity.unit_price.map(|v| v.map(|d| d.abs()));
+        activity.amount = activity.amount.map(|v| v.map(|d| d.abs()));
+        activity.fee = activity.fee.map(|v| v.map(|d| d.abs()));
 
         // Normalize minor currency units
         if get_normalization_rule(&activity.currency).is_some() {
@@ -3047,6 +3059,12 @@ impl ActivityService {
                     activity.currency = account_currency.clone();
                 }
             }
+
+            // Normalize amounts to absolute values (direction is determined by activity type)
+            activity.quantity = activity.quantity.map(|v| v.abs());
+            activity.unit_price = activity.unit_price.map(|v| v.abs());
+            activity.amount = activity.amount.map(|v| v.abs());
+            activity.fee = activity.fee.map(|v| v.abs());
 
             // Normalize minor currency units (e.g., GBp -> GBP) and convert amounts
             if get_normalization_rule(&activity.currency).is_some() {

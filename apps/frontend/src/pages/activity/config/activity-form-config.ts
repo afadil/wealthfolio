@@ -62,6 +62,13 @@ export interface ActivityTypeConfig<TFormValues = unknown> {
   toPayload: (data: TFormValues) => Partial<NewActivityFormValues>;
 }
 
+// Normalize a numeric value to its absolute value (direction is determined by activity type)
+function absNum(value: string | number | null | undefined): number | undefined {
+  if (value == null) return undefined;
+  const n = typeof value === "string" ? Number(value) : value;
+  return Number.isFinite(n) ? Math.abs(n) : undefined;
+}
+
 // Base defaults shared by most forms
 function getBaseDefaults(
   activity: Partial<ActivityDetails> | undefined,
@@ -86,10 +93,10 @@ export const ACTIVITY_FORM_CONFIG: Record<
       const base = {
         ...getBaseDefaults(activity, accounts),
         assetId: activity?.assetSymbol ?? activity?.assetId ?? "",
-        quantity: activity?.quantity,
-        unitPrice: activity?.unitPrice,
-        amount: activity?.amount,
-        fee: activity?.fee ?? "0",
+        quantity: absNum(activity?.quantity),
+        unitPrice: absNum(activity?.unitPrice),
+        amount: absNum(activity?.amount),
+        fee: absNum(activity?.fee) ?? 0,
         quoteMode: activity?.assetQuoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
         // Advanced options
         currency: activity?.currency,
@@ -162,10 +169,10 @@ export const ACTIVITY_FORM_CONFIG: Record<
       const base = {
         ...getBaseDefaults(activity, accounts),
         assetId: activity?.assetSymbol ?? activity?.assetId ?? "",
-        quantity: activity?.quantity,
-        unitPrice: activity?.unitPrice,
-        amount: activity?.amount,
-        fee: activity?.fee ?? "0",
+        quantity: absNum(activity?.quantity),
+        unitPrice: absNum(activity?.unitPrice),
+        amount: absNum(activity?.amount),
+        fee: absNum(activity?.fee) ?? 0,
         quoteMode: activity?.assetQuoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
         // Advanced options
         currency: activity?.currency,
@@ -236,7 +243,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
     activityType: ActivityType.DEPOSIT,
     getDefaults: (activity, accounts) => ({
       ...getBaseDefaults(activity, accounts),
-      amount: activity?.amount,
+      amount: absNum(activity?.amount),
       // Advanced options
       currency: activity?.currency,
       fxRate: activity?.fxRate ?? undefined,
@@ -259,7 +266,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
     activityType: ActivityType.WITHDRAWAL,
     getDefaults: (activity, accounts) => ({
       ...getBaseDefaults(activity, accounts),
-      amount: activity?.amount,
+      amount: absNum(activity?.amount),
       // Advanced options
       currency: activity?.currency,
       fxRate: activity?.fxRate ?? undefined,
@@ -283,7 +290,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
     getDefaults: (activity, accounts) => ({
       ...getBaseDefaults(activity, accounts),
       symbol: activity?.assetSymbol ?? activity?.assetId ?? "",
-      amount: activity?.amount,
+      amount: absNum(activity?.amount),
       // Advanced options
       currency: activity?.currency,
       fxRate: activity?.fxRate ?? undefined,
@@ -328,9 +335,9 @@ export const ACTIVITY_FORM_CONFIG: Record<
         toAccountId: "",
         activityDate: activity?.date ? new Date(activity.date) : new Date(),
         transferMode,
-        amount: activity?.amount,
+        amount: absNum(activity?.amount),
         assetId: activity?.assetSymbol ?? activity?.assetId ?? null,
-        quantity: activity?.quantity ?? null,
+        quantity: absNum(activity?.quantity) ?? null,
         comment: activity?.comment ?? null,
         // Advanced options
         currency: activity?.currency,
@@ -376,7 +383,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
     getDefaults: (activity, accounts) => ({
       ...getBaseDefaults(activity, accounts),
       symbol: activity?.assetSymbol ?? activity?.assetId ?? "",
-      splitRatio: activity?.amount,
+      splitRatio: absNum(activity?.amount),
       // Advanced options
       currency: activity?.currency,
       subtype: activity?.subtype ?? null,
@@ -404,7 +411,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
     activityType: ActivityType.FEE,
     getDefaults: (activity, accounts) => ({
       ...getBaseDefaults(activity, accounts),
-      amount: activity?.amount,
+      amount: absNum(activity?.amount),
       // Advanced options
       currency: activity?.currency,
       subtype: activity?.subtype ?? null,
@@ -428,7 +435,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
     getDefaults: (activity, accounts) => ({
       ...getBaseDefaults(activity, accounts),
       symbol: activity?.assetSymbol ?? activity?.assetId ?? null,
-      amount: activity?.amount as unknown as number | undefined,
+      amount: absNum(activity?.amount),
       // Advanced options
       currency: activity?.currency,
       fxRate: (activity?.fxRate ?? undefined) as unknown as number | undefined,
@@ -458,7 +465,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
     activityType: ActivityType.TAX,
     getDefaults: (activity, accounts) => ({
       ...getBaseDefaults(activity, accounts),
-      amount: activity?.amount,
+      amount: absNum(activity?.amount),
       // Advanced options
       currency: activity?.currency,
       subtype: activity?.subtype ?? null,
