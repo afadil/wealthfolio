@@ -35,6 +35,7 @@ import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useLinkedLiabilities, useAlternativeHoldings } from "@/hooks/use-alternative-assets";
 import type { AlternativeAssetHolding, Quote, Asset, TimePeriod, DateRange } from "@/lib/types";
 import { AlternativeAssetKind } from "@/lib/types";
+import { parseLocalDate } from "@/lib/utils";
 
 interface AlternativeAssetContentProps {
   assetId: string;
@@ -557,7 +558,7 @@ const AlternativeAssetDetailCard: React.FC<AlternativeAssetDetailCardProps> = ({
             <div className="flex justify-between">
               <span className="text-muted-foreground">Purchase Date</span>
               <span className="font-medium">
-                {format(new Date(holding.purchaseDate), "MMM d, yyyy")}
+                {format(parseLocalDate(holding.purchaseDate), "MMM d, yyyy")}
               </span>
             </div>
           )}
@@ -565,7 +566,7 @@ const AlternativeAssetDetailCard: React.FC<AlternativeAssetDetailCardProps> = ({
           <div className="flex justify-between">
             <span className="text-muted-foreground">Last Updated</span>
             <span className="font-medium">
-              {format(new Date(holding.valuationDate), "MMM d, yyyy")}
+              {format(parseLocalDate(holding.valuationDate), "MMM d, yyyy")}
             </span>
           </div>
         </div>
@@ -725,7 +726,7 @@ function getDetailRows(
       if (originationDate) {
         rows.push({
           label: "Origination Date",
-          value: format(new Date(originationDate), "MMM d, yyyy"),
+          value: format(parseLocalDate(originationDate), "MMM d, yyyy"),
         });
       }
       break;

@@ -1,5 +1,6 @@
 import * as z from "zod";
 import { AlternativeAssetKind } from "@/lib/types";
+import { parseLocalDate } from "@/lib/utils";
 
 // Property types
 export const PROPERTY_TYPES = [
@@ -170,7 +171,7 @@ export function getDefaultDetailsFormValues(
   const base = {
     name,
     purchasePrice: metadata?.purchase_price ? parseFloat(metadata.purchase_price as string) : null,
-    purchaseDate: metadata?.purchase_date ? new Date(metadata.purchase_date as string) : null,
+    purchaseDate: metadata?.purchase_date ? parseLocalDate(metadata.purchase_date as string) : null,
     notes: notes ?? null,
   };
 
@@ -225,7 +226,7 @@ export function getDefaultDetailsFormValues(
         kind: AlternativeAssetKind.LIABILITY,
         liabilityType: subType as LiabilityDetailsFormValues["liabilityType"],
         originalAmount: origAmount ? parseFloat(origAmount as string) : null,
-        originationDate: origDate ? new Date(origDate as string) : null,
+        originationDate: origDate ? parseLocalDate(origDate as string) : null,
         interestRate: metadata?.interest_rate ? parseFloat(metadata.interest_rate as string) : null,
         linkedAssetId: (metadata?.linked_asset_id as string) ?? null,
       };
