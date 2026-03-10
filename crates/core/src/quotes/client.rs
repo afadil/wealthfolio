@@ -38,10 +38,11 @@ use crate::secrets::SecretStore;
 
 use wealthfolio_market_data::{
     mic_to_currency, mic_to_exchange_name, yahoo_exchange_to_mic, yahoo_suffix_to_mic,
-    AlphaVantageProvider, AssetProfile as MarketAssetProfile, BondQuoteMetadata, FinnhubProvider,
-    MarketDataAppProvider, MetalPriceApiProvider, ProviderId, ProviderRegistry,
-    Quote as MarketQuote, QuoteContext, ResolverChain, SearchResult as MarketSearchResult,
-    SplitEvent, YahooProvider,
+    AlphaVantageProvider, AssetProfile as MarketAssetProfile, BoerseFrankfurtProvider,
+    BondQuoteMetadata, FinnhubProvider, MarketDataAppProvider, MetalPriceApiProvider,
+    OpenFigiProvider, ProviderId, ProviderRegistry, Quote as MarketQuote, QuoteContext,
+    ResolverChain, SearchResult as MarketSearchResult, SplitEvent, UsTreasuryCalcProvider,
+    YahooProvider,
 };
 
 /// Market data error types.
@@ -210,6 +211,18 @@ impl MarketDataClient {
                     }
                 }
                 Ok(None)
+            }
+            "US_TREASURY_CALC" => {
+                let provider = UsTreasuryCalcProvider::new();
+                Ok(Some(Arc::new(provider)))
+            }
+            "BOERSE_FRANKFURT" => {
+                let provider = BoerseFrankfurtProvider::new();
+                Ok(Some(Arc::new(provider)))
+            }
+            "OPENFIGI" => {
+                let provider = OpenFigiProvider::new();
+                Ok(Some(Arc::new(provider)))
             }
             _ => {
                 warn!("Unknown provider ID: {}", provider_id);
