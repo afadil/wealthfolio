@@ -609,7 +609,7 @@ impl QuoteStore for MarketDataRepository {
         let result = quotes_dsl::quotes
             .filter(quotes_dsl::asset_id.eq(symbol))
             .filter(quotes_dsl::day.lt(&before_str))
-            .order(quotes_dsl::day.desc())
+            .order((quotes_dsl::day.desc(), quotes_dsl::timestamp.desc()))
             .first::<QuoteDB>(&mut conn)
             .optional()
             .into_core()?;
