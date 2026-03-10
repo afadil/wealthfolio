@@ -38,7 +38,7 @@ use crate::secrets::SecretStore;
 
 use wealthfolio_market_data::{
     mic_to_currency, mic_to_exchange_name, yahoo_exchange_to_mic, yahoo_suffix_to_mic,
-    AlphaVantageProvider, AssetProfile as MarketAssetProfile, FinnhubProvider,
+    AlphaVantageProvider, AssetProfile as MarketAssetProfile, BondQuoteMetadata, FinnhubProvider,
     MarketDataAppProvider, MetalPriceApiProvider, ProviderId, ProviderRegistry,
     Quote as MarketQuote, QuoteContext, ResolverChain, SearchResult as MarketSearchResult,
     SplitEvent, YahooProvider,
@@ -338,12 +338,24 @@ impl MarketDataClient {
         // Preferred provider from asset
         let preferred_provider: Option<ProviderId> = asset.preferred_provider().map(Cow::Owned);
 
+        // Populate bond metadata from asset for yield-curve-based pricing
+        let bond_metadata = asset.bond_spec().and_then(|spec| {
+            Some(BondQuoteMetadata {
+                coupon_rate: spec.coupon_rate.unwrap_or_default(),
+                maturity_date: spec.maturity_date?,
+                face_value: spec.face_value.unwrap_or(rust_decimal::Decimal::from(1000)),
+                coupon_frequency: spec
+                    .coupon_frequency
+                    .unwrap_or_else(|| "SEMI_ANNUAL".to_string()),
+            })
+        });
+
         Ok(QuoteContext {
             instrument,
             overrides,
             currency_hint,
             preferred_provider,
-            bond_metadata: None,
+            bond_metadata,
         })
     }
 
