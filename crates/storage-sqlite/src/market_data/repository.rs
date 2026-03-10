@@ -602,6 +602,21 @@ impl QuoteStore for MarketDataRepository {
         Ok(result_map)
     }
 
+    fn get_latest_quote_before(&self, symbol: &str, before: NaiveDate) -> Result<Option<Quote>> {
+        let mut conn = get_connection(&self.pool)?;
+        let before_str = before.format("%Y-%m-%d").to_string();
+
+        let result = quotes_dsl::quotes
+            .filter(quotes_dsl::asset_id.eq(symbol))
+            .filter(quotes_dsl::day.lt(&before_str))
+            .order((quotes_dsl::day.desc(), quotes_dsl::timestamp.desc()))
+            .first::<QuoteDB>(&mut conn)
+            .optional()
+            .into_core()?;
+
+        Ok(result.map(Quote::from))
+    }
+
     fn get_historical_quotes(&self, symbol: &str) -> Result<Vec<Quote>> {
         let mut conn = get_connection(&self.pool)?;
 

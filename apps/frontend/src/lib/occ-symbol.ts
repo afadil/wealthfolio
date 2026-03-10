@@ -45,8 +45,9 @@ export function parseOccSymbol(symbol: string): ParsedOccSymbol | null {
   const month = parseInt(dateStr.slice(2, 4), 10);
   const day = parseInt(dateStr.slice(4, 6), 10);
 
-  // Basic date validation
-  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  // Date validation: construct a Date and verify components match (catches invalid dates like Feb 30)
+  const dateCheck = new Date(year, month - 1, day);
+  if (dateCheck.getMonth() !== month - 1 || dateCheck.getDate() !== day) return null;
 
   const expiration = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
@@ -98,10 +99,12 @@ export function normalizeOptionSymbol(symbol: string): string | null {
 
   const [, underlying, dateStr, typeChar, strikeStr] = result;
 
-  // Basic date validation
+  // Date validation (reject impossible dates like Feb 30)
+  const year = parseInt(dateStr.slice(0, 2), 10);
   const month = parseInt(dateStr.slice(2, 4), 10);
   const day = parseInt(dateStr.slice(4, 6), 10);
-  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const dateCheck = new Date(2000 + year, month - 1, day);
+  if (dateCheck.getMonth() !== month - 1 || dateCheck.getDate() !== day) return null;
 
   // Strike: plain integer dollars → ×1000, pad to 8 digits
   const strikeScaled = parseInt(strikeStr, 10) * 1000;

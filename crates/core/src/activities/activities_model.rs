@@ -134,24 +134,28 @@ impl Activity {
         self.activity_type_override.is_some()
     }
 
-    /// Get quantity, defaulting to zero if not set
+    /// Get quantity, defaulting to zero if not set.
+    /// Always returns absolute value — direction is determined by activity type.
     pub fn qty(&self) -> Decimal {
-        self.quantity.unwrap_or(Decimal::ZERO)
+        self.quantity.unwrap_or(Decimal::ZERO).abs()
     }
 
-    /// Get unit price, defaulting to zero if not set
+    /// Get unit price, defaulting to zero if not set.
+    /// Always returns absolute value.
     pub fn price(&self) -> Decimal {
-        self.unit_price.unwrap_or(Decimal::ZERO)
+        self.unit_price.unwrap_or(Decimal::ZERO).abs()
     }
 
-    /// Get amount, defaulting to zero if not set
+    /// Get amount, defaulting to zero if not set.
+    /// Always returns absolute value — direction is determined by activity type.
     pub fn amt(&self) -> Decimal {
-        self.amount.unwrap_or(Decimal::ZERO)
+        self.amount.unwrap_or(Decimal::ZERO).abs()
     }
 
-    /// Get fee, defaulting to zero if not set
+    /// Get fee, defaulting to zero if not set.
+    /// Always returns absolute value.
     pub fn fee_amt(&self) -> Decimal {
-        self.fee.unwrap_or(Decimal::ZERO)
+        self.fee.unwrap_or(Decimal::ZERO).abs()
     }
 
     /// Get typed metadata value

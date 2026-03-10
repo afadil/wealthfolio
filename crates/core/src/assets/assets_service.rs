@@ -205,6 +205,17 @@ impl AssetService {
             QuoteMode::Manual => None,
         };
 
+        let resolved_symbol = canonical
+            .instrument_symbol
+            .clone()
+            .or(spec.instrument_symbol.clone());
+        let metadata = spec.metadata.clone().or_else(|| {
+            super::build_asset_metadata(
+                spec.instrument_type.as_ref(),
+                resolved_symbol.as_deref().unwrap_or(""),
+            )
+        });
+
         NewAsset {
             id: spec.id.clone(),
             kind: spec.kind.clone(),
@@ -213,12 +224,11 @@ impl AssetService {
             quote_mode,
             quote_ccy: resolved_quote_ccy,
             instrument_type: spec.instrument_type.clone(),
-            instrument_symbol: canonical
-                .instrument_symbol
-                .or(spec.instrument_symbol.clone()),
+            instrument_symbol: resolved_symbol,
             instrument_exchange_mic: resolved_mic,
             provider_config,
             is_active: true,
+            metadata,
             ..Default::default()
         }
     }
@@ -444,6 +454,7 @@ impl AssetServiceTrait for AssetService {
                         kind: meta.kind.clone().unwrap_or(AssetKind::Investment),
                         quote_mode: None,
                         name: meta.name.clone(),
+                        metadata: None,
                     };
                     if let Some(key) = spec.instrument_key() {
                         if let Ok(Some(existing)) =
@@ -513,6 +524,7 @@ impl AssetServiceTrait for AssetService {
         };
 
         let name = metadata.as_ref().and_then(|m| m.name.clone());
+        let asset_metadata_json = metadata.as_ref().and_then(|m| m.asset_metadata.clone());
         let canonical_identity = canonicalize_market_identity(
             instrument_type.clone(),
             metadata
@@ -535,6 +547,7 @@ impl AssetServiceTrait for AssetService {
                 .display_code
                 .or_else(|| metadata.as_ref().and_then(|m| m.display_code.clone())),
             provider_config,
+            metadata: asset_metadata_json,
             is_active: true,
             ..Default::default()
         };

@@ -613,6 +613,7 @@ fn test_parse_manifest_json_metadata_service() {
 #[cfg(test)]
 mod service_tests {
     use super::*;
+    use crate::addons::addon_traits::AddonServiceTrait;
     use std::env;
 
     #[test]
@@ -658,6 +659,55 @@ mod service_tests {
         // Verify the parent directory is the addons directory
         let parent = addon_path.parent().unwrap();
         assert_eq!(parent.file_name().unwrap(), "addons");
+
+        // Clean up
+        std::fs::remove_dir_all(&temp_dir).ok();
+    }
+
+    #[test]
+    fn test_addon_service_load_manifest() {
+        // Test that AddonService can load an installed addo
+        let temp_dir = env::temp_dir().join("wealthfolio_test_manifest_service");
+        let app_data_path = temp_dir.to_str().unwrap();
+
+        if temp_dir.exists() {
+            std::fs::remove_dir_all(&temp_dir).ok();
+        }
+
+        let service = AddonService::new(app_data_path, "test-instance");
+
+        // Create addon directory structure manually
+        let addon_dir = temp_dir.join("addons").join("addon");
+        std::fs::create_dir_all(&addon_dir).expect("Failed to create addon dir");
+
+        let manifest_json = r#"{
+            "id": "addon",
+            "name": "Addon",
+            "version": "1.0.0",
+            "main": "addon.js",
+            "permissions": [
+                {
+                    "category": "api",
+                    "purpose": "Network calls",
+                    "functions": ["fetch"]
+                }
+            ]
+        }"#;
+
+        std::fs::write(addon_dir.join("manifest.json"), manifest_json)
+            .expect("Failed to write manifest");
+        std::fs::write(addon_dir.join("addon.js"), "console.log('test')")
+            .expect("Failed to write js");
+
+        let installed = service
+            .list_installed_addons()
+            .expect("Failed to list installed addons");
+        assert_eq!(installed.len(), 1, "AddonService should load the manifest");
+
+        let permissions = installed[0].metadata.permissions.as_ref().unwrap();
+        assert_eq!(permissions.len(), 1);
+        assert_eq!(permissions[0].functions[0].name, "fetch");
+        assert!(permissions[0].functions[0].is_declared);
 
         // Clean up
         std::fs::remove_dir_all(&temp_dir).ok();

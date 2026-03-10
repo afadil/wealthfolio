@@ -9,6 +9,9 @@ export const WEALTHFOLIO_CONNECT_PORTAL_URL = "https://connect.wealthfolio.app";
 
 export const PORTFOLIO_ACCOUNT_ID = "TOTAL";
 
+/** JSON metadata key for a non-standard option contract multiplier (e.g. mini options = 10). */
+export const METADATA_CONTRACT_MULTIPLIER = "contract_multiplier";
+
 export const HoldingType = {
   CASH: "cash",
   SECURITY: "security",

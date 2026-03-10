@@ -1,3 +1,4 @@
+import { ExternalLink } from "@/components/external-link";
 import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -77,14 +78,12 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
             {isEditing
               ? "Update the details of your transaction"
               : "Record a new transaction in your account."}{" "}
-            <a
+            <ExternalLink
               href="https://wealthfolio.app/docs/concepts/activity-types"
-              target="_blank"
-              rel="noopener noreferrer"
               className="underline"
             >
               Learn more
-            </a>
+            </ExternalLink>
           </SheetDescription>
         </SheetHeader>
 

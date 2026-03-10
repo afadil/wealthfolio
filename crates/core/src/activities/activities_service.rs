@@ -125,6 +125,7 @@ impl ActivityService {
     fn kind_from_instrument_type(instrument_type: &InstrumentType) -> AssetKind {
         match instrument_type {
             InstrumentType::Fx => AssetKind::Fx,
+            InstrumentType::Metal => AssetKind::PreciousMetal,
             _ => AssetKind::Investment,
         }
     }
@@ -581,6 +582,18 @@ impl ActivityService {
 }
 
 impl ActivityService {
+    /// JSON metadata key for a non-standard option contract multiplier (e.g. mini options = 10).
+    const METADATA_CONTRACT_MULTIPLIER: &'static str = "contract_multiplier";
+
+    /// Extracts a custom contract multiplier from the activity metadata JSON, if present.
+    fn custom_option_multiplier(activity_metadata: Option<&str>) -> Option<Decimal> {
+        activity_metadata
+            .and_then(|m| serde_json::from_str::<serde_json::Value>(m).ok())
+            .and_then(|v| v.get(Self::METADATA_CONTRACT_MULTIPLIER)?.as_f64())
+            .and_then(Decimal::from_f64_retain)
+            .filter(|d| d.is_sign_positive() && !d.is_zero())
+    }
+
     /// Infers the asset kind and instrument type from symbol, exchange, and input values.
     /// Returns (AssetKind, Option<InstrumentType>).
     fn infer_asset_kind(
@@ -598,8 +611,9 @@ impl ActivityService {
                 "CRYPTO" => return (AssetKind::Investment, Some(InstrumentType::Crypto)),
                 "FX_RATE" | "FX" => return (AssetKind::Fx, Some(InstrumentType::Fx)),
                 "OPTION" | "OPT" => return (AssetKind::Investment, Some(InstrumentType::Option)),
+                "BOND" => return (AssetKind::Investment, Some(InstrumentType::Bond)),
                 "COMMODITY" | "CMDTY" | "METAL" => {
-                    return (AssetKind::Investment, Some(InstrumentType::Metal))
+                    return (AssetKind::PreciousMetal, Some(InstrumentType::Metal))
                 }
                 "PROPERTY" | "PROP" => return (AssetKind::Property, None),
                 "VEHICLE" | "VEH" => return (AssetKind::Vehicle, None),
@@ -642,7 +656,12 @@ impl ActivityService {
             return (AssetKind::Investment, Some(InstrumentType::Crypto));
         }
 
-        // 5. Default to equity (most common case)
+        // 5. OCC option symbol heuristic (e.g. AAPL240119C00150000)
+        if crate::utils::occ_symbol::looks_like_occ_symbol(&upper_symbol) {
+            return (AssetKind::Investment, Some(InstrumentType::Option));
+        }
+
+        // 6. Default to equity (most common case)
         (AssetKind::Investment, Some(InstrumentType::Equity))
     }
 
@@ -761,6 +780,7 @@ impl ActivityService {
 
         // Normalize symbol + MIC using payload/suffix only (no live lookup for user save paths).
         let is_crypto = effective_instrument_type.as_ref() == Some(&InstrumentType::Crypto);
+        let is_option = effective_instrument_type.as_ref() == Some(&InstrumentType::Option);
         let is_non_security_instrument = matches!(
             effective_instrument_type.as_ref(),
             Some(InstrumentType::Crypto | InstrumentType::Fx)
@@ -780,6 +800,13 @@ impl ActivityService {
             Some(
                 parse_crypto_pair_symbol(base_symbol)
                     .map(|(base, _)| base)
+                    .unwrap_or_else(|| base_symbol.to_string()),
+            )
+        } else if is_option {
+            // Normalize broker-specific option symbols (e.g. Fidelity's "-MU270115C600")
+            // to standard OCC format before storing.
+            Some(
+                crate::utils::occ_symbol::normalize_option_symbol(base_symbol)
                     .unwrap_or_else(|| base_symbol.to_string()),
             )
         } else {
@@ -889,6 +916,19 @@ impl ActivityService {
             } else {
                 // Create new asset with generated UUID
                 let new_id = Uuid::new_v4().to_string();
+
+                // Build structured metadata for option/bond/metal assets
+                let structured_metadata = if let Some(mult) =
+                    Self::custom_option_multiplier(activity.metadata.as_deref())
+                {
+                    crate::assets::build_option_metadata(normalized_symbol, mult)
+                } else {
+                    crate::assets::build_asset_metadata(
+                        effective_instrument_type.as_ref(),
+                        normalized_symbol,
+                    )
+                };
+
                 let metadata = crate::assets::AssetMetadata {
                     name: asset_name.clone(),
                     kind: effective_kind.clone(),
@@ -897,6 +937,7 @@ impl ActivityService {
                     instrument_type: effective_instrument_type.clone(),
                     display_code: Some(normalized_symbol.clone()),
                     requested_quote_ccy: quote_ccy_for_asset.clone(),
+                    asset_metadata: structured_metadata,
                 };
                 self.asset_service
                     .get_or_create_minimal_asset(
@@ -944,6 +985,7 @@ impl ActivityService {
                 instrument_type: effective_instrument_type.clone(),
                 display_code: canonical_symbol,
                 requested_quote_ccy: quote_ccy_for_asset.clone(),
+                asset_metadata: None,
             };
             let asset = self
                 .asset_service
@@ -1008,6 +1050,12 @@ impl ActivityService {
                     .await?;
             }
         }
+
+        // Normalize amounts to absolute values (direction is determined by activity type)
+        activity.quantity = activity.quantity.map(|v| v.abs());
+        activity.unit_price = activity.unit_price.map(|v| v.abs());
+        activity.amount = activity.amount.map(|v| v.abs());
+        activity.fee = activity.fee.map(|v| v.abs());
 
         // Normalize minor currency units (e.g., GBp -> GBP) and convert amounts
         if get_normalization_rule(&activity.currency).is_some() {
@@ -1128,12 +1176,18 @@ impl ActivityService {
         } else {
             exchange_mic.or_else(|| suffix_mic.map(|mic| mic.to_string()))
         };
+        let is_option = effective_instrument_type.as_ref() == Some(&InstrumentType::Option);
         let normalized_symbol_for_lookup = if base_symbol.is_empty() {
             None
         } else if is_crypto {
             Some(
                 parse_crypto_pair_symbol(base_symbol)
                     .map(|(base, _)| base)
+                    .unwrap_or_else(|| base_symbol.to_string()),
+            )
+        } else if is_option {
+            Some(
+                crate::utils::occ_symbol::normalize_option_symbol(base_symbol)
                     .unwrap_or_else(|| base_symbol.to_string()),
             )
         } else {
@@ -1235,6 +1289,16 @@ impl ActivityService {
                 Some(id)
             } else {
                 let new_id = Uuid::new_v4().to_string();
+                let structured_metadata = if let Some(mult) =
+                    Self::custom_option_multiplier(activity.metadata.as_deref())
+                {
+                    crate::assets::build_option_metadata(normalized_symbol, mult)
+                } else {
+                    crate::assets::build_asset_metadata(
+                        effective_instrument_type.as_ref(),
+                        normalized_symbol,
+                    )
+                };
                 let metadata = crate::assets::AssetMetadata {
                     name: asset_name.clone(),
                     kind: effective_kind.clone(),
@@ -1243,6 +1307,7 @@ impl ActivityService {
                     instrument_type: effective_instrument_type.clone(),
                     display_code: Some(normalized_symbol.clone()),
                     requested_quote_ccy: quote_ccy_for_asset.clone(),
+                    asset_metadata: structured_metadata,
                 };
                 self.asset_service
                     .get_or_create_minimal_asset(
@@ -1289,6 +1354,7 @@ impl ActivityService {
                 instrument_type: effective_instrument_type.clone(),
                 display_code: canonical_symbol,
                 requested_quote_ccy: quote_ccy_for_asset.clone(),
+                asset_metadata: None,
             };
             let asset = self
                 .asset_service
@@ -1349,6 +1415,12 @@ impl ActivityService {
                     .await?;
             }
         }
+
+        // Normalize amounts to absolute values (direction is determined by activity type)
+        activity.quantity = activity.quantity.map(|v| v.map(|d| d.abs()));
+        activity.unit_price = activity.unit_price.map(|v| v.map(|d| d.abs()));
+        activity.amount = activity.amount.map(|v| v.map(|d| d.abs()));
+        activity.fee = activity.fee.map(|v| v.map(|d| d.abs()));
 
         // Normalize minor currency units
         if get_normalization_rule(&activity.currency).is_some() {
@@ -1426,6 +1498,7 @@ impl ActivityService {
                             kind: AssetKind::Investment,
                             quote_mode,
                             name: activity.get_name().map(|s| s.to_string()),
+                            metadata: None,
                         }));
                     }
                 }
@@ -1497,10 +1570,19 @@ impl ActivityService {
             instrument_type.as_ref(),
             Some(InstrumentType::Crypto | InstrumentType::Fx)
         );
-        let exchange_mic = if is_non_security { None } else { exchange_mic };
+        let is_option = instrument_type.as_ref() == Some(&InstrumentType::Option);
+        // OCC option symbols are globally unique — exchange MIC would fragment identity
+        let exchange_mic = if is_non_security || is_option {
+            None
+        } else {
+            exchange_mic
+        };
         let normalized_symbol = if is_crypto {
             parse_crypto_pair_symbol(base_symbol)
                 .map(|(base, _)| base)
+                .unwrap_or_else(|| base_symbol.to_string())
+        } else if is_option {
+            crate::utils::occ_symbol::normalize_option_symbol(base_symbol)
                 .unwrap_or_else(|| base_symbol.to_string())
         } else {
             base_symbol.to_string()
@@ -1582,6 +1664,7 @@ impl ActivityService {
             kind,
             quote_mode,
             name: activity.get_name().map(|s| s.to_string()),
+            metadata: None,
         }))
     }
 
@@ -2998,6 +3081,12 @@ impl ActivityService {
                     activity.currency = account_currency.clone();
                 }
             }
+
+            // Normalize amounts to absolute values (direction is determined by activity type)
+            activity.quantity = activity.quantity.map(|v| v.abs());
+            activity.unit_price = activity.unit_price.map(|v| v.abs());
+            activity.amount = activity.amount.map(|v| v.abs());
+            activity.fee = activity.fee.map(|v| v.abs());
 
             // Normalize minor currency units (e.g., GBp -> GBP) and convert amounts
             if get_normalization_rule(&activity.currency).is_some() {

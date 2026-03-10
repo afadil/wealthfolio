@@ -236,6 +236,8 @@ impl HoldingsCalculator {
             ActivityType::TransferOut => {
                 self.handle_transfer_out(activity, state, account_currency, asset_cache)
             }
+            // Split activities are NO-OPs here: the snapshot service retroactively
+            // adjusts historical activity quantities/prices before the calculator runs.
             ActivityType::Split => Ok(()),
             ActivityType::Adjustment => self.handle_adjustment(activity, state, asset_cache),
             ActivityType::Unknown => {
@@ -646,10 +648,16 @@ impl HoldingsCalculator {
                         activity.id
                     );
                 }
+                // For options, price is per-share but each contract covers `multiplier` shares
+                let multiplier = asset_cache
+                    .get(asset_id)
+                    .map(|(_, _, m)| *m)
+                    .unwrap_or(Decimal::ONE);
+
                 let (unit_price_for_lot, fee_for_lot, fx_rate_used) = if needs_conversion {
                     let (converted_price, converted_fee, fx_rate) = self
                         .convert_to_position_currency(
-                            activity.price(),
+                            activity.price() * multiplier,
                             activity.fee_amt(),
                             activity,
                             &position_currency,
@@ -657,7 +665,7 @@ impl HoldingsCalculator {
                         )?;
                     (converted_price, converted_fee, fx_rate)
                 } else {
-                    (activity.price(), activity.fee_amt(), None)
+                    (activity.price() * multiplier, activity.fee_amt(), None)
                 };
 
                 position.add_lot_values(
@@ -869,7 +877,7 @@ impl HoldingsCalculator {
         if !asset_id.is_empty() && !cache.contains_key(asset_id) {
             let (ccy, is_alt, multiplier) = self.get_position_info(asset_id).unwrap_or_else(|_| {
                 warn!(
-                    "Failed to get asset info for {}, using activity currency {}",
+                    "Failed to get asset info for {}, using activity currency {} and multiplier 1",
                     asset_id, activity_currency
                 );
                 (activity_currency.to_string(), false, Decimal::ONE)
@@ -1014,18 +1022,7 @@ impl HoldingsCalculator {
             )));
         }
 
-        // Ensure cache is populated for this asset
-        if !cache.contains_key(asset_id) {
-            let (ccy, is_alt, multiplier) =
-                self.get_position_info(asset_id).unwrap_or_else(|_| {
-                    warn!(
-                        "Failed to get asset info for {}, using activity currency {} and is_alternative=false",
-                        asset_id, activity_currency
-                    );
-                    (activity_currency.to_string(), false, Decimal::ONE)
-                });
-            cache.insert(asset_id.to_string(), (ccy, is_alt, multiplier));
-        }
+        self.ensure_asset_cached(asset_id, activity_currency, cache);
 
         let (ref position_currency, is_alternative, multiplier) = cache[asset_id];
 

@@ -11,6 +11,7 @@ import {
   isSplitActivity,
 } from "@/lib/activity-utils";
 import { ActivityType, ActivityTypeNames } from "@/lib/constants";
+import { parseOccSymbol } from "@/lib/occ-symbol";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { ActivityDetails } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
@@ -64,8 +65,13 @@ export const ActivityTableMobile = ({
         const isCash = isTransferActivity
           ? !hasAsset || isCashTransfer(activityType, symbol)
           : isCashActivity(activityType) && !isAssetBackedIncome;
-        const displaySymbol = isCash ? "Cash" : symbol;
+        const isOptionActivity = activity.instrumentType === "OPTION";
+        const parsedOption = isOptionActivity ? parseOccSymbol(symbol) : null;
+        const displaySymbol = isCash ? "Cash" : parsedOption ? parsedOption.underlying : symbol;
         const avatarSymbol = isCash ? "$CASH" : symbol;
+        const optionSubtitle = parsedOption
+          ? `${new Date(parsedOption.expiration + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} $${parsedOption.strikePrice} ${parsedOption.optionType}`
+          : null;
         const formattedDate = formatDateTime(activity.date, appTimezone);
         const displayValue = calculateActivityValue(activity);
 
@@ -88,7 +94,11 @@ export const ActivityTableMobile = ({
                             </span>
                           )}
                         </div>
-                        <p className="text-muted-foreground text-xs">{activityTypeLabel}</p>
+                        <p className="text-muted-foreground text-xs">
+                          {optionSubtitle
+                            ? `${activityTypeLabel} · ${optionSubtitle}`
+                            : activityTypeLabel}
+                        </p>
                         <div className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-xs">
                           <span>{formattedDate.date}</span>
                           {!isCash &&
@@ -98,7 +108,9 @@ export const ActivityTableMobile = ({
                             activity.quantity && (
                               <>
                                 <span>•</span>
-                                <span>{activity.quantity} shares</span>
+                                <span>
+                                  {activity.quantity} {isOptionActivity ? "contracts" : "shares"}
+                                </span>
                               </>
                             )}
                         </div>
@@ -140,7 +152,7 @@ export const ActivityTableMobile = ({
                       <div>
                         <p className="font-semibold">{displaySymbol}</p>
                         <p className="text-muted-foreground text-xs">
-                          {isCash ? activity.currency : activity.assetName}
+                          {isCash ? activity.currency : (optionSubtitle ?? activity.assetName)}
                         </p>
                       </div>
                     </>
@@ -189,7 +201,9 @@ export const ActivityTableMobile = ({
                   !isFeeActivity(activity.activityType) &&
                   activity.quantity && (
                     <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Shares</span>
+                      <span className="text-muted-foreground">
+                        {isOptionActivity ? "Contracts" : "Shares"}
+                      </span>
                       <span className="font-medium">{activity.quantity}</span>
                     </div>
                   )}
@@ -203,7 +217,9 @@ export const ActivityTableMobile = ({
                           isCashTransfer(activity.activityType, symbol) ||
                           (isIncomeActivity(activity.activityType) && !isAssetBackedIncome)
                         ? "Amount"
-                        : "Price"}
+                        : isOptionActivity
+                          ? "Premium"
+                          : "Price"}
                   </span>
                   <span className="font-medium">
                     {activity.activityType === "FEE"

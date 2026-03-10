@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { parseOccSymbol } from "@/lib/occ-symbol";
 import { Avatar, AvatarFallback, AvatarImage } from "@wealthfolio/ui";
 
 interface TickerAvatarProps {
@@ -7,9 +8,13 @@ interface TickerAvatarProps {
 }
 
 export const TickerAvatar = ({ symbol, className = "size-8" }: TickerAvatarProps) => {
+  // For OCC option symbols (e.g. "AAPL250321C00150000"), use the underlying ticker for logo
+  const parsed = symbol ? parseOccSymbol(symbol) : null;
+  const logoSymbol = parsed ? parsed.underlying : symbol;
+
   // Extract the base symbol (before any dot, hyphen, or colon) for fallback
-  const baseSymbol = symbol ? symbol.split(/[.:-]/)[0].toUpperCase() : "";
-  const fullSymbol = symbol ? symbol.toUpperCase() : "";
+  const baseSymbol = logoSymbol ? logoSymbol.split(/[.:-]/)[0].toUpperCase() : "";
+  const fullSymbol = logoSymbol ? logoSymbol.toUpperCase() : "";
 
   // Try full symbol first, then fallback to base symbol
   const primaryLogoUrl = fullSymbol ? `/ticker-logos/${fullSymbol}.png` : "";

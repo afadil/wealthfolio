@@ -95,6 +95,8 @@ export function DashboardContent() {
     );
   }, [valuationHistory, baseCurrency]);
 
+  const isNegative = totalValue < 0;
+
   // Callback for IntervalSelector
   const handleIntervalSelect = (
     code: TimePeriod,
@@ -152,34 +154,42 @@ export function DashboardContent() {
         </PortfolioUpdateTrigger>
       </div>
 
-      <div className="h-[280px]">
-        <HistoryChart data={chartData} isLoading={isValuationHistoryLoading} />
-        {valuationHistory && chartData.length > 0 && (
-          <div className="flex w-full justify-center">
-            <IntervalSelector
-              className="pointer-events-auto relative z-20 w-full max-w-screen-sm sm:max-w-screen-md md:max-w-2xl lg:max-w-3xl"
-              onIntervalSelect={handleIntervalSelect}
-              onHaptic={triggerHaptic}
-              isLoading={isValuationHistoryLoading}
-              storageKey={INTERVAL_STORAGE_KEY}
-              defaultValue={DEFAULT_INTERVAL}
-            />
-          </div>
-        )}
-      </div>
+      <div
+        className={`bg-linear-to-t flex grow flex-col ${
+          isNegative
+            ? "from-destructive/30 via-destructive/15 to-transparent"
+            : "from-success/30 via-success/15 to-transparent"
+        }`}
+      >
+        <div className="h-[280px]">
+          <HistoryChart data={chartData} isLoading={isValuationHistoryLoading} />
+          {valuationHistory && chartData.length > 0 && (
+            <div className="flex w-full justify-center">
+              <IntervalSelector
+                className="pointer-events-auto relative z-20 w-full max-w-screen-sm sm:max-w-screen-md md:max-w-2xl lg:max-w-3xl"
+                onIntervalSelect={handleIntervalSelect}
+                onHaptic={triggerHaptic}
+                isLoading={isValuationHistoryLoading}
+                storageKey={INTERVAL_STORAGE_KEY}
+                defaultValue={DEFAULT_INTERVAL}
+              />
+            </div>
+          )}
+        </div>
 
-      <div className="from-success/30 via-success/15 to-success/10 bg-linear-to-t grow px-4 pb-[calc(var(--mobile-nav-ui-height)+max(var(--mobile-nav-gap),env(safe-area-inset-bottom)))] pt-12 md:px-6 md:pb-6 md:pt-6 lg:px-10 lg:pb-8 lg:pt-8">
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:gap-20">
-          <div className="lg:col-span-2">
-            <AccountsSummary />
-          </div>
-          <div className="space-y-6 lg:col-span-1">
-            <TopHoldings
-              holdings={holdings}
-              isLoading={isHoldingsLoading}
-              baseCurrency={baseCurrency}
-            />
-            <SavingGoals />
+        <div className="grow px-4 pb-[calc(var(--mobile-nav-ui-height)+max(var(--mobile-nav-gap),env(safe-area-inset-bottom)))] pt-12 md:px-6 md:pb-6 md:pt-6 lg:px-10 lg:pb-8 lg:pt-8">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:gap-20">
+            <div className="lg:col-span-2">
+              <AccountsSummary />
+            </div>
+            <div className="space-y-6 lg:col-span-1">
+              <TopHoldings
+                holdings={holdings}
+                isLoading={isHoldingsLoading}
+                baseCurrency={baseCurrency}
+              />
+              <SavingGoals />
+            </div>
           </div>
         </div>
       </div>

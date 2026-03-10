@@ -147,52 +147,72 @@ async fn process_event_batch(events: &[DomainEvent], deps: Arc<QueueWorkerDeps>)
         let chunk_size = 5;
 
         for chunk in enrichment_assets.chunks(chunk_size) {
-            match deps.asset_service.enrich_assets(chunk.to_vec()).await {
-                Ok((enriched, skipped, failed)) => {
+            match tokio::time::timeout(
+                Duration::from_secs(30),
+                deps.asset_service.enrich_assets(chunk.to_vec()),
+            )
+            .await
+            {
+                Ok(Ok((enriched, skipped, failed))) => {
                     total_enriched += enriched;
                     total_skipped += skipped;
                     total_failed += failed;
-
-                    let completed = total_enriched + total_skipped + total_failed;
-                    deps.event_bus
-                        .publish(crate::events::ServerEvent::with_payload(
-                            crate::events::ASSET_ENRICHMENT_PROGRESS,
-                            serde_json::json!({
-                                "completed": completed,
-                                "total": total,
-                            }),
-                        ));
                 }
-                Err(e) => {
+                Ok(Err(e)) => {
                     tracing::warn!("Asset enrichment chunk failed: {}", e);
                     had_error = true;
-                    deps.event_bus
-                        .publish(crate::events::ServerEvent::with_payload(
-                            crate::events::ASSET_ENRICHMENT_ERROR,
-                            serde_json::json!(e.to_string()),
-                        ));
-                    break;
+                    total_failed += chunk.len();
+                }
+                Err(_) => {
+                    tracing::warn!(
+                        "Asset enrichment chunk timed out ({} asset(s))",
+                        chunk.len()
+                    );
+                    had_error = true;
+                    total_failed += chunk.len();
                 }
             }
-        }
 
-        if !had_error {
-            tracing::info!(
-                "Asset enrichment complete: {} enriched, {} skipped, {} failed",
-                total_enriched,
-                total_skipped,
-                total_failed
-            );
+            let completed = total_enriched + total_skipped + total_failed;
             deps.event_bus
                 .publish(crate::events::ServerEvent::with_payload(
-                    crate::events::ASSET_ENRICHMENT_COMPLETE,
+                    crate::events::ASSET_ENRICHMENT_PROGRESS,
                     serde_json::json!({
-                        "enriched": total_enriched,
-                        "skipped": total_skipped,
-                        "failed": total_failed,
+                        "completed": completed,
+                        "total": total,
                     }),
                 ));
         }
+
+        tracing::info!(
+            "Asset enrichment complete: {} enriched, {} skipped, {} failed{}",
+            total_enriched,
+            total_skipped,
+            total_failed,
+            if had_error {
+                " (some chunks failed)"
+            } else {
+                ""
+            }
+        );
+
+        if had_error || total_failed > 0 {
+            deps.event_bus
+                .publish(crate::events::ServerEvent::with_payload(
+                    crate::events::ASSET_ENRICHMENT_ERROR,
+                    serde_json::json!(format!("{} asset(s) failed enrichment", total_failed)),
+                ));
+        }
+
+        deps.event_bus
+            .publish(crate::events::ServerEvent::with_payload(
+                crate::events::ASSET_ENRICHMENT_COMPLETE,
+                serde_json::json!({
+                    "enriched": total_enriched,
+                    "skipped": total_skipped,
+                    "failed": total_failed,
+                }),
+            ));
     }
 
     // 2. Plan and trigger portfolio job

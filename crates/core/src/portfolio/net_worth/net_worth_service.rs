@@ -104,11 +104,12 @@ impl NetWorthService {
         &self,
         quantity: Decimal,
         price: Decimal,
+        contract_multiplier: Decimal,
         asset_currency: &str,
         base_currency: &str,
         date: NaiveDate,
     ) -> Result<Decimal> {
-        let local_value = quantity * price;
+        let local_value = quantity * price * contract_multiplier;
 
         if asset_currency == base_currency {
             return Ok(local_value.round_dp(DECIMAL_PRECISION));
@@ -337,6 +338,7 @@ impl NetWorthServiceTrait for NetWorthService {
                 let market_value_base = match self.calculate_market_value(
                     position.quantity,
                     normalized_price,
+                    position.contract_multiplier,
                     normalized_currency,
                     &base_currency,
                     date,
@@ -347,7 +349,7 @@ impl NetWorthServiceTrait for NetWorthService {
                             "Failed to calculate market value for {}: {}. Using local value.",
                             asset_id, e
                         );
-                        position.quantity * price
+                        position.quantity * price * position.contract_multiplier
                     }
                 };
 
@@ -436,6 +438,7 @@ impl NetWorthServiceTrait for NetWorthService {
             let market_value_base = match self.calculate_market_value(
                 quantity,
                 normalized_price,
+                Decimal::ONE,
                 normalized_currency,
                 &base_currency,
                 date,

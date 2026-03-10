@@ -15,7 +15,7 @@ import {
 import { PrivacyAmount } from "@wealthfolio/ui";
 import { useNetWorth } from "@/hooks/use-alternative-assets";
 import { useSettingsContext } from "@/lib/settings-provider";
-import { cn } from "@/lib/utils";
+import { cn, parseLocalDate } from "@/lib/utils";
 import { useMemo, useState } from "react";
 
 interface NetWorthWidgetProps {
@@ -39,7 +39,7 @@ interface BreakdownItem {
  * Checks if a valuation is stale (older than 90 days)
  */
 function isValuationStale(dateStr: string): boolean {
-  const date = new Date(dateStr);
+  const date = parseLocalDate(dateStr);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffDays = diffMs / (1000 * 60 * 60 * 24);
@@ -50,7 +50,7 @@ function isValuationStale(dateStr: string): boolean {
  * Formats a date string to a human-readable format
  */
 function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
+  const date = parseLocalDate(dateStr);
   return date.toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",

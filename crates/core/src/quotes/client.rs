@@ -141,6 +141,12 @@ impl MarketDataClient {
             }
         }
 
+        // Always register OpenFIGI — it's free, keyless, and only handles bond search/profile.
+        // This ensures bond ISIN/FIGI lookup works without users needing to enable it in settings.
+        if !providers.iter().any(|p| p.id() == DATA_SOURCE_OPENFIGI) {
+            providers.push(Arc::new(OpenFigiProvider::new()));
+        }
+
         if providers.is_empty() {
             warn!(
                 "No market data providers initialized! Enabled: {:?}, Errors: {:?}",
@@ -212,17 +218,17 @@ impl MarketDataClient {
                 }
                 Ok(None)
             }
-            "US_TREASURY_CALC" => {
-                let provider = UsTreasuryCalcProvider::new();
-                Ok(Some(Arc::new(provider)))
+            DATA_SOURCE_OPENFIGI => {
+                // OpenFIGI doesn't need an API key (free tier)
+                Ok(Some(Arc::new(OpenFigiProvider::new())))
             }
-            "BOERSE_FRANKFURT" => {
-                let provider = BoerseFrankfurtProvider::new();
-                Ok(Some(Arc::new(provider)))
+            DATA_SOURCE_US_TREASURY_CALC => {
+                // Calculates bond prices from US Treasury yield curve data (no API key)
+                Ok(Some(Arc::new(UsTreasuryCalcProvider::new())))
             }
-            "OPENFIGI" => {
-                let provider = OpenFigiProvider::new();
-                Ok(Some(Arc::new(provider)))
+            DATA_SOURCE_BOERSE_FRANKFURT => {
+                // European bond pricing via Börse Frankfurt (no API key)
+                Ok(Some(Arc::new(BoerseFrankfurtProvider::new())))
             }
             _ => {
                 warn!("Unknown provider ID: {}", provider_id);
@@ -351,10 +357,10 @@ impl MarketDataClient {
         // Preferred provider from asset
         let preferred_provider: Option<ProviderId> = asset.preferred_provider().map(Cow::Owned);
 
-        // Populate bond metadata from asset for yield-curve-based pricing
+        // Convert bond spec to market-data BondQuoteMetadata when available
         let bond_metadata = asset.bond_spec().and_then(|spec| {
             Some(BondQuoteMetadata {
-                coupon_rate: spec.coupon_rate.unwrap_or_default(),
+                coupon_rate: spec.coupon_rate?,
                 maturity_date: spec.maturity_date?,
                 face_value: spec.face_value.unwrap_or(rust_decimal::Decimal::from(1000)),
                 coupon_frequency: spec
@@ -380,6 +386,8 @@ impl MarketDataClient {
             DATA_SOURCE_MARKET_DATA_APP => DataSource::MarketDataApp,
             DATA_SOURCE_METAL_PRICE_API => DataSource::MetalPriceApi,
             DATA_SOURCE_FINNHUB => DataSource::Finnhub,
+            DATA_SOURCE_US_TREASURY_CALC => DataSource::UsTreasuryCalc,
+            DATA_SOURCE_BOERSE_FRANKFURT => DataSource::BoerseFrankfurt,
             DATA_SOURCE_MANUAL => DataSource::Manual,
             _ => DataSource::Yahoo, // Default fallback
         };
@@ -982,6 +990,58 @@ mod tests {
         let context = client.build_quote_context(&asset).unwrap();
 
         assert_eq!(context.currency_hint.as_deref(), Some("CAD"));
+    }
+
+    #[test]
+    fn test_build_quote_context_bond_metadata_populated() {
+        use crate::assets::InstrumentType;
+        use chrono::NaiveDate;
+
+        let mut asset = create_test_asset(AssetKind::Investment, "US912810TD00", "USD");
+        asset.instrument_type = Some(InstrumentType::Bond);
+        asset.instrument_symbol = Some("US912810TD00".to_string());
+        // Set bond metadata via the JSON metadata field (camelCase per BondSpec serde)
+        asset.metadata = Some(serde_json::json!({
+            "bond": {
+                "couponRate": 0.04375,
+                "maturityDate": "2040-11-15",
+                "faceValue": 1000,
+                "couponFrequency": "SEMI_ANNUAL"
+            }
+        }));
+
+        let client = create_test_client();
+        let context = client.build_quote_context(&asset).unwrap();
+
+        let bond_meta = context
+            .bond_metadata
+            .expect("bond_metadata should be populated");
+        assert_eq!(bond_meta.coupon_rate, dec!(0.04375));
+        assert_eq!(
+            bond_meta.maturity_date,
+            NaiveDate::from_ymd_opt(2040, 11, 15).unwrap()
+        );
+        assert_eq!(bond_meta.face_value, dec!(1000));
+        assert_eq!(bond_meta.coupon_frequency, "SEMI_ANNUAL");
+    }
+
+    #[test]
+    fn test_build_quote_context_bond_metadata_none_when_missing() {
+        use crate::assets::InstrumentType;
+
+        let mut asset = create_test_asset(AssetKind::Investment, "US912810TD00", "USD");
+        asset.instrument_type = Some(InstrumentType::Bond);
+        asset.instrument_symbol = Some("US912810TD00".to_string());
+        // Bond with no metadata — bond_metadata should be None
+        asset.metadata = None;
+
+        let client = create_test_client();
+        let context = client.build_quote_context(&asset).unwrap();
+
+        assert!(
+            context.bond_metadata.is_none(),
+            "bond_metadata should be None when no bond spec exists"
+        );
     }
 
     // =========================================================================

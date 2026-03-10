@@ -189,11 +189,12 @@ export function ActivityDataGrid({
             exchangeMic: result.exchangeMic,
             assetQuoteMode: result.dataSource === "MANUAL" ? "MANUAL" : "MARKET",
             currency,
+            instrumentType: result.quoteType,
             // Capture asset metadata for custom assets
             pendingAssetName: result.longName,
             pendingAssetKind: result.assetKind,
             pendingQuoteCcy: result.currency,
-            pendingInstrumentType: (result as { quoteType?: string }).quoteType,
+            pendingInstrumentType: result.quoteType,
           };
         }
         return updated;
@@ -201,11 +202,7 @@ export function ActivityDataGrid({
 
       // Resolve quote to confirm currency and get latest price
       if (result.dataSource !== "MANUAL") {
-        resolveSymbolQuote(
-          result.symbol,
-          result.exchangeMic,
-          (result as { quoteType?: string }).quoteType,
-        ).then((resolved) => {
+        resolveSymbolQuote(result.symbol, result.exchangeMic, result.quoteType).then((resolved) => {
           if (requestId !== latestResolveRequestId.current) return;
           if (!resolved) return;
 
@@ -279,10 +276,11 @@ export function ActivityDataGrid({
             exchangeMic: result.exchangeMic,
             assetQuoteMode: "MANUAL",
             currency,
+            instrumentType: result.quoteType,
             pendingAssetName: result.longName,
             pendingAssetKind: result.assetKind,
             pendingQuoteCcy: result.currency,
-            pendingInstrumentType: (result as { quoteType?: string }).quoteType,
+            pendingInstrumentType: result.quoteType,
           };
         }
         return updated;

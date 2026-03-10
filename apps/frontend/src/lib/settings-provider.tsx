@@ -136,6 +136,13 @@ const applySettingsToDocument = (newSettings: Settings) => {
   document.body.classList.remove("font-mono", "font-sans", "font-serif");
   document.body.classList.add(newSettings.font);
 
+  // Cache theme/font in localStorage for pre-auth usage (login screen)
+  try {
+    localStorage.setItem("wealthfolio-theme", newSettings.theme);
+  } catch {
+    // noop – localStorage may be unavailable
+  }
+
   // Always clean up previous listeners before applying a new theme mode
   cleanupSystemThemeListeners();
 

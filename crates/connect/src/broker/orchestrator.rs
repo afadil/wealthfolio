@@ -703,11 +703,16 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
             .map_err(|e| e.to_string())?;
 
         let positions_count = holdings.positions.as_ref().map(|p| p.len()).unwrap_or(0);
+        let option_positions_count = holdings
+            .option_positions
+            .as_ref()
+            .map(|p| p.len())
+            .unwrap_or(0);
         let balances_count = holdings.balances.as_ref().map(|b| b.len()).unwrap_or(0);
 
         info!(
-            "Fetched {} positions and {} balances for '{}'",
-            positions_count, balances_count, account_name
+            "Fetched {} positions, {} option positions, and {} balances for '{}'",
+            positions_count, option_positions_count, balances_count, account_name
         );
 
         // Save holdings as a snapshot
@@ -717,6 +722,7 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
                 account_id.to_string(),
                 holdings.balances.unwrap_or_default(),
                 holdings.positions.unwrap_or_default(),
+                holdings.option_positions.unwrap_or_default(),
             )
             .await
             .map_err(|e| format!("Failed to save broker holdings: {}", e))?;

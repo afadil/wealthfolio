@@ -56,7 +56,6 @@ mod desktop {
     /// Initializes desktop-specific plugins.
     pub fn init_plugins(handle: &AppHandle) {
         let _ = handle.plugin(tauri_plugin_updater::Builder::new().build());
-        let _ = handle.plugin(tauri_plugin_window_state::Builder::new().build());
     }
 
     /// Performs synchronous setup on desktop: initializes context, menu, and registers listeners.
@@ -187,7 +186,21 @@ fn get_app_data_dir(handle: &AppHandle) -> Result<String, Box<dyn std::error::Er
 pub fn run() {
     dotenv().ok();
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+
+    // Single-instance must be the first plugin registered (per Tauri docs).
+    // With the "deep-link" feature, it automatically forwards deep link URLs
+    // to the existing instance's on_open_url handler instead of spawning a new process.
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+        // Focus the existing window when a second instance is attempted
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.unminimize();
+            let _ = window.set_focus();
+        }
+    }));
+
+    let builder = builder
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(if cfg!(debug_assertions) {
@@ -205,7 +218,12 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_deep_link::init());
+
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
+
+    builder
         .setup(|app| {
             let handle = app.handle().clone();
 

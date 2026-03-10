@@ -1317,7 +1317,7 @@ impl AddonService {
         }
         let content = fs::read_to_string(&manifest_path)
             .map_err(|e| format!("Failed to read manifest {}: {}", manifest_path.display(), e))?;
-        let manifest = serde_json::from_str::<AddonManifest>(&content).map_err(|e| {
+        let manifest = parse_manifest_json_metadata(&content).map_err(|e| {
             format!(
                 "Failed to parse manifest {}: {}",
                 manifest_path.display(),

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { ExternalLink } from "@/components/external-link";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Label } from "@wealthfolio/ui/components/ui/label";
@@ -146,14 +147,12 @@ export function NewAccountsFoundModal({
                   <strong>Transactions</strong> mode tracks every trade for full performance
                   analytics. <strong>Holdings</strong> mode imports snapshots only with limited
                   metrics.{" "}
-                  <a
+                  <ExternalLink
                     href="https://wealthfolio.app/docs/concepts/activity-types"
-                    target="_blank"
-                    rel="noopener noreferrer"
                     className="hover:text-foreground underline"
                   >
                     Learn more
-                  </a>
+                  </ExternalLink>
                 </AlertDescription>
               </Alert>
 

@@ -3728,4 +3728,73 @@ mod tests {
             "symbol_name should be enriched from existing option asset"
         );
     }
+
+    /// Test: OCC symbol pattern (e.g. AAPL240119C00150000) infers OPTION kind
+    /// and matches against an existing option asset.
+    #[tokio::test]
+    async fn test_infer_asset_kind_occ_symbol() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        // Add an option asset matching the OCC symbol
+        let asset = create_test_asset_with_instrument(
+            "aapl-opt-uuid",
+            "AAPL240119C00150000",
+            None,
+            Some(InstrumentType::Option),
+            "USD",
+        );
+        asset_service.add_asset(asset);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        // OCC symbol with no explicit kind input — should be inferred as OPTION
+        let new_activity = NewActivity {
+            id: Some("activity-occ-1".to_string()),
+            account_id: "acc-1".to_string(),
+            symbol: Some(SymbolInput {
+                symbol: Some("AAPL240119C00150000".to_string()),
+                ..Default::default()
+            }),
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(dec!(2)),
+            unit_price: Some(dec!(5)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(10)),
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+        };
+
+        let result = activity_service.create_activity(new_activity).await;
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+
+        let created = result.unwrap();
+        assert_eq!(
+            created.asset_id,
+            Some("aapl-opt-uuid".to_string()),
+            "OCC symbol should match existing option asset"
+        );
+    }
 }

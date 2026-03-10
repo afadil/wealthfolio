@@ -246,6 +246,13 @@ All configuration is done via environment variables in `.env.web`.
   (default `60`)
 - `WF_AUTH_REQUIRED` - Set to `false` to allow starting on non-loopback
   addresses without authentication (e.g. when a reverse proxy handles auth)
+- `WF_COOKIE_SECURE` - Controls the `Secure` attribute on session cookies
+  (default: `auto`)
+  - `auto` - set `Secure` only when `X-Forwarded-Proto: https` is present
+    (recommended for most reverse-proxy setups)
+  - `true` - always set `Secure` (use when TLS is guaranteed but the header is
+    absent)
+  - `false` - never set `Secure` (plain HTTP without a reverse proxy)
 - `WF_SECRET_FILE` - **Optional** path to secrets storage file (default:
   `<data-root>/secrets.json`)
 - `WF_ADDONS_DIR` - **Optional** path to addons directory (default: derived from
@@ -277,8 +284,15 @@ All configuration is done via environment variables in `.env.web`.
 
   Copy the full output (starting with `$argon2id$...`) into `.env.web`.
 
-- Tokens are short-lived (default 60 minutes) and stored in memory on the
-  client; refresh the page to re-authenticate.
+- Sessions are cookie-based (`HttpOnly`, `SameSite=Lax`, `Path=/api`). The login
+  endpoint sets the session cookie automatically — no token is exposed to
+  client-side JavaScript. Sessions last 60 minutes by default (see
+  `WF_AUTH_TOKEN_TTL_MINUTES`).
+
+- **Reverse proxy (HTTPS):** If your reverse proxy terminates TLS, ensure it
+  forwards `X-Forwarded-Proto: https` so the server sets the `Secure` cookie
+  attribute correctly. Alternatively, set `WF_COOKIE_SECURE=true` to always set
+  `Secure`. See `WF_COOKIE_SECURE` above.
 
 #### Notes
 

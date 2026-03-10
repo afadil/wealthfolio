@@ -355,6 +355,10 @@ export function TransferForm({
   const toAccountOptions = accounts.filter((acc) => acc.value !== fromAccountId);
 
   const handleSubmit = createValidatedSubmit(form, async (data) => {
+    // Ensure symbolQuoteCcy is set — manual/custom symbols leave it undefined
+    if (!data.symbolQuoteCcy && data.currency) {
+      data.symbolQuoteCcy = data.currency;
+    }
     await onSubmit(data);
   });
 

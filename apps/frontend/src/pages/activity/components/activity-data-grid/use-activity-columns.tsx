@@ -9,6 +9,7 @@ import {
   SUBTYPE_DISPLAY_NAMES,
   SUBTYPES_BY_ACTIVITY_TYPE,
 } from "@/lib/constants";
+import { parseOccSymbol } from "@/lib/occ-symbol";
 import type { Account, ActivityDetails } from "@/lib/types";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Badge, Checkbox, type SymbolSearchResult } from "@wealthfolio/ui";
@@ -82,8 +83,11 @@ export function useActivityColumns({
       exchange: result.exchange,
       exchangeMic: result.exchangeMic,
       currency: result.currency,
+      currencySource: result.currencySource,
+      quoteType: result.quoteType,
       score: result.score,
       dataSource: result.dataSource,
+      assetKind: result.assetKind,
     }));
   }, []);
 
@@ -223,7 +227,7 @@ export function useActivityColumns({
       {
         accessorKey: "assetSymbol",
         header: "Symbol",
-        size: 140,
+        size: 160,
         meta: {
           cell: {
             variant: "symbol",
@@ -238,6 +242,15 @@ export function useActivityColumns({
               const symbol = (row.assetSymbol ?? "").trim().toUpperCase();
               if (!symbol || symbol === "CASH" || symbol.startsWith("$CASH")) {
                 return undefined;
+              }
+              // Show contract description for options
+              const parsed = row.instrumentType === "OPTION" ? parseOccSymbol(symbol) : null;
+              if (parsed) {
+                const expDisplay = new Date(parsed.expiration + "T12:00:00").toLocaleDateString(
+                  "en-US",
+                  { month: "short", day: "numeric" },
+                );
+                return `${expDisplay} $${parsed.strikePrice} ${parsed.optionType}`;
               }
               return getExchangeDisplayName(row.exchangeMic);
             },
@@ -258,23 +271,24 @@ export function useActivityColumns({
         },
       },
 
-      // 9. Instrument Type (hidden by default)
+      // 9. Instrument Type (hidden by default, editable select)
       {
         id: "instrumentType",
         accessorKey: "instrumentType",
         header: "Instrument",
-        size: 110,
+        size: 120,
         enableSorting: false,
         enableHiding: true,
-        cell: ({ row }) => {
-          const value = row.original.instrumentType;
-          if (!value) return <span className="text-muted-foreground">—</span>;
-          const option = INSTRUMENT_TYPE_OPTIONS.find((o) => o.value === value);
-          return (
-            <Badge variant="outline" className="text-xs font-normal">
-              {option?.label ?? value}
-            </Badge>
-          );
+        meta: {
+          cell: {
+            variant: "select",
+            options: INSTRUMENT_TYPE_OPTIONS.map((opt) => ({
+              value: opt.value,
+              label: opt.label,
+            })),
+            allowEmpty: true,
+            emptyLabel: "Auto",
+          },
         },
       },
 
