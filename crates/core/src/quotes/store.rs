@@ -261,6 +261,23 @@ pub trait QuoteStore: Send + Sync {
         symbols: &[String],
     ) -> Result<HashMap<String, LatestQuotePair>>;
 
+    /// Gets the most recent quote for a symbol strictly before the given date.
+    ///
+    /// Used as a seed for gap-fill when the standard lookback window misses
+    /// stale manual quotes.
+    ///
+    /// The default implementation falls back to `get_historical_quotes` with
+    /// an in-memory filter. Storage backends should override this with a
+    /// targeted query for efficiency.
+    fn get_latest_quote_before(&self, symbol: &str, before: NaiveDate) -> Result<Option<Quote>> {
+        let quote = self
+            .get_historical_quotes(symbol)?
+            .into_iter()
+            .filter(|q| q.timestamp.date_naive() < before)
+            .max_by_key(|q| q.timestamp);
+        Ok(quote)
+    }
+
     /// Gets all historical quotes for a symbol, ordered by date.
     ///
     /// # Arguments
