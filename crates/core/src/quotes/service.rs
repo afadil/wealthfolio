@@ -1672,18 +1672,14 @@ pub(crate) fn append_historical_seed_quotes<Q: QuoteStore>(
         .map(|quote| quote.asset_id.clone())
         .collect();
 
-    // Fall back to full history for symbols without a pre-start seed in the lookback
-    // window. This preserves manual quote carry-forward when the latest quote is stale.
+    // For symbols without a pre-start seed in the lookback window, fetch the
+    // latest quote before start. Preserves manual quote carry-forward when stale.
     for symbol in symbols {
         if symbols_with_seed_quotes.contains(symbol) {
             continue;
         }
 
-        let maybe_seed_quote = quote_store
-            .get_historical_quotes(symbol)?
-            .into_iter()
-            .filter(|quote| quote.timestamp.date_naive() < start)
-            .max_by_key(|quote| quote.timestamp);
+        let maybe_seed_quote = quote_store.get_latest_quote_before(symbol, start)?;
 
         if let Some(mut seed_quote) = maybe_seed_quote {
             if let Some(asset) = assets_by_id.get(symbol) {

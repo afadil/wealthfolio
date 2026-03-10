@@ -613,8 +613,8 @@ fn test_parse_manifest_json_metadata_service() {
 #[cfg(test)]
 mod service_tests {
     use super::*;
-    use std::env;
     use crate::addons::addon_traits::AddonServiceTrait;
+    use std::env;
 
     #[test]
     fn test_ensure_addons_directory_service() {
@@ -694,10 +694,14 @@ mod service_tests {
             ]
         }"#;
 
-        std::fs::write(addon_dir.join("manifest.json"), manifest_json).expect("Failed to write manifest");
-        std::fs::write(addon_dir.join("addon.js"), "console.log('test')").expect("Failed to write js");
+        std::fs::write(addon_dir.join("manifest.json"), manifest_json)
+            .expect("Failed to write manifest");
+        std::fs::write(addon_dir.join("addon.js"), "console.log('test')")
+            .expect("Failed to write js");
 
-        let installed = service.list_installed_addons().expect("Failed to list installed addons");
+        let installed = service
+            .list_installed_addons()
+            .expect("Failed to list installed addons");
         assert_eq!(installed.len(), 1, "AddonService should load the manifest");
 
         let permissions = installed[0].metadata.permissions.as_ref().unwrap();
