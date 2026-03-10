@@ -560,6 +560,13 @@ impl AssetServiceTrait for AssetService {
             .update_quote_mode(asset_id, quote_mode)
             .await?;
 
+        // Switching to Manual means providers will no longer sync this asset,
+        // so clear any stale error state to keep the health panel clean.
+        if asset.quote_mode == QuoteMode::Manual {
+            if let Err(e) = self.quote_service.delete_sync_state(asset_id).await {
+                warn!("Failed to clear sync state for {}: {:?}", asset_id, e);
+            }
+        }
         self.event_sink
             .emit(DomainEvent::assets_updated(vec![asset.id.clone()]));
 
@@ -568,9 +575,18 @@ impl AssetServiceTrait for AssetService {
 
     /// Updates quote mode without emitting domain events.
     async fn update_quote_mode_silent(&self, asset_id: &str, quote_mode: &str) -> Result<Asset> {
-        self.asset_repository
+        let asset = self
+            .asset_repository
             .update_quote_mode(asset_id, quote_mode)
-            .await
+            .await?;
+
+        if asset.quote_mode == QuoteMode::Manual {
+            if let Err(e) = self.quote_service.delete_sync_state(asset_id).await {
+                warn!("Failed to clear sync state for {}: {:?}", asset_id, e);
+            }
+        }
+
+        Ok(asset)
     }
 
     async fn get_assets_by_asset_ids(&self, asset_ids: &[String]) -> Result<Vec<Asset>> {
