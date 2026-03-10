@@ -101,7 +101,8 @@ async fn login_and_access_protected_route() {
         .get(header::SET_COOKIE)
         .expect("login should set a cookie")
         .to_str()
-        .unwrap();
+        .unwrap()
+        .to_owned();
     assert!(
         set_cookie.contains("wf_session="),
         "cookie should contain wf_session"
@@ -111,14 +112,26 @@ async fn login_and_access_protected_route() {
         .await
         .unwrap();
     let login_json: serde_json::Value = serde_json::from_slice(&login_bytes).unwrap();
-    let token = login_json["accessToken"].as_str().unwrap();
+    assert_eq!(login_json["authenticated"], true);
+    assert!(login_json["expiresIn"].as_u64().unwrap() > 0);
+    assert!(
+        login_json.get("accessToken").is_none(),
+        "login should not expose accessToken"
+    );
 
-    // Access with token succeeds
+    // Extract session cookie from Set-Cookie header
+    let cookie_token = set_cookie
+        .split(';')
+        .next()
+        .unwrap()
+        .trim_start_matches("wf_session=");
+
+    // Access with cookie succeeds
     let authed_response = app
         .oneshot(
             Request::builder()
                 .uri("/api/v1/accounts")
-                .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                .header(header::COOKIE, format!("wf_session={cookie_token}"))
                 .body(Body::empty())
                 .unwrap(),
         )

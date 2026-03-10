@@ -150,6 +150,18 @@ pub fn emit_app_ready(handle: &tauri::AppHandle) {
     });
 }
 
+/// Event emitted when asset enrichment starts.
+pub const ASSET_ENRICHMENT_START: &str = "asset:enrichment-start";
+
+/// Event emitted when asset enrichment completes.
+pub const ASSET_ENRICHMENT_COMPLETE: &str = "asset:enrichment-complete";
+
+/// Event emitted when asset enrichment encounters an error.
+pub const ASSET_ENRICHMENT_ERROR: &str = "asset:enrichment-error";
+
+/// Event emitted for asset enrichment progress updates.
+pub const ASSET_ENRICHMENT_PROGRESS: &str = "asset:enrichment-progress";
+
 // Note: Broker sync events (start/complete/error) are emitted by the orchestrator
 // via TauriProgressReporter in commands/brokers_sync.rs, not by helper functions here.
 // The payload format is SyncResult from wealthfolio_connect.

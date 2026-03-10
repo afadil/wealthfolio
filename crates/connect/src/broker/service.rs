@@ -7,7 +7,8 @@ use std::sync::Arc;
 use super::mapping;
 use super::models::{
     AccountUniversalActivity, BrokerAccount, BrokerConnection, HoldingsBalance, HoldingsDiff,
-    HoldingsPosition, NewAccountInfo, SyncAccountsResponse, SyncConnectionsResponse,
+    HoldingsOptionPosition, HoldingsPosition, NewAccountInfo, SyncAccountsResponse,
+    SyncConnectionsResponse,
 };
 use super::traits::{BrokerSyncServiceTrait, PlatformRepositoryTrait};
 use crate::broker_ingest::{
@@ -25,8 +26,8 @@ use wealthfolio_core::activities::{
     NewActivity,
 };
 use wealthfolio_core::assets::{
-    parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix, AssetKind, AssetServiceTrait,
-    AssetSpec,
+    build_option_metadata, parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix, AssetKind,
+    AssetServiceTrait, AssetSpec,
 };
 use wealthfolio_core::errors::Result;
 use wealthfolio_core::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
@@ -545,6 +546,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
         account_id: String,
         balances: Vec<HoldingsBalance>,
         positions: Vec<HoldingsPosition>,
+        option_positions: Vec<HoldingsOptionPosition>,
     ) -> Result<(HoldingsDiff, usize, Vec<String>)> {
         use std::collections::VecDeque;
         use wealthfolio_core::assets::InstrumentType;
@@ -637,6 +639,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 kind: AssetKind::Investment,
                 quote_mode: None,
                 name: asset_name,
+                metadata: None,
             };
 
             let spec_key = spec.instrument_key().unwrap_or_else(|| {
@@ -661,6 +664,94 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 .unwrap_or(Decimal::ZERO)
                 .round_dp(HOLDINGS_DECIMAL_PRECISION);
             let avg_cost = Decimal::from_f64(pos.average_purchase_price.unwrap_or(0.0))
+                .unwrap_or(price)
+                .round_dp(HOLDINGS_DECIMAL_PRECISION);
+
+            position_data.push((spec_key, quantity, price, avg_cost, currency));
+        }
+
+        // 1b. Build AssetSpecs and position data from option positions
+        for opt_pos in &option_positions {
+            let option_symbol = match opt_pos.resolved_option_symbol() {
+                Some(s) => s,
+                None => {
+                    debug!("Skipping option position without symbol");
+                    continue;
+                }
+            };
+
+            let ticker = match option_symbol
+                .ticker
+                .as_ref()
+                .filter(|t| !t.trim().is_empty())
+            {
+                Some(t) => t.clone(),
+                None => {
+                    debug!("Skipping option position without OCC ticker");
+                    continue;
+                }
+            };
+
+            let units = opt_pos.units.unwrap_or(0.0);
+            if units == 0.0 {
+                debug!("Skipping option position {} with zero units", ticker);
+                continue;
+            }
+
+            // Normalize OCC symbol
+            let normalized_ticker =
+                wealthfolio_core::utils::occ_symbol::normalize_option_symbol(&ticker)
+                    .unwrap_or_else(|| ticker.clone());
+
+            let currency = opt_pos
+                .currency
+                .as_ref()
+                .and_then(|c| c.code.clone())
+                .unwrap_or_else(|| account_currency.clone());
+
+            let multiplier = if option_symbol.is_mini_option.unwrap_or(false) {
+                Decimal::from(10)
+            } else {
+                Decimal::from(100)
+            };
+            let metadata = build_option_metadata(&normalized_ticker, multiplier);
+
+            let asset_name = option_symbol
+                .underlying_symbol
+                .as_ref()
+                .and_then(|u| u.description.clone());
+
+            let spec = AssetSpec {
+                id: None,
+                display_code: Some(normalized_ticker.clone()),
+                instrument_symbol: Some(normalized_ticker.clone()),
+                instrument_exchange_mic: None, // OCC symbols are globally unique
+                instrument_type: Some(InstrumentType::Option),
+                quote_ccy: currency.clone(),
+                requested_quote_ccy: Some(currency.clone()),
+                kind: AssetKind::Investment,
+                quote_mode: None,
+                name: asset_name,
+                metadata,
+            };
+
+            let spec_key = spec
+                .instrument_key()
+                .unwrap_or_else(|| format!("OPTION:{}", normalized_ticker.to_uppercase()));
+
+            if !spec_key_to_idx.contains_key(&spec_key) {
+                let idx = asset_specs.len();
+                asset_specs.push(spec);
+                spec_key_to_idx.insert(spec_key.clone(), idx);
+            }
+
+            let quantity = Decimal::from_f64(units)
+                .unwrap_or(Decimal::ZERO)
+                .round_dp(HOLDINGS_DECIMAL_PRECISION);
+            let price = Decimal::from_f64(opt_pos.price.unwrap_or(0.0))
+                .unwrap_or(Decimal::ZERO)
+                .round_dp(HOLDINGS_DECIMAL_PRECISION);
+            let avg_cost = Decimal::from_f64(opt_pos.average_purchase_price.unwrap_or(0.0))
                 .unwrap_or(price)
                 .round_dp(HOLDINGS_DECIMAL_PRECISION);
 
@@ -721,6 +812,13 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 }
             };
 
+            // Determine contract multiplier from the asset spec metadata
+            let contract_multiplier = spec_key_to_idx
+                .get(spec_key)
+                .and_then(|idx| asset_specs.get(*idx))
+                .and_then(|spec| spec.option_multiplier())
+                .unwrap_or(Decimal::ONE);
+
             let position_cost_basis = (*quantity * *avg_cost).round_dp(HOLDINGS_DECIMAL_PRECISION);
             total_cost_basis += position_cost_basis;
 
@@ -737,7 +835,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 created_at: now,
                 last_updated: now,
                 is_alternative: false,
-                contract_multiplier: Decimal::ONE,
+                contract_multiplier,
             };
             positions_map.insert(asset_id, position);
         }

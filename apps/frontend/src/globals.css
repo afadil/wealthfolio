@@ -782,8 +782,14 @@ html.app-lockdown .allow-select {
   user-select: text;
 }
 
-/* Prevent zoom on double tap */
-* {
+/* Prevent zoom on double tap for interactive elements */
+button,
+[role="button"],
+input,
+select,
+textarea,
+label,
+summary {
   touch-action: manipulation;
 }
 

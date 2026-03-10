@@ -3,7 +3,8 @@
 mod tests {
     use crate::activities::{Activity, ActivityStatus, ActivityType};
     use crate::assets::{
-        Asset, AssetKind, AssetRepositoryTrait, NewAsset, QuoteMode, UpdateAssetProfile,
+        Asset, AssetKind, AssetRepositoryTrait, InstrumentType, NewAsset, QuoteMode,
+        UpdateAssetProfile,
     };
     use crate::errors::Result;
     use crate::fx::{ExchangeRate, FxError, FxServiceTrait, NewExchangeRate};
@@ -51,6 +52,23 @@ mod tests {
                 name: Some(format!("Mock Asset {}", symbol)),
                 kind: AssetKind::Investment,
                 quote_mode: QuoteMode::Market,
+                created_at: Utc::now().naive_utc(),
+                updated_at: Utc::now().naive_utc(),
+                ..Default::default()
+            };
+            self.assets.insert(symbol.to_string(), asset);
+        }
+
+        /// Add an option asset (instrument_type = Option, no metadata → multiplier defaults to 100)
+        fn add_option_asset(&mut self, symbol: &str, currency: &str) {
+            let asset = Asset {
+                id: symbol.to_string(),
+                display_code: Some(symbol.to_string()),
+                quote_ccy: currency.to_string(),
+                name: Some(format!("Mock Option {}", symbol)),
+                kind: AssetKind::Investment,
+                quote_mode: QuoteMode::Market,
+                instrument_type: Some(InstrumentType::Option),
                 created_at: Utc::now().naive_utc(),
                 updated_at: Utc::now().naive_utc(),
                 ..Default::default()
@@ -4802,5 +4820,317 @@ mod tests {
         let pos_c = result_c.snapshot.positions.get("AAPL").unwrap();
         assert_eq!(pos_c.quantity, dec!(5));
         assert_eq!(pos_c.total_cost_basis, dec!(500)); // 5 * $100
+    }
+
+    #[test]
+    fn test_transfer_in_option_applies_multiplier() {
+        // External TRANSFER_IN for an option asset (no OptionSpec metadata).
+        // contract_multiplier() defaults to 100 for InstrumentType::Option.
+        // cost_basis should be qty * price * 100.
+
+        let mock_fx_service = MockFxService::new();
+        let base_currency = Arc::new(RwLock::new("USD".to_string()));
+
+        // Custom repo with an option asset
+        let mut repo = MockAssetRepository::new();
+        repo.add_option_asset("AAPL240119C00150000", "USD");
+
+        let calculator =
+            HoldingsCalculator::new(Arc::new(mock_fx_service), base_currency, Arc::new(repo));
+
+        let previous_snapshot = create_initial_snapshot("acc_1", "USD", "2023-12-31");
+
+        // External transfer-in: 2 contracts @ $5 per share, no fee
+        let transfer_in = create_external_transfer_activity(
+            "act_opt_xfer",
+            ActivityType::TransferIn,
+            "AAPL240119C00150000",
+            dec!(2), // 2 contracts
+            dec!(5), // $5 per share (option premium)
+            dec!(0), // no fee
+            "USD",
+            "2024-01-02",
+        );
+
+        let target_date = NaiveDate::from_str("2024-01-02").unwrap();
+        let result = calculator
+            .calculate_next_holdings(&previous_snapshot, &[transfer_in], target_date)
+            .unwrap();
+
+        let pos = result
+            .snapshot
+            .positions
+            .get("AAPL240119C00150000")
+            .expect("Option position should exist");
+
+        assert_eq!(pos.quantity, dec!(2));
+        // cost_basis = qty * price * multiplier = 2 * 5 * 100 = 1000
+        assert_eq!(pos.total_cost_basis, dec!(1000));
+        // average_cost = price * multiplier = 5 * 100 = 500 per contract
+        assert_eq!(pos.average_cost, dec!(500));
+    }
+
+    #[test]
+    fn test_asset_not_in_repo_falls_back_to_multiplier_1() {
+        // When an asset is NOT in the repository, the fallback uses multiplier=1.
+        // The proper multiplier comes from asset metadata (OptionSpec) in the success path.
+        // This degraded path logs a warning and uses safe defaults.
+
+        let mock_fx_service = MockFxService::new();
+        let base_currency = Arc::new(RwLock::new("USD".to_string()));
+
+        // Use a bare MockAssetRepository with NO assets
+        let repo = MockAssetRepository::new();
+
+        let calculator =
+            HoldingsCalculator::new(Arc::new(mock_fx_service), base_currency, Arc::new(repo));
+
+        let previous_snapshot = create_initial_snapshot("acc_1", "USD", "2023-12-31");
+
+        let occ_symbol = "TSLA  250321C00250000";
+
+        let transfer_in = create_external_transfer_activity(
+            "act_opt_missing",
+            ActivityType::TransferIn,
+            occ_symbol,
+            dec!(3),  // 3 contracts
+            dec!(10), // $10 per share (option premium)
+            dec!(0),  // no fee
+            "USD",
+            "2024-01-02",
+        );
+
+        let target_date = NaiveDate::from_str("2024-01-02").unwrap();
+        let result = calculator
+            .calculate_next_holdings(&previous_snapshot, &[transfer_in], target_date)
+            .unwrap();
+
+        let pos = result
+            .snapshot
+            .positions
+            .get(occ_symbol)
+            .expect("Position should exist even when asset not in repo");
+
+        assert_eq!(pos.quantity, dec!(3));
+        // Fallback multiplier is 1 (asset missing from repo — degraded state)
+        assert_eq!(pos.total_cost_basis, dec!(30));
+        assert_eq!(pos.average_cost, dec!(10));
+        assert_eq!(pos.contract_multiplier, dec!(1));
+    }
+
+    #[test]
+    fn test_option_buy_partial_sell_cost_basis() {
+        // BUY 5 option contracts @ $3.00 premium (multiplier=100), fee=$10
+        // SELL 3 contracts @ $4.00, fee=$5
+        // Verify remaining position and cost basis after partial sell.
+        // Then SELL remaining 2 @ $5.00, fee=$5 to close position.
+
+        let mock_fx_service = MockFxService::new();
+        let base_currency = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut repo = MockAssetRepository::new();
+        repo.add_option_asset("AAPL250321C00150000", "USD");
+
+        let calculator =
+            HoldingsCalculator::new(Arc::new(mock_fx_service), base_currency, Arc::new(repo));
+
+        let previous_snapshot = create_initial_snapshot("acc_1", "USD", "2024-12-31");
+
+        // --- BUY 5 contracts @ $3.00 premium, fee $10 ---
+        let buy = create_default_activity(
+            "act_buy_opt",
+            ActivityType::Buy,
+            "AAPL250321C00150000",
+            dec!(5),  // 5 contracts
+            dec!(3),  // $3.00 per share (option premium)
+            dec!(10), // $10 fee
+            "USD",
+            "2025-01-02",
+        );
+
+        let buy_date = NaiveDate::from_str("2025-01-02").unwrap();
+        let result = calculator
+            .calculate_next_holdings(&previous_snapshot, &[buy], buy_date)
+            .unwrap();
+
+        let pos = result
+            .snapshot
+            .positions
+            .get("AAPL250321C00150000")
+            .expect("Option position should exist after buy");
+
+        // cost_basis = qty * (price * multiplier) + fee = 5 * (3 * 100) + 10 = 1510
+        assert_eq!(pos.quantity, dec!(5));
+        assert_eq!(pos.total_cost_basis, dec!(1510));
+        // average_cost = 1510 / 5 = 302
+        assert_eq!(pos.average_cost, dec!(302));
+
+        // --- SELL 3 contracts @ $4.00, fee $5 ---
+        let sell_3 = create_default_activity(
+            "act_sell_opt_3",
+            ActivityType::Sell,
+            "AAPL250321C00150000",
+            dec!(3),
+            dec!(4),
+            dec!(5),
+            "USD",
+            "2025-02-01",
+        );
+
+        let sell_date = NaiveDate::from_str("2025-02-01").unwrap();
+        let result2 = calculator
+            .calculate_next_holdings(&result.snapshot, &[sell_3], sell_date)
+            .unwrap();
+
+        let pos2 = result2
+            .snapshot
+            .positions
+            .get("AAPL250321C00150000")
+            .expect("Option position should exist after partial sell");
+
+        assert_eq!(pos2.quantity, dec!(2));
+        // FIFO: cost_basis_removed = 1510 * (3/5) = 906
+        // remaining cost_basis = 1510 - 906 = 604
+        assert_eq!(pos2.total_cost_basis, dec!(604));
+        // average_cost = 604 / 2 = 302
+        assert_eq!(pos2.average_cost, dec!(302));
+
+        // --- SELL remaining 2 contracts @ $5.00, fee $5 ---
+        let sell_2 = create_default_activity(
+            "act_sell_opt_2",
+            ActivityType::Sell,
+            "AAPL250321C00150000",
+            dec!(2),
+            dec!(5),
+            dec!(5),
+            "USD",
+            "2025-03-01",
+        );
+
+        let sell_date2 = NaiveDate::from_str("2025-03-01").unwrap();
+        let result3 = calculator
+            .calculate_next_holdings(&result2.snapshot, &[sell_2], sell_date2)
+            .unwrap();
+
+        let pos3 = result3.snapshot.positions.get("AAPL250321C00150000");
+        // Position should be fully closed (quantity = 0, which means it may be zeroed out)
+        if let Some(p) = pos3 {
+            assert_eq!(p.quantity, dec!(0));
+        }
+    }
+
+    #[test]
+    fn test_option_transfer_preserves_multiplier() {
+        // BUY 3 option contracts @ $2.00 in account_a, then transfer to account_b.
+        // Verify that the multiplier-adjusted cost basis is preserved through the transfer.
+
+        let mock_fx_service = MockFxService::new();
+        let base_currency = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut repo = MockAssetRepository::new();
+        repo.add_option_asset("AAPL250321C00150000", "USD");
+
+        let calculator =
+            HoldingsCalculator::new(Arc::new(mock_fx_service), base_currency, Arc::new(repo));
+
+        let buy_date_str = "2025-01-02";
+        let transfer_date_str = "2025-06-01";
+        let buy_date = NaiveDate::from_str(buy_date_str).unwrap();
+        let transfer_date = NaiveDate::from_str(transfer_date_str).unwrap();
+
+        // --- Account A: BUY 3 contracts @ $2.00, no fee ---
+        let prev_a = create_initial_snapshot("acc_a", "USD", "2024-12-31");
+
+        let buy = {
+            let mut a = create_default_activity(
+                "buy_opt",
+                ActivityType::Buy,
+                "AAPL250321C00150000",
+                dec!(3), // 3 contracts
+                dec!(2), // $2.00 per share (option premium)
+                dec!(0), // no fee
+                "USD",
+                buy_date_str,
+            );
+            a.account_id = "acc_a".to_string();
+            a
+        };
+
+        let result_a_buy = calculator
+            .calculate_next_holdings(&prev_a, std::slice::from_ref(&buy), buy_date)
+            .unwrap();
+
+        let pos_a = result_a_buy
+            .snapshot
+            .positions
+            .get("AAPL250321C00150000")
+            .expect("Account A should have option position");
+
+        // cost_basis = 3 * (2 * 100) + 0 = 600
+        assert_eq!(pos_a.quantity, dec!(3));
+        assert_eq!(pos_a.total_cost_basis, dec!(600));
+        assert_eq!(pos_a.contract_multiplier, dec!(100));
+
+        // --- Account A: TRANSFER_OUT 3 contracts ---
+        let transfer_out = create_transfer_activity(
+            "xfer_out_opt",
+            ActivityType::TransferOut,
+            "AAPL250321C00150000",
+            dec!(3),
+            dec!(0),
+            dec!(0),
+            "USD",
+            transfer_date_str,
+            "acc_a",
+            Some("grp_opt"),
+        );
+
+        let result_a_xfer = calculator
+            .calculate_next_holdings(&result_a_buy.snapshot, &[transfer_out], transfer_date)
+            .unwrap();
+
+        // Account A should have no position (or zero quantity)
+        let pos_a_after = result_a_xfer.snapshot.positions.get("AAPL250321C00150000");
+        if let Some(p) = pos_a_after {
+            assert_eq!(
+                p.quantity,
+                dec!(0),
+                "Account A should have 0 after transfer out"
+            );
+        }
+
+        // --- Account B: TRANSFER_IN 3 contracts (lots carried over from cache) ---
+        let prev_b = create_initial_snapshot("acc_b", "USD", "2025-05-31");
+
+        let transfer_in = create_transfer_activity(
+            "xfer_in_opt",
+            ActivityType::TransferIn,
+            "AAPL250321C00150000",
+            dec!(3),
+            dec!(0),
+            dec!(0),
+            "USD",
+            transfer_date_str,
+            "acc_b",
+            Some("grp_opt"),
+        );
+
+        let result_b = calculator
+            .calculate_next_holdings(&prev_b, &[transfer_in], transfer_date)
+            .unwrap();
+
+        let pos_b = result_b
+            .snapshot
+            .positions
+            .get("AAPL250321C00150000")
+            .expect("Account B should have option position after transfer in");
+
+        // Cost basis should be preserved: 600
+        assert_eq!(pos_b.quantity, dec!(3));
+        assert_eq!(pos_b.total_cost_basis, dec!(600));
+        // average_cost = 600 / 3 = 200 per contract
+        assert_eq!(pos_b.average_cost, dec!(200));
+        // Multiplier should be 100
+        assert_eq!(pos_b.contract_multiplier, dec!(100));
     }
 }

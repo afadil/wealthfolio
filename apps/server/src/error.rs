@@ -22,6 +22,8 @@ pub enum ApiError {
     #[error("{0}")]
     Unauthorized(String),
     #[error("{0}")]
+    Forbidden(String),
+    #[error("{0}")]
     Internal(String),
     // Surface the underlying error message to help debugging during development
     #[error("{0}")]
@@ -46,6 +48,7 @@ impl IntoResponse for ApiError {
             ApiError::NotImplemented(reason) => (StatusCode::NOT_IMPLEMENTED, reason.clone()),
             ApiError::BadRequest(reason) => (StatusCode::BAD_REQUEST, reason.clone()),
             ApiError::Unauthorized(reason) => (StatusCode::UNAUTHORIZED, reason.clone()),
+            ApiError::Forbidden(reason) => (StatusCode::FORBIDDEN, reason.clone()),
             ApiError::Internal(reason) => (StatusCode::INTERNAL_SERVER_ERROR, reason.clone()),
             ApiError::Anyhow(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
         };

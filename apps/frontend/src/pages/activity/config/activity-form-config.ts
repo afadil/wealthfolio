@@ -1,5 +1,11 @@
 import type { ComponentType } from "react";
-import { ActivityType, QuoteMode } from "@/lib/constants";
+import {
+  ActivityType,
+  InstrumentType,
+  METADATA_CONTRACT_MULTIPLIER,
+  QuoteMode,
+} from "@/lib/constants";
+import { parseOccSymbol } from "@/lib/occ-symbol";
 import type { ActivityDetails } from "@/lib/types";
 import { BuyForm, type BuyFormValues } from "../components/forms/buy-form";
 import { SellForm, type SellFormValues } from "../components/forms/sell-form";
@@ -61,6 +67,13 @@ export interface ActivityTypeConfig<TFormValues = unknown> {
   toPayload: (data: TFormValues) => Partial<NewActivityFormValues>;
 }
 
+// Normalize a numeric value to its absolute value (direction is determined by activity type)
+function absNum(value: string | number | null | undefined): number | undefined {
+  if (value == null) return undefined;
+  const n = typeof value === "string" ? Number(value) : value;
+  return Number.isFinite(n) ? Math.abs(n) : undefined;
+}
+
 // Base defaults shared by most forms
 function getBaseDefaults(
   activity: Partial<ActivityDetails> | undefined,
@@ -81,19 +94,51 @@ export const ACTIVITY_FORM_CONFIG: Record<
   BUY: {
     component: BuyForm as ComponentType<ActivityFormComponentProps<ActivityFormValues>>,
     activityType: ActivityType.BUY,
-    getDefaults: (activity, accounts) => ({
-      ...getBaseDefaults(activity, accounts),
-      assetId: activity?.assetSymbol ?? activity?.assetId ?? "",
-      quantity: activity?.quantity,
-      unitPrice: activity?.unitPrice,
-      amount: activity?.amount,
-      fee: activity?.fee ?? "0",
-      quoteMode: activity?.assetQuoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
-      // Advanced options
-      currency: activity?.currency,
-      fxRate: activity?.fxRate ?? undefined,
-      exchangeMic: activity?.exchangeMic,
-    }),
+    getDefaults: (activity, accounts) => {
+      const base = {
+        ...getBaseDefaults(activity, accounts),
+        assetId: activity?.assetSymbol ?? activity?.assetId ?? "",
+        quantity: absNum(activity?.quantity),
+        unitPrice: absNum(activity?.unitPrice),
+        amount: absNum(activity?.amount),
+        fee: absNum(activity?.fee) ?? 0,
+        quoteMode: activity?.assetQuoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
+        // Advanced options
+        currency: activity?.currency,
+        fxRate: activity?.fxRate ?? undefined,
+        exchangeMic: activity?.exchangeMic,
+      };
+
+      // Populate option-specific fields from OCC symbol when editing
+      if (activity?.instrumentType === "OPTION") {
+        const parsed = parseOccSymbol(activity.assetSymbol ?? "");
+        return {
+          ...base,
+          assetType: "option" as const,
+          assetKind: "OPTION",
+          symbolInstrumentType: "OPTION",
+          symbolQuoteCcy: activity?.currency ?? undefined,
+          underlyingSymbol: parsed?.underlying ?? "",
+          strikePrice: parsed?.strikePrice,
+          expirationDate: parsed?.expiration,
+          optionType: parsed?.optionType,
+          contractMultiplier: 100,
+        };
+      }
+
+      // Populate bond-specific fields when editing
+      if (activity?.instrumentType === "BOND") {
+        return {
+          ...base,
+          assetType: "bond" as const,
+          assetKind: "BOND",
+          symbolInstrumentType: "BOND",
+          symbolQuoteCcy: activity?.currency ?? undefined,
+        };
+      }
+
+      return base;
+    },
     toPayload: (data) => {
       const d = data as BuyFormValues;
       return {
@@ -108,6 +153,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
         exchangeMic: d.exchangeMic ?? undefined,
         symbolQuoteCcy: d.symbolQuoteCcy ?? undefined,
         symbolInstrumentType: d.symbolInstrumentType ?? undefined,
+        assetKind: d.assetKind ?? undefined,
         currency: d.currency,
         fxRate: d.fxRate,
         assetMetadata: d.assetMetadata
@@ -117,6 +163,11 @@ export const ACTIVITY_FORM_CONFIG: Record<
               exchangeMic: d.assetMetadata.exchangeMic ?? undefined,
             }
           : undefined,
+        ...(d.symbolInstrumentType === InstrumentType.OPTION &&
+          d.contractMultiplier != null &&
+          d.contractMultiplier !== 100 && {
+            metadata: { [METADATA_CONTRACT_MULTIPLIER]: d.contractMultiplier },
+          }),
       };
     },
   },
@@ -124,19 +175,51 @@ export const ACTIVITY_FORM_CONFIG: Record<
   SELL: {
     component: SellForm as ComponentType<ActivityFormComponentProps<ActivityFormValues>>,
     activityType: ActivityType.SELL,
-    getDefaults: (activity, accounts) => ({
-      ...getBaseDefaults(activity, accounts),
-      assetId: activity?.assetSymbol ?? activity?.assetId ?? "",
-      quantity: activity?.quantity,
-      unitPrice: activity?.unitPrice,
-      amount: activity?.amount,
-      fee: activity?.fee ?? "0",
-      quoteMode: activity?.assetQuoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
-      // Advanced options
-      currency: activity?.currency,
-      fxRate: activity?.fxRate ?? undefined,
-      exchangeMic: activity?.exchangeMic,
-    }),
+    getDefaults: (activity, accounts) => {
+      const base = {
+        ...getBaseDefaults(activity, accounts),
+        assetId: activity?.assetSymbol ?? activity?.assetId ?? "",
+        quantity: absNum(activity?.quantity),
+        unitPrice: absNum(activity?.unitPrice),
+        amount: absNum(activity?.amount),
+        fee: absNum(activity?.fee) ?? 0,
+        quoteMode: activity?.assetQuoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
+        // Advanced options
+        currency: activity?.currency,
+        fxRate: activity?.fxRate ?? undefined,
+        exchangeMic: activity?.exchangeMic,
+      };
+
+      // Populate option-specific fields from OCC symbol when editing
+      if (activity?.instrumentType === "OPTION") {
+        const parsed = parseOccSymbol(activity.assetSymbol ?? "");
+        return {
+          ...base,
+          assetType: "option" as const,
+          assetKind: "OPTION",
+          symbolInstrumentType: "OPTION",
+          symbolQuoteCcy: activity?.currency ?? undefined,
+          underlyingSymbol: parsed?.underlying ?? "",
+          strikePrice: parsed?.strikePrice,
+          expirationDate: parsed?.expiration,
+          optionType: parsed?.optionType,
+          contractMultiplier: 100,
+        };
+      }
+
+      // Populate bond-specific fields when editing
+      if (activity?.instrumentType === "BOND") {
+        return {
+          ...base,
+          assetType: "bond" as const,
+          assetKind: "BOND",
+          symbolInstrumentType: "BOND",
+          symbolQuoteCcy: activity?.currency ?? undefined,
+        };
+      }
+
+      return base;
+    },
     toPayload: (data) => {
       const d = data as SellFormValues;
       return {
@@ -151,6 +234,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
         exchangeMic: d.exchangeMic ?? undefined,
         symbolQuoteCcy: d.symbolQuoteCcy ?? undefined,
         symbolInstrumentType: d.symbolInstrumentType ?? undefined,
+        assetKind: d.assetKind ?? undefined,
         currency: d.currency,
         fxRate: d.fxRate,
         assetMetadata: d.assetMetadata
@@ -160,6 +244,11 @@ export const ACTIVITY_FORM_CONFIG: Record<
               exchangeMic: d.assetMetadata.exchangeMic ?? undefined,
             }
           : undefined,
+        ...(d.symbolInstrumentType === InstrumentType.OPTION &&
+          d.contractMultiplier != null &&
+          d.contractMultiplier !== 100 && {
+            metadata: { [METADATA_CONTRACT_MULTIPLIER]: d.contractMultiplier },
+          }),
       };
     },
   },
@@ -169,7 +258,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
     activityType: ActivityType.DEPOSIT,
     getDefaults: (activity, accounts) => ({
       ...getBaseDefaults(activity, accounts),
-      amount: activity?.amount,
+      amount: absNum(activity?.amount),
       // Advanced options
       currency: activity?.currency,
       fxRate: activity?.fxRate ?? undefined,
@@ -192,7 +281,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
     activityType: ActivityType.WITHDRAWAL,
     getDefaults: (activity, accounts) => ({
       ...getBaseDefaults(activity, accounts),
-      amount: activity?.amount,
+      amount: absNum(activity?.amount),
       // Advanced options
       currency: activity?.currency,
       fxRate: activity?.fxRate ?? undefined,
@@ -216,7 +305,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
     getDefaults: (activity, accounts) => ({
       ...getBaseDefaults(activity, accounts),
       symbol: activity?.assetSymbol ?? activity?.assetId ?? "",
-      amount: activity?.amount,
+      amount: absNum(activity?.amount),
       // Advanced options
       currency: activity?.currency,
       fxRate: activity?.fxRate ?? undefined,
@@ -261,9 +350,9 @@ export const ACTIVITY_FORM_CONFIG: Record<
         toAccountId: "",
         activityDate: activity?.date ? new Date(activity.date) : new Date(),
         transferMode,
-        amount: activity?.amount,
+        amount: absNum(activity?.amount),
         assetId: activity?.assetSymbol ?? activity?.assetId ?? null,
-        quantity: activity?.quantity ?? null,
+        quantity: absNum(activity?.quantity) ?? null,
         comment: activity?.comment ?? null,
         // Advanced options
         currency: activity?.currency,
@@ -282,6 +371,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
         amount: d.amount ?? undefined,
         assetId: d.assetId ?? undefined,
         quantity: d.quantity ?? undefined,
+        unitPrice: d.unitPrice ?? undefined,
         comment: d.comment ?? undefined,
         subtype: d.subtype ?? undefined,
         currency: d.currency,
@@ -308,7 +398,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
     getDefaults: (activity, accounts) => ({
       ...getBaseDefaults(activity, accounts),
       symbol: activity?.assetSymbol ?? activity?.assetId ?? "",
-      splitRatio: activity?.amount,
+      splitRatio: absNum(activity?.amount),
       // Advanced options
       currency: activity?.currency,
       subtype: activity?.subtype ?? null,
@@ -336,7 +426,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
     activityType: ActivityType.FEE,
     getDefaults: (activity, accounts) => ({
       ...getBaseDefaults(activity, accounts),
-      amount: activity?.amount,
+      amount: absNum(activity?.amount),
       // Advanced options
       currency: activity?.currency,
       subtype: activity?.subtype ?? null,
@@ -360,7 +450,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
     getDefaults: (activity, accounts) => ({
       ...getBaseDefaults(activity, accounts),
       symbol: activity?.assetSymbol ?? activity?.assetId ?? null,
-      amount: activity?.amount as unknown as number | undefined,
+      amount: absNum(activity?.amount),
       // Advanced options
       currency: activity?.currency,
       fxRate: (activity?.fxRate ?? undefined) as unknown as number | undefined,
@@ -390,7 +480,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
     activityType: ActivityType.TAX,
     getDefaults: (activity, accounts) => ({
       ...getBaseDefaults(activity, accounts),
-      amount: activity?.amount,
+      amount: absNum(activity?.amount),
       // Advanced options
       currency: activity?.currency,
       subtype: activity?.subtype ?? null,

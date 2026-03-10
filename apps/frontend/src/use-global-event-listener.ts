@@ -186,8 +186,17 @@ const useGlobalEventListener = () => {
       });
     };
 
-    const handleAssetEnrichmentComplete = () => {
+    const handleAssetEnrichmentComplete = (event: {
+      payload: { enriched: number; skipped: number; failed: number };
+    }) => {
       toast.dismiss(TOAST_IDS.assetEnrichmentStart);
+      syncContextRef.current?.setIdle();
+      if (event.payload?.failed > 0) {
+        toast.warning("Some assets failed to enrich", {
+          description: `${event.payload.failed} asset(s) could not be enriched. Portfolio values may be incomplete.`,
+          duration: 8000,
+        });
+      }
     };
 
     const handleAssetEnrichmentProgress = (event: {

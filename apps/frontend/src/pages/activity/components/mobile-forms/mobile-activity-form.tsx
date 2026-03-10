@@ -10,8 +10,9 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@wealthfolio/ui/components/ui/sheet";
-import { ActivityType, QuoteMode } from "@/lib/constants";
+import { ActivityType, METADATA_CONTRACT_MULTIPLIER, QuoteMode } from "@/lib/constants";
 import { isSymbolRequired } from "@/lib/activity-utils";
+import { buildOccSymbol, parseOccSymbol } from "@/lib/occ-symbol";
 import { generateId } from "@/lib/id";
 import type { ActivityCreate, ActivityDetails, SymbolInput } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -87,6 +88,38 @@ export function validateTransferFields(
   return null;
 }
 
+/**
+ * Validates trade fields that the Zod schema can't enforce in a discriminatedUnion.
+ * For options: requires all structured fields. For stocks/bonds: requires assetId.
+ */
+function validateTradeFields(data: Record<string, unknown>): TransferValidationError | null {
+  const activityType = data.activityType as string;
+  if (!["BUY", "SELL"].includes(activityType)) return null;
+
+  const assetType = (data.assetType as string) ?? "stock";
+
+  if (assetType === "option") {
+    if (!(data.underlyingSymbol as string)?.trim()) {
+      return { field: "underlyingSymbol", message: "Underlying symbol is required." };
+    }
+    if (!data.strikePrice || Number(data.strikePrice) <= 0) {
+      return { field: "strikePrice", message: "Strike price is required." };
+    }
+    if (!(data.expirationDate as string)?.trim()) {
+      return { field: "expirationDate", message: "Expiration date is required." };
+    }
+    if (!data.optionType) {
+      return { field: "optionType", message: "Option type is required." };
+    }
+  } else {
+    if (!(data.assetId as string)?.trim()) {
+      return { field: "assetId", message: "Please select a security." };
+    }
+  }
+
+  return null;
+}
+
 function extractErrorMessage(error: unknown): string {
   if (typeof error === "string" && error.trim()) return error;
   if (error instanceof Error && error.message.trim()) return error.message;
@@ -130,6 +163,11 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
   const hasSecurityData = !!(activity?.assetSymbol || activity?.assetId);
   const initialTransferMode = isTransferType && hasSecurityData ? "securities" : "cash";
 
+  // Detect option/bond activities for editing
+  const isOptionActivity = activity?.instrumentType === "OPTION";
+  const isBondActivity = activity?.instrumentType === "BOND";
+  const parsedOcc = isOptionActivity ? parseOccSymbol(activity?.assetSymbol ?? "") : null;
+
   const defaultValues: Partial<NewActivityFormValues> = {
     id: activity?.id,
     accountId: activity?.accountId ?? "",
@@ -156,6 +194,23 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
       isExternal: true,
       direction: activity?.activityType === "TRANSFER_IN" ? "in" : "out",
       toAccountId: "",
+    }),
+    // Option defaults when editing an option activity
+    ...(isOptionActivity && {
+      assetType: "option" as const,
+      assetKind: "OPTION",
+      symbolQuoteCcy: activity?.currency ?? undefined,
+      underlyingSymbol: parsedOcc?.underlying ?? "",
+      strikePrice: parsedOcc?.strikePrice,
+      expirationDate: parsedOcc?.expiration,
+      optionType: parsedOcc?.optionType,
+      contractMultiplier: 100,
+    }),
+    // Bond defaults when editing a bond activity
+    ...(isBondActivity && {
+      assetType: "bond" as const,
+      assetKind: "BOND",
+      symbolQuoteCcy: activity?.currency ?? undefined,
     }),
   };
 
@@ -189,12 +244,53 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
         isExternal: _isExternal,
         direction: _direction,
         toAccountId: _toAccountId,
+        // Strip option-internal fields (not sent to backend)
+        assetType: _assetType,
+        underlyingSymbol: _underlying,
+        strikePrice: _strike,
+        expirationDate: _expiration,
+        optionType: _optType,
+        contractMultiplier: _multiplier,
         id,
         ...submitData
       } = data as any;
       const account = accounts.find((a) => a.value === submitData.accountId);
       const isTransferActivity = ["TRANSFER_IN", "TRANSFER_OUT"].includes(submitData.activityType);
       const isSecuritiesTransfer = isTransferActivity && (_tm ?? "cash") === "securities";
+
+      // Validate trade fields (assetId for stocks, option fields for options)
+      const tradeError = validateTradeFields(data as any);
+      if (tradeError) {
+        form.setError(tradeError.field as any, { message: tradeError.message });
+        return;
+      }
+
+      // For options: build OCC symbol from structured fields
+      if (_assetType === "option" && _underlying && _strike && _expiration && _optType) {
+        const occSymbol = buildOccSymbol(_underlying, _expiration, _optType, _strike);
+        submitData.assetId = occSymbol;
+        submitData.symbolInstrumentType = "OPTION";
+        submitData.assetMetadata = {
+          name: `${_underlying.toUpperCase()} ${_expiration} ${_optType} ${_strike}`,
+          kind: "OPTION",
+        };
+        if (_multiplier != null && _multiplier !== 100) {
+          submitData.metadata = {
+            ...submitData.metadata,
+            [METADATA_CONTRACT_MULTIPLIER]: _multiplier,
+          };
+        }
+      }
+
+      // For bonds: set instrument type
+      if (_assetType === "bond") {
+        submitData.symbolInstrumentType = submitData.symbolInstrumentType ?? "BOND";
+      }
+
+      // Ensure symbolQuoteCcy is set — manual/custom symbols leave it undefined
+      if (!submitData.symbolQuoteCcy && submitData.currency) {
+        submitData.symbolQuoteCcy = submitData.currency;
+      }
 
       // Validate transfer-specific required fields (schema can't use superRefine in discriminatedUnion)
       const transferError = validateTransferFields({
@@ -341,8 +437,13 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
         return ["activityType"];
       case 2: {
         const activityType = form.watch("activityType");
+        const assetType = (form.getValues() as any).assetType ?? "stock";
         const baseFields = ["accountId", "activityDate"];
         if (["BUY", "SELL"].includes(activityType ?? "")) {
+          // Options: validate underlying instead of assetId (OCC built at submit)
+          if (assetType === "option") {
+            return [...baseFields, "underlyingSymbol", "quantity", "unitPrice", "fee"];
+          }
           return [...baseFields, "assetId", "quantity", "unitPrice", "fee"];
         }
         if (["DEPOSIT", "WITHDRAWAL", "TRANSFER_IN", "TRANSFER_OUT"].includes(activityType ?? "")) {

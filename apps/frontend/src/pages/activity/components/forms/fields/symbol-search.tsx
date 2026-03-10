@@ -141,10 +141,13 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
 
     // Background quote resolution: confirm inferred currency and show display quote
     // For existing assets, currency is already established — never override it
+    // Update activity currency when:
+    // - currency was exchange-inferred (needs provider confirmation)
+    // - search result had no currency at all (e.g., OpenFIGI bonds)
     const needsCurrencyConfirmation =
       currencyName &&
-      searchResult?.currencySource === "exchange_inferred" &&
-      !searchResult?.isExisting;
+      !searchResult?.isExisting &&
+      (searchResult?.currencySource === "exchange_inferred" || !searchResult?.currency);
 
     if (searchResult) {
       setQuoteDisplay({ price: null, isLoading: true });
@@ -162,10 +165,13 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
             setValue(quoteCcyName, confirmedCurrency as any);
           }
 
-          // Update activity currency only if it was exchange-inferred and user hasn't changed it.
+          // Update activity currency when:
+          // - provisional (inferred) currency exists and user hasn't changed it
+          // - no currency was known at selection time (e.g., OpenFIGI bonds)
           if (needsCurrencyConfirmation && confirmedCurrency) {
             const current = getValues(currencyName!);
-            if (current === provisionalCurrency) {
+            const shouldUpdate = provisionalCurrency ? current === provisionalCurrency : true;
+            if (shouldUpdate) {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               setValue(currencyName!, confirmedCurrency as any, {
                 shouldDirty: true,

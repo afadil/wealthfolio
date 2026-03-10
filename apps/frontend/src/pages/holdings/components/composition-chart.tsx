@@ -1,7 +1,7 @@
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { Holding } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, parseLocalDate } from "@/lib/utils";
 import { AnimatedToggleGroup, formatAmount, formatPercent } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
@@ -213,7 +213,7 @@ const CompositionTooltip = ({ active, payload, settings }: TooltipProps) => {
             <div className="flex items-center justify-between">
               <span className="text-primary text-sm font-bold">{data.symbol}</span>
               <span className="text-muted-foreground text-xs">
-                {data.asOfDate ? new Date(data.asOfDate).toLocaleDateString() : ""}
+                {data.asOfDate ? parseLocalDate(data.asOfDate).toLocaleDateString() : ""}
               </span>
             </div>
             <p className="text-muted-foreground text-xs leading-tight">{data.name}</p>

@@ -1,7 +1,7 @@
 // Web adapter core - Internal invoke function, COMMANDS map, and helpers
 // This module exports invoke, logger, and platform constants for shared modules
 
-import { getAuthToken, notifyUnauthorized } from "@/lib/auth-token";
+import { notifyUnauthorized } from "@/lib/auth-token";
 import type { Logger } from "../types";
 
 /** True when running in the desktop (Tauri) environment */
@@ -1212,10 +1212,6 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
   if (body !== undefined) {
     headers["Content-Type"] = "application/json";
   }
-  const token = getAuthToken();
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
   if (command === "get_health_status" || command === "run_health_checks") {
     const payloadTimezone =
       typeof payload === "object" && payload !== null && "clientTimezone" in payload
@@ -1234,41 +1230,8 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     credentials: "same-origin",
   });
 
-  // Only notify unauthorized for app auth failures, not for connect cloud token issues
-  // Connect endpoints return 401 when cloud token isn't configured - that's not an app auth failure
-  const connectCommands = [
-    "get_subscription_plans",
-    "get_subscription_plans_public",
-    "get_user_info",
-    "get_connect_portal",
-    "sync_broker_connections",
-    "sync_broker_accounts",
-    "sync_broker_activities",
-    "list_broker_connections",
-    "list_broker_accounts",
-    "get_broker_sync_states",
-    "get_broker_ingest_states",
-    "get_import_runs",
-    "get_data_import_runs",
-    "get_synced_accounts",
-    "get_platforms",
-    "sync_broker_data",
-    "broker_ingest_run",
-    "device_sync_engine_status",
-    "device_sync_bootstrap_overwrite_check",
-    "device_sync_reconcile_ready_state",
-    "device_sync_bootstrap_snapshot_if_needed",
-    "device_sync_trigger_cycle",
-    "device_sync_start_background_engine",
-    "device_sync_stop_background_engine",
-    "device_sync_generate_snapshot_now",
-    "device_sync_cancel_snapshot_upload",
-    "store_sync_session",
-    "clear_sync_session",
-    "get_sync_session_status",
-    "restore_sync_session",
-  ];
-  if (res.status === 401 && !connectCommands.includes(command)) {
+  // 401 = app auth failure (JWT expired/invalid). Cloud auth failures return 403.
+  if (res.status === 401) {
     notifyUnauthorized();
   }
   if (!res.ok) {

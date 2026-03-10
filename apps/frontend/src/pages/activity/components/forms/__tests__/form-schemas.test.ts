@@ -9,6 +9,7 @@ import { splitFormSchema } from "../split-form";
 import { feeFormSchema } from "../fee-form";
 import { interestFormSchema } from "../interest-form";
 import { taxFormSchema } from "../tax-form";
+import { ACTIVITY_FORM_CONFIG } from "../../../config/activity-form-config";
 
 describe("Form Schemas Validation", () => {
   describe("buyFormSchema", () => {
@@ -748,6 +749,120 @@ describe("Form Schemas Validation", () => {
       if (!result.success) {
         expect(result.error.issues[0].message).toBe("Please select an account.");
       }
+    });
+  });
+
+  describe("buyFormSchema option validation", () => {
+    it("fails when option fields are missing for assetType=option", () => {
+      const data = {
+        assetType: "option",
+        accountId: "acc-123",
+        activityDate: new Date(),
+        quantity: 1,
+        unitPrice: 5.0,
+        fee: 0,
+        currency: "USD",
+      };
+
+      const result = buyFormSchema.safeParse(data);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const paths = result.error.issues.map((i) => i.path[0]);
+        expect(paths).toContain("underlyingSymbol");
+        expect(paths).toContain("strikePrice");
+        expect(paths).toContain("expirationDate");
+      }
+    });
+
+    it("passes when all option fields are provided", () => {
+      const data = {
+        assetType: "option",
+        accountId: "acc-123",
+        activityDate: new Date(),
+        quantity: 1,
+        unitPrice: 5.0,
+        fee: 0,
+        currency: "USD",
+        underlyingSymbol: "AAPL",
+        strikePrice: 150,
+        expirationDate: "2025-01-17",
+        optionType: "CALL",
+        contractMultiplier: 100,
+      };
+
+      const result = buyFormSchema.safeParse(data);
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("transferFormSchema external securities cost basis", () => {
+    it("fails when unitPrice is missing for external securities transfer-in", () => {
+      const data = {
+        isExternal: true,
+        direction: "in",
+        accountId: "acc-123",
+        activityDate: new Date(),
+        transferMode: "securities",
+        assetId: "AAPL",
+        quantity: 10,
+        currency: "USD",
+      };
+
+      const result = transferFormSchema.safeParse(data);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const error = result.error.issues.find((i) => i.message.includes("cost basis"));
+        expect(error).toBeDefined();
+      }
+    });
+
+    it("does not require unitPrice for external securities transfer-out", () => {
+      const data = {
+        isExternal: true,
+        direction: "out",
+        accountId: "acc-123",
+        activityDate: new Date(),
+        transferMode: "securities",
+        assetId: "AAPL",
+        quantity: 10,
+        currency: "USD",
+      };
+
+      const result = transferFormSchema.safeParse(data);
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("TRANSFER toPayload", () => {
+    it("includes unitPrice in payload for external securities transfer-in", () => {
+      const formData = {
+        isExternal: true,
+        direction: "in" as const,
+        accountId: "acc-123",
+        activityDate: new Date(),
+        transferMode: "securities" as const,
+        assetId: "AAPL",
+        quantity: 10,
+        unitPrice: 150.5,
+        currency: "USD",
+      };
+
+      const payload = ACTIVITY_FORM_CONFIG.TRANSFER.toPayload(formData as any);
+      expect(payload).toHaveProperty("unitPrice", 150.5);
+    });
+
+    it("omits unitPrice when not provided", () => {
+      const formData = {
+        isExternal: false,
+        fromAccountId: "acc-123",
+        activityDate: new Date(),
+        transferMode: "cash" as const,
+        amount: 1000,
+        currency: "USD",
+      };
+
+      const payload = ACTIVITY_FORM_CONFIG.TRANSFER.toPayload(formData as any) as any;
+      expect(payload.unitPrice).toBeUndefined();
     });
   });
 });

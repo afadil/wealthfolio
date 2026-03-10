@@ -8,6 +8,5 @@ export function useBrokerAccounts() {
     queryKey: [QueryKeys.BROKER_ACCOUNTS],
     queryFn: listBrokerAccounts,
     staleTime: 30 * 1000, // 30 seconds
-    refetchInterval: 60 * 1000, // Refetch every minute
   });
 }

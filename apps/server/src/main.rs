@@ -23,7 +23,7 @@ use wealthfolio_device_sync::SyncState;
 #[cfg(feature = "device-sync")]
 fn is_expected_startup_token_warmup_error(err: &crate::error::ApiError) -> bool {
     match err {
-        crate::error::ApiError::Unauthorized(_) => true,
+        crate::error::ApiError::Unauthorized(_) | crate::error::ApiError::Forbidden(_) => true,
         crate::error::ApiError::Internal(message) => {
             message.contains("No refresh token configured")
                 || message.contains("Auth refresh configuration is missing")
@@ -40,7 +40,7 @@ mod tests {
 
     #[test]
     fn startup_token_warmup_treats_unauthorized_as_expected() {
-        let err = ApiError::Unauthorized("No refresh token configured".to_string());
+        let err = ApiError::Forbidden("No refresh token configured".to_string());
         assert!(is_expected_startup_token_warmup_error(&err));
     }
 
@@ -108,6 +108,14 @@ async fn main() -> anyhow::Result<()> {
     let index_file = static_dir.join("index.html");
     let static_service = ServeDir::new(static_dir).fallback(ServeFile::new(index_file));
     let router = app_router(state, &config).fallback_service(static_service);
+    if let Some(ref auth) = config.auth {
+        tracing::info!(
+            "Authentication enabled, cookie secure policy: {}",
+            auth.cookie_secure
+        );
+    } else {
+        tracing::info!("Authentication disabled");
+    }
     tracing::info!("Listening on {}", config.listen_addr);
     let listener = tokio::net::TcpListener::bind(config.listen_addr).await?;
     axum::serve(

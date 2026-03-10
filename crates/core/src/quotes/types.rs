@@ -75,6 +75,9 @@ impl ProviderId {
     pub const MARKETDATA_APP: &'static str = "MARKETDATA_APP";
     pub const METAL_PRICE_API: &'static str = "METAL_PRICE_API";
     pub const FINNHUB: &'static str = "FINNHUB";
+    pub const US_TREASURY_CALC: &'static str = "US_TREASURY_CALC";
+    pub const BOERSE_FRANKFURT: &'static str = "BOERSE_FRANKFURT";
+    pub const OPENFIGI: &'static str = "OPENFIGI";
 
     pub fn new(id: impl Into<String>) -> Self {
         Self(id.into())
@@ -98,6 +101,18 @@ impl ProviderId {
 
     pub fn finnhub() -> Self {
         Self(Self::FINNHUB.to_string())
+    }
+
+    pub fn us_treasury_calc() -> Self {
+        Self(Self::US_TREASURY_CALC.to_string())
+    }
+
+    pub fn boerse_frankfurt() -> Self {
+        Self(Self::BOERSE_FRANKFURT.to_string())
+    }
+
+    pub fn openfigi() -> Self {
+        Self(Self::OPENFIGI.to_string())
     }
 
     pub fn as_str(&self) -> &str {
@@ -338,6 +353,8 @@ impl From<DataSource> for QuoteSource {
             DataSource::MarketDataApp => QuoteSource::Provider(ProviderId::marketdata_app()),
             DataSource::MetalPriceApi => QuoteSource::Provider(ProviderId::metal_price_api()),
             DataSource::Finnhub => QuoteSource::Provider(ProviderId::finnhub()),
+            DataSource::UsTreasuryCalc => QuoteSource::Provider(ProviderId::us_treasury_calc()),
+            DataSource::BoerseFrankfurt => QuoteSource::Provider(ProviderId::boerse_frankfurt()),
         }
     }
 }

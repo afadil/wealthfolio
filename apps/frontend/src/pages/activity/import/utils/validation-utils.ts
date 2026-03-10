@@ -15,7 +15,7 @@ import { looksLikeIsin } from "@/lib/isin";
 import { normalizeInstrumentType, splitInstrumentPrefixedSymbol } from "./instrument-type";
 
 // Ticker symbol validation regex
-const tickerRegex = /^(CASH:[A-Z]{3}|[A-Z0-9]{1,10}([.-][A-Z0-9]+){0,2})$/;
+const tickerRegex = /^(CASH:[A-Z]{3}|[A-Z0-9]{1,21}([.-][A-Z0-9]+){0,2})$/;
 
 // CUSIP: 9 alphanumeric chars ending in a digit
 const cusipRegex = /^[A-Z0-9]{8}\d$/;

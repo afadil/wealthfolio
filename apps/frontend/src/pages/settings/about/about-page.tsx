@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { getAppInfo } from "@/adapters";
+import { ExternalLink } from "@/components/external-link";
 import { usePlatform } from "@/hooks/use-platform";
 import { useCheckForUpdates } from "@/hooks/use-updater";
 import { Button } from "@wealthfolio/ui/components/ui/button";
@@ -91,10 +92,10 @@ export default function AboutSettingsPage() {
                 size="sm"
                 className="inline-flex items-center gap-2"
               >
-                <a href="https://wealthfolio.app" target="_blank" rel="noreferrer noopener">
+                <ExternalLink href="https://wealthfolio.app">
                   <Icons.Globe className="h-4 w-4" />
                   Website
-                </a>
+                </ExternalLink>
               </Button>
               <Button
                 asChild
@@ -102,14 +103,10 @@ export default function AboutSettingsPage() {
                 size="sm"
                 className="inline-flex items-center gap-2"
               >
-                <a
-                  href="https://wealthfolio.app/docs/introduction/"
-                  target="_blank"
-                  rel="noreferrer noopener"
-                >
+                <ExternalLink href="https://wealthfolio.app/docs/introduction/">
                   <Icons.FileText className="h-4 w-4" />
                   Docs
-                </a>
+                </ExternalLink>
               </Button>
               <Button
                 asChild
@@ -117,14 +114,10 @@ export default function AboutSettingsPage() {
                 size="sm"
                 className="inline-flex items-center gap-2"
               >
-                <a
-                  href="https://github.com/afadil/wealthfolio"
-                  target="_blank"
-                  rel="noreferrer noopener"
-                >
+                <ExternalLink href="https://github.com/afadil/wealthfolio">
                   <Icons.ExternalLink className="h-4 w-4" />
                   GitHub
-                </a>
+                </ExternalLink>
               </Button>
             </div>
           </div>
@@ -190,10 +183,10 @@ export default function AboutSettingsPage() {
                 size="sm"
                 className="inline-flex items-center gap-2"
               >
-                <a href="mailto:support@wealthfolio.app">
+                <ExternalLink href="mailto:support@wealthfolio.app">
                   <Icons.ExternalLink className="h-4 w-4" />
                   Email Us
-                </a>
+                </ExternalLink>
               </Button>
               <Button
                 asChild
@@ -201,46 +194,36 @@ export default function AboutSettingsPage() {
                 size="sm"
                 className="inline-flex items-center gap-2"
               >
-                <a
-                  href="https://github.com/afadil/wealthfolio/issues"
-                  target="_blank"
-                  rel="noreferrer noopener"
-                >
+                <ExternalLink href="https://github.com/afadil/wealthfolio/issues">
                   <Icons.AlertCircle className="h-4 w-4" />
                   Report Issue
-                </a>
+                </ExternalLink>
               </Button>
             </div>
 
             <Separator />
 
             <p className="text-muted-foreground text-sm">
-              <a
+              <ExternalLink
                 href="https://wealthfolio.app/legal/privacy-policy"
-                target="_blank"
-                rel="noreferrer noopener"
                 className="hover:text-foreground underline underline-offset-4"
               >
                 Privacy Policy
-              </a>
+              </ExternalLink>
               <span className="mx-2">•</span>
-              <a
+              <ExternalLink
                 href="https://wealthfolio.app/legal/terms-of-use"
-                target="_blank"
-                rel="noreferrer noopener"
                 className="hover:text-foreground underline underline-offset-4"
               >
                 Terms of Use
-              </a>
+              </ExternalLink>
               <span className="mx-2">•</span>
-              <a
+              <ExternalLink
                 href="https://wealthfolio.app"
-                target="_blank"
-                rel="noreferrer noopener"
                 className="hover:text-foreground underline underline-offset-4"
               >
                 Website
-              </a>
+              </ExternalLink>
             </p>
           </div>
         </CardContent>

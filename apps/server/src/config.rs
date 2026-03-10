@@ -1,6 +1,6 @@
 use std::{net::SocketAddr, time::Duration};
 
-use crate::auth::{decode_secret_key, derive_keys, AuthConfig};
+use crate::auth::{decode_secret_key, derive_keys, AuthConfig, CookieSecurePolicy};
 
 pub struct Config {
     pub listen_addr: SocketAddr,
@@ -64,11 +64,22 @@ impl Config {
                     .and_then(|value| value.parse::<u64>().ok())
                     .filter(|value| *value > 0)
                     .unwrap_or(60);
+                let cookie_secure_raw =
+                    std::env::var("WF_COOKIE_SECURE").unwrap_or_else(|_| "auto".into());
+                let cookie_secure = match cookie_secure_raw.trim().to_ascii_lowercase().as_str() {
+                    "auto" => CookieSecurePolicy::Auto,
+                    "true" | "1" | "yes" => CookieSecurePolicy::Always,
+                    "false" | "0" | "no" => CookieSecurePolicy::Never,
+                    other => panic!(
+                        "Invalid WF_COOKIE_SECURE value: \"{other}\". \
+                         Expected one of: auto, true, false"
+                    ),
+                };
                 AuthConfig {
                     password_hash,
                     jwt_secret: jwt_key.to_vec(),
                     access_token_ttl: Duration::from_secs(ttl_minutes.saturating_mul(60)),
-                    secure_cookie: !listen_addr.ip().is_loopback(),
+                    cookie_secure,
                 }
             });
         // When auth is enabled, wildcard CORS is incompatible with credentials

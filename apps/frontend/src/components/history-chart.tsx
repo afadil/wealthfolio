@@ -3,7 +3,7 @@ import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { formatDate } from "@/lib/utils";
 import { AmountDisplay } from "@wealthfolio/ui";
-import { useState, useMemo } from "react";
+import { useId, useState, useMemo } from "react";
 import { Area, AreaChart, ReferenceDot, Tooltip, XAxis, YAxis } from "recharts";
 
 export interface HistoryChartData {
@@ -65,13 +65,15 @@ const CustomTooltip = ({
     return null;
   }
 
+  const tooltipColor = tvPayload.totalValue >= 0 ? "var(--success)" : "var(--destructive)";
+
   return (
     <div className="bg-popover pointer-events-none grid grid-cols-1 gap-1.5 rounded-md border p-2 shadow-md">
       <p className="text-muted-foreground text-xs">{formatDate(tvPayload.date)}</p>
 
       <div className="flex items-center justify-between space-x-2">
         <div className="flex items-center space-x-1.5">
-          <span className="block h-0.5 w-3" style={{ backgroundColor: "var(--success)" }} />
+          <span className="block h-0.5 w-3" style={{ backgroundColor: tooltipColor }} />
           <span className="text-muted-foreground text-xs">Total Value:</span>
         </div>
         <AmountDisplay
@@ -112,6 +114,9 @@ export function HistoryChart({
   const { isBalanceHidden } = useBalancePrivacy();
   const [isChartHovered, setIsChartHovered] = useState(false);
   const isMobile = useIsMobileViewport();
+  const id = useId();
+  const fillGradientId = `historyFill-${id}`;
+  const strokeGradientId = `historyStroke-${id}`;
 
   const chartConfig = {
     totalValue: {
@@ -121,6 +126,24 @@ export function HistoryChart({
       label: "Net Contribution",
     },
   } satisfies ChartConfig;
+
+  // Compute where y=0 falls in the gradient (0=top, 1=bottom)
+  // to split green (positive) / red (negative) fill & stroke
+  const { zeroOffset, allPositive, allNegative } = useMemo(() => {
+    if (data.length === 0) return { zeroOffset: 0, allPositive: true, allNegative: false };
+    let min = Infinity;
+    let max = -Infinity;
+    for (const d of data) {
+      if (d.totalValue < min) min = d.totalValue;
+      if (d.totalValue > max) max = d.totalValue;
+    }
+    if (min >= 0) return { zeroOffset: 1, allPositive: true, allNegative: false };
+    if (max <= 0) return { zeroOffset: 0, allPositive: false, allNegative: true };
+    // Account for the 2% padding on the Y domain minimum
+    const adjustedMin = min - Math.abs(min) * 0.02;
+    const offset = max / (max - adjustedMin);
+    return { zeroOffset: offset, allPositive: false, allNegative: false };
+  }, [data]);
 
   // Build a map of date -> index for efficient lookup
   const dateToIndexMap = useMemo(() => {
@@ -155,6 +178,9 @@ export function HistoryChart({
     return null;
   }
 
+  // Gradient stops for fill and stroke based on zero crossing
+  const zeroPercent = `${(zeroOffset * 100).toFixed(1)}%`;
+
   return (
     <ChartContainer config={chartConfig} className="h-full w-full">
       <AreaChart
@@ -170,9 +196,39 @@ export function HistoryChart({
         onMouseLeave={() => setIsChartHovered(false)}
       >
         <defs>
-          <linearGradient id="colorUv" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="var(--success)" stopOpacity={0.2} />
-            <stop offset="95%" stopColor="var(--success)" stopOpacity={0.1} />
+          <linearGradient id={fillGradientId} x1="0" y1="0" x2="0" y2="1">
+            {allNegative ? (
+              <>
+                <stop offset="5%" stopColor="var(--destructive)" stopOpacity={0.2} />
+                <stop offset="70%" stopColor="var(--destructive)" stopOpacity={0.12} />
+                <stop offset="100%" stopColor="var(--destructive)" stopOpacity={0} />
+              </>
+            ) : allPositive ? (
+              <>
+                <stop offset="5%" stopColor="var(--success)" stopOpacity={0.2} />
+                <stop offset="70%" stopColor="var(--success)" stopOpacity={0.12} />
+                <stop offset="100%" stopColor="var(--success)" stopOpacity={0} />
+              </>
+            ) : (
+              <>
+                <stop offset="0%" stopColor="var(--success)" stopOpacity={0.2} />
+                <stop offset={zeroPercent} stopColor="var(--success)" stopOpacity={0.05} />
+                <stop offset={zeroPercent} stopColor="var(--destructive)" stopOpacity={0.05} />
+                <stop offset="100%" stopColor="var(--destructive)" stopOpacity={0.2} />
+              </>
+            )}
+          </linearGradient>
+          <linearGradient id={strokeGradientId} x1="0" y1="0" x2="0" y2="1">
+            {allNegative ? (
+              <stop offset="0%" stopColor="var(--destructive)" />
+            ) : allPositive ? (
+              <stop offset="0%" stopColor="var(--success)" />
+            ) : (
+              <>
+                <stop offset={zeroPercent} stopColor="var(--success)" />
+                <stop offset={zeroPercent} stopColor="var(--destructive)" />
+              </>
+            )}
           </linearGradient>
         </defs>
         <Tooltip
@@ -200,9 +256,9 @@ export function HistoryChart({
           connectNulls={true}
           type="monotone"
           dataKey="totalValue"
-          stroke="var(--success)"
+          stroke={`url(#${strokeGradientId})`}
           fillOpacity={1}
-          fill="url(#colorUv)"
+          fill={`url(#${fillGradientId})`}
           style={{ pointerEvents: "none" }}
         />
         <Area
@@ -241,7 +297,7 @@ export function HistoryChart({
                     {/* Diamond shape */}
                     <polygon
                       points={`${cx},${cy - size} ${cx + size},${cy} ${cx},${cy + size} ${cx - size},${cy}`}
-                      fill="var(--success)"
+                      fill={point.value >= 0 ? "var(--success)" : "var(--destructive)"}
                       stroke="hsl(var(--background))"
                       strokeWidth={2}
                     />

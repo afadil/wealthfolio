@@ -448,6 +448,17 @@ export function parseDecimalInput(value: string | number, precision = DECIMAL_PR
 }
 
 /**
+ * Parses a YYYY-MM-DD string as a local-timezone Date.
+ * `new Date("2023-07-20")` treats date-only strings as UTC midnight, which
+ * shifts the day back for users west of UTC. This avoids that by splitting
+ * the components and constructing a local Date directly.
+ */
+export function parseLocalDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+/**
  * Parses a local datetime string in format "YYYY-MM-DDTHH:mm" to a Date object.
  * @param value The datetime string to parse
  * @returns A Date object, or current date if parsing fails

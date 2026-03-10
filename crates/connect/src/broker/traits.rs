@@ -4,8 +4,8 @@ use async_trait::async_trait;
 
 use super::models::{
     AccountUniversalActivity, BrokerAccount, BrokerBrokerage, BrokerConnection,
-    BrokerHoldingsResponse, HoldingsBalance, HoldingsDiff, HoldingsPosition,
-    PaginatedUniversalActivity, SyncAccountsResponse, SyncConnectionsResponse,
+    BrokerHoldingsResponse, HoldingsBalance, HoldingsDiff, HoldingsOptionPosition,
+    HoldingsPosition, PaginatedUniversalActivity, SyncAccountsResponse, SyncConnectionsResponse,
 };
 use crate::broker_ingest::BrokerSyncState;
 use crate::broker_ingest::{ImportRun, ImportRunMode, ImportRunStatus, ImportRunSummary};
@@ -156,5 +156,6 @@ pub trait BrokerSyncServiceTrait: Send + Sync {
         account_id: String,
         balances: Vec<HoldingsBalance>,
         positions: Vec<HoldingsPosition>,
+        option_positions: Vec<HoldingsOptionPosition>,
     ) -> Result<(HoldingsDiff, usize, Vec<String>)>;
 }

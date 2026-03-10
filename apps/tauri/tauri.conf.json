@@ -32,7 +32,7 @@
   },
   "productName": "Wealthfolio",
   "mainBinaryName": "Wealthfolio",
-  "version": "3.0.5",
+  "version": "3.1.0",
   "identifier": "com.teymz.wealthfolio",
   "plugins": {
     "updater": {
@@ -65,8 +65,7 @@
         "hiddenTitle": true,
         "title": "Wealthfolio",
         "width": 1440,
-        "height": 960,
-        "center": true
+        "height": 960
       }
     ],
     "security": {

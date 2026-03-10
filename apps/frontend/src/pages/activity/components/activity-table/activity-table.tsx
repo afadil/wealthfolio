@@ -1,6 +1,7 @@
 import React from "react";
 
 import { TickerAvatar } from "@/components/ticker-avatar";
+import { parseOccSymbol } from "@/lib/occ-symbol";
 import { DataTableColumnHeader } from "@wealthfolio/ui/components/ui/data-table/data-table-column-header";
 import {
   DropdownMenu,
@@ -154,6 +155,7 @@ export const ActivityTable = ({
           const symbol = String(row.getValue("assetSymbol"));
           const assetId = row.original.assetId;
           const activityType = String(row.getValue("activityType"));
+          const instrumentType = row.original.instrumentType;
           const isTransferActivity =
             activityType === ActivityType.TRANSFER_IN || activityType === ActivityType.TRANSFER_OUT;
           const isAssetBackedIncome = isAssetBackedIncomeActivity(activityType, symbol, assetId);
@@ -161,11 +163,16 @@ export const ActivityTable = ({
           const isCash = isTransferActivity
             ? !hasAsset || isCashTransfer(activityType, symbol)
             : isCashActivity(activityType) && !isAssetBackedIncome;
-          const displaySymbol = isCash ? "Cash" : symbol;
+
+          // Parse OCC symbol for options
+          const isOptionActivity = instrumentType === "OPTION";
+          const parsedOption = isOptionActivity ? parseOccSymbol(symbol) : null;
+
+          const displaySymbol = isCash ? "Cash" : parsedOption ? parsedOption.underlying : symbol;
           const avatarSymbol = isCash ? "$CASH" : symbol;
-          const normalizedSymbol = symbol.trim().toUpperCase();
+          const normalizedSymbol = (parsedOption?.underlying ?? symbol).trim().toUpperCase();
           const shouldShowExchange =
-            !isCash && (symbolExchangeCountMap.get(normalizedSymbol) ?? 0) > 1;
+            !isCash && !isOptionActivity && (symbolExchangeCountMap.get(normalizedSymbol) ?? 0) > 1;
           const exchangeDisplay = shouldShowExchange
             ? getExchangeDisplayName(row.original.exchangeMic)
             : "";
@@ -173,8 +180,13 @@ export const ActivityTable = ({
           const assetName = row.getValue("assetName");
           const currency = row.getValue("currency");
 
+          // Option subtitle: "Mar 29 $150 CALL"
+          const optionSubtitle = parsedOption
+            ? `${new Date(parsedOption.expiration + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} $${parsedOption.strikePrice} ${parsedOption.optionType}`
+            : null;
+
           const content = (
-            <div className="flex max-w-[200px] items-center gap-2">
+            <div className="flex max-w-[220px] items-center gap-2">
               <TickerAvatar symbol={avatarSymbol} className="h-8 w-8 shrink-0" />
               <div className="flex min-w-0 flex-col">
                 <span className="flex items-center gap-1 truncate font-medium">
@@ -186,7 +198,7 @@ export const ActivityTable = ({
                   ) : null}
                 </span>
                 <span className="text-muted-foreground truncate text-xs font-light">
-                  {isCash ? String(currency) : String(assetName ?? currency)}
+                  {isCash ? String(currency) : (optionSubtitle ?? String(assetName ?? currency))}
                 </span>
               </div>
             </div>
