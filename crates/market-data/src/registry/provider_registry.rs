@@ -518,6 +518,7 @@ impl ProviderRegistry {
         }
 
         let mut last_error: Option<MarketDataError> = None;
+        let mut fallback_results: Option<Vec<SearchResult>> = None;
 
         for provider in providers {
             let provider_id: ProviderId = Cow::Borrowed(provider.id());
@@ -532,7 +533,14 @@ impl ProviderRegistry {
             match provider.search(query).await {
                 Ok(results) if !results.is_empty() => {
                     self.circuit_breaker.record_success(&provider_id);
-                    return Ok(results);
+                    // If any result has MIC, return immediately
+                    if results.iter().any(|r| r.exchange_mic.is_some())
+                        || fallback_results.is_some()
+                    {
+                        return Ok(results);
+                    }
+                    // Save as fallback, try next provider for MIC-enriched results
+                    fallback_results = Some(results);
                 }
                 Ok(_) => {
                     debug!(
@@ -558,6 +566,10 @@ impl ProviderRegistry {
                     last_error = Some(e);
                 }
             }
+        }
+
+        if let Some(results) = fallback_results {
+            return Ok(results);
         }
 
         Err(last_error.unwrap_or(MarketDataError::AllProvidersFailed))

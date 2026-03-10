@@ -168,11 +168,7 @@ export const ActivityTable = ({
           const isOptionActivity = instrumentType === "OPTION";
           const parsedOption = isOptionActivity ? parseOccSymbol(symbol) : null;
 
-          const displaySymbol = isCash
-            ? "Cash"
-            : parsedOption
-              ? parsedOption.underlying
-              : symbol;
+          const displaySymbol = isCash ? "Cash" : parsedOption ? parsedOption.underlying : symbol;
           const avatarSymbol = isCash ? "$CASH" : symbol;
           const normalizedSymbol = (parsedOption?.underlying ?? symbol).trim().toUpperCase();
           const shouldShowExchange =
@@ -202,9 +198,7 @@ export const ActivityTable = ({
                   ) : null}
                 </span>
                 <span className="text-muted-foreground truncate text-xs font-light">
-                  {isCash
-                    ? String(currency)
-                    : optionSubtitle ?? String(assetName ?? currency)}
+                  {isCash ? String(currency) : (optionSubtitle ?? String(assetName ?? currency))}
                 </span>
               </div>
             </div>

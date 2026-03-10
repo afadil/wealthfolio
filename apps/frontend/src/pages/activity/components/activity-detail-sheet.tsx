@@ -110,7 +110,9 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
             <div className="flex flex-col items-start">
               <span>Activity Details</span>
               <span className="text-muted-foreground text-xs font-normal">
-                {parsedOption ? parsedOption.underlying : activity.assetSymbol || "Cash Transaction"}
+                {parsedOption
+                  ? parsedOption.underlying
+                  : activity.assetSymbol || "Cash Transaction"}
               </span>
             </div>
           </SheetTitle>
@@ -128,7 +130,8 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
                   <>
                     <div className="text-xl font-bold">{parsedOption.underlying}</div>
                     <div className="text-muted-foreground text-sm">
-                      {optionExpirationDisplay} ${parsedOption.strikePrice} {parsedOption.optionType}
+                      {optionExpirationDisplay} ${parsedOption.strikePrice}{" "}
+                      {parsedOption.optionType}
                     </div>
                   </>
                 ) : (
@@ -188,11 +191,7 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
               <DetailRow label="Underlying" value={parsedOption.underlying} />
               <DetailRow
                 label="Type"
-                value={
-                  <Badge variant="outline">
-                    {parsedOption.optionType}
-                  </Badge>
-                }
+                value={<Badge variant="outline">{parsedOption.optionType}</Badge>}
               />
               <DetailRow
                 label="Strike Price"

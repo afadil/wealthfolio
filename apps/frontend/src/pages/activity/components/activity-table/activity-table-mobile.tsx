@@ -67,11 +67,7 @@ export const ActivityTableMobile = ({
           : isCashActivity(activityType) && !isAssetBackedIncome;
         const isOptionActivity = activity.instrumentType === "OPTION";
         const parsedOption = isOptionActivity ? parseOccSymbol(symbol) : null;
-        const displaySymbol = isCash
-          ? "Cash"
-          : parsedOption
-            ? parsedOption.underlying
-            : symbol;
+        const displaySymbol = isCash ? "Cash" : parsedOption ? parsedOption.underlying : symbol;
         const avatarSymbol = isCash ? "$CASH" : symbol;
         const optionSubtitle = parsedOption
           ? `${new Date(parsedOption.expiration + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} $${parsedOption.strikePrice} ${parsedOption.optionType}`
@@ -112,7 +108,9 @@ export const ActivityTableMobile = ({
                             activity.quantity && (
                               <>
                                 <span>•</span>
-                                <span>{activity.quantity} {isOptionActivity ? "contracts" : "shares"}</span>
+                                <span>
+                                  {activity.quantity} {isOptionActivity ? "contracts" : "shares"}
+                                </span>
                               </>
                             )}
                         </div>
@@ -154,9 +152,7 @@ export const ActivityTableMobile = ({
                       <div>
                         <p className="font-semibold">{displaySymbol}</p>
                         <p className="text-muted-foreground text-xs">
-                          {isCash
-                            ? activity.currency
-                            : optionSubtitle ?? activity.assetName}
+                          {isCash ? activity.currency : (optionSubtitle ?? activity.assetName)}
                         </p>
                       </div>
                     </>

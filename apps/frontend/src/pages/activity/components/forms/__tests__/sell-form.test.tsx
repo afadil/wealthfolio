@@ -57,6 +57,9 @@ vi.mock("../fields", () => ({
       <textarea data-testid={`textarea-${name}`} name={name} id={name} />
     </div>
   ),
+  AssetTypeSelector: ({ name }: { name: string }) => (
+    <div data-testid={`asset-type-selector-${name}`} />
+  ),
   AdvancedOptionsSection: () => <div data-testid="advanced-options-section" />,
   createValidatedSubmit: vi.fn((_form, handler) => handler),
 }));

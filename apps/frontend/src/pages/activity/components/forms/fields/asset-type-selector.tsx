@@ -48,9 +48,7 @@ export function AssetTypeSelector<TFieldValues extends FieldValues = FieldValues
   };
 
   return (
-    <div
-      className={cn("bg-muted relative flex items-center gap-1 rounded-lg p-1", className)}
-    >
+    <div className={cn("bg-muted relative flex items-center gap-1 rounded-lg p-1", className)}>
       {assetTypes.map((type) => {
         const Icon = Icons[type.icon];
         const isSelected = field.value === type.value;

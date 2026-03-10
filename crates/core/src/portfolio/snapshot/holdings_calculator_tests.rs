@@ -5014,9 +5014,8 @@ mod tests {
 
         let pos3 = result3.snapshot.positions.get("AAPL250321C00150000");
         // Position should be fully closed (quantity = 0, which means it may be zeroed out)
-        match pos3 {
-            Some(p) => assert_eq!(p.quantity, dec!(0)),
-            None => {} // Position removed entirely is also acceptable
+        if let Some(p) = pos3 {
+            assert_eq!(p.quantity, dec!(0));
         }
     }
 
@@ -5092,13 +5091,12 @@ mod tests {
 
         // Account A should have no position (or zero quantity)
         let pos_a_after = result_a_xfer.snapshot.positions.get("AAPL250321C00150000");
-        match pos_a_after {
-            Some(p) => assert_eq!(
+        if let Some(p) = pos_a_after {
+            assert_eq!(
                 p.quantity,
                 dec!(0),
                 "Account A should have 0 after transfer out"
-            ),
-            None => {} // Position removed entirely is also acceptable
+            );
         }
 
         // --- Account B: TRANSFER_IN 3 contracts (lots carried over from cache) ---

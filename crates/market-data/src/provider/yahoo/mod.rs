@@ -29,7 +29,7 @@ use crate::models::{
     SplitEvent,
 };
 use crate::provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
-use crate::resolver::ResolverChain;
+use crate::resolver::{yahoo_exchange_to_mic, ResolverChain};
 
 use models::{YahooQuoteSummaryResponse, YahooQuoteSummaryResult};
 
@@ -440,7 +440,12 @@ impl YahooProvider {
         let exchange = item.exchange.unwrap_or_default();
         let quote_type = item.quote_type.unwrap_or_else(|| "UNKNOWN".to_string());
 
-        let mut result = SearchResult::new(symbol.to_string(), name, exchange, quote_type);
+        let mut result = SearchResult::new(symbol.to_string(), name, &exchange, quote_type);
+
+        // Derive MIC from Yahoo exchange code (e.g., NMS→XNAS, TOR→XTSE)
+        if let Some(mic) = yahoo_exchange_to_mic(&exchange) {
+            result = result.with_exchange_mic(mic.into_owned());
+        }
 
         if let Some(score) = item.score {
             result = result.with_score(score);
@@ -1047,13 +1052,17 @@ impl MarketDataProvider for YahooProvider {
             .quotes
             .iter()
             .map(|item| {
-                SearchResult::new(
+                let mut r = SearchResult::new(
                     &item.symbol,
                     &item.long_name,
                     &item.exchange,
                     &item.quote_type,
                 )
-                .with_score(item.score)
+                .with_score(item.score);
+                if let Some(mic) = yahoo_exchange_to_mic(&item.exchange) {
+                    r = r.with_exchange_mic(mic.into_owned());
+                }
+                r
             })
             .collect();
 

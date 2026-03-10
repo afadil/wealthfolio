@@ -60,9 +60,7 @@ export function MobileDetailsStep({ accounts, activityType, isEditing }: MobileD
 
   // BUY/SELL asset type (stock/option/bond)
   const isBuyOrSell = ["BUY", "SELL"].includes(activityType);
-  const assetType = isBuyOrSell
-    ? ((watch("assetType" as any) as string) ?? "stock")
-    : "stock";
+  const assetType = isBuyOrSell ? ((watch("assetType" as any) as string) ?? "stock") : "stock";
   const isOption = assetType === "option";
   const isBond = assetType === "bond";
   const isManualForType = isManualAsset && !isBond;
@@ -71,9 +69,7 @@ export function MobileDetailsStep({ accounts, activityType, isEditing }: MobileD
   const optQuantity = isBuyOrSell ? watch("quantity") : undefined;
   const optUnitPrice = isBuyOrSell ? watch("unitPrice") : undefined;
   const optFee = isBuyOrSell ? watch("fee") : undefined;
-  const optMultiplier = isOption
-    ? ((watch("contractMultiplier" as any) as number) ?? 100)
-    : 1;
+  const optMultiplier = isOption ? ((watch("contractMultiplier" as any) as number) ?? 100) : 1;
 
   const optionTotal = useMemo(() => {
     if (!isOption || !optQuantity || !optUnitPrice) return 0;
@@ -362,8 +358,8 @@ export function MobileDetailsStep({ accounts, activityType, isEditing }: MobileD
           />
 
           {/* Asset Symbol / Option Contract Fields */}
-          {needsAssetSymbol && (
-            isOption ? (
+          {needsAssetSymbol &&
+            (isOption ? (
               <OptionContractFields
                 underlyingName={"underlyingSymbol" as any}
                 strikePriceName={"strikePrice" as any}
@@ -386,8 +382,7 @@ export function MobileDetailsStep({ accounts, activityType, isEditing }: MobileD
                 assetMetadataName="assetMetadata"
                 defaultCurrency={accountCurrency}
               />
-            )
-          )}
+            ))}
 
           {/* Quantity and Unit Price */}
           {needsQuantity && (
@@ -426,9 +421,7 @@ export function MobileDetailsStep({ accounts, activityType, isEditing }: MobileD
               {/* Shares breakdown for options */}
               {isOption && optQuantity && (
                 <div className="text-muted-foreground -mt-2 flex items-center gap-1.5 px-1 text-xs">
-                  <span>
-                    {Number(optQuantity) * (Number(optMultiplier) || 100)} shares
-                  </span>
+                  <span>{Number(optQuantity) * (Number(optMultiplier) || 100)} shares</span>
                   <span>·</span>
                   <input
                     type="number"

@@ -205,7 +205,10 @@ const getColumns = (
       const isManual = holding.instrument?.quoteMode === "MANUAL";
       const content = (
         <div className="flex items-center">
-          <TickerAvatar symbol={parsedOption ? parsedOption.underlying : symbol} className="mr-2 h-8 w-8" />
+          <TickerAvatar
+            symbol={parsedOption ? parsedOption.underlying : symbol}
+            className="mr-2 h-8 w-8"
+          />
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
               <span className="font-medium">{displaySymbol}</span>
@@ -269,7 +272,10 @@ const getColumns = (
       const symbol = row.original.instrument?.symbol ?? row.original.id;
       const isOption = !!parseOccSymbol(symbol);
       const assetTypeKey = row.original.instrument?.classifications?.assetType?.key ?? "";
-      const isBond = assetTypeKey.startsWith("BOND_") || assetTypeKey === "DEBT_SECURITY" || assetTypeKey === "MONEY_MARKET_DEBT";
+      const isBond =
+        assetTypeKey.startsWith("BOND_") ||
+        assetTypeKey === "DEBT_SECURITY" ||
+        assetTypeKey === "MONEY_MARKET_DEBT";
       return (
         <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
           <QuantityDisplay value={row.original.quantity} isHidden={isHidden} />

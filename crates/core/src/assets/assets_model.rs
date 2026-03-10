@@ -1053,12 +1053,12 @@ pub struct AssetSpec {
 
 impl AssetSpec {
     /// Extracts the option contract multiplier from pre-built metadata, if present.
+    /// Handles both numeric (serde-float) and string serialization of Decimal.
     pub fn option_multiplier(&self) -> Option<Decimal> {
-        self.metadata
-            .as_ref()?
-            .get("option")?
-            .get("multiplier")
-            .and_then(|v| v.as_str().and_then(|s| s.parse::<Decimal>().ok()))
+        let v = self.metadata.as_ref()?.get("option")?.get("multiplier")?;
+        v.as_f64()
+            .and_then(Decimal::from_f64_retain)
+            .or_else(|| v.as_str().and_then(|s| s.parse::<Decimal>().ok()))
     }
 }
 
