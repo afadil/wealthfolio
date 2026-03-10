@@ -755,6 +755,14 @@ where
             all_quotes.extend(quotes);
         }
 
+        append_historical_seed_quotes(
+            self.quote_store.as_ref(),
+            symbols,
+            start,
+            &assets_by_id,
+            &mut all_quotes,
+        )?;
+
         // Fill missing quotes
         Ok(fill_missing_quotes(&all_quotes, symbols, start, end))
     }
@@ -1651,6 +1659,44 @@ fn mic_to_yahoo_suffix(mic: &str) -> Option<&'static str> {
 // Gap Filling Helper
 // =============================================================================
 
+pub(crate) fn append_historical_seed_quotes<Q: QuoteStore>(
+    quote_store: &Q,
+    symbols: &HashSet<String>,
+    start: NaiveDate,
+    assets_by_id: &HashMap<String, Asset>,
+    all_quotes: &mut Vec<Quote>,
+) -> Result<()> {
+    let mut symbols_with_seed_quotes: HashSet<String> = all_quotes
+        .iter()
+        .filter(|quote| quote.timestamp.date_naive() < start)
+        .map(|quote| quote.asset_id.clone())
+        .collect();
+
+    // Fall back to full history for symbols without a pre-start seed in the lookback
+    // window. This preserves manual quote carry-forward when the latest quote is stale.
+    for symbol in symbols {
+        if symbols_with_seed_quotes.contains(symbol) {
+            continue;
+        }
+
+        let maybe_seed_quote = quote_store
+            .get_historical_quotes(symbol)?
+            .into_iter()
+            .filter(|quote| quote.timestamp.date_naive() < start)
+            .max_by_key(|quote| quote.timestamp);
+
+        if let Some(mut seed_quote) = maybe_seed_quote {
+            if let Some(asset) = assets_by_id.get(symbol) {
+                reconcile_quote_currency(&mut seed_quote, asset);
+            }
+            all_quotes.push(seed_quote);
+            symbols_with_seed_quotes.insert(symbol.clone());
+        }
+    }
+
+    Ok(())
+}
+
 /// Fills missing quotes for weekends and holidays by carrying forward the last known quote.
 ///
 /// This is critical for portfolio valuation which needs a quote for every day in the range.
@@ -1671,7 +1717,7 @@ fn mic_to_yahoo_suffix(mic: &str) -> Option<&'static str> {
 ///
 /// # Returns
 /// A Vec of quotes with one entry per symbol per day (filled from last known value)
-fn fill_missing_quotes(
+pub(crate) fn fill_missing_quotes(
     quotes: &[Quote],
     required_symbols: &HashSet<String>,
     start_date: NaiveDate,
