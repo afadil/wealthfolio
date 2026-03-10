@@ -538,6 +538,11 @@ async fn perform_broker_sync(
     let token = mint_access_token(&secret_store, token_lifecycle.as_ref()).await?;
     let client = ConnectApiClient::new(&cloud_api_base_url(), &token).map_err(|e| e.to_string())?;
 
+    // Check plan entitlement before syncing
+    if !client.has_broker_sync().await.map_err(|e| e.to_string())? {
+        return Err("Plan does not include broker sync".to_string());
+    }
+
     // Create progress reporter and orchestrator
     let reporter = Arc::new(EventBusProgressReporter::new(event_bus));
     let orchestrator = SyncOrchestrator::new(

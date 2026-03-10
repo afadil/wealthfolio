@@ -105,7 +105,7 @@ export interface BrokerAccount {
 // Subscription Plans Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type PlanId = "essentials" | "duo" | "plus";
+export type PlanId = "basic" | "essentials" | "duo" | "plus";
 export type BillingPeriod = "monthly" | "yearly";
 
 export interface PlanPricing {

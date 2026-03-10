@@ -3,6 +3,7 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
 import { useWealthfolioConnect } from "../providers/wealthfolio-connect-provider";
+import { hasBrokerSync } from "../lib/plan-capabilities";
 import { useAggregatedSyncStatus, useSyncBrokerData } from "../hooks";
 import type { AggregatedSyncStatus } from "../types";
 
@@ -32,13 +33,8 @@ export function SyncButton({ className, showLabel = false, size = "icon" }: Sync
   const { status, lastSyncTime } = useAggregatedSyncStatus();
   const { mutate: syncBrokerData, isPending: isSyncing } = useSyncBrokerData();
 
-  // Check if user has an active subscription
-  const hasSubscription =
-    userInfo?.team?.subscription_status === "active" ||
-    userInfo?.team?.subscription_status === "trialing";
-
-  // Only show when Connect is enabled and user has subscription
-  if (!isEnabled || !isConnected || !hasSubscription) {
+  // Only show when Connect is enabled, connected, and plan includes broker sync
+  if (!isEnabled || !isConnected || !hasBrokerSync(userInfo)) {
     return null;
   }
 

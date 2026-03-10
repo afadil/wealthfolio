@@ -344,25 +344,44 @@ impl ConnectApiClient {
         self.get("/api/v1/subscription/plans").await
     }
 
-    /// Check if the current user has an active subscription.
-    pub async fn has_active_subscription(&self) -> Result<bool> {
+    /// Check if the current user's plan includes broker sync.
+    ///
+    /// Returns true when the user has an active subscription AND their plan
+    /// is not "basic" (basic plan only includes device sync).
+    pub async fn has_broker_sync(&self) -> Result<bool> {
         let user_info = self.get_user_info().await?;
 
-        let subscription_status = user_info.team.and_then(|t| t.subscription_status);
+        let team = match &user_info.team {
+            Some(t) => t,
+            None => {
+                debug!("[ConnectApi] No team info, broker sync not available");
+                return Ok(false);
+            }
+        };
 
-        match subscription_status.as_deref() {
-            Some("active") => {
-                debug!("[ConnectApi] User has active subscription");
-                Ok(true)
-            }
-            status => {
-                debug!(
-                    "[ConnectApi] User does not have active subscription: {:?}",
-                    status
-                );
-                Ok(false)
-            }
+        let is_active = matches!(
+            team.subscription_status.as_deref(),
+            Some("active") | Some("trialing")
+        );
+        if !is_active {
+            debug!("[ConnectApi] No active subscription, broker sync not available");
+            return Ok(false);
         }
+
+        let plan = match team.plan.as_deref() {
+            Some(p) => p,
+            None => {
+                debug!("[ConnectApi] No plan metadata, broker sync not available");
+                return Ok(false);
+            }
+        };
+        if plan == "basic" {
+            debug!("[ConnectApi] Basic plan, broker sync not available");
+            return Ok(false);
+        }
+
+        debug!("[ConnectApi] Broker sync is available");
+        Ok(true)
     }
 }
 

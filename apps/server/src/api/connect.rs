@@ -456,6 +456,22 @@ async fn sync_broker_data(State(state): State<Arc<AppState>>) -> StatusCode {
         return StatusCode::NOT_IMPLEMENTED;
     }
 
+    // Check plan entitlement before starting sync
+    match has_broker_sync(&state).await {
+        Ok(true) => {}
+        Ok(false) => {
+            info!("[Connect] Broker sync skipped: plan does not include broker sync");
+            return StatusCode::FORBIDDEN;
+        }
+        Err(e) => {
+            error!(
+                "[Connect] Broker sync skipped: could not verify entitlement ({})",
+                e
+            );
+            return StatusCode::FORBIDDEN;
+        }
+    }
+
     info!("[Connect] Starting broker data sync (non-blocking)...");
 
     // Spawn background task to perform the sync
@@ -473,6 +489,16 @@ async fn sync_broker_data(State(state): State<Arc<AppState>>) -> StatusCode {
     });
 
     StatusCode::ACCEPTED
+}
+
+/// Check if the current user's plan includes broker sync.
+/// Used by the scheduler to skip sync for basic-plan users.
+pub async fn has_broker_sync(state: &AppState) -> Result<bool, String> {
+    ensure_connect_sync_enabled().map_err(|e| e.to_string())?;
+    let client = create_connect_client(state)
+        .await
+        .map_err(|e| e.to_string())?;
+    client.has_broker_sync().await.map_err(|e| e.to_string())
 }
 
 /// Core broker sync logic - syncs connections, accounts, and activities from cloud to local DB.

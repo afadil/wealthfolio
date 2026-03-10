@@ -76,6 +76,18 @@ pub async fn sync_broker_data(
     app: AppHandle,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<(), String> {
+    // Check plan entitlement before starting sync
+    match state.connect_service().has_broker_sync().await {
+        Ok(true) => {}
+        Ok(false) => {
+            info!("[Connect] Broker sync skipped: plan does not include broker sync");
+            return Err("Plan does not include broker sync".to_string());
+        }
+        Err(e) => {
+            return Err(format!("Could not verify broker sync entitlement: {}", e));
+        }
+    }
+
     info!("[Connect] Starting broker data sync ...");
 
     // Clone what we need for the spawned task

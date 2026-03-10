@@ -2,6 +2,7 @@ import { ActionPalette, type ActionPaletteGroup } from "@/components/action-pale
 import { syncService, useDeviceSync } from "@/features/devices-sync";
 import { SyncStates } from "@/features/devices-sync/types";
 import { useSyncBrokerData } from "@/features/wealthfolio-connect/hooks";
+import { hasBrokerSync } from "@/features/wealthfolio-connect";
 import { useWealthfolioConnect } from "@/features/wealthfolio-connect/providers/wealthfolio-connect-provider";
 import {
   useRecalculatePortfolioMutation,
@@ -30,10 +31,7 @@ export function DashboardActions({ onAddAsset, onAddLiability }: DashboardAction
   // Wealthfolio Connect sync
   const { isEnabled, isConnected, userInfo } = useWealthfolioConnect();
   const { mutate: syncBrokerData } = useSyncBrokerData();
-  const hasSubscription =
-    userInfo?.team?.subscription_status === "active" ||
-    userInfo?.team?.subscription_status === "trialing";
-  const showSyncAction = isEnabled && isConnected && hasSubscription;
+  const showSyncAction = isEnabled && isConnected && hasBrokerSync(userInfo);
 
   // Device sync
   const { state: deviceSync } = useDeviceSync();

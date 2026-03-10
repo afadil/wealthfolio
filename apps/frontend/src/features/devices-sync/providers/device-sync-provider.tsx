@@ -337,8 +337,10 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
     return engineStatus;
   }, []);
 
-  // Check if user has a subscription (team)
-  const hasSubscription = !!userInfo?.team?.plan;
+  // Check if user has an active subscription
+  const hasSubscription =
+    userInfo?.team?.subscription_status === "active" ||
+    userInfo?.team?.subscription_status === "trialing";
 
   // Detect state on mount (when connected AND has subscription)
   useEffect(() => {

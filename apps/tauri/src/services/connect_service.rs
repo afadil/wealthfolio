@@ -118,18 +118,12 @@ impl ConnectService {
         ConnectApiClient::new(&cloud_api_base_url, &access_token).map_err(|e| e.to_string())
     }
 
-    /// Check if the current user has an active subscription.
+    /// Check if the current user's plan includes broker sync.
     ///
-    /// # Returns
-    ///
-    /// - `Ok(true)` if the user has an active subscription
-    /// - `Ok(false)` if the user does not have an active subscription
-    /// - `Err(String)` if there's an authentication or API error
-    pub async fn has_active_subscription(&self) -> Result<bool, String> {
+    /// Returns `Ok(true)` only when the user has an active subscription
+    /// on a plan that includes broker sync (i.e. not "basic").
+    pub async fn has_broker_sync(&self) -> Result<bool, String> {
         let client = self.get_api_client().await?;
-        client
-            .has_active_subscription()
-            .await
-            .map_err(|e| e.to_string())
+        client.has_broker_sync().await.map_err(|e| e.to_string())
     }
 }
