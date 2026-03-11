@@ -184,18 +184,6 @@ async fn process_event_batch(events: &[DomainEvent], deps: Arc<QueueWorkerDeps>)
                 ));
         }
 
-        tracing::info!(
-            "Asset enrichment complete: {} enriched, {} skipped, {} failed{}",
-            total_enriched,
-            total_skipped,
-            total_failed,
-            if had_error {
-                " (some chunks failed)"
-            } else {
-                ""
-            }
-        );
-
         if had_error || total_failed > 0 {
             deps.event_bus
                 .publish(crate::events::ServerEvent::with_payload(

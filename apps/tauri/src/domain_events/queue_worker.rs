@@ -173,18 +173,6 @@ async fn process_event_batch(
             );
         }
 
-        info!(
-            "Asset enrichment complete: {} enriched, {} skipped, {} failed{}",
-            total_enriched,
-            total_skipped,
-            total_failed,
-            if had_error {
-                " (some chunks failed)"
-            } else {
-                ""
-            }
-        );
-
         if had_error || total_failed > 0 {
             let _ = app_handle.emit(
                 ASSET_ENRICHMENT_ERROR,
@@ -205,10 +193,6 @@ async fn process_event_batch(
     // 2. Plan and run portfolio job directly (not via event emission)
     // This ensures the is_processing guard properly tracks completion
     if let Some(payload) = plan_portfolio_job(events) {
-        info!(
-            "Running portfolio job (accounts: {:?})",
-            payload.account_ids
-        );
         run_portfolio_job(app_handle, context, payload).await;
     }
 

@@ -465,10 +465,6 @@ impl AssetServiceTrait for AssetService {
                         if let Ok(Some(existing)) =
                             self.asset_repository.find_by_instrument_key(&key)
                         {
-                            info!(
-                                "Found existing asset by instrument_key '{}': {}",
-                                key, existing.id
-                            );
                             if !existing.is_active {
                                 self.asset_repository.reactivate(&existing.id).await?;
                             }
@@ -862,11 +858,6 @@ impl AssetServiceTrait for AssetService {
                 }
             }
         }
-
-        info!(
-            "Asset enrichment complete: {} enriched, {} skipped, {} failed",
-            enriched_count, skipped_count, failed_count
-        );
 
         Ok((enriched_count, skipped_count, failed_count))
     }

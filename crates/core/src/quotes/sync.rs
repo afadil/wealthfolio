@@ -921,11 +921,6 @@ where
                     format_sync_failure_message(&error, fetch_error.provider_id.as_deref());
 
                 if should_treat_backfill_error_as_non_fatal(&plan.category, &error) {
-                    info!(
-                        "Backfill reached provider data boundary for {} ({}). Treating as complete.",
-                        asset.id, error
-                    );
-
                     if let Err(state_err) = self.sync_state_store.update_after_sync(&asset.id).await
                     {
                         warn!(
