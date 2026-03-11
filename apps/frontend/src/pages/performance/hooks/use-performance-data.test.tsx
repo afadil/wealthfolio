@@ -56,7 +56,12 @@ describe("useCalculatePerformanceHistory", () => {
       expect(mocks.calculatePerformanceHistory).toHaveBeenCalled();
     });
 
-    const calls = mocks.calculatePerformanceHistory.mock.calls as [string, string, string, string][];
+    const calls = mocks.calculatePerformanceHistory.mock.calls as [
+      string,
+      string,
+      string,
+      string,
+    ][];
     const starts = calls.map(([, , start]) => start);
     const ends = calls.map(([, , , end]) => end);
 
