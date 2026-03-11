@@ -563,12 +563,14 @@ const AlternativeAssetDetailCard: React.FC<AlternativeAssetDetailCardProps> = ({
             </div>
           )}
 
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Last Updated</span>
-            <span className="font-medium">
-              {format(parseLocalDate(holding.valuationDate), "MMM d, yyyy")}
-            </span>
-          </div>
+          {holding.valuationDate && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Last Updated</span>
+              <span className="font-medium">
+                {format(parseLocalDate(holding.valuationDate), "MMM d, yyyy")}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Type-specific details (continued without separator) */}
