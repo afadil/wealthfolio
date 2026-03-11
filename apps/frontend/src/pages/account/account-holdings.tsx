@@ -62,6 +62,20 @@ const AccountHoldings = ({
 
   const filteredHoldings = holdings?.filter((holding) => holding.holdingType !== HoldingType.CASH);
 
+  const typeOptions = useMemo(() => {
+    if (!filteredHoldings) return [];
+    const seen = new Set<string>();
+    const options: { value: string; label: string }[] = [];
+    for (const h of filteredHoldings) {
+      const name = h.instrument?.classifications?.assetType?.name;
+      if (name && !seen.has(name)) {
+        seen.add(name);
+        options.push({ value: name, label: name });
+      }
+    }
+    return options;
+  }, [filteredHoldings]);
+
   // Show loading state while data is being fetched
   if (isLoading) {
     return null;
@@ -174,6 +188,7 @@ const AccountHoldings = ({
           accounts={dummyAccounts}
           onAccountChange={handleAccountChange}
           showAccountFilter={false}
+          typeOptions={typeOptions}
         />
       ) : (
         <HoldingsTable holdings={filteredHoldings ?? []} isLoading={isLoading} />

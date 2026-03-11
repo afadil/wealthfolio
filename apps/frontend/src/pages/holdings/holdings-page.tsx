@@ -294,7 +294,7 @@ export const HoldingsPage = () => {
   );
 
   // Process investment holdings
-  const { nonCashHoldings, filteredHoldings } = useMemo(() => {
+  const { nonCashHoldings, filteredHoldings, availableTypeOptions } = useMemo(() => {
     const nonCash =
       holdings?.filter((holding) => holding.holdingType?.toLowerCase() !== HoldingType.CASH) ?? [];
 
@@ -306,6 +306,17 @@ export const HoldingsPage = () => {
       });
     }
 
+    // Build available type options from taxonomy classifications
+    const typeSet = new Set<string>();
+    const typeOptions: { value: string; label: string }[] = [];
+    for (const h of filtered) {
+      const name = h.instrument?.classifications?.assetType?.name;
+      if (name && !typeSet.has(name)) {
+        typeSet.add(name);
+        typeOptions.push({ value: name, label: name });
+      }
+    }
+
     if (selectedTypes.length > 0) {
       filtered = filtered.filter((holding) => {
         const assetType = holding.instrument?.classifications?.assetType?.name;
@@ -313,7 +324,11 @@ export const HoldingsPage = () => {
       });
     }
 
-    return { nonCashHoldings: nonCash, filteredHoldings: filtered };
+    return {
+      nonCashHoldings: nonCash,
+      filteredHoldings: filtered,
+      availableTypeOptions: typeOptions,
+    };
   }, [holdings, selectedTypes, investmentsFilter]);
 
   // Combined loading state
@@ -406,6 +421,7 @@ export const HoldingsPage = () => {
               showFilterButton={false}
               sortBy={sortBy}
               showTotalReturn={showTotalReturn}
+              typeOptions={availableTypeOptions}
             />
           </div>
         </>
@@ -645,6 +661,7 @@ export const HoldingsPage = () => {
         setSortBy={setSortBy}
         showTotalReturn={showTotalReturn}
         setShowTotalReturn={setShowTotalReturn}
+        typeOptions={availableTypeOptions}
       />
 
       {/* Alternative Asset Quick Add Modal */}

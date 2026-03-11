@@ -418,6 +418,24 @@ impl HoldingsServiceTrait for HoldingsService {
             .await;
         apply_portfolio_weights(account_id, &mut holdings);
 
+        // Load taxonomy classifications for all holdings
+        let asset_ids: Vec<String> = holdings
+            .iter()
+            .filter_map(|h| h.instrument.as_ref().map(|i| i.id.clone()))
+            .collect();
+        if !asset_ids.is_empty() {
+            let classifications_map = self
+                .classification_service
+                .get_classifications_batch(&asset_ids);
+            for holding in &mut holdings {
+                if let Some(ref mut instrument) = holding.instrument {
+                    if let Some(classifications) = classifications_map.get(&instrument.id) {
+                        instrument.classifications = Some(classifications.clone());
+                    }
+                }
+            }
+        }
+
         for holding_view in &mut holdings {
             normalize_holding_currency(holding_view);
         }

@@ -429,9 +429,15 @@ export function AssetEditSheet({
             </TabsList>
           ) : (
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="general">General</TabsTrigger>
-              <TabsTrigger value="classification">Classification</TabsTrigger>
-              <TabsTrigger value="market-data">Market Data</TabsTrigger>
+              <TabsTrigger value="general" className="px-1.5 text-xs sm:px-3 sm:text-sm">
+                General
+              </TabsTrigger>
+              <TabsTrigger value="classification" className="px-1.5 text-xs sm:px-3 sm:text-sm">
+                Classification
+              </TabsTrigger>
+              <TabsTrigger value="market-data" className="px-1.5 text-xs sm:px-3 sm:text-sm">
+                Market Data
+              </TabsTrigger>
             </TabsList>
           )}
 

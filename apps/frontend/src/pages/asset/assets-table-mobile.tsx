@@ -6,6 +6,7 @@ import { Badge, Card, Input } from "@wealthfolio/ui";
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { ASSET_KIND_DISPLAY_NAMES, LatestQuoteSnapshot } from "@/lib/types";
+import { parseOccSymbol } from "@/lib/occ-symbol";
 import { cn, formatAmount, formatDate } from "@/lib/utils";
 import { ScrollArea, Separator } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
@@ -211,21 +212,31 @@ export function AssetsTableMobile({
                 onClick={() => navigate(`/holdings/${encodeURIComponent(asset.id)}`)}
                 className="hover:bg-muted/60 focus-visible:ring-ring flex flex-1 items-center gap-3 overflow-hidden rounded-md text-left transition"
               >
-                <TickerAvatar
-                  symbol={asset.displayCode ?? ""}
-                  className="h-10 w-10 flex-shrink-0"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate font-semibold">
-                      {asset.displayCode ?? asset.name ?? "Unknown"}
-                    </p>
-                    <Badge variant="secondary" className="text-[10px] uppercase">
-                      {asset.quoteCcy}
-                    </Badge>
-                  </div>
-                  <p className="text-muted-foreground truncate text-sm">{asset.name ?? "-"}</p>
-                </div>
+                {(() => {
+                  const rawSymbol = asset.displayCode ?? "";
+                  const parsedOption = parseOccSymbol(rawSymbol);
+                  const displaySymbol = parsedOption
+                    ? parsedOption.underlying
+                    : (asset.displayCode ?? asset.name ?? "Unknown");
+                  const subtitle = parsedOption
+                    ? `${new Date(parsedOption.expiration + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} $${parsedOption.strikePrice} ${parsedOption.optionType}`
+                    : (asset.name ?? "-");
+                  const avatarSymbol = parsedOption ? parsedOption.underlying : rawSymbol;
+                  return (
+                    <>
+                      <TickerAvatar symbol={avatarSymbol} className="h-10 w-10 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate font-semibold">{displaySymbol}</p>
+                          <Badge variant="secondary" className="text-[10px] uppercase">
+                            {asset.quoteCcy}
+                          </Badge>
+                        </div>
+                        <p className="text-muted-foreground truncate text-sm">{subtitle}</p>
+                      </div>
+                    </>
+                  );
+                })()}
               </button>
 
               <div className="flex flex-shrink-0 items-center gap-2">

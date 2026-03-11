@@ -2,6 +2,7 @@ import { TickerAvatar } from "@/components/ticker-avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { HoldingType, isAlternativeAssetKind, type AssetKind } from "@/lib/constants";
+import { parseOccSymbol } from "@/lib/occ-symbol";
 import { Holding } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { AmountDisplay, Button, GainAmount, GainPercent, Icons } from "@wealthfolio/ui";
@@ -27,11 +28,15 @@ interface HoldingRowProps {
 
 function HoldingRow({ holding, baseCurrency, isHidden, onClick }: HoldingRowProps) {
   const symbol = holding.instrument?.symbol ?? holding.id;
-  const displayName = symbol.split(".")[0];
+  const parsedOption = parseOccSymbol(symbol);
+  const displayName = parsedOption ? parsedOption.underlying : symbol.split(".")[0];
+  const subtitle = parsedOption
+    ? `${new Date(parsedOption.expiration + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} $${parsedOption.strikePrice} ${parsedOption.optionType}`
+    : `${(holding.quantity ?? 0).toLocaleString(undefined, { maximumFractionDigits: 3 })} shares`;
+  const avatarSymbol = parsedOption ? parsedOption.underlying : symbol;
   const marketValue = holding.marketValue?.base ?? 0;
   const gainAmount = holding.unrealizedGain?.base ?? 0;
   const gainPercent = holding.unrealizedGainPct ?? 0;
-  const shares = holding.quantity ?? 0;
 
   return (
     <div
@@ -42,12 +47,10 @@ function HoldingRow({ holding, baseCurrency, isHidden, onClick }: HoldingRowProp
       onKeyDown={(e) => e.key === "Enter" && onClick?.()}
     >
       <div className="flex items-center gap-3">
-        <TickerAvatar symbol={symbol} className="size-9" />
+        <TickerAvatar symbol={avatarSymbol} className="size-9" />
         <div className="flex flex-col">
           <span className="text-sm font-semibold">{displayName}</span>
-          <span className="text-muted-foreground text-xs">
-            {shares.toLocaleString(undefined, { maximumFractionDigits: 3 })} shares
-          </span>
+          <span className="text-muted-foreground text-xs">{subtitle}</span>
         </div>
       </div>
       <div className="flex flex-col items-end gap-1">
@@ -96,13 +99,15 @@ function StackedAvatars({ holdings, totalRemaining, onClick }: StackedAvatarsPro
       <div className="flex items-center">
         {displayedHoldings.map((holding, index) => {
           const symbol = holding.instrument?.symbol ?? holding.id;
+          const parsed = parseOccSymbol(symbol);
+          const avatarSym = parsed ? parsed.underlying : symbol;
           return (
             <div
               key={holding.id}
               className={cn("relative", index > 0 && "-ml-2")}
               style={{ zIndex: displayedHoldings.length - index }}
             >
-              <TickerAvatar symbol={symbol} className="ring-background size-8 ring-2" />
+              <TickerAvatar symbol={avatarSym} className="ring-background size-8 ring-2" />
             </div>
           );
         })}
