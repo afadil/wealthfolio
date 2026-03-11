@@ -490,6 +490,8 @@
   --toast-info-bg: var(--color-blue-950);
   --toast-info-fg: var(--color-blue-200);
   --toast-info-border: var(--color-blue-800);
+
+  --input: hsl(var(--flexoki-ui-2));
 }
 
 @layer base {
