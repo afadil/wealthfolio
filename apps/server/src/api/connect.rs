@@ -171,6 +171,7 @@ struct DeviceSyncCycleResponse {
     needs_bootstrap: bool,
     bootstrap_snapshot_id: Option<String>,
     bootstrap_snapshot_seq: Option<i64>,
+    dead_letter_count: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -303,6 +304,10 @@ async fn clear_sync_session(State(state): State<Arc<AppState>>) -> ApiResult<Jso
 
     state.token_lifecycle.clear_cache().await;
     device_sync_engine::clear_min_snapshot_created_at_from_store();
+    let _ = state
+        .app_sync_repository
+        .clear_all_min_snapshot_created_at()
+        .await;
 
     info!("[Connect] Sync session cleared");
     Ok(Json(()))
@@ -915,6 +920,10 @@ async fn enable_device_sync(
         .set_secret(DEVICE_ID_KEY, &result.device_id)
         .map_err(|e| ApiError::Internal(format!("Failed to store device ID: {}", e)))?;
     device_sync_engine::clear_min_snapshot_created_at_from_store();
+    let _ = state
+        .app_sync_repository
+        .clear_all_min_snapshot_created_at()
+        .await;
 
     if result.state == SyncState::Ready {
         let _ = device_sync_engine::ensure_background_engine_started(Arc::clone(&state)).await;
@@ -938,6 +947,10 @@ async fn clear_device_sync_data(State(state): State<Arc<AppState>>) -> ApiResult
         .delete_secret(DEVICE_ID_KEY)
         .map_err(|e| ApiError::Internal(format!("Failed to clear device ID: {}", e)))?;
     device_sync_engine::clear_min_snapshot_created_at_from_store();
+    let _ = state
+        .app_sync_repository
+        .clear_all_min_snapshot_created_at()
+        .await;
     let _ = device_sync_engine::ensure_background_engine_stopped(Arc::clone(&state)).await;
 
     info!("[Connect] Device sync data cleared");
@@ -964,6 +977,10 @@ async fn reinitialize_device_sync(
         .set_secret(DEVICE_ID_KEY, &result.device_id)
         .map_err(|e| ApiError::Internal(format!("Failed to store device ID: {}", e)))?;
     device_sync_engine::clear_min_snapshot_created_at_from_store();
+    let _ = state
+        .app_sync_repository
+        .clear_all_min_snapshot_created_at()
+        .await;
 
     if result.state == SyncState::Ready {
         let _ = device_sync_engine::ensure_background_engine_started(Arc::clone(&state)).await;
@@ -1061,6 +1078,7 @@ async fn trigger_device_sync_cycle(
         needs_bootstrap: result.needs_bootstrap,
         bootstrap_snapshot_id: result.bootstrap_snapshot_id,
         bootstrap_snapshot_seq: result.bootstrap_snapshot_seq,
+        dead_letter_count: result.dead_letter_count,
     }))
 }
 
