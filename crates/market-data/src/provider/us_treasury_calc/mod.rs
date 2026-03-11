@@ -879,4 +879,34 @@ mod tests {
             "SEMI_ANNUAL"
         );
     }
+
+    #[test]
+    fn test_calculate_price_tbill_182_day() {
+        // Concrete T-bill example: 182-day T-bill at 4.5% yield
+        // Expected price = face / (1 + yield * days/360)
+        // = 1000 / (1 + 0.045 * 182/360)
+        // = 1000 / 1.02275
+        // = ~977.76 => fraction ~0.97776
+        let curve = YieldCurve(vec![(0.5, 4.5)]);
+        let today = NaiveDate::from_ymd_opt(2025, 1, 1).unwrap();
+        let maturity = NaiveDate::from_ymd_opt(2025, 7, 2).unwrap(); // 182 days
+
+        let price = UsTreasuryCalcProvider::calculate_price(
+            &curve, today, maturity, 0.0, // zero coupon
+            "ZERO", 1000.0,
+        )
+        .unwrap();
+
+        // P = 1000 / (1 + 0.045 * 182/360) / 1000 = 1 / 1.02275
+        let expected = 1.0 / (1.0 + 0.045 * 182.0 / 360.0);
+        assert!(
+            (price - expected).abs() < 0.001,
+            "T-bill price {:.6} should be close to expected {:.6}",
+            price,
+            expected
+        );
+        // Verify it is below par (discounted)
+        assert!(price < 1.0);
+        assert!(price > 0.97);
+    }
 }

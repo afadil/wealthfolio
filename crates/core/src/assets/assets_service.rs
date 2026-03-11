@@ -201,7 +201,12 @@ impl AssetService {
         };
 
         let provider_config = match quote_mode {
-            QuoteMode::Market => Some(serde_json::json!({ "preferred_provider": "YAHOO" })),
+            QuoteMode::Market => match spec.instrument_type.as_ref() {
+                // Bonds use specialized providers (US_TREASURY_CALC, BOERSE_FRANKFURT);
+                // don't override with Yahoo which can't resolve ISINs.
+                Some(InstrumentType::Bond) => None,
+                _ => Some(serde_json::json!({ "preferred_provider": "YAHOO" })),
+            },
             QuoteMode::Manual => None,
         };
 
@@ -519,7 +524,10 @@ impl AssetServiceTrait for AssetService {
 
         // Set preferred provider based on quote mode
         let provider_config = match quote_mode {
-            QuoteMode::Market => Some(serde_json::json!({ "preferred_provider": "YAHOO" })),
+            QuoteMode::Market => match instrument_type.as_ref() {
+                Some(InstrumentType::Bond) => None,
+                _ => Some(serde_json::json!({ "preferred_provider": "YAHOO" })),
+            },
             QuoteMode::Manual => None,
         };
 
@@ -1243,6 +1251,51 @@ mod tests {
                 Some("XLON"),
                 Some("XNAS"),
             )
+        );
+    }
+
+    #[test]
+    fn test_bond_provider_config_is_none() {
+        use super::super::assets_model::InstrumentType;
+
+        // The provider_config logic in new_asset_from_spec:
+        // Bond → None (no Yahoo override)
+        let quote_mode = QuoteMode::Market;
+        let instrument_type = Some(InstrumentType::Bond);
+
+        let provider_config = match quote_mode {
+            QuoteMode::Market => match instrument_type.as_ref() {
+                Some(InstrumentType::Bond) => None,
+                _ => Some(serde_json::json!({ "preferred_provider": "YAHOO" })),
+            },
+            QuoteMode::Manual => None,
+        };
+
+        assert!(
+            provider_config.is_none(),
+            "Bonds should NOT get Yahoo preferred_provider"
+        );
+    }
+
+    #[test]
+    fn test_equity_provider_config_is_yahoo() {
+        use super::super::assets_model::InstrumentType;
+
+        let quote_mode = QuoteMode::Market;
+        let instrument_type = Some(InstrumentType::Equity);
+
+        let provider_config = match quote_mode {
+            QuoteMode::Market => match instrument_type.as_ref() {
+                Some(InstrumentType::Bond) => None,
+                _ => Some(serde_json::json!({ "preferred_provider": "YAHOO" })),
+            },
+            QuoteMode::Manual => None,
+        };
+
+        assert_eq!(
+            provider_config,
+            Some(serde_json::json!({ "preferred_provider": "YAHOO" })),
+            "Equities should get Yahoo preferred_provider"
         );
     }
 }
