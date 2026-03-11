@@ -13,7 +13,7 @@ import { useWealthfolioConnect } from "@/features/wealthfolio-connect/providers/
 import { useAccounts } from "@/hooks/use-accounts";
 import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert } from "@wealthfolio/ui/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@wealthfolio/ui/components/ui/avatar";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
@@ -46,11 +46,25 @@ export default function ConnectPage() {
   const { mutate: syncBrokerData, isPending: isSyncing } = useSyncBrokerData();
   const { state: deviceSyncState } = useDeviceSync();
   const { data: devices } = useDevices("my");
+  const queryClient = useQueryClient();
+  const [isTriggeringDeviceSync, setIsTriggeringDeviceSync] = useState(false);
 
-  const handleSyncAll = useCallback(() => {
-    syncBrokerData();
-    syncTriggerCycle();
-  }, [syncBrokerData]);
+  const isSyncRunning = isSyncing || isTriggeringDeviceSync || status === "running";
+
+  const handleSyncAll = useCallback(async () => {
+    if (showBrokerSync) {
+      syncBrokerData();
+    }
+    setIsTriggeringDeviceSync(true);
+    try {
+      await syncTriggerCycle();
+    } finally {
+      setIsTriggeringDeviceSync(false);
+      queryClient.invalidateQueries({ queryKey: ["sync", "devices"] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.BROKER_CONNECTIONS] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS] });
+    }
+  }, [showBrokerSync, syncBrokerData, queryClient]);
   const { data: importRunsData } = useImportRunsInfinite({ pageSize: 10, enabled: showBrokerSync });
   const { accounts: localAccounts } = useAccounts({ filterActive: false, includeArchived: false });
 
@@ -196,27 +210,21 @@ export default function ConnectPage() {
             : "Your devices, all in one place."
         }
         actions={
-          showBrokerSync ? (
-            <div className="flex items-center gap-2 sm:gap-3">
-              <Button
-                onClick={handleSyncAll}
-                disabled={isSyncing || status === "running"}
-                size="sm"
-              >
-                {isSyncing || status === "running" ? (
-                  <>
-                    <Icons.Spinner className="h-4 w-4 animate-spin sm:mr-2" />
-                    <span className="hidden sm:inline">Syncing...</span>
-                  </>
-                ) : (
-                  <>
-                    <Icons.RefreshCw className="h-4 w-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Sync Now</span>
-                  </>
-                )}
-              </Button>
-            </div>
-          ) : undefined
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Button onClick={handleSyncAll} disabled={isSyncRunning} size="sm">
+              {isSyncRunning ? (
+                <>
+                  <Icons.Spinner className="h-4 w-4 animate-spin sm:mr-2" />
+                  <span className="hidden sm:inline">Syncing...</span>
+                </>
+              ) : (
+                <>
+                  <Icons.RefreshCw className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Sync Now</span>
+                </>
+              )}
+            </Button>
+          </div>
         }
       />
       <PageContent>
