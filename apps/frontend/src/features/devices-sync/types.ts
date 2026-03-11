@@ -14,7 +14,6 @@ export type DevicePlatform =
   | "server";
 export type PairingRole = "issuer" | "claimer";
 export type PairingStatus = "open" | "claimed" | "approved" | "completed" | "cancelled" | "expired";
-export type KeyState = "ACTIVE" | "PENDING";
 export type EnrollmentMode = "BOOTSTRAP" | "PAIR" | "READY";
 export type BootstrapAction =
   | "PULL_REMOTE_OVERWRITE"
@@ -64,9 +63,9 @@ export interface SyncIdentity {
   rootKey?: string;
   /** E2EE key version (epoch) */
   keyVersion?: number;
-  /** Device Ed25519 secret key (base64 encoded) */
+  /** Device X25519 secret key (base64 encoded) */
   deviceSecretKey?: string;
-  /** Device Ed25519 public key (base64 encoded) */
+  /** Device X25519 public key (base64 encoded) */
   devicePublicKey?: string;
 }
 
@@ -107,15 +106,6 @@ export interface Device {
   isCurrent?: boolean;
 }
 
-// Device registration request
-export interface RegisterDeviceRequest {
-  displayName: string;
-  platform: string;
-  deviceNonce: string;
-  osVersion?: string;
-  appVersion?: string;
-}
-
 // Summary of a trusted device (used in PAIR mode response)
 export interface TrustedDeviceSummary {
   id: string;
@@ -138,12 +128,6 @@ export type EnrollDeviceResponse =
     }
   | { mode: "READY"; device_id: string; e2ee_key_version: number; trust_state: TrustState };
 
-// Device update request
-export interface UpdateDeviceRequest {
-  displayName?: string;
-  metadata?: Record<string, unknown>;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Team Keys Types (E2EE)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -160,49 +144,6 @@ export type InitializeKeysResult =
       trusted_devices: TrustedDeviceSummary[];
     }
   | { mode: "READY"; e2ee_key_version: number };
-
-// Request to commit team key initialization (Phase 2)
-export interface CommitInitializeKeysRequest {
-  deviceId: string;
-  keyVersion: number;
-  deviceKeyEnvelope: string;
-  signature: string;
-  challengeResponse?: string;
-  recoveryEnvelope?: string;
-}
-
-// Response from committing team key initialization
-export interface CommitInitializeKeysResponse {
-  success: boolean;
-  keyState: KeyState;
-}
-
-// Response from starting key rotation (Phase 1)
-export interface RotateKeysResponse {
-  challenge: string;
-  nonce: string;
-  newKeyVersion: number;
-}
-
-// Envelope for a device during key rotation
-export interface DeviceKeyEnvelope {
-  deviceId: string;
-  deviceKeyEnvelope: string;
-}
-
-// Request to commit key rotation (Phase 2)
-export interface CommitRotateKeysRequest {
-  newKeyVersion: number;
-  envelopes: DeviceKeyEnvelope[];
-  signature: string;
-  challengeResponse?: string;
-}
-
-// Response from committing key rotation
-export interface CommitRotateKeysResponse {
-  success: boolean;
-  keyVersion: number;
-}
 
 // Response from resetting team sync
 export interface ResetTeamSyncResponse {
@@ -316,15 +257,6 @@ export interface PairingSession {
   expiresAt: Date;
   status: PairingStatus;
   requireSas: boolean;
-}
-
-// Pairing claim result (claimer side - for new device joining via QR code)
-export interface ClaimResult {
-  pairingId: string;
-  issuerPublicKey: string; // base64
-  sessionKey: string; // base64
-  requireSas: boolean;
-  expiresAt: Date;
 }
 
 // Claimer session state (for new device being paired)

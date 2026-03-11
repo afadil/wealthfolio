@@ -83,7 +83,8 @@ type SyncAction =
   // Common
   | { type: "CLEAR_ERROR" }
   | { type: "CLEAR_PAIRING_STATE" }
-  | { type: "RESET" };
+  | { type: "RESET" }
+  | { type: "HARD_RESET" };
 
 function syncReducer(state: SyncState, action: SyncAction): SyncState {
   switch (action.type) {
@@ -249,6 +250,17 @@ function syncReducer(state: SyncState, action: SyncAction): SyncState {
       return { ...state, error: null };
 
     case "RESET":
+      return {
+        ...INITIAL_SYNC_STATE,
+        isDetecting: false,
+        // Preserve in-flight pairing sessions so a brief connectivity blip
+        // doesn't destroy ephemeral session keys that exist only in memory.
+        pairingRole: state.pairingRole,
+        pairingSession: state.pairingSession,
+        claimerSession: state.claimerSession,
+      };
+
+    case "HARD_RESET":
       return { ...INITIAL_SYNC_STATE, isDetecting: false };
 
     default:
@@ -493,6 +505,15 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
     };
   }, [state.syncState, state.identity?.deviceId, state.device?.id, runReconcileReadyState]);
 
+  const bootstrapRetryCountRef = useRef(0);
+
+  // Reset retry counter when bootstrap succeeds or state leaves READY
+  useEffect(() => {
+    if (state.syncState !== SyncStates.READY || state.bootstrapStatus === "success") {
+      bootstrapRetryCountRef.current = 0;
+    }
+  }, [state.syncState, state.bootstrapStatus]);
+
   useEffect(() => {
     if (state.syncState !== SyncStates.READY) {
       return;
@@ -511,13 +532,22 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    const MAX_BOOTSTRAP_RETRIES = 20;
+    if (bootstrapRetryCountRef.current >= MAX_BOOTSTRAP_RETRIES) {
+      return;
+    }
+
+    // Exponential backoff: 5s, 10s, 20s, ... capped at 60s
+    const delay = Math.min(5_000 * Math.pow(2, bootstrapRetryCountRef.current), 60_000);
+
     let cancelled = false;
     const timer = window.setTimeout(() => {
+      bootstrapRetryCountRef.current += 1;
       void runReconcileReadyState({
         bypassOverwriteGuard: false,
         isCancelled: () => cancelled,
       });
-    }, 5_000);
+    }, delay);
 
     return () => {
       cancelled = true;
@@ -727,7 +757,7 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
     try {
       await syncService.resetSync();
       await syncService.clearSyncData();
-      dispatch({ type: "RESET" });
+      dispatch({ type: "HARD_RESET" });
     } catch (err) {
       throw SyncError.from(err);
     } finally {
@@ -784,7 +814,7 @@ export function DeviceSyncProvider({ children }: { children: ReactNode }) {
 
   const clearSyncData = useCallback(async () => {
     await syncService.clearSyncData();
-    dispatch({ type: "RESET" });
+    dispatch({ type: "HARD_RESET" });
   }, []);
 
   const value: SyncContextValue = {

@@ -541,6 +541,8 @@ pub fn run() {
             #[cfg(feature = "device-sync")]
             commands::sync_crypto::sync_hash_pairing_code,
             #[cfg(feature = "device-sync")]
+            commands::sync_crypto::sync_hmac_sha256,
+            #[cfg(feature = "device-sync")]
             commands::sync_crypto::sync_compute_sas,
             #[cfg(feature = "device-sync")]
             commands::sync_crypto::sync_generate_device_id,

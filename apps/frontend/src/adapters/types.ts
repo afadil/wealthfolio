@@ -296,6 +296,7 @@ export interface BackendSyncCycleResult {
   needsBootstrap: boolean;
   bootstrapSnapshotId: string | null;
   bootstrapSnapshotSeq: number | null;
+  deadLetterCount: number;
 }
 
 export interface BackendSyncBackgroundEngineResult {

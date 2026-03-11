@@ -140,6 +140,7 @@ impl<'a, R: ReplayStore + ?Sized> CycleContext<'a, R> {
             needs_bootstrap: status == "stale_cursor",
             bootstrap_snapshot_id: None,
             bootstrap_snapshot_seq: None,
+            dead_letter_count: 0,
         })
     }
 }
@@ -191,6 +192,7 @@ where
                 needs_bootstrap: false,
                 bootstrap_snapshot_id: None,
                 bootstrap_snapshot_seq: None,
+                dead_letter_count: 0,
             });
         }
     };
@@ -226,6 +228,7 @@ where
             needs_bootstrap: false,
             bootstrap_snapshot_id: None,
             bootstrap_snapshot_seq: None,
+            dead_letter_count: 0,
         });
     }
 
@@ -282,6 +285,7 @@ where
                     needs_bootstrap: false,
                     bootstrap_snapshot_id: None,
                     bootstrap_snapshot_seq: None,
+                    dead_letter_count: 0,
                 });
             }
             debug!("[DeviceSync] Reconcile action=NOOP but has pending outbox, proceeding with push+pull");
@@ -307,6 +311,7 @@ where
                     .as_ref()
                     .map(|s| s.snapshot_id.clone()),
                 bootstrap_snapshot_seq: reconcile.latest_snapshot.as_ref().map(|s| s.oplog_seq),
+                dead_letter_count: 0,
             });
         }
         "WAIT_SNAPSHOT" => {
@@ -327,6 +332,7 @@ where
                 needs_bootstrap: false,
                 bootstrap_snapshot_id: None,
                 bootstrap_snapshot_seq: None,
+                dead_letter_count: 0,
             });
         }
         "PULL_TAIL" => {
@@ -498,6 +504,7 @@ where
                             )
                             .await
                             .map_err(|e| e.to_string())?;
+                        let dropped = stale_key_version_event_ids.len();
                         return Ok(SyncCycleResult {
                             status: "ok".to_string(),
                             lock_version,
@@ -507,9 +514,11 @@ where
                             needs_bootstrap: false,
                             bootstrap_snapshot_id: None,
                             bootstrap_snapshot_seq: None,
+                            dead_letter_count: dropped,
                         });
                     }
 
+                    let mixed_dead_count = push_event_ids.len();
                     ports
                         .mark_outbox_dead(
                             push_event_ids,
@@ -525,7 +534,11 @@ where
                             "Key version mismatch — re-pairing required".to_string(),
                             None,
                         )
-                        .await;
+                        .await
+                        .map(|mut r| {
+                            r.dead_letter_count = mixed_dead_count;
+                            r
+                        });
                 }
 
                 let backoff = backoff_seconds(max_retry_count);
@@ -602,6 +615,7 @@ where
             needs_bootstrap: false,
             bootstrap_snapshot_id: None,
             bootstrap_snapshot_seq: None,
+            dead_letter_count: 0,
         });
     }
 
@@ -655,6 +669,7 @@ where
                                 needs_bootstrap: true,
                                 bootstrap_snapshot_id: snap_id,
                                 bootstrap_snapshot_seq: snap_seq,
+                                dead_letter_count: 0,
                             });
                         }
                     }
@@ -807,6 +822,12 @@ where
             };
             pulled_count += applied_count;
 
+            if pull_response.next_cursor < local_cursor {
+                return Err(format!(
+                    "Server returned non-monotonic cursor ({} < {})",
+                    pull_response.next_cursor, local_cursor
+                ));
+            }
             local_cursor = pull_response.next_cursor;
             ports
                 .set_cursor(local_cursor)
@@ -853,6 +874,7 @@ where
         needs_bootstrap: false,
         bootstrap_snapshot_id: None,
         bootstrap_snapshot_seq: None,
+        dead_letter_count: 0,
     })
 }
 
@@ -1600,6 +1622,7 @@ mod tests {
             needs_bootstrap: false,
             bootstrap_snapshot_id: None,
             bootstrap_snapshot_seq: None,
+            dead_letter_count: 0,
         });
 
         let result = run_ready_reconcile_state(&ports).await;
@@ -1637,6 +1660,7 @@ mod tests {
                 needs_bootstrap: false,
                 bootstrap_snapshot_id: None,
                 bootstrap_snapshot_seq: None,
+                dead_letter_count: 0,
             });
             cycle_results.push(SyncCycleResult {
                 status: "stale_cursor".to_string(),
@@ -1647,6 +1671,7 @@ mod tests {
                 needs_bootstrap: true,
                 bootstrap_snapshot_id: None,
                 bootstrap_snapshot_seq: None,
+                dead_letter_count: 0,
             });
         }
 
@@ -1682,6 +1707,7 @@ mod tests {
             needs_bootstrap: true,
             bootstrap_snapshot_id: None,
             bootstrap_snapshot_seq: None,
+            dead_letter_count: 0,
         });
 
         let result = run_ready_reconcile_state(&ports).await;
@@ -1720,6 +1746,7 @@ mod tests {
                 needs_bootstrap: true,
                 bootstrap_snapshot_id: None,
                 bootstrap_snapshot_seq: None,
+                dead_letter_count: 0,
             });
             cycle_results.push(SyncCycleResult {
                 status: "stale_cursor".to_string(),
@@ -1730,6 +1757,7 @@ mod tests {
                 needs_bootstrap: true,
                 bootstrap_snapshot_id: None,
                 bootstrap_snapshot_seq: None,
+                dead_letter_count: 0,
             });
         }
 

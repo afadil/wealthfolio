@@ -14,10 +14,6 @@ impl SqliteSyncEngineDbPorts {
     pub fn new(repository: Arc<AppSyncRepository>) -> Self {
         Self { repository }
     }
-
-    pub fn repository(&self) -> Arc<AppSyncRepository> {
-        Arc::clone(&self.repository)
-    }
 }
 
 #[async_trait]

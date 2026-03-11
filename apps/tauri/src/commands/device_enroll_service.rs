@@ -42,6 +42,10 @@ pub async fn enable_device_sync(
         .await
         .map_err(|e| e.message)?;
     clear_min_snapshot_created_at_from_store();
+    let _ = context
+        .app_sync_repository()
+        .clear_all_min_snapshot_created_at()
+        .await;
 
     if result.state == SyncState::Ready {
         let engine_context = Arc::clone(context.inner());
@@ -69,6 +73,10 @@ pub async fn clear_device_sync_data(context: State<'_, Arc<ServiceContext>>) -> 
         .map_err(|e| e.message);
     if result.is_ok() {
         clear_min_snapshot_created_at_from_store();
+        let _ = context
+            .app_sync_repository()
+            .clear_all_min_snapshot_created_at()
+            .await;
     }
     result
 }
@@ -86,6 +94,10 @@ pub async fn reinitialize_device_sync(
         .await
         .map_err(|e| e.message)?;
     clear_min_snapshot_created_at_from_store();
+    let _ = context
+        .app_sync_repository()
+        .clear_all_min_snapshot_created_at()
+        .await;
 
     if result.state == SyncState::Ready {
         let engine_context = Arc::clone(context.inner());

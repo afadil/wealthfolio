@@ -224,8 +224,15 @@ class SyncService {
     pulledCount: number;
     cursor: number;
     needsBootstrap: boolean;
+    deadLetterCount: number;
   }> {
-    return syncTriggerCycleApi();
+    const result = await syncTriggerCycleApi();
+    if (result.deadLetterCount > 0) {
+      logger.warn(
+        `[SyncService] ${result.deadLetterCount} outbox event(s) dead-lettered (key version mismatch)`,
+      );
+    }
+    return result;
   }
 
   async startBackgroundEngine(): Promise<{ status: string; message: string }> {
@@ -256,6 +263,8 @@ class SyncService {
     try {
       // Generate pairing code
       const code = await crypto.generatePairingCode();
+      // hashPairingCode is intentionally used here (not hmacSha256) — this is a
+      // lookup hash for the server to match the pairing code, not an auth proof.
       const codeHash = await crypto.hashPairingCode(code);
 
       // Generate ephemeral keypair for key exchange
@@ -355,9 +364,8 @@ class SyncService {
     // Compute SAS for verification
     const sas = await crypto.computeSAS(session.sessionKey);
 
-    // Create signature
     const signatureData = `complete:${session.pairingId}:${encryptedKeyBundle}`;
-    const signature = await crypto.hashPairingCode(signatureData);
+    const signature = await crypto.hmacSha256(session.sessionKey, signatureData);
 
     // Complete on server (server knows claimer from claim step)
     const result = await completePairingApi(session.pairingId, encryptedKeyBundle, sas, signature);
@@ -479,9 +487,8 @@ class SyncService {
       throw new SyncError(SyncErrorCodes.PAIRING_EXPIRED, "Pairing session expired");
     }
 
-    // Compute proof (HMAC of session data)
     const proofData = `confirm:${session.pairingId}:${keyBundle.keyVersion}`;
-    const proof = await crypto.hashPairingCode(proofData);
+    const proof = await crypto.hmacSha256(session.sessionKey, proofData);
 
     // Confirm with server
     const freshnessGate = minSnapshotCreatedAt ?? session.keyBundleCreatedAt;
@@ -608,36 +615,6 @@ class SyncService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // LOCAL STATE HELPERS
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  /**
-   * Get the sync identity from keychain.
-   */
-  async getIdentity(): Promise<SyncIdentity | null> {
-    return syncStorage.getIdentity();
-  }
-
-  /**
-   * Get the device ID from keychain.
-   */
-  async getDeviceId(): Promise<string | null> {
-    return syncStorage.getDeviceId();
-  }
-
-  /**
-   * Get the root key from keychain.
-   */
-  async getRootKey(): Promise<string | null> {
-    return syncStorage.getRootKey();
-  }
-
-  /**
-   * Get the key version from keychain.
-   */
-  async getKeyVersion(): Promise<number | null> {
-    return syncStorage.getKeyVersion();
-  }
 }
 
 // Export singleton instance with explicit device-sync naming.

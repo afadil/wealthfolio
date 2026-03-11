@@ -135,7 +135,7 @@ function ClaimerFlow({ onComplete, onCancel }: PairingFlowProps) {
   const [step, setStep] = useState<ClaimerStep>("enter_code");
   const [error, setError] = useState<string | null>(null);
   const [sas, setSas] = useState<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Use ref to always access latest actions (avoids stale closure in setInterval)
   const actionsRef = useRef(actions);
@@ -152,7 +152,7 @@ function ClaimerFlow({ onComplete, onCancel }: PairingFlowProps) {
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      if (pollRef.current) clearTimeout(pollRef.current);
     };
   }, []);
 
@@ -175,14 +175,13 @@ function ClaimerFlow({ onComplete, onCancel }: PairingFlowProps) {
 
     logger.info("[ClaimerFlow] Starting key bundle polling...");
 
-    pollRef.current = setInterval(async () => {
+    const poll = async () => {
       try {
         const result = await actionsRef.current.pollForKeyBundle();
         logger.info(
           `[ClaimerFlow] Poll result: received=${result.received}, hasKeyBundle=${!!result.keyBundle}`,
         );
         if (result.received && result.keyBundle) {
-          if (pollRef.current) clearInterval(pollRef.current);
           pollRef.current = null;
 
           // Auto-complete when key bundle is received
@@ -195,15 +194,18 @@ function ClaimerFlow({ onComplete, onCancel }: PairingFlowProps) {
           );
           logger.info("[ClaimerFlow] Pairing confirmed, setting success");
           setStep("success");
+        } else {
+          // Schedule next poll (2s intervals, no backoff needed for short-lived sessions)
+          pollRef.current = setTimeout(poll, 2000);
         }
       } catch (err) {
-        if (pollRef.current) clearInterval(pollRef.current);
         pollRef.current = null;
         logger.error(`[ClaimerFlow] Poll error: ${err}`);
         setError(err instanceof Error ? err.message : String(err));
         setStep("error");
       }
-    }, 2000);
+    };
+    pollRef.current = setTimeout(poll, 2000);
   }, []);
 
   // Handle code submission

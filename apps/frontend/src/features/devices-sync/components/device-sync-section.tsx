@@ -1175,7 +1175,7 @@ function DeviceCard({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-muted-foreground h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                  className="text-muted-foreground h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100"
                 >
                   <Icons.MoreVertical className="h-4 w-4" />
                   <span className="sr-only">Device actions</span>

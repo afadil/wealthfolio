@@ -26,7 +26,7 @@ export function usePairing() {
   const [error, setError] = useState<string | null>(null);
   const [sas, setSas] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Use ref to always access latest actions (avoids stale closure in setInterval)
   const actionsRef = useRef(actions);
@@ -37,7 +37,7 @@ export function usePairing() {
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      if (pollRef.current) clearTimeout(pollRef.current);
     };
   }, []);
 
@@ -69,11 +69,12 @@ export function usePairing() {
       `[usePairing] Starting poll for claimer, pairingId: ${state.pairingSession.pairingId}`,
     );
 
-    pollRef.current = setInterval(async () => {
+    const poll = async () => {
       // Check if session has expired
       const expiresAt = state.pairingSession?.expiresAt;
       if (expiresAt && new Date() > expiresAt) {
-        if (pollRef.current) clearInterval(pollRef.current);
+        if (pollRef.current) clearTimeout(pollRef.current);
+        pollRef.current = null;
         setError("Pairing session expired");
         setStep("expired");
         return;
@@ -83,21 +84,25 @@ export function usePairing() {
         const claimed = await actionsRef.current.pollForClaimerConnection();
         if (claimed) {
           logger.info("[usePairing] Claimer detected! Moving to verify_sas");
-          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = null;
           // Session is now claimed, move to SAS verification
           setStep("verify_sas");
+        } else {
+          // Schedule next poll (2s intervals, no backoff needed for short-lived sessions)
+          pollRef.current = setTimeout(poll, 2000);
         }
       } catch (err) {
         logger.error(`[usePairing] Poll error: ${err}`);
-        if (pollRef.current) clearInterval(pollRef.current);
+        pollRef.current = null;
         setError(err instanceof Error ? err.message : String(err));
         setStep("error");
       }
-    }, 2000); // Poll every 2 seconds
+    };
+    pollRef.current = setTimeout(poll, 2000);
 
     return () => {
       if (pollRef.current) {
-        clearInterval(pollRef.current);
+        clearTimeout(pollRef.current);
         pollRef.current = null;
       }
     };

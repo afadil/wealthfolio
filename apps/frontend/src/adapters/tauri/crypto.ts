@@ -45,6 +45,10 @@ export const syncHashPairingCode = async (code: string): Promise<string> => {
   return invoke<string>("sync_hash_pairing_code", { code });
 };
 
+export const syncHmacSha256 = async (key: string, data: string): Promise<string> => {
+  return invoke<string>("sync_hmac_sha256", { key, data });
+};
+
 export const syncComputeSas = async (sharedSecret: string): Promise<string> => {
   return invoke<string>("sync_compute_sas", { sharedSecret });
 };

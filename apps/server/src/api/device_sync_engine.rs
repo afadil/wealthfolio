@@ -703,20 +703,32 @@ pub async fn sync_bootstrap_snapshot_if_needed(
     let token = crate::api::connect::mint_access_token(&state)
         .await
         .map_err(|e| e.to_string())?;
-    let min_snapshot_created_at =
-        get_min_snapshot_created_at_from_store(&device_id).and_then(|value| {
-            match wealthfolio_device_sync::normalize_sync_datetime(&value) {
-                Ok(normalized) => Some(normalized),
-                Err(_) => {
-                    tracing::warn!(
-                        "[DeviceSync] Dropping invalid min snapshot freshness gate: {}",
-                        value
-                    );
-                    remove_min_snapshot_created_at_from_store(&device_id);
-                    None
-                }
+    // Check in-memory first, then fall back to SQLite (survives restart)
+    let raw_freshness_gate = get_min_snapshot_created_at_from_store(&device_id).or_else(|| {
+        state
+            .app_sync_repository
+            .get_min_snapshot_created_at(&device_id)
+            .ok()
+            .flatten()
+    });
+    let min_snapshot_created_at = match raw_freshness_gate {
+        Some(value) => match wealthfolio_device_sync::normalize_sync_datetime(&value) {
+            Ok(normalized) => Some(normalized),
+            Err(_) => {
+                tracing::warn!(
+                    "[DeviceSync] Dropping invalid min snapshot freshness gate: {}",
+                    value
+                );
+                remove_min_snapshot_created_at_from_store(&device_id);
+                let _ = state
+                    .app_sync_repository
+                    .clear_min_snapshot_created_at(device_id.clone())
+                    .await;
+                None
             }
-        });
+        },
+        None => None,
+    };
 
     let sync_state = state
         .device_enroll_service
@@ -792,7 +804,7 @@ pub async fn sync_bootstrap_snapshot_if_needed(
                 match classify_missing_snapshot_disposition(&client, &token, &device_id).await {
                     MissingSnapshotDisposition::CompleteNoBootstrap { message } => {
                         sync_repo
-                            .mark_bootstrap_complete(device_id, identity.key_version)
+                            .reset_and_mark_bootstrap_complete(device_id, identity.key_version)
                             .await
                             .map_err(|e| e.to_string())?;
                         clear_min_snapshot_created_at_from_store();
@@ -836,7 +848,7 @@ pub async fn sync_bootstrap_snapshot_if_needed(
             match classify_missing_snapshot_disposition(&client, &token, &device_id).await {
                 MissingSnapshotDisposition::CompleteNoBootstrap { message } => {
                     sync_repo
-                        .mark_bootstrap_complete(device_id, identity.key_version)
+                        .reset_and_mark_bootstrap_complete(device_id, identity.key_version)
                         .await
                         .map_err(|e| e.to_string())?;
                     clear_min_snapshot_created_at_from_store();
@@ -966,21 +978,32 @@ pub async fn sync_bootstrap_snapshot_if_needed(
             snapshot_path_str,
             tables_to_restore,
             snapshot_oplog_seq,
-            device_id,
+            device_id.clone(),
             identity.key_version,
         )
         .await;
     let _ = std::fs::remove_file(&temp_snapshot_path);
     restore_result.map_err(|e| e.to_string())?;
 
+    // Trigger portfolio recalculation so derived state is up-to-date
+    state
+        .domain_event_sink
+        .emit(DomainEvent::device_sync_pull_complete());
+
+    // Clear freshness gate from both in-memory and SQLite
+    clear_min_snapshot_created_at_from_store();
+    if let Err(err) = sync_repo.clear_min_snapshot_created_at(device_id).await {
+        tracing::warn!(
+            "[DeviceSync] Failed to clear freshness gate from SQLite: {}",
+            err
+        );
+    }
+
     Ok(SyncBootstrapResult {
         status: "applied".to_string(),
         message: "Snapshot bootstrap completed".to_string(),
         snapshot_id: Some(snapshot_id),
         cursor: Some(snapshot_oplog_seq),
-    })
-    .inspect(|_| {
-        clear_min_snapshot_created_at_from_store();
     })
 }
 

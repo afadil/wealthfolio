@@ -368,4 +368,5 @@ export {
   syncGeneratePairingCode,
   syncGenerateRootKey,
   syncHashPairingCode,
+  syncHmacSha256,
 } from "./crypto";

@@ -52,7 +52,9 @@ export function useAggregatedSyncStatus() {
   }, [userInfo]);
 
   const status = useMemo<AggregatedSyncStatus>(() => {
-    if (!isEnabled || !showBrokerSync) return "not_connected";
+    if (!isEnabled) return "not_connected";
+    if (!isConnected || !hasSubscription) return "not_connected";
+    if (!showBrokerSync) return "idle";
     return determineAggregatedStatus(isConnected, hasSubscription, syncStates);
   }, [isEnabled, showBrokerSync, isConnected, hasSubscription, syncStates]);
 

@@ -201,4 +201,5 @@ export {
   syncHashPairingCode,
   syncComputeSas,
   syncGenerateDeviceId,
+  syncHmacSha256,
 } from "./crypto";

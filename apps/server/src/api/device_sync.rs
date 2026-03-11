@@ -629,7 +629,18 @@ async fn confirm_pairing_endpoint(
                             &normalized,
                         ) {
                             warn!(
-                                "[DeviceSync] Failed to persist min snapshot freshness gate after confirm_pairing: {}",
+                                "[DeviceSync] Failed to set in-memory freshness gate after confirm_pairing: {}",
+                                err
+                            );
+                        }
+                        // Persist to SQLite so the gate survives process restarts
+                        if let Err(err) = state
+                            .app_sync_repository
+                            .set_min_snapshot_created_at(device_id.clone(), normalized)
+                            .await
+                        {
+                            warn!(
+                                "[DeviceSync] Failed to persist freshness gate to SQLite: {}",
                                 err
                             );
                         }

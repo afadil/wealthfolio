@@ -210,6 +210,7 @@ pub struct SyncCycleResult {
     pub needs_bootstrap: bool,
     pub bootstrap_snapshot_id: Option<String>,
     pub bootstrap_snapshot_seq: Option<i64>,
+    pub dead_letter_count: usize,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -305,6 +306,7 @@ impl shared_sync_engine::ReadyReconcileStore for TauriReadyReconcileRunner {
             needs_bootstrap: result.needs_bootstrap,
             bootstrap_snapshot_id: result.bootstrap_snapshot_id,
             bootstrap_snapshot_seq: result.bootstrap_snapshot_seq,
+            dead_letter_count: result.dead_letter_count,
         })
     }
 
@@ -734,7 +736,6 @@ pub async fn reset_team_sync(
 // Engine Status & Tauri Command Wrappers
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[tauri::command]
 pub async fn sync_engine_status(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<SyncEngineStatusResult, String> {
@@ -803,7 +804,6 @@ pub async fn device_sync_bootstrap_overwrite_check(
     })
 }
 
-#[tauri::command]
 pub async fn sync_trigger_cycle(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<SyncCycleResult, String> {
@@ -1132,6 +1132,17 @@ pub async fn confirm_pairing(
                 match wealthfolio_device_sync::normalize_sync_datetime(min_created_at) {
                     Ok(normalized) => {
                         set_min_snapshot_created_at_in_store(&device_id, &normalized);
+                        // Persist to SQLite so the gate survives process restarts
+                        if let Err(err) = state
+                            .app_sync_repository()
+                            .set_min_snapshot_created_at(device_id.clone(), normalized)
+                            .await
+                        {
+                            log::warn!(
+                                "[DeviceSync] Failed to persist freshness gate to SQLite: {}",
+                                err
+                            );
+                        }
                     }
                     Err(err) => {
                         log::warn!(

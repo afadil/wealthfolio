@@ -58,6 +58,7 @@ const cryptoMocks = vi.hoisted(() => ({
   encrypt: vi.fn(),
   decrypt: vi.fn(),
   computeSAS: vi.fn(),
+  hmacSha256: vi.fn(),
 }));
 
 vi.mock("@/adapters", () => adapterMocks);
@@ -119,7 +120,7 @@ describe("syncService pairing remote seed status", () => {
       keyVersion: 8,
     };
 
-    cryptoMocks.hashPairingCode.mockResolvedValue("proof");
+    cryptoMocks.hmacSha256.mockResolvedValue("proof");
     adapterMocks.confirmPairing.mockResolvedValue({
       success: true,
       keyVersion: 8,

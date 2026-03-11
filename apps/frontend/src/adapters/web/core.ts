@@ -1234,6 +1234,7 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     headers,
     body,
     credentials: "same-origin",
+    signal: AbortSignal.timeout(120_000),
   });
 
   // 401 = app auth failure (JWT expired/invalid). Cloud auth failures return 403.

@@ -310,22 +310,16 @@ impl DeviceEnrollService {
     /// 4. Save all credentials to secret store
     pub async fn enable_sync(&self) -> Result<EnableSyncResult, EnrollServiceError> {
         let _guard = enroll_operation_lock().lock().await;
-        self.enable_sync_inner(false).await
+        self.enable_sync_inner().await
     }
 
-    async fn enable_sync_inner(
-        &self,
-        _allow_orphaned_auto_recover: bool,
-    ) -> Result<EnableSyncResult, EnrollServiceError> {
+    async fn enable_sync_inner(&self) -> Result<EnableSyncResult, EnrollServiceError> {
         info!("[DeviceEnrollService] Enabling sync...");
 
         let mut existing_identity = self.read_identity()?;
         let device_nonce = self.ensure_device_nonce(&mut existing_identity)?;
         let token = self.get_access_token()?;
-        if let Some(result) = self
-            .try_resume_existing_sync(&token, &existing_identity)
-            .await?
-        {
+        if let Some(result) = self.try_resume_existing_sync(&existing_identity).await? {
             return Ok(result);
         }
 
@@ -441,7 +435,7 @@ impl DeviceEnrollService {
             ..Default::default()
         })?;
 
-        self.enable_sync_inner(false).await
+        self.enable_sync_inner().await
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -501,9 +495,11 @@ impl DeviceEnrollService {
         let device_key_envelope = crypto::encrypt(&envelope_key, &root_key)
             .map_err(|e| format!("Failed to create device key envelope: {}", e))?;
 
-        // Create signature (raw hash, no normalization)
+        // HMAC-keyed with root_key for cryptographic binding. The cloud API currently
+        // ignores this field, but the signature is ready for server-side enforcement.
         let signature_data = format!("{}:{}:{}", challenge, key_version, device_key_envelope);
-        let signature = crypto::hash_sha256(&signature_data);
+        let signature = crypto::hmac_sha256(&root_key, &signature_data)
+            .map_err(|e| format!("Failed to compute bootstrap signature: {}", e))?;
 
         // Create challenge response (raw hash, no normalization)
         let challenge_response_data = format!("{}:{}", challenge, nonce);
@@ -616,7 +612,6 @@ impl DeviceEnrollService {
 
     async fn try_resume_existing_sync(
         &self,
-        _token: &str,
         identity: &SyncIdentity,
     ) -> Result<Option<EnableSyncResult>, EnrollServiceError> {
         if identity.device_id.is_none() {

@@ -407,7 +407,7 @@ fn resolve_payload_key_version(conn: &mut SqliteConnection, requested_version: i
     let maybe_row = sync_device_config::table
         .filter(sync_device_config::trust_state.eq("trusted"))
         .filter(sync_device_config::key_version.is_not_null())
-        .order(sync_device_config::key_version.desc())
+        .order(sync_device_config::last_bootstrap_at.desc())
         .first::<SyncDeviceConfigDB>(conn)
         .optional()
         .map_err(StorageError::from)?;
@@ -421,6 +421,7 @@ fn resolve_payload_key_version(conn: &mut SqliteConnection, requested_version: i
 fn resolve_local_device_id(conn: &mut SqliteConnection) -> Option<String> {
     sync_device_config::table
         .filter(sync_device_config::trust_state.eq("trusted"))
+        .order(sync_device_config::last_bootstrap_at.desc())
         .select(sync_device_config::device_id)
         .first::<String>(conn)
         .optional()
@@ -800,6 +801,7 @@ impl AppSyncRepository {
                     key_version: key_version_value,
                     trust_state: trust_state_value.clone(),
                     last_bootstrap_at: None,
+                    min_snapshot_created_at: None,
                 };
 
                 diesel::insert_into(sync_device_config::table)
@@ -818,7 +820,7 @@ impl AppSyncRepository {
             .await
     }
 
-    pub async fn mark_bootstrap_complete(
+    pub async fn reset_and_mark_bootstrap_complete(
         &self,
         device_id_value: String,
         key_version_value: Option<i32>,
@@ -827,12 +829,38 @@ impl AppSyncRepository {
             .exec(move |conn| {
                 let now = Utc::now().to_rfc3339();
 
+                // Clear stale control-plane state so outbox events / metadata from a
+                // previous sync session never leak into the new baseline.  When called
+                // after `restore_snapshot_tables_from_file` these tables are already
+                // empty, so the deletes are harmless no-ops.
+                diesel::delete(sync_outbox::table)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                diesel::delete(sync_entity_metadata::table)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                diesel::delete(sync_applied_events::table)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                diesel::delete(sync_table_state::table)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                // Remove stale device config rows from previous enrollment cycles so
+                // resolve_payload_key_version never picks an outdated key_version.
+                diesel::delete(
+                    sync_device_config::table
+                        .filter(sync_device_config::device_id.ne(&device_id_value)),
+                )
+                .execute(conn)
+                .map_err(StorageError::from)?;
+
                 diesel::insert_into(sync_device_config::table)
                     .values(SyncDeviceConfigDB {
                         device_id: device_id_value.clone(),
                         key_version: key_version_value,
                         trust_state: "trusted".to_string(),
                         last_bootstrap_at: Some(now.clone()),
+                        min_snapshot_created_at: None,
                     })
                     .on_conflict(sync_device_config::device_id)
                     .do_update()
@@ -840,10 +868,80 @@ impl AppSyncRepository {
                         sync_device_config::key_version.eq(key_version_value),
                         sync_device_config::trust_state.eq("trusted"),
                         sync_device_config::last_bootstrap_at.eq(Some(now.clone())),
+                        sync_device_config::min_snapshot_created_at.eq(None::<String>),
                     ))
                     .execute(conn)
                     .map_err(StorageError::from)?;
 
+                Ok(())
+            })
+            .await
+    }
+
+    /// Persist the bootstrap freshness gate for a device.
+    /// Uses upsert so the gate is stored even if no device_config row exists yet.
+    pub async fn set_min_snapshot_created_at(
+        &self,
+        device_id_value: String,
+        value: String,
+    ) -> Result<()> {
+        self.writer
+            .exec(move |conn| {
+                diesel::insert_into(sync_device_config::table)
+                    .values(SyncDeviceConfigDB {
+                        device_id: device_id_value.clone(),
+                        key_version: None,
+                        trust_state: "untrusted".to_string(),
+                        last_bootstrap_at: None,
+                        min_snapshot_created_at: Some(value.clone()),
+                    })
+                    .on_conflict(sync_device_config::device_id)
+                    .do_update()
+                    .set(sync_device_config::min_snapshot_created_at.eq(Some(&value)))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                Ok(())
+            })
+            .await
+    }
+
+    /// Read the bootstrap freshness gate for a device.
+    pub fn get_min_snapshot_created_at(&self, device_id_value: &str) -> Result<Option<String>> {
+        let mut conn = get_connection(&self.pool)?;
+        let row = sync_device_config::table
+            .filter(sync_device_config::device_id.eq(device_id_value))
+            .select(sync_device_config::min_snapshot_created_at)
+            .first::<Option<String>>(&mut conn)
+            .optional()
+            .map_err(StorageError::from)?;
+        Ok(row.flatten())
+    }
+
+    /// Clear the bootstrap freshness gate for ALL devices.
+    /// Used during logout/reset/reinitialize flows.
+    pub async fn clear_all_min_snapshot_created_at(&self) -> Result<()> {
+        self.writer
+            .exec(move |conn| {
+                diesel::update(sync_device_config::table)
+                    .set(sync_device_config::min_snapshot_created_at.eq(None::<String>))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                Ok(())
+            })
+            .await
+    }
+
+    /// Clear the bootstrap freshness gate for a device.
+    pub async fn clear_min_snapshot_created_at(&self, device_id_value: String) -> Result<()> {
+        self.writer
+            .exec(move |conn| {
+                diesel::update(
+                    sync_device_config::table
+                        .filter(sync_device_config::device_id.eq(&device_id_value)),
+                )
+                .set(sync_device_config::min_snapshot_created_at.eq(None::<String>))
+                .execute(conn)
+                .map_err(StorageError::from)?;
                 Ok(())
             })
             .await
@@ -1131,7 +1229,7 @@ impl AppSyncRepository {
                         last_error: None,
                         consecutive_failures: 0,
                         next_retry_at: None,
-                        last_cycle_status: Some("ok".to_string()),
+                        last_cycle_status: None,
                         last_cycle_duration_ms: None,
                     })
                     .on_conflict(sync_engine_state::id)
@@ -1141,7 +1239,6 @@ impl AppSyncRepository {
                         sync_engine_state::last_error.eq::<Option<String>>(None),
                         sync_engine_state::consecutive_failures.eq(0),
                         sync_engine_state::next_retry_at.eq::<Option<String>>(None),
-                        sync_engine_state::last_cycle_status.eq(Some("ok")),
                     ))
                     .execute(conn)
                     .map_err(StorageError::from)?;
@@ -1163,7 +1260,7 @@ impl AppSyncRepository {
                         last_error: None,
                         consecutive_failures: 0,
                         next_retry_at: None,
-                        last_cycle_status: Some("ok".to_string()),
+                        last_cycle_status: None,
                         last_cycle_duration_ms: None,
                     })
                     .on_conflict(sync_engine_state::id)
@@ -1173,7 +1270,6 @@ impl AppSyncRepository {
                         sync_engine_state::last_error.eq::<Option<String>>(None),
                         sync_engine_state::consecutive_failures.eq(0),
                         sync_engine_state::next_retry_at.eq::<Option<String>>(None),
-                        sync_engine_state::last_cycle_status.eq(Some("ok")),
                     ))
                     .execute(conn)
                     .map_err(StorageError::from)?;
@@ -1491,6 +1587,14 @@ impl AppSyncRepository {
                     diesel::delete(sync_table_state::table)
                         .execute(conn)
                         .map_err(StorageError::from)?;
+                    // Remove stale device config rows from previous enrollment cycles so
+                    // resolve_payload_key_version never picks an outdated key_version.
+                    diesel::delete(
+                        sync_device_config::table
+                            .filter(sync_device_config::device_id.ne(&device_id_value)),
+                    )
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
 
                     for table in &table_set {
                         let target_columns = load_table_columns(conn, "main", table)?;
@@ -1565,6 +1669,7 @@ impl AppSyncRepository {
                             key_version: key_version_value,
                             trust_state: "trusted".to_string(),
                             last_bootstrap_at: Some(now.clone()),
+                            min_snapshot_created_at: None,
                         })
                         .on_conflict(sync_device_config::device_id)
                         .do_update()
@@ -1905,7 +2010,7 @@ mod tests {
         let (pool, writer) = setup_db();
         let repo = AppSyncRepository::new(pool, writer);
 
-        repo.mark_bootstrap_complete("device-1".to_string(), Some(1))
+        repo.reset_and_mark_bootstrap_complete("device-1".to_string(), Some(1))
             .await
             .expect("mark bootstrap complete");
         assert!(
