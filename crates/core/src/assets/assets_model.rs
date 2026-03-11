@@ -1010,7 +1010,12 @@ pub fn canonicalize_market_identity(
                 // Auto-convert 9-char CUSIPs to 12-char ISINs for proper
                 // provider routing (US_TREASURY_CALC, BOERSE_FRANKFURT).
                 instrument_symbol = Some(if crate::utils::cusip::looks_like_cusip(&upper) {
-                    crate::utils::cusip::cusip_to_isin(&upper, "US")
+                    let country = match normalized_quote.as_deref() {
+                        Some("CAD") => "CA",
+                        Some("BMD") => "BM",
+                        _ => "US",
+                    };
+                    crate::utils::cusip::cusip_to_isin(&upper, country)
                 } else {
                     upper
                 });
@@ -1205,5 +1210,42 @@ mod tests {
 
         let sym = result.instrument_symbol.expect("should have symbol");
         assert_eq!(sym, "US912797NQ65", "ISIN should pass through unchanged");
+    }
+
+    #[test]
+    fn test_canonicalize_market_identity_cusip_to_isin_canadian() {
+        // Canadian bond CUSIP should produce a CA-prefixed ISIN
+        let result = canonicalize_market_identity(
+            Some(InstrumentType::Bond),
+            Some("135087D26"),
+            None,
+            Some("CAD"),
+        );
+
+        let sym = result.instrument_symbol.expect("should have symbol");
+        assert_eq!(sym.len(), 12, "CUSIP should be converted to 12-char ISIN");
+        assert!(
+            sym.starts_with("CA"),
+            "Canadian bond ISIN should start with CA, got {}",
+            sym
+        );
+    }
+
+    #[test]
+    fn test_canonicalize_market_identity_cusip_defaults_to_us() {
+        // When no currency is provided, CUSIP should default to US
+        let result = canonicalize_market_identity(
+            Some(InstrumentType::Bond),
+            Some("912797NQ6"),
+            None,
+            None,
+        );
+
+        let sym = result.instrument_symbol.expect("should have symbol");
+        assert!(
+            sym.starts_with("US"),
+            "CUSIP with no currency should default to US, got {}",
+            sym
+        );
     }
 }

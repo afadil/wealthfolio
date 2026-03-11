@@ -92,4 +92,3 @@ db/
 apps/db/
 apps/tauri/db/
 tasks
-wf.sh

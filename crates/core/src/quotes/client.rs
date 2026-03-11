@@ -357,19 +357,20 @@ impl MarketDataClient {
         // Preferred provider from asset
         let preferred_provider: Option<ProviderId> = asset.preferred_provider().map(Cow::Owned);
 
-        // Convert bond spec to market-data BondQuoteMetadata when available
-        let bond_metadata = asset.bond_spec().and_then(|spec| {
-            // coupon_rate defaults to 0 for zero-coupon instruments (T-bills).
-            // maturity_date is still required — without it we can't price.
-            Some(BondQuoteMetadata {
+        // Convert bond spec to market-data BondQuoteMetadata when available.
+        // coupon_rate defaults to 0 for zero-coupon instruments (T-bills).
+        // maturity_date is still required — without it we can't price.
+        let bond_metadata = match asset.bond_spec() {
+            Some(spec) if spec.maturity_date.is_some() => Some(BondQuoteMetadata {
                 coupon_rate: spec.coupon_rate.unwrap_or(rust_decimal::Decimal::ZERO),
-                maturity_date: spec.maturity_date?,
+                maturity_date: spec.maturity_date.unwrap(),
                 face_value: spec.face_value.unwrap_or(rust_decimal::Decimal::from(1000)),
                 coupon_frequency: spec
                     .coupon_frequency
                     .unwrap_or_else(|| "SEMI_ANNUAL".to_string()),
-            })
-        });
+            }),
+            _ => None,
+        };
 
         Ok(QuoteContext {
             instrument,
