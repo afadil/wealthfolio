@@ -87,14 +87,15 @@ impl ActivityService {
 
     fn parse_instrument_type(value: Option<&str>) -> Option<InstrumentType> {
         match value?.trim().to_uppercase().as_str() {
-            "EQUITY" | "STOCK" | "ETF" | "MUTUALFUND" | "MUTUAL_FUND" | "INDEX" => {
-                Some(InstrumentType::Equity)
-            }
+            "EQUITY" | "STOCK" | "ETF" | "MUTUALFUND" | "MUTUAL_FUND" | "INDEX" | "FUTURE"
+            | "FUTURES" => Some(InstrumentType::Equity),
             "CRYPTO" | "CRYPTOCURRENCY" => Some(InstrumentType::Crypto),
             "FX" | "FOREX" | "CURRENCY" => Some(InstrumentType::Fx),
             "OPTION" => Some(InstrumentType::Option),
             "METAL" | "COMMODITY" => Some(InstrumentType::Metal),
-            "BOND" | "FIXEDINCOME" | "FIXED_INCOME" | "DEBT" => Some(InstrumentType::Bond),
+            "BOND" | "FIXEDINCOME" | "FIXED_INCOME" | "DEBT" | "MONEYMARKET" => {
+                Some(InstrumentType::Bond)
+            }
             _ => None,
         }
     }

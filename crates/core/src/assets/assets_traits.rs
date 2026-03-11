@@ -152,7 +152,13 @@ pub trait AssetServiceTrait: Send + Sync {
             .into());
         }
 
-        if is_equity && !is_manual_quote && exchange_mic.is_none() && symbol_id.is_none() {
+        let is_futures_symbol = symbol.contains("=F");
+        if is_equity
+            && !is_futures_symbol
+            && !is_manual_quote
+            && exchange_mic.is_none()
+            && symbol_id.is_none()
+        {
             let has_existing_without_mic = self.get_assets().ok().is_some_and(|assets| {
                 let upper_symbol = symbol.to_uppercase();
                 assets.into_iter().any(|asset| {
