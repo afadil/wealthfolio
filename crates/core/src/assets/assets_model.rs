@@ -449,10 +449,16 @@ impl Asset {
                 base: Cow::Owned(symbol.clone()),
                 quote: Cow::Owned(self.quote_ccy.clone()),
             }),
-            InstrumentType::Metal => Some(InstrumentId::Metal {
-                code: Arc::from(symbol.as_str()),
-                quote: Cow::Owned(self.quote_ccy.clone()),
-            }),
+            InstrumentType::Metal => {
+                // Strip weight suffix (e.g. "XAU-500G" → "XAU") so price
+                // providers receive the base metal code. Weight conversion
+                // is handled separately by metal_weight_oz().
+                let base_code = symbol.split('-').next().unwrap_or(symbol);
+                Some(InstrumentId::Metal {
+                    code: Arc::from(base_code),
+                    quote: Cow::Owned(self.quote_ccy.clone()),
+                })
+            }
             InstrumentType::Option => {
                 // OCC symbol is stored as instrument_symbol
                 Some(InstrumentId::Option {
@@ -1234,12 +1240,8 @@ mod tests {
     #[test]
     fn test_canonicalize_market_identity_cusip_defaults_to_us() {
         // When no currency is provided, CUSIP should default to US
-        let result = canonicalize_market_identity(
-            Some(InstrumentType::Bond),
-            Some("912797NQ6"),
-            None,
-            None,
-        );
+        let result =
+            canonicalize_market_identity(Some(InstrumentType::Bond), Some("912797NQ6"), None, None);
 
         let sym = result.instrument_symbol.expect("should have symbol");
         assert!(
