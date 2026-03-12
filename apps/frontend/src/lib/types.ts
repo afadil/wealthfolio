@@ -819,6 +819,20 @@ export interface PerformanceMetrics {
   isHoldingsMode?: boolean;
 }
 
+export interface NewAsset {
+  id?: string;
+  kind: string;
+  name?: string;
+  displayCode?: string;
+  isActive: boolean;
+  quoteMode: string;
+  quoteCcy: string;
+  instrumentType?: string;
+  instrumentSymbol?: string;
+  instrumentExchangeMic?: string;
+  notes?: string;
+}
+
 export interface UpdateAssetProfile {
   id: string;
   displayCode?: string | null;
@@ -827,6 +841,7 @@ export interface UpdateAssetProfile {
   kind?: AssetKind | null;
   quoteMode?: QuoteMode | null;
   quoteCcy?: string | null;
+  instrumentType?: string | null;
   instrumentExchangeMic?: string | null;
   providerConfig?: Record<string, unknown> | null;
 }

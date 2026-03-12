@@ -334,6 +334,7 @@ pub fn run() {
             commands::asset::update_asset_profile,
             commands::asset::update_quote_mode,
             commands::asset::delete_asset,
+            commands::asset::create_asset,
             // Alternative asset commands
             commands::alternative_assets::create_alternative_asset,
             commands::alternative_assets::update_alternative_asset_valuation,
