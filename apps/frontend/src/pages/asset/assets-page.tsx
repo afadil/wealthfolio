@@ -11,6 +11,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@wealthfolio/ui/components/ui/alert-dialog";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { RefreshQuotesConfirmDialog } from "./refresh-quotes-confirm-dialog";
 
 import { useHoldings } from "@/hooks/use-holdings";
@@ -22,13 +24,14 @@ import { AssetEditSheet } from "./asset-edit-sheet";
 import { ParsedAsset, toParsedAsset } from "./asset-utils";
 import { AssetsTable } from "./assets-table";
 import { AssetsTableMobile } from "./assets-table-mobile";
+import { CreateSecurityDialog } from "./create-security-dialog";
 import { useAssetManagement } from "./hooks/use-asset-management";
 import { useAssets } from "./hooks/use-assets";
 import { useLatestQuotes } from "./hooks/use-latest-quotes";
 
 export default function AssetsPage() {
   const { assets, isLoading } = useAssets();
-  const { deleteAssetMutation } = useAssetManagement();
+  const { createAssetMutation, deleteAssetMutation } = useAssetManagement();
   const refetchQuotesMutation = useSyncMarketDataMutation(true);
   const updateQuotesMutation = useSyncMarketDataMutation(false);
   const isMobileViewport = useIsMobileViewport();
@@ -48,6 +51,7 @@ export default function AssetsPage() {
   const assetIds = useMemo(() => parsedAssets.map((asset) => asset.id), [parsedAssets]);
   const { data: latestQuotes = {}, isLoading: isQuotesLoading } = useLatestQuotes(assetIds);
 
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<ParsedAsset | null>(null);
   const [assetPendingDelete, setAssetPendingDelete] = useState<ParsedAsset | null>(null);
   const [assetPendingRefetch, setAssetPendingRefetch] = useState<ParsedAsset | null>(null);
@@ -63,7 +67,12 @@ export default function AssetsPage() {
       <SettingsHeader
         heading="Securities"
         text="Browse and manage the securities available in your portfolio."
-      />
+      >
+        <Button onClick={() => setCreateDialogOpen(true)} size="sm">
+          <Icons.Plus className="mr-2 h-4 w-4" />
+          Add Security
+        </Button>
+      </SettingsHeader>
       <Separator />
       <div className="w-full">
         {isMobileViewport ? (
@@ -148,6 +157,17 @@ export default function AssetsPage() {
           setAssetPendingRefetch(null);
         }}
         assetName={assetPendingRefetch?.displayCode ?? assetPendingRefetch?.name ?? undefined}
+      />
+
+      <CreateSecurityDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        onSubmit={(payload) => {
+          createAssetMutation.mutate(payload, {
+            onSuccess: () => setCreateDialogOpen(false),
+          });
+        }}
+        isPending={createAssetMutation.isPending}
       />
     </div>
   );

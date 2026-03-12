@@ -47,6 +47,8 @@ interface SearchProps {
   quoteInfo?: QuoteInfo;
   /** Called when the user clears the selection */
   onClear?: () => void;
+  /** Hide the "Create custom (manual)" option in search results */
+  hideCustomCreate?: boolean;
   /** Test ID for e2e testing */
   "data-testid"?: string;
 }
@@ -59,6 +61,7 @@ interface SearchResultsProps {
   selectedResult: SearchProps["selectedResult"];
   onSelect: (symbol: SymbolSearchResult) => void;
   onCreateCustomAsset: () => void;
+  hideCustomCreate?: boolean;
 }
 
 function getSearchResultKey(result: SymbolSearchResult) {
@@ -81,6 +84,7 @@ const SearchResults = memo(
     selectedResult,
     onSelect,
     onCreateCustomAsset,
+    hideCustomCreate,
   }: SearchResultsProps) => {
     const hasResults = results && results.length > 0;
     const showNoResults = !isLoading && !hasResults && query.length > 1;
@@ -137,8 +141,8 @@ const SearchResults = memo(
             );
           })}
 
-        {/* Create custom asset option - always visible */}
-        {!isLoading && (
+        {/* Create custom asset option - always visible unless hidden */}
+        {!isLoading && !hideCustomCreate && (
           <>
             {hasResults && <CommandSeparator />}
             <CommandItem
@@ -210,6 +214,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       selectedExchangeMic,
       quoteInfo,
       onClear,
+      hideCustomCreate,
       "data-testid": testId,
     },
     ref,
@@ -540,6 +545,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
                 selectedResult={selectedResult}
                 onSelect={handleSelectResult}
                 onCreateCustomAsset={handleCreateCustomAsset}
+                hideCustomCreate={hideCustomCreate}
               />
             </Command>
           </PopoverContent>

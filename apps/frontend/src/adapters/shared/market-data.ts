@@ -4,6 +4,7 @@ import type {
   Asset,
   Quote,
   LatestQuoteSnapshot,
+  NewAsset,
   UpdateAssetProfile,
   MarketDataProviderInfo,
   ExchangeInfo,
@@ -66,6 +67,15 @@ export const updateAssetProfile = async (payload: UpdateAssetProfile): Promise<A
     return await invoke<Asset>("update_asset_profile", { id: payload.id, payload });
   } catch (error) {
     logger.error("Error updating asset profile.");
+    throw error;
+  }
+};
+
+export const createAsset = async (payload: NewAsset): Promise<Asset> => {
+  try {
+    return await invoke<Asset>("create_asset", { payload });
+  } catch (error) {
+    logger.error("Error creating asset.");
     throw error;
   }
 };

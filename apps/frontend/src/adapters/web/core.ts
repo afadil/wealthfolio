@@ -85,6 +85,7 @@ export const COMMANDS: CommandMap = {
   calculate_deposits_for_contribution_limit: { method: "GET", path: "/limits" },
   // Asset profile
   get_assets: { method: "GET", path: "/assets" },
+  create_asset: { method: "POST", path: "/assets" },
   delete_asset: { method: "DELETE", path: "/assets" },
   get_asset_profile: { method: "GET", path: "/assets/profile" },
   update_asset_profile: { method: "PUT", path: "/assets/profile" },
@@ -578,6 +579,11 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "delete_contribution_limit": {
       const { id } = payload as { id: string };
       url += `/${encodeURIComponent(id)}`;
+      break;
+    }
+    case "create_asset": {
+      const { payload: assetPayload } = payload as { payload: Record<string, unknown> };
+      body = JSON.stringify(assetPayload);
       break;
     }
     case "delete_asset": {

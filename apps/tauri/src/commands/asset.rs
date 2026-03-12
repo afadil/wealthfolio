@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::context::ServiceContext;
 use tauri::State;
-use wealthfolio_core::assets::{Asset, UpdateAssetProfile};
+use wealthfolio_core::assets::{Asset, NewAsset, UpdateAssetProfile};
 
 #[tauri::command]
 pub async fn get_asset_profile(
@@ -45,6 +45,18 @@ pub async fn update_quote_mode(
     state
         .asset_service()
         .update_quote_mode(&id, &quote_mode)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn create_asset(
+    payload: NewAsset,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Asset, String> {
+    state
+        .asset_service()
+        .create_asset(payload)
         .await
         .map_err(|e| e.to_string())
 }

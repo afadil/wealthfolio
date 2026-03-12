@@ -4,7 +4,6 @@ import { SingleSelectTaxonomy } from "@/components/classification/single-select-
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { useMarketDataProviders } from "@/hooks/use-market-data-providers";
 import { useTaxonomies } from "@/hooks/use-taxonomies";
-import { ASSET_KIND_DISPLAY_NAMES, type AssetKind, EDITABLE_ASSET_KINDS } from "@/lib/constants";
 import type { Asset, Quote } from "@/lib/types";
 import { formatAmount } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -39,6 +38,13 @@ import {
 } from "@wealthfolio/ui/components/ui/form";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Input } from "@wealthfolio/ui/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@wealthfolio/ui/components/ui/select";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
@@ -81,7 +87,7 @@ type QuoteMode = (typeof QuoteMode)[keyof typeof QuoteMode];
 const assetFormSchema = z.object({
   name: z.string().optional(),
   notes: z.string().optional(),
-  kind: z.string().optional(),
+  instrumentType: z.string().optional(),
   quoteCcy: z.string().min(1, "Currency is required"),
   instrumentExchangeMic: z.string().optional(),
   quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]),
@@ -94,11 +100,13 @@ type ProviderOverride = z.infer<typeof providerOverrideSchema>;
 
 const normalizeMic = (mic?: string | null): string => mic?.trim().toUpperCase() ?? "";
 
-// Convert asset kind options from constants
-const kindOptions: ResponsiveSelectOption[] = EDITABLE_ASSET_KINDS.map((kind) => ({
-  label: ASSET_KIND_DISPLAY_NAMES[kind],
-  value: kind,
-}));
+const EDIT_INSTRUMENT_TYPE_OPTIONS = [
+  { value: "EQUITY", label: "Equity (Stock, ETF, Fund)" },
+  { value: "CRYPTO", label: "Cryptocurrency" },
+  { value: "BOND", label: "Bond" },
+  { value: "OPTION", label: "Option" },
+  { value: "METAL", label: "Precious Metal" },
+] as const;
 
 // Parse provider overrides from config JSON (supports nested and flat formats)
 function parseProviderOverrides(
@@ -300,7 +308,7 @@ export function AssetEditSheet({
     defaultValues: {
       name: asset?.name ?? "",
       notes: asset?.notes ?? "",
-      kind: asset?.kind ?? "INVESTMENT",
+      instrumentType: asset?.instrumentType ?? "",
       quoteCcy: asset?.quoteCcy ?? "",
       instrumentExchangeMic: normalizeMic(asset?.instrumentExchangeMic),
       quoteMode: asset?.quoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
@@ -328,7 +336,7 @@ export function AssetEditSheet({
       form.reset({
         name: asset.name ?? "",
         notes: asset.notes ?? "",
-        kind: asset.kind ?? "INVESTMENT",
+        instrumentType: asset.instrumentType ?? "",
         quoteCcy: asset.quoteCcy ?? "",
         instrumentExchangeMic: normalizeMic(asset.instrumentExchangeMic),
         quoteMode: asset.quoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
@@ -354,11 +362,10 @@ export function AssetEditSheet({
       if (!asset) return;
 
       // Serialize provider config to nested JSON format
-      const assetKind = values.kind ?? asset.kind ?? "INVESTMENT";
       const serializedOverrides = serializeProviderConfig(
         values.preferredProvider,
         values.providerConfig ?? [],
-        assetKind,
+        asset.kind ?? "INVESTMENT",
       );
       const normalizedMic = normalizeMic(values.instrumentExchangeMic);
 
@@ -369,7 +376,7 @@ export function AssetEditSheet({
           displayCode: asset.displayCode,
           name: values.name || "",
           notes: values.notes ?? "",
-          kind: values.kind as AssetKind | undefined,
+          instrumentType: values.instrumentType || null,
           quoteMode: values.quoteMode,
           quoteCcy: values.quoteCcy,
           instrumentExchangeMic: normalizedMic || null,
@@ -554,26 +561,32 @@ export function AssetEditSheet({
                         )}
                       />
 
-                      {/* Asset Type and Exchange */}
+                      {/* Instrument Type and Exchange */}
                       <div className="grid gap-4 md:grid-cols-2">
                         <FormField
                           control={form.control}
-                          name="kind"
+                          name="instrumentType"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Asset Type</FormLabel>
-                              <FormControl>
-                                <ResponsiveSelect
-                                  value={field.value ?? "INVESTMENT"}
-                                  onValueChange={field.onChange}
-                                  options={kindOptions}
-                                  placeholder="Select type"
-                                  sheetTitle="Asset Type"
-                                  sheetDescription="Select the type of asset"
-                                  disabled={isSystemManagedKind}
-                                  triggerClassName="h-11"
-                                />
-                              </FormControl>
+                              <FormLabel>Instrument Type</FormLabel>
+                              <Select
+                                onValueChange={field.onChange}
+                                value={field.value ?? ""}
+                                disabled={isSystemManagedKind}
+                              >
+                                <FormControl>
+                                  <SelectTrigger className="h-11">
+                                    <SelectValue placeholder="Select type" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {EDIT_INSTRUMENT_TYPE_OPTIONS.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                      {option.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                               <FormMessage />
                             </FormItem>
                           )}
