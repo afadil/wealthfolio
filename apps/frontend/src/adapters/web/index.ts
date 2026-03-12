@@ -147,6 +147,7 @@ export {
 // Market Data Commands
 export {
   checkQuotesImport,
+  createAsset,
   deleteAsset,
   deleteQuote,
   fetchYahooDividends,

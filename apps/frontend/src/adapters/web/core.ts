@@ -581,6 +581,11 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       url += `/${encodeURIComponent(id)}`;
       break;
     }
+    case "create_asset": {
+      const { payload: assetPayload } = payload as { payload: Record<string, unknown> };
+      body = JSON.stringify(assetPayload);
+      break;
+    }
     case "delete_asset": {
       const { id } = payload as { id: string };
       url += `/${encodeURIComponent(id)}`;
