@@ -149,8 +149,17 @@ pub fn build_asset_metadata(
             Some(serde_json::json!({ "option": spec }))
         }
         InstrumentType::Bond => {
+            // For US Treasury bills (CUSIP prefix 912797), set zero coupon.
+            // Other bonds get None and rely on user/provider to fill in.
+            let is_tbill = symbol.starts_with("US912797") || symbol.starts_with("912797");
             let spec = BondSpec {
                 isin: Some(symbol.to_uppercase()),
+                coupon_rate: if is_tbill { Some(Decimal::ZERO) } else { None },
+                coupon_frequency: if is_tbill {
+                    Some("ZERO".to_string())
+                } else {
+                    None
+                },
                 ..Default::default()
             };
             Some(serde_json::json!({ "bond": spec }))
@@ -997,7 +1006,19 @@ pub fn canonicalize_market_identity(
         Some(InstrumentType::Bond) => {
             // Bonds use ISIN as symbol (uppercase, no exchange suffix)
             if let Some(raw) = instrument_symbol.as_deref() {
-                instrument_symbol = Some(raw.to_uppercase());
+                let upper = raw.to_uppercase();
+                // Auto-convert 9-char CUSIPs to 12-char ISINs for proper
+                // provider routing (US_TREASURY_CALC, BOERSE_FRANKFURT).
+                instrument_symbol = Some(if crate::utils::cusip::looks_like_cusip(&upper) {
+                    let country = match normalized_quote.as_deref() {
+                        Some("CAD") => "CA",
+                        Some("BMD") => "BM",
+                        _ => "US",
+                    };
+                    crate::utils::cusip::cusip_to_isin(&upper, country)
+                } else {
+                    upper
+                });
             }
             CanonicalMarketIdentity {
                 display_code: instrument_symbol.clone(),
@@ -1111,4 +1132,120 @@ pub struct EnsureAssetsResult {
     pub created_ids: Vec<String>,
     /// Merge candidates: (resolved_id, unknown_id) pairs where UNKNOWN was merged into resolved
     pub merge_candidates: Vec<(String, String)>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rust_decimal_macros::dec;
+
+    #[test]
+    fn test_build_asset_metadata_tbill_isin() {
+        let meta = build_asset_metadata(Some(&InstrumentType::Bond), "US912797NQ65");
+        let meta = meta.expect("T-bill should produce metadata");
+        let bond: BondSpec = serde_json::from_value(meta.get("bond").cloned().unwrap()).unwrap();
+
+        // T-bill (912797 prefix) should get zero coupon
+        assert_eq!(
+            bond.coupon_rate,
+            Some(dec!(0)),
+            "T-bill coupon_rate should be 0"
+        );
+        assert_eq!(
+            bond.coupon_frequency.as_deref(),
+            Some("ZERO"),
+            "T-bill coupon_frequency should be ZERO"
+        );
+        assert_eq!(
+            bond.isin.as_deref(),
+            Some("US912797NQ65"),
+            "ISIN should be preserved"
+        );
+    }
+
+    #[test]
+    fn test_build_asset_metadata_corporate_bond_isin() {
+        let meta = build_asset_metadata(Some(&InstrumentType::Bond), "US00507VAJ89");
+        let meta = meta.expect("Corporate bond should produce metadata");
+        let bond: BondSpec = serde_json::from_value(meta.get("bond").cloned().unwrap()).unwrap();
+
+        // Non-T-bill bond: coupon_rate and coupon_frequency should be None
+        assert_eq!(
+            bond.coupon_rate, None,
+            "Corporate bond coupon_rate should be None"
+        );
+        assert_eq!(
+            bond.coupon_frequency, None,
+            "Corporate bond coupon_frequency should be None"
+        );
+    }
+
+    #[test]
+    fn test_canonicalize_market_identity_cusip_to_isin() {
+        // 9-char CUSIP for a bond should be converted to 12-char ISIN
+        let result = canonicalize_market_identity(
+            Some(InstrumentType::Bond),
+            Some("912797NQ6"),
+            None,
+            Some("USD"),
+        );
+
+        let sym = result.instrument_symbol.expect("should have symbol");
+        assert_eq!(sym.len(), 12, "CUSIP should be converted to 12-char ISIN");
+        assert!(
+            sym.starts_with("US"),
+            "ISIN should start with US country code"
+        );
+    }
+
+    #[test]
+    fn test_canonicalize_market_identity_isin_passthrough() {
+        // 12-char ISIN for a bond should pass through unchanged
+        let result = canonicalize_market_identity(
+            Some(InstrumentType::Bond),
+            Some("US912797NQ65"),
+            None,
+            Some("USD"),
+        );
+
+        let sym = result.instrument_symbol.expect("should have symbol");
+        assert_eq!(sym, "US912797NQ65", "ISIN should pass through unchanged");
+    }
+
+    #[test]
+    fn test_canonicalize_market_identity_cusip_to_isin_canadian() {
+        // Canadian bond CUSIP should produce a CA-prefixed ISIN
+        let result = canonicalize_market_identity(
+            Some(InstrumentType::Bond),
+            Some("135087D26"),
+            None,
+            Some("CAD"),
+        );
+
+        let sym = result.instrument_symbol.expect("should have symbol");
+        assert_eq!(sym.len(), 12, "CUSIP should be converted to 12-char ISIN");
+        assert!(
+            sym.starts_with("CA"),
+            "Canadian bond ISIN should start with CA, got {}",
+            sym
+        );
+    }
+
+    #[test]
+    fn test_canonicalize_market_identity_cusip_defaults_to_us() {
+        // When no currency is provided, CUSIP should default to US
+        let result = canonicalize_market_identity(
+            Some(InstrumentType::Bond),
+            Some("912797NQ6"),
+            None,
+            None,
+        );
+
+        let sym = result.instrument_symbol.expect("should have symbol");
+        assert!(
+            sym.starts_with("US"),
+            "CUSIP with no currency should default to US, got {}",
+            sym
+        );
+    }
 }

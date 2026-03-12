@@ -25,6 +25,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Duration, NaiveDate, TimeZone, Utc};
 use futures::stream::{self, StreamExt};
 use log::{debug, error, info, warn};
+use rust_decimal::Decimal;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, LazyLock, Mutex};
 use tokio::sync::RwLock;
@@ -32,6 +33,7 @@ use tokio::sync::RwLock;
 use super::client::MarketDataClient;
 use super::constants::*;
 use super::errors::MarketDataError;
+use super::model::{DataSource, Quote};
 use super::store::QuoteStore;
 use super::sync_state::{
     calculate_sync_window, determine_sync_category, QuoteSyncState, SymbolSyncPlan, SyncCategory,
@@ -196,6 +198,8 @@ pub enum AssetSkipReason {
     SyncInProgress,
     /// Too many consecutive sync failures (exceeds MAX_SYNC_ERRORS).
     TooManyErrors,
+    /// Bond has matured — price is par, no further sync needed.
+    MaturedBond,
 }
 
 impl std::fmt::Display for AssetSkipReason {
@@ -208,6 +212,7 @@ impl std::fmt::Display for AssetSkipReason {
             AssetSkipReason::NotFound => write!(f, "Asset not found"),
             AssetSkipReason::SyncInProgress => write!(f, "Sync already in progress"),
             AssetSkipReason::TooManyErrors => write!(f, "Too many consecutive sync failures"),
+            AssetSkipReason::MaturedBond => write!(f, "Bond has matured (price is par)"),
         }
     }
 }
@@ -452,7 +457,80 @@ where
             return Some(AssetSkipReason::Inactive);
         }
 
+        // Skip matured bonds — price is par, no sync needed
+        if asset.is_bond() {
+            if let Some(spec) = asset.bond_spec() {
+                if let Some(maturity) = spec.maturity_date {
+                    if maturity < Utc::now().date_naive() {
+                        return Some(AssetSkipReason::MaturedBond);
+                    }
+                }
+            }
+        }
+
         None
+    }
+
+    /// Ensure a matured bond has a par-value quote so it doesn't show as "no data"
+    /// in health checks. If the bond has never been successfully synced, we write
+    /// a single quote at par (1.0 as fraction-of-par) dated at maturity and reset
+    /// the error counter.
+    async fn ensure_matured_bond_par_quote(&self, asset: &Asset) {
+        let spec = match asset.bond_spec() {
+            Some(s) => s,
+            None => return,
+        };
+        let maturity = match spec.maturity_date {
+            Some(d) => d,
+            None => return,
+        };
+
+        // Check if any quote already exists for this asset
+        if let Ok(Some(_)) = self.quote_store.latest(&AssetId(asset.id.clone()), None) {
+            return;
+        }
+
+        // No quote exists — write a par-value quote at the maturity date
+        let timestamp = maturity
+            .and_hms_opt(16, 0, 0)
+            .map(|dt| Utc.from_utc_datetime(&dt))
+            .unwrap_or_else(Utc::now);
+
+        let par = Decimal::ONE;
+        let quote = Quote {
+            id: format!("{}_{}_{}", asset.id, maturity.format("%Y-%m-%d"), "MANUAL"),
+            asset_id: asset.id.clone(),
+            timestamp,
+            open: par,
+            high: par,
+            low: par,
+            close: par,
+            adjclose: par,
+            volume: Decimal::ZERO,
+            currency: asset.quote_ccy.clone(),
+            data_source: DataSource::Manual,
+            created_at: Utc::now(),
+            notes: Some("Par value at maturity (auto-generated)".to_string()),
+        };
+
+        match self.quote_store.upsert_quotes(&[quote]).await {
+            Ok(_) => {
+                info!(
+                    "Wrote par-value quote for matured bond {} (matured {})",
+                    asset.id, maturity
+                );
+                // Reset error count so health check stops flagging this asset
+                if let Err(e) = self.sync_state_store.update_after_sync(&asset.id).await {
+                    warn!("Failed to reset sync state for {}: {:?}", asset.id, e);
+                }
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to write par-value quote for matured bond {}: {:?}",
+                    asset.id, e
+                );
+            }
+        }
     }
 
     /// Build sync plan for a single asset.
@@ -1225,6 +1303,9 @@ where
         for asset in &assets {
             if let Some(reason) = self.get_skip_reason(asset) {
                 debug!("Skipping asset {} for sync: {}", asset.id, reason);
+                if matches!(reason, AssetSkipReason::MaturedBond) {
+                    self.ensure_matured_bond_par_quote(asset).await;
+                }
                 result.add_skipped(asset.id.clone(), reason);
             } else {
                 syncable.push(asset);

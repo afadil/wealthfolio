@@ -357,17 +357,20 @@ impl MarketDataClient {
         // Preferred provider from asset
         let preferred_provider: Option<ProviderId> = asset.preferred_provider().map(Cow::Owned);
 
-        // Convert bond spec to market-data BondQuoteMetadata when available
-        let bond_metadata = asset.bond_spec().and_then(|spec| {
-            Some(BondQuoteMetadata {
-                coupon_rate: spec.coupon_rate?,
-                maturity_date: spec.maturity_date?,
+        // Convert bond spec to market-data BondQuoteMetadata when available.
+        // coupon_rate defaults to 0 for zero-coupon instruments (T-bills).
+        // maturity_date is still required — without it we can't price.
+        let bond_metadata = match asset.bond_spec() {
+            Some(spec) if spec.maturity_date.is_some() => Some(BondQuoteMetadata {
+                coupon_rate: spec.coupon_rate.unwrap_or(rust_decimal::Decimal::ZERO),
+                maturity_date: spec.maturity_date.unwrap(),
                 face_value: spec.face_value.unwrap_or(rust_decimal::Decimal::from(1000)),
                 coupon_frequency: spec
                     .coupon_frequency
                     .unwrap_or_else(|| "SEMI_ANNUAL".to_string()),
-            })
-        });
+            }),
+            _ => None,
+        };
 
         Ok(QuoteContext {
             instrument,
@@ -1130,5 +1133,38 @@ mod tests {
         let core_quote = MarketDataClient::convert_quote(market_quote, "SHIB-USD");
 
         assert_eq!(core_quote.close, precise_price);
+    }
+
+    #[test]
+    fn test_build_quote_context_bond_zero_coupon() {
+        use crate::assets::InstrumentType;
+        use chrono::NaiveDate;
+
+        let mut asset = create_test_asset(AssetKind::Investment, "US912797NQ65", "USD");
+        asset.instrument_type = Some(InstrumentType::Bond);
+        asset.instrument_symbol = Some("US912797NQ65".to_string());
+        // Zero-coupon T-bill: couponRate is 0
+        asset.metadata = Some(serde_json::json!({
+            "bond": {
+                "couponRate": 0,
+                "maturityDate": "2025-12-18",
+                "faceValue": 1000,
+                "couponFrequency": "ZERO"
+            }
+        }));
+
+        let client = create_test_client();
+        let context = client.build_quote_context(&asset).unwrap();
+
+        let bond_meta = context
+            .bond_metadata
+            .expect("bond_metadata should be Some for zero-coupon bond");
+        assert_eq!(bond_meta.coupon_rate, dec!(0));
+        assert_eq!(
+            bond_meta.maturity_date,
+            NaiveDate::from_ymd_opt(2025, 12, 18).unwrap()
+        );
+        assert_eq!(bond_meta.face_value, dec!(1000));
+        assert_eq!(bond_meta.coupon_frequency, "ZERO");
     }
 }
