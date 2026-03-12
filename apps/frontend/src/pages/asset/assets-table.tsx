@@ -98,8 +98,13 @@ export function AssetsTable({
             >
               <TickerAvatar symbol={avatarSymbol} className="h-8 w-8 shrink-0" />
               <div className="min-w-0 flex-1">
-                <div className="group-hover:text-primary font-semibold leading-tight transition-colors">
+                <div className="group-hover:text-primary flex items-center gap-1.5 font-semibold leading-tight transition-colors">
                   {displaySymbol}
+                  {parsedOption ? (
+                    <Badge variant="secondary" className="text-[10px]">
+                      Option
+                    </Badge>
+                  ) : null}
                 </div>
                 <div className="text-muted-foreground line-clamp-2 text-xs leading-tight">
                   {subtitle}

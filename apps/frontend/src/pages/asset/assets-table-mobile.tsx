@@ -228,6 +228,11 @@ export function AssetsTableMobile({
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <p className="truncate font-semibold">{displaySymbol}</p>
+                          {parsedOption ? (
+                            <Badge variant="secondary" className="text-[10px]">
+                              Option
+                            </Badge>
+                          ) : null}
                           <Badge variant="secondary" className="text-[10px] uppercase">
                             {asset.quoteCcy}
                           </Badge>
