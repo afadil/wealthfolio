@@ -13,7 +13,7 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
-import { formatDistanceToNow } from "date-fns";
+import { formatDate } from "@/lib/utils";
 import { useCallback, useState } from "react";
 import { useWealthfolioConnect } from "../providers/wealthfolio-connect-provider";
 import {
@@ -142,9 +142,7 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
   const logoUrl =
     connection?.brokerage?.aws_s3_square_logo_url ?? connection?.brokerage?.aws_s3_logo_url;
 
-  const lastSyncedText = lastSyncDate
-    ? `Synced ${formatDistanceToNow(new Date(lastSyncDate), { addSuffix: false })} ago`
-    : "Never synced";
+  const lastSyncedText = lastSyncDate ? `Data as of ${formatDate(lastSyncDate)}` : "No data yet";
 
   return (
     <div className="bg-muted/30 rounded-lg border p-3">
