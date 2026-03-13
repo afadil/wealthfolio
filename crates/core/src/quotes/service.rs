@@ -301,6 +301,9 @@ pub trait QuoteServiceTrait: Send + Sync {
     /// Get sync states that have errors (error_count > 0).
     fn get_sync_states_with_errors(&self) -> Result<Vec<QuoteSyncState>>;
 
+    /// Reset sync error counts for the given asset IDs, allowing retry.
+    async fn reset_sync_errors(&self, asset_ids: &[String]) -> Result<()>;
+
     /// Update position status (active/inactive) based on current holdings.
     async fn update_position_status_from_holdings(
         &self,
@@ -1182,6 +1185,13 @@ where
 
     fn get_sync_states_with_errors(&self) -> Result<Vec<QuoteSyncState>> {
         self.sync_state_store.get_with_errors()
+    }
+
+    async fn reset_sync_errors(&self, asset_ids: &[String]) -> Result<()> {
+        for asset_id in asset_ids {
+            self.sync_state_store.update_after_sync(asset_id).await?;
+        }
+        Ok(())
     }
 
     // =========================================================================
