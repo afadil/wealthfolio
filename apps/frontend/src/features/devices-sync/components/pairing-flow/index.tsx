@@ -2,10 +2,11 @@
 // Main component that orchestrates the pairing flow (issuer and claimer)
 // =====================================================================
 
-import { useEffect, useRef, useCallback, useState } from "react";
-import { usePairing } from "../../hooks";
-import { useDeviceSync } from "../../providers/device-sync-provider";
+import { useEffect, useRef, useCallback } from "react";
+import { usePairingIssuer, usePairingClaimer, useSyncStatus } from "../../hooks";
 import { logger } from "@/adapters";
+import { Icons } from "@wealthfolio/ui";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 import { DisplayCode } from "./display-code";
 import { SASVerification } from "./sas-verification";
 import { WaitingState } from "./waiting-state";
@@ -15,26 +16,57 @@ import { EnterCode } from "./enter-code";
 interface PairingFlowProps {
   onComplete?: () => void;
   onCancel?: () => void;
+  /** Title shown during the initial step (display_code for issuer, enter_code for claimer) */
+  title?: string;
+  /** Description shown during the initial step */
+  description?: string;
 }
 
-// Claimer flow steps
-type ClaimerStep = "enter_code" | "connecting" | "waiting_keys" | "syncing" | "success" | "error";
+/** Inline title block rendered above the initial step content */
+function StepHeader({ title, description }: { title?: string; description?: string }) {
+  if (!title) return null;
+  return (
+    <div className="mb-1 text-center">
+      <p className="text-foreground text-base font-semibold">{title}</p>
+      {description && <p className="text-muted-foreground mt-1 text-sm">{description}</p>}
+    </div>
+  );
+}
 
-export function PairingFlow({ onComplete, onCancel }: PairingFlowProps) {
-  const { state } = useDeviceSync();
-
-  // Determine role: trusted = issuer, untrusted = claimer
-  const isTrusted = state.device?.trustState === "trusted";
+export function PairingFlow({ onComplete, onCancel, title, description }: PairingFlowProps) {
+  const { device } = useSyncStatus();
+  const initialRoleRef = useRef<"issuer" | "claimer" | null>(null);
+  if (initialRoleRef.current == null && device) {
+    initialRoleRef.current = device.trustState === "trusted" ? "issuer" : "claimer";
+  }
+  const isTrusted =
+    initialRoleRef.current != null
+      ? initialRoleRef.current === "issuer"
+      : device?.trustState === "trusted";
 
   if (isTrusted) {
-    return <IssuerFlow onComplete={onComplete} onCancel={onCancel} />;
+    return (
+      <IssuerFlow
+        onComplete={onComplete}
+        onCancel={onCancel}
+        title={title}
+        description={description}
+      />
+    );
   } else {
-    return <ClaimerFlow onComplete={onComplete} onCancel={onCancel} />;
+    return (
+      <ClaimerFlow
+        onComplete={onComplete}
+        onCancel={onCancel}
+        title={title}
+        description={description}
+      />
+    );
   }
 }
 
 // Issuer Flow (trusted device - displays QR code)
-function IssuerFlow({ onComplete, onCancel }: PairingFlowProps) {
+function IssuerFlow({ onComplete, onCancel, title, description }: PairingFlowProps) {
   const {
     step,
     error,
@@ -46,19 +78,11 @@ function IssuerFlow({ onComplete, onCancel }: PairingFlowProps) {
     rejectSAS,
     cancel,
     reset,
-  } = usePairing();
-
-  // Debug: log step changes
-  useEffect(() => {
-    logger.info(`[IssuerFlow] Step changed to: ${step}, pairingCode: ${pairingCode ?? "null"}`);
-  }, [step, pairingCode]);
+  } = usePairingIssuer();
 
   // Auto-start pairing when component mounts
   const hasAutoStarted = useRef(false);
   useEffect(() => {
-    logger.info(
-      `[IssuerFlow] Auto-start check: step=${step}, hasAutoStarted=${hasAutoStarted.current}`,
-    );
     if (step === "idle" && !hasAutoStarted.current) {
       hasAutoStarted.current = true;
       logger.info("[IssuerFlow] Starting pairing...");
@@ -86,9 +110,13 @@ function IssuerFlow({ onComplete, onCancel }: PairingFlowProps) {
       return <WaitingState title="Starting..." onCancel={onCancel} />;
 
     case "display_code":
-    case "waiting_claim":
       if (pairingCode && expiresAt) {
-        return <DisplayCode code={pairingCode} expiresAt={expiresAt} onCancel={handleCancel} />;
+        return (
+          <>
+            <StepHeader title={title} description={description} />
+            <DisplayCode code={pairingCode} expiresAt={expiresAt} onCancel={handleCancel} />
+          </>
+        );
       }
       return <WaitingState title="Generating code..." onCancel={handleCancel} showQRSkeleton />;
 
@@ -130,134 +158,27 @@ function IssuerFlow({ onComplete, onCancel }: PairingFlowProps) {
 }
 
 // Claimer Flow (untrusted device - enters code and receives keys)
-function ClaimerFlow({ onComplete, onCancel }: PairingFlowProps) {
-  const { state, actions } = useDeviceSync();
-  const [step, setStep] = useState<ClaimerStep>("enter_code");
-  const [error, setError] = useState<string | null>(null);
-  const [sas, setSas] = useState<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+function ClaimerFlow({ onComplete, onCancel, title, description }: PairingFlowProps) {
+  const { step, error, sas, overwriteInfo, submitCode, approveOverwrite, cancel, retry } =
+    usePairingClaimer();
 
-  // Use ref to always access latest actions (avoids stale closure in setInterval)
-  const actionsRef = useRef(actions);
-  useEffect(() => {
-    actionsRef.current = actions;
-  }, [actions]);
-
-  // Use ref to always access latest state (for requireSas check in interval)
-  const stateRef = useRef(state);
-  useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
-
-  // Cleanup polling on unmount
-  useEffect(() => {
-    return () => {
-      if (pollRef.current) clearTimeout(pollRef.current);
-    };
-  }, []);
-
-  // Compute SAS when session key is available
-  const sessionKey = state.claimerSession?.sessionKey;
-  useEffect(() => {
-    if (!sessionKey) {
-      setSas(null);
-      return;
-    }
-    actionsRef.current
-      .computeSAS()
-      .then(setSas)
-      .catch(() => setSas(null));
-  }, [sessionKey]);
-
-  // Start polling for key bundle
-  const startPolling = useCallback(() => {
-    if (pollRef.current) return; // Already polling
-
-    logger.info("[ClaimerFlow] Starting key bundle polling...");
-
-    const poll = async () => {
-      try {
-        const result = await actionsRef.current.pollForKeyBundle();
-        logger.info(
-          `[ClaimerFlow] Poll result: received=${result.received}, hasKeyBundle=${!!result.keyBundle}`,
-        );
-        if (result.received && result.keyBundle) {
-          pollRef.current = null;
-
-          // Auto-complete when key bundle is received
-          // The issuer (trusted device) already verified SAS, so claimer can auto-complete
-          logger.info("[ClaimerFlow] Key bundle received, auto-completing pairing...");
-          setStep("syncing");
-          await actionsRef.current.confirmPairingAsClaimer(
-            result.keyBundle,
-            result.keyBundleCreatedAt,
-          );
-          logger.info("[ClaimerFlow] Pairing confirmed, setting success");
-          setStep("success");
-        } else {
-          // Schedule next poll (2s intervals, no backoff needed for short-lived sessions)
-          pollRef.current = setTimeout(poll, 2000);
-        }
-      } catch (err) {
-        pollRef.current = null;
-        logger.error(`[ClaimerFlow] Poll error: ${err}`);
-        setError(err instanceof Error ? err.message : String(err));
-        setStep("error");
-      }
-    };
-    pollRef.current = setTimeout(poll, 2000);
-  }, []);
-
-  // Handle code submission
-  const handleCodeSubmit = useCallback(
-    async (code: string) => {
-      logger.info(`[ClaimerFlow] Submitting code: ${code}`);
-      setStep("connecting");
-      setError(null);
-
-      try {
-        const session = await actionsRef.current.claimPairing(code);
-        logger.info(`[ClaimerFlow] Session claimed, pairingId=${session.pairingId}`);
-
-        // Start polling for key bundle in background
-        startPolling();
-
-        // Show waiting state - claimer auto-completes when key bundle arrives
-        // SAS verification happens on issuer (trusted device) side only
-        logger.info("[ClaimerFlow] Waiting for key bundle from trusted device...");
-        setStep("waiting_keys");
-      } catch (err) {
-        logger.error(`[ClaimerFlow] Claim error: ${err}`);
-        setError(err instanceof Error ? err.message : String(err));
-        setStep("error");
-      }
-    },
-    [startPolling],
-  );
-
-  // Handle cancel
   const handleCancel = useCallback(async () => {
-    if (pollRef.current) clearInterval(pollRef.current);
-    await actionsRef.current.cancelPairing().catch(() => {});
+    await cancel();
     onCancel?.();
-  }, [onCancel]);
+  }, [cancel, onCancel]);
 
-  // Handle done
   const handleDone = useCallback(() => {
     onComplete?.();
   }, [onComplete]);
 
-  // Handle retry
-  const handleRetry = useCallback(() => {
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = null;
-    setStep("enter_code");
-    setError(null);
-  }, []);
-
   switch (step) {
     case "enter_code":
-      return <EnterCode onSubmit={handleCodeSubmit} onCancel={handleCancel} error={error} />;
+      return (
+        <>
+          <StepHeader title={title} description={description} />
+          <EnterCode onSubmit={submitCode} onCancel={handleCancel} error={error} />
+        </>
+      );
 
     case "connecting":
       return <WaitingState title="Connecting..." onCancel={handleCancel} />;
@@ -265,6 +186,28 @@ function ClaimerFlow({ onComplete, onCancel }: PairingFlowProps) {
     case "waiting_keys":
       return (
         <WaitingState title="Verify Security Code" securityCode={sas} onCancel={handleCancel} />
+      );
+
+    case "overwrite_confirm":
+      return (
+        <div className="flex flex-col items-center px-4 py-6">
+          <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
+            <Icons.AlertTriangle className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+          </div>
+          <div className="mb-6 text-center">
+            <p className="text-foreground text-base font-semibold">Replace local data?</p>
+            <p className="text-muted-foreground mt-2 max-w-[280px] text-sm">
+              This device has {overwriteInfo?.localRows ?? 0} rows of data that will be replaced
+              with data from your other device.
+            </p>
+          </div>
+          <div className="flex w-full max-w-[240px] flex-col gap-2">
+            <Button onClick={approveOverwrite}>Replace &amp; Sync</Button>
+            <Button variant="ghost" size="sm" onClick={handleCancel}>
+              Cancel
+            </Button>
+          </div>
+        </div>
       );
 
     case "syncing":
@@ -276,9 +219,7 @@ function ClaimerFlow({ onComplete, onCancel }: PairingFlowProps) {
       return <PairingResult success onDone={handleDone} />;
 
     case "error":
-      return (
-        <PairingResult success={false} error={error} onRetry={handleRetry} onDone={handleCancel} />
-      );
+      return <PairingResult success={false} error={error} onRetry={retry} onDone={handleCancel} />;
 
     default:
       return null;

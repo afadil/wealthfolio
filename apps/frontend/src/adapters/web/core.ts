@@ -172,6 +172,18 @@ export const COMMANDS: CommandMap = {
   claim_pairing: { method: "POST", path: "/sync/pairing/claim" },
   get_pairing_messages: { method: "GET", path: "/sync/pairing" },
   confirm_pairing: { method: "POST", path: "/sync/pairing" },
+  complete_pairing_with_transfer: {
+    method: "POST",
+    path: "/sync/pairing/complete-with-transfer",
+  },
+  confirm_pairing_with_bootstrap: {
+    method: "POST",
+    path: "/sync/pairing/confirm-with-bootstrap",
+  },
+  begin_pairing_confirm: { method: "POST", path: "/sync/pairing/flow/begin" },
+  get_pairing_flow_state: { method: "POST", path: "/sync/pairing/flow/state" },
+  approve_pairing_overwrite: { method: "POST", path: "/sync/pairing/flow/approve-overwrite" },
+  cancel_pairing_flow: { method: "POST", path: "/sync/pairing/flow/cancel" },
   // Wealthfolio Connect (Broker Sync)
   store_sync_session: { method: "POST", path: "/connect/session" },
   clear_sync_session: { method: "DELETE", path: "/connect/session" },
@@ -200,6 +212,10 @@ export const COMMANDS: CommandMap = {
   clear_device_sync_data: { method: "DELETE", path: "/connect/device/sync-data" },
   reinitialize_device_sync: { method: "POST", path: "/connect/device/reinitialize" },
   device_sync_engine_status: { method: "GET", path: "/connect/device/engine-status" },
+  device_sync_pairing_source_status: {
+    method: "GET",
+    path: "/connect/device/pairing-source-status",
+  },
   device_sync_bootstrap_overwrite_check: {
     method: "GET",
     path: "/connect/device/bootstrap-overwrite-check",
@@ -1014,6 +1030,25 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       };
       url += `/${encodeURIComponent(pairingId)}/confirm`;
       body = JSON.stringify({ proof, minSnapshotCreatedAt });
+      break;
+    }
+    case "complete_pairing_with_transfer": {
+      body = JSON.stringify(payload);
+      break;
+    }
+    case "confirm_pairing_with_bootstrap": {
+      body = JSON.stringify(payload);
+      break;
+    }
+    case "begin_pairing_confirm":
+    case "get_pairing_flow_state":
+    case "approve_pairing_overwrite":
+    case "cancel_pairing_flow": {
+      body = JSON.stringify(payload);
+      break;
+    }
+    case "device_sync_reconcile_ready_state": {
+      body = JSON.stringify(payload ?? {});
       break;
     }
     // Wealthfolio Connect commands

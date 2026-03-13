@@ -224,6 +224,13 @@ export interface BackendSyncEngineStatusResult {
   bootstrapRequired: boolean;
 }
 
+export interface BackendSyncPairingSourceStatusResult {
+  status: "ready" | "restore_required";
+  message: string;
+  localCursor: number;
+  serverCursor: number;
+}
+
 export interface BackendSyncBootstrapOverwriteCheckTableResult {
   table: string;
   rows: number;

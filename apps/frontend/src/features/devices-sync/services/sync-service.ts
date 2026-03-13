@@ -7,14 +7,12 @@
 // pairing operations which require real-time UI interaction.
 // ===========================================================================
 
-import type { BackendSyncReconcileReadyResult } from "@/adapters";
 import {
-  approvePairing as approvePairingApi,
   cancelPairing as cancelPairingApi,
   claimPairing as claimPairingApi,
   clearDeviceSyncData as clearDeviceSyncDataApi,
-  completePairing as completePairingApi,
-  confirmPairing as confirmPairingApi,
+  completePairingWithTransfer as completePairingWithTransferApi,
+  confirmPairingWithBootstrap as confirmPairingWithBootstrapApi,
   createPairing as createPairingApi,
   deleteDevice as deleteDeviceApi,
   deviceSyncBootstrapOverwriteCheck as deviceSyncBootstrapOverwriteCheckApi,
@@ -25,6 +23,7 @@ import {
   enableDeviceSync as enableDeviceSyncApi,
   getDevice as getDeviceApi,
   getDeviceSyncState as getDeviceSyncStateApi,
+  getPairingSourceStatus as getPairingSourceStatusApi,
   getPairing as getPairingApi,
   getPairingMessages as getPairingMessagesApi,
   getSyncEngineStatus as getSyncEngineStatusApi,
@@ -37,21 +36,21 @@ import {
   syncTriggerCycle as syncTriggerCycleApi,
   updateDevice as updateDeviceApi,
 } from "@/adapters";
+import type { ConfirmPairingWithBootstrapResult } from "@/adapters";
 import * as crypto from "../crypto";
 import { syncStorage } from "../storage/keyring";
 import type {
-  BootstrapAction,
   ClaimerSession,
   Device,
   DeviceSyncState,
   KeyBundlePayload,
+  PairingStatus,
   PairingSession,
   StateDetectionResult,
   SyncIdentity,
   TrustedDeviceSummary,
 } from "../types";
 import { SyncError, SyncErrorCodes, SyncStates } from "../types";
-import { extractRemoteSeedPresent, resolveBootstrapAction } from "./reconcile-intent";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Exported Types
@@ -67,7 +66,15 @@ export interface EnableSyncResult {
   trustedDevices: TrustedDeviceSummary[];
 }
 
-export type ReconcileReadyStateResult = BackendSyncReconcileReadyResult;
+export type BootstrapCheckResult =
+  | {
+      status: "overwrite_required";
+      localRows: number;
+      nonEmptyTables: { table: string; rows: number }[];
+    }
+  | { status: "waiting_snapshot"; message: string }
+  | { status: "applied"; message: string }
+  | { status: "error"; message: string };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sync Service Class
@@ -191,12 +198,13 @@ class SyncService {
     return getSyncEngineStatusApi();
   }
 
-  async reconcileReadyState(): Promise<ReconcileReadyStateResult> {
-    return deviceSyncReconcileReadyStateApi();
-  }
-
-  resolveBootstrapAction(result: ReconcileReadyStateResult): BootstrapAction {
-    return resolveBootstrapAction(result);
+  async getPairingSourceStatus(): Promise<{
+    status: "ready" | "restore_required";
+    message: string;
+    localCursor: number;
+    serverCursor: number;
+  }> {
+    return getPairingSourceStatusApi();
   }
 
   async getBootstrapOverwriteCheck(): Promise<{
@@ -323,53 +331,98 @@ class SyncService {
     return { claimed: false };
   }
 
-  /**
-   * Approve a pairing session.
-   */
-  async approvePairing(pairingId: string): Promise<void> {
-    await approvePairingApi(pairingId);
+  async getPairingStatus(pairingId: string): Promise<PairingStatus> {
+    const result = await getPairingApi(pairingId);
+    return result.status;
   }
 
   /**
-   * Complete pairing by sending encrypted key bundle to claimer.
-   * Note: The claimer's device ID is already known by the server from the claim step.
+   * Complete pairing with transfer — issuer side, single backend call.
+   * Frontend computes crypto (SAS, encrypt key bundle) then calls this.
    */
-  async completePairing(session: PairingSession): Promise<{ remoteSeedPresent: boolean | null }> {
+  async completePairingWithTransfer(
+    session: PairingSession,
+  ): Promise<{ remoteSeedPresent: boolean | null }> {
     if (new Date() > session.expiresAt) {
       throw new SyncError(SyncErrorCodes.PAIRING_EXPIRED, "Pairing session expired");
     }
-
     if (!session.claimerPublicKey || !session.sessionKey) {
       throw new SyncError(SyncErrorCodes.INVALID_SESSION, "Session not ready for key transfer");
     }
 
-    // Load root key
     const rootKeyB64 = await syncStorage.getRootKey();
     if (!rootKeyB64) {
       throw new SyncError(SyncErrorCodes.ROOT_KEY_NOT_FOUND, "Root key not found");
     }
-
     const keyVersion = await syncStorage.getKeyVersion();
-
-    // Create key bundle
     const keyBundle: KeyBundlePayload = {
       version: 1,
       rootKey: rootKeyB64,
       keyVersion: keyVersion ?? 1,
     };
-
-    // Encrypt key bundle with session key
     const encryptedKeyBundle = await crypto.encrypt(session.sessionKey, JSON.stringify(keyBundle));
-
-    // Compute SAS for verification
     const sas = await crypto.computeSAS(session.sessionKey);
-
     const signatureData = `complete:${session.pairingId}:${encryptedKeyBundle}`;
     const signature = await crypto.hmacSha256(session.sessionKey, signatureData);
 
-    // Complete on server (server knows claimer from claim step)
-    const result = await completePairingApi(session.pairingId, encryptedKeyBundle, sas, signature);
-    return { remoteSeedPresent: extractRemoteSeedPresent(result) };
+    try {
+      await completePairingWithTransferApi(session.pairingId, encryptedKeyBundle, sas, signature);
+      return { remoteSeedPresent: null };
+    } catch (err) {
+      throw SyncError.from(err, SyncErrorCodes.SNAPSHOT_FAILED);
+    }
+  }
+
+  /**
+   * Confirm pairing with bootstrap — claimer side, single backend call.
+   * Returns result indicating if overwrite is needed.
+   */
+  async confirmPairingWithBootstrap(
+    session: ClaimerSession,
+    keyBundle: KeyBundlePayload,
+    minSnapshotCreatedAt?: string,
+    allowOverwrite?: boolean,
+  ): Promise<ConfirmPairingWithBootstrapResult> {
+    if (new Date() > session.expiresAt) {
+      throw new SyncError(SyncErrorCodes.PAIRING_EXPIRED, "Pairing session expired");
+    }
+
+    const proofData = `confirm:${session.pairingId}:${keyBundle.keyVersion}`;
+    const proof = await crypto.hmacSha256(session.sessionKey, proofData);
+    const freshnessGate = minSnapshotCreatedAt ?? session.keyBundleCreatedAt;
+
+    // Store credentials locally BEFORE confirming (so backend can use them for bootstrap)
+    await syncStorage.setE2EECredentials(keyBundle.rootKey, keyBundle.keyVersion, {
+      secretKey: session.ephemeralSecretKey,
+      publicKey: session.ephemeralPublicKey,
+    });
+
+    const result = await confirmPairingWithBootstrapApi(
+      session.pairingId,
+      proof,
+      freshnessGate,
+      allowOverwrite,
+    );
+
+    logger.info(`[SyncService] confirmPairingWithBootstrap: status=${result.status}`);
+    return result;
+  }
+
+  /**
+   * Retry bootstrap with overwrite after user accepted the overwrite dialog.
+   * Uses the composite endpoint — proof is null because confirm is idempotent
+   * (already confirmed on the first call), freshness gate is already set in backend.
+   */
+  async retryBootstrapWithOverwrite(pairingId: string): Promise<ConfirmPairingWithBootstrapResult> {
+    return confirmPairingWithBootstrapApi(pairingId, undefined, undefined, true);
+  }
+
+  /**
+   * Retry claimer bootstrap without overwrite.
+   * Used when backend reports waiting_snapshot and the claimer should poll until ready.
+   */
+  async retryPairingBootstrap(pairingId: string): Promise<ConfirmPairingWithBootstrapResult> {
+    return confirmPairingWithBootstrapApi(pairingId, undefined, undefined, false);
   }
 
   /**
@@ -475,39 +528,49 @@ class SyncService {
     return { received: false, status: result.sessionStatus };
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NON-PAIRING BOOTSTRAP (stale_cursor / device rejoining)
+  // ═══════════════════════════════════════════════════════════════════════════
+
   /**
-   * Confirm pairing and store root key (claimer side).
+   * Bootstrap with overwrite check — combines overwrite check + reconcile.
+   * First call with allowOverwrite=false to check. If overwrite_required,
+   * show dialog, then call again with allowOverwrite=true.
    */
-  async confirmPairingAsClaimer(
-    session: ClaimerSession,
-    keyBundle: KeyBundlePayload,
-    minSnapshotCreatedAt?: string,
-  ): Promise<{ keyVersion: number; remoteSeedPresent: boolean | null }> {
-    if (new Date() > session.expiresAt) {
-      throw new SyncError(SyncErrorCodes.PAIRING_EXPIRED, "Pairing session expired");
+  async bootstrapWithOverwriteCheck(allowOverwrite: boolean): Promise<BootstrapCheckResult> {
+    if (!allowOverwrite) {
+      const check = await this.getBootstrapOverwriteCheck();
+      if (check.bootstrapRequired && check.hasLocalData) {
+        return {
+          status: "overwrite_required",
+          localRows: check.localRows,
+          nonEmptyTables: check.nonEmptyTables,
+        };
+      }
     }
 
-    const proofData = `confirm:${session.pairingId}:${keyBundle.keyVersion}`;
-    const proof = await crypto.hmacSha256(session.sessionKey, proofData);
-
-    // Confirm with server
-    const freshnessGate = minSnapshotCreatedAt ?? session.keyBundleCreatedAt;
-    const result = await confirmPairingApi(session.pairingId, proof, freshnessGate);
-
-    if (!result.success) {
-      throw new SyncError(SyncErrorCodes.KEYS_INIT_FAILED, "Failed to confirm pairing");
+    const result = await deviceSyncReconcileReadyStateApi(allowOverwrite);
+    if (result.status === "error") {
+      return { status: "error", message: result.message };
     }
 
-    // Store credentials locally (atomic operation)
-    await syncStorage.setE2EECredentials(keyBundle.rootKey, keyBundle.keyVersion, {
-      secretKey: session.ephemeralSecretKey,
-      publicKey: session.ephemeralPublicKey,
-    });
+    const waitingForSnapshot =
+      result.bootstrapStatus === "requested" ||
+      result.cycleNeedsBootstrap ||
+      result.cycleStatus === "wait_snapshot" ||
+      result.cycleStatus === "stale_cursor" ||
+      result.retryCycleStatus === "wait_snapshot" ||
+      result.retryCycleStatus === "stale_cursor";
+    if (waitingForSnapshot) {
+      return {
+        status: "waiting_snapshot",
+        message: result.bootstrapMessage ?? result.message,
+      };
+    }
 
-    logger.info(`[SyncService] Pairing confirmed, key version: ${keyBundle.keyVersion}`);
     return {
-      keyVersion: keyBundle.keyVersion,
-      remoteSeedPresent: extractRemoteSeedPresent(result),
+      status: "applied",
+      message: result.bootstrapMessage ?? result.message,
     };
   }
 

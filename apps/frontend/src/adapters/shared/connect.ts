@@ -26,6 +26,7 @@ import type {
   BackendSyncBootstrapResult,
   BackendSyncCycleResult,
   BackendSyncEngineStatusResult,
+  BackendSyncPairingSourceStatusResult,
   BackendSyncReconcileReadyResult,
   BackendSyncSnapshotUploadResult,
   BackendSyncStateResult,
@@ -106,6 +107,10 @@ export const getSyncEngineStatus = async (): Promise<BackendSyncEngineStatusResu
   return invoke<BackendSyncEngineStatusResult>("device_sync_engine_status");
 };
 
+export const getPairingSourceStatus = async (): Promise<BackendSyncPairingSourceStatusResult> => {
+  return invoke<BackendSyncPairingSourceStatusResult>("device_sync_pairing_source_status");
+};
+
 export const deviceSyncBootstrapOverwriteCheck =
   async (): Promise<BackendSyncBootstrapOverwriteCheckResult> => {
     return invoke<BackendSyncBootstrapOverwriteCheckResult>(
@@ -113,8 +118,12 @@ export const deviceSyncBootstrapOverwriteCheck =
     );
   };
 
-export const deviceSyncReconcileReadyState = async (): Promise<BackendSyncReconcileReadyResult> => {
-  return invoke<BackendSyncReconcileReadyResult>("device_sync_reconcile_ready_state");
+export const deviceSyncReconcileReadyState = async (
+  allowOverwrite = false,
+): Promise<BackendSyncReconcileReadyResult> => {
+  return invoke<BackendSyncReconcileReadyResult>("device_sync_reconcile_ready_state", {
+    allowOverwrite,
+  });
 };
 
 export const syncBootstrapSnapshotIfNeeded = async (): Promise<BackendSyncBootstrapResult> => {
@@ -227,6 +236,83 @@ export const confirmPairing = async (
     pairingId,
     proof,
     minSnapshotCreatedAt,
+  });
+};
+
+// ============================================================================
+// Pairing Flow Coordinator Commands
+// ============================================================================
+
+export type PairingFlowPhase =
+  | {
+      phase: "overwrite_required";
+      info: { localRows: number; nonEmptyTables: { table: string; rows: number }[] };
+    }
+  | { phase: "syncing"; detail: string }
+  | { phase: "success" }
+  | { phase: "error"; message: string };
+
+export interface PairingFlowResponse {
+  flowId: string;
+  phase: PairingFlowPhase;
+}
+
+export const beginPairingConfirm = async (
+  pairingId: string,
+  proof: string,
+  minSnapshotCreatedAt?: string,
+): Promise<PairingFlowResponse> => {
+  return invoke<PairingFlowResponse>("begin_pairing_confirm", {
+    pairingId,
+    proof,
+    minSnapshotCreatedAt,
+  });
+};
+
+export const getPairingFlowState = async (flowId: string): Promise<PairingFlowResponse> => {
+  return invoke<PairingFlowResponse>("get_pairing_flow_state", { flowId });
+};
+
+export const approvePairingOverwrite = async (flowId: string): Promise<PairingFlowResponse> => {
+  return invoke<PairingFlowResponse>("approve_pairing_overwrite", { flowId });
+};
+
+export const cancelPairingFlow = async (flowId: string): Promise<PairingFlowResponse> => {
+  return invoke<PairingFlowResponse>("cancel_pairing_flow", { flowId });
+};
+
+export const completePairingWithTransfer = async (
+  pairingId: string,
+  encryptedKeyBundle: string,
+  sasProof: string | Record<string, unknown>,
+  signature: string,
+): Promise<{ success: boolean }> => {
+  return invoke<{ success: boolean }>("complete_pairing_with_transfer", {
+    pairingId,
+    encryptedKeyBundle,
+    sasProof,
+    signature,
+  });
+};
+
+export interface ConfirmPairingWithBootstrapResult {
+  status: "applied" | "overwrite_required" | "already_complete" | "waiting_snapshot";
+  message: string;
+  localRows: number | null;
+  nonEmptyTables: { table: string; rows: number }[] | null;
+}
+
+export const confirmPairingWithBootstrap = async (
+  pairingId: string,
+  proof?: string,
+  minSnapshotCreatedAt?: string,
+  allowOverwrite?: boolean,
+): Promise<ConfirmPairingWithBootstrapResult> => {
+  return invoke<ConfirmPairingWithBootstrapResult>("confirm_pairing_with_bootstrap", {
+    pairingId,
+    proof,
+    minSnapshotCreatedAt,
+    allowOverwrite: allowOverwrite ?? false,
   });
 };
 

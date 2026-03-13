@@ -19,7 +19,7 @@ use super::{
     get_access_token, get_min_snapshot_created_at_from_store, get_sync_identity_from_store,
     is_sqlite_image, persist_device_config_from_identity,
     remove_min_snapshot_created_at_from_store, sha256_checksum, SyncBootstrapResult, SyncIdentity,
-    SyncSnapshotUploadResult,
+    SyncPairingSourceStatusResult, SyncSnapshotUploadResult, SYNC_SOURCE_RESTORE_REQUIRED_CODE,
 };
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -32,6 +32,110 @@ struct SnapshotUploadProgressEvent {
 
 const DEVICE_SYNC_SNAPSHOT_UPLOAD_PROGRESS_EVENT: &str = "device-sync:snapshot-upload-progress";
 const SNAPSHOT_FRESHNESS_CLOCK_SKEW_LEEWAY_SECS: i64 = 120;
+
+fn is_snapshot_index_conflict(message: &str) -> bool {
+    let message = message.to_ascii_lowercase();
+    message.contains("sync_transaction_failed") && message.contains("snapshot index conflict")
+}
+
+fn sync_source_restore_required_error() -> String {
+    format!(
+        "{SYNC_SOURCE_RESTORE_REQUIRED_CODE}: This device needs to set up sync again before you add another device."
+    )
+}
+
+pub async fn get_pairing_source_status_internal(
+    context: Arc<ServiceContext>,
+) -> Result<SyncPairingSourceStatusResult, String> {
+    let identity = get_sync_identity_from_store()
+        .ok_or_else(|| "No sync identity configured. Please enable sync first.".to_string())?;
+    let device_id = identity
+        .device_id
+        .clone()
+        .ok_or_else(|| "No device ID configured".to_string())?;
+    let token = get_access_token(&context).await?;
+    let client = create_client()?;
+    let sync_state = client
+        .get_device(&token, &device_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    if sync_state.trust_state != wealthfolio_device_sync::TrustState::Trusted {
+        return Err("Current device is not ready to connect another device yet.".to_string());
+    }
+
+    let local_cursor = context
+        .app_sync_repository()
+        .get_cursor()
+        .map_err(|e| e.to_string())?;
+    let server_cursor = client
+        .get_events_cursor(&token, &device_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .cursor;
+
+    if local_cursor > server_cursor {
+        return Ok(SyncPairingSourceStatusResult {
+            status: "restore_required".to_string(),
+            message: "This device needs to set up sync again before you add another device."
+                .to_string(),
+            local_cursor,
+            server_cursor,
+        });
+    }
+
+    Ok(SyncPairingSourceStatusResult {
+        status: "ready".to_string(),
+        message: "This device is ready to connect another device.".to_string(),
+        local_cursor,
+        server_cursor,
+    })
+}
+
+async fn snapshot_satisfies_freshness_gate(
+    client: &wealthfolio_device_sync::DeviceSyncClient,
+    token: &str,
+    device_id: &str,
+    latest: &wealthfolio_device_sync::SnapshotLatestResponse,
+    min_created_at: &str,
+) -> Result<bool, String> {
+    let latest_created_at = wealthfolio_device_sync::parse_sync_datetime_to_utc(&latest.created_at)
+        .map_err(|e| format!("Invalid snapshot created_at in metadata: {}", e))?;
+    let min_created_at = wealthfolio_device_sync::parse_sync_datetime_to_utc(min_created_at)
+        .map_err(|e| format!("Invalid min snapshot freshness gate: {}", e))?;
+    if latest_created_at + Duration::seconds(SNAPSHOT_FRESHNESS_CLOCK_SKEW_LEEWAY_SECS)
+        > min_created_at
+    {
+        return Ok(true);
+    }
+
+    match client.get_events_cursor(token, device_id).await {
+        Ok(cursor) if latest.oplog_seq >= cursor.cursor => {
+            info!(
+                "[DeviceSync] Accepting snapshot {} older than freshness gate because oplog_seq {} already covers remote cursor {}",
+                latest.snapshot_id,
+                latest.oplog_seq,
+                cursor.cursor
+            );
+            Ok(true)
+        }
+        Ok(cursor) => {
+            debug!(
+                "[DeviceSync] Snapshot {} is older than freshness gate and oplog_seq {} does not cover remote cursor {}",
+                latest.snapshot_id,
+                latest.oplog_seq,
+                cursor.cursor
+            );
+            Ok(false)
+        }
+        Err(err) => {
+            debug!(
+                "[DeviceSync] Failed to verify remote cursor for freshness gate on snapshot {}: {}",
+                latest.snapshot_id, err
+            );
+            Ok(false)
+        }
+    }
+}
 
 enum MissingSnapshotDisposition {
     CompleteNoBootstrap { message: String },
@@ -334,20 +438,12 @@ pub async fn sync_bootstrap_snapshot_if_needed(
     );
 
     if let Some(min_created_at) = min_snapshot_created_at.as_deref() {
-        let latest_created_at =
-            wealthfolio_device_sync::parse_sync_datetime_to_utc(&latest.created_at)
-                .map_err(|e| format!("Invalid snapshot created_at in metadata: {}", e))?;
-        let min_created_at = wealthfolio_device_sync::parse_sync_datetime_to_utc(min_created_at)
-            .map_err(|e| format!("Invalid min snapshot freshness gate: {}", e))?;
-        if latest_created_at + Duration::seconds(SNAPSHOT_FRESHNESS_CLOCK_SKEW_LEEWAY_SECS)
-            <= min_created_at
+        if !snapshot_satisfies_freshness_gate(&client, &token, &device_id, &latest, min_created_at)
+            .await?
         {
             debug!(
-                "[DeviceSync] Snapshot {} is older than required freshness gate beyond leeway (latest_created_at={}, min_created_at={}, leeway_secs={})",
+                "[DeviceSync] Snapshot {} is older than required freshness gate beyond leeway and does not cover current remote cursor",
                 latest.snapshot_id,
-                latest_created_at,
-                min_created_at,
-                SNAPSHOT_FRESHNESS_CLOCK_SKEW_LEEWAY_SECS
             );
             return Ok(SyncBootstrapResult {
                 status: "requested".to_string(),
@@ -524,6 +620,41 @@ pub async fn generate_snapshot_now_internal(
         ));
     }
 
+    let local_cursor = context.app_sync_repository().get_cursor().ok();
+    let server_cursor = create_client()?
+        .get_events_cursor(&token, &device_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .cursor;
+    if local_cursor.is_some_and(|cursor| cursor > server_cursor) {
+        return Err(sync_source_restore_required_error());
+    }
+    if let Some(cursor) = local_cursor {
+        if let Ok(Some(latest_snapshot)) = create_client()?
+            .get_latest_snapshot_with_cursor_fallback(&token, &device_id)
+            .await
+        {
+            if latest_snapshot.oplog_seq >= cursor {
+                info!(
+                    "[DeviceSync] Reusing latest remote snapshot id={} oplog_seq={} for cursor={}",
+                    latest_snapshot.snapshot_id, latest_snapshot.oplog_seq, cursor
+                );
+                emit_snapshot_upload_progress(
+                    handle,
+                    "completed",
+                    100,
+                    "Latest remote snapshot already covers current data",
+                );
+                return Ok(SyncSnapshotUploadResult {
+                    status: "uploaded".to_string(),
+                    snapshot_id: Some(latest_snapshot.snapshot_id),
+                    oplog_seq: Some(latest_snapshot.oplog_seq),
+                    message: "Latest remote snapshot already covers current cursor".to_string(),
+                });
+            }
+        }
+    }
+
     let sqlite_bytes = context
         .app_sync_repository()
         .export_snapshot_sqlite_image(APP_SYNC_TABLES.iter().map(|v| v.to_string()).collect())
@@ -560,17 +691,11 @@ pub async fn generate_snapshot_now_internal(
         key_version,
     )?;
 
-    let local_cursor = context.app_sync_repository().get_cursor().ok();
-    let remote_cursor = create_client()?
-        .get_events_cursor(&token, &device_id)
-        .await
-        .map(|cursor| cursor.cursor)
-        .ok();
-    let base_seq = match (local_cursor, remote_cursor) {
-        (Some(local), Some(remote)) => Some(local.min(remote)),
-        (None, Some(remote)) => Some(remote),
-        _ => None,
-    };
+    let base_seq = local_cursor;
+    debug!(
+        "[DeviceSync] Snapshot upload cursor anchor local_cursor={:?} server_cursor={} base_seq={:?}",
+        local_cursor, server_cursor, base_seq
+    );
     let upload_headers = wealthfolio_device_sync::SnapshotUploadHeaders {
         event_id: Some(Uuid::now_v7().to_string()),
         schema_version: 1,
@@ -619,6 +744,37 @@ pub async fn generate_snapshot_now_internal(
                 return Ok(snapshot_upload_cancelled_result(
                     "Snapshot upload cancelled during transfer",
                 ));
+            }
+            if is_snapshot_index_conflict(&message) {
+                let latest = match create_client() {
+                    Ok(client) => client
+                        .get_latest_snapshot_with_cursor_fallback(&token, &device_id)
+                        .await
+                        .ok()
+                        .flatten(),
+                    Err(_) => None,
+                };
+                if let (Some(cursor), Some(snapshot)) = (local_cursor, latest) {
+                    if snapshot.oplog_seq >= cursor {
+                        info!(
+                            "[DeviceSync] Snapshot conflict resolved by existing remote snapshot id={} oplog_seq={} cursor={}",
+                            snapshot.snapshot_id, snapshot.oplog_seq, cursor
+                        );
+                        emit_snapshot_upload_progress(
+                            handle,
+                            "complete",
+                            100,
+                            "Snapshot already available",
+                        );
+                        return Ok(SyncSnapshotUploadResult {
+                            status: "uploaded".to_string(),
+                            snapshot_id: Some(snapshot.snapshot_id),
+                            oplog_seq: Some(snapshot.oplog_seq),
+                            message: "Latest remote snapshot already covers current cursor"
+                                .to_string(),
+                        });
+                    }
+                }
             }
             return Err(message);
         }

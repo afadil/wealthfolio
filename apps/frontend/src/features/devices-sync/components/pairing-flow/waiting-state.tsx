@@ -13,6 +13,8 @@ interface WaitingStateProps {
   showQRSkeleton?: boolean;
   /** Security code to display (for claimer to show while waiting) */
   securityCode?: string | null;
+  /** Optional action button rendered below the security code */
+  action?: React.ReactNode;
 }
 
 export function WaitingState({
@@ -21,6 +23,7 @@ export function WaitingState({
   onCancel,
   showQRSkeleton,
   securityCode,
+  action,
 }: WaitingStateProps) {
   return (
     <div className="flex flex-col items-center px-4 py-6">
@@ -41,15 +44,22 @@ export function WaitingState({
                 : securityCode}
             </span>
           </div>
-          {/* Spinner below code */}
-          <div className="text-muted-foreground flex items-center gap-2 text-sm">
-            <Icons.Spinner className="h-4 w-4 animate-spin" />
-            <span>Waiting for confirmation...</span>
-          </div>
+          {/* Spinner or action below code */}
+          {action ?? (
+            <div className="text-muted-foreground flex items-center gap-2 text-sm">
+              <Icons.Spinner className="h-4 w-4 animate-spin" />
+              <span>Waiting for confirmation...</span>
+            </div>
+          )}
         </div>
       ) : (
-        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
-          <Icons.Spinner className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400" />
+        <div className="mb-6 flex flex-col items-center gap-4">
+          {!action && (
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
+              <Icons.Spinner className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400" />
+            </div>
+          )}
+          {action}
         </div>
       )}
 

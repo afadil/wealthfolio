@@ -29,11 +29,11 @@ const adapterMocks = vi.hoisted(() => ({
   createPairing: vi.fn(),
   getPairing: vi.fn(),
   approvePairing: vi.fn(),
-  completePairing: vi.fn(),
+  completePairingWithTransfer: vi.fn(),
   cancelPairing: vi.fn(),
   claimPairing: vi.fn(),
   getPairingMessages: vi.fn(),
-  confirmPairing: vi.fn(),
+  confirmPairingWithBootstrap: vi.fn(),
 }));
 
 const storageMocks = vi.hoisted(() => ({
@@ -65,15 +65,15 @@ vi.mock("@/adapters", () => adapterMocks);
 vi.mock("../storage/keyring", () => ({ syncStorage: storageMocks }));
 vi.mock("../crypto", () => cryptoMocks);
 
-import type { ClaimerSession, KeyBundlePayload, PairingSession } from "../types";
+import { SyncErrorCodes, type ClaimerSession, type KeyBundlePayload, type PairingSession } from "../types";
 import { syncService } from "./sync-service";
 
-describe("syncService pairing remote seed status", () => {
+describe("syncService pairing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("maps completePairing remoteSeedPresent from API response", async () => {
+  it("completePairingWithTransfer encrypts key bundle and calls backend", async () => {
     const session: PairingSession = {
       pairingId: "pair_1",
       code: "123456",
@@ -92,16 +92,21 @@ describe("syncService pairing remote seed status", () => {
     storageMocks.getKeyVersion.mockResolvedValue(7);
     cryptoMocks.encrypt.mockResolvedValue("encrypted_bundle");
     cryptoMocks.computeSAS.mockResolvedValue("sas");
-    cryptoMocks.hashPairingCode.mockResolvedValue("signature");
-    adapterMocks.completePairing.mockResolvedValue({ success: true, remoteSeedPresent: false });
+    cryptoMocks.hmacSha256.mockResolvedValue("signature");
+    adapterMocks.completePairingWithTransfer.mockResolvedValue({ success: true });
 
-    const result = await syncService.completePairing(session);
+    const result = await syncService.completePairingWithTransfer(session);
 
-    expect(adapterMocks.completePairing).toHaveBeenCalledTimes(1);
-    expect(result.remoteSeedPresent).toBe(false);
+    expect(adapterMocks.completePairingWithTransfer).toHaveBeenCalledWith(
+      "pair_1",
+      "encrypted_bundle",
+      "sas",
+      "signature",
+    );
+    expect(result.remoteSeedPresent).toBeNull();
   });
 
-  it("maps confirmPairingAsClaimer remoteSeedPresent from API response", async () => {
+  it("confirmPairingWithBootstrap stores credentials and calls backend", async () => {
     const session: ClaimerSession = {
       pairingId: "pair_2",
       code: "654321",
@@ -121,17 +126,81 @@ describe("syncService pairing remote seed status", () => {
     };
 
     cryptoMocks.hmacSha256.mockResolvedValue("proof");
-    adapterMocks.confirmPairing.mockResolvedValue({
-      success: true,
-      keyVersion: 8,
-      remoteSeedPresent: true,
-    });
     storageMocks.setE2EECredentials.mockResolvedValue(undefined);
+    adapterMocks.confirmPairingWithBootstrap.mockResolvedValue({
+      status: "applied",
+      message: "Bootstrap completed",
+      localRows: null,
+      nonEmptyTables: null,
+    });
 
-    const result = await syncService.confirmPairingAsClaimer(session, keyBundle);
+    const result = await syncService.confirmPairingWithBootstrap(session, keyBundle);
 
-    expect(adapterMocks.confirmPairing).toHaveBeenCalledWith("pair_2", "proof", undefined);
-    expect(storageMocks.setE2EECredentials).toHaveBeenCalledTimes(1);
-    expect(result.remoteSeedPresent).toBe(true);
+    expect(storageMocks.setE2EECredentials).toHaveBeenCalledWith("root_key", 8, {
+      secretKey: "esk",
+      publicKey: "epk",
+    });
+    expect(adapterMocks.confirmPairingWithBootstrap).toHaveBeenCalledWith(
+      "pair_2",
+      "proof",
+      undefined, // no keyBundleCreatedAt on session
+      undefined, // allowOverwrite
+    );
+    expect(result.status).toBe("applied");
+  });
+
+  it("maps restore-required snapshot errors to a typed sync error", async () => {
+    const session: PairingSession = {
+      pairingId: "pair_restore",
+      code: "123456",
+      ephemeralSecretKey: "esk",
+      ephemeralPublicKey: "epk",
+      claimerPublicKey: "claimer_pub",
+      claimerDeviceId: "dev_2",
+      sessionKey: "session_key",
+      keyVersion: 7,
+      expiresAt: new Date(Date.now() + 60_000),
+      status: "claimed",
+      requireSas: true,
+    };
+
+    storageMocks.getRootKey.mockResolvedValue("root_key");
+    storageMocks.getKeyVersion.mockResolvedValue(7);
+    cryptoMocks.encrypt.mockResolvedValue("encrypted_bundle");
+    cryptoMocks.computeSAS.mockResolvedValue("sas");
+    cryptoMocks.hmacSha256.mockResolvedValue("signature");
+    adapterMocks.completePairingWithTransfer.mockRejectedValue(
+      new Error(
+        "SYNC_SOURCE_RESTORE_REQUIRED: Local sync state is ahead of the last confirmed sync state on the server. Use this device to restore sync before connecting another device.",
+      ),
+    );
+
+    await expect(syncService.completePairingWithTransfer(session)).rejects.toMatchObject({
+      code: SyncErrorCodes.SOURCE_RESTORE_REQUIRED,
+    });
+  });
+
+  it("keeps bootstrap in waiting state when reconcile is still waiting for a fresh snapshot", async () => {
+    adapterMocks.deviceSyncReconcileReadyState.mockResolvedValue({
+      status: "ok",
+      message: "Device sync reconcile completed",
+      bootstrapAction: "WAIT_REMOTE_SNAPSHOT",
+      bootstrapStatus: "requested",
+      bootstrapMessage: "Waiting for a fresh snapshot",
+      bootstrapSnapshotId: null,
+      cycleStatus: "wait_snapshot",
+      cycleNeedsBootstrap: true,
+      retryAttempted: false,
+      retryCycleStatus: null,
+      backgroundStatus: "started",
+    });
+
+    const result = await syncService.bootstrapWithOverwriteCheck(true);
+
+    expect(adapterMocks.deviceSyncReconcileReadyState).toHaveBeenCalledWith(true);
+    expect(result).toEqual({
+      status: "waiting_snapshot",
+      message: "Waiting for a fresh snapshot",
+    });
   });
 });

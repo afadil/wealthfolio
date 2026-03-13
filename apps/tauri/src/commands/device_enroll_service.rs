@@ -48,6 +48,13 @@ pub async fn enable_device_sync(
         .await;
 
     if result.state == SyncState::Ready {
+        // Clear stale outbox/metadata from any previous sync session before
+        // the bg engine starts pushing events.
+        let _ = context
+            .app_sync_repository()
+            .reset_and_mark_bootstrap_complete(result.device_id.clone(), result.key_version)
+            .await;
+
         let engine_context = Arc::clone(context.inner());
         tauri::async_runtime::spawn(async move {
             if let Err(err) = ensure_background_engine_started(engine_context).await {
@@ -72,6 +79,10 @@ pub async fn clear_device_sync_data(context: State<'_, Arc<ServiceContext>>) -> 
         .clear_sync_data()
         .map_err(|e| e.message);
     if result.is_ok() {
+        let _ = context
+            .app_sync_repository()
+            .reset_local_sync_session()
+            .await;
         clear_min_snapshot_created_at_from_store();
         let _ = context
             .app_sync_repository()
@@ -100,6 +111,11 @@ pub async fn reinitialize_device_sync(
         .await;
 
     if result.state == SyncState::Ready {
+        let _ = context
+            .app_sync_repository()
+            .reset_and_mark_bootstrap_complete(result.device_id.clone(), result.key_version)
+            .await;
+
         let engine_context = Arc::clone(context.inner());
         tauri::async_runtime::spawn(async move {
             if let Err(err) = ensure_background_engine_started(engine_context).await {

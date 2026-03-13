@@ -481,6 +481,8 @@ pub fn run() {
             #[cfg(feature = "device-sync")]
             commands::device_sync::device_sync_engine_status,
             #[cfg(feature = "device-sync")]
+            commands::device_sync::device_sync_pairing_source_status,
+            #[cfg(feature = "device-sync")]
             commands::device_sync::device_sync_bootstrap_overwrite_check,
             #[cfg(feature = "device-sync")]
             commands::device_sync::device_sync_reconcile_ready_state,
@@ -512,6 +514,20 @@ pub fn run() {
             commands::device_sync::get_pairing_messages,
             #[cfg(feature = "device-sync")]
             commands::device_sync::confirm_pairing,
+            // Composite pairing endpoints
+            #[cfg(feature = "device-sync")]
+            commands::device_sync::complete_pairing_with_transfer,
+            #[cfg(feature = "device-sync")]
+            commands::device_sync::confirm_pairing_with_bootstrap,
+            // Pairing flow coordinator
+            #[cfg(feature = "device-sync")]
+            commands::device_sync::begin_pairing_confirm,
+            #[cfg(feature = "device-sync")]
+            commands::device_sync::get_pairing_flow_state,
+            #[cfg(feature = "device-sync")]
+            commands::device_sync::approve_pairing_overwrite,
+            #[cfg(feature = "device-sync")]
+            commands::device_sync::cancel_pairing_flow,
             // Device enroll service (high-level commands)
             #[cfg(feature = "device-sync")]
             commands::device_enroll_service::get_device_sync_state,

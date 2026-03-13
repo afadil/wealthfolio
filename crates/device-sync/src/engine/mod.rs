@@ -14,7 +14,10 @@ pub use ports::{
     SyncBootstrapResult, SyncCycleResult, SyncIdentity, SyncReadyReconcileResult, SyncTransport,
     TransportError,
 };
-pub use runtime::DeviceSyncRuntimeState;
+pub use runtime::{
+    DeviceSyncRuntimeState, OverwriteInfo, OverwriteTableInfo, PairingFlowPhase,
+    PairingFlowResponse, PairingFlowState,
+};
 
 /// Foreground pull cadence in seconds.
 pub const DEVICE_SYNC_FOREGROUND_INTERVAL_SECS: u64 = 5 * 60;
@@ -260,7 +263,6 @@ where
         "[DeviceSync] Reconcile action={}, cursor={:?}",
         reconcile.action, reconcile.cursor
     );
-
     let has_pending = ports.has_pending_outbox().await.unwrap_or(false);
     match reconcile.action.as_str() {
         "NOOP" => {
@@ -291,28 +293,41 @@ where
             debug!("[DeviceSync] Reconcile action=NOOP but has pending outbox, proceeding with push+pull");
         }
         "BOOTSTRAP_SNAPSHOT" => {
-            ports
-                .mark_cycle_outcome(
-                    "stale_cursor".to_string(),
-                    ctx.started_at.elapsed().as_millis() as i64,
-                    None,
-                )
-                .await
-                .map_err(|e| e.to_string())?;
-            return Ok(SyncCycleResult {
-                status: "stale_cursor".to_string(),
-                lock_version: 0,
-                pushed_count: 0,
-                pulled_count: 0,
-                cursor: ctx.local_cursor,
-                needs_bootstrap: true,
-                bootstrap_snapshot_id: reconcile
-                    .latest_snapshot
-                    .as_ref()
-                    .map(|s| s.snapshot_id.clone()),
-                bootstrap_snapshot_seq: reconcile.latest_snapshot.as_ref().map(|s| s.oplog_seq),
-                dead_letter_count: 0,
-            });
+            if ctx.local_cursor > 0 {
+                // Bootstrap was already applied (cursor is set from snapshot restore).
+                // The server doesn't know our updated cursor yet because no push/pull
+                // has happened. Fall through to push+pull so the server learns our
+                // actual cursor. If the cursor is genuinely stale (behind GC watermark),
+                // the pull error handler will catch SYNC_CURSOR_TOO_OLD and return
+                // stale_cursor at that point.
+                debug!(
+                    "[DeviceSync] Reconcile action=BOOTSTRAP_SNAPSHOT but local cursor {} > 0, proceeding with push+pull",
+                    ctx.local_cursor
+                );
+            } else {
+                ports
+                    .mark_cycle_outcome(
+                        "stale_cursor".to_string(),
+                        ctx.started_at.elapsed().as_millis() as i64,
+                        None,
+                    )
+                    .await
+                    .map_err(|e| e.to_string())?;
+                return Ok(SyncCycleResult {
+                    status: "stale_cursor".to_string(),
+                    lock_version: 0,
+                    pushed_count: 0,
+                    pulled_count: 0,
+                    cursor: ctx.local_cursor,
+                    needs_bootstrap: true,
+                    bootstrap_snapshot_id: reconcile
+                        .latest_snapshot
+                        .as_ref()
+                        .map(|s| s.snapshot_id.clone()),
+                    bootstrap_snapshot_seq: reconcile.latest_snapshot.as_ref().map(|s| s.oplog_seq),
+                    dead_letter_count: 0,
+                });
+            }
         }
         "WAIT_SNAPSHOT" => {
             ports
@@ -354,7 +369,7 @@ where
     debug!("[DeviceSync] Local cursor: {}", ctx.local_cursor);
     let lock_version = ctx.lock_version;
     let mut local_cursor = ctx.local_cursor;
-    let server_cursor = match reconcile.cursor {
+    let mut server_cursor = match reconcile.cursor {
         Some(c) => c,
         None => {
             log::warn!(
@@ -474,6 +489,7 @@ where
                     .mark_push_completed()
                     .await
                     .map_err(|e| e.to_string())?;
+                server_cursor = push_response.server_cursor;
             }
             Err(err) => {
                 let err_str = err.to_string();
