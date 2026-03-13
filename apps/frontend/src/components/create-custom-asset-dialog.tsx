@@ -31,10 +31,12 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-// Simplified asset types for the form (values are InstrumentType)
 const ASSET_TYPE_OPTIONS = [
-  { value: "EQUITY", label: "Security (Stock, ETF, Bond)" },
+  { value: "EQUITY", label: "Equity (Stock, ETF, Fund)" },
   { value: "CRYPTO", label: "Cryptocurrency" },
+  { value: "BOND", label: "Bond" },
+  { value: "OPTION", label: "Option" },
+  { value: "METAL", label: "Precious Metal" },
   { value: "OTHER", label: "Other" },
 ] as const;
 
@@ -45,7 +47,7 @@ const customAssetSchema = z.object({
     .max(20, "Symbol must be 20 characters or less")
     .transform((val) => val.toUpperCase().trim()),
   name: z.string().min(1, "Name is required").max(100, "Name must be 100 characters or less"),
-  assetType: z.enum(["EQUITY", "CRYPTO", "OTHER"]),
+  assetType: z.enum(["EQUITY", "CRYPTO", "BOND", "OPTION", "METAL", "OTHER"]),
   currency: z.string().min(1, "Currency is required"),
 });
 
@@ -106,7 +108,7 @@ export function CreateCustomAssetDialog({
           ? "CRYPTOCURRENCY"
           : values.assetType === "OTHER"
             ? "OTHER"
-            : "EQUITY",
+            : values.assetType,
       index: "MANUAL",
       typeDisplay: "Custom Asset",
       dataSource: "MANUAL",
