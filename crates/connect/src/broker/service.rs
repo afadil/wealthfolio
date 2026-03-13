@@ -596,7 +596,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 api_symbol.as_deref(),
                 is_crypto_asset,
             );
-            let (symbol, exchange_mic) = match normalized_symbol {
+            let (symbol, mut exchange_mic) = match normalized_symbol {
                 Some(pair) => pair,
                 None if is_crypto_asset => {
                     debug!("Skipping crypto position without symbol");
@@ -607,6 +607,16 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                     continue;
                 }
             };
+
+            // Fallback: use exchange MIC from broker API data when suffix parsing didn't yield one
+            if exchange_mic.is_none() && !is_crypto_asset {
+                exchange_mic = symbol_info.and_then(|s| s.exchange.as_ref()).and_then(|e| {
+                    e.mic_code
+                        .clone()
+                        .filter(|c| !c.trim().is_empty())
+                        .or_else(|| e.code.clone().filter(|c| !c.trim().is_empty()))
+                });
+            }
 
             let units = pos.units.unwrap_or(0.0);
             if units == 0.0 {

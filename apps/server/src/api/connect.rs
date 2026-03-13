@@ -137,6 +137,15 @@ struct DeviceSyncEngineStatusResponse {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct DeviceSyncPairingSourceStatusResponse {
+    status: String,
+    message: String,
+    local_cursor: i64,
+    server_cursor: i64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct DeviceSyncBootstrapOverwriteCheckTableResponse {
     table: String,
     rows: i64,
@@ -213,6 +222,13 @@ fn to_device_sync_reconcile_ready_response(
         retry_cycle_status: result.retry_cycle_status,
         background_status: result.background_status,
     }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DeviceSyncReconcileReadyRequest {
+    #[serde(default)]
+    allow_overwrite: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -926,6 +942,13 @@ async fn enable_device_sync(
         .await;
 
     if result.state == SyncState::Ready {
+        // Clear stale outbox/metadata from any previous sync session before
+        // the bg engine starts pushing events.
+        let _ = state
+            .app_sync_repository
+            .reset_and_mark_bootstrap_complete(result.device_id.clone(), result.key_version)
+            .await;
+
         let _ = device_sync_engine::ensure_background_engine_started(Arc::clone(&state)).await;
     }
 
@@ -942,6 +965,7 @@ async fn clear_device_sync_data(State(state): State<Arc<AppState>>) -> ApiResult
         .device_enroll_service
         .clear_sync_data()
         .map_err(|e| ApiError::Internal(e.message))?;
+    let _ = state.app_sync_repository.reset_local_sync_session().await;
     state
         .secret_store
         .delete_secret(DEVICE_ID_KEY)
@@ -983,6 +1007,11 @@ async fn reinitialize_device_sync(
         .await;
 
     if result.state == SyncState::Ready {
+        let _ = state
+            .app_sync_repository
+            .reset_and_mark_bootstrap_complete(result.device_id.clone(), result.key_version)
+            .await;
+
         let _ = device_sync_engine::ensure_background_engine_started(Arc::clone(&state)).await;
     }
 
@@ -1008,6 +1037,21 @@ async fn get_device_sync_engine_status(
         last_cycle_duration_ms: status.last_cycle_duration_ms,
         background_running: status.background_running,
         bootstrap_required: status.bootstrap_required,
+    }))
+}
+
+async fn get_device_sync_pairing_source_status(
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<DeviceSyncPairingSourceStatusResponse>> {
+    ensure_device_sync_enabled()?;
+    let status = device_sync_engine::get_pairing_source_status(&state)
+        .await
+        .map_err(ApiError::Internal)?;
+    Ok(Json(DeviceSyncPairingSourceStatusResponse {
+        status: status.status,
+        message: status.message,
+        local_cursor: status.local_cursor,
+        server_cursor: status.server_cursor,
     }))
 }
 
@@ -1106,9 +1150,10 @@ async fn start_device_sync_background_engine(
 
 async fn reconcile_device_sync_ready_state(
     State(state): State<Arc<AppState>>,
+    Json(body): Json<DeviceSyncReconcileReadyRequest>,
 ) -> ApiResult<Json<DeviceSyncReconcileReadyResponse>> {
     ensure_device_sync_enabled()?;
-    let result = device_sync_engine::reconcile_ready_state(state)
+    let result = device_sync_engine::reconcile_ready_state(state, body.allow_overwrite)
         .await
         .map_err(ApiError::Internal)?;
     Ok(Json(to_device_sync_reconcile_ready_response(result)))
@@ -1193,6 +1238,10 @@ pub fn router() -> Router<Arc<AppState>> {
         .route(
             "/connect/device/engine-status",
             get(get_device_sync_engine_status),
+        )
+        .route(
+            "/connect/device/pairing-source-status",
+            get(get_device_sync_pairing_source_status),
         )
         .route(
             "/connect/device/bootstrap-overwrite-check",

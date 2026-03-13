@@ -22,7 +22,7 @@ use super::broker::BrokerApiClient;
 const DEFAULT_TIMEOUT_SECS: u64 = 30;
 
 /// Default base URL for Wealthfolio Connect cloud service.
-pub const DEFAULT_CLOUD_API_URL: &str = "https://api-staging.wealthfolio.app";
+pub const DEFAULT_CLOUD_API_URL: &str = "https://api.wealthfolio.app";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // API Response Types (internal, for parsing cloud API responses)

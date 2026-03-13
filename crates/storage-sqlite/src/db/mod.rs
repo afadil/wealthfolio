@@ -17,6 +17,7 @@ use wealthfolio_core::errors::{DatabaseError, Error, Result};
 
 use crate::errors::StorageError;
 
+// Keep this invocation in sync with the on-disk migrations directory.
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 pub type DbPool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
