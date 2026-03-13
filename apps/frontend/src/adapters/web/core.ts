@@ -461,23 +461,25 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     }
     case "calculate_performance_history": {
-      const { itemType, itemId, startDate, endDate } = payload as {
+      const { itemType, itemId, startDate, endDate, trackingMode } = payload as {
         itemType: string;
         itemId: string;
         startDate?: string;
         endDate?: string;
+        trackingMode?: string;
       };
-      body = JSON.stringify({ itemType, itemId, startDate, endDate });
+      body = JSON.stringify({ itemType, itemId, startDate, endDate, trackingMode });
       break;
     }
     case "calculate_performance_summary": {
-      const { itemType, itemId, startDate, endDate } = payload as {
+      const { itemType, itemId, startDate, endDate, trackingMode } = payload as {
         itemType: string;
         itemId: string;
         startDate?: string;
         endDate?: string;
+        trackingMode?: string;
       };
-      body = JSON.stringify({ itemType, itemId, startDate, endDate });
+      body = JSON.stringify({ itemType, itemId, startDate, endDate, trackingMode });
       break;
     }
     case "check_update": {
