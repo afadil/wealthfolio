@@ -1234,12 +1234,8 @@ mod tests {
     #[test]
     fn test_canonicalize_market_identity_cusip_defaults_to_us() {
         // When no currency is provided, CUSIP should default to US
-        let result = canonicalize_market_identity(
-            Some(InstrumentType::Bond),
-            Some("912797NQ6"),
-            None,
-            None,
-        );
+        let result =
+            canonicalize_market_identity(Some(InstrumentType::Bond), Some("912797NQ6"), None, None);
 
         let sym = result.instrument_symbol.expect("should have symbol");
         assert!(
