@@ -13,7 +13,14 @@ import type { Account } from "@/lib/types";
 import { canImportCSV } from "@/lib/activity-restrictions";
 
 // Context
-import { ImportProvider, useImportContext, nextStep, prevStep, type ImportStep } from "./context";
+import {
+  ImportProvider,
+  useImportContext,
+  nextStep,
+  prevStep,
+  setMapping,
+  type ImportStep,
+} from "./context";
 
 // Components
 import { WizardStepIndicator, type WizardStep } from "./components/wizard-step-indicator";
@@ -37,6 +44,7 @@ import { HoldingsConfirmStep } from "./steps/holdings-confirm-step";
 import { IMPORT_REQUIRED_FIELDS, ImportFormat } from "@/lib/constants";
 import { isCashSymbol, isSymbolRequired } from "@/lib/activity-utils";
 import { validateTickerSymbol, findMappedActivityType } from "./utils/validation-utils";
+import { computeFieldMappings } from "./hooks/use-import-mapping";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Step Configuration
@@ -266,10 +274,30 @@ function ImportWizardContent() {
 
   // Handlers
   const handleNext = useCallback(() => {
-    if (canGoNext) {
-      dispatch(nextStep());
+    if (!canGoNext) return;
+
+    // At the upload→mapping transition, compute field mappings synchronously
+    // so the mapping step mounts with fieldMappings already populated.
+    if (state.step === "upload" && state.headers.length > 0 && !isHoldingsMode) {
+      const mergedFieldMappings = computeFieldMappings(state.headers, state.mapping?.fieldMappings);
+      dispatch(
+        setMapping({
+          ...(state.mapping ?? {
+            accountId: state.accountId || "",
+            name: "",
+            fieldMappings: {},
+            activityMappings: {},
+            symbolMappings: {},
+            accountMappings: {},
+            symbolMappingMeta: {},
+          }),
+          fieldMappings: mergedFieldMappings,
+        }),
+      );
     }
-  }, [dispatch, canGoNext]);
+
+    dispatch(nextStep());
+  }, [dispatch, canGoNext, state.step, state.headers, state.mapping, state.accountId]);
 
   const handleBack = useCallback(() => {
     if (canGoBack) {

@@ -46,7 +46,6 @@ export function MappingStepUnified() {
     handleSymbolMapping,
     handleAccountIdMapping,
   } = useImportMapping({
-    headers,
     accountId,
     defaultMapping: mapping || {
       accountId: accountId || "",
@@ -55,6 +54,7 @@ export function MappingStepUnified() {
       activityMappings: {},
       symbolMappings: {},
       accountMappings: {},
+      symbolMappingMeta: {},
     },
   });
 
