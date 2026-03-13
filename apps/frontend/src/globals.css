@@ -550,6 +550,54 @@
   z-index: 2147483647 !important;
 }
 
+/* Per-type toast colors — override Sonner's --normal-* variables */
+[data-sonner-toast][data-type="success"] {
+  --normal-bg: var(--toast-success-bg);
+  --normal-text: var(--toast-success-fg);
+  --normal-border: var(--toast-success-border);
+}
+
+[data-sonner-toast][data-type="error"] {
+  --normal-bg: var(--toast-error-bg);
+  --normal-text: var(--toast-error-fg);
+  --normal-border: var(--toast-error-border);
+}
+
+[data-sonner-toast][data-type="warning"] {
+  --normal-bg: var(--toast-warning-bg);
+  --normal-text: var(--toast-warning-fg);
+  --normal-border: var(--toast-warning-border);
+}
+
+[data-sonner-toast][data-type="info"] {
+  --normal-bg: var(--toast-info-bg);
+  --normal-text: var(--toast-info-fg);
+  --normal-border: var(--toast-info-border);
+}
+
+/* Mobile: glassy translucent backgrounds for typed toasts */
+@media (width < 768px) {
+  [data-sonner-toast][data-type="success"] {
+    --normal-bg: color-mix(in srgb, var(--toast-success-bg) 70%, transparent);
+    --normal-border: color-mix(in srgb, var(--toast-success-border) 50%, transparent);
+  }
+
+  [data-sonner-toast][data-type="error"] {
+    --normal-bg: color-mix(in srgb, var(--toast-error-bg) 70%, transparent);
+    --normal-border: color-mix(in srgb, var(--toast-error-border) 50%, transparent);
+  }
+
+  [data-sonner-toast][data-type="warning"] {
+    --normal-bg: color-mix(in srgb, var(--toast-warning-bg) 70%, transparent);
+    --normal-border: color-mix(in srgb, var(--toast-warning-border) 50%, transparent);
+  }
+
+  [data-sonner-toast][data-type="info"] {
+    --normal-bg: color-mix(in srgb, var(--toast-info-bg) 70%, transparent);
+    --normal-border: color-mix(in srgb, var(--toast-info-border) 50%, transparent);
+  }
+}
+
 /* QR scanning transparency overrides */
 body.qr-scan-active,
 body.qr-scan-active #root,

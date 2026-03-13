@@ -107,21 +107,13 @@ const useGlobalEventListener = () => {
 
       // Show error toast on both mobile and desktop for failed syncs
       if (failed_syncs && failed_syncs.length > 0) {
-        const failedSymbols = failed_syncs.map(([symbol]) => symbol).join(", ");
-        toast.error("Market Data Update Incomplete", {
-          id: `market-sync-error-${failedSymbols || "unknown"}`,
-          description: `Unable to update market data for: ${failedSymbols}. This may affect your portfolio calculations and analytics. Please try again later.`,
-          duration: 15000,
+        const count = failed_syncs.length;
+        toast.error(`Price update failed for ${count} asset${count === 1 ? "" : "s"}`, {
+          id: "market-sync-error",
+          duration: 10000,
           action: {
-            label: "View Securities",
-            onClick: () => {
-              navigateRef.current("/settings/securities");
-            },
-          },
-          classNames: {
-            toast: "!flex-wrap",
-            content: "!flex-[1_0_calc(100%-2rem)]",
-            actionButton: "!ml-auto",
+            label: "View",
+            onClick: () => navigateRef.current("/health"),
           },
         });
       }
