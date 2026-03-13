@@ -1,5 +1,6 @@
 import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
-import { syncService, useDeviceSync } from "@/features/devices-sync";
+import { syncService } from "@/features/devices-sync";
+import { useSyncStatus } from "@/features/devices-sync/hooks";
 import { SyncStates } from "@/features/devices-sync/types";
 import { useSyncBrokerData } from "@/features/wealthfolio-connect/hooks";
 import { hasBrokerSync } from "@/features/wealthfolio-connect";
@@ -34,8 +35,8 @@ export function DashboardActions({ onAddAsset, onAddLiability }: DashboardAction
   const showSyncAction = isEnabled && isConnected && hasBrokerSync(userInfo);
 
   // Device sync
-  const { state: deviceSync } = useDeviceSync();
-  const showDeviceSyncAction = deviceSync.syncState === SyncStates.READY;
+  const { syncState } = useSyncStatus();
+  const showDeviceSyncAction = syncState === SyncStates.READY;
 
   const groups = useMemo((): ActionPaletteGroup[] => {
     const primaryActions =

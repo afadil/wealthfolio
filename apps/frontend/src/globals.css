@@ -48,7 +48,17 @@
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   /* Disable default colors to prevent their use; feel free to re-enable as needed. */
-  --color-amber-*: initial;
+  --color-amber-50: #fef3c7;
+  --color-amber-100: #fde68a;
+  --color-amber-200: #fcd34d;
+  --color-amber-300: #fbbf24;
+  --color-amber-400: #f59e0b;
+  --color-amber-500: #d97706;
+  --color-amber-600: #b45309;
+  --color-amber-700: #92400e;
+  --color-amber-800: #78350f;
+  --color-amber-900: #451a03;
+  --color-amber-950: #291000;
   --color-lime-*: initial;
   --color-emerald-*: initial;
   --color-teal-*: initial;

@@ -1,6 +1,6 @@
 import { openUrlInBrowser, syncTriggerCycle } from "@/adapters";
 import { Page, PageContent, PageHeader } from "@/components/page";
-import { useDeviceSync } from "@/features/devices-sync";
+import { useSyncStatus } from "@/features/devices-sync/hooks";
 import { useDevices } from "@/features/devices-sync/hooks";
 import { ConnectEmptyState } from "@/features/wealthfolio-connect/components/connect-empty-state";
 import {
@@ -44,7 +44,7 @@ export default function ConnectPage() {
   const showBrokerSync = hasBrokerSync(userInfo);
   const { data: brokerAccounts = [] } = useBrokerAccounts({ enabled: showBrokerSync });
   const { mutate: syncBrokerData, isPending: isSyncing } = useSyncBrokerData();
-  const { state: deviceSyncState } = useDeviceSync();
+  const { engineStatus: deviceSyncEngineStatus } = useSyncStatus();
   const { data: devices } = useDevices("my");
   const queryClient = useQueryClient();
   const [isTriggeringDeviceSync, setIsTriggeringDeviceSync] = useState(false);
@@ -340,7 +340,7 @@ export default function ConnectPage() {
                       <Icons.Smartphone className="text-muted-foreground h-3.5 w-3.5" />
                     </div>
                     Devices
-                    <DeviceSyncStatusBadge engineStatus={deviceSyncState.engineStatus} />
+                    <DeviceSyncStatusBadge engineStatus={deviceSyncEngineStatus} />
                   </div>
                   <div className="flex items-center gap-1">
                     <Link to="/settings/connect">
