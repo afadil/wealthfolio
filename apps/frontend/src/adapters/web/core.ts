@@ -968,9 +968,7 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     }
     case "reset_team_sync": {
       const { reason } = (payload ?? {}) as { reason?: string };
-      if (reason) {
-        body = JSON.stringify({ reason });
-      }
+      body = reason ? JSON.stringify({ reason }) : JSON.stringify({});
       break;
     }
     // Device Sync commands - Pairing (Issuer - Trusted Device)

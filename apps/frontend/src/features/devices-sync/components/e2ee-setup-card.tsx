@@ -16,14 +16,21 @@ import {
 import { useSyncActions, useSyncStatus } from "../hooks";
 import { SyncStates } from "../types";
 
-export function E2EESetupCard() {
+interface E2EESetupCardProps {
+  onPairingNeeded?: () => void;
+}
+
+export function E2EESetupCard({ onPairingNeeded }: E2EESetupCardProps) {
   const { syncState, trustedDevices } = useSyncStatus();
   const { enableSync } = useSyncActions();
   const hasTrustedDevices = trustedDevices.length > 0;
   const trustedDevicePreview = trustedDevices.slice(0, 3);
 
   const handleEnable = async () => {
-    await enableSync.mutateAsync();
+    const result = await enableSync.mutateAsync();
+    if (result.needsPairing) {
+      onPairingNeeded?.();
+    }
   };
 
   // If in READY state, don't show this card

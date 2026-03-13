@@ -1489,9 +1489,7 @@ pub async fn confirm_pairing_with_bootstrap(
 // Pairing Flow Coordinator Commands
 // ─────────────────────────────────────────────────────────────────────────────
 
-use wealthfolio_device_sync::engine::{
-    OverwriteInfo, OverwriteTableInfo, PairingFlowPhase, PairingFlowResponse,
-};
+use wealthfolio_device_sync::engine::{PairingFlowPhase, PairingFlowResponse};
 
 /// Begin the post-SAS confirm+bootstrap phase. Creates a flow entry and returns its state.
 #[tauri::command(rename_all = "camelCase")]
@@ -1561,24 +1559,18 @@ pub async fn begin_pairing_confirm(
         });
     }
 
-    // 4. Check overwrite risk
+    // 4. If local data exists, defer bootstrap to auto-bootstrap AlertDialog
+    //    (which offers "Back up first" option). Pairing is done at this point.
     let summary = context
         .app_sync_repository()
         .get_local_sync_data_summary()
         .map_err(|e| e.to_string())?;
     if summary.total_rows > 0 {
-        let phase = PairingFlowPhase::OverwriteRequired {
-            info: OverwriteInfo {
-                local_rows: summary.total_rows,
-                non_empty_tables: summary
-                    .non_empty_tables
-                    .into_iter()
-                    .map(|SyncTableRowCount { table, rows }| OverwriteTableInfo { table, rows })
-                    .collect(),
-            },
-        };
-        let flow_id = runtime.create_flow(pairing_id, phase.clone());
-        return Ok(PairingFlowResponse { flow_id, phase });
+        info!("[DeviceSync] begin_pairing_confirm: local data found ({} rows), deferring bootstrap to auto-bootstrap", summary.total_rows);
+        return Ok(PairingFlowResponse {
+            flow_id: uuid::Uuid::new_v4().to_string(),
+            phase: PairingFlowPhase::Success,
+        });
     }
 
     // 5. Bootstrap snapshot

@@ -287,7 +287,6 @@ export function DeviceSyncSection() {
   const beginPairingFlow = useCallback(async () => {
     setPrepareError(null);
     setIsPreparing(true);
-    setIsPairingOpen(true);
 
     try {
       const pairingSource = await syncService.getPairingSourceStatus();
@@ -298,15 +297,16 @@ export function DeviceSyncSection() {
           return;
         }
 
-        setIsPairingOpen(false);
         setIsPreparing(false);
         setShowReinitConfirmDialog(true);
         return;
       }
 
       setIsPreparing(false);
+      setIsPairingOpen(true);
     } catch (err) {
       setPrepareError(err instanceof Error ? err.message : "An unexpected error occurred");
+      setIsPairingOpen(true);
     }
   }, [actions.reinitializeSync, otherConnectedDevices]);
 
@@ -396,7 +396,7 @@ export function DeviceSyncSection() {
 
   // FRESH state - Show enable sync card
   if (status.syncState === SyncStates.FRESH) {
-    return <E2EESetupCard />;
+    return <E2EESetupCard onPairingNeeded={() => setIsPairingOpen(true)} />;
   }
 
   // ORPHANED state - Keys exist on server but no trusted devices to pair with
@@ -461,6 +461,7 @@ export function DeviceSyncSection() {
               onCancel={handlePairingCancel}
               title="Connect This Device"
               description="Enter the code from your other connected device"
+              forceRole="claimer"
             />
           </DialogContent>
         </Dialog>
@@ -514,6 +515,7 @@ export function DeviceSyncSection() {
               onCancel={handlePairingCancel}
               title="Update This Device"
               description="Enter the code from your other connected device"
+              forceRole="claimer"
             />
           </DialogContent>
         </Dialog>
@@ -1072,35 +1074,102 @@ function ConnectedDevicesList({
 }
 
 function PairThisDeviceItem({ onPair }: { onPair: () => void }) {
+  const { clearSyncData } = useSyncActions();
+  const [showResetAlert, setShowResetAlert] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+
+  const handleDisconnect = async () => {
+    setIsResetting(true);
+    try {
+      await clearSyncData.mutateAsync();
+      setShowResetAlert(false);
+    } catch (err) {
+      toast.error("Failed to disconnect", {
+        description: err instanceof Error ? err.message : "An unexpected error occurred",
+      });
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   return (
-    <div className="bg-muted/30 flex flex-col gap-3 rounded-lg border border-dashed p-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        <Avatar className="h-9 w-9 shrink-0 rounded-lg">
-          <AvatarFallback className="rounded-lg">
-            <Icons.Smartphone className="text-muted-foreground h-4 w-4" />
-          </AvatarFallback>
-        </Avatar>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-medium">This device</span>
-            <Badge
-              variant="outline"
-              className="text-warning border-warning/20 bg-warning/20 h-5 shrink-0 text-[10px]"
-            >
-              Not connected
-            </Badge>
-          </div>
-          <div className="text-muted-foreground flex items-center gap-1 text-xs">
-            <Icons.ShieldAlert className="h-3 w-3 text-amber-600 dark:text-amber-500" />
-            Connect this device to start syncing.
+    <>
+      <div className="bg-muted/30 flex flex-col gap-3 rounded-lg border border-dashed p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <Avatar className="h-9 w-9 shrink-0 rounded-lg">
+            <AvatarFallback className="rounded-lg">
+              <Icons.Smartphone className="text-muted-foreground h-4 w-4" />
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="truncate text-sm font-medium">This device</span>
+              <Badge
+                variant="outline"
+                className="text-warning border-warning/20 bg-warning/20 h-5 shrink-0 text-[10px]"
+              >
+                Not connected
+              </Badge>
+            </div>
+            <div className="text-muted-foreground flex items-center gap-1 text-xs">
+              <Icons.ShieldAlert className="h-3 w-3 text-amber-600 dark:text-amber-500" />
+              Connect this device to start syncing.
+            </div>
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          <Button size="default" className="w-full shrink-0 sm:w-auto" onClick={onPair}>
+            <Icons.Link className="mr-2 h-4 w-4" />
+            Connect This Device
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground h-8 w-8 shrink-0"
+              >
+                <Icons.MoreVertical className="h-4 w-4" />
+                <span className="sr-only">Options</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onSelect={() => setShowResetAlert(true)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Icons.LogOut className="mr-2 h-4 w-4" />
+                Disconnect
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
-      <Button size="default" className="w-full shrink-0 sm:w-auto" onClick={onPair}>
-        <Icons.Link className="mr-2 h-4 w-4" />
-        Connect This Device
-      </Button>
-    </div>
+
+      <AlertDialog open={showResetAlert} onOpenChange={setShowResetAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disconnect this device?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove sync from this device. You can set it up again later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isResetting}>Cancel</AlertDialogCancel>
+            <Button variant="destructive" onClick={handleDisconnect} disabled={isResetting}>
+              {isResetting ? (
+                <>
+                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  Disconnecting...
+                </>
+              ) : (
+                "Disconnect"
+              )}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 

@@ -5,8 +5,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import { usePairingIssuer, usePairingClaimer, useSyncStatus } from "../../hooks";
 import { logger } from "@/adapters";
-import { Icons } from "@wealthfolio/ui";
-import { Button } from "@wealthfolio/ui/components/ui/button";
 import { DisplayCode } from "./display-code";
 import { SASVerification } from "./sas-verification";
 import { WaitingState } from "./waiting-state";
@@ -20,6 +18,8 @@ interface PairingFlowProps {
   title?: string;
   /** Description shown during the initial step */
   description?: string;
+  /** Override auto-detected role (e.g. REGISTERED state always needs claimer) */
+  forceRole?: "issuer" | "claimer";
 }
 
 /** Inline title block rendered above the initial step content */
@@ -33,9 +33,15 @@ function StepHeader({ title, description }: { title?: string; description?: stri
   );
 }
 
-export function PairingFlow({ onComplete, onCancel, title, description }: PairingFlowProps) {
+export function PairingFlow({
+  onComplete,
+  onCancel,
+  title,
+  description,
+  forceRole,
+}: PairingFlowProps) {
   const { device } = useSyncStatus();
-  const initialRoleRef = useRef<"issuer" | "claimer" | null>(null);
+  const initialRoleRef = useRef<"issuer" | "claimer" | null>(forceRole ?? null);
   if (initialRoleRef.current == null && device) {
     initialRoleRef.current = device.trustState === "trusted" ? "issuer" : "claimer";
   }
@@ -159,8 +165,7 @@ function IssuerFlow({ onComplete, onCancel, title, description }: PairingFlowPro
 
 // Claimer Flow (untrusted device - enters code and receives keys)
 function ClaimerFlow({ onComplete, onCancel, title, description }: PairingFlowProps) {
-  const { step, error, sas, overwriteInfo, submitCode, approveOverwrite, cancel, retry } =
-    usePairingClaimer();
+  const { step, error, sas, submitCode, cancel, retry } = usePairingClaimer();
 
   const handleCancel = useCallback(async () => {
     await cancel();
@@ -186,28 +191,6 @@ function ClaimerFlow({ onComplete, onCancel, title, description }: PairingFlowPr
     case "waiting_keys":
       return (
         <WaitingState title="Verify Security Code" securityCode={sas} onCancel={handleCancel} />
-      );
-
-    case "overwrite_confirm":
-      return (
-        <div className="flex flex-col items-center px-4 py-6">
-          <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
-            <Icons.AlertTriangle className="h-8 w-8 text-amber-600 dark:text-amber-400" />
-          </div>
-          <div className="mb-6 text-center">
-            <p className="text-foreground text-base font-semibold">Replace local data?</p>
-            <p className="text-muted-foreground mt-2 max-w-[280px] text-sm">
-              This device has {overwriteInfo?.localRows ?? 0} rows of data that will be replaced
-              with data from your other device.
-            </p>
-          </div>
-          <div className="flex w-full max-w-[240px] flex-col gap-2">
-            <Button onClick={approveOverwrite}>Replace &amp; Sync</Button>
-            <Button variant="ghost" size="sm" onClick={handleCancel}>
-              Cancel
-            </Button>
-          </div>
-        </div>
       );
 
     case "syncing":

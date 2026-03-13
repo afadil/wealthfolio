@@ -29,20 +29,15 @@ describe("PairingFlow", () => {
     vi.clearAllMocks();
   });
 
-  it("shows overwrite_confirm step with row count and action buttons", () => {
+  it("shows success step for claimer flow", () => {
     hookMocks.useSyncStatus.mockReturnValue({
       device: { trustState: "untrusted" },
     });
     hookMocks.usePairingClaimer.mockReturnValue({
-      step: "overwrite_confirm",
+      step: "success",
       error: null,
       sas: null,
-      overwriteInfo: {
-        localRows: 42,
-        nonEmptyTables: [{ table: "accounts", rows: 10 }],
-      },
       submitCode: vi.fn(),
-      approveOverwrite: vi.fn(),
       cancel: vi.fn(),
       retry: vi.fn(),
     });
@@ -50,10 +45,7 @@ describe("PairingFlow", () => {
 
     render(<PairingFlow />);
 
-    expect(screen.getByText("Replace local data?")).toBeInTheDocument();
-    expect(screen.getByText(/42 rows/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Replace & Sync/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    expect(screen.getByText("You're all set!")).toBeInTheDocument();
   });
 
   it("shows restore-required issuer errors as a normal PairingResult error", () => {

@@ -1,15 +1,10 @@
 // usePairingClaimer
 // Self-contained hook for the claimer (new device) pairing flow.
 // Uses backend-owned pairing flow coordinator for the post-SAS phase.
+// Overwrite consent is handled by the auto-bootstrap AlertDialog after pairing.
 // ================================================================
 
-import {
-  logger,
-  beginPairingConfirm,
-  getPairingFlowState,
-  approvePairingOverwrite,
-  cancelPairingFlow,
-} from "@/adapters";
+import { logger, beginPairingConfirm, getPairingFlowState, cancelPairingFlow } from "@/adapters";
 import type { PairingFlowPhase } from "@/adapters";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -25,7 +20,6 @@ export type ClaimerStep =
   | "connecting"
   | "waiting_keys"
   | "syncing"
-  | "overwrite_confirm"
   | "success"
   | "error";
 
@@ -35,10 +29,6 @@ export function usePairingClaimer() {
   const [session, setSession] = useState<ClaimerSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [flowId, setFlowId] = useState<string | null>(null);
-  const [overwriteInfo, setOverwriteInfo] = useState<{
-    localRows: number;
-    nonEmptyTables: { table: string; rows: number }[];
-  } | null>(null);
 
   // Guard against auto-proceed firing twice
   const autoProceedFired = useRef(false);
@@ -78,7 +68,6 @@ export function usePairingClaimer() {
     if (phase === "error") return "error";
     if (phase === "complete") return "success";
     if (phase === "flow_active") {
-      if (overwriteInfo) return "overwrite_confirm";
       if (flowPoll.error) return "error";
       return "syncing";
     }
@@ -88,7 +77,7 @@ export function usePairingClaimer() {
       return "waiting_keys";
     }
     return "enter_code";
-  }, [phase, overwriteInfo, keyPoll.error, flowPoll.error]);
+  }, [phase, keyPoll.error, flowPoll.error]);
 
   // Derive error message
   const errorMessage = useMemo(() => {
@@ -150,21 +139,15 @@ export function usePairingClaimer() {
   function processFlowPhase(flowPhase: PairingFlowPhase) {
     switch (flowPhase.phase) {
       case "overwrite_required":
-        setOverwriteInfo({
-          localRows: flowPhase.info.localRows,
-          nonEmptyTables: flowPhase.info.nonEmptyTables,
-        });
+        // Backend no longer sends this during pairing — treat as syncing
         break;
       case "syncing":
-        setOverwriteInfo(null);
         break;
       case "success":
-        setOverwriteInfo(null);
         setPhase("complete");
         queryClient.invalidateQueries({ queryKey: ["sync"] });
         break;
       case "error":
-        setOverwriteInfo(null);
         setError(flowPhase.message);
         setPhase("error");
         break;
@@ -174,7 +157,6 @@ export function usePairingClaimer() {
   const submitCode = useCallback(async (code: string) => {
     logger.info(`[usePairingClaimer] Submitting code`);
     setError(null);
-    setOverwriteInfo(null);
     autoProceedFired.current = false;
     setPhase("connecting");
     try {
@@ -189,20 +171,6 @@ export function usePairingClaimer() {
     }
   }, []);
 
-  const approveOverwrite = useCallback(async () => {
-    if (!flowId) return;
-    logger.info("[usePairingClaimer] Approving overwrite");
-    setOverwriteInfo(null);
-    try {
-      const result = await approvePairingOverwrite(flowId);
-      processFlowPhase(result.phase);
-    } catch (err) {
-      logger.error(`[usePairingClaimer] approveOverwrite error: ${err}`);
-      setError(err instanceof Error ? err.message : String(err));
-      setPhase("error");
-    }
-  }, [flowId]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const cancel = useCallback(async () => {
     if (flowId) {
       await cancelPairingFlow(flowId).catch(() => {});
@@ -214,7 +182,6 @@ export function usePairingClaimer() {
     setFlowId(null);
     setPhase("idle");
     setError(null);
-    setOverwriteInfo(null);
     autoProceedFired.current = false;
   }, [session, flowId]);
 
@@ -223,7 +190,6 @@ export function usePairingClaimer() {
     setFlowId(null);
     setPhase("idle");
     setError(null);
-    setOverwriteInfo(null);
     autoProceedFired.current = false;
   }, []);
 
@@ -231,9 +197,7 @@ export function usePairingClaimer() {
     step,
     error: errorMessage,
     sas: sasQuery.data ?? null,
-    overwriteInfo,
     submitCode,
-    approveOverwrite,
     cancel,
     retry,
   };
