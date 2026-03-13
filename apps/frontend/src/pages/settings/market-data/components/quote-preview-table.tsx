@@ -115,7 +115,7 @@ export function QuotePreviewTable({ quotes, maxRows = 10 }: QuotePreviewTablePro
                               </TooltipContent>
                             </Tooltip>
                           )}
-                          {quote.symbol}
+                          {quote.displaySymbol ?? quote.symbol}
                         </div>
                       </TableCell>
                       <TableCell>{quote.date}</TableCell>

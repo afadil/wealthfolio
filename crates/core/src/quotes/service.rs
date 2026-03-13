@@ -1421,6 +1421,7 @@ where
 
             quotes.push(QuoteImport {
                 symbol,
+                display_symbol: None,
                 date,
                 open: parse_decimal(open_idx),
                 high: parse_decimal(high_idx),
@@ -1503,7 +1504,13 @@ where
 
             match matched_asset {
                 Some(asset) => {
-                    // Update the symbol to the canonical asset ID
+                    // Preserve original symbol for display, replace with asset ID for import
+                    quote.display_symbol = Some(
+                        asset
+                            .display_code
+                            .clone()
+                            .unwrap_or_else(|| quote.symbol.clone()),
+                    );
                     quote.symbol = asset.id.clone();
                 }
                 None => {

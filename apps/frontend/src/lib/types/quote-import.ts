@@ -1,5 +1,6 @@
 export interface QuoteImport {
   symbol: string;
+  displaySymbol?: string;
   date: string; // ISO format YYYY-MM-DD
   open?: number;
   high?: number;
