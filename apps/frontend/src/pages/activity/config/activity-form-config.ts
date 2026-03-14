@@ -1,24 +1,25 @@
-import type { ComponentType } from "react";
 import {
   ActivityType,
   InstrumentType,
   METADATA_CONTRACT_MULTIPLIER,
+  METADATA_INCLUDE_CASH_DEPOSIT,
   QuoteMode,
 } from "@/lib/constants";
 import { parseOccSymbol } from "@/lib/occ-symbol";
 import type { ActivityDetails } from "@/lib/types";
+import type { ComponentType } from "react";
 import { BuyForm, type BuyFormValues } from "../components/forms/buy-form";
-import { SellForm, type SellFormValues } from "../components/forms/sell-form";
 import { DepositForm, type DepositFormValues } from "../components/forms/deposit-form";
-import { WithdrawalForm, type WithdrawalFormValues } from "../components/forms/withdrawal-form";
 import { DividendForm, type DividendFormValues } from "../components/forms/dividend-form";
-import { TransferForm, type TransferFormValues } from "../components/forms/transfer-form";
-import { SplitForm, type SplitFormValues } from "../components/forms/split-form";
 import { FeeForm, type FeeFormValues } from "../components/forms/fee-form";
-import { InterestForm, type InterestFormValues } from "../components/forms/interest-form";
-import { TaxForm, type TaxFormValues } from "../components/forms/tax-form";
 import type { AccountSelectOption } from "../components/forms/fields";
+import { InterestForm, type InterestFormValues } from "../components/forms/interest-form";
 import type { NewActivityFormValues } from "../components/forms/schemas";
+import { SellForm, type SellFormValues } from "../components/forms/sell-form";
+import { SplitForm, type SplitFormValues } from "../components/forms/split-form";
+import { TaxForm, type TaxFormValues } from "../components/forms/tax-form";
+import { TransferForm, type TransferFormValues } from "../components/forms/transfer-form";
+import { WithdrawalForm, type WithdrawalFormValues } from "../components/forms/withdrawal-form";
 
 // Picker activity types (TRANSFER_IN/OUT merged into TRANSFER)
 export type PickerActivityType =
@@ -106,6 +107,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
         // Advanced options
         currency: activity?.currency,
         fxRate: activity?.fxRate ?? undefined,
+        includeCashDeposit: activity?.metadata?.include_cash_deposit === true,
         exchangeMic: activity?.exchangeMic,
       };
 
@@ -141,6 +143,19 @@ export const ACTIVITY_FORM_CONFIG: Record<
     },
     toPayload: (data) => {
       const d = data as BuyFormValues;
+
+      const metadata: Record<string, unknown> = {};
+      if (
+        d.symbolInstrumentType === InstrumentType.OPTION &&
+        d.contractMultiplier != null &&
+        d.contractMultiplier !== 100
+      ) {
+        metadata[METADATA_CONTRACT_MULTIPLIER] = d.contractMultiplier;
+      }
+      if (d.includeCashDeposit) {
+        metadata[METADATA_INCLUDE_CASH_DEPOSIT] = true;
+      }
+
       return {
         accountId: d.accountId,
         activityDate: d.activityDate,
@@ -163,11 +178,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
               exchangeMic: d.assetMetadata.exchangeMic ?? undefined,
             }
           : undefined,
-        ...(d.symbolInstrumentType === InstrumentType.OPTION &&
-          d.contractMultiplier != null &&
-          d.contractMultiplier !== 100 && {
-            metadata: { [METADATA_CONTRACT_MULTIPLIER]: d.contractMultiplier },
-          }),
+        ...(Object.keys(metadata).length > 0 && { metadata }),
       };
     },
   },

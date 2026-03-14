@@ -640,6 +640,9 @@ impl ActivityService {
     }
 }
 
+/// JSON metadata key indicating the buy was pre-funded (cash deposit included).
+pub const METADATA_INCLUDE_CASH_DEPOSIT: &str = "include_cash_deposit";
+
 impl ActivityService {
     /// JSON metadata key for a non-standard option contract multiplier (e.g. mini options = 10).
     const METADATA_CONTRACT_MULTIPLIER: &'static str = "contract_multiplier";

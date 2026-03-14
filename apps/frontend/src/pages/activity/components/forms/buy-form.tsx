@@ -1,27 +1,29 @@
-import { useEffect, useMemo } from "react";
-import { normalizeCurrency } from "@/lib/utils";
-import { useForm, FormProvider, type Resolver } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Button } from "@wealthfolio/ui/components/ui/button";
-import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { useSettings } from "@/hooks/use-settings";
 import { ActivityType, QuoteMode } from "@/lib/constants";
 import { buildOccSymbol } from "@/lib/occ-symbol";
-import { useSettings } from "@/hooks/use-settings";
+import { normalizeCurrency } from "@/lib/utils";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
+import { Checkbox } from "@wealthfolio/ui/components/ui/checkbox";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Label } from "@wealthfolio/ui/components/ui/label";
+import { useEffect, useMemo } from "react";
+import { FormProvider, useForm, type Resolver } from "react-hook-form";
+import { z } from "zod";
 import {
   AccountSelect,
-  SymbolSearch,
-  DatePicker,
-  AmountInput,
-  QuantityInput,
-  NotesInput,
   AdvancedOptionsSection,
+  AmountInput,
   AssetTypeSelector,
+  DatePicker,
+  NotesInput,
   OptionContractFields,
+  QuantityInput,
+  SymbolSearch,
   createValidatedSubmit,
-  type AssetType,
   type AccountSelectOption,
+  type AssetType,
 } from "./fields";
 
 // Asset metadata schema for custom assets
@@ -68,6 +70,7 @@ export const buyFormSchema = z
       })
       .positive({ message: "FX Rate must be positive." })
       .optional(),
+    includeCashDeposit: z.boolean().default(false),
     // Internal fields
     quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).default(QuoteMode.MARKET),
     exchangeMic: z.string().nullable().optional(),
@@ -175,6 +178,7 @@ export function BuyForm({
       fee: 0,
       comment: null,
       fxRate: undefined,
+      includeCashDeposit: false,
       quoteMode: QuoteMode.MARKET,
       exchangeMic: undefined,
       // Option defaults
@@ -417,6 +421,22 @@ export function BuyForm({
               baseCurrency={baseCurrency}
               showSubtype={false}
             />
+
+            <div className="flex items-start gap-3 rounded-md border p-3">
+              <Checkbox
+                id="includeCashDeposit"
+                checked={watch("includeCashDeposit")}
+                onCheckedChange={(checked) => setValue("includeCashDeposit", !!checked)}
+              />
+              <div className="grid gap-1.5 leading-none">
+                <Label htmlFor="includeCashDeposit" className="text-sm font-medium">
+                  Include cash deposit
+                </Label>
+                <p className="text-muted-foreground text-xs">
+                  Offsets the cash debit so no separate deposit is needed.
+                </p>
+              </div>
+            </div>
 
             {/* Notes */}
             <NotesInput name="comment" label="Notes" placeholder="Add an optional note..." />

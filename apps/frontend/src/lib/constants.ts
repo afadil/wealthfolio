@@ -12,6 +12,9 @@ export const PORTFOLIO_ACCOUNT_ID = "TOTAL";
 /** JSON metadata key for a non-standard option contract multiplier (e.g. mini options = 10). */
 export const METADATA_CONTRACT_MULTIPLIER = "contract_multiplier";
 
+/** JSON metadata key indicating the buy includes an implicit cash deposit (no cash debit). */
+export const METADATA_INCLUDE_CASH_DEPOSIT = "include_cash_deposit";
+
 export const HoldingType = {
   CASH: "cash",
   SECURITY: "security",

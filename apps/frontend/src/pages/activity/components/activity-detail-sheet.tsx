@@ -1,4 +1,9 @@
-import { ActivityStatus, ActivityTypeNames, SUBTYPE_DISPLAY_NAMES } from "@/lib/constants";
+import {
+  ActivityStatus,
+  ActivityTypeNames,
+  METADATA_INCLUDE_CASH_DEPOSIT,
+  SUBTYPE_DISPLAY_NAMES,
+} from "@/lib/constants";
 import { parseOccSymbol } from "@/lib/occ-symbol";
 import type { ActivityDetails } from "@/lib/types";
 import {
@@ -120,7 +125,7 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
 
         <div className="space-y-6 pb-6 md:pb-8">
           {/* Header Summary */}
-          <div className="from-primary/5 to-primary/10 rounded-xl border bg-gradient-to-br p-4">
+          <div className="from-primary/5 to-primary/10 bg-linear-to-br rounded-xl border p-4">
             <div className="flex items-start justify-between">
               <div>
                 <div className="text-muted-foreground mb-1 text-xs uppercase tracking-wide">
@@ -151,6 +156,12 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
                   <Badge variant="outline" className="border-amber-500 text-amber-600">
                     <Icons.AlertCircle className="mr-1 h-3 w-3" />
                     Needs Review
+                  </Badge>
+                )}
+                {activity.metadata?.[METADATA_INCLUDE_CASH_DEPOSIT] === true && (
+                  <Badge variant="outline" className="border-blue-500 text-blue-600">
+                    <Icons.Wallet className="mr-1 h-3 w-3" />
+                    Cash Deposit Included
                   </Badge>
                 )}
               </div>

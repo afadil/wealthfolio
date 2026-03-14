@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BuyForm } from "../buy-form";
 import type { AccountSelectOption } from "../fields";
 
@@ -54,7 +54,9 @@ vi.mock("../fields", () => ({
     <div data-testid={`asset-type-selector-${name}`} />
   ),
   OptionContractFields: () => <div data-testid="option-contract-fields" />,
-  createValidatedSubmit: vi.fn((_form, handler) => handler),
+  createValidatedSubmit: vi.fn(
+    (_form: unknown, handler: (event?: unknown) => void | Promise<void>) => handler,
+  ),
 }));
 
 // Mock UI components
@@ -87,6 +89,41 @@ vi.mock("@wealthfolio/ui/components/ui/card", () => ({
   Card: ({ children }: { children: React.ReactNode }) => <div data-testid="card">{children}</div>,
   CardContent: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="card-content">{children}</div>
+  ),
+}));
+
+vi.mock("@wealthfolio/ui/components/ui/checkbox", () => ({
+  Checkbox: ({
+    id,
+    checked,
+    onCheckedChange,
+  }: {
+    id: string;
+    checked?: boolean;
+    onCheckedChange?: (checked: boolean) => void;
+  }) => (
+    <input
+      id={id}
+      type="checkbox"
+      checked={checked}
+      onChange={(event) => onCheckedChange?.(event.target.checked)}
+    />
+  ),
+}));
+
+vi.mock("@wealthfolio/ui/components/ui/label", () => ({
+  Label: ({
+    children,
+    htmlFor,
+    className,
+  }: {
+    children: React.ReactNode;
+    htmlFor?: string;
+    className?: string;
+  }) => (
+    <label htmlFor={htmlFor} className={className}>
+      {children}
+    </label>
   ),
 }));
 
@@ -131,6 +168,19 @@ describe("BuyForm", () => {
       expect(screen.getByTestId("input-fee")).toBeInTheDocument();
       // Amount is now calculated and displayed as text, not as an input field
       expect(screen.getByTestId("textarea-comment")).toBeInTheDocument();
+      expect(screen.getByLabelText(/include cash deposit/i)).toBeInTheDocument();
+    });
+
+    it("loads the include cash deposit checkbox from default values", () => {
+      render(
+        <BuyForm
+          accounts={mockAccounts}
+          onSubmit={mockOnSubmit}
+          defaultValues={{ includeCashDeposit: true }}
+        />,
+      );
+
+      expect(screen.getByLabelText(/include cash deposit/i)).toBeChecked();
     });
 
     it("renders submit button with correct text for new buy", () => {

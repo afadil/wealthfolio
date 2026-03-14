@@ -309,9 +309,11 @@ impl HoldingsCalculator {
             fx_rate_used,
         )?;
 
-        // Book cash outflow
+        // Book cash outflow unless this buy includes an implicit cash deposit.
         let total_cost = (activity.qty() * activity.price() * multiplier) + activity.fee_amt();
-        if activity_currency != account_currency {
+        if activity.includes_cash_deposit() {
+            self.record_external_contribution(total_cost, activity, state, account_currency);
+        } else if activity_currency != account_currency {
             if let Some(fx_rate) = activity.fx_rate.filter(|r| *r != Decimal::ZERO) {
                 // Broker converted at transaction time — book in account currency
                 add_cash(state, account_currency, -(total_cost * fx_rate));
@@ -324,6 +326,41 @@ impl HoldingsCalculator {
         }
 
         Ok(())
+    }
+
+    /// Record an external contribution in both account and base currency.
+    fn record_external_contribution(
+        &self,
+        amount: Decimal,
+        activity: &Activity,
+        state: &mut AccountStateSnapshot,
+        account_currency: &str,
+    ) {
+        let activity_currency = &activity.currency;
+        let activity_date = self.activity_local_date(activity);
+
+        let amount_acct =
+            self.convert_to_account_currency(amount, activity, account_currency, "Contribution");
+
+        let base_ccy = self.base_currency.read().unwrap();
+        let amount_base = match self.fx_service.convert_currency_for_date(
+            amount,
+            activity_currency,
+            &base_ccy,
+            activity_date,
+        ) {
+            Ok(converted_amount) => converted_amount,
+            Err(error) => {
+                warn!(
+                    "Holdings Calc (Contribution {}): Failed conversion {} {}->{} on {}: {}. Base contribution not updated.",
+                    activity.id, amount, activity_currency, &base_ccy, activity_date, error
+                );
+                Decimal::ZERO
+            }
+        };
+
+        state.net_contribution += amount_acct;
+        state.net_contribution_base += amount_base;
     }
 
     /// Handle SELL activity.
@@ -381,41 +418,13 @@ impl HoldingsCalculator {
         account_currency: &str,
     ) -> Result<()> {
         let activity_currency = &activity.currency;
-        let activity_date = self.activity_local_date(activity);
         let activity_amount = activity.amt();
 
         // Book cash in ACTIVITY currency (amount - fee)
         let net_amount = activity_amount - activity.fee_amt();
         add_cash(state, activity_currency, net_amount);
 
-        // Convert for net_contribution (pre-fee amount in account currency)
-        let amount_acct = self.convert_to_account_currency(
-            activity_amount,
-            activity,
-            account_currency,
-            "Deposit Amount",
-        );
-
-        // Convert for net_contribution_base
-        let base_ccy = self.base_currency.read().unwrap();
-        let amount_base = match self.fx_service.convert_currency_for_date(
-            activity_amount,
-            activity_currency,
-            &base_ccy,
-            activity_date,
-        ) {
-            Ok(c) => c,
-            Err(e) => {
-                warn!(
-                    "Holdings Calc (NetContrib Deposit {}): Failed conversion {} {}->{} on {}: {}. Base contribution not updated.",
-                    activity.id, activity_amount, activity_currency, &base_ccy, activity_date, e
-                );
-                Decimal::ZERO
-            }
-        };
-
-        state.net_contribution += amount_acct;
-        state.net_contribution_base += amount_base;
+        self.record_external_contribution(activity_amount, activity, state, account_currency);
         Ok(())
     }
 

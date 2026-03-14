@@ -1,5 +1,6 @@
 //! Activity domain models.
 
+use super::activities_service::METADATA_INCLUDE_CASH_DEPOSIT;
 use crate::activities::activities_errors::ActivityError;
 use crate::activities::csv_parser::ParseConfig;
 use crate::Result;
@@ -164,6 +165,12 @@ impl Activity {
             .as_ref()
             .and_then(|v| v.get(key))
             .and_then(|v| serde_json::from_value(v.clone()).ok())
+    }
+
+    /// Returns true if this activity includes an implicit cash deposit.
+    pub fn includes_cash_deposit(&self) -> bool {
+        self.get_meta::<bool>(METADATA_INCLUDE_CASH_DEPOSIT)
+            .unwrap_or(false)
     }
 }
 
