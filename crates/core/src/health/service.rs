@@ -347,7 +347,7 @@ impl HealthService {
                         .or_else(|| fx_asset_map.get(&key_inverse))
                         .and_then(|asset_id| {
                             quote_service
-                                .get_latest_quotes(&[asset_id.clone()])
+                                .get_latest_quotes(std::slice::from_ref(asset_id))
                                 .ok()
                                 .and_then(|q| q.into_values().next().map(|quote| quote.timestamp))
                         });
