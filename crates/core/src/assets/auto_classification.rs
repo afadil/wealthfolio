@@ -77,7 +77,7 @@ fn map_instrument_type_to_taxonomy_category(
         InstrumentType::Crypto => Some("CRYPTO_NATIVE"),
         InstrumentType::Option => Some("OPTION"),
         InstrumentType::Bond => Some("BOND_CORPORATE"),
-        InstrumentType::Metal => None,
+        InstrumentType::Metal => Some("PHYSICAL_METAL"),
         InstrumentType::Fx => None,
     }
 }

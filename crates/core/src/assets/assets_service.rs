@@ -166,6 +166,21 @@ impl AssetService {
         self
     }
 
+    /// Auto-classify a single newly created asset (instrument_type + asset_class).
+    async fn classify_new_asset(
+        &self,
+        asset_id: &str,
+        instrument_type: Option<&InstrumentType>,
+        kind: &AssetKind,
+    ) {
+        if let Some(taxonomy_service) = &self.taxonomy_service {
+            let classifier = AutoClassificationService::new(Arc::clone(taxonomy_service));
+            classifier
+                .classify_from_spec(asset_id, instrument_type, kind)
+                .await;
+        }
+    }
+
     /// Builds a NewAsset from an AssetSpec without any I/O.
     fn new_asset_from_spec(&self, spec: &AssetSpec) -> NewAsset {
         let canonical = canonicalize_market_identity(
@@ -367,7 +382,13 @@ impl AssetServiceTrait for AssetService {
             })
             .unwrap_or(new_asset.quote_ccy);
 
+        let instrument_type = new_asset.instrument_type.clone();
+        let kind = new_asset.kind.clone();
         let asset = self.asset_repository.create(new_asset).await?;
+
+        // Auto-classify the newly created asset
+        self.classify_new_asset(&asset.id, instrument_type.as_ref(), &kind)
+            .await;
 
         // Emit event for newly created asset
         self.event_sink
@@ -561,7 +582,13 @@ impl AssetServiceTrait for AssetService {
             asset_id, new_asset.kind, new_asset.quote_mode, new_asset.name
         );
 
+        let instrument_type = new_asset.instrument_type.clone();
+        let kind = new_asset.kind.clone();
         let asset = self.asset_repository.create(new_asset).await?;
+
+        // Auto-classify the newly created asset
+        self.classify_new_asset(&asset.id, instrument_type.as_ref(), &kind)
+            .await;
 
         // Emit event for newly created asset
         self.event_sink
@@ -1221,24 +1248,20 @@ impl AssetServiceTrait for AssetService {
 
         // 4. Auto-classify newly created assets (instrument_type + asset_class)
         if !created_ids.is_empty() {
-            if let Some(taxonomy_service) = &self.taxonomy_service {
-                let classifier = AutoClassificationService::new(Arc::clone(taxonomy_service));
-                let created_set: HashSet<&str> = created_ids.iter().map(|id| id.as_str()).collect();
-                for (spec, _) in &specs_for_create {
-                    let asset_id = spec.id.as_deref().or_else(|| {
-                        spec.instrument_key().and_then(|key| {
-                            assets_map
-                                .values()
-                                .find(|a| a.instrument_key.as_deref() == Some(key.as_str()))
-                                .map(|a| a.id.as_str())
-                        })
-                    });
-                    if let Some(id) = asset_id {
-                        if created_set.contains(id) {
-                            classifier
-                                .classify_from_spec(id, spec.instrument_type.as_ref(), &spec.kind)
-                                .await;
-                        }
+            let created_set: HashSet<&str> = created_ids.iter().map(|id| id.as_str()).collect();
+            for (spec, _) in &specs_for_create {
+                let asset_id = spec.id.as_deref().or_else(|| {
+                    spec.instrument_key().and_then(|key| {
+                        assets_map
+                            .values()
+                            .find(|a| a.instrument_key.as_deref() == Some(key.as_str()))
+                            .map(|a| a.id.as_str())
+                    })
+                });
+                if let Some(id) = asset_id {
+                    if created_set.contains(id) {
+                        self.classify_new_asset(id, spec.instrument_type.as_ref(), &spec.kind)
+                            .await;
                     }
                 }
             }
