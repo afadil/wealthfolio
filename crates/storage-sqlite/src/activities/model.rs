@@ -250,6 +250,14 @@ impl From<ActivityDetailsDB> for wealthfolio_core::activities::ActivityDetails {
             _ => ActivityStatus::Posted, // Default to Posted for unknown values
         };
 
+        let amount = db.amount.or_else(|| {
+            let q = db.quantity.as_ref()?;
+            let p = db.unit_price.as_ref()?;
+            let qty = parse_decimal_string_tolerant(q, "quantity");
+            let price = parse_decimal_string_tolerant(p, "unit_price");
+            Some((qty * price).to_string())
+        });
+
         Self {
             id: db.id,
             account_id: db.account_id,
@@ -262,7 +270,7 @@ impl From<ActivityDetailsDB> for wealthfolio_core::activities::ActivityDetails {
             unit_price: db.unit_price,
             currency: db.currency,
             fee: db.fee,
-            amount: db.amount,
+            amount,
             needs_review: db.needs_review != 0,
             comment: db.notes,
             fx_rate: db.fx_rate,
