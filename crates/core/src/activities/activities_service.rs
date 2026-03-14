@@ -40,6 +40,7 @@ pub struct ActivityService {
     quote_service: Arc<dyn QuoteServiceTrait>,
     import_run_repository: Option<Arc<dyn ImportRunRepositoryTrait>>,
     event_sink: Arc<dyn DomainEventSink>,
+    timezone: Arc<std::sync::RwLock<String>>,
 }
 
 #[derive(Clone, Copy)]
@@ -187,6 +188,7 @@ impl ActivityService {
         asset_service: Arc<dyn AssetServiceTrait>,
         fx_service: Arc<dyn FxServiceTrait>,
         quote_service: Arc<dyn QuoteServiceTrait>,
+        timezone: Arc<std::sync::RwLock<String>>,
     ) -> Self {
         Self {
             activity_repository,
@@ -196,6 +198,7 @@ impl ActivityService {
             quote_service,
             import_run_repository: None,
             event_sink: Arc::new(NoOpDomainEventSink),
+            timezone,
         }
     }
 
@@ -207,6 +210,7 @@ impl ActivityService {
         fx_service: Arc<dyn FxServiceTrait>,
         quote_service: Arc<dyn QuoteServiceTrait>,
         import_run_repository: Arc<dyn ImportRunRepositoryTrait>,
+        timezone: Arc<std::sync::RwLock<String>>,
     ) -> Self {
         Self {
             activity_repository,
@@ -216,7 +220,18 @@ impl ActivityService {
             quote_service,
             import_run_repository: Some(import_run_repository),
             event_sink: Arc::new(NoOpDomainEventSink),
+            timezone,
         }
+    }
+
+    /// Convert a UTC activity timestamp to a local date using the user's timezone.
+    fn activity_date_local(&self, utc: chrono::DateTime<chrono::Utc>) -> chrono::NaiveDate {
+        crate::utils::time_utils::activity_date_in_tz(
+            utc,
+            crate::utils::time_utils::parse_user_timezone_or_default(
+                &self.timezone.read().unwrap(),
+            ),
+        )
     }
 
     /// Sets the domain event sink for this service.
@@ -1777,7 +1792,7 @@ impl ActivityServiceTrait for ActivityService {
             account_ids,
             asset_ids,
             currencies,
-            Some(created.activity_date.date_naive()),
+            Some(self.activity_date_local(created.activity_date)),
         ));
 
         Ok(created)
@@ -1815,10 +1830,9 @@ impl ActivityServiceTrait for ActivityService {
         let account_ids: Vec<String> = account_ids_set.into_iter().collect();
         let asset_ids: Vec<String> = asset_ids_set.into_iter().collect();
         let currencies: Vec<String> = currencies_set.into_iter().collect();
-        let earliest_date = existing
-            .activity_date
-            .date_naive()
-            .min(updated.activity_date.date_naive());
+        let earliest_date = self
+            .activity_date_local(existing.activity_date)
+            .min(self.activity_date_local(updated.activity_date));
         self.event_sink.emit(DomainEvent::activities_changed(
             account_ids,
             asset_ids,
@@ -1844,7 +1858,7 @@ impl ActivityServiceTrait for ActivityService {
             account_ids,
             asset_ids,
             currencies,
-            Some(deleted.activity_date.date_naive()),
+            Some(self.activity_date_local(deleted.activity_date)),
         ));
 
         Ok(deleted)

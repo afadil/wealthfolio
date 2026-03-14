@@ -313,6 +313,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             fx_service.clone(),
             quote_service.clone(),
             core_import_run_repository,
+            timezone.clone(),
         )
         .with_event_sink(domain_event_sink.clone()),
     );

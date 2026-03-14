@@ -695,7 +695,7 @@ impl AssetServiceTrait for AssetService {
         }
 
         // Merge with existing metadata (preserving any non-profile fields like OptionSpec)
-        let updated_metadata = if profile_metadata.is_empty() {
+        let mut updated_metadata = if profile_metadata.is_empty() {
             existing_asset.metadata.clone()
         } else {
             let mut merged = match &existing_asset.metadata {
@@ -711,6 +711,41 @@ impl AssetServiceTrait for AssetService {
             );
             Some(serde_json::Value::Object(merged))
         };
+
+        // Enrich US Treasury bonds with maturity/coupon data from TreasuryDirect
+        // when the bond spec is missing this data (needed for yield-curve pricing).
+        if existing_asset.is_bond() {
+            let needs_bond_enrichment = existing_asset
+                .bond_spec()
+                .is_none_or(|s| s.maturity_date.is_none());
+
+            if needs_bond_enrichment {
+                if let Some(isin) = existing_asset.instrument_symbol.as_deref() {
+                    if isin.starts_with("US912") {
+                        let http = reqwest::Client::new();
+                        match wealthfolio_market_data::provider::us_treasury_calc::UsTreasuryCalcProvider::fetch_bond_details(&http, isin).await {
+                            Some(details) => {
+                                let spec = super::assets_model::BondSpec {
+                                    isin: Some(isin.to_string()),
+                                    coupon_rate: Some(details.coupon_rate),
+                                    maturity_date: Some(details.maturity_date),
+                                    face_value: Some(details.face_value),
+                                    coupon_frequency: Some(details.coupon_frequency),
+                                };
+                                let meta = updated_metadata.get_or_insert_with(|| serde_json::json!({}));
+                                if let Some(obj) = meta.as_object_mut() {
+                                    obj.insert("bond".to_string(), serde_json::json!(spec));
+                                }
+                                info!("Enriched bond {} with Treasury details: maturity={}, coupon={}", asset_id, details.maturity_date, details.coupon_rate);
+                            }
+                            None => {
+                                debug!("Could not fetch Treasury bond details for {}", isin);
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         let effective_instrument_type = updated_instrument_type
             .clone()

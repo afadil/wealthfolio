@@ -903,6 +903,10 @@ pub mod test_env {
             Ok(Vec::new())
         }
 
+        async fn reset_sync_errors(&self, _asset_ids: &[String]) -> CoreResult<()> {
+            Ok(())
+        }
+
         async fn get_providers_info(&self) -> CoreResult<Vec<ProviderInfo>> {
             Ok(Vec::new())
         }

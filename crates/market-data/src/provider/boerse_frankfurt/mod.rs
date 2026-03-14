@@ -9,13 +9,13 @@
 
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, Utc};
+use log::warn;
 use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
-use tracing::warn;
 
 use crate::errors::MarketDataError;
 use crate::models::{

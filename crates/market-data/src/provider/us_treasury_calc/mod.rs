@@ -15,12 +15,12 @@
 
 use async_trait::async_trait;
 use chrono::{DateTime, Datelike, NaiveDate, Utc};
+use log::{debug, warn};
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
-use tracing::{debug, warn};
 
 use crate::errors::MarketDataError;
 use crate::models::{Coverage, InstrumentKind, ProviderInstrument, Quote, QuoteContext};
@@ -87,7 +87,7 @@ pub struct TreasuryBondDetails {
 #[serde(rename_all = "camelCase")]
 struct TdSecurityItem {
     #[serde(default)]
-    rate: Option<String>,
+    interest_rate: Option<String>,
     #[serde(default)]
     maturity_date: Option<String>,
     #[serde(default)]
@@ -152,21 +152,31 @@ impl UsTreasuryCalcProvider {
         let item = items.into_iter().next()?;
 
         let coupon_rate = item
-            .rate
+            .interest_rate
             .as_ref()
+            .filter(|r| !r.is_empty())
             .and_then(|r| r.parse::<f64>().ok())
-            .map(|r| Decimal::try_from(r / 100.0).unwrap_or_default())?;
+            .map(|r| Decimal::try_from(r / 100.0).unwrap_or_default())
+            .unwrap_or(Decimal::ZERO);
 
         let maturity_date = item.maturity_date.as_ref().and_then(|d| {
             // Format: "2043-05-15T00:00:00"
             NaiveDate::parse_from_str(&d[..10], "%Y-%m-%d").ok()
         })?;
 
+        let is_zero_coupon = coupon_rate.is_zero();
         let coupon_frequency = item
             .interest_payment_frequency
             .as_ref()
+            .filter(|f| !f.is_empty() && *f != "None")
             .map(|f| normalize_frequency(f))
-            .unwrap_or_else(|| "SEMI_ANNUAL".to_string());
+            .unwrap_or_else(|| {
+                if is_zero_coupon {
+                    "ZERO".to_string()
+                } else {
+                    "SEMI_ANNUAL".to_string()
+                }
+            });
 
         Some(TreasuryBondDetails {
             coupon_rate,
@@ -397,19 +407,43 @@ impl MarketDataProvider for UsTreasuryCalcProvider {
                 })?;
 
         let today = Utc::now().date_naive();
-        let curve = self.get_curve_for_date(today).await?;
+        let curve = match self.get_curve_for_date(today).await {
+            Ok(c) => c,
+            Err(e) => {
+                warn!(
+                    "US_TREASURY_CALC: yield curve fetch failed for {}: {}",
+                    isin, e
+                );
+                return Err(e);
+            }
+        };
 
         let coupon_rate: f64 = bond.coupon_rate.try_into().unwrap_or(0.0);
         let face_value: f64 = bond.face_value.try_into().unwrap_or(US_TREASURY_FACE_VALUE);
 
-        let price = Self::calculate_price(
+        let price = match Self::calculate_price(
             &curve,
             today,
             bond.maturity_date,
             coupon_rate,
             &bond.coupon_frequency,
             face_value,
-        )?;
+        ) {
+            Ok(p) => {
+                debug!(
+                    "US_TREASURY_CALC: {} price={:.6} (coupon={}, maturity={}, freq={})",
+                    isin, p, coupon_rate, bond.maturity_date, bond.coupon_frequency
+                );
+                p
+            }
+            Err(e) => {
+                warn!(
+                    "US_TREASURY_CALC: price calculation failed for {}: {}",
+                    isin, e
+                );
+                return Err(e);
+            }
+        };
 
         let currency = context.currency_hint.as_deref().unwrap_or("USD");
         Self::make_quote(today, price, currency)
@@ -606,12 +640,16 @@ fn extract_xml_value(xml: &str, tag: &str) -> Option<String> {
     // Try d:TAG first (common namespace prefix)
     let patterns = [format!("d:{}", tag), tag.to_string()];
     for pat in &patterns {
-        let open = format!("<{}>", pat);
-        let close = format!("</{}>", pat);
-        if let Some(start) = xml.find(&open) {
-            let after = &xml[start + open.len()..];
-            if let Some(end) = after.find(&close) {
-                return Some(after[..end].trim().to_string());
+        // Match opening tag with optional attributes: <d:TAG> or <d:TAG m:type="...">
+        let open_prefix = format!("<{}", pat);
+        if let Some(tag_start) = xml.find(&open_prefix) {
+            let after_tag = &xml[tag_start + open_prefix.len()..];
+            // Find the end of the opening tag (either > or whitespace+attributes+>)
+            let content_start = after_tag.find('>')?;
+            let after_open = &after_tag[content_start + 1..];
+            let close = format!("</{}>", pat);
+            if let Some(end) = after_open.find(&close) {
+                return Some(after_open[..end].trim().to_string());
             }
         }
     }
@@ -858,7 +896,7 @@ mod tests {
         let json = r#"[{
             "cusip": "912810TH1",
             "type": "Bond",
-            "rate": "2.875",
+            "interestRate": "2.875",
             "maturityDate": "2043-05-15T00:00:00",
             "interestPaymentFrequency": "Semi-Annual"
         }]"#;
@@ -867,7 +905,7 @@ mod tests {
         assert_eq!(items.len(), 1);
 
         let item = &items[0];
-        let rate: f64 = item.rate.as_ref().unwrap().parse().unwrap();
+        let rate: f64 = item.interest_rate.as_ref().unwrap().parse().unwrap();
         assert!((rate - 2.875).abs() < 1e-10);
 
         let mat_str = item.maturity_date.as_ref().unwrap();

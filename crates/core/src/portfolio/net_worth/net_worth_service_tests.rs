@@ -561,6 +561,10 @@ impl QuoteServiceTrait for MockMarketDataRepository {
         Ok(Vec::new())
     }
 
+    async fn reset_sync_errors(&self, _asset_ids: &[String]) -> Result<()> {
+        Ok(())
+    }
+
     // =========================================================================
     // Provider Settings
     // =========================================================================

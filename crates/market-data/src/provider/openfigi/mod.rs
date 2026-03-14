@@ -201,6 +201,10 @@ impl OpenFigiProvider {
         {
             return Some(vec!["ID_ISIN"]);
         }
+        // CUSIP: 9 alphanumeric characters (digits + uppercase letters)
+        if q.len() == 9 && q.chars().all(|c| c.is_ascii_alphanumeric()) {
+            return Some(vec!["ID_CUSIP"]);
+        }
         None
     }
 
