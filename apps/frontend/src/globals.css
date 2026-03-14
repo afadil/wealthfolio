@@ -489,7 +489,7 @@
   --toast-fg: hsl(var(--flexoki-tx));
   --toast-border: hsl(var(--flexoki-ui-2));
   --toast-success-bg: var(--color-green-950);
-  --toast-success-fg: var(--color-green-200);
+  --toast-success-fg: var(--color-green-100);
   --toast-success-border: var(--color-green-800);
   --toast-error-bg: var(--color-red-950);
   --toast-error-fg: var(--color-red-200);
@@ -556,11 +556,17 @@
   --normal-text: var(--toast-success-fg);
   --normal-border: var(--toast-success-border);
 }
+[data-sonner-toast][data-type="success"] [data-description] {
+  color: var(--toast-success-fg) !important;
+}
 
 [data-sonner-toast][data-type="error"] {
   --normal-bg: var(--toast-error-bg);
   --normal-text: var(--toast-error-fg);
   --normal-border: var(--toast-error-border);
+}
+[data-sonner-toast][data-type="error"] [data-description] {
+  color: var(--toast-error-fg) !important;
 }
 
 [data-sonner-toast][data-type="warning"] {
@@ -568,11 +574,17 @@
   --normal-text: var(--toast-warning-fg);
   --normal-border: var(--toast-warning-border);
 }
+[data-sonner-toast][data-type="warning"] [data-description] {
+  color: var(--toast-warning-fg) !important;
+}
 
 [data-sonner-toast][data-type="info"] {
   --normal-bg: var(--toast-info-bg);
   --normal-text: var(--toast-info-fg);
   --normal-border: var(--toast-info-border);
+}
+[data-sonner-toast][data-type="info"] [data-description] {
+  color: var(--toast-info-fg) !important;
 }
 
 /* Mobile: glassy translucent backgrounds for typed toasts */
