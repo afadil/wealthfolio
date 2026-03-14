@@ -3,7 +3,7 @@
 //! This service wraps the ConnectApiClient with keyring token retrieval,
 //! providing a simple interface for cloud API operations.
 
-use log::{debug, error};
+use log::error;
 use std::sync::Arc;
 
 use wealthfolio_connect::{

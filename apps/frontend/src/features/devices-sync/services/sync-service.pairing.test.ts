@@ -65,7 +65,12 @@ vi.mock("@/adapters", () => adapterMocks);
 vi.mock("../storage/keyring", () => ({ syncStorage: storageMocks }));
 vi.mock("../crypto", () => cryptoMocks);
 
-import { SyncErrorCodes, type ClaimerSession, type KeyBundlePayload, type PairingSession } from "../types";
+import {
+  SyncErrorCodes,
+  type ClaimerSession,
+  type KeyBundlePayload,
+  type PairingSession,
+} from "../types";
 import { syncService } from "./sync-service";
 
 describe("syncService pairing", () => {

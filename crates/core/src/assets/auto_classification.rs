@@ -32,7 +32,7 @@ fn map_quote_type_to_instrument_type(quote_type: &str, name: Option<&str>) -> Op
         "CRYPTOCURRENCY" | "CRYPTO" => Some("CRYPTO_NATIVE"),
         "OPTION" => Some("OPTION"),
         "BOND" => {
-            if name.map_or(false, is_government_bond) {
+            if name.is_some_and(is_government_bond) {
                 Some("BOND_GOVERNMENT")
             } else {
                 Some("BOND_CORPORATE")
