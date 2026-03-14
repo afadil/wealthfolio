@@ -1067,13 +1067,14 @@ impl ActivityService {
                 }
             }
 
-            // Create a quote from the activity price as a fallback
+            // Create a quote from the activity price as a fallback.
+            // Use the requested mode (if switching) rather than the pre-update asset mode.
             if let Some(unit_price) = activity.unit_price {
-                let is_manual = asset.quote_mode == QuoteMode::Manual
-                    || quote_mode
-                        .as_deref()
-                        .is_some_and(|m| m.eq_ignore_ascii_case("manual"));
-                let source = if is_manual {
+                let effective_manual = quote_mode
+                    .as_deref()
+                    .map(|m| m.eq_ignore_ascii_case("manual"))
+                    .unwrap_or(asset.quote_mode == QuoteMode::Manual);
+                let source = if effective_manual {
                     DataSource::Manual
                 } else {
                     DataSource::Broker
@@ -1444,13 +1445,14 @@ impl ActivityService {
                 }
             }
 
-            // Create a quote from the activity price as a fallback
+            // Create a quote from the activity price as a fallback.
+            // Use the requested mode (if switching) rather than the pre-update asset mode.
             if let Some(Some(unit_price)) = activity.unit_price {
-                let is_manual = asset.quote_mode == QuoteMode::Manual
-                    || quote_mode
-                        .as_deref()
-                        .is_some_and(|m| m.eq_ignore_ascii_case("manual"));
-                let source = if is_manual {
+                let effective_manual = quote_mode
+                    .as_deref()
+                    .map(|m| m.eq_ignore_ascii_case("manual"))
+                    .unwrap_or(asset.quote_mode == QuoteMode::Manual);
+                let source = if effective_manual {
                     DataSource::Manual
                 } else {
                     DataSource::Broker

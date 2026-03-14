@@ -375,7 +375,9 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
             <CardContent className="px-2 sm:px-6">
               <OpenTradesTable
                 positions={openPositions}
-                onAssetClick={(assetId) => ctx.api.navigation.navigate(`/holdings/${assetId}`)}
+                onAssetClick={(assetId) =>
+                  ctx.api.navigation.navigate(`/holdings/${encodeURIComponent(assetId)}`)
+                }
               />
             </CardContent>
           </Card>
