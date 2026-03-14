@@ -32,6 +32,11 @@ interface AssetDetail {
     couponRate?: number | null;
     couponFrequency?: string | null;
   } | null;
+  optionSpec?: {
+    right?: string | null;
+    strike?: number | null;
+    expiration?: string | null;
+  } | null;
   className?: string;
 }
 
@@ -57,6 +62,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
     quoteCurrency,
     quote,
     bondSpec,
+    optionSpec,
   } = assetData;
 
   const holdingRows = [
@@ -198,27 +204,63 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
         {bondSpec && (
           <>
             <Separator className="my-4" />
-            <div className="space-y-3 text-sm">
+            <div className="grid grid-cols-2 gap-x-6">
               {bondSpec.couponRate != null && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Coupon</span>
-                  <span className="font-medium">
+                <div className="flex flex-col">
+                  <span className="text-muted-foreground text-xs">Coupon</span>
+                  <span className="text-sm font-medium">
                     {bondSpec.couponFrequency === "ZERO"
                       ? "Zero coupon"
                       : `${(bondSpec.couponRate * 100).toFixed(3)}%`}
-                    {bondSpec.couponFrequency && bondSpec.couponFrequency !== "ZERO" && (
-                      <span className="text-muted-foreground ml-1">
-                        ({bondSpec.couponFrequency.replace("_", " ").toLowerCase()})
-                      </span>
-                    )}
+                    {bondSpec.couponFrequency &&
+                      bondSpec.couponFrequency !== "ZERO" &&
+                      ` ${bondSpec.couponFrequency.replace("_", " ").toLowerCase()}`}
                   </span>
                 </div>
               )}
               {bondSpec.maturityDate && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Maturity</span>
-                  <span className="font-medium">
+                <div className="flex flex-col items-end">
+                  <span className="text-muted-foreground text-xs">Maturity</span>
+                  <span className="text-sm font-medium">
                     {new Date(bondSpec.maturityDate + "T00:00:00").toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </span>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {optionSpec && (
+          <>
+            <Separator className="my-4" />
+            <div className="grid grid-cols-3 gap-x-4">
+              {optionSpec.right && (
+                <div className="flex flex-col">
+                  <span className="text-muted-foreground text-xs">Type</span>
+                  <span className="text-sm font-medium">{optionSpec.right}</span>
+                </div>
+              )}
+              {optionSpec.strike != null && (
+                <div className="flex flex-col">
+                  <span className="text-muted-foreground text-xs">Strike</span>
+                  <div className="text-sm font-medium">
+                    <AmountDisplay
+                      value={optionSpec.strike}
+                      currency={quoteCurrency ?? currency}
+                      isHidden={isBalanceHidden}
+                    />
+                  </div>
+                </div>
+              )}
+              {optionSpec.expiration && (
+                <div className="flex flex-col items-end">
+                  <span className="text-muted-foreground text-xs">Expiry</span>
+                  <span className="text-sm font-medium">
+                    {new Date(optionSpec.expiration + "T00:00:00").toLocaleDateString(undefined, {
                       year: "numeric",
                       month: "short",
                       day: "numeric",
