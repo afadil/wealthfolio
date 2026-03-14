@@ -357,7 +357,9 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             .count();
 
         // 3. Convert prepared activities into ActivityUpsert payloads
+        //    and collect quote data from trade activities
         let mut activity_upserts: Vec<ActivityUpsert> = Vec::new();
+        let mut quote_data: Vec<(String, Decimal, DateTime<Utc>, String)> = Vec::new(); // (asset_id, price, datetime, currency)
 
         for prepared in prepare_result.prepared {
             let act = prepared.activity;
@@ -371,6 +373,20 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             let activity_datetime: DateTime<Utc> = DateTime::parse_from_rfc3339(&act.activity_date)
                 .map(|dt| dt.with_timezone(&Utc))
                 .unwrap_or_else(|_| Utc::now());
+
+            // Collect quote data from BUY/SELL activities with a resolved asset and non-zero price
+            if matches!(act.activity_type.as_str(), "BUY" | "SELL") {
+                if let (Some(ref aid), Some(price)) = (&asset_id, act.unit_price) {
+                    if price > Decimal::ZERO {
+                        quote_data.push((
+                            aid.clone(),
+                            price,
+                            activity_datetime,
+                            act.currency.clone(),
+                        ));
+                    }
+                }
+            }
 
             // Compute idempotency key for content-based deduplication
             let idempotency_key = compute_idempotency_key(
@@ -423,6 +439,54 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             .upsert_activities_bulk(activity_upserts)
             .await?;
         let activities_upserted = bulk_result.upserted;
+
+        // 3b. Create quotes from trade activity prices (dedup by asset+date, last write wins)
+        if let Some(ref quote_store) = self.quote_store {
+            let now = Utc::now();
+            let mut quotes_map: HashMap<String, Quote> = HashMap::new();
+
+            for (asset_id, price, activity_datetime, currency) in &quote_data {
+                let date_str = activity_datetime.format("%Y-%m-%d").to_string();
+                let quote_id = format!("{}_{}_{}", asset_id, date_str, DataSource::Broker.as_str());
+                quotes_map.insert(
+                    quote_id.clone(),
+                    Quote {
+                        id: quote_id,
+                        asset_id: asset_id.clone(),
+                        timestamp: *activity_datetime,
+                        open: *price,
+                        high: *price,
+                        low: *price,
+                        close: *price,
+                        adjclose: *price,
+                        volume: Decimal::ZERO,
+                        currency: currency.clone(),
+                        data_source: DataSource::Broker,
+                        created_at: now,
+                        notes: None,
+                    },
+                );
+            }
+
+            let quotes: Vec<Quote> = quotes_map.into_values().collect();
+
+            if !quotes.is_empty() {
+                match quote_store.upsert_quotes(&quotes).await {
+                    Ok(count) => {
+                        debug!(
+                            "Saved {} broker-provided quotes from activities for account {}",
+                            count, account_id
+                        );
+                    }
+                    Err(e) => {
+                        warn!(
+                            "Failed to save broker quotes from activities for account {}: {}",
+                            account_id, e
+                        );
+                    }
+                }
+            }
+        }
 
         debug!(
             "Upserted {} activities for account {} ({} assets created, {} new asset IDs, {} need review)",
@@ -821,7 +885,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             let mut quotes: Vec<Quote> = Vec::new();
 
             for (spec_key, _quantity, price, _avg_cost, currency) in &position_data {
-                if *price == Decimal::ZERO {
+                if *price <= Decimal::ZERO {
                     continue;
                 }
                 let asset_id = match spec_key_to_asset_id.get(spec_key) {
