@@ -10,9 +10,7 @@ import {
  * The backend uses the refresh token to mint fresh access tokens when needed.
  * Works in both desktop (Tauri) and web modes.
  */
-export const storeSyncSession = async (
-  refreshToken: string,
-): Promise<void> => {
+export const storeSyncSession = async (refreshToken: string): Promise<void> => {
   try {
     await storeSyncSessionApi(refreshToken);
     logger.debug("Sync session stored in backend");
