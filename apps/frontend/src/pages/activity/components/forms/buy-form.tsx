@@ -78,6 +78,9 @@ export const buyFormSchema = z
     symbolInstrumentType: z.string().nullable().optional(),
     // Asset metadata for custom assets (name, etc.)
     assetMetadata: assetMetadataSchema,
+    // Carries through any extra metadata keys from the original activity so they aren't
+    // overwritten when saving. Only the keys the form explicitly manages are updated.
+    existingMetadata: z.record(z.unknown()).optional(),
     // Option-specific fields
     underlyingSymbol: z.string().optional(),
     strikePrice: z.coerce.number().positive().optional(),

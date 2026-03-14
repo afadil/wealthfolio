@@ -1,7 +1,9 @@
 // Test cases for HoldingsCalculator will go here.
 #[cfg(test)]
 mod tests {
-    use crate::activities::{Activity, ActivityStatus, ActivityType};
+    use crate::activities::{
+        Activity, ActivityStatus, ActivityType, METADATA_INCLUDE_CASH_DEPOSIT,
+    };
     use crate::assets::{
         Asset, AssetKind, AssetRepositoryTrait, InstrumentType, NewAsset, QuoteMode,
         UpdateAssetProfile,
@@ -606,7 +608,7 @@ mod tests {
             "USD",
             target_date_str,
         );
-        buy_activity.metadata = Some(serde_json::json!({"include_cash_deposit": true}));
+        buy_activity.metadata = Some(serde_json::json!({ METADATA_INCLUDE_CASH_DEPOSIT: true }));
 
         let result =
             calculator.calculate_next_holdings(&previous_snapshot, &[buy_activity], target_date);
@@ -891,7 +893,7 @@ mod tests {
             "CAD",
             "2024-01-15",
         );
-        buy_activity.metadata = Some(serde_json::json!({"include_cash_deposit": true}));
+        buy_activity.metadata = Some(serde_json::json!({ METADATA_INCLUDE_CASH_DEPOSIT: true }));
 
         let result =
             calculator.calculate_next_holdings(&previous_snapshot, &[buy_activity], target_date);

@@ -1,6 +1,6 @@
 //! Activity domain models.
 
-use super::activities_service::METADATA_INCLUDE_CASH_DEPOSIT;
+use super::activities_constants::METADATA_INCLUDE_CASH_DEPOSIT;
 use crate::activities::activities_errors::ActivityError;
 use crate::activities::csv_parser::ParseConfig;
 use crate::Result;
