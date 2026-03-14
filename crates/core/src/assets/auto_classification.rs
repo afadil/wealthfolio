@@ -6,6 +6,7 @@
 //! - sector (Technology, Healthcare) → industries_gics taxonomy
 //! - country (United States, Canada) → regions taxonomy
 
+use crate::assets::assets_model::{AssetKind, InstrumentType};
 use crate::taxonomies::{NewAssetTaxonomyAssignment, TaxonomyServiceTrait};
 use log::{debug, warn};
 use std::sync::Arc;
@@ -63,6 +64,46 @@ fn map_quote_type_to_asset_class(quote_type: &str) -> Option<&'static str> {
         // NONE: Delisted - skip
         "ECNQUOTE" | "NONE" => None,
         _ => None,
+    }
+}
+
+/// Maps InstrumentType enum to instrument_type taxonomy category ID.
+/// Used at asset creation time when no provider profile is available yet.
+fn map_instrument_type_to_taxonomy_category(
+    instrument_type: &InstrumentType,
+) -> Option<&'static str> {
+    match instrument_type {
+        InstrumentType::Equity => Some("STOCK_COMMON"),
+        InstrumentType::Crypto => Some("CRYPTO_NATIVE"),
+        InstrumentType::Option => Some("OPTION"),
+        InstrumentType::Bond => Some("BOND_CORPORATE"),
+        InstrumentType::Metal => None,
+        InstrumentType::Fx => None,
+    }
+}
+
+/// Maps InstrumentType enum to asset_classes taxonomy category ID.
+/// Used at asset creation time when no provider profile is available yet.
+fn map_instrument_type_to_asset_class(instrument_type: &InstrumentType) -> Option<&'static str> {
+    match instrument_type {
+        InstrumentType::Equity => Some("EQUITY"),
+        InstrumentType::Crypto => Some("DIGITAL_ASSETS"),
+        InstrumentType::Option => Some("EQUITY"),
+        InstrumentType::Bond => Some("FIXED_INCOME"),
+        InstrumentType::Metal => Some("COMMODITIES"),
+        InstrumentType::Fx => None,
+    }
+}
+
+/// Maps AssetKind to asset_classes taxonomy category ID.
+/// Covers non-Investment kinds that don't have an InstrumentType.
+fn map_kind_to_asset_class(kind: &AssetKind) -> Option<&'static str> {
+    match kind {
+        AssetKind::Property => Some("REAL_ESTATE"),
+        AssetKind::PreciousMetal => Some("COMMODITIES"),
+        AssetKind::PrivateEquity => Some("ALTERNATIVES"),
+        AssetKind::Vehicle | AssetKind::Collectible | AssetKind::Other => Some("ALTERNATIVES"),
+        AssetKind::Investment | AssetKind::Fx | AssetKind::Liability => None,
     }
 }
 
@@ -422,6 +463,48 @@ impl AutoClassificationService {
         }
 
         Ok(result)
+    }
+
+    /// Classify a newly created asset using InstrumentType and AssetKind.
+    /// This is a lightweight classification at creation time, before any provider data is available.
+    /// Only assigns instrument_type and asset_class taxonomies.
+    pub async fn classify_from_spec(
+        &self,
+        asset_id: &str,
+        instrument_type: Option<&InstrumentType>,
+        kind: &AssetKind,
+    ) {
+        // 1. Classify instrument type (only if we have an InstrumentType)
+        if let Some(it) = instrument_type {
+            if let Some(category_id) = map_instrument_type_to_taxonomy_category(it) {
+                if let Err(e) = self
+                    .assign_to_taxonomy(asset_id, "instrument_type", category_id, 10000)
+                    .await
+                {
+                    debug!(
+                        "Initial classification of {} instrument_type failed: {}",
+                        asset_id, e
+                    );
+                }
+            }
+        }
+
+        // 2. Classify asset class — prefer InstrumentType mapping, fall back to AssetKind
+        let asset_class = instrument_type
+            .and_then(map_instrument_type_to_asset_class)
+            .or_else(|| map_kind_to_asset_class(kind));
+
+        if let Some(category_id) = asset_class {
+            if let Err(e) = self
+                .assign_to_taxonomy(asset_id, "asset_classes", category_id, 10000)
+                .await
+            {
+                debug!(
+                    "Initial classification of {} asset_classes failed: {}",
+                    asset_id, e
+                );
+            }
+        }
     }
 
     /// Helper to assign an asset to a taxonomy category

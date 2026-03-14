@@ -1219,7 +1219,32 @@ impl AssetServiceTrait for AssetService {
 
         let created_ids: Vec<String> = created_ids.into_iter().collect();
 
-        // 4. Emit batch event for created assets
+        // 4. Auto-classify newly created assets (instrument_type + asset_class)
+        if !created_ids.is_empty() {
+            if let Some(taxonomy_service) = &self.taxonomy_service {
+                let classifier = AutoClassificationService::new(Arc::clone(taxonomy_service));
+                let created_set: HashSet<&str> = created_ids.iter().map(|id| id.as_str()).collect();
+                for (spec, _) in &specs_for_create {
+                    let asset_id = spec.id.as_deref().or_else(|| {
+                        spec.instrument_key().and_then(|key| {
+                            assets_map
+                                .values()
+                                .find(|a| a.instrument_key.as_deref() == Some(key.as_str()))
+                                .map(|a| a.id.as_str())
+                        })
+                    });
+                    if let Some(id) = asset_id {
+                        if created_set.contains(id) {
+                            classifier
+                                .classify_from_spec(id, spec.instrument_type.as_ref(), &spec.kind)
+                                .await;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. Emit batch event for created assets
         if !created_ids.is_empty() {
             self.event_sink
                 .emit(DomainEvent::assets_created(created_ids.clone()));
