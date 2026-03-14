@@ -23,7 +23,7 @@ use super::planner::{plan_asset_enrichment, plan_portfolio_job};
 use crate::commands::brokers_sync::perform_broker_sync;
 use crate::context::ServiceContext;
 use crate::events::{
-    MarketSyncResult, PortfolioRequestPayload, ASSET_ENRICHMENT_COMPLETE, ASSET_ENRICHMENT_ERROR,
+    MarketSyncResult, PortfolioRequestPayload, ASSET_ENRICHMENT_COMPLETE,
     ASSET_ENRICHMENT_PROGRESS, ASSET_ENRICHMENT_START, MARKET_SYNC_COMPLETE, MARKET_SYNC_ERROR,
     MARKET_SYNC_START, PORTFOLIO_UPDATE_COMPLETE, PORTFOLIO_UPDATE_ERROR, PORTFOLIO_UPDATE_START,
 };
@@ -133,7 +133,7 @@ async fn process_event_batch(
         let mut total_enriched: usize = 0;
         let mut total_skipped: usize = 0;
         let mut total_failed: usize = 0;
-        let mut had_error = false;
+
         let chunk_size = 5;
 
         for chunk in enrichment_asset_ids.chunks(chunk_size) {
@@ -150,7 +150,6 @@ async fn process_event_batch(
                 }
                 Ok(Err(e)) => {
                     warn!("Asset enrichment chunk failed: {}", e);
-                    had_error = true;
                     total_failed += chunk.len();
                 }
                 Err(_) => {
@@ -158,7 +157,6 @@ async fn process_event_batch(
                         "Asset enrichment chunk timed out ({} asset(s))",
                         chunk.len()
                     );
-                    had_error = true;
                     total_failed += chunk.len();
                 }
             }
@@ -170,13 +168,6 @@ async fn process_event_batch(
                     "completed": completed,
                     "total": total,
                 }),
-            );
-        }
-
-        if had_error || total_failed > 0 {
-            let _ = app_handle.emit(
-                ASSET_ENRICHMENT_ERROR,
-                format!("{} asset(s) failed enrichment", total_failed),
             );
         }
 
@@ -192,7 +183,8 @@ async fn process_event_batch(
 
     // 2. Plan and run portfolio job directly (not via event emission)
     // This ensures the is_processing guard properly tracks completion
-    if let Some(payload) = plan_portfolio_job(events) {
+    let timezone = context.get_timezone();
+    if let Some(payload) = plan_portfolio_job(events, &timezone) {
         run_portfolio_job(app_handle, context, payload).await;
     }
 

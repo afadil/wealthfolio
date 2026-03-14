@@ -64,6 +64,7 @@ async fn update_settings(
                 },
                 snapshot_mode: SnapshotRecalcMode::Full,
                 valuation_mode: ValuationRecalcMode::Full,
+                since_date: None,
             };
 
             if let Err(err) = process_portfolio_job(state_for_job, job_config).await {
@@ -78,6 +79,7 @@ async fn update_settings(
                 market_sync_mode: MarketSyncMode::None,
                 snapshot_mode: SnapshotRecalcMode::Full,
                 valuation_mode: ValuationRecalcMode::Full,
+                since_date: None,
             };
 
             if let Err(err) = process_portfolio_job(state_for_job, job_config).await {

@@ -188,6 +188,7 @@ async fn create_alternative_asset(
             market_sync_mode: MarketSyncMode::None,
             snapshot_mode: SnapshotRecalcMode::IncrementalFromLast,
             valuation_mode: ValuationRecalcMode::IncrementalFromLast,
+            since_date: None,
         },
     );
 
@@ -233,6 +234,7 @@ async fn update_alternative_asset_valuation(
             market_sync_mode: MarketSyncMode::None,
             snapshot_mode: SnapshotRecalcMode::IncrementalFromLast,
             valuation_mode: ValuationRecalcMode::IncrementalFromLast,
+            since_date: None,
         },
     );
 
@@ -298,6 +300,7 @@ async fn delete_alternative_asset(
             market_sync_mode: MarketSyncMode::None,
             snapshot_mode: SnapshotRecalcMode::IncrementalFromLast,
             valuation_mode: ValuationRecalcMode::IncrementalFromLast,
+            since_date: None,
         },
     );
 

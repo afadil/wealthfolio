@@ -1,6 +1,6 @@
 //! Domain event types.
 
-use chrono::NaiveDate;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::accounts::TrackingMode;
@@ -19,8 +19,9 @@ pub enum DomainEvent {
         asset_ids: Vec<String>,
         /// Currencies observed in affected activities (for FX sync planning)
         currencies: Vec<String>,
-        /// Earliest activity date in this change, if known. Used to limit recalculation range.
-        earliest_activity_date: Option<NaiveDate>,
+        /// Earliest affected activity timestamp in UTC, if known.
+        /// Runtime planners convert this to a local business date using the current timezone.
+        earliest_activity_at_utc: Option<DateTime<Utc>>,
     },
 
     /// Holdings snapshots were created or updated.
@@ -84,13 +85,13 @@ impl DomainEvent {
         account_ids: Vec<String>,
         asset_ids: Vec<String>,
         currencies: Vec<String>,
-        earliest_activity_date: Option<NaiveDate>,
+        earliest_activity_at_utc: Option<DateTime<Utc>>,
     ) -> Self {
         Self::ActivitiesChanged {
             account_ids,
             asset_ids,
             currencies,
-            earliest_activity_date,
+            earliest_activity_at_utc,
         }
     }
 
@@ -162,15 +163,16 @@ impl DomainEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::TimeZone;
 
     #[test]
     fn test_domain_event_serialization() {
-        let date = NaiveDate::from_ymd_opt(2024, 6, 15).unwrap();
+        let timestamp = Utc.with_ymd_and_hms(2024, 6, 15, 14, 30, 0).unwrap();
         let event = DomainEvent::activities_changed(
             vec!["acc1".to_string()],
             vec!["AAPL".to_string()],
             vec!["USD".to_string()],
-            Some(date),
+            Some(timestamp),
         );
 
         let json = serde_json::to_string(&event).unwrap();
@@ -182,12 +184,12 @@ mod tests {
                 account_ids,
                 asset_ids,
                 currencies,
-                earliest_activity_date,
+                earliest_activity_at_utc,
             } => {
                 assert_eq!(account_ids, vec!["acc1"]);
                 assert_eq!(asset_ids, vec!["AAPL"]);
                 assert_eq!(currencies, vec!["USD"]);
-                assert_eq!(earliest_activity_date, Some(date));
+                assert_eq!(earliest_activity_at_utc, Some(timestamp));
             }
             _ => panic!("Expected ActivitiesChanged"),
         }

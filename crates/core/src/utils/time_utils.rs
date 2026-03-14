@@ -67,6 +67,12 @@ pub fn activity_date_in_tz(activity_instant: DateTime<Utc>, tz: Tz) -> NaiveDate
     valuation_date_from_utc(activity_instant, tz)
 }
 
+/// Converts an activity UTC timestamp to a user-local date using a timezone name.
+/// Invalid or empty timezone values fall back to UTC.
+pub fn activity_date_in_user_timezone(activity_instant: DateTime<Utc>, tz_raw: &str) -> NaiveDate {
+    activity_date_in_tz(activity_instant, parse_user_timezone_or_default(tz_raw))
+}
+
 /// Returns UTC boundaries for a local calendar year in a timezone.
 /// The returned range is [start_utc, end_utc_exclusive).
 pub fn local_year_utc_bounds(year: i32, tz: Tz) -> Result<(DateTime<Utc>, DateTime<Utc>)> {
@@ -234,6 +240,13 @@ mod tests {
         let instant = Utc.with_ymd_and_hms(2026, 3, 29, 0, 30, 0).unwrap();
         let local_date = user_date_from_utc(instant, tz);
         assert_eq!(local_date.to_string(), "2026-03-29");
+    }
+
+    #[test]
+    fn activity_date_in_user_timezone_uses_timezone_name() {
+        let instant = Utc.with_ymd_and_hms(2025, 1, 1, 1, 30, 0).unwrap();
+        let local_date = activity_date_in_user_timezone(instant, "America/Toronto");
+        assert_eq!(local_date.to_string(), "2024-12-31");
     }
 
     #[test]

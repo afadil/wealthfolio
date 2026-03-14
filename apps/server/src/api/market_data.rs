@@ -93,6 +93,7 @@ async fn update_quote(
             market_sync_mode: MarketSyncMode::None,
             snapshot_mode: SnapshotRecalcMode::Full,
             valuation_mode: ValuationRecalcMode::Full,
+            since_date: None,
         },
     );
     Ok(StatusCode::NO_CONTENT)
@@ -112,6 +113,7 @@ async fn delete_quote(
             market_sync_mode: MarketSyncMode::None,
             snapshot_mode: SnapshotRecalcMode::Full,
             valuation_mode: ValuationRecalcMode::Full,
+            since_date: None,
         },
     );
     Ok(StatusCode::NO_CONTENT)
@@ -168,6 +170,7 @@ async fn import_quotes_csv(
             market_sync_mode: MarketSyncMode::None,
             snapshot_mode: SnapshotRecalcMode::Full,
             valuation_mode: ValuationRecalcMode::Full,
+            since_date: None,
         },
     );
 
@@ -212,6 +215,7 @@ async fn sync_market_data(
             market_sync_mode,
             snapshot_mode: SnapshotRecalcMode::IncrementalFromLast,
             valuation_mode: ValuationRecalcMode::IncrementalFromLast,
+            since_date: None,
         },
     );
     Ok(StatusCode::NO_CONTENT)

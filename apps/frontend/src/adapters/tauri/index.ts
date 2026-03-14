@@ -171,10 +171,6 @@ export {
   listenBrokerSyncStart,
   listenBrokerSyncComplete,
   listenBrokerSyncError,
-  listenAssetEnrichmentStart,
-  listenAssetEnrichmentComplete,
-  listenAssetEnrichmentError,
-  listenAssetEnrichmentProgress,
   listenNavigateToRoute,
   listenDeepLink,
 } from "./events";

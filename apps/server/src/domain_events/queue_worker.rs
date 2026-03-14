@@ -5,7 +5,7 @@
 //! and broker sync.
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use tokio::sync::mpsc;
@@ -37,6 +37,7 @@ pub struct QueueWorkerDeps {
         Arc<dyn wealthfolio_core::portfolio::valuation::ValuationServiceTrait + Send + Sync>,
     pub account_service: Arc<wealthfolio_core::accounts::AccountService>,
     pub fx_service: Arc<dyn wealthfolio_core::fx::FxServiceTrait + Send + Sync>,
+    pub timezone: Arc<RwLock<String>>,
     /// Secret store for accessing credentials (e.g., refresh tokens for broker sync)
     pub secret_store: Arc<dyn SecretStore>,
     /// Shared token lifecycle state; must be the same instance used by API handlers.
@@ -143,7 +144,7 @@ async fn process_event_batch(events: &[DomainEvent], deps: Arc<QueueWorkerDeps>)
         let mut total_enriched: usize = 0;
         let mut total_skipped: usize = 0;
         let mut total_failed: usize = 0;
-        let mut had_error = false;
+
         let chunk_size = 5;
 
         for chunk in enrichment_assets.chunks(chunk_size) {
@@ -160,7 +161,6 @@ async fn process_event_batch(events: &[DomainEvent], deps: Arc<QueueWorkerDeps>)
                 }
                 Ok(Err(e)) => {
                     tracing::warn!("Asset enrichment chunk failed: {}", e);
-                    had_error = true;
                     total_failed += chunk.len();
                 }
                 Err(_) => {
@@ -168,7 +168,6 @@ async fn process_event_batch(events: &[DomainEvent], deps: Arc<QueueWorkerDeps>)
                         "Asset enrichment chunk timed out ({} asset(s))",
                         chunk.len()
                     );
-                    had_error = true;
                     total_failed += chunk.len();
                 }
             }
@@ -184,14 +183,6 @@ async fn process_event_batch(events: &[DomainEvent], deps: Arc<QueueWorkerDeps>)
                 ));
         }
 
-        if had_error || total_failed > 0 {
-            deps.event_bus
-                .publish(crate::events::ServerEvent::with_payload(
-                    crate::events::ASSET_ENRICHMENT_ERROR,
-                    serde_json::json!(format!("{} asset(s) failed enrichment", total_failed)),
-                ));
-        }
-
         deps.event_bus
             .publish(crate::events::ServerEvent::with_payload(
                 crate::events::ASSET_ENRICHMENT_COMPLETE,
@@ -204,7 +195,8 @@ async fn process_event_batch(events: &[DomainEvent], deps: Arc<QueueWorkerDeps>)
     }
 
     // 2. Plan and trigger portfolio job
-    if let Some(config) = plan_portfolio_job(events) {
+    let timezone = deps.timezone.read().unwrap().clone();
+    if let Some(config) = plan_portfolio_job(events, &timezone) {
         tracing::info!(
             "Triggering portfolio job for accounts: {:?}, market_sync: {:?}",
             config.account_ids,

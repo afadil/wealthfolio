@@ -156,9 +156,6 @@ pub const ASSET_ENRICHMENT_START: &str = "asset:enrichment-start";
 /// Event emitted when asset enrichment completes.
 pub const ASSET_ENRICHMENT_COMPLETE: &str = "asset:enrichment-complete";
 
-/// Event emitted when asset enrichment encounters an error.
-pub const ASSET_ENRICHMENT_ERROR: &str = "asset:enrichment-error";
-
 /// Event emitted for asset enrichment progress updates.
 pub const ASSET_ENRICHMENT_PROGRESS: &str = "asset:enrichment-progress";
 

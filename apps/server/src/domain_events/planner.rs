@@ -5,11 +5,13 @@
 
 use std::collections::HashSet;
 
+use chrono::{DateTime, Utc};
 use wealthfolio_core::{
     accounts::TrackingMode,
     events::DomainEvent,
     portfolio::{snapshot::SnapshotRecalcMode, valuation::ValuationRecalcMode},
     quotes::MarketSyncMode,
+    utils::time_utils::activity_date_in_user_timezone,
 };
 
 use crate::api::shared::PortfolioJobConfig;
@@ -21,16 +23,18 @@ use crate::api::shared::PortfolioJobConfig;
 /// from AssetsCreated when a recalc-triggering event exists in the same batch.
 ///
 /// Returns None if no events require portfolio recalculation.
-pub fn plan_portfolio_job(events: &[DomainEvent]) -> Option<PortfolioJobConfig> {
+pub fn plan_portfolio_job(events: &[DomainEvent], timezone: &str) -> Option<PortfolioJobConfig> {
     let mut account_ids: HashSet<String> = HashSet::new();
     let mut asset_ids: HashSet<String> = HashSet::new();
     let mut has_recalc_event = false;
+    let mut min_activity_at_utc: Option<DateTime<Utc>> = None;
 
     for event in events {
         match event {
             DomainEvent::ActivitiesChanged {
                 account_ids: acc_ids,
                 asset_ids: ast_ids,
+                earliest_activity_at_utc,
                 ..
             } => {
                 has_recalc_event = true;
@@ -44,6 +48,11 @@ pub fn plan_portfolio_job(events: &[DomainEvent]) -> Option<PortfolioJobConfig> 
                         asset_ids.insert(id.clone());
                     }
                 }
+                min_activity_at_utc = match (min_activity_at_utc, earliest_activity_at_utc) {
+                    (Some(current), Some(new)) => Some(current.min(*new)),
+                    (None, Some(new)) => Some(*new),
+                    (current, None) => current,
+                };
             }
             DomainEvent::HoldingsChanged {
                 account_ids: acc_ids,
@@ -120,6 +129,8 @@ pub fn plan_portfolio_job(events: &[DomainEvent]) -> Option<PortfolioJobConfig> 
         },
         snapshot_mode: SnapshotRecalcMode::Full,
         valuation_mode: ValuationRecalcMode::Full,
+        since_date: min_activity_at_utc
+            .map(|instant| activity_date_in_user_timezone(instant, timezone)),
     })
 }
 
@@ -189,6 +200,7 @@ pub fn plan_asset_enrichment(events: &[DomainEvent]) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::{TimeZone, Utc};
 
     #[test]
     fn test_plan_portfolio_job_merges_events() {
@@ -197,17 +209,17 @@ mod tests {
                 account_ids: vec!["acc1".to_string()],
                 asset_ids: vec!["AAPL".to_string()],
                 currencies: vec!["USD".to_string()],
-                earliest_activity_date: None,
+                earliest_activity_at_utc: None,
             },
             DomainEvent::ActivitiesChanged {
                 account_ids: vec!["acc2".to_string()],
                 asset_ids: vec!["MSFT".to_string()],
                 currencies: vec!["CAD".to_string()],
-                earliest_activity_date: None,
+                earliest_activity_at_utc: None,
             },
         ];
 
-        let config = plan_portfolio_job(&events).unwrap();
+        let config = plan_portfolio_job(&events, "UTC").unwrap();
         let acc_ids = config.account_ids.unwrap();
         assert!(acc_ids.contains(&"acc1".to_string()));
         assert!(acc_ids.contains(&"acc2".to_string()));
@@ -222,6 +234,22 @@ mod tests {
     }
 
     #[test]
+    fn test_plan_portfolio_job_converts_utc_timestamp_using_timezone() {
+        let events = vec![DomainEvent::ActivitiesChanged {
+            account_ids: vec!["acc1".to_string()],
+            asset_ids: vec!["AAPL".to_string()],
+            currencies: vec!["USD".to_string()],
+            earliest_activity_at_utc: Some(Utc.with_ymd_and_hms(2025, 1, 1, 1, 30, 0).unwrap()),
+        }];
+
+        let config = plan_portfolio_job(&events, "America/Toronto").unwrap();
+        assert_eq!(
+            config.since_date.map(|date| date.to_string()),
+            Some("2024-12-31".to_string())
+        );
+    }
+
+    #[test]
     fn test_plan_portfolio_job_accounts_changed_no_fake_fx_ids() {
         let events = vec![DomainEvent::AccountsChanged {
             account_ids: vec!["acc1".to_string()],
@@ -232,7 +260,7 @@ mod tests {
             }],
         }];
 
-        let config = plan_portfolio_job(&events).unwrap();
+        let config = plan_portfolio_job(&events, "UTC").unwrap();
         let acc_ids = config.account_ids.unwrap();
         assert!(acc_ids.contains(&"acc1".to_string()));
 
@@ -253,14 +281,14 @@ mod tests {
                 account_ids: vec!["acc1".to_string()],
                 asset_ids: vec!["equity-uuid".to_string()],
                 currencies: vec!["USD".to_string()],
-                earliest_activity_date: None,
+                earliest_activity_at_utc: None,
             },
             DomainEvent::AssetsCreated {
                 asset_ids: vec!["fx-uuid".to_string()],
             },
         ];
 
-        let config = plan_portfolio_job(&events).unwrap();
+        let config = plan_portfolio_job(&events, "UTC").unwrap();
         if let MarketSyncMode::Incremental { asset_ids } = config.market_sync_mode {
             let ids = asset_ids.unwrap();
             assert!(ids.contains(&"equity-uuid".to_string()));
@@ -276,7 +304,7 @@ mod tests {
             asset_ids: vec!["AAPL".to_string()],
         }];
 
-        let config = plan_portfolio_job(&events);
+        let config = plan_portfolio_job(&events, "UTC");
         assert!(config.is_none());
     }
 
@@ -286,7 +314,7 @@ mod tests {
             asset_ids: vec!["asset-1".to_string()],
         }];
 
-        let config = plan_portfolio_job(&events).unwrap();
+        let config = plan_portfolio_job(&events, "UTC").unwrap();
         assert!(config.account_ids.is_none());
 
         if let MarketSyncMode::Incremental { asset_ids } = config.market_sync_mode {
