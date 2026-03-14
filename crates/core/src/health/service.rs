@@ -233,6 +233,8 @@ impl HealthService {
         let mut holdings_map: HashMap<String, AssetHoldingInfo> = HashMap::new();
         let mut latest_quote_times: HashMap<String, chrono::DateTime<chrono::Utc>> = HashMap::new();
         let mut total_portfolio_value = 0.0;
+        // Track FX pairs needed: (from_currency, to_currency) → affected market value
+        let mut fx_pair_mv: HashMap<(String, String), f64> = HashMap::new();
 
         for account in &accounts {
             let holdings = holdings_service
@@ -240,6 +242,23 @@ impl HealthService {
                 .await?;
 
             for holding in holdings {
+                // Collect FX pair info before filtering to instrument-only
+                if holding.local_currency != holding.base_currency {
+                    let mv = holding
+                        .market_value
+                        .base
+                        .to_string()
+                        .parse::<f64>()
+                        .unwrap_or(0.0)
+                        .abs();
+                    *fx_pair_mv
+                        .entry((
+                            holding.local_currency.clone(),
+                            holding.base_currency.clone(),
+                        ))
+                        .or_default() += mv;
+                }
+
                 if let Some(ref instrument) = holding.instrument {
                     let market_value_f64 = holding
                         .market_value
@@ -301,9 +320,48 @@ impl HealthService {
             &latest_quote_times,
         );
 
-        // For now, we'll use empty data for FX, unclassified, and consistency checks
-        // These can be enhanced later with proper data gathering
-        let fx_pairs: Vec<FxPairInfo> = Vec::new();
+        // Gather FX pairs from holdings where local_currency != base_currency
+        let fx_pairs: Vec<FxPairInfo> = if fx_pair_mv.is_empty() {
+            Vec::new()
+        } else {
+            // Build instrument_key → asset_id map for FX assets only
+            let fx_asset_map: HashMap<String, String> = asset_service
+                .get_assets()
+                .unwrap_or_default()
+                .into_iter()
+                .filter_map(|a| {
+                    a.instrument_key
+                        .filter(|k| k.starts_with("FX:"))
+                        .map(|k| (k, a.id))
+                })
+                .collect();
+
+            fx_pair_mv
+                .iter()
+                .map(|((from_ccy, to_ccy), affected_mv)| {
+                    // Check both directions since FX asset could be stored either way
+                    let key_direct = format!("FX:{}/{}", from_ccy, to_ccy);
+                    let key_inverse = format!("FX:{}/{}", to_ccy, from_ccy);
+                    let latest_quote_time = fx_asset_map
+                        .get(&key_direct)
+                        .or_else(|| fx_asset_map.get(&key_inverse))
+                        .and_then(|asset_id| {
+                            quote_service
+                                .get_latest_quotes(&[asset_id.clone()])
+                                .ok()
+                                .and_then(|q| q.into_values().next().map(|quote| quote.timestamp))
+                        });
+
+                    FxPairInfo {
+                        pair_id: format!("{}:{}", from_ccy, to_ccy),
+                        from_currency: from_ccy.clone(),
+                        to_currency: to_ccy.clone(),
+                        affected_mv: *affected_mv,
+                        latest_quote_time,
+                    }
+                })
+                .collect()
+        };
         let unclassified_assets: Vec<UnclassifiedAssetInfo> = Vec::new();
         let consistency_issues: Vec<ConsistencyIssueInfo> = Vec::new();
 
