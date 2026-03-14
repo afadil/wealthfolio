@@ -251,7 +251,6 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
     if (session.refresh_token) {
       try {
         await storeSyncSession(session.refresh_token);
-        logger.info("Tokens stored in backend successfully");
       } catch (err) {
         logger.error(`Failed to store tokens in backend: ${err}`);
       }
@@ -262,9 +261,6 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
     if (session.refresh_token) {
       try {
         await setSecret(REFRESH_TOKEN_KEY, session.refresh_token);
-        logger.info(
-          isDesktop ? "Refresh token stored in keyring" : "Refresh token stored in backend",
-        );
       } catch (err) {
         logger.error(`setSecret failed: ${err}`);
         // Fallback to localStorage only on desktop where keyring might fail
@@ -278,15 +274,12 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
   // Handle auth callback from URL (deep link or web redirect)
   const handleAuthCallback = useCallback(
     async (url: string) => {
-      logger.info(`handleAuthCallback called with URL: ${url.substring(0, 100)}...`);
       const payload = parseAuthCallbackUrl(url);
 
       if (!payload) {
         logger.error("Failed to parse auth callback URL - no payload");
         return;
       }
-
-      logger.info(`Parsed payload type: ${payload.type}`);
 
       if (payload.type === "error") {
         logger.error(`Auth callback error: ${payload.message}`);
@@ -295,7 +288,6 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
       }
 
       try {
-        logger.info("Exchanging code for session...");
         const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(
           payload.code,
         );
@@ -312,12 +304,8 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
           return;
         }
 
-        logger.info("Session received, storing tokens...");
-        logger.info(`Access token length: ${data.session.access_token?.length ?? 0}`);
-        logger.info(`Refresh token length: ${data.session.refresh_token?.length ?? 0}`);
         // Store tokens BEFORE setting session to avoid race condition
         await storeTokens(data.session);
-        logger.info("storeTokens function returned, setting session state...");
         setSession(data.session);
         setUser(data.session.user);
         logger.info("Auth callback completed successfully");
@@ -552,21 +540,14 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
         // This opens a secure Safari sheet that Google accepts for OAuth
         if (useASWebAuth && data.url) {
           try {
-            logger.info("Starting ASWebAuth flow...");
-            logger.info(`OAuth URL: ${data.url.substring(0, 100)}...`);
-
             const result = await authenticateWithASWebAuth({
               url: data.url,
               callbackScheme: "wealthfolio",
             });
 
-            logger.info(`ASWebAuth result: ${JSON.stringify(result)}`);
-
             // The plugin returns the full callback URL with the auth code
             if (result?.callbackUrl) {
-              logger.info(`Callback URL received: ${result.callbackUrl.substring(0, 100)}...`);
               await handleAuthCallback(result.callbackUrl);
-              logger.info("handleAuthCallback completed");
             } else {
               logger.error("No callbackUrl in ASWebAuth result");
             }
