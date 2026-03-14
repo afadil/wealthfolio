@@ -28,6 +28,9 @@ pub struct SyncCycleResult {
     pub bootstrap_snapshot_id: Option<String>,
     #[serde(default)]
     pub bootstrap_snapshot_seq: Option<i64>,
+    /// Number of outbox events dead-lettered during this cycle (e.g. key version mismatch).
+    #[serde(default)]
+    pub dead_letter_count: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -313,6 +313,7 @@ diesel::table! {
         key_version -> Nullable<Integer>,
         trust_state -> Text,
         last_bootstrap_at -> Nullable<Text>,
+        min_snapshot_created_at -> Nullable<Text>,
     }
 }
 

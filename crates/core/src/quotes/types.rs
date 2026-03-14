@@ -78,6 +78,7 @@ impl ProviderId {
     pub const US_TREASURY_CALC: &'static str = "US_TREASURY_CALC";
     pub const BOERSE_FRANKFURT: &'static str = "BOERSE_FRANKFURT";
     pub const OPENFIGI: &'static str = "OPENFIGI";
+    pub const BROKER: &'static str = "BROKER";
 
     pub fn new(id: impl Into<String>) -> Self {
         Self(id.into())
@@ -113,6 +114,10 @@ impl ProviderId {
 
     pub fn openfigi() -> Self {
         Self(Self::OPENFIGI.to_string())
+    }
+
+    pub fn broker() -> Self {
+        Self(Self::BROKER.to_string())
     }
 
     pub fn as_str(&self) -> &str {
@@ -355,6 +360,7 @@ impl From<DataSource> for QuoteSource {
             DataSource::Finnhub => QuoteSource::Provider(ProviderId::finnhub()),
             DataSource::UsTreasuryCalc => QuoteSource::Provider(ProviderId::us_treasury_calc()),
             DataSource::BoerseFrankfurt => QuoteSource::Provider(ProviderId::boerse_frankfurt()),
+            DataSource::Broker => QuoteSource::Provider(ProviderId::broker()),
         }
     }
 }
@@ -368,6 +374,7 @@ impl From<QuoteSource> for DataSource {
                 ProviderId::ALPHA_VANTAGE => DataSource::AlphaVantage,
                 ProviderId::MARKETDATA_APP => DataSource::MarketDataApp,
                 ProviderId::METAL_PRICE_API => DataSource::MetalPriceApi,
+                ProviderId::BROKER => DataSource::Broker,
                 _ => DataSource::Manual, // Unknown providers default to Manual for compatibility
             },
         }

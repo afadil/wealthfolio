@@ -13,10 +13,10 @@ use std::time::Duration;
 use crate::SymbolResolver;
 use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
+use log::{debug, warn};
 use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::Deserialize;
-use tracing::{debug, warn};
 
 use crate::errors::MarketDataError;
 use crate::models::{

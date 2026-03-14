@@ -64,6 +64,7 @@ impl PortfolioRequestBody {
             market_sync_mode: self.market_sync_mode,
             snapshot_mode,
             valuation_mode,
+            since_date: None,
         }
     }
 }
@@ -73,6 +74,7 @@ pub struct PortfolioJobConfig {
     pub market_sync_mode: MarketSyncMode,
     pub snapshot_mode: SnapshotRecalcMode,
     pub valuation_mode: ValuationRecalcMode,
+    pub since_date: Option<NaiveDate>,
 }
 
 /// Enqueue a background portfolio job that will publish SSE events as it runs.
@@ -94,6 +96,7 @@ pub fn trigger_lightweight_portfolio_update(state: Arc<AppState>) {
             market_sync_mode: MarketSyncMode::None,
             snapshot_mode: SnapshotRecalcMode::IncrementalFromLast,
             valuation_mode: ValuationRecalcMode::IncrementalFromLast,
+            since_date: None,
         },
     );
 }
@@ -108,6 +111,7 @@ pub fn trigger_full_portfolio_recalc(state: Arc<AppState>) {
             market_sync_mode: MarketSyncMode::None,
             snapshot_mode: SnapshotRecalcMode::Full,
             valuation_mode: ValuationRecalcMode::Full,
+            since_date: None,
         },
     );
 }
@@ -117,6 +121,14 @@ pub async fn process_portfolio_job(
     config: PortfolioJobConfig,
 ) -> ApiResult<()> {
     let event_bus = state.event_bus.clone();
+    let snapshot_mode = config
+        .since_date
+        .map(SnapshotRecalcMode::SinceDate)
+        .unwrap_or_else(|| config.snapshot_mode.clone());
+    let valuation_mode = config
+        .since_date
+        .map(ValuationRecalcMode::SinceDate)
+        .unwrap_or_else(|| config.valuation_mode.clone());
 
     // Only perform market sync if the mode requires it
     if config.market_sync_mode.requires_sync() {
@@ -191,7 +203,7 @@ pub async fn process_portfolio_job(
         let ids_slice = account_ids.as_slice();
         if let Err(err) = state
             .snapshot_service
-            .recalculate_holdings_snapshots(Some(ids_slice), config.snapshot_mode.clone())
+            .recalculate_holdings_snapshots(Some(ids_slice), snapshot_mode.clone())
             .await
         {
             let err_msg = format!(
@@ -208,7 +220,7 @@ pub async fn process_portfolio_job(
 
     if let Err(err) = state
         .snapshot_service
-        .recalculate_total_portfolio_snapshots(config.snapshot_mode)
+        .recalculate_total_portfolio_snapshots(snapshot_mode)
         .await
     {
         let err_msg = format!("Failed to calculate TOTAL portfolio snapshot: {}", err);
@@ -256,7 +268,7 @@ pub async fn process_portfolio_job(
     for account_id in account_ids {
         if let Err(err) = state
             .valuation_service
-            .calculate_valuation_history(&account_id, config.valuation_mode.clone())
+            .calculate_valuation_history(&account_id, valuation_mode.clone())
             .await
         {
             let err_msg = format!(

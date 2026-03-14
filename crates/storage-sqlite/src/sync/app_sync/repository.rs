@@ -407,7 +407,7 @@ fn resolve_payload_key_version(conn: &mut SqliteConnection, requested_version: i
     let maybe_row = sync_device_config::table
         .filter(sync_device_config::trust_state.eq("trusted"))
         .filter(sync_device_config::key_version.is_not_null())
-        .order(sync_device_config::key_version.desc())
+        .order(sync_device_config::last_bootstrap_at.desc())
         .first::<SyncDeviceConfigDB>(conn)
         .optional()
         .map_err(StorageError::from)?;
@@ -421,6 +421,7 @@ fn resolve_payload_key_version(conn: &mut SqliteConnection, requested_version: i
 fn resolve_local_device_id(conn: &mut SqliteConnection) -> Option<String> {
     sync_device_config::table
         .filter(sync_device_config::trust_state.eq("trusted"))
+        .order(sync_device_config::last_bootstrap_at.desc())
         .select(sync_device_config::device_id)
         .first::<String>(conn)
         .optional()
@@ -800,6 +801,7 @@ impl AppSyncRepository {
                     key_version: key_version_value,
                     trust_state: trust_state_value.clone(),
                     last_bootstrap_at: None,
+                    min_snapshot_created_at: None,
                 };
 
                 diesel::insert_into(sync_device_config::table)
@@ -818,11 +820,81 @@ impl AppSyncRepository {
             .await
     }
 
-    pub async fn mark_bootstrap_complete(
+    pub async fn reset_local_sync_session(&self) -> Result<()> {
+        self.writer
+            .exec(move |conn| {
+                let now = Utc::now().to_rfc3339();
+
+                diesel::delete(sync_outbox::table)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                diesel::delete(sync_entity_metadata::table)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                diesel::delete(sync_applied_events::table)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                diesel::delete(sync_table_state::table)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                diesel::delete(sync_device_config::table)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+
+                diesel::insert_into(sync_cursor::table)
+                    .values(SyncCursorDB {
+                        id: 1,
+                        cursor: 0,
+                        updated_at: now.clone(),
+                    })
+                    .on_conflict(sync_cursor::id)
+                    .do_update()
+                    .set((
+                        sync_cursor::cursor.eq(0),
+                        sync_cursor::updated_at.eq(now.clone()),
+                    ))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+
+                diesel::insert_into(sync_engine_state::table)
+                    .values(SyncEngineStateDB {
+                        id: 1,
+                        lock_version: 0,
+                        last_push_at: None,
+                        last_pull_at: None,
+                        last_error: None,
+                        consecutive_failures: 0,
+                        next_retry_at: None,
+                        last_cycle_status: None,
+                        last_cycle_duration_ms: None,
+                    })
+                    .on_conflict(sync_engine_state::id)
+                    .do_update()
+                    .set((
+                        sync_engine_state::lock_version.eq(0),
+                        sync_engine_state::last_push_at.eq::<Option<String>>(None),
+                        sync_engine_state::last_pull_at.eq::<Option<String>>(None),
+                        sync_engine_state::last_error.eq::<Option<String>>(None),
+                        sync_engine_state::consecutive_failures.eq(0),
+                        sync_engine_state::next_retry_at.eq::<Option<String>>(None),
+                        sync_engine_state::last_cycle_status.eq::<Option<String>>(None),
+                        sync_engine_state::last_cycle_duration_ms.eq::<Option<i64>>(None),
+                    ))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+
+                Ok(())
+            })
+            .await
+    }
+
+    pub async fn reset_and_mark_bootstrap_complete(
         &self,
         device_id_value: String,
         key_version_value: Option<i32>,
     ) -> Result<()> {
+        self.reset_local_sync_session().await?;
+
         self.writer
             .exec(move |conn| {
                 let now = Utc::now().to_rfc3339();
@@ -833,6 +905,7 @@ impl AppSyncRepository {
                         key_version: key_version_value,
                         trust_state: "trusted".to_string(),
                         last_bootstrap_at: Some(now.clone()),
+                        min_snapshot_created_at: None,
                     })
                     .on_conflict(sync_device_config::device_id)
                     .do_update()
@@ -840,10 +913,80 @@ impl AppSyncRepository {
                         sync_device_config::key_version.eq(key_version_value),
                         sync_device_config::trust_state.eq("trusted"),
                         sync_device_config::last_bootstrap_at.eq(Some(now.clone())),
+                        sync_device_config::min_snapshot_created_at.eq(None::<String>),
                     ))
                     .execute(conn)
                     .map_err(StorageError::from)?;
 
+                Ok(())
+            })
+            .await
+    }
+
+    /// Persist the bootstrap freshness gate for a device.
+    /// Uses upsert so the gate is stored even if no device_config row exists yet.
+    pub async fn set_min_snapshot_created_at(
+        &self,
+        device_id_value: String,
+        value: String,
+    ) -> Result<()> {
+        self.writer
+            .exec(move |conn| {
+                diesel::insert_into(sync_device_config::table)
+                    .values(SyncDeviceConfigDB {
+                        device_id: device_id_value.clone(),
+                        key_version: None,
+                        trust_state: "untrusted".to_string(),
+                        last_bootstrap_at: None,
+                        min_snapshot_created_at: Some(value.clone()),
+                    })
+                    .on_conflict(sync_device_config::device_id)
+                    .do_update()
+                    .set(sync_device_config::min_snapshot_created_at.eq(Some(&value)))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                Ok(())
+            })
+            .await
+    }
+
+    /// Read the bootstrap freshness gate for a device.
+    pub fn get_min_snapshot_created_at(&self, device_id_value: &str) -> Result<Option<String>> {
+        let mut conn = get_connection(&self.pool)?;
+        let row = sync_device_config::table
+            .filter(sync_device_config::device_id.eq(device_id_value))
+            .select(sync_device_config::min_snapshot_created_at)
+            .first::<Option<String>>(&mut conn)
+            .optional()
+            .map_err(StorageError::from)?;
+        Ok(row.flatten())
+    }
+
+    /// Clear the bootstrap freshness gate for ALL devices.
+    /// Used during logout/reset/reinitialize flows.
+    pub async fn clear_all_min_snapshot_created_at(&self) -> Result<()> {
+        self.writer
+            .exec(move |conn| {
+                diesel::update(sync_device_config::table)
+                    .set(sync_device_config::min_snapshot_created_at.eq(None::<String>))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                Ok(())
+            })
+            .await
+    }
+
+    /// Clear the bootstrap freshness gate for a device.
+    pub async fn clear_min_snapshot_created_at(&self, device_id_value: String) -> Result<()> {
+        self.writer
+            .exec(move |conn| {
+                diesel::update(
+                    sync_device_config::table
+                        .filter(sync_device_config::device_id.eq(&device_id_value)),
+                )
+                .set(sync_device_config::min_snapshot_created_at.eq(None::<String>))
+                .execute(conn)
+                .map_err(StorageError::from)?;
                 Ok(())
             })
             .await
@@ -1131,7 +1274,7 @@ impl AppSyncRepository {
                         last_error: None,
                         consecutive_failures: 0,
                         next_retry_at: None,
-                        last_cycle_status: Some("ok".to_string()),
+                        last_cycle_status: None,
                         last_cycle_duration_ms: None,
                     })
                     .on_conflict(sync_engine_state::id)
@@ -1141,7 +1284,6 @@ impl AppSyncRepository {
                         sync_engine_state::last_error.eq::<Option<String>>(None),
                         sync_engine_state::consecutive_failures.eq(0),
                         sync_engine_state::next_retry_at.eq::<Option<String>>(None),
-                        sync_engine_state::last_cycle_status.eq(Some("ok")),
                     ))
                     .execute(conn)
                     .map_err(StorageError::from)?;
@@ -1163,7 +1305,7 @@ impl AppSyncRepository {
                         last_error: None,
                         consecutive_failures: 0,
                         next_retry_at: None,
-                        last_cycle_status: Some("ok".to_string()),
+                        last_cycle_status: None,
                         last_cycle_duration_ms: None,
                     })
                     .on_conflict(sync_engine_state::id)
@@ -1173,7 +1315,6 @@ impl AppSyncRepository {
                         sync_engine_state::last_error.eq::<Option<String>>(None),
                         sync_engine_state::consecutive_failures.eq(0),
                         sync_engine_state::next_retry_at.eq::<Option<String>>(None),
-                        sync_engine_state::last_cycle_status.eq(Some("ok")),
                     ))
                     .execute(conn)
                     .map_err(StorageError::from)?;
@@ -1491,6 +1632,14 @@ impl AppSyncRepository {
                     diesel::delete(sync_table_state::table)
                         .execute(conn)
                         .map_err(StorageError::from)?;
+                    // Remove stale device config rows from previous enrollment cycles so
+                    // resolve_payload_key_version never picks an outdated key_version.
+                    diesel::delete(
+                        sync_device_config::table
+                            .filter(sync_device_config::device_id.ne(&device_id_value)),
+                    )
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
 
                     for table in &table_set {
                         let target_columns = load_table_columns(conn, "main", table)?;
@@ -1565,6 +1714,7 @@ impl AppSyncRepository {
                             key_version: key_version_value,
                             trust_state: "trusted".to_string(),
                             last_bootstrap_at: Some(now.clone()),
+                            min_snapshot_created_at: None,
                         })
                         .on_conflict(sync_device_config::device_id)
                         .do_update()
@@ -1615,13 +1765,14 @@ impl AppSyncRepository {
 mod tests {
     use super::*;
     use diesel::dsl::count_star;
+    use diesel::Connection;
     use std::collections::BTreeSet;
     use tempfile::tempdir;
 
     use crate::db::{create_pool, get_connection, init, run_migrations, write_actor::spawn_writer};
     use crate::schema::{
         accounts, activity_import_profiles, assets, goals, platforms, sync_applied_events,
-        sync_entity_metadata, sync_outbox,
+        sync_device_config, sync_entity_metadata, sync_outbox,
     };
 
     fn setup_db() -> (
@@ -1905,7 +2056,7 @@ mod tests {
         let (pool, writer) = setup_db();
         let repo = AppSyncRepository::new(pool, writer);
 
-        repo.mark_bootstrap_complete("device-1".to_string(), Some(1))
+        repo.reset_and_mark_bootstrap_complete("device-1".to_string(), Some(1))
             .await
             .expect("mark bootstrap complete");
         assert!(
@@ -2078,6 +2229,120 @@ mod tests {
         assert_eq!(outbox_count, 0);
         assert_eq!(metadata_count, 0);
         assert_eq!(applied_count, 0);
+    }
+
+    #[tokio::test]
+    async fn reset_local_sync_session_clears_control_plane_and_zeroes_cursors() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        {
+            let mut conn = get_connection(&pool).expect("conn");
+            insert_account_for_test(&mut conn, "acc-keep").expect("insert account");
+            insert_outbox_event(
+                &mut conn,
+                OutboxWriteRequest::new(
+                    SyncEntity::Account,
+                    "acc-dirty",
+                    SyncOperation::Update,
+                    serde_json::json!({ "id": "acc-dirty", "name": "dirty" }),
+                ),
+            )
+            .expect("insert outbox");
+        }
+
+        repo.upsert_entity_metadata(SyncEntityMetadata {
+            entity: SyncEntity::Account,
+            entity_id: "acc-dirty".to_string(),
+            last_event_id: "evt-dirty".to_string(),
+            last_client_timestamp: chrono::Utc::now().to_rfc3339(),
+            last_seq: 42,
+        })
+        .await
+        .expect("upsert metadata");
+        repo.mark_applied_event(
+            "evt-applied".to_string(),
+            43,
+            SyncEntity::Account,
+            "acc-dirty".to_string(),
+        )
+        .await
+        .expect("mark applied");
+        repo.upsert_device_config("device-1".to_string(), Some(3), "trusted".to_string())
+            .await
+            .expect("upsert device config");
+        repo.set_cursor(15).await.expect("set cursor");
+        repo.mark_engine_error("sync failed".to_string())
+            .await
+            .expect("mark engine error");
+
+        repo.reset_local_sync_session()
+            .await
+            .expect("reset local sync session");
+
+        let mut conn = get_connection(&pool).expect("conn");
+        let outbox_count: i64 = sync_outbox::table
+            .select(count_star())
+            .first(&mut conn)
+            .expect("count outbox");
+        let metadata_count: i64 = sync_entity_metadata::table
+            .select(count_star())
+            .first(&mut conn)
+            .expect("count metadata");
+        let applied_count: i64 = sync_applied_events::table
+            .select(count_star())
+            .first(&mut conn)
+            .expect("count applied");
+        let device_config_count: i64 = sync_device_config::table
+            .select(count_star())
+            .first(&mut conn)
+            .expect("count device config");
+
+        assert_eq!(outbox_count, 0);
+        assert_eq!(metadata_count, 0);
+        assert_eq!(applied_count, 0);
+        assert_eq!(device_config_count, 0);
+        assert_eq!(
+            count_account_rows(&pool, "acc-keep"),
+            1,
+            "app data must remain"
+        );
+        assert_eq!(repo.get_cursor().expect("cursor"), 0);
+
+        let status = repo.get_engine_status().expect("engine status");
+        assert_eq!(status.last_error, None);
+        assert_eq!(status.last_cycle_status, None);
+    }
+
+    #[tokio::test]
+    async fn reset_and_mark_bootstrap_complete_recreates_current_device_config() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        repo.set_cursor(21).await.expect("set cursor");
+        repo.upsert_device_config("old-device".to_string(), Some(2), "trusted".to_string())
+            .await
+            .expect("upsert old device config");
+
+        repo.reset_and_mark_bootstrap_complete("device-9".to_string(), Some(7))
+            .await
+            .expect("mark bootstrap complete");
+
+        let mut conn = get_connection(&pool).expect("conn");
+        let configs = sync_device_config::table
+            .load::<SyncDeviceConfigDB>(&mut conn)
+            .expect("load device configs");
+        assert_eq!(configs.len(), 1);
+        assert_eq!(configs[0].device_id, "device-9");
+        assert_eq!(configs[0].key_version, Some(7));
+        assert_eq!(configs[0].trust_state, "trusted");
+        assert!(configs[0].last_bootstrap_at.is_some());
+
+        assert_eq!(repo.get_cursor().expect("cursor"), 0);
+        assert!(
+            !repo.needs_bootstrap("device-9").expect("needs bootstrap"),
+            "bootstrap should be marked complete for the current device"
+        );
     }
 
     #[tokio::test]

@@ -1009,6 +1009,8 @@ pub fn canonicalize_market_identity(
                 let upper = raw.to_uppercase();
                 // Auto-convert 9-char CUSIPs to 12-char ISINs for proper
                 // provider routing (US_TREASURY_CALC, BOERSE_FRANKFURT).
+                // Country code comes from the search result's currency (set by
+                // the provider, e.g. OpenFIGI's securityType → "USD").
                 instrument_symbol = Some(if crate::utils::cusip::looks_like_cusip(&upper) {
                     let country = match normalized_quote.as_deref() {
                         Some("CAD") => "CA",
@@ -1241,6 +1243,25 @@ mod tests {
         assert!(
             sym.starts_with("US"),
             "CUSIP with no currency should default to US, got {}",
+            sym
+        );
+    }
+
+    #[test]
+    fn test_canonicalize_market_identity_us_treasury_with_usd_currency() {
+        // When the search provider sets currency to USD (from securityType),
+        // US Treasury CUSIPs get the correct US prefix.
+        let result = canonicalize_market_identity(
+            Some(InstrumentType::Bond),
+            Some("912797TR8"),
+            None,
+            Some("USD"),
+        );
+
+        let sym = result.instrument_symbol.expect("should have symbol");
+        assert!(
+            sym.starts_with("US"),
+            "US Treasury CUSIP with USD currency should get US prefix, got {}",
             sym
         );
     }

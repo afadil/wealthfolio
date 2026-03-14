@@ -87,14 +87,15 @@ impl ActivityService {
 
     fn parse_instrument_type(value: Option<&str>) -> Option<InstrumentType> {
         match value?.trim().to_uppercase().as_str() {
-            "EQUITY" | "STOCK" | "ETF" | "MUTUALFUND" | "MUTUAL_FUND" | "INDEX" => {
-                Some(InstrumentType::Equity)
-            }
+            "EQUITY" | "STOCK" | "ETF" | "MUTUALFUND" | "MUTUAL_FUND" | "INDEX" | "FUTURE"
+            | "FUTURES" => Some(InstrumentType::Equity),
             "CRYPTO" | "CRYPTOCURRENCY" => Some(InstrumentType::Crypto),
             "FX" | "FOREX" | "CURRENCY" => Some(InstrumentType::Fx),
             "OPTION" => Some(InstrumentType::Option),
             "METAL" | "COMMODITY" => Some(InstrumentType::Metal),
-            "BOND" | "FIXEDINCOME" | "FIXED_INCOME" | "DEBT" => Some(InstrumentType::Bond),
+            "BOND" | "FIXEDINCOME" | "FIXED_INCOME" | "DEBT" | "MONEYMARKET" => {
+                Some(InstrumentType::Bond)
+            }
             _ => None,
         }
     }
@@ -216,6 +217,58 @@ impl ActivityService {
             import_run_repository: Some(import_run_repository),
             event_sink: Arc::new(NoOpDomainEventSink),
         }
+    }
+
+    fn parse_activity_timestamp_utc(activity_date: &str) -> Option<DateTime<Utc>> {
+        DateTime::parse_from_rfc3339(activity_date)
+            .map(|dt| dt.with_timezone(&Utc))
+            .or_else(|_| {
+                NaiveDate::parse_from_str(activity_date, "%Y-%m-%d")
+                    .map(|date| Utc.from_utc_datetime(&date.and_hms_opt(0, 0, 0).unwrap()))
+            })
+            .ok()
+    }
+
+    fn earliest_activity_at_utc<'a>(
+        activities: impl IntoIterator<Item = &'a Activity>,
+    ) -> Option<DateTime<Utc>> {
+        activities
+            .into_iter()
+            .map(|activity| activity.activity_date)
+            .min()
+    }
+
+    fn earliest_new_activity_at_utc<'a>(
+        activities: impl IntoIterator<Item = &'a NewActivity>,
+    ) -> Option<DateTime<Utc>> {
+        activities
+            .into_iter()
+            .filter_map(|activity| Self::parse_activity_timestamp_utc(&activity.activity_date))
+            .min()
+    }
+
+    fn earliest_upsert_activity_at_utc<'a>(
+        activities: impl IntoIterator<Item = &'a ActivityUpsert>,
+    ) -> Option<DateTime<Utc>> {
+        activities
+            .into_iter()
+            .filter_map(|activity| Self::parse_activity_timestamp_utc(&activity.activity_date))
+            .min()
+    }
+
+    fn emit_activities_changed(
+        &self,
+        account_ids: Vec<String>,
+        asset_ids: Vec<String>,
+        currencies: Vec<String>,
+        earliest_activity_at_utc: Option<DateTime<Utc>>,
+    ) {
+        self.event_sink.emit(DomainEvent::activities_changed(
+            account_ids,
+            asset_ids,
+            currencies,
+            earliest_activity_at_utc,
+        ));
     }
 
     /// Sets the domain event sink for this service.
@@ -1772,12 +1825,12 @@ impl ActivityServiceTrait for ActivityService {
         let account_ids = vec![created.account_id.clone()];
         let asset_ids = created.asset_id.clone().into_iter().collect();
         let currencies = vec![created.currency.clone()];
-        self.event_sink.emit(DomainEvent::activities_changed(
+        self.emit_activities_changed(
             account_ids,
             asset_ids,
             currencies,
-            Some(created.activity_date.date_naive()),
-        ));
+            Some(created.activity_date),
+        );
 
         Ok(created)
     }
@@ -1814,16 +1867,13 @@ impl ActivityServiceTrait for ActivityService {
         let account_ids: Vec<String> = account_ids_set.into_iter().collect();
         let asset_ids: Vec<String> = asset_ids_set.into_iter().collect();
         let currencies: Vec<String> = currencies_set.into_iter().collect();
-        let earliest_date = existing
-            .activity_date
-            .date_naive()
-            .min(updated.activity_date.date_naive());
-        self.event_sink.emit(DomainEvent::activities_changed(
+        let earliest_activity_at_utc = existing.activity_date.min(updated.activity_date);
+        self.emit_activities_changed(
             account_ids,
             asset_ids,
             currencies,
-            Some(earliest_date),
-        ));
+            Some(earliest_activity_at_utc),
+        );
 
         Ok(updated)
     }
@@ -1839,12 +1889,12 @@ impl ActivityServiceTrait for ActivityService {
         let account_ids = vec![deleted.account_id.clone()];
         let asset_ids = deleted.asset_id.clone().into_iter().collect();
         let currencies = vec![deleted.currency.clone()];
-        self.event_sink.emit(DomainEvent::activities_changed(
+        self.emit_activities_changed(
             account_ids,
             asset_ids,
             currencies,
-            Some(deleted.activity_date.date_naive()),
-        ));
+            Some(deleted.activity_date),
+        );
 
         Ok(deleted)
     }
@@ -1989,12 +2039,19 @@ impl ActivityServiceTrait for ActivityService {
             let account_ids: Vec<String> = account_ids_set.into_iter().collect();
             let asset_ids: Vec<String> = asset_ids_set.into_iter().collect();
             let currencies: Vec<String> = currencies_set.into_iter().collect();
-            self.event_sink.emit(DomainEvent::activities_changed(
+            let earliest_activity_at_utc = Self::earliest_activity_at_utc(
+                persisted
+                    .created
+                    .iter()
+                    .chain(persisted.updated.iter())
+                    .chain(persisted.deleted.iter()),
+            );
+            self.emit_activities_changed(
                 account_ids,
                 asset_ids,
                 currencies,
-                None,
-            ));
+                earliest_activity_at_utc,
+            );
         }
 
         Ok(persisted)
@@ -2666,6 +2723,7 @@ impl ActivityServiceTrait for ActivityService {
             .collect::<HashSet<_>>()
             .into_iter()
             .collect();
+        let earliest_activity_at_utc = Self::earliest_new_activity_at_utc(&activities_to_insert);
 
         let count = self
             .activity_repository
@@ -2675,12 +2733,12 @@ impl ActivityServiceTrait for ActivityService {
 
         // Emit domain event after successful import
         if count > 0 {
-            self.event_sink.emit(DomainEvent::activities_changed(
+            self.emit_activities_changed(
                 vec![account_id.clone()],
                 asset_ids,
                 currencies,
-                None,
-            ));
+                earliest_activity_at_utc,
+            );
         }
 
         // Mark import run as successful
@@ -2781,6 +2839,8 @@ impl ActivityServiceTrait for ActivityService {
             return Ok(BulkUpsertResult::default());
         }
 
+        let earliest_activity_at_utc = Self::earliest_upsert_activity_at_utc(&activities);
+
         // Collect unique account_ids, asset_ids, and currencies for the event before the upsert
         let account_ids: Vec<String> = activities
             .iter()
@@ -2807,12 +2867,12 @@ impl ActivityServiceTrait for ActivityService {
 
         // Emit single aggregated event if any activities were affected
         if result.upserted > 0 {
-            self.event_sink.emit(DomainEvent::activities_changed(
+            self.emit_activities_changed(
                 account_ids,
                 asset_ids,
                 currencies,
-                None,
-            ));
+                earliest_activity_at_utc,
+            );
         }
 
         Ok(result)

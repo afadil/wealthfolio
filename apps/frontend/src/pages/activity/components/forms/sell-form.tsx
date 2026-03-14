@@ -348,6 +348,7 @@ export function SellForm({
                 currencyName="currency"
                 exchangeMicName="exchangeMic"
                 quoteCcyName="symbolQuoteCcy"
+                unitPriceName="unitPrice"
               />
             ) : (
               <>

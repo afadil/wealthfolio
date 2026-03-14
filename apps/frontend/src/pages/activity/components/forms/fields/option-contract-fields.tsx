@@ -1,5 +1,5 @@
 import TickerSearchInput from "@/components/ticker-search";
-import { parseOccSymbol } from "@/lib/occ-symbol";
+import { buildOccSymbol, parseOccSymbol } from "@/lib/occ-symbol";
 import type { SymbolSearchResult } from "@/lib/types";
 import { normalizeCurrency } from "@/lib/utils";
 import { resolveSymbolQuote } from "@/adapters";
@@ -12,7 +12,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@wealthfolio/ui";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useFormContext, type FieldPath, type FieldValues } from "react-hook-form";
 
 interface OptionContractFieldsProps<TFieldValues extends FieldValues = FieldValues> {
@@ -26,6 +26,8 @@ interface OptionContractFieldsProps<TFieldValues extends FieldValues = FieldValu
   exchangeMicName?: FieldPath<TFieldValues>;
   /** Field name for symbol quote currency hint — confirmed via resolveSymbolQuote */
   quoteCcyName?: FieldPath<TFieldValues>;
+  /** Field name for unit price — pre-filled with option premium from provider */
+  unitPriceName?: FieldPath<TFieldValues>;
 }
 
 export function OptionContractFields<TFieldValues extends FieldValues = FieldValues>({
@@ -36,11 +38,15 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
   currencyName,
   exchangeMicName,
   quoteCcyName,
+  unitPriceName,
 }: OptionContractFieldsProps<TFieldValues>) {
   const { control, setValue, getValues, watch } = useFormContext<TFieldValues>();
   const latestResolveRequestId = useRef(0);
+  const needsCurrencyConfirmation = useRef(false);
+  const provisionalCurrency = useRef<string | undefined>(undefined);
 
-  // Watch contract fields for summary display
+  // Watch contract fields for summary display and OCC resolve
+  const underlying = watch(underlyingName) as string | undefined;
   const strikePrice = watch(strikePriceName) as number | undefined;
   const expirationDate = watch(expirationDateName) as string | undefined;
   const optionType = watch(optionTypeName) as string | undefined;
@@ -55,8 +61,6 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
   const hasContractSummary = strikePrice && expirationDate && optionType;
 
   const handleUnderlyingSelect = (symbol: string, searchResult?: SymbolSearchResult) => {
-    latestResolveRequestId.current += 1;
-    const requestId = latestResolveRequestId.current;
     const upper = symbol.toUpperCase();
 
     // Try to parse as OCC symbol — either from user paste or option search result
@@ -93,45 +97,65 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
       setValue(quoteCcyName, searchResult.currency as any);
     }
 
-    // Resolve symbol to confirm currency from provider.
-    // If user selected an option contract, resolve the underlying (EQUITY) since
-    // the option inherits its currency. Otherwise resolve whatever was selected.
-    const symbolToResolve = parsed?.underlying ?? searchResult?.symbol ?? upper;
-    const quoteTypeToResolve = parsed ? "EQUITY" : searchResult?.quoteType;
-    if (searchResult) {
-      const provisionalCurrency = searchResult.currency?.trim();
-      const needsCurrencyConfirmation =
-        currencyName &&
-        searchResult.currencySource === "exchange_inferred" &&
-        !searchResult.isExisting;
-
-      resolveSymbolQuote(symbolToResolve, searchResult.exchangeMic, quoteTypeToResolve)
-        .then((resolved) => {
-          if (requestId !== latestResolveRequestId.current) return;
-
-          const confirmedCurrency = resolved?.currency?.trim();
-          if (confirmedCurrency && quoteCcyName) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            setValue(quoteCcyName, confirmedCurrency as any);
-          }
-
-          // Update activity currency if it was exchange-inferred and user hasn't changed it
-          if (needsCurrencyConfirmation && confirmedCurrency) {
-            const current = getValues(currencyName!);
-            if (current === provisionalCurrency) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              setValue(currencyName!, confirmedCurrency as any, {
-                shouldDirty: true,
-                shouldValidate: true,
-              });
-            }
-          }
-        })
-        .catch(() => {
-          // Ignore — provisional currency from search result is already set
-        });
-    }
+    // Track whether currency needs provider confirmation (used by OCC resolve effect)
+    needsCurrencyConfirmation.current =
+      !!currencyName &&
+      !!searchResult &&
+      searchResult.currencySource === "exchange_inferred" &&
+      !searchResult.isExisting;
+    provisionalCurrency.current = searchResult?.currency?.trim();
   };
+
+  // Resolve option contract quote when all contract fields are filled.
+  // Builds OCC symbol → resolves via provider → sets currency + pre-fills premium.
+  useEffect(() => {
+    if (!underlying || !strikePrice || !expirationDate || !optionType) return;
+    if (optionType !== "CALL" && optionType !== "PUT") return;
+
+    latestResolveRequestId.current += 1;
+    const requestId = latestResolveRequestId.current;
+
+    const occSymbol = buildOccSymbol(underlying, expirationDate, optionType, strikePrice);
+    const exchangeMic = exchangeMicName
+      ? (getValues(exchangeMicName) as string | undefined)
+      : undefined;
+
+    resolveSymbolQuote(occSymbol, exchangeMic, "OPTION")
+      .then((resolved) => {
+        if (requestId !== latestResolveRequestId.current) return;
+
+        const confirmedCurrency = resolved?.currency?.trim();
+        if (confirmedCurrency && quoteCcyName) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setValue(quoteCcyName, confirmedCurrency as any);
+        }
+
+        // Update activity currency if it was exchange-inferred and user hasn't changed it
+        if (needsCurrencyConfirmation.current && confirmedCurrency && currencyName) {
+          const current = getValues(currencyName);
+          if (current === provisionalCurrency.current) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            setValue(currencyName, confirmedCurrency as any, {
+              shouldDirty: true,
+              shouldValidate: true,
+            });
+          }
+        }
+
+        // Pre-fill premium if not already set by user
+        if (resolved?.price != null && unitPriceName) {
+          const currentPrice = getValues(unitPriceName);
+          if (!currentPrice) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            setValue(unitPriceName, resolved.price as any, { shouldDirty: true });
+          }
+        }
+      })
+      .catch(() => {
+        // Ignore — provisional currency from search result is already set
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [underlying, strikePrice, expirationDate, optionType]);
 
   return (
     <div className="space-y-4">

@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use crate::context::ServiceContext;
-use log::{debug, info, warn};
-use tauri::State;
+use crate::events::{MarketSyncResult, MARKET_SYNC_COMPLETE, MARKET_SYNC_ERROR, MARKET_SYNC_START};
+use log::{debug, error, info, warn};
+use tauri::{AppHandle, Emitter, State};
 use wealthfolio_core::health::{FixAction, HealthConfig, HealthServiceTrait, HealthStatus};
 use wealthfolio_core::quotes::SyncMode;
 
@@ -108,6 +109,7 @@ pub async fn get_dismissed_health_issues(
 #[tauri::command]
 pub async fn execute_health_fix(
     action: FixAction,
+    app_handle: AppHandle,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<(), String> {
     debug!("Executing health fix: {} ({})", action.label, action.id);
@@ -119,7 +121,7 @@ pub async fn execute_health_fix(
         return Ok(());
     }
 
-    // Handle sync_prices and retry_sync actions - these need quote service
+    // Handle sync_prices and retry_sync actions - emit market sync events
     if action.id == "sync_prices" || action.id == "retry_sync" {
         let asset_ids: Vec<String> = serde_json::from_value(action.payload.clone())
             .map_err(|e| format!("Failed to parse asset IDs: {}", e))?;
@@ -130,15 +132,41 @@ pub async fn execute_health_fix(
             asset_ids
         );
 
+        // Reset error counts so the sync won't skip these assets
         let quote_service = state.quote_service();
-        let result = quote_service
+        quote_service
+            .reset_sync_errors(&asset_ids)
+            .await
+            .map_err(|e| format!("Failed to reset sync errors: {}", e))?;
+
+        if let Err(e) = app_handle.emit(MARKET_SYNC_START, &()) {
+            error!("Failed to emit market:sync-start event: {}", e);
+        }
+
+        let quote_service = state.quote_service();
+        match quote_service
             .sync(SyncMode::Incremental, Some(asset_ids))
             .await
-            .map_err(|e| format!("Failed to sync market data: {}", e))?;
-
-        if !result.failures.is_empty() {
-            let failed_symbols: Vec<_> = result.failures.iter().map(|(s, _)| s.as_str()).collect();
-            warn!("Some assets failed to sync: {:?}", failed_symbols);
+        {
+            Ok(result) => {
+                if !result.failures.is_empty() {
+                    let failed_symbols: Vec<_> =
+                        result.failures.iter().map(|(s, _)| s.as_str()).collect();
+                    warn!("Some assets failed to sync: {:?}", failed_symbols);
+                }
+                let result_payload = MarketSyncResult {
+                    failed_syncs: result.failures,
+                };
+                if let Err(e) = app_handle.emit(MARKET_SYNC_COMPLETE, &result_payload) {
+                    error!("Failed to emit market:sync-complete event: {}", e);
+                }
+            }
+            Err(e) => {
+                if let Err(e_emit) = app_handle.emit(MARKET_SYNC_ERROR, &e.to_string()) {
+                    error!("Failed to emit market:sync-error event: {}", e_emit);
+                }
+                return Err(format!("Failed to sync market data: {}", e));
+            }
         }
 
         // Clear health cache so next check reflects the sync results

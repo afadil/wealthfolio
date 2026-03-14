@@ -202,13 +202,19 @@ export {
 // Connect Commands (Broker + Device Sync + Auth)
 export {
   approvePairing,
+  approvePairingOverwrite,
+  beginPairingConfirm,
   cancelPairing,
+  cancelPairingFlow,
   claimPairing,
   clearDeviceSyncData,
   clearSyncSession,
   completePairing,
+  completePairingWithTransfer,
   confirmPairing,
+  confirmPairingWithBootstrap,
   createPairing,
+  getPairingFlowState,
   deleteDevice,
   deviceSyncBootstrapOverwriteCheck,
   deviceSyncCancelSnapshotUpload,
@@ -221,6 +227,7 @@ export {
   getDevice,
   getDeviceSyncState,
   getImportRuns,
+  getPairingSourceStatus,
   getPairing,
   getPairingMessages,
   getPlatforms,
@@ -285,10 +292,6 @@ export { streamAiChat } from "./ai-streaming";
 
 // Event Listeners (web-specific SSE implementation)
 export {
-  listenAssetEnrichmentComplete,
-  listenAssetEnrichmentError,
-  listenAssetEnrichmentProgress,
-  listenAssetEnrichmentStart,
   listenBrokerSyncComplete,
   listenBrokerSyncError,
   listenBrokerSyncStart,
@@ -368,4 +371,5 @@ export {
   syncGeneratePairingCode,
   syncGenerateRootKey,
   syncHashPairingCode,
+  syncHmacSha256,
 } from "./crypto";

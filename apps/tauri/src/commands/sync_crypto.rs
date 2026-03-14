@@ -54,6 +54,11 @@ pub fn sync_hash_pairing_code(code: String) -> String {
 }
 
 #[tauri::command]
+pub fn sync_hmac_sha256(key: String, data: String) -> Result<String, String> {
+    crypto::hmac_sha256(&key, &data)
+}
+
+#[tauri::command]
 pub fn sync_compute_sas(shared_secret: String) -> Result<String, String> {
     crypto::compute_sas(&shared_secret)
 }

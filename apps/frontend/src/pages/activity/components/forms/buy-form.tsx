@@ -275,10 +275,9 @@ export function BuyForm({
         kind: "OPTION",
       };
     }
-    // For bonds: set instrument type and force manual pricing (no automated quote provider)
+    // For bonds: set instrument type
     if (data.assetType === "bond") {
       data.symbolInstrumentType = data.symbolInstrumentType ?? "BOND";
-      data.quoteMode = QuoteMode.MANUAL;
     }
     await onSubmit(data);
   });
@@ -313,6 +312,7 @@ export function BuyForm({
                 currencyName="currency"
                 exchangeMicName="exchangeMic"
                 quoteCcyName="symbolQuoteCcy"
+                unitPriceName="unitPrice"
               />
             ) : (
               <>

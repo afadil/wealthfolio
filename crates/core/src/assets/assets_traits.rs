@@ -135,8 +135,7 @@ pub trait AssetServiceTrait: Send + Sync {
             instrument_type,
             Some(InstrumentType::Crypto | InstrumentType::Fx)
         );
-        let is_equity = instrument_type == Some(&InstrumentType::Equity);
-        let is_manual_quote = quote_mode == Some(QuoteMode::Manual);
+        let is_manual = matches!(quote_mode, Some(QuoteMode::Manual));
         let has_explicit_requested_quote_ccy =
             normalize_quote_ccy_code(requested_quote_ccy).is_some();
 
@@ -145,32 +144,15 @@ pub trait AssetServiceTrait: Send + Sync {
             .and_then(|asset| normalize_quote_ccy_code(Some(asset.quote_ccy.as_str())))
             .or_else(|| self.existing_quote_ccy_by_symbol(symbol, exchange_mic, instrument_type));
 
-        if !is_non_security && !has_explicit_requested_quote_ccy && existing_quote_ccy.is_none() {
+        if !is_non_security
+            && !is_manual
+            && !has_explicit_requested_quote_ccy
+            && existing_quote_ccy.is_none()
+        {
             return Err(crate::activities::ActivityError::InvalidData(
                 "Quote currency is required. Please re-select the symbol.".to_string(),
             )
             .into());
-        }
-
-        if is_equity && !is_manual_quote && exchange_mic.is_none() && symbol_id.is_none() {
-            let has_existing_without_mic = self.get_assets().ok().is_some_and(|assets| {
-                let upper_symbol = symbol.to_uppercase();
-                assets.into_iter().any(|asset| {
-                    asset
-                        .instrument_symbol
-                        .as_deref()
-                        .is_some_and(|s| s.eq_ignore_ascii_case(&upper_symbol))
-                        && asset.instrument_type.as_ref() == Some(&InstrumentType::Equity)
-                        && asset.instrument_exchange_mic.is_none()
-                })
-            });
-            if !has_existing_without_mic {
-                return Err(crate::activities::ActivityError::InvalidData(
-                    "Exchange MIC is required for market equity symbols. Please re-select the symbol."
-                        .to_string(),
-                )
-                .into());
-            }
         }
 
         Ok(())
@@ -217,4 +199,122 @@ pub trait AssetRepositoryTrait: Send + Sync {
     /// Finds INVESTMENT assets with no remaining activities and deactivates them.
     /// Returns the IDs of deactivated assets.
     async fn deactivate_orphaned_investments(&self) -> Result<Vec<String>>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::errors::Error;
+
+    struct TestAssetService;
+
+    #[async_trait::async_trait]
+    impl AssetServiceTrait for TestAssetService {
+        fn get_assets(&self) -> Result<Vec<Asset>> {
+            Ok(Vec::new())
+        }
+
+        fn get_asset_by_id(&self, _asset_id: &str) -> Result<Asset> {
+            Err(Error::Unexpected("Asset not found".to_string()))
+        }
+
+        async fn delete_asset(&self, _asset_id: &str) -> Result<()> {
+            unimplemented!()
+        }
+
+        async fn update_asset_profile(
+            &self,
+            _asset_id: &str,
+            _payload: UpdateAssetProfile,
+        ) -> Result<Asset> {
+            unimplemented!()
+        }
+
+        async fn create_asset(&self, _new_asset: NewAsset) -> Result<Asset> {
+            unimplemented!()
+        }
+
+        async fn get_or_create_minimal_asset(
+            &self,
+            _asset_id: &str,
+            _context_currency: Option<String>,
+            _metadata: Option<AssetMetadata>,
+            _quote_mode: Option<String>,
+        ) -> Result<Asset> {
+            unimplemented!()
+        }
+
+        async fn update_quote_mode(&self, _asset_id: &str, _quote_mode: &str) -> Result<Asset> {
+            unimplemented!()
+        }
+
+        async fn get_assets_by_asset_ids(&self, _asset_ids: &[String]) -> Result<Vec<Asset>> {
+            unimplemented!()
+        }
+
+        async fn enrich_asset_profile(&self, _asset_id: &str) -> Result<Asset> {
+            unimplemented!()
+        }
+
+        async fn enrich_assets(&self, _asset_ids: Vec<String>) -> Result<(usize, usize, usize)> {
+            unimplemented!()
+        }
+
+        async fn cleanup_legacy_metadata(&self, _asset_id: &str) -> Result<()> {
+            unimplemented!()
+        }
+
+        async fn merge_unknown_asset(
+            &self,
+            _resolved_asset_id: &str,
+            _unknown_asset_id: &str,
+            _activity_repository: &dyn crate::activities::ActivityRepositoryTrait,
+        ) -> Result<u32> {
+            unimplemented!()
+        }
+
+        async fn ensure_assets(
+            &self,
+            _specs: Vec<AssetSpec>,
+            _activity_repository: &dyn crate::activities::ActivityRepositoryTrait,
+        ) -> Result<EnsureAssetsResult> {
+            unimplemented!()
+        }
+    }
+
+    #[test]
+    fn validate_persisted_symbol_metadata_allows_manual_mode_without_quote_currency() {
+        let service = TestAssetService;
+
+        let result = service.validate_persisted_symbol_metadata(
+            "NFLX",
+            None,
+            Some("XNAS"),
+            Some(&InstrumentType::Equity),
+            Some(QuoteMode::Manual),
+            None,
+        );
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn validate_persisted_symbol_metadata_rejects_market_mode_without_quote_currency() {
+        let service = TestAssetService;
+
+        let result = service.validate_persisted_symbol_metadata(
+            "NFLX",
+            None,
+            Some("XNAS"),
+            Some(&InstrumentType::Equity),
+            Some(QuoteMode::Market),
+            None,
+        );
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Quote currency is required"));
+    }
 }

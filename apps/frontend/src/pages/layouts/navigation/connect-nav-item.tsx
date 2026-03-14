@@ -16,11 +16,9 @@ export function ConnectNavItem({ collapsed }: ConnectNavItemProps) {
   const { status, lastSyncTime } = useAggregatedSyncStatus();
   const isActive = isPathActive(location.pathname, "/connect");
 
-  const lastSyncedText = lastSyncTime
-    ? `Last synced ${formatDistanceToNow(new Date(lastSyncTime), { addSuffix: true })}`
-    : "Never synced";
-
-  const tooltipContent = `Connect - ${lastSyncedText}`;
+  const tooltipContent = lastSyncTime
+    ? `Connect - Last synced ${formatDistanceToNow(new Date(lastSyncTime), { addSuffix: true })}`
+    : "Connect";
 
   return (
     <Tooltip>

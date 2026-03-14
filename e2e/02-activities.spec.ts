@@ -874,10 +874,7 @@ test.describe("Activity Creation Tests", () => {
     await nameInput.fill(customBuy.customAsset.name);
 
     // Select asset type
-    const assetTypeSelect = page
-      .locator("button")
-      .filter({ hasText: /Security|Cryptocurrency|Other/i })
-      .first();
+    const assetTypeSelect = page.getByRole("combobox", { name: "Asset Type" });
     await assetTypeSelect.click();
     await page.getByRole("option", { name: customBuy.customAsset.assetType }).click();
 

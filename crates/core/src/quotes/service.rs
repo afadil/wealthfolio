@@ -301,6 +301,9 @@ pub trait QuoteServiceTrait: Send + Sync {
     /// Get sync states that have errors (error_count > 0).
     fn get_sync_states_with_errors(&self) -> Result<Vec<QuoteSyncState>>;
 
+    /// Reset sync error counts for the given asset IDs, allowing retry.
+    async fn reset_sync_errors(&self, asset_ids: &[String]) -> Result<()>;
+
     /// Update position status (active/inactive) based on current holdings.
     async fn update_position_status_from_holdings(
         &self,
@@ -940,15 +943,51 @@ where
         };
 
         for attempt_symbol in symbol_resolution_candidates(clean_symbol) {
+            // For bonds, populate metadata with TreasuryDirect details so
+            // US_TREASURY_CALC can price them during resolve.
+            let bond_metadata = if instrument_type == Some(&InstrumentType::Bond) {
+                let upper = attempt_symbol.to_uppercase();
+                // Convert CUSIP to ISIN if needed
+                let isin = if crate::utils::cusip::looks_like_cusip(&upper) {
+                    crate::utils::cusip::cusip_to_isin(&upper, "US")
+                } else {
+                    upper
+                };
+                if isin.starts_with("US912") {
+                    let http = reqwest::Client::new();
+                    wealthfolio_market_data::provider::us_treasury_calc::UsTreasuryCalcProvider::fetch_bond_details(&http, &isin).await
+                        .map(|details| {
+                            let spec = crate::assets::BondSpec {
+                                isin: Some(isin.clone()),
+                                coupon_rate: Some(details.coupon_rate),
+                                maturity_date: Some(details.maturity_date),
+                                face_value: Some(details.face_value),
+                                coupon_frequency: Some(details.coupon_frequency),
+                            };
+                            (isin, serde_json::json!({ "bond": spec }))
+                        })
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            let (resolved_symbol, metadata) = match &bond_metadata {
+                Some((isin, meta)) => (isin.clone(), Some(meta.clone())),
+                None => (attempt_symbol.clone(), None),
+            };
+
             let temp_asset = Asset {
                 id: format!("_QUOTE_RESOLVE_{}", attempt_symbol),
                 kind: AssetKind::Investment,
                 quote_mode: QuoteMode::Market,
                 quote_ccy: String::new(),
                 instrument_type: instrument_type.cloned().or(Some(InstrumentType::Equity)),
-                instrument_symbol: Some(attempt_symbol.clone()),
+                instrument_symbol: Some(resolved_symbol),
                 display_code: Some(attempt_symbol.clone()),
                 instrument_exchange_mic: exchange_mic.map(str::to_string),
+                metadata,
                 ..Default::default()
             };
 
@@ -1184,6 +1223,13 @@ where
         self.sync_state_store.get_with_errors()
     }
 
+    async fn reset_sync_errors(&self, asset_ids: &[String]) -> Result<()> {
+        for asset_id in asset_ids {
+            self.sync_state_store.update_after_sync(asset_id).await?;
+        }
+        Ok(())
+    }
+
     // =========================================================================
     // Provider Settings
     // =========================================================================
@@ -1411,6 +1457,7 @@ where
 
             quotes.push(QuoteImport {
                 symbol,
+                display_symbol: None,
                 date,
                 open: parse_decimal(open_idx),
                 high: parse_decimal(high_idx),
@@ -1493,7 +1540,13 @@ where
 
             match matched_asset {
                 Some(asset) => {
-                    // Update the symbol to the canonical asset ID
+                    // Preserve original symbol for display, replace with asset ID for import
+                    quote.display_symbol = Some(
+                        asset
+                            .display_code
+                            .clone()
+                            .unwrap_or_else(|| quote.symbol.clone()),
+                    );
                     quote.symbol = asset.id.clone();
                 }
                 None => {

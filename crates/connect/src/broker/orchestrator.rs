@@ -109,12 +109,10 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
         api_client: &dyn BrokerApiClient,
     ) -> Result<SyncResult, String> {
         // Step 1: Sync connections (platforms)
-        info!("Fetching broker connections...");
         let connections = api_client
             .list_connections()
             .await
             .map_err(|e| e.to_string())?;
-        info!("Found {} broker connections", connections.len());
 
         let connections_result = self
             .sync_service
@@ -122,13 +120,12 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
             .await
             .map_err(|e| format!("Failed to sync connections: {}", e))?;
 
-        info!(
+        debug!(
             "Connections synced: {} created, {} updated",
             connections_result.platforms_created, connections_result.platforms_updated
         );
 
         // Step 2: Sync accounts (filter by sync_enabled)
-        info!("Fetching broker accounts...");
         let authorization_ids: Vec<String> = connections.iter().map(|c| c.id.clone()).collect();
         let all_accounts = api_client
             .list_accounts(if authorization_ids.is_empty() {
@@ -138,20 +135,6 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
             })
             .await
             .map_err(|e| e.to_string())?;
-
-        info!(
-            "Fetched {} total broker accounts from API",
-            all_accounts.len()
-        );
-        for acc in &all_accounts {
-            debug!(
-                "  Account '{}' (id={:?}): sync_enabled={}, shared_with_household={}",
-                acc.name.as_deref().unwrap_or("unnamed"),
-                acc.id,
-                acc.sync_enabled,
-                acc.shared_with_household
-            );
-        }
 
         // Track sync-enabled broker IDs for data sync
         let sync_enabled_broker_ids: HashSet<String> = all_accounts
@@ -165,8 +148,6 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
             .into_iter()
             .filter(|a| a.sync_enabled)
             .collect();
-
-        info!("Syncing {} sync-enabled broker accounts", accounts.len());
 
         let accounts_result = self
             .sync_service

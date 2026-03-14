@@ -27,6 +27,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 
 import { ASSET_KIND_DISPLAY_NAMES, LatestQuoteSnapshot } from "@/lib/types";
+import { parseOccSymbol } from "@/lib/occ-symbol";
 import { formatAmount, formatDate } from "@/lib/utils";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { isStaleQuote, ParsedAsset } from "./asset-utils";
@@ -80,20 +81,33 @@ export function AssetsTable({
         maxSize: 260,
         cell: ({ row }) => {
           const asset = row.original;
-          const displaySymbol = asset.displayCode ?? asset.name ?? "Unknown";
+          const rawSymbol = asset.displayCode ?? "";
+          const parsedOption = parseOccSymbol(rawSymbol);
+          const displaySymbol = parsedOption
+            ? parsedOption.underlying
+            : (asset.displayCode ?? asset.name ?? "Unknown");
+          const subtitle = parsedOption
+            ? `${new Date(parsedOption.expiration + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} $${parsedOption.strikePrice} ${parsedOption.optionType}`
+            : (asset.name ?? "—");
+          const avatarSymbol = parsedOption ? parsedOption.underlying : rawSymbol;
           return (
             <button
               type="button"
               onClick={() => navigate(`/holdings/${encodeURIComponent(asset.id)}`)}
               className="hover:bg-muted/60 focus-visible:ring-ring group flex w-full items-center gap-2.5 rounded-md py-1 text-left transition"
             >
-              <TickerAvatar symbol={asset.displayCode ?? ""} className="h-8 w-8 shrink-0" />
+              <TickerAvatar symbol={avatarSymbol} className="h-8 w-8 shrink-0" />
               <div className="min-w-0 flex-1">
-                <div className="group-hover:text-primary font-semibold leading-tight transition-colors">
+                <div className="group-hover:text-primary flex items-center gap-1.5 font-semibold leading-tight transition-colors">
                   {displaySymbol}
+                  {parsedOption ? (
+                    <Badge variant="secondary" className="text-[10px]">
+                      Option
+                    </Badge>
+                  ) : null}
                 </div>
                 <div className="text-muted-foreground line-clamp-2 text-xs leading-tight">
-                  {asset.name ?? "—"}
+                  {subtitle}
                 </div>
               </div>
             </button>

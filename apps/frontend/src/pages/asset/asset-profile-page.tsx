@@ -85,6 +85,16 @@ interface AssetDetailData {
     close: number;
     adjclose: number;
   } | null;
+  bondSpec?: {
+    maturityDate?: string | null;
+    couponRate?: number | null;
+    couponFrequency?: string | null;
+  } | null;
+  optionSpec?: {
+    right?: string | null;
+    strike?: number | null;
+    expiration?: string | null;
+  } | null;
 }
 
 type AssetTab = "overview" | "lots" | "history";
@@ -298,8 +308,33 @@ export const AssetProfilePage = () => {
     return quoteHistory?.at(0) ?? null;
   }, [quoteHistory]);
 
+  // Bond metadata for display (only when asset is a bond)
+  const bondSpec = useMemo(() => {
+    if (assetProfile?.instrumentType !== "BOND" || !assetProfile?.metadata) return null;
+    const bond = assetProfile.metadata.bond as
+      | {
+          maturityDate?: string | null;
+          couponRate?: number | null;
+          couponFrequency?: string | null;
+        }
+      | undefined;
+    if (!bond || (!bond.maturityDate && bond.couponRate == null)) return null;
+    return bond;
+  }, [assetProfile]);
+
+  // Option metadata for display (only when asset is an option)
+  const optionSpec = useMemo(() => {
+    if (assetProfile?.instrumentType !== "OPTION" || !assetProfile?.metadata) return null;
+    const option = assetProfile.metadata.option as
+      | { right?: string | null; strike?: number | null; expiration?: string | null }
+      | undefined;
+    if (!option || (!option.right && option.strike == null && !option.expiration)) return null;
+    return option;
+  }, [assetProfile]);
+
   const { saveQuoteMutation, deleteQuoteMutation } = useQuoteMutations(assetId);
   const syncMarketDataMutation = useSyncMarketDataMutation(true);
+  const updateMarketDataMutation = useSyncMarketDataMutation(false);
 
   // Determine if manual tracking based on asset's quoteMode
   const isManualPricingMode = assetProfile?.quoteMode === "MANUAL";
@@ -398,8 +433,10 @@ export const AssetProfilePage = () => {
       currency: holding.localCurrency ?? holding.instrument?.currency ?? baseCurrency,
       quoteCurrency: quoteData?.quoteCurrency ?? null,
       quote: quoteData?.quote ?? null,
+      bondSpec: bondSpec ?? null,
+      optionSpec: optionSpec ?? null,
     };
-  }, [holding, quote]);
+  }, [holding, quote, bondSpec, optionSpec]);
 
   // Build toggle items dynamically based on available data
   const toggleItems = useMemo(() => {
@@ -601,10 +638,14 @@ export const AssetProfilePage = () => {
   const isLoading = isHoldingLoading || isQuotesLoading || isAssetProfileLoading;
   const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
 
+  const handleUpdateQuotes = useCallback(() => {
+    if (!profile?.id) return;
+    triggerHaptic();
+    updateMarketDataMutation.mutate([profile.id]);
+  }, [profile?.id, updateMarketDataMutation, triggerHaptic]);
+
   const handleRefreshQuotes = useCallback(() => {
-    if (!profile?.id) {
-      return;
-    }
+    if (!profile?.id) return;
     triggerHaptic();
     syncMarketDataMutation.mutate([profile.id]);
   }, [profile?.id, syncMarketDataMutation, triggerHaptic]);
@@ -668,8 +709,13 @@ export const AssetProfilePage = () => {
                       title: "Manage",
                       items: [
                         {
+                          icon: Icons.Download,
+                          label: "Update Price",
+                          onClick: handleUpdateQuotes,
+                        },
+                        {
                           icon: Icons.Refresh,
-                          label: "Refresh Price",
+                          label: "Refresh History",
                           onClick: handleRefreshQuotesWithConfirm,
                         },
                         {
@@ -878,8 +924,13 @@ export const AssetProfilePage = () => {
                         title: "Manage",
                         items: [
                           {
+                            icon: Icons.Download,
+                            label: "Update Price",
+                            onClick: handleUpdateQuotes,
+                          },
+                          {
                             icon: Icons.Refresh,
-                            label: "Refresh Price",
+                            label: "Refresh History",
                             onClick: handleRefreshQuotesWithConfirm,
                           },
                           {

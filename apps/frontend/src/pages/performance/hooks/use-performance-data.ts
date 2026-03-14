@@ -104,10 +104,8 @@ export function useCalculatePerformanceHistory({
     hasErrors,
     errorMessages,
     queries: performanceQueries,
-    effectiveStartDate: null,
     formattedStartDate: startDate,
     formattedEndDate: endDate,
     displayDateRange,
-    isCustomRange: false,
   };
 }

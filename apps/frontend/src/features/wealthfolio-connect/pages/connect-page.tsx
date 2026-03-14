@@ -1,6 +1,6 @@
 import { openUrlInBrowser, syncTriggerCycle } from "@/adapters";
 import { Page, PageContent, PageHeader } from "@/components/page";
-import { useDeviceSync } from "@/features/devices-sync";
+import { useSyncStatus } from "@/features/devices-sync/hooks";
 import { useDevices } from "@/features/devices-sync/hooks";
 import { ConnectEmptyState } from "@/features/wealthfolio-connect/components/connect-empty-state";
 import {
@@ -13,7 +13,7 @@ import { useWealthfolioConnect } from "@/features/wealthfolio-connect/providers/
 import { useAccounts } from "@/hooks/use-accounts";
 import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert } from "@wealthfolio/ui/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@wealthfolio/ui/components/ui/avatar";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
@@ -35,27 +35,43 @@ import type { BrokerConnection, ImportRun } from "../types";
 
 import type { Device } from "@/features/devices-sync/types";
 import type { Account } from "@/lib/types";
+import { hasBrokerSync } from "../lib/plan-capabilities";
 import { NewAccountsFoundModal } from "../components/new-accounts-found-modal";
 
 export default function ConnectPage() {
   const { isEnabled, isConnected, isInitializing, userInfo } = useWealthfolioConnect();
   const { status, lastSyncTime, issueCount } = useAggregatedSyncStatus();
-  const { data: brokerAccounts = [] } = useBrokerAccounts();
+  const showBrokerSync = hasBrokerSync(userInfo);
+  const { data: brokerAccounts = [] } = useBrokerAccounts({ enabled: showBrokerSync });
   const { mutate: syncBrokerData, isPending: isSyncing } = useSyncBrokerData();
-  const { state: deviceSyncState } = useDeviceSync();
+  const { engineStatus: deviceSyncEngineStatus } = useSyncStatus();
   const { data: devices } = useDevices("my");
+  const queryClient = useQueryClient();
+  const [isTriggeringDeviceSync, setIsTriggeringDeviceSync] = useState(false);
 
-  const handleSyncAll = useCallback(() => {
-    syncBrokerData();
-    syncTriggerCycle();
-  }, [syncBrokerData]);
-  const { data: importRunsData } = useImportRunsInfinite({ pageSize: 10 });
+  const isSyncRunning = isSyncing || isTriggeringDeviceSync || status === "running";
+
+  const handleSyncAll = useCallback(async () => {
+    if (showBrokerSync) {
+      syncBrokerData();
+    }
+    setIsTriggeringDeviceSync(true);
+    try {
+      await syncTriggerCycle();
+    } finally {
+      setIsTriggeringDeviceSync(false);
+      queryClient.invalidateQueries({ queryKey: ["sync", "devices"] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.BROKER_CONNECTIONS] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS] });
+    }
+  }, [showBrokerSync, syncBrokerData, queryClient]);
+  const { data: importRunsData } = useImportRunsInfinite({ pageSize: 10, enabled: showBrokerSync });
   const { accounts: localAccounts } = useAccounts({ filterActive: false, includeArchived: false });
 
   const { data: brokerConnections = [] } = useQuery({
     queryKey: [QueryKeys.BROKER_CONNECTIONS],
     queryFn: listBrokerConnections,
-    enabled: isConnected,
+    enabled: isConnected && showBrokerSync,
     staleTime: 30000,
   });
 
@@ -188,11 +204,15 @@ export default function ConnectPage() {
     <Page>
       <PageHeader
         heading="Sync & Connections"
-        text="Your brokerages and devices, all in one place."
+        text={
+          showBrokerSync
+            ? "Your brokerages and devices, all in one place."
+            : "Your devices, all in one place."
+        }
         actions={
           <div className="flex items-center gap-2 sm:gap-3">
-            <Button onClick={handleSyncAll} disabled={isSyncing || status === "running"} size="sm">
-              {isSyncing || status === "running" ? (
+            <Button onClick={handleSyncAll} disabled={isSyncRunning} size="sm">
+              {isSyncRunning ? (
                 <>
                   <Icons.Spinner className="h-4 w-4 animate-spin sm:mr-2" />
                   <span className="hidden sm:inline">Syncing...</span>
@@ -209,7 +229,7 @@ export default function ConnectPage() {
       />
       <PageContent>
         <div className="mx-auto max-w-5xl space-y-6 pt-12">
-          {hasAccountsNeedingSetup && (
+          {showBrokerSync && hasAccountsNeedingSetup && (
             <Alert variant="warning" className="mb-4">
               <Icons.AlertTriangle className="h-4 w-4" />
               <div className="flex flex-1 items-center justify-between">
@@ -236,79 +256,81 @@ export default function ConnectPage() {
             </Alert>
           )}
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <Card className="flex flex-col border">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center justify-between text-base font-medium">
-                  <div className="flex items-center gap-2">
-                    <div className="bg-muted flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
-                      <Icons.Link className="text-muted-foreground h-3.5 w-3.5" />
+          <div className={`grid grid-cols-1 gap-4 ${showBrokerSync ? "md:grid-cols-2" : ""}`}>
+            {showBrokerSync && (
+              <Card className="flex flex-col border">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center justify-between text-base font-medium">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-muted flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
+                        <Icons.Link className="text-muted-foreground h-3.5 w-3.5" />
+                      </div>
+                      Brokerages
+                      {lastSyncTime && (
+                        <span className="text-muted-foreground text-xs font-normal">
+                          · {formatDistanceToNow(new Date(lastSyncTime))} ago
+                        </span>
+                      )}
                     </div>
-                    Brokerages
-                    {lastSyncTime && (
-                      <span className="text-muted-foreground text-xs font-normal">
-                        · {formatDistanceToNow(new Date(lastSyncTime))} ago
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-muted-foreground hover:text-foreground h-8 w-8 sm:hidden"
-                      onClick={() =>
-                        openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/connections`)
-                      }
-                    >
-                      <Icons.ExternalLink className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-muted-foreground hover:text-foreground hidden sm:inline-flex"
-                      onClick={() =>
-                        openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/connections`)
-                      }
-                    >
-                      Manage
-                      <Icons.ArrowRight className="ml-1 h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex-1 pt-0">
-                {brokerConnections.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <div className="bg-muted/50 mb-3 rounded-full p-3">
-                      <Icons.Link className="text-muted-foreground h-6 w-6" />
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-foreground h-8 w-8 sm:hidden"
+                        onClick={() =>
+                          openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/connections`)
+                        }
+                      >
+                        <Icons.ExternalLink className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-foreground hidden sm:inline-flex"
+                        onClick={() =>
+                          openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/connections`)
+                        }
+                      >
+                        Manage
+                        <Icons.ArrowRight className="ml-1 h-3.5 w-3.5" />
+                      </Button>
                     </div>
-                    <p className="text-muted-foreground text-sm">No brokerages connected</p>
-                    <p className="text-muted-foreground mt-1 text-xs">
-                      Link a brokerage to start syncing your accounts.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {brokerConnections.map((connection) => {
-                      const connectionAccounts = brokerAccounts.filter(
-                        (a) => a.brokerage_authorization === connection.id,
-                      );
-                      const syncEnabledCount = connectionAccounts.filter(
-                        (a) => a.sync_enabled,
-                      ).length;
-                      return (
-                        <ConnectionItem
-                          key={connection.id}
-                          connection={connection}
-                          syncEnabledCount={syncEnabledCount}
-                          totalAccountCount={connectionAccounts.length}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1 pt-0">
+                  {brokerConnections.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <div className="bg-muted/50 mb-3 rounded-full p-3">
+                        <Icons.Link className="text-muted-foreground h-6 w-6" />
+                      </div>
+                      <p className="text-muted-foreground text-sm">No brokerages connected</p>
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        Link a brokerage to start syncing your accounts.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {brokerConnections.map((connection) => {
+                        const connectionAccounts = brokerAccounts.filter(
+                          (a) => a.brokerage_authorization === connection.id,
+                        );
+                        const syncEnabledCount = connectionAccounts.filter(
+                          (a) => a.sync_enabled,
+                        ).length;
+                        return (
+                          <ConnectionItem
+                            key={connection.id}
+                            connection={connection}
+                            syncEnabledCount={syncEnabledCount}
+                            totalAccountCount={connectionAccounts.length}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             <Card className="flex flex-col border">
               <CardHeader className="pb-3">
@@ -318,7 +340,7 @@ export default function ConnectPage() {
                       <Icons.Smartphone className="text-muted-foreground h-3.5 w-3.5" />
                     </div>
                     Devices
-                    <DeviceSyncStatusBadge engineStatus={deviceSyncState.engineStatus} />
+                    <DeviceSyncStatusBadge engineStatus={deviceSyncEngineStatus} />
                   </div>
                   <div className="flex items-center gap-1">
                     <Link to="/settings/connect">
@@ -365,45 +387,71 @@ export default function ConnectPage() {
             </Card>
           </div>
 
-          <Card className="border">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base font-medium">
-                <div className="bg-muted flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
-                  <Icons.History className="text-muted-foreground h-3.5 w-3.5" />
-                </div>
-                Recent Activity
-                {issueCount > 0 && (
-                  <Badge variant="default" className="ml-1 h-5 min-w-5 px-1.5 text-xs">
-                    {issueCount}
-                  </Badge>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              {recentActivity.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <div className="bg-muted/50 mb-3 rounded-full p-3">
-                    <Icons.History className="text-muted-foreground h-6 w-6" />
+          {showBrokerSync && (
+            <Card className="border">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base font-medium">
+                  <div className="bg-muted flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
+                    <Icons.History className="text-muted-foreground h-3.5 w-3.5" />
                   </div>
-                  <p className="text-muted-foreground text-sm">No activity yet</p>
-                  <p className="text-muted-foreground mt-1 text-xs">
-                    Updates will appear here once your data starts syncing.
-                  </p>
+                  Recent Activity
+                  {issueCount > 0 && (
+                    <Badge variant="default" className="ml-1 h-5 min-w-5 px-1.5 text-xs">
+                      {issueCount}
+                    </Badge>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {recentActivity.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="bg-muted/50 mb-3 rounded-full p-3">
+                      <Icons.History className="text-muted-foreground h-6 w-6" />
+                    </div>
+                    <p className="text-muted-foreground text-sm">No activity yet</p>
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      Updates will appear here once your data starts syncing.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-border -mx-3 divide-y">
+                    {recentActivity.map((run) => (
+                      <SyncHistoryItem
+                        key={run.id}
+                        run={run}
+                        accountName={accountNameMap.get(run.accountId)}
+                        trackingMode={accountTrackingModeMap.get(run.accountId)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {!showBrokerSync && (
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-medium">Upgrade to sync broker accounts</h3>
+                    <p className="text-muted-foreground mt-0.5 text-xs">
+                      Connect your brokerage accounts for automatic portfolio syncing.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/settings/billing`)
+                    }
+                  >
+                    Upgrade
+                    <Icons.ArrowRight className="ml-1 h-3.5 w-3.5" />
+                  </Button>
                 </div>
-              ) : (
-                <div className="divide-border -mx-3 divide-y">
-                  {recentActivity.map((run) => (
-                    <SyncHistoryItem
-                      key={run.id}
-                      run={run}
-                      accountName={accountNameMap.get(run.accountId)}
-                      trackingMode={accountTrackingModeMap.get(run.accountId)}
-                    />
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </PageContent>
 

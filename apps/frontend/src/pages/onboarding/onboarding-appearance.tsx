@@ -228,15 +228,15 @@ export const OnboardingAppearance = forwardRef<
                   )}
                 >
                   {/* Font preview area */}
-                  <div className="bg-muted/30 flex flex-1 flex-col items-center justify-center px-3 py-5 text-center sm:px-4 sm:py-6">
-                    <div className="w-full space-y-3">
+                  <div className="bg-muted/30 flex flex-1 flex-col items-center justify-center px-3 py-3 text-center sm:px-4 sm:py-4">
+                    <div className="w-full space-y-2">
                       {/* Font name as hero */}
                       <div className="text-xl font-medium tracking-tight sm:text-2xl">
                         {f.label}
                       </div>
                       {/* Sample text paragraph */}
                       <div className="text-muted-foreground text-[11px] leading-relaxed sm:text-xs">
-                        Track investments with clarity.
+                        Invest with clarity.
                       </div>
                       {/* Secondary: numbers sample */}
                       <div className="text-muted-foreground/60 whitespace-nowrap text-[10px] sm:text-xs">

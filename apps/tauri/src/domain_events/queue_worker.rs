@@ -23,7 +23,7 @@ use super::planner::{plan_asset_enrichment, plan_portfolio_job};
 use crate::commands::brokers_sync::perform_broker_sync;
 use crate::context::ServiceContext;
 use crate::events::{
-    MarketSyncResult, PortfolioRequestPayload, ASSET_ENRICHMENT_COMPLETE, ASSET_ENRICHMENT_ERROR,
+    MarketSyncResult, PortfolioRequestPayload, ASSET_ENRICHMENT_COMPLETE,
     ASSET_ENRICHMENT_PROGRESS, ASSET_ENRICHMENT_START, MARKET_SYNC_COMPLETE, MARKET_SYNC_ERROR,
     MARKET_SYNC_START, PORTFOLIO_UPDATE_COMPLETE, PORTFOLIO_UPDATE_ERROR, PORTFOLIO_UPDATE_START,
 };
@@ -133,7 +133,7 @@ async fn process_event_batch(
         let mut total_enriched: usize = 0;
         let mut total_skipped: usize = 0;
         let mut total_failed: usize = 0;
-        let mut had_error = false;
+
         let chunk_size = 5;
 
         for chunk in enrichment_asset_ids.chunks(chunk_size) {
@@ -150,7 +150,6 @@ async fn process_event_batch(
                 }
                 Ok(Err(e)) => {
                     warn!("Asset enrichment chunk failed: {}", e);
-                    had_error = true;
                     total_failed += chunk.len();
                 }
                 Err(_) => {
@@ -158,7 +157,6 @@ async fn process_event_batch(
                         "Asset enrichment chunk timed out ({} asset(s))",
                         chunk.len()
                     );
-                    had_error = true;
                     total_failed += chunk.len();
                 }
             }
@@ -170,25 +168,6 @@ async fn process_event_batch(
                     "completed": completed,
                     "total": total,
                 }),
-            );
-        }
-
-        info!(
-            "Asset enrichment complete: {} enriched, {} skipped, {} failed{}",
-            total_enriched,
-            total_skipped,
-            total_failed,
-            if had_error {
-                " (some chunks failed)"
-            } else {
-                ""
-            }
-        );
-
-        if had_error || total_failed > 0 {
-            let _ = app_handle.emit(
-                ASSET_ENRICHMENT_ERROR,
-                format!("{} asset(s) failed enrichment", total_failed),
             );
         }
 
@@ -204,11 +183,8 @@ async fn process_event_batch(
 
     // 2. Plan and run portfolio job directly (not via event emission)
     // This ensures the is_processing guard properly tracks completion
-    if let Some(payload) = plan_portfolio_job(events) {
-        info!(
-            "Running portfolio job (accounts: {:?})",
-            payload.account_ids
-        );
+    let timezone = context.get_timezone();
+    if let Some(payload) = plan_portfolio_job(events, &timezone) {
         run_portfolio_job(app_handle, context, payload).await;
     }
 
@@ -217,6 +193,19 @@ async fn process_event_batch(
         // 3. Plan and trigger broker sync for eligible tracking mode changes
         let sync_account_ids = plan_broker_sync(events);
         if !sync_account_ids.is_empty() {
+            // Check plan entitlement before syncing
+            match context.connect_service().has_broker_sync().await {
+                Ok(true) => {}
+                Ok(false) => {
+                    info!("Broker sync skipped after tracking mode change: plan does not include broker sync");
+                    return;
+                }
+                Err(e) => {
+                    warn!("Broker sync skipped after tracking mode change: could not verify entitlement ({})", e);
+                    return;
+                }
+            }
+
             info!(
                 "Triggering broker sync for {} accounts (tracking mode changed)",
                 sync_account_ids.len()

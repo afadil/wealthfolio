@@ -448,7 +448,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
               variant="outline"
               role="combobox"
               className={cn(
-                "h-auto min-h-10 w-full justify-between rounded-md px-3 py-2",
+                "min-h-input-height h-auto w-full justify-between rounded-md px-3 py-2",
                 open && "ring-ring ring-2",
                 className,
               )}

@@ -14,7 +14,10 @@ pub use ports::{
     SyncBootstrapResult, SyncCycleResult, SyncIdentity, SyncReadyReconcileResult, SyncTransport,
     TransportError,
 };
-pub use runtime::DeviceSyncRuntimeState;
+pub use runtime::{
+    DeviceSyncRuntimeState, OverwriteInfo, OverwriteTableInfo, PairingFlowPhase,
+    PairingFlowResponse, PairingFlowState,
+};
 
 /// Foreground pull cadence in seconds.
 pub const DEVICE_SYNC_FOREGROUND_INTERVAL_SECS: u64 = 5 * 60;
@@ -140,6 +143,7 @@ impl<'a, R: ReplayStore + ?Sized> CycleContext<'a, R> {
             needs_bootstrap: status == "stale_cursor",
             bootstrap_snapshot_id: None,
             bootstrap_snapshot_seq: None,
+            dead_letter_count: 0,
         })
     }
 }
@@ -191,6 +195,7 @@ where
                 needs_bootstrap: false,
                 bootstrap_snapshot_id: None,
                 bootstrap_snapshot_seq: None,
+                dead_letter_count: 0,
             });
         }
     };
@@ -226,6 +231,7 @@ where
             needs_bootstrap: false,
             bootstrap_snapshot_id: None,
             bootstrap_snapshot_seq: None,
+            dead_letter_count: 0,
         });
     }
 
@@ -257,7 +263,6 @@ where
         "[DeviceSync] Reconcile action={}, cursor={:?}",
         reconcile.action, reconcile.cursor
     );
-
     let has_pending = ports.has_pending_outbox().await.unwrap_or(false);
     match reconcile.action.as_str() {
         "NOOP" => {
@@ -282,32 +287,47 @@ where
                     needs_bootstrap: false,
                     bootstrap_snapshot_id: None,
                     bootstrap_snapshot_seq: None,
+                    dead_letter_count: 0,
                 });
             }
             debug!("[DeviceSync] Reconcile action=NOOP but has pending outbox, proceeding with push+pull");
         }
         "BOOTSTRAP_SNAPSHOT" => {
-            ports
-                .mark_cycle_outcome(
-                    "stale_cursor".to_string(),
-                    ctx.started_at.elapsed().as_millis() as i64,
-                    None,
-                )
-                .await
-                .map_err(|e| e.to_string())?;
-            return Ok(SyncCycleResult {
-                status: "stale_cursor".to_string(),
-                lock_version: 0,
-                pushed_count: 0,
-                pulled_count: 0,
-                cursor: ctx.local_cursor,
-                needs_bootstrap: true,
-                bootstrap_snapshot_id: reconcile
-                    .latest_snapshot
-                    .as_ref()
-                    .map(|s| s.snapshot_id.clone()),
-                bootstrap_snapshot_seq: reconcile.latest_snapshot.as_ref().map(|s| s.oplog_seq),
-            });
+            if ctx.local_cursor > 0 {
+                // Bootstrap was already applied (cursor is set from snapshot restore).
+                // The server doesn't know our updated cursor yet because no push/pull
+                // has happened. Fall through to push+pull so the server learns our
+                // actual cursor. If the cursor is genuinely stale (behind GC watermark),
+                // the pull error handler will catch SYNC_CURSOR_TOO_OLD and return
+                // stale_cursor at that point.
+                debug!(
+                    "[DeviceSync] Reconcile action=BOOTSTRAP_SNAPSHOT but local cursor {} > 0, proceeding with push+pull",
+                    ctx.local_cursor
+                );
+            } else {
+                ports
+                    .mark_cycle_outcome(
+                        "stale_cursor".to_string(),
+                        ctx.started_at.elapsed().as_millis() as i64,
+                        None,
+                    )
+                    .await
+                    .map_err(|e| e.to_string())?;
+                return Ok(SyncCycleResult {
+                    status: "stale_cursor".to_string(),
+                    lock_version: 0,
+                    pushed_count: 0,
+                    pulled_count: 0,
+                    cursor: ctx.local_cursor,
+                    needs_bootstrap: true,
+                    bootstrap_snapshot_id: reconcile
+                        .latest_snapshot
+                        .as_ref()
+                        .map(|s| s.snapshot_id.clone()),
+                    bootstrap_snapshot_seq: reconcile.latest_snapshot.as_ref().map(|s| s.oplog_seq),
+                    dead_letter_count: 0,
+                });
+            }
         }
         "WAIT_SNAPSHOT" => {
             ports
@@ -327,6 +347,7 @@ where
                 needs_bootstrap: false,
                 bootstrap_snapshot_id: None,
                 bootstrap_snapshot_seq: None,
+                dead_letter_count: 0,
             });
         }
         "PULL_TAIL" => {
@@ -348,7 +369,7 @@ where
     debug!("[DeviceSync] Local cursor: {}", ctx.local_cursor);
     let lock_version = ctx.lock_version;
     let mut local_cursor = ctx.local_cursor;
-    let server_cursor = match reconcile.cursor {
+    let mut server_cursor = match reconcile.cursor {
         Some(c) => c,
         None => {
             log::warn!(
@@ -468,6 +489,7 @@ where
                     .mark_push_completed()
                     .await
                     .map_err(|e| e.to_string())?;
+                server_cursor = push_response.server_cursor;
             }
             Err(err) => {
                 let err_str = err.to_string();
@@ -498,6 +520,7 @@ where
                             )
                             .await
                             .map_err(|e| e.to_string())?;
+                        let dropped = stale_key_version_event_ids.len();
                         return Ok(SyncCycleResult {
                             status: "ok".to_string(),
                             lock_version,
@@ -507,9 +530,11 @@ where
                             needs_bootstrap: false,
                             bootstrap_snapshot_id: None,
                             bootstrap_snapshot_seq: None,
+                            dead_letter_count: dropped,
                         });
                     }
 
+                    let mixed_dead_count = push_event_ids.len();
                     ports
                         .mark_outbox_dead(
                             push_event_ids,
@@ -525,7 +550,11 @@ where
                             "Key version mismatch — re-pairing required".to_string(),
                             None,
                         )
-                        .await;
+                        .await
+                        .map(|mut r| {
+                            r.dead_letter_count = mixed_dead_count;
+                            r
+                        });
                 }
 
                 let backoff = backoff_seconds(max_retry_count);
@@ -602,6 +631,7 @@ where
             needs_bootstrap: false,
             bootstrap_snapshot_id: None,
             bootstrap_snapshot_seq: None,
+            dead_letter_count: 0,
         });
     }
 
@@ -655,6 +685,7 @@ where
                                 needs_bootstrap: true,
                                 bootstrap_snapshot_id: snap_id,
                                 bootstrap_snapshot_seq: snap_seq,
+                                dead_letter_count: 0,
                             });
                         }
                     }
@@ -807,6 +838,12 @@ where
             };
             pulled_count += applied_count;
 
+            if pull_response.next_cursor < local_cursor {
+                return Err(format!(
+                    "Server returned non-monotonic cursor ({} < {})",
+                    pull_response.next_cursor, local_cursor
+                ));
+            }
             local_cursor = pull_response.next_cursor;
             ports
                 .set_cursor(local_cursor)
@@ -853,6 +890,7 @@ where
         needs_bootstrap: false,
         bootstrap_snapshot_id: None,
         bootstrap_snapshot_seq: None,
+        dead_letter_count: 0,
     })
 }
 
@@ -1600,6 +1638,7 @@ mod tests {
             needs_bootstrap: false,
             bootstrap_snapshot_id: None,
             bootstrap_snapshot_seq: None,
+            dead_letter_count: 0,
         });
 
         let result = run_ready_reconcile_state(&ports).await;
@@ -1637,6 +1676,7 @@ mod tests {
                 needs_bootstrap: false,
                 bootstrap_snapshot_id: None,
                 bootstrap_snapshot_seq: None,
+                dead_letter_count: 0,
             });
             cycle_results.push(SyncCycleResult {
                 status: "stale_cursor".to_string(),
@@ -1647,6 +1687,7 @@ mod tests {
                 needs_bootstrap: true,
                 bootstrap_snapshot_id: None,
                 bootstrap_snapshot_seq: None,
+                dead_letter_count: 0,
             });
         }
 
@@ -1682,6 +1723,7 @@ mod tests {
             needs_bootstrap: true,
             bootstrap_snapshot_id: None,
             bootstrap_snapshot_seq: None,
+            dead_letter_count: 0,
         });
 
         let result = run_ready_reconcile_state(&ports).await;
@@ -1720,6 +1762,7 @@ mod tests {
                 needs_bootstrap: true,
                 bootstrap_snapshot_id: None,
                 bootstrap_snapshot_seq: None,
+                dead_letter_count: 0,
             });
             cycle_results.push(SyncCycleResult {
                 status: "stale_cursor".to_string(),
@@ -1730,6 +1773,7 @@ mod tests {
                 needs_bootstrap: true,
                 bootstrap_snapshot_id: None,
                 bootstrap_snapshot_seq: None,
+                dead_letter_count: 0,
             });
         }
 

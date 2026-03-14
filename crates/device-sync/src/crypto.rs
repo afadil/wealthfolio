@@ -12,6 +12,7 @@ use chacha20poly1305::{
     XChaCha20Poly1305, XNonce,
 };
 use hkdf::Hkdf;
+use hmac::{Hmac, Mac};
 use rand::{rngs::OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -221,6 +222,20 @@ pub fn hash_sha256(data: &str) -> String {
     result.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
+/// Compute HMAC-SHA256 over `data` using a base64-encoded `key`.
+/// Returns hex-encoded MAC (64 characters).
+pub fn hmac_sha256(key_b64: &str, data: &str) -> Result<String, String> {
+    let key_bytes = BASE64
+        .decode(key_b64)
+        .map_err(|e| format!("Invalid HMAC key: {}", e))?;
+
+    let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(&key_bytes)
+        .map_err(|e| format!("HMAC key error: {}", e))?;
+    mac.update(data.as_bytes());
+    let result = mac.finalize().into_bytes();
+    Ok(result.iter().map(|b| format!("{:02x}", b)).collect())
+}
+
 /// Compute Short Authentication String (SAS) from shared secret
 /// Returns a 6-digit numeric string for human verification
 pub fn compute_sas(shared_secret_b64: &str) -> Result<String, String> {
@@ -314,6 +329,27 @@ mod tests {
 
         assert_eq!(sas.len(), 6);
         assert!(sas.chars().all(|c| c.is_ascii_digit()));
+    }
+
+    #[test]
+    fn test_hmac_sha256() {
+        let key = generate_root_key();
+        let mac1 = hmac_sha256(&key, "hello").unwrap();
+        let mac2 = hmac_sha256(&key, "hello").unwrap();
+        let mac3 = hmac_sha256(&key, "world").unwrap();
+
+        // Deterministic
+        assert_eq!(mac1, mac2);
+        // Different data → different MAC
+        assert_ne!(mac1, mac3);
+        // 64 hex characters
+        assert_eq!(mac1.len(), 64);
+        assert!(mac1.chars().all(|c| c.is_ascii_hexdigit()));
+
+        // Different key → different MAC
+        let key2 = generate_root_key();
+        let mac4 = hmac_sha256(&key2, "hello").unwrap();
+        assert_ne!(mac1, mac4);
     }
 
     #[test]

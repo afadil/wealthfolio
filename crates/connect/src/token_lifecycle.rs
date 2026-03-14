@@ -210,6 +210,12 @@ async fn read_cached_token(state: &TokenLifecycleState) -> Option<String> {
     cache
         .as_ref()
         .filter(|value| value.expires_at > Instant::now())
+        // Also verify wall-clock expiry: Instant doesn't advance during
+        // device sleep (iOS/macOS), so the monotonic check alone can return
+        // a JWT whose real `exp` has already passed.
+        .filter(|value| {
+            is_access_token_fresh(&value.token, SystemTime::now(), DEFAULT_EXPIRY_BUFFER_SECS)
+        })
         .map(|value| value.token.clone())
 }
 

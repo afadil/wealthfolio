@@ -13,7 +13,7 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
-import { formatDistanceToNow } from "date-fns";
+import { formatDate } from "@/lib/utils";
 import { useCallback, useState } from "react";
 import { useWealthfolioConnect } from "../providers/wealthfolio-connect-provider";
 import {
@@ -22,6 +22,7 @@ import {
   syncBrokerData,
 } from "../services/broker-service";
 import type { BrokerAccount, BrokerConnection } from "../types";
+import { hasBrokerSync } from "../lib/plan-capabilities";
 import { SubscriptionPlans } from "./subscription-plans";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -141,9 +142,7 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
   const logoUrl =
     connection?.brokerage?.aws_s3_square_logo_url ?? connection?.brokerage?.aws_s3_logo_url;
 
-  const lastSyncedText = lastSyncDate
-    ? `Synced ${formatDistanceToNow(new Date(lastSyncDate), { addSuffix: false })} ago`
-    : "Never synced";
+  const lastSyncedText = lastSyncDate ? `Data as of ${formatDate(lastSyncDate)}` : "No data yet";
 
   return (
     <div className="bg-muted/30 rounded-lg border p-3">
@@ -362,12 +361,17 @@ export function ConnectedView() {
   // Check if there's a service unavailable error (failed to fetch user info)
   const isServiceUnavailable = !!error && !isLoadingUserInfo && !userInfo;
 
-  // Check if user has an active subscription (has a team with a plan)
-  const hasSubscription = !!userInfo?.team?.plan;
+  // Check if user has an active subscription
+  const hasSubscription =
+    userInfo?.team?.subscription_status === "active" ||
+    userInfo?.team?.subscription_status === "trialing";
 
-  // Hooks - only fetch broker connections and accounts if user has a subscription
-  const connectionsQuery = useBrokerConnections(hasSubscription);
-  const accountsQuery = useBrokerAccountsQuery(hasSubscription);
+  // Check if user's plan includes broker sync
+  const showBrokerSync = hasBrokerSync(userInfo);
+
+  // Hooks - only fetch broker connections and accounts if user has broker sync
+  const connectionsQuery = useBrokerConnections(showBrokerSync);
+  const accountsQuery = useBrokerAccountsQuery(showBrokerSync);
 
   // Retry handler for service unavailable state
   const handleRetry = useCallback(async () => {
@@ -503,8 +507,8 @@ export function ConnectedView() {
         />
       )}
 
-      {/* Broker Connections Card - Only show if user has an active subscription */}
-      {hasSubscription && (
+      {/* Broker Connections Card - Only show if user has broker sync */}
+      {showBrokerSync && (
         <BrokerConnectionsCard
           connections={connections}
           isLoading={isLoadingConnections}
@@ -513,8 +517,8 @@ export function ConnectedView() {
         />
       )}
 
-      {/* Accounts Card - Only show if user has an active subscription */}
-      {hasSubscription && (
+      {/* Accounts Card - Only show if user has broker sync */}
+      {showBrokerSync && (
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between gap-2">
@@ -587,6 +591,31 @@ export function ConnectedView() {
 
       {/* Device Sync Section - Only show if user has an active subscription */}
       {hasSubscription && <DeviceSyncSection />}
+
+      {/* Upgrade callout for basic plan users */}
+      {hasSubscription && !showBrokerSync && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-medium">Upgrade to sync broker accounts</h3>
+                <p className="text-muted-foreground mt-0.5 text-xs">
+                  Connect your brokerage accounts for automatic portfolio syncing.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                onClick={() =>
+                  openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/settings/billing`)
+                }
+              >
+                Upgrade
+                <Icons.ArrowRight className="ml-1 h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Privacy Footnote */}
       <footer className="border-t pt-4">

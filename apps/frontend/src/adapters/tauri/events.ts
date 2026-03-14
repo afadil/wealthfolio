@@ -12,9 +12,18 @@ const adaptCallback = <T>(handler: EventCallback<T>): TauriEventCallback<T> => {
   return (event) => handler({ event: event.event, payload: event.payload, id: event.id });
 };
 
-// Helper to adapt Tauri's unlisten function to our unified type
+// Helper to adapt Tauri's unlisten function to our unified type.
+// The try-catch guards against a Tauri race condition where unlisten is called
+// before the listen_js_script has executed in the webview (e.g. React strict mode
+// cleanup), causing "listeners[eventId].handlerId" to be undefined.
 const adaptUnlisten = (unlisten: TauriUnlistenFn): UnlistenFn => {
-  return async () => unlisten();
+  return async () => {
+    try {
+      unlisten();
+    } catch {
+      // Listener was never fully registered or already removed — safe to ignore.
+    }
+  };
 };
 
 export const listenFileDropHover = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
@@ -72,34 +81,6 @@ export async function listenMarketSyncStart<T>(handler: EventCallback<T>): Promi
 
 export async function listenMarketSyncError<T>(handler: EventCallback<T>): Promise<UnlistenFn> {
   const unlisten = await listen<T>("market:sync-error", adaptCallback(handler));
-  return adaptUnlisten(unlisten);
-}
-
-export async function listenAssetEnrichmentStart<T>(
-  handler: EventCallback<T>,
-): Promise<UnlistenFn> {
-  const unlisten = await listen<T>("asset:enrichment-start", adaptCallback(handler));
-  return adaptUnlisten(unlisten);
-}
-
-export async function listenAssetEnrichmentComplete<T>(
-  handler: EventCallback<T>,
-): Promise<UnlistenFn> {
-  const unlisten = await listen<T>("asset:enrichment-complete", adaptCallback(handler));
-  return adaptUnlisten(unlisten);
-}
-
-export async function listenAssetEnrichmentError<T>(
-  handler: EventCallback<T>,
-): Promise<UnlistenFn> {
-  const unlisten = await listen<T>("asset:enrichment-error", adaptCallback(handler));
-  return adaptUnlisten(unlisten);
-}
-
-export async function listenAssetEnrichmentProgress<T>(
-  handler: EventCallback<T>,
-): Promise<UnlistenFn> {
-  const unlisten = await listen<T>("asset:enrichment-progress", adaptCallback(handler));
   return adaptUnlisten(unlisten);
 }
 

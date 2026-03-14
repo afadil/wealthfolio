@@ -458,6 +458,16 @@ pub struct HoldingsSymbolType {
     pub description: Option<String>,
 }
 
+/// Exchange information from the holdings API.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HoldingsExchange {
+    pub id: Option<String>,
+    pub code: Option<String>,
+    pub mic_code: Option<String>,
+    pub name: Option<String>,
+    pub suffix: Option<String>,
+}
+
 /// Inner symbol information.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HoldingsInnerSymbol {
@@ -469,6 +479,7 @@ pub struct HoldingsInnerSymbol {
     pub currency: Option<HoldingsCurrency>,
     #[serde(rename = "type")]
     pub symbol_type: Option<HoldingsSymbolType>,
+    pub exchange: Option<HoldingsExchange>,
 }
 
 /// Symbol wrapper from the holdings API.

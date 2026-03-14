@@ -200,6 +200,8 @@ pub enum AssetSkipReason {
     TooManyErrors,
     /// Bond has matured — price is par, no further sync needed.
     MaturedBond,
+    /// Option has expired — no further quotes available.
+    ExpiredOption,
 }
 
 impl std::fmt::Display for AssetSkipReason {
@@ -213,6 +215,7 @@ impl std::fmt::Display for AssetSkipReason {
             AssetSkipReason::SyncInProgress => write!(f, "Sync already in progress"),
             AssetSkipReason::TooManyErrors => write!(f, "Too many consecutive sync failures"),
             AssetSkipReason::MaturedBond => write!(f, "Bond has matured (price is par)"),
+            AssetSkipReason::ExpiredOption => write!(f, "Option has expired"),
         }
     }
 }
@@ -464,6 +467,15 @@ where
                     if maturity < Utc::now().date_naive() {
                         return Some(AssetSkipReason::MaturedBond);
                     }
+                }
+            }
+        }
+
+        // Skip expired options — no further quotes available
+        if asset.is_option() {
+            if let Some(spec) = asset.option_spec() {
+                if spec.expiration < Utc::now().date_naive() {
+                    return Some(AssetSkipReason::ExpiredOption);
                 }
             }
         }
@@ -921,11 +933,6 @@ where
                     format_sync_failure_message(&error, fetch_error.provider_id.as_deref());
 
                 if should_treat_backfill_error_as_non_fatal(&plan.category, &error) {
-                    info!(
-                        "Backfill reached provider data boundary for {} ({}). Treating as complete.",
-                        asset.id, error
-                    );
-
                     if let Err(state_err) = self.sync_state_store.update_after_sync(&asset.id).await
                     {
                         warn!(
@@ -1305,6 +1312,16 @@ where
                 debug!("Skipping asset {} for sync: {}", asset.id, reason);
                 if matches!(reason, AssetSkipReason::MaturedBond) {
                     self.ensure_matured_bond_par_quote(asset).await;
+                }
+                if matches!(reason, AssetSkipReason::ExpiredOption) {
+                    // Clear any lingering sync errors so expired options
+                    // don't show up in health checks
+                    if let Err(e) = self.sync_state_store.update_after_sync(&asset.id).await {
+                        warn!(
+                            "Failed to reset sync state for expired option {}: {:?}",
+                            asset.id, e
+                        );
+                    }
                 }
                 result.add_skipped(asset.id.clone(), reason);
             } else {

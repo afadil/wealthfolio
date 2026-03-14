@@ -119,8 +119,11 @@ impl ValidationStatus {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct QuoteImport {
-    /// The asset identifier for the quote.
+    /// The asset identifier for the quote (replaced with asset ID after validation).
     pub symbol: String,
+    /// The original symbol from CSV, preserved for display.
+    #[serde(default)]
+    pub display_symbol: Option<String>,
     /// Date in ISO format (YYYY-MM-DD).
     pub date: String,
     /// Opening price (optional, defaults to close if not provided).
@@ -147,6 +150,7 @@ impl QuoteImport {
     pub fn new(symbol: String, date: String, close: Decimal, currency: String) -> Self {
         Self {
             symbol,
+            display_symbol: None,
             date,
             open: None,
             high: None,
@@ -173,6 +177,7 @@ impl QuoteImport {
     ) -> Self {
         Self {
             symbol,
+            display_symbol: None,
             date,
             open: Some(open),
             high: Some(high),

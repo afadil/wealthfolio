@@ -166,6 +166,21 @@ impl AssetService {
         self
     }
 
+    /// Auto-classify a single newly created asset (instrument_type + asset_class).
+    async fn classify_new_asset(
+        &self,
+        asset_id: &str,
+        instrument_type: Option<&InstrumentType>,
+        kind: &AssetKind,
+    ) {
+        if let Some(taxonomy_service) = &self.taxonomy_service {
+            let classifier = AutoClassificationService::new(Arc::clone(taxonomy_service));
+            classifier
+                .classify_from_spec(asset_id, instrument_type, kind)
+                .await;
+        }
+    }
+
     /// Builds a NewAsset from an AssetSpec without any I/O.
     fn new_asset_from_spec(&self, spec: &AssetSpec) -> NewAsset {
         let canonical = canonicalize_market_identity(
@@ -367,7 +382,13 @@ impl AssetServiceTrait for AssetService {
             })
             .unwrap_or(new_asset.quote_ccy);
 
+        let instrument_type = new_asset.instrument_type.clone();
+        let kind = new_asset.kind.clone();
         let asset = self.asset_repository.create(new_asset).await?;
+
+        // Auto-classify the newly created asset
+        self.classify_new_asset(&asset.id, instrument_type.as_ref(), &kind)
+            .await;
 
         // Emit event for newly created asset
         self.event_sink
@@ -465,10 +486,6 @@ impl AssetServiceTrait for AssetService {
                         if let Ok(Some(existing)) =
                             self.asset_repository.find_by_instrument_key(&key)
                         {
-                            info!(
-                                "Found existing asset by instrument_key '{}': {}",
-                                key, existing.id
-                            );
                             if !existing.is_active {
                                 self.asset_repository.reactivate(&existing.id).await?;
                             }
@@ -565,7 +582,13 @@ impl AssetServiceTrait for AssetService {
             asset_id, new_asset.kind, new_asset.quote_mode, new_asset.name
         );
 
+        let instrument_type = new_asset.instrument_type.clone();
+        let kind = new_asset.kind.clone();
         let asset = self.asset_repository.create(new_asset).await?;
+
+        // Auto-classify the newly created asset
+        self.classify_new_asset(&asset.id, instrument_type.as_ref(), &kind)
+            .await;
 
         // Emit event for newly created asset
         self.event_sink
@@ -699,7 +722,7 @@ impl AssetServiceTrait for AssetService {
         }
 
         // Merge with existing metadata (preserving any non-profile fields like OptionSpec)
-        let updated_metadata = if profile_metadata.is_empty() {
+        let mut updated_metadata = if profile_metadata.is_empty() {
             existing_asset.metadata.clone()
         } else {
             let mut merged = match &existing_asset.metadata {
@@ -715,6 +738,41 @@ impl AssetServiceTrait for AssetService {
             );
             Some(serde_json::Value::Object(merged))
         };
+
+        // Enrich US Treasury bonds with maturity/coupon data from TreasuryDirect
+        // when the bond spec is missing this data (needed for yield-curve pricing).
+        if existing_asset.is_bond() {
+            let needs_bond_enrichment = existing_asset
+                .bond_spec()
+                .is_none_or(|s| s.maturity_date.is_none());
+
+            if needs_bond_enrichment {
+                if let Some(isin) = existing_asset.instrument_symbol.as_deref() {
+                    if isin.starts_with("US912") {
+                        let http = reqwest::Client::new();
+                        match wealthfolio_market_data::provider::us_treasury_calc::UsTreasuryCalcProvider::fetch_bond_details(&http, isin).await {
+                            Some(details) => {
+                                let spec = super::assets_model::BondSpec {
+                                    isin: Some(isin.to_string()),
+                                    coupon_rate: Some(details.coupon_rate),
+                                    maturity_date: Some(details.maturity_date),
+                                    face_value: Some(details.face_value),
+                                    coupon_frequency: Some(details.coupon_frequency),
+                                };
+                                let meta = updated_metadata.get_or_insert_with(|| serde_json::json!({}));
+                                if let Some(obj) = meta.as_object_mut() {
+                                    obj.insert("bond".to_string(), serde_json::json!(spec));
+                                }
+                                info!("Enriched bond {} with Treasury details: maturity={}, coupon={}", asset_id, details.maturity_date, details.coupon_rate);
+                            }
+                            None => {
+                                debug!("Could not fetch Treasury bond details for {}", isin);
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         let effective_instrument_type = updated_instrument_type
             .clone()
@@ -768,6 +826,7 @@ impl AssetServiceTrait for AssetService {
         if let Some(taxonomy_service) = &self.taxonomy_service {
             let classification_input = ClassificationInput::from_provider_profile(
                 provider_profile.asset_type.as_deref(),
+                updated_asset.name.as_deref(),
                 None,
                 provider_profile.sectors.as_deref(),
                 None,
@@ -862,11 +921,6 @@ impl AssetServiceTrait for AssetService {
                 }
             }
         }
-
-        info!(
-            "Asset enrichment complete: {} enriched, {} skipped, {} failed",
-            enriched_count, skipped_count, failed_count
-        );
 
         Ok((enriched_count, skipped_count, failed_count))
     }
@@ -1193,7 +1247,28 @@ impl AssetServiceTrait for AssetService {
 
         let created_ids: Vec<String> = created_ids.into_iter().collect();
 
-        // 4. Emit batch event for created assets
+        // 4. Auto-classify newly created assets (instrument_type + asset_class)
+        if !created_ids.is_empty() {
+            let created_set: HashSet<&str> = created_ids.iter().map(|id| id.as_str()).collect();
+            for (spec, _) in &specs_for_create {
+                let asset_id = spec.id.as_deref().or_else(|| {
+                    spec.instrument_key().and_then(|key| {
+                        assets_map
+                            .values()
+                            .find(|a| a.instrument_key.as_deref() == Some(key.as_str()))
+                            .map(|a| a.id.as_str())
+                    })
+                });
+                if let Some(id) = asset_id {
+                    if created_set.contains(id) {
+                        self.classify_new_asset(id, spec.instrument_type.as_ref(), &spec.kind)
+                            .await;
+                    }
+                }
+            }
+        }
+
+        // 5. Emit batch event for created assets
         if !created_ids.is_empty() {
             self.event_sink
                 .emit(DomainEvent::assets_created(created_ids.clone()));

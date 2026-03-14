@@ -1,7 +1,7 @@
 use crate::commands::device_sync::clear_min_snapshot_created_at_from_store;
 use crate::context::ServiceContext;
 use crate::secret_store::KeyringSecretStore;
-use log::{error, info};
+use log::{debug, error};
 use serde::Serialize;
 use std::sync::Arc;
 use tauri::State;
@@ -21,13 +21,11 @@ pub async fn store_sync_session(
         return Err("Access token cannot be empty".to_string());
     }
 
-    info!("Attempting to store sync session in keyring...");
-
     if let Err(e) = KeyringSecretStore.set_secret(SYNC_ACCESS_TOKEN_KEY, &access_token) {
         error!("Failed to store access token in keyring: {}", e);
         return Err(format!("Failed to store access token: {}", e));
     }
-    info!("Access token stored successfully");
+    debug!("Access token stored successfully");
 
     match refresh_token.as_deref().map(str::trim) {
         Some(token) if !token.is_empty() => {
@@ -35,7 +33,7 @@ pub async fn store_sync_session(
                 error!("Failed to store refresh token in keyring: {}", e);
                 return Err(format!("Failed to store refresh token: {}", e));
             }
-            info!("Refresh token stored successfully");
+            debug!("Refresh token stored successfully");
         }
         _ => {
             if let Err(e) = KeyringSecretStore.delete_secret(SYNC_REFRESH_TOKEN_KEY) {
@@ -45,7 +43,6 @@ pub async fn store_sync_session(
         }
     }
 
-    info!("Sync session stored successfully in keyring");
     state.connect_service().clear_cached_token().await;
     Ok(())
 }
@@ -69,9 +66,13 @@ pub async fn clear_sync_session(state: State<'_, Arc<ServiceContext>>) -> Result
 
     state.connect_service().clear_cached_token().await;
     clear_min_snapshot_created_at_from_store();
+    let _ = state
+        .app_sync_repository()
+        .clear_all_min_snapshot_created_at()
+        .await;
 
     if errors.is_empty() {
-        info!("Sync session cleared from keyring");
+        debug!("Sync session cleared from keyring");
         Ok(())
     } else {
         Err(format!(

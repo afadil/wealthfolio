@@ -48,7 +48,17 @@
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   /* Disable default colors to prevent their use; feel free to re-enable as needed. */
-  --color-amber-*: initial;
+  --color-amber-50: #fef3c7;
+  --color-amber-100: #fde68a;
+  --color-amber-200: #fcd34d;
+  --color-amber-300: #fbbf24;
+  --color-amber-400: #f59e0b;
+  --color-amber-500: #d97706;
+  --color-amber-600: #b45309;
+  --color-amber-700: #92400e;
+  --color-amber-800: #78350f;
+  --color-amber-900: #451a03;
+  --color-amber-950: #291000;
   --color-lime-*: initial;
   --color-emerald-*: initial;
   --color-teal-*: initial;
@@ -378,7 +388,7 @@
   --foreground: hsl(var(--flexoki-tx));
   --card: hsl(var(--flexoki-bg-2));
   --card-foreground: hsl(var(--flexoki-tx));
-  --popover: hsl(var(--flexoki-bg));
+  --popover: hsl(var(--flexoki-bg-2));
   --popover-foreground: hsl(var(--flexoki-tx));
   --primary: hsl(var(--flexoki-tx));
   --primary-foreground: hsl(var(--flexoki-bg));
@@ -479,7 +489,7 @@
   --toast-fg: hsl(var(--flexoki-tx));
   --toast-border: hsl(var(--flexoki-ui-2));
   --toast-success-bg: var(--color-green-950);
-  --toast-success-fg: var(--color-green-200);
+  --toast-success-fg: var(--color-green-100);
   --toast-success-border: var(--color-green-800);
   --toast-error-bg: var(--color-red-950);
   --toast-error-fg: var(--color-red-200);
@@ -490,6 +500,8 @@
   --toast-info-bg: var(--color-blue-950);
   --toast-info-fg: var(--color-blue-200);
   --toast-info-border: var(--color-blue-800);
+
+  --input: hsl(var(--flexoki-ui-2));
 }
 
 @layer base {
@@ -536,6 +548,66 @@
 
 [data-sonner-toaster] {
   z-index: 2147483647 !important;
+}
+
+/* Per-type toast colors — override Sonner's --normal-* variables */
+[data-sonner-toast][data-type="success"] {
+  --normal-bg: var(--toast-success-bg);
+  --normal-text: var(--toast-success-fg);
+  --normal-border: var(--toast-success-border);
+}
+[data-sonner-toast][data-type="success"] [data-description] {
+  color: var(--toast-success-fg) !important;
+}
+
+[data-sonner-toast][data-type="error"] {
+  --normal-bg: var(--toast-error-bg);
+  --normal-text: var(--toast-error-fg);
+  --normal-border: var(--toast-error-border);
+}
+[data-sonner-toast][data-type="error"] [data-description] {
+  color: var(--toast-error-fg) !important;
+}
+
+[data-sonner-toast][data-type="warning"] {
+  --normal-bg: var(--toast-warning-bg);
+  --normal-text: var(--toast-warning-fg);
+  --normal-border: var(--toast-warning-border);
+}
+[data-sonner-toast][data-type="warning"] [data-description] {
+  color: var(--toast-warning-fg) !important;
+}
+
+[data-sonner-toast][data-type="info"] {
+  --normal-bg: var(--toast-info-bg);
+  --normal-text: var(--toast-info-fg);
+  --normal-border: var(--toast-info-border);
+}
+[data-sonner-toast][data-type="info"] [data-description] {
+  color: var(--toast-info-fg) !important;
+}
+
+/* Mobile: glassy translucent backgrounds for typed toasts */
+@media (width < 768px) {
+  [data-sonner-toast][data-type="success"] {
+    --normal-bg: color-mix(in srgb, var(--toast-success-bg) 70%, transparent);
+    --normal-border: color-mix(in srgb, var(--toast-success-border) 50%, transparent);
+  }
+
+  [data-sonner-toast][data-type="error"] {
+    --normal-bg: color-mix(in srgb, var(--toast-error-bg) 70%, transparent);
+    --normal-border: color-mix(in srgb, var(--toast-error-border) 50%, transparent);
+  }
+
+  [data-sonner-toast][data-type="warning"] {
+    --normal-bg: color-mix(in srgb, var(--toast-warning-bg) 70%, transparent);
+    --normal-border: color-mix(in srgb, var(--toast-warning-border) 50%, transparent);
+  }
+
+  [data-sonner-toast][data-type="info"] {
+    --normal-bg: color-mix(in srgb, var(--toast-info-bg) 70%, transparent);
+    --normal-border: color-mix(in srgb, var(--toast-info-border) 50%, transparent);
+  }
 }
 
 /* QR scanning transparency overrides */

@@ -189,12 +189,12 @@ export interface Activity {
   settlementDate?: string;
 
   // Quantities (strings to preserve decimal precision)
-  quantity?: string;
-  unitPrice?: string;
-  amount?: string;
-  fee?: string;
+  quantity?: string | null;
+  unitPrice?: string | null;
+  amount?: string | null;
+  fee?: string | null;
   currency: string;
-  fxRate?: string;
+  fxRate?: string | null;
 
   // Metadata
   notes?: string;
@@ -350,17 +350,26 @@ export interface ActivityImport {
   activityType: ActivityType;
   subtype?: string;
   date?: Date | string;
-  symbol: string;
-  amount?: number;
-  quantity?: number;
-  unitPrice?: number;
-  fee?: number;
-  fxRate?: number;
+  symbol?: string;
+  amount?: number | string | null;
+  quantity?: number | string | null;
+  unitPrice?: number | string | null;
+  fee?: number | string | null;
+  fxRate?: number | string | null;
   accountName?: string;
   symbolName?: string;
   /** Resolved exchange MIC for the symbol (populated during validation) */
   exchangeMic?: string;
+  /** Resolved quote currency hint (e.g., GBp) */
+  quoteCcy?: string;
+  /** Resolved instrument type hint (e.g., EQUITY, CRYPTO) */
+  instrumentType?: string;
+  /** Resolved quote mode hint (e.g., MANUAL, MARKET) */
+  quoteMode?: string;
   errors?: Record<string, string[]>;
+  warnings?: Record<string, string[]>;
+  duplicateOfId?: string;
+  duplicateOfLineNumber?: number;
   isValid: boolean;
   lineNumber?: number;
   isDraft: boolean;
@@ -880,4 +889,63 @@ export interface BrokerSyncState {
   syncStatus: SyncStatus;
   createdAt: string;
   updatedAt: string;
+}
+
+// ============================================================================
+// Snapshot Types
+// ============================================================================
+
+export interface SnapshotInfo {
+  id: string;
+  snapshotDate: string;
+  source: string;
+  positionCount: number;
+  cashCurrencyCount: number;
+}
+
+export interface SnapshotHoldingInput {
+  assetId?: string;
+  symbol: string;
+  quantity: string;
+  currency: string;
+  averageCost?: string;
+  exchangeMic?: string;
+  name?: string;
+  dataSource?: string;
+  assetKind?: string;
+}
+
+export interface SnapshotPositionInput {
+  symbol: string;
+  quantity: string;
+  avgCost?: string;
+  currency: string;
+  exchangeMic?: string;
+}
+
+export interface SnapshotInput {
+  date: string;
+  positions: SnapshotPositionInput[];
+  cashBalances: Record<string, string>;
+}
+
+export interface SnapshotSymbolCheckResult {
+  symbol: string;
+  found: boolean;
+  assetName?: string;
+  assetId?: string;
+  currency?: string;
+  exchangeMic?: string;
+}
+
+export interface CheckSnapshotImportResult {
+  existingDates: string[];
+  symbols: SnapshotSymbolCheckResult[];
+  validationErrors: string[];
+}
+
+export interface SnapshotImportResult {
+  snapshotsImported: number;
+  snapshotsFailed: number;
+  errors: string[];
 }

@@ -76,6 +76,18 @@ pub async fn sync_broker_data(
     app: AppHandle,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<(), String> {
+    // Check plan entitlement before starting sync
+    match state.connect_service().has_broker_sync().await {
+        Ok(true) => {}
+        Ok(false) => {
+            info!("[Connect] Broker sync skipped: plan does not include broker sync");
+            return Err("Plan does not include broker sync".to_string());
+        }
+        Err(e) => {
+            return Err(format!("Could not verify broker sync entitlement: {}", e));
+        }
+    }
+
     info!("[Connect] Starting broker data sync ...");
 
     // Clone what we need for the spawned task
@@ -222,7 +234,7 @@ pub async fn get_subscription_plans(
 /// Get subscription plans from the cloud API (public, no authentication required)
 #[tauri::command]
 pub async fn get_subscription_plans_public() -> Result<PlansResponse, String> {
-    info!("Fetching subscription plans from cloud API (public)...");
+    debug!("Fetching subscription plans from cloud API (public)...");
 
     let base_url = crate::services::cloud_api_base_url().ok_or_else(|| {
         "Cloud API base URL is unavailable. Connect API operations are disabled.".to_string()
@@ -230,7 +242,7 @@ pub async fn get_subscription_plans_public() -> Result<PlansResponse, String> {
 
     match fetch_subscription_plans_public(&base_url).await {
         Ok(response) => {
-            info!("Found {} subscription plans (public)", response.plans.len());
+            debug!("Found {} subscription plans (public)", response.plans.len());
             Ok(response)
         }
         Err(e) => {
@@ -245,7 +257,14 @@ pub async fn get_subscription_plans_public() -> Result<PlansResponse, String> {
 pub async fn get_user_info(state: State<'_, Arc<ServiceContext>>) -> Result<UserInfo, String> {
     debug!("Fetching user info from cloud API...");
 
-    let client = state.connect_service().get_api_client().await?;
+    let client = state
+        .connect_service()
+        .get_api_client()
+        .await
+        .map_err(|e| {
+            error!("Failed to get API client for user info: {}", e);
+            e
+        })?;
     match client.get_user_info().await {
         Ok(user_info) => Ok(user_info),
         Err(e) => {

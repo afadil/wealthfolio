@@ -25,7 +25,6 @@ const Toaster = ({ ...props }: ToasterProps) => {
       position={isMobile ? "top-center" : undefined}
       className="toaster group"
       expand={true}
-      richColors
       icons={{
         success: <Icons.CheckCircle className="size-4" />,
         info: <Icons.Info className="size-4" />,
@@ -36,28 +35,31 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }}
       toastOptions={{
         classNames: {
-          closeButton: "!absolute !top-2 !right-2 !left-auto !transform-none !border-none",
+          toast:
+            (isMobile
+              ? "!backdrop-blur-[20px] !backdrop-saturate-[1.8] !rounded-2xl !shadow-[0_2px_16px_rgba(0,0,0,0.08)] dark:!shadow-[0_2px_20px_rgba(0,0,0,0.3)] !py-3 !px-4"
+              : "") + " !pr-8",
+          title: isMobile ? "!text-sm !font-semibold" : undefined,
+          description: isMobile ? "!text-[0.8125rem] !leading-tight" : undefined,
+          actionButton: isMobile
+            ? "!bg-transparent !border-none !p-0 !font-semibold !text-[0.8125rem] !underline !underline-offset-2"
+            : undefined,
+          closeButton:
+            "!absolute !top-2 !right-2 !left-auto !transform-none !border-none" +
+            (isMobile ? " !bg-transparent" : ""),
         },
       }}
       style={
         {
           zIndex: 2147483647,
-          "--normal-bg": "var(--toast-bg)",
+          "--normal-bg": isMobile
+            ? "color-mix(in srgb, var(--toast-bg) 70%, transparent)"
+            : "var(--toast-bg)",
           "--normal-text": "var(--toast-fg)",
-          "--normal-border": "var(--toast-border)",
-          "--border-radius": "var(--radius)",
-          "--success-bg": "var(--toast-success-bg)",
-          "--success-text": "var(--toast-success-fg)",
-          "--success-border": "var(--toast-success-border)",
-          "--error-bg": "var(--toast-error-bg)",
-          "--error-text": "var(--toast-error-fg)",
-          "--error-border": "var(--toast-error-border)",
-          "--warning-bg": "var(--toast-warning-bg)",
-          "--warning-text": "var(--toast-warning-fg)",
-          "--warning-border": "var(--toast-warning-border)",
-          "--info-bg": "var(--toast-info-bg)",
-          "--info-text": "var(--toast-info-fg)",
-          "--info-border": "var(--toast-info-border)",
+          "--normal-border": isMobile
+            ? "color-mix(in srgb, var(--toast-border) 50%, transparent)"
+            : "var(--toast-border)",
+          "--border-radius": isMobile ? "1rem" : "var(--radius)",
         } as React.CSSProperties
       }
       {...props}

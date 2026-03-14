@@ -1,6 +1,7 @@
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { parseOccSymbol } from "@/lib/occ-symbol";
 import { Account, Holding } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { AmountDisplay, GainPercent, Input, Separator } from "@wealthfolio/ui";
@@ -27,6 +28,7 @@ interface HoldingsTableMobileProps {
   setSortBy?: (value: "symbol" | "marketValue") => void;
   showTotalReturn?: boolean;
   setShowTotalReturn?: (value: boolean) => void;
+  typeOptions?: { value: string; label: string }[];
 }
 
 export const HoldingsTableMobile = ({
@@ -44,6 +46,7 @@ export const HoldingsTableMobile = ({
   setSortBy: controlledSetSortBy,
   showTotalReturn: controlledShowTotalReturn,
   setShowTotalReturn: controlledSetShowTotalReturn,
+  typeOptions,
 }: HoldingsTableMobileProps) => {
   const { isBalanceHidden } = useBalancePrivacy();
   const navigate = useNavigate();
@@ -158,8 +161,16 @@ export const HoldingsTableMobile = ({
           filteredHoldings.map((holding) => {
             const symbol = holding.instrument?.symbol ?? holding.id;
             const isCash = symbol.startsWith("$CASH");
-            const avatarSymbol = isCash ? "$CASH" : symbol;
-            const displaySymbol = isCash ? symbol.split("-")[0] : symbol;
+            const parsedOption = isCash ? null : parseOccSymbol(symbol);
+            const avatarSymbol = isCash ? "$CASH" : parsedOption ? parsedOption.underlying : symbol;
+            const displaySymbol = isCash
+              ? symbol.split("-")[0]
+              : parsedOption
+                ? parsedOption.underlying
+                : symbol;
+            const subtitle = parsedOption
+              ? `${new Date(parsedOption.expiration + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} $${parsedOption.strikePrice} ${parsedOption.optionType}`
+              : (holding.instrument?.name ?? null);
             const isNavigable = !isCash && holding.instrument?.symbol;
 
             return (
@@ -176,10 +187,8 @@ export const HoldingsTableMobile = ({
                     <TickerAvatar symbol={avatarSymbol} className="h-10 w-10" />
                     <div className="flex-1 overflow-hidden">
                       <p className="truncate font-semibold">{displaySymbol}</p>
-                      {holding.instrument?.name && (
-                        <p className="text-muted-foreground truncate text-sm">
-                          {holding.instrument.name}
-                        </p>
+                      {subtitle && (
+                        <p className="text-muted-foreground truncate text-sm">{subtitle}</p>
                       )}
                     </div>
                   </div>
@@ -243,6 +252,7 @@ export const HoldingsTableMobile = ({
         setSortBy={setSortBy}
         showTotalReturn={showTotalReturn}
         setShowTotalReturn={setShowTotalReturn}
+        typeOptions={typeOptions}
       />
     </div>
   );

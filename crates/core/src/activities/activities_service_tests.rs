@@ -554,6 +554,10 @@ mod tests {
             Ok(vec![])
         }
 
+        async fn reset_sync_errors(&self, _asset_ids: &[String]) -> Result<()> {
+            Ok(())
+        }
+
         async fn get_providers_info(&self) -> Result<Vec<ProviderInfo>> {
             Ok(vec![])
         }

@@ -163,6 +163,20 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     riskLevel: 'high',
   },
   {
+    id: 'snapshots',
+    name: 'Snapshot Management',
+    description: 'Access to holdings snapshots for accounts with holdings tracking mode',
+    functions: [
+      'getAll',
+      'getByDate',
+      'save',
+      'checkImport',
+      'importSnapshots',
+      'delete',
+    ],
+    riskLevel: 'high',
+  },
+  {
     id: 'events',
     name: 'Event Listeners',
     description: 'Access to application events and notifications',

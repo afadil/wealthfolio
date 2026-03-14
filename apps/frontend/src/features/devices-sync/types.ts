@@ -14,14 +14,7 @@ export type DevicePlatform =
   | "server";
 export type PairingRole = "issuer" | "claimer";
 export type PairingStatus = "open" | "claimed" | "approved" | "completed" | "cancelled" | "expired";
-export type KeyState = "ACTIVE" | "PENDING";
 export type EnrollmentMode = "BOOTSTRAP" | "PAIR" | "READY";
-export type BootstrapAction =
-  | "PULL_REMOTE_OVERWRITE"
-  | "NO_REMOTE_PULL"
-  | "WAIT_REMOTE_SNAPSHOT"
-  | "NO_BOOTSTRAP";
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Device Sync State Machine
 // ─────────────────────────────────────────────────────────────────────────────
@@ -64,9 +57,9 @@ export interface SyncIdentity {
   rootKey?: string;
   /** E2EE key version (epoch) */
   keyVersion?: number;
-  /** Device Ed25519 secret key (base64 encoded) */
+  /** Device X25519 secret key (base64 encoded) */
   deviceSecretKey?: string;
-  /** Device Ed25519 public key (base64 encoded) */
+  /** Device X25519 public key (base64 encoded) */
   devicePublicKey?: string;
 }
 
@@ -107,15 +100,6 @@ export interface Device {
   isCurrent?: boolean;
 }
 
-// Device registration request
-export interface RegisterDeviceRequest {
-  displayName: string;
-  platform: string;
-  deviceNonce: string;
-  osVersion?: string;
-  appVersion?: string;
-}
-
 // Summary of a trusted device (used in PAIR mode response)
 export interface TrustedDeviceSummary {
   id: string;
@@ -138,12 +122,6 @@ export type EnrollDeviceResponse =
     }
   | { mode: "READY"; device_id: string; e2ee_key_version: number; trust_state: TrustState };
 
-// Device update request
-export interface UpdateDeviceRequest {
-  displayName?: string;
-  metadata?: Record<string, unknown>;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Team Keys Types (E2EE)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -160,49 +138,6 @@ export type InitializeKeysResult =
       trusted_devices: TrustedDeviceSummary[];
     }
   | { mode: "READY"; e2ee_key_version: number };
-
-// Request to commit team key initialization (Phase 2)
-export interface CommitInitializeKeysRequest {
-  deviceId: string;
-  keyVersion: number;
-  deviceKeyEnvelope: string;
-  signature: string;
-  challengeResponse?: string;
-  recoveryEnvelope?: string;
-}
-
-// Response from committing team key initialization
-export interface CommitInitializeKeysResponse {
-  success: boolean;
-  keyState: KeyState;
-}
-
-// Response from starting key rotation (Phase 1)
-export interface RotateKeysResponse {
-  challenge: string;
-  nonce: string;
-  newKeyVersion: number;
-}
-
-// Envelope for a device during key rotation
-export interface DeviceKeyEnvelope {
-  deviceId: string;
-  deviceKeyEnvelope: string;
-}
-
-// Request to commit key rotation (Phase 2)
-export interface CommitRotateKeysRequest {
-  newKeyVersion: number;
-  envelopes: DeviceKeyEnvelope[];
-  signature: string;
-  challengeResponse?: string;
-}
-
-// Response from committing key rotation
-export interface CommitRotateKeysResponse {
-  success: boolean;
-  keyVersion: number;
-}
 
 // Response from resetting team sync
 export interface ResetTeamSyncResponse {
@@ -318,15 +253,6 @@ export interface PairingSession {
   requireSas: boolean;
 }
 
-// Pairing claim result (claimer side - for new device joining via QR code)
-export interface ClaimResult {
-  pairingId: string;
-  issuerPublicKey: string; // base64
-  sessionKey: string; // base64
-  requireSas: boolean;
-  expiresAt: Date;
-}
-
 // Claimer session state (for new device being paired)
 export interface ClaimerSession {
   pairingId: string;
@@ -342,120 +268,6 @@ export interface ClaimerSession {
   /** Server timestamp when RK bundle was generated; used as snapshot freshness gate. */
   keyBundleCreatedAt?: string;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sync State (Provider State)
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Sync state managed by the DeviceSyncProvider.
- * Uses the state machine model for clear state transitions.
- */
-export interface SyncState {
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Core State Machine
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  /** Current device sync state */
-  syncState: DeviceSyncState;
-
-  /** Whether state detection is in progress */
-  isDetecting: boolean;
-
-  /** Whether an operation is in progress (enable, pairing, etc.) */
-  isLoading: boolean;
-
-  /** Current error (if any) */
-  error: SyncError | null;
-
-  /** Snapshot bootstrap status (desktop-only). */
-  bootstrapStatus: "idle" | "running" | "success" | "error";
-
-  /** Last bootstrap status message from backend. */
-  bootstrapMessage: string | null;
-
-  /** Last snapshot ID applied/requested by bootstrap flow. */
-  bootstrapSnapshotId: string | null;
-
-  /** Latest sync engine telemetry (desktop runtime). */
-  engineStatus: {
-    cursor: number;
-    lastPushAt: string | null;
-    lastPullAt: string | null;
-    lastError: string | null;
-    consecutiveFailures: number;
-    nextRetryAt: string | null;
-    lastCycleStatus: string | null;
-    lastCycleDurationMs: number | null;
-    backgroundRunning: boolean;
-    bootstrapRequired: boolean;
-  } | null;
-
-  /** Pending overwrite guard before applying remote bootstrap snapshot. */
-  bootstrapOverwriteRisk: {
-    localRows: number;
-    nonEmptyTables: { table: string; rows: number }[];
-  } | null;
-
-  /** Server-authoritative bootstrap action for the current reconcile pass. */
-  bootstrapAction: BootstrapAction | null;
-
-  /** Whether a remote seed exists after pairing complete/confirm. */
-  remoteSeedPresent: boolean | null;
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Identity & Device
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  /** Sync identity from keychain */
-  identity: SyncIdentity | null;
-
-  /** Device info from server (populated in READY state) */
-  device: Device | null;
-
-  /** Server's E2EE key version (for stale detection) */
-  serverKeyVersion: number | null;
-
-  /** Trusted devices for pairing (in REGISTERED/PAIR mode) */
-  trustedDevices: TrustedDeviceSummary[];
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Pairing State
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  /** Current pairing role (if in pairing flow) */
-  pairingRole: PairingRole | null;
-
-  /** Pairing session state (issuer side) */
-  pairingSession: PairingSession | null;
-
-  /** Claimer session state (claimer side) */
-  claimerSession: ClaimerSession | null;
-}
-
-/**
- * Initial sync state - used when provider mounts.
- */
-export const INITIAL_SYNC_STATE: SyncState = {
-  syncState: SyncStates.FRESH,
-  isDetecting: true,
-  isLoading: false,
-  error: null,
-  bootstrapStatus: "idle",
-  bootstrapMessage: null,
-  bootstrapSnapshotId: null,
-  engineStatus: null,
-  bootstrapOverwriteRisk: null,
-  bootstrapAction: null,
-  remoteSeedPresent: null,
-  identity: null,
-  device: null,
-  serverKeyVersion: null,
-  trustedDevices: [],
-  pairingRole: null,
-  pairingSession: null,
-  claimerSession: null,
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Error Handling
@@ -484,6 +296,8 @@ export const SyncErrorCodes = {
   PAIRING_ENDED: "PAIRING_ENDED",
   PAIRING_EXPIRED: "PAIRING_EXPIRED",
   CLAIMER_NOT_FOUND: "CLAIMER_NOT_FOUND",
+  SNAPSHOT_FAILED: "SNAPSHOT_FAILED",
+  SOURCE_RESTORE_REQUIRED: "SOURCE_RESTORE_REQUIRED",
 
   // General errors
   INIT_FAILED: "INIT_FAILED",
@@ -525,6 +339,9 @@ export class SyncError extends Error {
     }
     if (SyncError.isKeysAlreadyInitialized(error)) {
       return new SyncError(SyncErrorCodes.KEYS_ALREADY_INITIALIZED, message, true);
+    }
+    if (SyncError.isSourceRestoreRequired(error)) {
+      return new SyncError(SyncErrorCodes.SOURCE_RESTORE_REQUIRED, message, false);
     }
 
     return new SyncError(defaultCode, message, true);
@@ -604,12 +421,30 @@ export class SyncError extends Error {
     return false;
   }
 
+  static isSourceRestoreRequired(error: unknown): boolean {
+    if (error instanceof SyncError) {
+      return error.code === SyncErrorCodes.SOURCE_RESTORE_REQUIRED;
+    }
+    if (error instanceof Error) {
+      const msg = error.message.toLowerCase();
+      return (
+        msg.includes("sync_source_restore_required") ||
+        (msg.includes("restore sync") && msg.includes("connect another device"))
+      );
+    }
+    return false;
+  }
+
   /**
    * Check if this error indicates the device needs recovery.
    * This happens when the device ID exists locally but not on the server.
    */
   static needsRecovery(error: unknown): boolean {
     return SyncError.isDeviceNotFound(error) || SyncError.isDeviceRevoked(error);
+  }
+
+  static needsSourceRestore(error: unknown): boolean {
+    return SyncError.isSourceRestoreRequired(error);
   }
 }
 

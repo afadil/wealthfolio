@@ -311,6 +311,7 @@ pub(super) async fn run_sync_cycle(
         needs_bootstrap: result.needs_bootstrap,
         bootstrap_snapshot_id: result.bootstrap_snapshot_id,
         bootstrap_snapshot_seq: result.bootstrap_snapshot_seq,
+        dead_letter_count: result.dead_letter_count,
     })
 }
 

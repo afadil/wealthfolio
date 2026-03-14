@@ -88,6 +88,11 @@ export const syncHashPairingCode = async (code: string): Promise<string> => {
   return response.value;
 };
 
+export const syncHmacSha256 = async (key: string, data: string): Promise<string> => {
+  const response = await cryptoPost<StringResponse>("hmac-sha256", { key, data });
+  return response.value;
+};
+
 export const syncComputeSas = async (sharedSecret: string): Promise<string> => {
   const response = await cryptoPost<StringResponse>("compute-sas", { sharedSecret });
   return response.value;

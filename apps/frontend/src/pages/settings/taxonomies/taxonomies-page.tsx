@@ -95,21 +95,23 @@ export default function TaxonomiesPage() {
             setSelectedCategoryId(null);
           }}
         >
-          <TabsList className="w-full justify-start gap-2">
-            {taxonomies.map((taxonomy) => (
-              <TabsTrigger
-                key={taxonomy.id}
-                value={taxonomy.id}
-                className="flex items-center gap-2"
-              >
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: taxonomy.color }}
-                />
-                <span>{taxonomy.name.replace(" (GICS)", "")}</span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
+          <div className="overflow-x-auto [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <TabsList className="inline-flex w-max justify-start gap-2">
+              {taxonomies.map((taxonomy) => (
+                <TabsTrigger
+                  key={taxonomy.id}
+                  value={taxonomy.id}
+                  className="flex shrink-0 items-center gap-2"
+                >
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: taxonomy.color }}
+                  />
+                  <span>{taxonomy.name.replace(" (GICS)", "")}</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
         </Tabs>
       )}
 

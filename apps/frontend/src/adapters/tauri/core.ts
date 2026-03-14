@@ -26,12 +26,20 @@ export const logger: Logger = {
   },
 };
 
+const INVOKE_TIMEOUT_MS = 120_000;
+
 /**
  * Invoke a Tauri command (internal - use typed adapter functions instead)
  */
 export const invoke = async <T>(command: string, payload?: Record<string, unknown>): Promise<T> => {
   try {
-    return await tauriInvoke<T>(command, payload);
+    const result = await Promise.race([
+      tauriInvoke<T>(command, payload),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`Command "${command}" timed out`)), INVOKE_TIMEOUT_MS),
+      ),
+    ]);
+    return result;
   } catch (err) {
     logger.error(`[Invoke] Command "${command}" failed: ${err}`);
     throw err;

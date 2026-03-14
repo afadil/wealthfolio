@@ -454,7 +454,8 @@ export function parseDecimalInput(value: string | number, precision = DECIMAL_PR
  * the components and constructing a local Date directly.
  */
 export function parseLocalDate(dateStr: string): Date {
-  const [year, month, day] = dateStr.split("-").map(Number);
+  const [datePart] = dateStr.split("T");
+  const [year, month, day] = datePart.split("-").map(Number);
   return new Date(year, month - 1, day);
 }
 
