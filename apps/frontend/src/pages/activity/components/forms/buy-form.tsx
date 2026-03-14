@@ -312,6 +312,7 @@ export function BuyForm({
                 currencyName="currency"
                 exchangeMicName="exchangeMic"
                 quoteCcyName="symbolQuoteCcy"
+                unitPriceName="unitPrice"
               />
             ) : (
               <>

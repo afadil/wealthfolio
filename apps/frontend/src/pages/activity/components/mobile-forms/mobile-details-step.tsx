@@ -368,6 +368,7 @@ export function MobileDetailsStep({ accounts, activityType, isEditing }: MobileD
                 currencyName="currency"
                 exchangeMicName={"exchangeMic" as any}
                 quoteCcyName={"symbolQuoteCcy" as any}
+                unitPriceName={"unitPrice" as any}
               />
             ) : (
               <SymbolSearch
