@@ -27,6 +27,11 @@ interface AssetDetail {
     close: number;
     adjclose: number;
   } | null;
+  bondSpec?: {
+    maturityDate?: string | null;
+    couponRate?: number | null;
+    couponFrequency?: string | null;
+  } | null;
   className?: string;
 }
 
@@ -51,6 +56,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
     currency,
     quoteCurrency,
     quote,
+    bondSpec,
   } = assetData;
 
   const holdingRows = [
@@ -185,6 +191,41 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
                   </span>
                 </div>
               </div>
+            </div>
+          </>
+        )}
+
+        {bondSpec && (
+          <>
+            <Separator className="my-4" />
+            <div className="space-y-3 text-sm">
+              {bondSpec.couponRate != null && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Coupon</span>
+                  <span className="font-medium">
+                    {bondSpec.couponFrequency === "ZERO"
+                      ? "Zero coupon"
+                      : `${(bondSpec.couponRate * 100).toFixed(3)}%`}
+                    {bondSpec.couponFrequency && bondSpec.couponFrequency !== "ZERO" && (
+                      <span className="text-muted-foreground ml-1">
+                        ({bondSpec.couponFrequency.replace("_", " ").toLowerCase()})
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )}
+              {bondSpec.maturityDate && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Maturity</span>
+                  <span className="font-medium">
+                    {new Date(bondSpec.maturityDate + "T00:00:00").toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </span>
+                </div>
+              )}
             </div>
           </>
         )}

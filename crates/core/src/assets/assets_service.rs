@@ -826,6 +826,7 @@ impl AssetServiceTrait for AssetService {
         if let Some(taxonomy_service) = &self.taxonomy_service {
             let classification_input = ClassificationInput::from_provider_profile(
                 provider_profile.asset_type.as_deref(),
+                updated_asset.name.as_deref(),
                 None,
                 provider_profile.sectors.as_deref(),
                 None,

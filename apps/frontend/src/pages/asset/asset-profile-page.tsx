@@ -85,6 +85,11 @@ interface AssetDetailData {
     close: number;
     adjclose: number;
   } | null;
+  bondSpec?: {
+    maturityDate?: string | null;
+    couponRate?: number | null;
+    couponFrequency?: string | null;
+  } | null;
 }
 
 type AssetTab = "overview" | "lots" | "history";
@@ -298,6 +303,20 @@ export const AssetProfilePage = () => {
     return quoteHistory?.at(0) ?? null;
   }, [quoteHistory]);
 
+  // Bond metadata for display (only when asset is a bond)
+  const bondSpec = useMemo(() => {
+    if (assetProfile?.instrumentType !== "BOND" || !assetProfile?.metadata) return null;
+    const bond = assetProfile.metadata.bond as
+      | {
+          maturityDate?: string | null;
+          couponRate?: number | null;
+          couponFrequency?: string | null;
+        }
+      | undefined;
+    if (!bond || (!bond.maturityDate && bond.couponRate == null)) return null;
+    return bond;
+  }, [assetProfile]);
+
   const { saveQuoteMutation, deleteQuoteMutation } = useQuoteMutations(assetId);
   const syncMarketDataMutation = useSyncMarketDataMutation(true);
 
@@ -398,8 +417,9 @@ export const AssetProfilePage = () => {
       currency: holding.localCurrency ?? holding.instrument?.currency ?? baseCurrency,
       quoteCurrency: quoteData?.quoteCurrency ?? null,
       quote: quoteData?.quote ?? null,
+      bondSpec: bondSpec ?? null,
     };
-  }, [holding, quote]);
+  }, [holding, quote, bondSpec]);
 
   // Build toggle items dynamically based on available data
   const toggleItems = useMemo(() => {
