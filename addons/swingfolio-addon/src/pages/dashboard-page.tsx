@@ -373,7 +373,10 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
               </span>
             </CardHeader>
             <CardContent className="px-2 sm:px-6">
-              <OpenTradesTable positions={openPositions} />
+              <OpenTradesTable
+                positions={openPositions}
+                onAssetClick={(assetId) => ctx.api.navigation.navigate(`/holdings/${assetId}`)}
+              />
             </CardContent>
           </Card>
 

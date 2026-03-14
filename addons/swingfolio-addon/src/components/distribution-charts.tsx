@@ -20,7 +20,15 @@ import {
   XAxis,
   YAxis,
 } from "@wealthfolio/ui/chart";
+import { parseOccSymbol, formatOptionDescription } from "../lib/utils";
 import type { TradeDistribution } from "../types";
+
+function formatSymbolLabel(symbol: string): string {
+  const parsed = parseOccSymbol(symbol);
+  if (!parsed) return symbol;
+  const desc = formatOptionDescription(symbol);
+  return `${parsed.underlying} ${desc}`;
+}
 
 interface DistributionChartsProps {
   distribution: TradeDistribution;
@@ -31,7 +39,7 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
   // Prepare data for charts
   const symbolData = Object.entries(distribution.bySymbol)
     .map(([symbol, data]) => ({
-      name: symbol,
+      name: formatSymbolLabel(symbol),
       pl: data.pl,
       count: data.count,
       returnPercent: data.returnPercent,
