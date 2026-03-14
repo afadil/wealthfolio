@@ -334,6 +334,7 @@ export const AssetProfilePage = () => {
 
   const { saveQuoteMutation, deleteQuoteMutation } = useQuoteMutations(assetId);
   const syncMarketDataMutation = useSyncMarketDataMutation(true);
+  const updateMarketDataMutation = useSyncMarketDataMutation(false);
 
   // Determine if manual tracking based on asset's quoteMode
   const isManualPricingMode = assetProfile?.quoteMode === "MANUAL";
@@ -637,10 +638,14 @@ export const AssetProfilePage = () => {
   const isLoading = isHoldingLoading || isQuotesLoading || isAssetProfileLoading;
   const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
 
+  const handleUpdateQuotes = useCallback(() => {
+    if (!profile?.id) return;
+    triggerHaptic();
+    updateMarketDataMutation.mutate([profile.id]);
+  }, [profile?.id, updateMarketDataMutation, triggerHaptic]);
+
   const handleRefreshQuotes = useCallback(() => {
-    if (!profile?.id) {
-      return;
-    }
+    if (!profile?.id) return;
     triggerHaptic();
     syncMarketDataMutation.mutate([profile.id]);
   }, [profile?.id, syncMarketDataMutation, triggerHaptic]);
@@ -704,8 +709,13 @@ export const AssetProfilePage = () => {
                       title: "Manage",
                       items: [
                         {
+                          icon: Icons.Download,
+                          label: "Update Price",
+                          onClick: handleUpdateQuotes,
+                        },
+                        {
                           icon: Icons.Refresh,
-                          label: "Refresh Price",
+                          label: "Refresh History",
                           onClick: handleRefreshQuotesWithConfirm,
                         },
                         {
@@ -914,8 +924,13 @@ export const AssetProfilePage = () => {
                         title: "Manage",
                         items: [
                           {
+                            icon: Icons.Download,
+                            label: "Update Price",
+                            onClick: handleUpdateQuotes,
+                          },
+                          {
                             icon: Icons.Refresh,
-                            label: "Refresh Price",
+                            label: "Refresh History",
                             onClick: handleRefreshQuotesWithConfirm,
                           },
                           {

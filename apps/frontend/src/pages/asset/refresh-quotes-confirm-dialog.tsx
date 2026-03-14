@@ -27,7 +27,7 @@ export function RefreshQuotesConfirmDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Refresh quotes</AlertDialogTitle>
+          <AlertDialogTitle>Refresh history</AlertDialogTitle>
           <AlertDialogDescription>
             This will delete and replace all provider quotes with fresh data
             {assetName ? ` for ${assetName}` : ""}. Manual quotes will be preserved. Continue?
