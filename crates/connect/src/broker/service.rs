@@ -27,13 +27,15 @@ use wealthfolio_core::activities::{
 };
 use wealthfolio_core::assets::{
     build_option_metadata, parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix, AssetKind,
-    AssetServiceTrait, AssetSpec,
+    AssetServiceTrait, AssetSpec, InstrumentType,
 };
 use wealthfolio_core::errors::Result;
 use wealthfolio_core::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use wealthfolio_core::portfolio::snapshot::{
     AccountStateSnapshot, Position, SnapshotRepositoryTrait, SnapshotServiceTrait, SnapshotSource,
 };
+use wealthfolio_core::quotes::model::{DataSource, Quote};
+use wealthfolio_core::quotes::store::QuoteStore;
 use wealthfolio_core::utils::time_utils::valuation_date_today;
 
 const DEFAULT_BROKERAGE_PROVIDER: &str = "snaptrade";
@@ -52,6 +54,7 @@ pub struct BrokerSyncService {
     import_run_repository: Arc<dyn ImportRunRepositoryTrait>,
     snapshot_repository: Arc<dyn SnapshotRepositoryTrait>,
     snapshot_service: Option<Arc<dyn SnapshotServiceTrait>>,
+    quote_store: Option<Arc<dyn QuoteStore>>,
     event_sink: Arc<dyn DomainEventSink>,
 }
 
@@ -77,6 +80,7 @@ impl BrokerSyncService {
             import_run_repository,
             snapshot_repository,
             snapshot_service: None,
+            quote_store: None,
             event_sink: Arc::new(NoOpDomainEventSink),
         }
     }
@@ -87,6 +91,12 @@ impl BrokerSyncService {
         snapshot_service: Arc<dyn SnapshotServiceTrait>,
     ) -> Self {
         self.snapshot_service = Some(snapshot_service);
+        self
+    }
+
+    /// Sets the quote store for saving broker-provided prices as quotes.
+    pub fn with_quote_store(mut self, quote_store: Arc<dyn QuoteStore>) -> Self {
+        self.quote_store = Some(quote_store);
         self
     }
 
@@ -549,7 +559,6 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
         option_positions: Vec<HoldingsOptionPosition>,
     ) -> Result<(HoldingsDiff, usize, Vec<String>)> {
         use std::collections::VecDeque;
-        use wealthfolio_core::assets::InstrumentType;
 
         // Get the account to determine its currency
         let account = self.account_service.get_account(&account_id)?;
@@ -630,11 +639,8 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 .and_then(|c| c.code.clone())
                 .unwrap_or_else(|| account_currency.clone());
 
-            let instrument_type = if is_crypto_asset {
-                InstrumentType::Crypto
-            } else {
-                InstrumentType::Equity
-            };
+            let instrument_type =
+                map_broker_symbol_type(symbol_type_code.as_deref(), is_crypto_asset);
 
             let asset_name = symbol_info.and_then(|s| s.name.clone().or(s.description.clone()));
 
@@ -805,6 +811,60 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             if let Some(ref id) = spec.id {
                 if let Some(asset_id) = key_to_asset_id.get(id) {
                     spec_key_to_asset_id.insert(spec_key.clone(), asset_id.clone());
+                }
+            }
+        }
+
+        // 3b. Create quotes from broker-provided prices
+        if let Some(ref quote_store) = self.quote_store {
+            let today_date = today.format("%Y-%m-%d").to_string();
+            let mut quotes: Vec<Quote> = Vec::new();
+
+            for (spec_key, _quantity, price, _avg_cost, currency) in &position_data {
+                if *price == Decimal::ZERO {
+                    continue;
+                }
+                let asset_id = match spec_key_to_asset_id.get(spec_key) {
+                    Some(id) => id,
+                    None => continue,
+                };
+
+                quotes.push(Quote {
+                    id: format!(
+                        "{}_{}_{}",
+                        asset_id,
+                        today_date,
+                        DataSource::Broker.as_str()
+                    ),
+                    asset_id: asset_id.clone(),
+                    timestamp: now,
+                    open: *price,
+                    high: *price,
+                    low: *price,
+                    close: *price,
+                    adjclose: *price,
+                    volume: Decimal::ZERO,
+                    currency: currency.clone(),
+                    data_source: DataSource::Broker,
+                    created_at: now,
+                    notes: None,
+                });
+            }
+
+            if !quotes.is_empty() {
+                match quote_store.upsert_quotes(&quotes).await {
+                    Ok(count) => {
+                        debug!(
+                            "Saved {} broker-provided quotes for account {}",
+                            count, account_id
+                        );
+                    }
+                    Err(e) => {
+                        warn!(
+                            "Failed to save broker quotes for account {}: {}",
+                            account_id, e
+                        );
+                    }
                 }
             }
         }
@@ -1226,6 +1286,24 @@ impl BrokerSyncService {
             broker_account.institution_name, external_id_candidates
         );
         Ok(None)
+    }
+}
+
+/// Maps a SnapTrade symbol type code to our InstrumentType.
+///
+/// SnapTrade codes: ad (ADR), bnd (Bond), cs (Common Stock), cef (Closed End Fund),
+/// crypto (Cryptocurrency), et (ETF), oef (Open Ended Fund), pm (Precious Metals),
+/// ps (Preferred Stock), rt (Right), struct (Structured Product), ut (Unit),
+/// wi (When Issued), wt (Warrant).
+fn map_broker_symbol_type(code: Option<&str>, is_crypto_fallback: bool) -> InstrumentType {
+    match code.map(|c| c.to_lowercase()).as_deref() {
+        Some("crypto" | "cryptocurrency") => InstrumentType::Crypto,
+        Some("bnd") => InstrumentType::Bond,
+        Some("pm") => InstrumentType::Metal,
+        Some("fx") => InstrumentType::Fx,
+        Some(_) => InstrumentType::Equity,
+        None if is_crypto_fallback => InstrumentType::Crypto,
+        None => InstrumentType::Equity,
     }
 }
 
