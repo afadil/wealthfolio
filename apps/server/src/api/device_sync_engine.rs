@@ -745,10 +745,16 @@ pub async fn get_bootstrap_overwrite_check(
     })
 }
 
-pub async fn run_sync_cycle(state: Arc<AppState>) -> Result<engine::SyncCycleResult, String> {
+pub async fn run_sync_cycle(
+    state: Arc<AppState>,
+    post_bootstrap: bool,
+) -> Result<engine::SyncCycleResult, String> {
     ensure_device_sync_enabled()?;
     let ports = ServerEnginePorts::new(Arc::clone(&state));
-    let result = state.device_sync_runtime.run_cycle(&ports).await?;
+    let result = state
+        .device_sync_runtime
+        .run_cycle(&ports, post_bootstrap)
+        .await?;
 
     // Note: on_pull_complete is now called by the engine itself via ReplayStore trait
 
@@ -782,8 +788,11 @@ impl ReadyReconcileStore for ServerReadyReconcileRunner {
         })
     }
 
-    async fn run_sync_cycle(&self) -> Result<engine::SyncCycleResult, String> {
-        run_sync_cycle(Arc::clone(&self.state)).await
+    async fn run_sync_cycle(
+        &self,
+        post_bootstrap: bool,
+    ) -> Result<engine::SyncCycleResult, String> {
+        run_sync_cycle(Arc::clone(&self.state), post_bootstrap).await
     }
 
     async fn ensure_background_started(&self) -> Result<bool, String> {
@@ -1450,7 +1459,7 @@ pub async fn complete_pairing_with_transfer(
 
     // 1. Run sync cycle to flush any pending outbox events
     tracing::info!("[DeviceSync] complete_pairing_with_transfer: running sync cycle");
-    let _cycle_result = run_sync_cycle(Arc::clone(&state)).await?;
+    let _cycle_result = run_sync_cycle(Arc::clone(&state), false).await?;
 
     // 2. Generate snapshot (full local SQLite export — always contains all local data)
     tracing::info!("[DeviceSync] complete_pairing_with_transfer: generating snapshot");
@@ -1648,7 +1657,7 @@ pub async fn confirm_pairing_with_bootstrap(
 
     // 6. Run sync cycle after bootstrap
     tracing::info!("[DeviceSync] confirm_pairing_with_bootstrap: running sync cycle");
-    let _ = run_sync_cycle(Arc::clone(&state)).await;
+    let _ = run_sync_cycle(Arc::clone(&state), true).await;
 
     // 7. Start background engine
     let engine_state = Arc::clone(&state);
@@ -1769,7 +1778,7 @@ pub async fn begin_pairing_confirm(
     }
 
     // 6. Run sync cycle + start engine
-    let _ = run_sync_cycle(Arc::clone(&state)).await;
+    let _ = run_sync_cycle(Arc::clone(&state), true).await;
     let engine_state = Arc::clone(&state);
     tokio::spawn(async move {
         if let Err(err) = ensure_background_engine_started(engine_state).await {
@@ -1800,7 +1809,7 @@ pub async fn get_pairing_flow_state_handler(
             match sync_bootstrap_snapshot_if_needed(Arc::clone(&state)).await {
                 Ok(bootstrap) => {
                     if bootstrap.status != "requested" {
-                        let _ = run_sync_cycle(Arc::clone(&state)).await;
+                        let _ = run_sync_cycle(Arc::clone(&state), true).await;
                         let engine_state = Arc::clone(&state);
                         tokio::spawn(async move {
                             if let Err(err) = ensure_background_engine_started(engine_state).await {
@@ -1874,7 +1883,7 @@ pub async fn approve_pairing_overwrite_handler(
                 return Ok(PairingFlowResponse { flow_id, phase });
             }
 
-            let _ = run_sync_cycle(Arc::clone(&state)).await;
+            let _ = run_sync_cycle(Arc::clone(&state), true).await;
             let engine_state = Arc::clone(&state);
             tokio::spawn(async move {
                 if let Err(err) = ensure_background_engine_started(engine_state).await {

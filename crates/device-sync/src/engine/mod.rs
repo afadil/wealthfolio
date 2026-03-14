@@ -148,7 +148,7 @@ impl<'a, R: ReplayStore + ?Sized> CycleContext<'a, R> {
     }
 }
 
-pub async fn run_sync_cycle<P>(ports: &P) -> Result<SyncCycleResult, String>
+pub async fn run_sync_cycle<P>(ports: &P, post_bootstrap: bool) -> Result<SyncCycleResult, String>
 where
     P: OutboxStore + ReplayStore + SyncTransport + CredentialStore + Send + Sync,
 {
@@ -293,15 +293,15 @@ where
             debug!("[DeviceSync] Reconcile action=NOOP but has pending outbox, proceeding with push+pull");
         }
         "BOOTSTRAP_SNAPSHOT" => {
-            if ctx.local_cursor > 0 {
-                // Bootstrap was already applied (cursor is set from snapshot restore).
-                // The server doesn't know our updated cursor yet because no push/pull
-                // has happened. Fall through to push+pull so the server learns our
-                // actual cursor. If the cursor is genuinely stale (behind GC watermark),
+            if post_bootstrap {
+                // Bootstrap was just applied by the caller (e.g. run_ready_reconcile_state
+                // or a pairing flow). The server doesn't know our updated cursor yet
+                // because no push/pull has happened. Fall through to push+pull so the
+                // server learns our actual cursor. If the cursor is genuinely stale,
                 // the pull error handler will catch SYNC_CURSOR_TOO_OLD and return
                 // stale_cursor at that point.
                 debug!(
-                    "[DeviceSync] Reconcile action=BOOTSTRAP_SNAPSHOT but local cursor {} > 0, proceeding with push+pull",
+                    "[DeviceSync] Reconcile action=BOOTSTRAP_SNAPSHOT but post_bootstrap=true (cursor {}), proceeding with push+pull",
                     ctx.local_cursor
                 );
             } else {
@@ -967,7 +967,7 @@ where
     );
 
     if result.bootstrap_status == "applied" {
-        let cycle_result = match ports.run_sync_cycle().await {
+        let cycle_result = match ports.run_sync_cycle(true).await {
             Ok(value) => value,
             Err(err) => {
                 return reconcile_error(result, format!("Initial sync cycle failed: {}", err));
@@ -1006,7 +1006,7 @@ where
                 );
             }
 
-            let retry_cycle_result = match ports.run_sync_cycle().await {
+            let retry_cycle_result = match ports.run_sync_cycle(true).await {
                 Ok(value) => value,
                 Err(err) => {
                     return reconcile_error(result, format!("Retry sync cycle failed: {}", err));
@@ -1091,7 +1091,7 @@ where
 {
     let mut consecutive_not_ready: u32 = 0;
     loop {
-        let cycle_result = run_sync_cycle(ports.as_ref()).await;
+        let cycle_result = run_sync_cycle(ports.as_ref(), false).await;
         if let Err(err) = &cycle_result {
             warn!("[DeviceSync] Background cycle failed: {}", err);
             consecutive_not_ready = 0;
@@ -1385,7 +1385,7 @@ mod tests {
     async fn run_sync_cycle_reports_config_error_when_identity_missing() {
         let ports = TestPorts::new(None, Ok(SyncState::Ready));
 
-        let result = run_sync_cycle(&ports)
+        let result = run_sync_cycle(&ports, false)
             .await
             .expect("cycle should return a status");
 
@@ -1406,7 +1406,7 @@ mod tests {
         };
         let ports = TestPorts::new(Some(identity), Ok(SyncState::Ready));
 
-        let result = run_sync_cycle(&ports)
+        let result = run_sync_cycle(&ports, false)
             .await
             .expect("cycle should return a status");
 
@@ -1424,7 +1424,7 @@ mod tests {
         };
         let ports = TestPorts::new(Some(identity), Ok(SyncState::Registered));
 
-        let result = run_sync_cycle(&ports)
+        let result = run_sync_cycle(&ports, false)
             .await
             .expect("cycle should return a status");
 
@@ -1446,7 +1446,7 @@ mod tests {
         let mut ports = TestPorts::new(Some(identity), Ok(SyncState::Registered));
         ports.fail_mark_cycle_outcome = true;
 
-        let error = run_sync_cycle(&ports)
+        let error = run_sync_cycle(&ports, false)
             .await
             .expect_err("cycle should fail when status persistence fails");
 
@@ -1504,7 +1504,7 @@ mod tests {
             ));
         }
 
-        let result = run_sync_cycle(&ports)
+        let result = run_sync_cycle(&ports, false)
             .await
             .expect("cycle should self-heal stale key version mismatch");
 
@@ -1546,7 +1546,7 @@ mod tests {
             ));
         }
 
-        let result = run_sync_cycle(&ports)
+        let result = run_sync_cycle(&ports, false)
             .await
             .expect("cycle should return a key version mismatch status");
 
@@ -1594,7 +1594,7 @@ mod tests {
                 .ok_or_else(|| "missing bootstrap result".to_string())
         }
 
-        async fn run_sync_cycle(&self) -> Result<SyncCycleResult, String> {
+        async fn run_sync_cycle(&self, _post_bootstrap: bool) -> Result<SyncCycleResult, String> {
             self.cycle_results
                 .lock()
                 .await

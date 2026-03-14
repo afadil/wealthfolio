@@ -1110,7 +1110,7 @@ async fn trigger_device_sync_cycle(
     State(state): State<Arc<AppState>>,
 ) -> ApiResult<Json<DeviceSyncCycleResponse>> {
     ensure_device_sync_enabled()?;
-    let result = device_sync_engine::run_sync_cycle(state)
+    let result = device_sync_engine::run_sync_cycle(state, false)
         .await
         .map_err(ApiError::Internal)?;
     Ok(Json(DeviceSyncCycleResponse {

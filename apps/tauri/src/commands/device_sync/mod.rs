@@ -409,8 +409,11 @@ impl shared_sync_engine::ReadyReconcileStore for TauriReadyReconcileRunner {
         })
     }
 
-    async fn run_sync_cycle(&self) -> Result<shared_sync_engine::SyncCycleResult, String> {
-        let result = engine::run_sync_cycle(Arc::clone(&self.context)).await?;
+    async fn run_sync_cycle(
+        &self,
+        post_bootstrap: bool,
+    ) -> Result<shared_sync_engine::SyncCycleResult, String> {
+        let result = engine::run_sync_cycle(Arc::clone(&self.context), post_bootstrap).await?;
         Ok(shared_sync_engine::SyncCycleResult {
             status: result.status,
             lock_version: result.lock_version,
@@ -937,7 +940,7 @@ pub async fn device_sync_bootstrap_overwrite_check(
 pub async fn sync_trigger_cycle(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<SyncCycleResult, String> {
-    engine::run_sync_cycle(Arc::clone(state.inner())).await
+    engine::run_sync_cycle(Arc::clone(state.inner()), false).await
 }
 
 #[tauri::command]
@@ -1284,7 +1287,7 @@ pub async fn complete_pairing_with_transfer(
 
     // 1. Run sync cycle to flush any pending outbox events
     info!("[DeviceSync] complete_pairing_with_transfer: running sync cycle");
-    let _cycle_result = engine::run_sync_cycle(Arc::clone(&context)).await?;
+    let _cycle_result = engine::run_sync_cycle(Arc::clone(&context), false).await?;
 
     // 2. Generate snapshot (full local SQLite export — always contains all local data)
     info!("[DeviceSync] complete_pairing_with_transfer: generating snapshot");
@@ -1465,7 +1468,7 @@ pub async fn confirm_pairing_with_bootstrap(
 
     // 6. Run sync cycle
     info!("[DeviceSync] confirm_pairing_with_bootstrap: running sync cycle");
-    let _ = engine::run_sync_cycle(Arc::clone(&context)).await;
+    let _ = engine::run_sync_cycle(Arc::clone(&context), true).await;
 
     // 7. Start background engine
     let engine_context = Arc::clone(state.inner());
@@ -1584,7 +1587,7 @@ pub async fn begin_pairing_confirm(
     }
 
     // 6. Run sync cycle + start engine
-    let _ = engine::run_sync_cycle(Arc::clone(&context)).await;
+    let _ = engine::run_sync_cycle(Arc::clone(&context), true).await;
     let engine_context = Arc::clone(state.inner());
     tauri::async_runtime::spawn(async move {
         if let Err(err) = ensure_background_engine_started(engine_context).await {
@@ -1619,7 +1622,7 @@ pub async fn get_pairing_flow_state(
                 Ok(bootstrap) => {
                     if bootstrap.status != "requested" {
                         // Bootstrap applied — run sync cycle + start engine
-                        let _ = engine::run_sync_cycle(Arc::clone(&context)).await;
+                        let _ = engine::run_sync_cycle(Arc::clone(&context), true).await;
                         let engine_context = Arc::clone(state.inner());
                         tauri::async_runtime::spawn(async move {
                             if let Err(err) = ensure_background_engine_started(engine_context).await
@@ -1701,7 +1704,7 @@ pub async fn approve_pairing_overwrite(
             }
 
             // Bootstrap applied — run sync cycle + start engine
-            let _ = engine::run_sync_cycle(Arc::clone(&context)).await;
+            let _ = engine::run_sync_cycle(Arc::clone(&context), true).await;
             let engine_context = Arc::clone(state.inner());
             tauri::async_runtime::spawn(async move {
                 if let Err(err) = ensure_background_engine_started(engine_context).await {
