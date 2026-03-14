@@ -15,6 +15,7 @@ import type {
   ActivitySearchResponse,
   ActivityUpdate,
   AccountValuation,
+  CheckSnapshotImportResult,
   ImportActivitiesResult,
   Asset,
   ContributionLimit,
@@ -31,6 +32,10 @@ import type {
   Quote,
   Settings,
   SimplePerformanceMetrics,
+  SnapshotHoldingInput,
+  SnapshotImportResult,
+  SnapshotInfo,
+  SnapshotInput,
   SymbolSearchResult,
   UpdateAssetProfile,
 } from './data-types';
@@ -689,6 +694,30 @@ export interface QueryAPI {
 }
 
 /**
+ * Snapshot management APIs
+ * For accounts using HOLDINGS tracking mode
+ */
+export interface SnapshotsAPI {
+  getAll(accountId: string, dateFrom?: string, dateTo?: string): Promise<SnapshotInfo[]>;
+  getByDate(accountId: string, date: string): Promise<Holding[]>;
+  save(
+    accountId: string,
+    holdings: SnapshotHoldingInput[],
+    cashBalances: Record<string, string>,
+    snapshotDate?: string,
+  ): Promise<void>;
+  checkImport(
+    accountId: string,
+    snapshots: SnapshotInput[],
+  ): Promise<CheckSnapshotImportResult>;
+  importSnapshots(
+    accountId: string,
+    snapshots: SnapshotInput[],
+  ): Promise<SnapshotImportResult>;
+  delete(accountId: string, date: string): Promise<void>;
+}
+
+/**
  * Comprehensive Host API interface providing access to all Wealthfolio functionality
  * Organized by functional domains for better discoverability and maintainability
  */
@@ -728,6 +757,9 @@ export interface HostAPI {
 
   /** File operations */
   files: FilesAPI;
+
+  /** Snapshot management for HOLDINGS mode accounts */
+  snapshots: SnapshotsAPI;
 
   /** Secrets management */
   secrets: SecretsAPI;

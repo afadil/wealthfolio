@@ -16,24 +16,29 @@ import type {
   ActivitySearchResponse,
   ActivityUpdate,
   Asset,
+  CheckHoldingsImportResult,
   ContributionLimit,
   DepositsCalculation,
   ExchangeRate,
   Goal,
   GoalAllocation,
   Holding,
+  HoldingsSnapshotInput,
   ImportActivitiesResult,
+  ImportHoldingsCsvResult,
   ImportMappingData,
   IncomeSummary,
   MarketDataProviderInfo,
   NewContributionLimit,
   PerformanceMetrics,
   Quote,
+  SnapshotInfo,
   SymbolSearchResult,
   Settings,
   SimplePerformanceMetrics,
   UpdateAssetProfile,
 } from "@/lib/types";
+import type { HoldingInput } from "@/adapters";
 import type { HostAPI as SDKHostAPI } from "@wealthfolio/addon-sdk";
 
 /**
@@ -154,6 +159,25 @@ export interface InternalHostAPI {
   getAccountImportMapping(accountId: string): Promise<ImportMappingData>;
   saveAccountImportMapping(mapping: ImportMappingData): Promise<ImportMappingData>;
 
+  // Snapshots
+  getSnapshots(accountId: string, dateFrom?: string, dateTo?: string): Promise<SnapshotInfo[]>;
+  getSnapshotByDate(accountId: string, date: string): Promise<Holding[]>;
+  saveManualHoldings(
+    accountId: string,
+    holdings: HoldingInput[],
+    cashBalances: Record<string, string>,
+    snapshotDate?: string,
+  ): Promise<void>;
+  checkHoldingsImport(
+    accountId: string,
+    snapshots: HoldingsSnapshotInput[],
+  ): Promise<CheckHoldingsImportResult>;
+  importHoldingsCsv(
+    accountId: string,
+    snapshots: HoldingsSnapshotInput[],
+  ): Promise<ImportHoldingsCsvResult>;
+  deleteSnapshot(accountId: string, date: string): Promise<void>;
+
   // Logger functions (internal - these are the raw logger functions)
   logError(message: string): void;
   logInfo(message: string): void;
@@ -180,7 +204,10 @@ export interface InternalHostAPI {
  * Type bridge utility to convert between internal and SDK types
  * This handles the mapping between the actual implementation types and the public SDK types
  */
-export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: string): SDKHostAPI {
+export function createSDKHostAPIBridge(
+  internalAPI: InternalHostAPI,
+  addonId?: string,
+): Omit<SDKHostAPI, "secrets"> {
   // Create logger with addon prefix
   const createAddonLogger = (prefix: string) => ({
     error: (message: string) => internalAPI.logError(`[${prefix}] ${message}`),
@@ -194,7 +221,6 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: s
     accounts: {
       getAll: internalAPI.getAccounts,
       create: internalAPI.createAccount,
-      update: internalAPI.updateAccount,
     },
     portfolio: {
       getHoldings: internalAPI.getHoldings,
@@ -268,6 +294,14 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: s
       openCsvDialog: internalAPI.openCsvFileDialog,
       openSaveDialog: internalAPI.openFileSaveDialog,
     },
+    snapshots: {
+      getAll: internalAPI.getSnapshots,
+      getByDate: internalAPI.getSnapshotByDate,
+      save: internalAPI.saveManualHoldings,
+      checkImport: internalAPI.checkHoldingsImport,
+      importSnapshots: internalAPI.importHoldingsCsv,
+      delete: internalAPI.deleteSnapshot,
+    },
 
     logger: createAddonLogger(addonId || "unknown-addon"),
 
@@ -304,28 +338,5 @@ export function createSDKHostAPIBridge(internalAPI: InternalHostAPI, addonId?: s
       warning: internalAPI.toastWarning,
       info: internalAPI.toastInfo,
     },
-  } as unknown as SDKHostAPI;
-}
-
-/**
- * Type guard to check if a value has SDK-compatible types
- */
-export function isSDKCompatible<T>(_value: T): _value is T {
-  return true; // For now, we use type assertions. Could add runtime checks if needed.
-}
-
-/**
- * Utility to convert internal types to SDK types
- * This can be expanded to handle specific type conversions if needed
- */
-export function toSDKType<T>(value: T): T {
-  return value;
-}
-
-/**
- * Utility to convert SDK types to internal types
- * This can be expanded to handle specific type conversions if needed
- */
-export function fromSDKType<T>(value: T): T {
-  return value;
+  };
 }

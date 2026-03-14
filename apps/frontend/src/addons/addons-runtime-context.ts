@@ -64,6 +64,12 @@ import {
   getLatestValuations,
   recalculatePortfolio,
   updatePortfolio,
+  getSnapshots,
+  getSnapshotByDate,
+  saveManualHoldings,
+  checkHoldingsImport,
+  importHoldingsCsv,
+  deleteSnapshot,
 } from "@/adapters";
 import {
   listenMarketSyncComplete,
@@ -299,6 +305,14 @@ export function createAddonContext(addonId: string): AddonContext {
           checkActivitiesImport,
           getAccountImportMapping,
           saveAccountImportMapping,
+
+          // Snapshots
+          getSnapshots,
+          getSnapshotByDate,
+          saveManualHoldings,
+          checkHoldingsImport,
+          importHoldingsCsv,
+          deleteSnapshot,
 
           // Logger functions
           logError: logger.error,

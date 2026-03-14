@@ -27,6 +27,7 @@ export type {
   ActivitySearchFilters,
   ActivitySort,
   HostAPI,
+  SnapshotsAPI,
   ToastAPI,
   YahooDividend,
 } from './host-api';
