@@ -106,25 +106,9 @@ pub async fn ensure_valid_access_token(
         return Ok(token);
     }
 
-    let buffer_secs = config
-        .map(|value| value.expiry_buffer_secs)
-        .unwrap_or(DEFAULT_EXPIRY_BUFFER_SECS);
-
-    if let Some(token) = get_stored_access_if_fresh(secret_store, buffer_secs).await? {
-        let expiry = compute_expires_at_from_jwt(&token, buffer_secs).unwrap_or_else(Instant::now);
-        write_cache(state, token.clone(), expiry).await;
-        return Ok(token);
-    }
-
     let _refresh_guard = state.refresh_lock.lock().await;
 
     if let Some(token) = read_cached_token(state).await {
-        return Ok(token);
-    }
-
-    if let Some(token) = get_stored_access_if_fresh(secret_store, buffer_secs).await? {
-        let expiry = compute_expires_at_from_jwt(&token, buffer_secs).unwrap_or_else(Instant::now);
-        write_cache(state, token.clone(), expiry).await;
         return Ok(token);
     }
 
@@ -151,12 +135,6 @@ pub async fn ensure_valid_access_token(
     let response = refresh_access_token(&refresh_token, config).await;
     match response {
         Ok(response) => {
-            secret_store
-                .set_secret(CLOUD_ACCESS_TOKEN_KEY, &response.access_token)
-                .map_err(|e| {
-                    TokenLifecycleError::Internal(format!("Failed to store access token: {}", e))
-                })?;
-
             let rotated_refresh = response
                 .refresh_token
                 .as_deref()
@@ -168,6 +146,8 @@ pub async fn ensure_valid_access_token(
                 .map_err(|e| {
                     TokenLifecycleError::Internal(format!("Failed to store refresh token: {}", e))
                 })?;
+            // Best-effort cleanup for legacy versions that persisted access tokens at rest.
+            let _ = secret_store.delete_secret(CLOUD_ACCESS_TOKEN_KEY);
 
             let expires_at = compute_expires_at(
                 &response.access_token,
@@ -222,19 +202,6 @@ async fn read_cached_token(state: &TokenLifecycleState) -> Option<String> {
 async fn write_cache(state: &TokenLifecycleState, token: String, expires_at: Instant) {
     let mut cache = state.cache.write().await;
     *cache = Some(CachedAccessToken { token, expires_at });
-}
-
-async fn get_stored_access_if_fresh(
-    secret_store: &dyn SecretStore,
-    buffer_secs: u64,
-) -> Result<Option<String>, TokenLifecycleError> {
-    let token = secret_store
-        .get_secret(CLOUD_ACCESS_TOKEN_KEY)
-        .map_err(|e| {
-            TokenLifecycleError::Internal(format!("Failed to read access token: {}", e))
-        })?;
-
-    Ok(token.filter(|value| is_access_token_fresh(value, SystemTime::now(), buffer_secs)))
 }
 
 fn compute_expires_at(token: &str, expires_in: Option<i64>, buffer_secs: u64) -> Instant {

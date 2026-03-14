@@ -12,10 +12,9 @@ import {
  */
 export const storeSyncSession = async (
   refreshToken: string,
-  accessToken?: string,
 ): Promise<void> => {
   try {
-    await storeSyncSessionApi(refreshToken, accessToken);
+    await storeSyncSessionApi(refreshToken);
     logger.debug("Sync session stored in backend");
   } catch (error) {
     logger.error("Error storing sync session in backend");

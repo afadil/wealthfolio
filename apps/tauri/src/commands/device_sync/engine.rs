@@ -249,13 +249,14 @@ impl CredentialStore for TauriEnginePorts {
     }
 
     async fn get_sync_state(&self) -> Result<SyncState, String> {
-        self.context
+        let token = self
+            .context
             .connect_service()
             .get_valid_access_token()
             .await?;
         self.context
             .device_enroll_service()
-            .get_sync_state()
+            .get_sync_state(&token)
             .await
             .map(|value| value.state)
             .map_err(|err| err.message)

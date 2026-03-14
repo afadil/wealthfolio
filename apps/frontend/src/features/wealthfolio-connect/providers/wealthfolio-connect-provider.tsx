@@ -250,7 +250,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
     // Store tokens in backend's encrypted secret store (backend can mint fresh access tokens if needed)
     if (session.refresh_token) {
       try {
-        await storeSyncSession(session.refresh_token, session.access_token);
+        await storeSyncSession(session.refresh_token);
         logger.info("Tokens stored in backend successfully");
       } catch (err) {
         logger.error(`Failed to store tokens in backend: ${err}`);

@@ -327,11 +327,8 @@ export const restoreSyncSession = async (): Promise<{
   return invoke<{ accessToken: string; refreshToken: string }>("restore_sync_session");
 };
 
-export const storeSyncSession = async (
-  refreshToken: string,
-  accessToken?: string,
-): Promise<void> => {
-  return invoke<void>("store_sync_session", { refreshToken, accessToken });
+export const storeSyncSession = async (refreshToken: string): Promise<void> => {
+  return invoke<void>("store_sync_session", { refreshToken });
 };
 
 export const clearSyncSession = async (): Promise<void> => {

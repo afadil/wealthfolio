@@ -70,32 +70,36 @@ async fn main() -> anyhow::Result<()> {
     if features::device_sync_enabled() {
         let startup_state = state.clone();
         tokio::spawn(async move {
-            if let Err(err) = api::connect::mint_access_token(&startup_state).await {
-                if is_expected_startup_token_warmup_error(&err) {
-                    info!(
-                        "Skipping startup device sync token warmup (expected state): {}",
-                        err
-                    );
-                } else {
-                    warn!("Device sync token warmup failed during startup: {}", err);
-                }
-            }
-
-            if startup_state
-                .device_enroll_service
-                .get_sync_state()
-                .await
-                .map(|sync_state| sync_state.state == SyncState::Ready)
-                .unwrap_or(false)
-            {
-                if let Err(err) =
-                    api::device_sync_engine::ensure_background_engine_started(startup_state.clone())
+            match api::connect::mint_access_token(&startup_state).await {
+                Ok(token) => {
+                    if startup_state
+                        .device_enroll_service
+                        .get_sync_state(&token)
                         .await
-                {
-                    warn!(
-                        "Failed to auto-start device sync background engine: {}",
-                        err
-                    );
+                        .map(|sync_state| sync_state.state == SyncState::Ready)
+                        .unwrap_or(false)
+                    {
+                        if let Err(err) = api::device_sync_engine::ensure_background_engine_started(
+                            startup_state.clone(),
+                        )
+                        .await
+                        {
+                            warn!(
+                                "Failed to auto-start device sync background engine: {}",
+                                err
+                            );
+                        }
+                    }
+                }
+                Err(err) => {
+                    if is_expected_startup_token_warmup_error(&err) {
+                        info!(
+                            "Skipping startup device sync token warmup (expected state): {}",
+                            err
+                        );
+                    } else {
+                        warn!("Device sync token warmup failed during startup: {}", err);
+                    }
                 }
             }
         });
