@@ -6,6 +6,7 @@ interface AmountDisplayProps {
   isHidden?: boolean;
   displayCurrency?: boolean;
   colorFormat?: boolean;
+  invertColor?: boolean;
   className?: string;
 }
 
@@ -15,10 +16,13 @@ export function AmountDisplay({
   isHidden,
   displayCurrency = true,
   colorFormat,
+  invertColor = false,
   className,
 }: AmountDisplayProps) {
   const formattedAmount = formatAmount(value, currency, displayCurrency);
-  const colorClass = colorFormat ? (value >= 0 ? "text-success" : "text-destructive") : "";
+  const positive = invertColor ? "text-destructive" : "text-success";
+  const negative = invertColor ? "text-success" : "text-destructive";
+  const colorClass = colorFormat ? (value >= 0 ? positive : negative) : "";
 
   return <span className={cn(colorClass, className)}>{isHidden ? "••••" : formattedAmount}</span>;
 }

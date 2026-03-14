@@ -147,6 +147,7 @@ export function AlternativeHoldingsTable({
           const holding = row.original;
           const gain = holding.unrealizedGain ? parseFloat(holding.unrealizedGain) : null;
           const gainPct = holding.unrealizedGainPct ? parseFloat(holding.unrealizedGainPct) : null;
+          const isLiability = holding.kind.toLowerCase() === "liability";
 
           if (gain === null || gainPct === null) {
             return <div className="text-muted-foreground text-right text-sm">—</div>;
@@ -160,8 +161,14 @@ export function AlternativeHoldingsTable({
                 isHidden={isBalanceHidden}
                 displayCurrency={false}
                 colorFormat={true}
+                invertColor={isLiability}
               />
-              <GainPercent value={gainPct} animated={false} className="text-xs" />
+              <GainPercent
+                value={gainPct}
+                animated={false}
+                className="text-xs"
+                invertColor={isLiability}
+              />
             </div>
           );
         },
