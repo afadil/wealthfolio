@@ -384,6 +384,11 @@ test.describe("Onboarding And Main Flow", () => {
       await searchInput.fill(trade.symbol);
       await page.waitForTimeout(500);
 
+      // Wait for search results to load before looking for the option
+      await expect(page.getByRole("progressbar", { name: "Loading..." })).toBeHidden({
+        timeout: 15000,
+      });
+
       // Wait for and click the matching option from the dropdown
       const symbolOption = page
         .getByRole("option", { name: new RegExp(trade.symbol, "i") })
