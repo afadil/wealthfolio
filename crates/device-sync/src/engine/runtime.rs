@@ -77,12 +77,16 @@ impl Default for DeviceSyncRuntimeState {
 }
 
 impl DeviceSyncRuntimeState {
-    pub async fn run_cycle<P>(&self, ports: &P) -> Result<SyncCycleResult, String>
+    pub async fn run_cycle<P>(
+        &self,
+        ports: &P,
+        post_bootstrap: bool,
+    ) -> Result<SyncCycleResult, String>
     where
         P: OutboxStore + ReplayStore + SyncTransport + CredentialStore + Send + Sync,
     {
         let _cycle_guard = self.cycle_mutex.lock().await;
-        run_sync_cycle(ports).await
+        run_sync_cycle(ports, post_bootstrap).await
     }
 
     pub async fn ensure_background_started<P>(&self, ports: Arc<P>)

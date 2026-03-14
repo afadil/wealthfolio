@@ -424,6 +424,7 @@ export class TradeMatcher {
     return {
       id: `avg-${averageLot.activities[0].id}-${sellActivity.id}-${Date.now()}`,
       symbol,
+      assetId: sellActivity.assetId,
       assetName: sellActivity.assetName || undefined,
       entryDate,
       exitDate,
@@ -469,6 +470,7 @@ export class TradeMatcher {
     return {
       id: `avg-open-${averageLot.activities[0].id}-${Date.now()}`,
       symbol,
+      assetId: latestActivity.assetId,
       assetName: latestActivity.assetName || undefined,
       quantity: averageLot.remainingQuantity,
       averageCost: averageLot.averagePrice,
@@ -521,6 +523,7 @@ export class TradeMatcher {
     return {
       id: `${buyActivity.id}-${sellActivity.id}-${Date.now()}`,
       symbol,
+      assetId: buyActivity.assetId,
       assetName: buyActivity.assetName || undefined,
       entryDate,
       exitDate,
@@ -562,6 +565,7 @@ export class TradeMatcher {
     return {
       id: `${lot.activity.id}-open-${Date.now()}`,
       symbol,
+      assetId: lot.activity.assetId,
       assetName: lot.activity.assetName || undefined,
       quantity: lot.remainingQuantity,
       averageCost: lot.activity.unitPrice,

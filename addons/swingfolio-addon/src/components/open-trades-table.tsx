@@ -12,13 +12,15 @@ import {
   EmptyPlaceholder,
 } from "@wealthfolio/ui";
 import { TickerAvatar } from "./ticker-avatar";
+import { parseOccSymbol, formatOptionDescription } from "../lib/utils";
 import type { OpenPosition } from "../types";
 
 interface OpenTradesTableProps {
   positions: OpenPosition[];
+  onAssetClick?: (assetId: string) => void;
 }
 
-export function OpenTradesTable({ positions }: OpenTradesTableProps) {
+export function OpenTradesTable({ positions, onAssetClick }: OpenTradesTableProps) {
   if (positions.length === 0) {
     return (
       <div className="flex h-[300px] w-full items-center justify-center">
@@ -49,50 +51,62 @@ export function OpenTradesTable({ positions }: OpenTradesTableProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {positions.map((position) => (
-              <TableRow key={position.id}>
-                <TableCell>
-                  <TickerAvatar symbol={position.symbol} className="h-8 w-8" />
-                </TableCell>
-                <TableCell>
-                  <div>
-                    <div className="font-medium">{position.symbol}</div>
-                    {position.assetName && (
-                      <div
-                        className="text-muted-foreground max-w-[120px] truncate text-xs"
-                        title={position.assetName}
-                      >
-                        {position.assetName}
-                      </div>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">{position.quantity.toLocaleString()}</TableCell>
-                <TableCell className="text-right">
-                  {position.averageCost.toLocaleString("en-US", {
-                    style: "currency",
-                    currency: position.currency,
-                  })}
-                </TableCell>
-                <TableCell className="text-right">
-                  {position.currentPrice.toLocaleString("en-US", {
-                    style: "currency",
-                    currency: position.currency,
-                  })}
-                </TableCell>
-                <TableCell className="text-right">
-                  <GainAmount value={position.unrealizedPL} currency={position.currency} />
-                </TableCell>
-                <TableCell className="text-right">
-                  <GainPercent value={position.unrealizedReturnPercent} />
-                </TableCell>
-                <TableCell className="text-center">
-                  <Badge variant="outline" className="text-xs">
-                    {position.daysOpen}
-                  </Badge>
-                </TableCell>
-              </TableRow>
-            ))}
+            {positions.map((position) => {
+              const parsed = parseOccSymbol(position.symbol);
+              const displaySymbol = parsed ? parsed.underlying : position.symbol;
+              const optionDescription = formatOptionDescription(position.symbol);
+
+              return (
+                <TableRow
+                  key={position.id}
+                  className={onAssetClick ? "cursor-pointer" : undefined}
+                  onClick={() => onAssetClick?.(position.assetId)}
+                >
+                  <TableCell>
+                    <TickerAvatar symbol={position.symbol} className="h-8 w-8" />
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <div className="font-medium">{displaySymbol}</div>
+                      {optionDescription ? (
+                        <div className="text-muted-foreground text-xs">{optionDescription}</div>
+                      ) : position.assetName ? (
+                        <div
+                          className="text-muted-foreground max-w-[120px] truncate text-xs"
+                          title={position.assetName}
+                        >
+                          {position.assetName}
+                        </div>
+                      ) : null}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">{position.quantity.toLocaleString()}</TableCell>
+                  <TableCell className="text-right">
+                    {position.averageCost.toLocaleString("en-US", {
+                      style: "currency",
+                      currency: position.currency,
+                    })}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {position.currentPrice.toLocaleString("en-US", {
+                      style: "currency",
+                      currency: position.currency,
+                    })}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <GainAmount value={position.unrealizedPL} currency={position.currency} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <GainPercent value={position.unrealizedReturnPercent} />
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Badge variant="outline" className="text-xs">
+                      {position.daysOpen}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>

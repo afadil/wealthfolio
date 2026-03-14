@@ -567,14 +567,16 @@ impl ActivityService {
         None
     }
 
-    /// Creates a manual quote from activity data when quote_mode is MANUAL.
-    /// This ensures the asset has a price point on the activity date.
-    async fn create_manual_quote_from_activity(
+    /// Creates a quote from activity data to serve as a price fallback.
+    /// Uses `DataSource::Manual` for MANUAL-mode assets (provider sync won't overwrite),
+    /// and `DataSource::Broker` for MARKET-mode assets (coexists with provider quotes).
+    async fn create_quote_from_activity(
         &self,
         asset_id: &str,
         unit_price: Decimal,
         currency: &str,
         activity_date: &str,
+        data_source: DataSource,
     ) -> Result<()> {
         // Parse activity date
         let timestamp = if let Ok(dt) = DateTime::parse_from_rfc3339(activity_date) {
@@ -583,15 +585,22 @@ impl ActivityService {
             Utc.from_utc_datetime(&date.and_hms_opt(12, 0, 0).unwrap())
         } else {
             debug!(
-                "Could not parse activity date '{}' for manual quote creation",
+                "Could not parse activity date '{}' for quote creation",
                 activity_date
             );
             return Ok(());
         };
 
-        // Generate quote ID: YYYYMMDD_ASSETID
-        let date_part = timestamp.format("%Y%m%d").to_string();
-        let quote_id = format!("{}_{}", date_part, asset_id.to_uppercase());
+        let quote_id = match data_source {
+            DataSource::Manual => {
+                let date_part = timestamp.format("%Y%m%d").to_string();
+                format!("{}_{}", date_part, asset_id.to_uppercase())
+            }
+            _ => {
+                let date_str = timestamp.format("%Y-%m-%d").to_string();
+                format!("{}_{}_{}", asset_id, date_str, data_source.as_str())
+            }
+        };
 
         let quote = Quote {
             id: quote_id,
@@ -604,7 +613,7 @@ impl ActivityService {
             adjclose: unit_price,
             volume: Decimal::ZERO,
             currency: currency.to_string(),
-            data_source: DataSource::Manual,
+            data_source,
             created_at: Utc::now(),
             notes: None,
         };
@@ -612,16 +621,13 @@ impl ActivityService {
         match self.quote_service.update_quote(quote).await {
             Ok(_) => {
                 debug!(
-                    "Created manual quote for asset {} on {} at price {}",
+                    "Created quote for asset {} on {} at price {}",
                     asset_id, activity_date, unit_price
                 );
             }
             Err(e) => {
                 // Log but don't fail the activity creation
-                debug!(
-                    "Failed to create manual quote for asset {}: {}",
-                    asset_id, e
-                );
+                debug!("Failed to create quote for asset {}: {}", asset_id, e);
             }
         }
 
@@ -1059,19 +1065,28 @@ impl ActivityService {
                         .update_quote_mode_silent(&asset.id, &requested_mode)
                         .await?;
                 }
+            }
 
-                // Create manual quote for MANUAL mode assets
-                if requested_mode == "MANUAL" {
-                    if let Some(unit_price) = activity.unit_price {
-                        self.create_manual_quote_from_activity(
-                            asset_id,
-                            unit_price,
-                            &currency,
-                            &activity.activity_date,
-                        )
-                        .await?;
-                    }
-                }
+            // Create a quote from the activity price as a fallback.
+            // Use the requested mode (if switching) rather than the pre-update asset mode.
+            if let Some(unit_price) = activity.unit_price {
+                let effective_manual = quote_mode
+                    .as_deref()
+                    .map(|m| m.eq_ignore_ascii_case("manual"))
+                    .unwrap_or(asset.quote_mode == QuoteMode::Manual);
+                let source = if effective_manual {
+                    DataSource::Manual
+                } else {
+                    DataSource::Broker
+                };
+                self.create_quote_from_activity(
+                    asset_id,
+                    unit_price,
+                    &currency,
+                    &activity.activity_date,
+                    source,
+                )
+                .await?;
             }
 
             if activity.currency.is_empty() {
@@ -1428,18 +1443,28 @@ impl ActivityService {
                         .update_quote_mode_silent(&asset.id, &requested_mode)
                         .await?;
                 }
+            }
 
-                if requested_mode == "MANUAL" {
-                    if let Some(Some(unit_price)) = activity.unit_price {
-                        self.create_manual_quote_from_activity(
-                            asset_id,
-                            unit_price,
-                            &currency,
-                            &activity.activity_date,
-                        )
-                        .await?;
-                    }
-                }
+            // Create a quote from the activity price as a fallback.
+            // Use the requested mode (if switching) rather than the pre-update asset mode.
+            if let Some(Some(unit_price)) = activity.unit_price {
+                let effective_manual = quote_mode
+                    .as_deref()
+                    .map(|m| m.eq_ignore_ascii_case("manual"))
+                    .unwrap_or(asset.quote_mode == QuoteMode::Manual);
+                let source = if effective_manual {
+                    DataSource::Manual
+                } else {
+                    DataSource::Broker
+                };
+                self.create_quote_from_activity(
+                    asset_id,
+                    unit_price,
+                    &currency,
+                    &activity.activity_date,
+                    source,
+                )
+                .await?;
             }
 
             if activity.currency.is_empty() {
@@ -3107,25 +3132,27 @@ impl ActivityService {
                 }
             }
 
-            // 6. Handle manual quotes for MANUAL quote mode assets
+            // 6. Create a quote from the activity price as a fallback
             if let Some(ref asset_id) = resolved_asset_id {
-                if let Some(asset) = ensure_result.assets.get(asset_id) {
-                    if asset.quote_mode == QuoteMode::Manual {
-                        if let Some(unit_price) = activity.unit_price {
-                            let currency = if !activity.currency.is_empty() {
-                                &activity.currency
-                            } else {
-                                &account_currency
-                            };
-                            self.create_manual_quote_from_activity(
-                                asset_id,
-                                unit_price,
-                                currency,
-                                &activity.activity_date,
-                            )
-                            .await?;
-                        }
-                    }
+                if let Some(unit_price) = activity.unit_price {
+                    let source = ensure_result
+                        .assets
+                        .get(asset_id)
+                        .filter(|a| a.quote_mode == QuoteMode::Manual)
+                        .map_or(DataSource::Broker, |_| DataSource::Manual);
+                    let currency = if !activity.currency.is_empty() {
+                        &activity.currency
+                    } else {
+                        &account_currency
+                    };
+                    self.create_quote_from_activity(
+                        asset_id,
+                        unit_price,
+                        currency,
+                        &activity.activity_date,
+                        source,
+                    )
+                    .await?;
                 }
             }
 
