@@ -388,7 +388,7 @@
   --foreground: hsl(var(--flexoki-tx));
   --card: hsl(var(--flexoki-bg-2));
   --card-foreground: hsl(var(--flexoki-tx));
-  --popover: hsl(var(--flexoki-bg));
+  --popover: hsl(var(--flexoki-bg-2));
   --popover-foreground: hsl(var(--flexoki-tx));
   --primary: hsl(var(--flexoki-tx));
   --primary-foreground: hsl(var(--flexoki-bg));
