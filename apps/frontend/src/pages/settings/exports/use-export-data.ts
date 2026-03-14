@@ -31,7 +31,7 @@ interface ExportParams {
 
 interface SQLiteBackupResult {
   mode: "sqlite";
-  target: "local" | "server";
+  target: "local";
   value: string;
 }
 
@@ -68,8 +68,12 @@ export function useExportData() {
       const { format, data: desiredData } = params;
       if (format === "SQLite") {
         if (isWeb) {
-          const { filename } = await backupDatabase();
-          return { mode: "sqlite", target: "server" as const, value: filename };
+          const { filename, data } = await backupDatabase();
+          const saved = await openFileSaveDialog(data, filename);
+          if (!saved) {
+            return null;
+          }
+          return { mode: "sqlite", target: "local" as const, value: filename };
         }
 
         const runtimePlatform = await getRuntimePlatform();
@@ -144,14 +148,9 @@ export function useExportData() {
       }
 
       if (result && typeof result === "object" && "mode" in result && result.mode === "sqlite") {
-        const description =
-          result.target === "server"
-            ? `Backup created on the server as ${result.value}`
-            : `Backup saved as ${result.value}`;
-
         toast({
           title: "Database backup completed successfully.",
-          description,
+          description: `Backup saved as ${result.value}`,
           variant: "success",
         });
       } else {
