@@ -99,6 +99,17 @@ const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
           }
         }}
         inputMode="decimal"
+        onPaste={
+          !thousandSeparator
+            ? (e) => {
+                const text = e.clipboardData.getData("text");
+                if ((text.match(/,/g) || []).length === 1) {
+                  e.preventDefault();
+                  document.execCommand("insertText", false, text.replace(",", "."));
+                }
+              }
+            : undefined
+        }
       />
     );
   },
