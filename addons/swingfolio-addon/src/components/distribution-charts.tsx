@@ -78,7 +78,7 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
   const hasHoldingPeriodData = holdingPeriodData.length > 0;
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
+    <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
       {/* P/L by Symbol */}
       <Card>
         <CardHeader>
@@ -86,7 +86,7 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
         </CardHeader>
         <CardContent>
           {hasSymbolData ? (
-            <ChartContainer config={chartConfig} className="h-[300px]">
+            <ChartContainer config={chartConfig} className="h-[200px] sm:h-[300px]">
               <BarChart data={symbolData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid vertical={false} />
                 <XAxis
@@ -145,7 +145,7 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
               </BarChart>
             </ChartContainer>
           ) : (
-            <div className="flex h-[300px] w-full items-center justify-center">
+            <div className="flex h-[200px] w-full items-center justify-center sm:h-[300px]">
               <EmptyPlaceholder
                 className="mx-auto flex max-w-[420px] items-center justify-center"
                 icon={<Icons.BarChart className="h-10 w-10" />}
@@ -164,7 +164,7 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
         </CardHeader>
         <CardContent>
           {hasHoldingPeriodData ? (
-            <ChartContainer config={chartConfig} className="h-[300px]">
+            <ChartContainer config={chartConfig} className="h-[200px] sm:h-[300px]">
               <BarChart
                 data={holdingPeriodData}
                 margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
@@ -226,7 +226,7 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
               </BarChart>
             </ChartContainer>
           ) : (
-            <div className="flex h-[300px] w-full items-center justify-center">
+            <div className="flex h-[200px] w-full items-center justify-center sm:h-[300px]">
               <EmptyPlaceholder
                 className="mx-auto flex max-w-[420px] items-center justify-center"
                 icon={<Icons.Clock className="h-10 w-10" />}

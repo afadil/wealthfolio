@@ -201,7 +201,7 @@ function DailyCalendarView({
                           <td
                             key={dayIndex}
                             className={cn(
-                              "bg-background h-20 w-[14.28%] p-0 align-top",
+                              "bg-background h-14 w-[14.28%] p-0 align-top sm:h-20",
                               dayIndex < 6 && "border-border/50 border-r",
                             )}
                           ></td>
@@ -217,7 +217,7 @@ function DailyCalendarView({
                         <td
                           key={dayIndex}
                           className={cn(
-                            "relative h-20 w-[14.28%] p-0 align-top",
+                            "relative h-14 w-[14.28%] p-0 align-top sm:h-20",
                             dayIndex < 6 && "border-border/50 border-r",
                           )}
                         >
@@ -369,7 +369,7 @@ function YearlyCalendarView({
                           <td
                             key={colIndex}
                             className={cn(
-                              "h-32 w-[33.33%] p-0 align-top",
+                              "h-24 w-[33.33%] p-0 align-top sm:h-32",
                               colIndex < 2 && "border-border/50 border-r",
                             )}
                           ></td>
@@ -398,7 +398,7 @@ function YearlyCalendarView({
                         <td
                           key={colIndex}
                           className={cn(
-                            "relative h-32 w-[33.33%] p-0 align-top",
+                            "relative h-24 w-[33.33%] p-0 align-top sm:h-32",
                             colIndex < 2 && "border-border/50 border-r",
                           )}
                         >

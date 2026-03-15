@@ -40,9 +40,17 @@ export function EquityCurveChart({
     };
   });
 
+  const formatCompact = (value: number) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(value);
+
   if (data.length === 0) {
     return (
-      <div className="flex h-full min-h-[400px] w-full items-center justify-center py-12">
+      <div className="flex h-full min-h-[200px] w-full items-center justify-center sm:min-h-[300px]">
         <EmptyPlaceholder
           className="mx-auto flex max-w-[420px] items-center justify-center"
           icon={<Icons.TrendingUp className="h-10 w-10" />}
@@ -58,16 +66,16 @@ export function EquityCurveChart({
   const tooltipDateFormat = periodType === "daily" ? "MMMM dd, yyyy" : "MMMM yyyy";
 
   return (
-    <div className="flex h-full min-h-[300px] w-full items-center justify-center py-12">
+    <div className="flex h-full min-h-[200px] w-full items-center justify-center sm:min-h-[300px]">
       <ChartContainer
         config={{
           periodPL: {
             label: `${periodLabel} P/L`,
-            color: "var(--chart-1)",
+            color: "var(--success)",
           },
           cumulativeRealizedPL: {
             label: "Cumulative Equity",
-            color: "var(--primary)",
+            color: "var(--chart-2)",
           },
         }}
         className="h-full w-full"
@@ -81,8 +89,8 @@ export function EquityCurveChart({
             axisLine={false}
             tickFormatter={(value) => format(parseISO(value), dateFormat)}
           />
-          <YAxis yAxisId="left" />
-          <YAxis yAxisId="right" orientation="right" />
+          <YAxis yAxisId="left" tickLine={false} axisLine={false} tickFormatter={formatCompact} />
+          <YAxis yAxisId="right" orientation="right" hide />
           <ChartTooltip
             content={
               <ChartTooltipContent
@@ -124,7 +132,7 @@ export function EquityCurveChart({
           <Bar
             yAxisId="left"
             dataKey="periodPL"
-            fill="var(--chart-1)"
+            fill="var(--success)"
             radius={[4, 4, 0, 0]}
             barSize={20}
           >
