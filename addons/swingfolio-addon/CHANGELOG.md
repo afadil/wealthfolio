@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-03-15
+
+### Improved
+
+- Mobile/narrow viewport layout for the dashboard
+- Period selector moves below header on mobile, stays in header on desktop
+- Open positions use card layout on mobile, table on desktop
+- Compact chart heights and empty states on small screens
+- Equity curve chart: compact currency Y-axis, hidden right axis, cleaner
+  padding
+- Distribution charts: compact currency Y-axis with narrowSymbol, full-width
+  rendering
+- Calendar: compact cell amounts (no currency symbol), smaller titles and stats
+- Calendar syncs to current date when period changes
+
+### Fixed
+
+- Flash of error state on dashboard load (check isPending alongside isLoading)
+- Distribution chart legend color contrast
+- Calendar inner padding on mobile
+- Manifest version synced to 3.1.0
+
 ## [3.0.1] - 2026-03-05
 
 ### Fixed

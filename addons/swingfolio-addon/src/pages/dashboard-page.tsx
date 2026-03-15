@@ -75,7 +75,18 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
   );
   const [selectedYear, setSelectedYear] = useState(new Date());
 
-  const { data: dashboardData, isLoading, error, refetch } = useSwingDashboard(ctx, selectedPeriod);
+  const handlePeriodSelect = (period: "1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL") => {
+    setSelectedPeriod(period);
+    setSelectedYear(new Date());
+  };
+
+  const {
+    data: dashboardData,
+    isLoading,
+    isPending,
+    error,
+    refetch,
+  } = useSwingDashboard(ctx, selectedPeriod);
   const { preferences } = useSwingPreferences(ctx);
 
   const handleNavigateToActivities = () => {
@@ -86,7 +97,7 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
     ctx.api.navigation.navigate("/addons/swingfolio/settings");
   };
 
-  if (isLoading) {
+  if (isLoading || isPending) {
     return <DashboardSkeleton />;
   }
 
@@ -157,7 +168,7 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
   const headerActions = (
     <>
       <div className="hidden md:block">
-        <PeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
+        <PeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={handlePeriodSelect} />
       </div>
       <Button
         variant="outline"
@@ -196,7 +207,7 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
         <div className="space-y-4 sm:space-y-6">
           {/* Mobile period selector */}
           <div className="flex justify-end md:hidden">
-            <PeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
+            <PeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={handlePeriodSelect} />
           </div>
 
           {/* KPI Cards */}
@@ -352,7 +363,7 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
               </CardContent>
             </Card>
             <Card className="flex flex-col pt-0">
-              <CardContent className="flex min-h-0 flex-1 flex-col py-4 sm:py-6">
+              <CardContent className="flex min-h-0 flex-1 flex-col px-2 py-2 sm:px-6 sm:py-4">
                 <AdaptiveCalendarView
                   calendar={calendar}
                   selectedPeriod={selectedPeriod}
