@@ -227,6 +227,15 @@ pub const ACTIVITY_SUBTYPE_REFUND: &str = "REFUND";
 /// Removes lots via FIFO with no cash effect.
 pub const ACTIVITY_SUBTYPE_OPTION_EXPIRY: &str = "OPTION_EXPIRY";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Activity metadata keys
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// JSON metadata key indicating a BUY was pre-funded (cash deposit included).
+/// When set to `true`, the holdings calculator skips the cash debit and books the
+/// trade cost as an external contribution instead.
+pub const METADATA_INCLUDE_CASH_DEPOSIT: &str = "include_cash_deposit";
+
 #[cfg(test)]
 mod tests {
     use super::*;

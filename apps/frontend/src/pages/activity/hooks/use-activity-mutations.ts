@@ -259,6 +259,9 @@ export function useActivityMutations(
       fxRate: restOfActivityData.fxRate ?? undefined,
       activityDate: date,
       comment: "Duplicated",
+      metadata: restOfActivityData.metadata
+        ? JSON.stringify(restOfActivityData.metadata)
+        : undefined,
       // Use nested symbol object
       symbol: {
         symbol: assetSymbol,

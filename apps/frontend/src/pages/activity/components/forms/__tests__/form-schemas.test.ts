@@ -1,15 +1,16 @@
-import { describe, it, expect } from "vitest";
+import { METADATA_INCLUDE_CASH_DEPOSIT } from "@/lib/constants";
+import { describe, expect, it } from "vitest";
+import { ACTIVITY_FORM_CONFIG } from "../../../config/activity-form-config";
 import { buyFormSchema } from "../buy-form";
-import { sellFormSchema } from "../sell-form";
 import { depositFormSchema } from "../deposit-form";
-import { withdrawalFormSchema } from "../withdrawal-form";
 import { dividendFormSchema } from "../dividend-form";
-import { transferFormSchema } from "../transfer-form";
-import { splitFormSchema } from "../split-form";
 import { feeFormSchema } from "../fee-form";
 import { interestFormSchema } from "../interest-form";
+import { sellFormSchema } from "../sell-form";
+import { splitFormSchema } from "../split-form";
 import { taxFormSchema } from "../tax-form";
-import { ACTIVITY_FORM_CONFIG } from "../../../config/activity-form-config";
+import { transferFormSchema } from "../transfer-form";
+import { withdrawalFormSchema } from "../withdrawal-form";
 
 describe("Form Schemas Validation", () => {
   describe("buyFormSchema", () => {
@@ -140,6 +141,23 @@ describe("Form Schemas Validation", () => {
         expect(typeof result.data.quantity).toBe("number");
         expect(typeof result.data.unitPrice).toBe("number");
         expect(typeof result.data.fee).toBe("number");
+      }
+    });
+
+    it("defaults includeCashDeposit to false", () => {
+      const validData = {
+        accountId: "acc-123",
+        assetId: "AAPL",
+        activityDate: new Date(),
+        quantity: 10,
+        unitPrice: 150.5,
+        currency: "USD",
+      };
+
+      const result = buyFormSchema.safeParse(validData);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.includeCashDeposit).toBe(false);
       }
     });
   });
@@ -863,6 +881,86 @@ describe("Form Schemas Validation", () => {
 
       const payload = ACTIVITY_FORM_CONFIG.TRANSFER.toPayload(formData as any) as any;
       expect(payload.unitPrice).toBeUndefined();
+    });
+  });
+
+  describe("BUY include cash deposit metadata", () => {
+    it("includes include_cash_deposit in buy payload metadata when enabled", () => {
+      const formData = {
+        accountId: "acc-123",
+        activityDate: new Date(),
+        assetId: "AAPL",
+        quantity: 10,
+        unitPrice: 150.5,
+        fee: 5,
+        comment: "Test purchase",
+        quoteMode: "MARKET",
+        currency: "USD",
+        includeCashDeposit: true,
+      };
+
+      const payload = ACTIVITY_FORM_CONFIG.BUY.toPayload(formData as any) as any;
+      expect(payload.metadata).toEqual({ [METADATA_INCLUDE_CASH_DEPOSIT]: true });
+    });
+
+    it("loads includeCashDeposit from existing activity metadata", () => {
+      const activity = {
+        accountId: "acc-123",
+        date: new Date("2024-01-15T00:00:00.000Z"),
+        assetSymbol: "AAPL",
+        quantity: "10",
+        unitPrice: "150.5",
+        amount: "1505",
+        fee: "5",
+        currency: "USD",
+        metadata: { include_cash_deposit: true },
+      };
+
+      const defaults = ACTIVITY_FORM_CONFIG.BUY.getDefaults(activity as any, [
+        { value: "acc-123", label: "Account", currency: "USD" },
+      ]) as any;
+
+      expect(defaults.includeCashDeposit).toBe(true);
+    });
+
+    it("loads includeCashDeposit from string 'true' metadata (CSV import)", () => {
+      const activity = {
+        accountId: "acc-123",
+        date: new Date("2024-01-15T00:00:00.000Z"),
+        assetSymbol: "AAPL",
+        quantity: "10",
+        unitPrice: "150.5",
+        amount: "1505",
+        fee: "5",
+        currency: "USD",
+        metadata: { include_cash_deposit: "true" },
+      };
+
+      const defaults = ACTIVITY_FORM_CONFIG.BUY.getDefaults(activity as any, [
+        { value: "acc-123", label: "Account", currency: "USD" },
+      ]) as any;
+
+      expect(defaults.includeCashDeposit).toBe(true);
+    });
+
+    it("removes include_cash_deposit from metadata when unchecked on save", () => {
+      const formData = {
+        accountId: "acc-123",
+        activityDate: new Date(),
+        assetId: "AAPL",
+        quantity: 10,
+        unitPrice: 150.5,
+        fee: 5,
+        comment: "Test purchase",
+        quoteMode: "MARKET",
+        currency: "USD",
+        includeCashDeposit: false,
+        existingMetadata: { [METADATA_INCLUDE_CASH_DEPOSIT]: true, custom_key: "keep" },
+      };
+
+      const payload = ACTIVITY_FORM_CONFIG.BUY.toPayload(formData as any) as any;
+      expect(payload.metadata).toEqual({ custom_key: "keep" });
+      expect(payload.metadata[METADATA_INCLUDE_CASH_DEPOSIT]).toBeUndefined();
     });
   });
 });

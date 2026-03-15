@@ -1,4 +1,9 @@
-import { ActivityStatus, ActivityTypeNames, SUBTYPE_DISPLAY_NAMES } from "@/lib/constants";
+import {
+  ActivityStatus,
+  ActivityTypeNames,
+  METADATA_INCLUDE_CASH_DEPOSIT,
+  SUBTYPE_DISPLAY_NAMES,
+} from "@/lib/constants";
 import { parseOccSymbol } from "@/lib/occ-symbol";
 import type { ActivityDetails } from "@/lib/types";
 import {
@@ -151,6 +156,13 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
                   <Badge variant="outline" className="border-amber-500 text-amber-600">
                     <Icons.AlertCircle className="mr-1 h-3 w-3" />
                     Needs Review
+                  </Badge>
+                )}
+                {(activity.metadata?.[METADATA_INCLUDE_CASH_DEPOSIT] === true ||
+                  activity.metadata?.[METADATA_INCLUDE_CASH_DEPOSIT] === "true") && (
+                  <Badge variant="outline" className="border-blue-500 text-blue-600">
+                    <Icons.Wallet className="mr-1 h-3 w-3" />
+                    Cash Deposit Included
                   </Badge>
                 )}
               </div>
