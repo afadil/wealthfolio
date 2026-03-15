@@ -18,9 +18,12 @@ import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useSettingsContext } from "@/lib/settings-provider";
-import { Holding } from "@/lib/types";
+import { Holding, IncomeSummary } from "@/lib/types";
+import { QueryKeys } from "@/lib/query-keys";
+import { getIncomeSummary } from "@/adapters";
 import { AmountDisplay, QuantityDisplay } from "@wealthfolio/ui";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 
 import { AnimatedToggleGroup } from "@wealthfolio/ui";
@@ -66,7 +69,15 @@ export const HoldingsTable = ({
   const { settings } = useSettingsContext();
   const [showConvertedValues, setShowConvertedValues] = useState(false);
 
+  const { data: incomeSummaries } = useQuery<IncomeSummary[], Error>({
+    queryKey: [QueryKeys.INCOME_SUMMARY],
+    queryFn: getIncomeSummary,
+  });
+  const totalIncome = incomeSummaries?.find((s) => s.period === "TOTAL");
+  const dividendsMap = totalIncome?.byAsset ?? {};
+
   const baseCurrency = settings?.baseCurrency ?? holdings[0]?.baseCurrency;
+  const incomeCurrency = totalIncome?.currency ?? baseCurrency ?? "";
   const hasMultipleCurrencies = holdings.some((holding) => {
     if (!baseCurrency || !holding.localCurrency) {
       return false;
@@ -112,7 +123,14 @@ export const HoldingsTable = ({
     <div className="flex h-full flex-col">
       <DataTable
         data={holdings}
-        columns={getColumns(isBalanceHidden, showConvertedValues, showTotalReturn, onClassify)}
+        columns={getColumns(
+          isBalanceHidden,
+          showConvertedValues,
+          showTotalReturn,
+          dividendsMap,
+          incomeCurrency,
+          onClassify,
+        )}
         searchBy="symbol"
         filters={filters}
         showColumnToggle={true}
@@ -122,6 +140,7 @@ export const HoldingsTable = ({
           symbolName: false,
           holdingType: false,
           bookValue: false,
+          dividends: false,
         }}
         defaultSorting={[{ id: "symbol", desc: false }]}
         scrollable={true}
@@ -173,6 +192,8 @@ const getColumns = (
   isHidden: boolean,
   showConvertedValues: boolean,
   showTotalReturn: boolean,
+  dividendsMap: Record<string, { income: number }>,
+  incomeCurrency: string,
   onClassify?: (holding: Holding) => void,
 ): ColumnDef<Holding>[] => [
   {
@@ -419,6 +440,32 @@ const getColumns = (
       const valueB = (showTotalReturn ? holdingB.totalGain?.base : holdingB.dayChange?.base) ?? 0;
 
       return valueA - valueB;
+    },
+  },
+  {
+    id: "dividends",
+    accessorFn: (row) => dividendsMap[row.instrument?.id ?? row.id]?.income ?? 0,
+    enableHiding: true,
+    header: ({ column }) => (
+      <DataTableColumnHeader className="justify-end" column={column} title="Dividends" />
+    ),
+    meta: {
+      label: "Dividends",
+    },
+    cell: ({ row }) => {
+      const holding = row.original;
+      const income = dividendsMap[holding.instrument?.id ?? holding.id]?.income ?? 0;
+      return (
+        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+          <AmountDisplay value={income} currency={incomeCurrency} isHidden={isHidden} />
+          <div className="text-xs text-transparent">-</div>
+        </div>
+      );
+    },
+    sortingFn: (rowA, rowB) => {
+      const a = dividendsMap[rowA.original.instrument?.id ?? rowA.original.id]?.income ?? 0;
+      const b = dividendsMap[rowB.original.instrument?.id ?? rowB.original.id]?.income ?? 0;
+      return a - b;
     },
   },
   {
