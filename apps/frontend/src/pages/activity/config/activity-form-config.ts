@@ -112,7 +112,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
           activity?.metadata?.include_cash_deposit === "true",
         exchangeMic: activity?.exchangeMic,
         // Carry all original metadata through so unrecognised keys aren't silently dropped on save
-        existingMetadata: (activity?.metadata as Record<string, unknown>) ?? undefined,
+        existingMetadata: activity?.metadata as Record<string, unknown> | undefined,
       };
 
       // Populate option-specific fields from OCC symbol when editing
