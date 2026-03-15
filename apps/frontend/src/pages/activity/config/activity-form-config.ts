@@ -107,7 +107,9 @@ export const ACTIVITY_FORM_CONFIG: Record<
         // Advanced options
         currency: activity?.currency,
         fxRate: activity?.fxRate ?? undefined,
-        includeCashDeposit: activity?.metadata?.include_cash_deposit === true,
+        includeCashDeposit:
+          activity?.metadata?.include_cash_deposit === true ||
+          activity?.metadata?.include_cash_deposit === "true",
         exchangeMic: activity?.exchangeMic,
         // Carry all original metadata through so unrecognised keys aren't silently dropped on save
         existingMetadata: (activity?.metadata as Record<string, unknown>) ?? undefined,

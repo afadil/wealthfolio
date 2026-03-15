@@ -922,5 +922,45 @@ describe("Form Schemas Validation", () => {
 
       expect(defaults.includeCashDeposit).toBe(true);
     });
+
+    it("loads includeCashDeposit from string 'true' metadata (CSV import)", () => {
+      const activity = {
+        accountId: "acc-123",
+        date: new Date("2024-01-15T00:00:00.000Z"),
+        assetSymbol: "AAPL",
+        quantity: "10",
+        unitPrice: "150.5",
+        amount: "1505",
+        fee: "5",
+        currency: "USD",
+        metadata: { include_cash_deposit: "true" },
+      };
+
+      const defaults = ACTIVITY_FORM_CONFIG.BUY.getDefaults(activity as any, [
+        { value: "acc-123", label: "Account", currency: "USD" },
+      ]) as any;
+
+      expect(defaults.includeCashDeposit).toBe(true);
+    });
+
+    it("removes include_cash_deposit from metadata when unchecked on save", () => {
+      const formData = {
+        accountId: "acc-123",
+        activityDate: new Date(),
+        assetId: "AAPL",
+        quantity: 10,
+        unitPrice: 150.5,
+        fee: 5,
+        comment: "Test purchase",
+        quoteMode: "MARKET",
+        currency: "USD",
+        includeCashDeposit: false,
+        existingMetadata: { [METADATA_INCLUDE_CASH_DEPOSIT]: true, custom_key: "keep" },
+      };
+
+      const payload = ACTIVITY_FORM_CONFIG.BUY.toPayload(formData as any) as any;
+      expect(payload.metadata).toEqual({ custom_key: "keep" });
+      expect(payload.metadata[METADATA_INCLUDE_CASH_DEPOSIT]).toBeUndefined();
+    });
   });
 });

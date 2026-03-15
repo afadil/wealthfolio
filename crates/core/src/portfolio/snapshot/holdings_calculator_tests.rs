@@ -911,6 +911,61 @@ mod tests {
     }
 
     #[test]
+    fn test_buy_with_include_cash_deposit_option_multiplier() {
+        // Option contract with multiplier=100: total_cost = qty * price * multiplier + fee
+        // With include_cash_deposit, cash should not be debited and contribution should
+        // reflect the multiplied total cost.
+        let mock_fx_service = MockFxService::new();
+        let account_currency = "USD";
+        let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+
+        let mut repo = MockAssetRepository::new();
+        repo.add_option_asset("AAPL240119C00150000", "USD");
+
+        let calculator =
+            HoldingsCalculator::new(Arc::new(mock_fx_service), base_currency, Arc::new(repo));
+
+        let target_date = NaiveDate::from_str("2024-01-15").unwrap();
+        let previous_snapshot = create_initial_snapshot("acc_1", account_currency, "2024-01-14");
+
+        let mut buy_activity = create_default_activity(
+            "act_buy_opt_funded",
+            ActivityType::Buy,
+            "AAPL240119C00150000",
+            dec!(5),  // 5 contracts
+            dec!(3),  // $3 premium per share
+            dec!(10), // $10 fee
+            "USD",
+            "2024-01-15",
+        );
+        buy_activity.metadata = Some(serde_json::json!({ METADATA_INCLUDE_CASH_DEPOSIT: true }));
+
+        let result =
+            calculator.calculate_next_holdings(&previous_snapshot, &[buy_activity], target_date);
+        assert!(result.is_ok());
+        let next_state = result.unwrap().snapshot;
+
+        let cash_usd = next_state
+            .cash_balances
+            .get("USD")
+            .cloned()
+            .unwrap_or(Decimal::ZERO);
+        assert_eq!(cash_usd, Decimal::ZERO, "Cash should not be debited");
+
+        // total_cost = 5 * 3 * 100 + 10 = 1510
+        assert_eq!(next_state.net_contribution, dec!(1510));
+        assert_eq!(next_state.net_contribution_base, dec!(1510));
+
+        let pos = next_state
+            .positions
+            .get("AAPL240119C00150000")
+            .expect("Option position should exist");
+        assert_eq!(pos.quantity, dec!(5));
+        // cost_basis = qty * (price * multiplier) + fee = 5 * (3 * 100) + 10 = 1510
+        assert_eq!(pos.total_cost_basis, dec!(1510));
+    }
+
+    #[test]
     fn test_deposit_activity_with_fx_conversion() {
         let mut mock_fx_service = MockFxService::new();
         let target_date_str = "2023-01-04";

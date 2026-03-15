@@ -423,23 +423,23 @@ export function BuyForm({
               accountCurrency={accountCurrency}
               baseCurrency={baseCurrency}
               showSubtype={false}
-            />
-
-            <div className="flex items-start gap-3 rounded-md border p-3">
-              <Checkbox
-                id="includeCashDeposit"
-                checked={watch("includeCashDeposit")}
-                onCheckedChange={(checked) => setValue("includeCashDeposit", !!checked)}
-              />
-              <div className="grid gap-1.5 leading-none">
-                <Label htmlFor="includeCashDeposit" className="text-sm font-medium">
-                  Include cash deposit
-                </Label>
-                <p className="text-muted-foreground text-xs">
-                  Offsets the cash debit so no separate deposit is needed.
-                </p>
+            >
+              <div className="flex items-start gap-3 rounded-md border p-3">
+                <Checkbox
+                  id="includeCashDeposit"
+                  checked={watch("includeCashDeposit")}
+                  onCheckedChange={(checked) => setValue("includeCashDeposit", !!checked)}
+                />
+                <div className="grid gap-1.5 leading-none">
+                  <Label htmlFor="includeCashDeposit" className="text-sm font-medium">
+                    Include cash deposit
+                  </Label>
+                  <p className="text-muted-foreground text-xs">
+                    Offsets the cash debit so no separate deposit is needed.
+                  </p>
+                </div>
               </div>
-            </div>
+            </AdvancedOptionsSection>
 
             {/* Notes */}
             <NotesInput name="comment" label="Notes" placeholder="Add an optional note..." />
