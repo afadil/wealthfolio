@@ -575,12 +575,12 @@ impl CredentialStore for ServerEnginePorts {
     }
 
     async fn get_sync_state(&self) -> Result<SyncState, String> {
-        crate::api::connect::mint_access_token(&self.state)
+        let token = crate::api::connect::mint_access_token(&self.state)
             .await
             .map_err(|e| e.to_string())?;
         self.state
             .device_enroll_service
-            .get_sync_state()
+            .get_sync_state(&token)
             .await
             .map(|value| value.state)
             .map_err(|err| err.message)
@@ -768,12 +768,12 @@ struct ServerReadyReconcileRunner {
 #[async_trait]
 impl ReadyReconcileStore for ServerReadyReconcileRunner {
     async fn get_sync_state(&self) -> Result<SyncState, String> {
-        crate::api::connect::mint_access_token(&self.state)
+        let token = crate::api::connect::mint_access_token(&self.state)
             .await
             .map_err(|e| e.to_string())?;
         self.state
             .device_enroll_service
-            .get_sync_state()
+            .get_sync_state(&token)
             .await
             .map(|value| value.state)
             .map_err(|err| err.message)
@@ -998,7 +998,7 @@ pub async fn sync_bootstrap_snapshot_if_needed(
 
     let sync_state = state
         .device_enroll_service
-        .get_sync_state()
+        .get_sync_state(&token)
         .await
         .map_err(|e| e.message)?;
     if sync_state.state != SyncState::Ready {

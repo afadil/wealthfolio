@@ -21,7 +21,6 @@ use crate::{
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SYNC_IDENTITY_KEY: &str = "sync_identity";
-const CLOUD_ACCESS_TOKEN_KEY: &str = "sync_access_token";
 const RESET_REASON_REINITIALIZE: &str = "reinitialize";
 
 static ENROLL_OPERATION_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -164,7 +163,7 @@ impl DeviceEnrollService {
 
     /// Get the current sync state.
     /// Reads from secret store and optionally verifies with server.
-    pub async fn get_sync_state(&self) -> Result<SyncStateResult, EnrollServiceError> {
+    pub async fn get_sync_state(&self, token: &str) -> Result<SyncStateResult, EnrollServiceError> {
         // Read identity from secret store
         let identity = self.read_identity()?;
 
@@ -198,9 +197,7 @@ impl DeviceEnrollService {
         };
 
         // Verify device on server
-        let token = self.get_access_token()?;
-
-        let device = match self.client.get_device(&token, &device_id).await {
+        let device = match self.client.get_device(token, &device_id).await {
             Ok(d) => d,
             Err(e) => {
                 // Device not found = RECOVERY
@@ -246,7 +243,7 @@ impl DeviceEnrollService {
             // REGISTERED or ORPHANED: local E2EE credentials are incomplete.
             return Ok(self
                 .build_registered_or_orphaned_state(
-                    &token,
+                    token,
                     &device_id,
                     &device.display_name,
                     server_key_version,
@@ -258,7 +255,7 @@ impl DeviceEnrollService {
         if !is_trusted {
             return Ok(self
                 .build_registered_or_orphaned_state(
-                    &token,
+                    token,
                     &device_id,
                     &device.display_name,
                     server_key_version,
@@ -276,7 +273,7 @@ impl DeviceEnrollService {
                     "[DeviceEnrollService] State: STALE (version mismatch: local={}, server={})",
                     local_version, server_version
                 );
-                let trusted_devices = self.get_trusted_devices(&token).await;
+                let trusted_devices = self.get_trusted_devices(token).await;
                 return Ok(SyncStateResult {
                     state: SyncState::Stale,
                     device_id: Some(device_id),
@@ -308,18 +305,20 @@ impl DeviceEnrollService {
     /// 2. Enroll device with server
     /// 3. If BOOTSTRAP mode: initialize E2EE keys
     /// 4. Save all credentials to secret store
-    pub async fn enable_sync(&self) -> Result<EnableSyncResult, EnrollServiceError> {
+    pub async fn enable_sync(&self, token: &str) -> Result<EnableSyncResult, EnrollServiceError> {
         let _guard = enroll_operation_lock().lock().await;
-        self.enable_sync_inner().await
+        self.enable_sync_inner(token).await
     }
 
-    async fn enable_sync_inner(&self) -> Result<EnableSyncResult, EnrollServiceError> {
+    async fn enable_sync_inner(&self, token: &str) -> Result<EnableSyncResult, EnrollServiceError> {
         info!("[DeviceEnrollService] Enabling sync...");
 
         let mut existing_identity = self.read_identity()?;
         let device_nonce = self.ensure_device_nonce(&mut existing_identity)?;
-        let token = self.get_access_token()?;
-        if let Some(result) = self.try_resume_existing_sync(&existing_identity).await? {
+        if let Some(result) = self
+            .try_resume_existing_sync(token, &existing_identity)
+            .await?
+        {
             return Ok(result);
         }
 
@@ -332,7 +331,7 @@ impl DeviceEnrollService {
         let enroll_result = self
             .client
             .enroll_device(
-                &token,
+                token,
                 RegisterDeviceRequest {
                     device_nonce: device_nonce.clone(),
                     display_name: self.device_display_name.clone(),
@@ -355,7 +354,7 @@ impl DeviceEnrollService {
                     Some(e2ee_key_version)
                 );
                 self.save_enrolled_identity(&device_nonce, &device_id)?;
-                let outcome = self.initialize_e2ee_keys(&token, &device_id).await?;
+                let outcome = self.initialize_e2ee_keys(token, &device_id).await?;
                 Ok(self.enable_result_from_key_init_outcome(device_id, outcome))
             }
             EnrollDeviceResponse::Pair {
@@ -374,7 +373,7 @@ impl DeviceEnrollService {
                     info!(
                         "[DeviceEnrollService] PAIR mode with no trusted devices - probing key initialization state..."
                     );
-                    let outcome = self.initialize_e2ee_keys(&token, &device_id).await?;
+                    let outcome = self.initialize_e2ee_keys(token, &device_id).await?;
                     return Ok(self.enable_result_from_key_init_outcome(device_id, outcome));
                 }
                 Ok(EnableSyncResult {
@@ -397,7 +396,7 @@ impl DeviceEnrollService {
                     Some(e2ee_key_version)
                 );
                 self.save_enrolled_identity(&device_nonce, &device_id)?;
-                let outcome = self.initialize_e2ee_keys(&token, &device_id).await?;
+                let outcome = self.initialize_e2ee_keys(token, &device_id).await?;
                 Ok(self.enable_result_from_key_init_outcome(device_id, outcome))
             }
         }
@@ -418,16 +417,18 @@ impl DeviceEnrollService {
 
     /// Reinitialize sync - reset server data and enable sync in one operation.
     /// Used when sync is in orphaned state (keys exist but no devices).
-    pub async fn reinitialize_sync(&self) -> Result<EnableSyncResult, EnrollServiceError> {
+    pub async fn reinitialize_sync(
+        &self,
+        token: &str,
+    ) -> Result<EnableSyncResult, EnrollServiceError> {
         let _guard = enroll_operation_lock().lock().await;
         info!("[DeviceEnrollService] Reinitializing sync...");
 
-        let token = self.get_access_token()?;
         let existing_identity = self.read_identity()?;
         let preserved_nonce = existing_identity
             .device_nonce
             .unwrap_or_else(crypto::generate_device_id);
-        self.reset_team_sync_checked(&token, RESET_REASON_REINITIALIZE)
+        self.reset_team_sync_checked(token, RESET_REASON_REINITIALIZE)
             .await?;
         self.save_identity(&SyncIdentity {
             version: 2,
@@ -435,7 +436,7 @@ impl DeviceEnrollService {
             ..Default::default()
         })?;
 
-        self.enable_sync_inner().await
+        self.enable_sync_inner(token).await
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -570,17 +571,6 @@ impl DeviceEnrollService {
             .map_err(|e| format!("Failed to save identity: {}", e).into())
     }
 
-    fn get_access_token(&self) -> Result<String, EnrollServiceError> {
-        self.secret_store
-            .get_secret(CLOUD_ACCESS_TOKEN_KEY)
-            .map_err(|e| format!("Failed to get access token: {}", e))?
-            .ok_or_else(|| "No access token. Please sign in first.".to_string().into())
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // INTERNAL: HELPERS
-    // ═══════════════════════════════════════════════════════════════════════════
-
     fn ensure_device_nonce(
         &self,
         identity: &mut SyncIdentity,
@@ -612,13 +602,14 @@ impl DeviceEnrollService {
 
     async fn try_resume_existing_sync(
         &self,
+        token: &str,
         identity: &SyncIdentity,
     ) -> Result<Option<EnableSyncResult>, EnrollServiceError> {
         if identity.device_id.is_none() {
             return Ok(None);
         }
 
-        let state = self.get_sync_state().await?;
+        let state = self.get_sync_state(token).await?;
         match state.state {
             SyncState::Ready | SyncState::Registered | SyncState::Stale => {
                 self.enable_result_from_state(state).map(Some)

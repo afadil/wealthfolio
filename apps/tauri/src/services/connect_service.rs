@@ -3,7 +3,6 @@
 //! This service wraps the ConnectApiClient with keyring token retrieval,
 //! providing a simple interface for cloud API operations.
 
-use log::error;
 use std::sync::Arc;
 
 use wealthfolio_connect::{
@@ -110,10 +109,7 @@ impl ConnectService {
             "Cloud API base URL is unavailable. Connect API operations are disabled.".to_string()
         })?;
 
-        let access_token = self.get_valid_access_token().await.map_err(|e| {
-            error!("ConnectService: failed to get valid access token: {}", e);
-            e
-        })?;
+        let access_token = self.get_valid_access_token().await?;
 
         ConnectApiClient::new(&cloud_api_base_url, &access_token).map_err(|e| e.to_string())
     }

@@ -257,14 +257,7 @@ pub async fn get_subscription_plans_public() -> Result<PlansResponse, String> {
 pub async fn get_user_info(state: State<'_, Arc<ServiceContext>>) -> Result<UserInfo, String> {
     debug!("Fetching user info from cloud API...");
 
-    let client = state
-        .connect_service()
-        .get_api_client()
-        .await
-        .map_err(|e| {
-            error!("Failed to get API client for user info: {}", e);
-            e
-        })?;
+    let client = state.connect_service().get_api_client().await?;
     match client.get_user_info().await {
         Ok(user_info) => Ok(user_info),
         Err(e) => {

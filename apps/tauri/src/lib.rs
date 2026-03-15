@@ -244,7 +244,7 @@ pub fn run() {
             let deep_link_handle = handle.clone();
             app.deep_link().on_open_url(move |event| {
                 let urls = event.urls();
-                log::info!("Deep link received: {:?}", urls);
+                log::debug!("Deep link received (count: {})", urls.len());
                 for url in urls {
                     let _ = deep_link_handle.emit("deep-link-received", url.to_string());
                 }

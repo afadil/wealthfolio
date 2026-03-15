@@ -280,7 +280,7 @@ pub async fn sync_bootstrap_snapshot_if_needed(
 
     let sync_state = context
         .device_enroll_service()
-        .get_sync_state()
+        .get_sync_state(&token)
         .await
         .map_err(|e| e.message)?;
     if sync_state.state != SyncState::Ready {

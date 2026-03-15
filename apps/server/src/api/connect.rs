@@ -103,7 +103,6 @@ async fn create_connect_client(state: &AppState) -> ApiResult<ConnectApiClient> 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StoreSyncSessionRequest {
-    pub access_token: Option<String>,
     pub refresh_token: String,
 }
 
@@ -295,17 +294,8 @@ async fn store_sync_session(
         .secret_store
         .set_secret(CLOUD_REFRESH_TOKEN_KEY, &body.refresh_token)
         .map_err(|e| ApiError::Internal(format!("Failed to store refresh token: {}", e)))?;
-
-    // Also persist the access token so DeviceEnrollService (which reads it directly from the
-    // store) can function immediately without a round-trip to the auth provider.
-    if let Some(ref access_token) = body.access_token {
-        if !access_token.is_empty() {
-            state
-                .secret_store
-                .set_secret(CLOUD_ACCESS_TOKEN_KEY, access_token)
-                .map_err(|e| ApiError::Internal(format!("Failed to store access token: {}", e)))?;
-        }
-    }
+    // Best-effort cleanup for legacy versions that stored access tokens at rest.
+    let _ = state.secret_store.delete_secret(CLOUD_ACCESS_TOKEN_KEY);
     state.token_lifecycle.clear_cache().await;
 
     Ok(Json(()))
@@ -904,12 +894,11 @@ async fn get_device_sync_state(
 ) -> ApiResult<Json<SyncStateResult>> {
     ensure_device_sync_enabled()?;
     info!("[Connect] Getting device sync state...");
-    // Ensure store has a fresh access token for DeviceEnrollService (reads from store directly).
-    mint_access_token(&state).await?;
+    let token = mint_access_token(&state).await?;
 
     let result = state
         .device_enroll_service
-        .get_sync_state()
+        .get_sync_state(&token)
         .await
         .map_err(|e| ApiError::Internal(e.message))?;
 
@@ -922,11 +911,11 @@ async fn enable_device_sync(
 ) -> ApiResult<Json<EnableSyncResult>> {
     ensure_device_sync_enabled()?;
     info!("[Connect] Enabling device sync...");
-    mint_access_token(&state).await?;
+    let token = mint_access_token(&state).await?;
 
     let result = state
         .device_enroll_service
-        .enable_sync()
+        .enable_sync(&token)
         .await
         .map_err(|e| ApiError::Internal(e.message))?;
 
@@ -987,11 +976,11 @@ async fn reinitialize_device_sync(
 ) -> ApiResult<Json<EnableSyncResult>> {
     ensure_device_sync_enabled()?;
     info!("[Connect] Reinitializing device sync...");
-    mint_access_token(&state).await?;
+    let token = mint_access_token(&state).await?;
 
     let result = state
         .device_enroll_service
-        .reinitialize_sync()
+        .reinitialize_sync(&token)
         .await
         .map_err(|e| ApiError::Internal(e.message))?;
 
@@ -1087,13 +1076,16 @@ async fn bootstrap_device_snapshot(
         .map_err(ApiError::Internal)?;
 
     // Start the background sync engine whenever this device is READY.
-    let should_start_engine = mint_access_token(&state).await.is_ok()
-        && state
+    let should_start_engine = if let Ok(token) = mint_access_token(&state).await {
+        state
             .device_enroll_service
-            .get_sync_state()
+            .get_sync_state(&token)
             .await
             .map(|sync_state| sync_state.state == SyncState::Ready)
-            .unwrap_or(false);
+            .unwrap_or(false)
+    } else {
+        false
+    };
     if should_start_engine {
         let _ = device_sync_engine::ensure_background_engine_started(Arc::clone(&state)).await;
     }

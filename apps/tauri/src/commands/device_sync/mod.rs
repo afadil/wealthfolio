@@ -385,13 +385,14 @@ struct TauriReadyReconcileRunner {
 #[async_trait]
 impl shared_sync_engine::ReadyReconcileStore for TauriReadyReconcileRunner {
     async fn get_sync_state(&self) -> Result<wealthfolio_device_sync::SyncState, String> {
-        self.context
+        let token = self
+            .context
             .connect_service()
             .get_valid_access_token()
             .await?;
         self.context
             .device_enroll_service()
-            .get_sync_state()
+            .get_sync_state(&token)
             .await
             .map(|value| value.state)
             .map_err(|err| err.message)
@@ -1058,10 +1059,10 @@ pub async fn device_sync_bootstrap_snapshot_if_needed(
 ) -> Result<SyncBootstrapResult, String> {
     let context = Arc::clone(state.inner());
     let result = snapshot::sync_bootstrap_snapshot_if_needed(handle, &context).await?;
-    context.connect_service().get_valid_access_token().await?;
+    let token = context.connect_service().get_valid_access_token().await?;
     let should_start_engine = context
         .device_enroll_service()
-        .get_sync_state()
+        .get_sync_state(&token)
         .await
         .map(|sync_state| sync_state.state == wealthfolio_device_sync::SyncState::Ready)
         .unwrap_or(false);
