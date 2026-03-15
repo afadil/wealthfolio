@@ -435,10 +435,13 @@ fn connect_auth_url() -> Option<String> {
         .ok()
         .map(|v| v.trim().trim_end_matches('/').to_string())
         .filter(|v| !v.is_empty())
+        .or_else(|| option_env!("CONNECT_AUTH_URL").map(|v| v.trim_end_matches('/').to_string()))
 }
 
 fn connect_auth_api_key() -> Option<String> {
-    std::env::var("CONNECT_AUTH_PUBLISHABLE_KEY").ok()
+    std::env::var("CONNECT_AUTH_PUBLISHABLE_KEY")
+        .ok()
+        .or_else(|| option_env!("CONNECT_AUTH_PUBLISHABLE_KEY").map(String::from))
 }
 
 fn token_lifecycle_config() -> Option<TokenLifecycleConfig> {
