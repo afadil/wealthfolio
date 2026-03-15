@@ -28,6 +28,13 @@ FROM --platform=$BUILDPLATFORM ${RUST_IMAGE} AS backend
 # Copy xx scripts to handle cross-compilation
 COPY --from=xx / /
 ARG TARGETPLATFORM
+
+# Wealthfolio Connect configuration (baked into server binary at build time)
+ARG CONNECT_AUTH_URL=
+ARG CONNECT_AUTH_PUBLISHABLE_KEY=
+ENV CONNECT_AUTH_URL=${CONNECT_AUTH_URL}
+ENV CONNECT_AUTH_PUBLISHABLE_KEY=${CONNECT_AUTH_PUBLISHABLE_KEY}
+
 WORKDIR /app
 
 # Install build tools for the HOST (to run cargo, build scripts)

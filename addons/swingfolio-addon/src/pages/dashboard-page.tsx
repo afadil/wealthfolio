@@ -75,7 +75,18 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
   );
   const [selectedYear, setSelectedYear] = useState(new Date());
 
-  const { data: dashboardData, isLoading, error, refetch } = useSwingDashboard(ctx, selectedPeriod);
+  const handlePeriodSelect = (period: "1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL") => {
+    setSelectedPeriod(period);
+    setSelectedYear(new Date());
+  };
+
+  const {
+    data: dashboardData,
+    isLoading,
+    isPending,
+    error,
+    refetch,
+  } = useSwingDashboard(ctx, selectedPeriod);
   const { preferences } = useSwingPreferences(ctx);
 
   const handleNavigateToActivities = () => {
@@ -86,7 +97,7 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
     ctx.api.navigation.navigate("/addons/swingfolio/settings");
   };
 
-  if (isLoading) {
+  if (isLoading || isPending) {
     return <DashboardSkeleton />;
   }
 
@@ -156,7 +167,9 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
 
   const headerActions = (
     <>
-      <PeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
+      <div className="hidden md:block">
+        <PeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={handlePeriodSelect} />
+      </div>
       <Button
         variant="outline"
         className="hidden rounded-full sm:inline-flex"
@@ -192,6 +205,11 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
 
       <PageContent>
         <div className="space-y-4 sm:space-y-6">
+          {/* Mobile period selector */}
+          <div className="flex justify-end md:hidden">
+            <PeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={handlePeriodSelect} />
+          </div>
+
           {/* KPI Cards */}
           <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-3">
             {/* Widget 1: Overall P/L Summary - Clean Design */}
@@ -322,22 +340,15 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
           <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
             {/* Equity Curve */}
             <Card className="flex flex-col">
-              <CardHeader className="shrink-0 pb-3">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <CardTitle className="text-base sm:text-lg">
-                      {getChartPeriodDisplay(selectedPeriod).type} Equity Curve
-                    </CardTitle>
-                    <p className="text-muted-foreground text-xs sm:text-sm">
-                      {getChartPeriodDisplay(selectedPeriod).description}
-                    </p>
-                  </div>
-                  <div className="bg-secondary text-muted-foreground self-start rounded-full px-2 py-1 text-xs whitespace-nowrap sm:self-auto">
-                    {selectedPeriod} → {getChartPeriodDisplay(selectedPeriod).type}
-                  </div>
-                </div>
+              <CardHeader className="shrink-0 pb-2">
+                <CardTitle className="text-base sm:text-lg">
+                  {getChartPeriodDisplay(selectedPeriod).type} Equity Curve
+                </CardTitle>
+                <p className="text-muted-foreground text-xs sm:text-sm">
+                  {getChartPeriodDisplay(selectedPeriod).description}
+                </p>
               </CardHeader>
-              <CardContent className="flex min-h-0 flex-1 flex-col py-4 sm:py-6">
+              <CardContent className="flex min-h-0 flex-1 flex-col px-2 py-2 sm:px-6 sm:py-4">
                 <EquityCurveChart
                   data={chartEquityData}
                   currency={metrics.currency}
@@ -352,7 +363,7 @@ export default function DashboardPage({ ctx }: DashboardPageProps) {
               </CardContent>
             </Card>
             <Card className="flex flex-col pt-0">
-              <CardContent className="flex min-h-0 flex-1 flex-col py-4 sm:py-6">
+              <CardContent className="flex min-h-0 flex-1 flex-col px-2 py-2 sm:px-6 sm:py-4">
                 <AdaptiveCalendarView
                   calendar={calendar}
                   selectedPeriod={selectedPeriod}

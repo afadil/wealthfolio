@@ -93,6 +93,13 @@ const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputProps>(
           }
         }}
         inputMode="decimal"
+        onPaste={(e) => {
+          const text = e.clipboardData.getData("text");
+          if ((text.match(/,/g) || []).length === 1) {
+            e.preventDefault();
+            document.execCommand("insertText", false, text.replace(",", "."));
+          }
+        }}
       />
     );
   },

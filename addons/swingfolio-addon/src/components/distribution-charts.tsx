@@ -56,9 +56,16 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
     }))
     .sort((a, b) => b.count - a.count);
 
-  const formatCurrency = (value: number) => {
-    return formatAmount(value, currency);
-  };
+  const formatCurrency = (value: number) => formatAmount(value, currency);
+
+  const formatCompactCurrency = (value: number) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+      currencyDisplay: "narrowSymbol",
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(value);
 
   const chartConfig = {
     pl: {
@@ -78,27 +85,27 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
   const hasHoldingPeriodData = holdingPeriodData.length > 0;
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
+    <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
       {/* P/L by Symbol */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">P/L by Symbol</CardTitle>
+          <CardTitle className="text-sm sm:text-lg">P/L by Symbol</CardTitle>
         </CardHeader>
         <CardContent>
           {hasSymbolData ? (
-            <ChartContainer config={chartConfig} className="h-[300px]">
+            <ChartContainer config={chartConfig} className="h-[200px] w-full sm:h-[300px]">
               <BarChart data={symbolData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid vertical={false} />
                 <XAxis
                   dataKey="name"
                   tickLine={false}
-                  tickMargin={10}
+                  tickMargin={12}
                   axisLine={false}
                   angle={-45}
                   textAnchor="end"
-                  height={60}
+                  height={65}
                 />
-                <YAxis tickLine={false} axisLine={false} tickFormatter={formatCurrency} />
+                <YAxis tickLine={false} axisLine={false} tickFormatter={formatCompactCurrency} />
                 <ChartTooltip
                   content={
                     <ChartTooltipContent
@@ -145,12 +152,12 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
               </BarChart>
             </ChartContainer>
           ) : (
-            <div className="flex h-[300px] w-full items-center justify-center">
+            <div className="flex h-[150px] w-full items-center justify-center sm:h-[200px]">
               <EmptyPlaceholder
                 className="mx-auto flex max-w-[420px] items-center justify-center"
-                icon={<Icons.BarChart className="h-10 w-10" />}
+                icon={<Icons.BarChart className="h-8 w-8" />}
                 title="No Symbol Data"
-                description="No completed trades in this period to analyze P/L by symbol. Switch to a different time period or wait for more trading activity."
+                description="No completed trades in this period."
               />
             </div>
           )}
@@ -160,11 +167,11 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
       {/* P/L by Holding Period */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">P/L by Holding Period</CardTitle>
+          <CardTitle className="text-sm sm:text-lg">P/L by Holding Period</CardTitle>
         </CardHeader>
         <CardContent>
           {hasHoldingPeriodData ? (
-            <ChartContainer config={chartConfig} className="h-[300px]">
+            <ChartContainer config={chartConfig} className="h-[200px] w-full sm:h-[300px]">
               <BarChart
                 data={holdingPeriodData}
                 margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
@@ -173,13 +180,13 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
                 <XAxis
                   dataKey="name"
                   tickLine={false}
-                  tickMargin={10}
+                  tickMargin={12}
                   axisLine={false}
                   angle={-45}
                   textAnchor="end"
-                  height={60}
+                  height={65}
                 />
-                <YAxis tickLine={false} axisLine={false} tickFormatter={formatCurrency} />
+                <YAxis tickLine={false} axisLine={false} tickFormatter={formatCompactCurrency} />
                 <ChartTooltip
                   content={
                     <ChartTooltipContent
@@ -226,12 +233,12 @@ export function DistributionCharts({ distribution, currency }: DistributionChart
               </BarChart>
             </ChartContainer>
           ) : (
-            <div className="flex h-[300px] w-full items-center justify-center">
+            <div className="flex h-[150px] w-full items-center justify-center sm:h-[200px]">
               <EmptyPlaceholder
                 className="mx-auto flex max-w-[420px] items-center justify-center"
-                icon={<Icons.Clock className="h-10 w-10" />}
+                icon={<Icons.Clock className="h-8 w-8" />}
                 title="No Holding Period Data"
-                description="No completed trades in this period to analyze P/L by holding period. This chart shows performance across different time horizons."
+                description="No completed trades in this period."
               />
             </div>
           )}

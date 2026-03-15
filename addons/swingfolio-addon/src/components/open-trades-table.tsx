@@ -10,9 +10,10 @@ import {
   TableRow,
   Icons,
   EmptyPlaceholder,
+  Separator,
 } from "@wealthfolio/ui";
 import { TickerAvatar } from "./ticker-avatar";
-import { parseOccSymbol, formatOptionDescription } from "../lib/utils";
+import { parseOccSymbol, formatOptionDescription, cn } from "../lib/utils";
 import type { OpenPosition } from "../types";
 
 interface OpenTradesTableProps {
@@ -20,10 +21,35 @@ interface OpenTradesTableProps {
   onAssetClick?: (assetId: string) => void;
 }
 
+function PositionInfo({ position }: { position: OpenPosition }) {
+  const parsed = parseOccSymbol(position.symbol);
+  const displaySymbol = parsed ? parsed.underlying : position.symbol;
+  const optionDescription = formatOptionDescription(position.symbol);
+
+  return (
+    <div className="flex items-center gap-2">
+      <TickerAvatar symbol={position.symbol} className="h-8 w-8" />
+      <div className="min-w-0">
+        <div className="font-medium">{displaySymbol}</div>
+        {optionDescription ? (
+          <div className="text-muted-foreground text-xs">{optionDescription}</div>
+        ) : position.assetName ? (
+          <div
+            className="text-muted-foreground max-w-[120px] truncate text-xs"
+            title={position.assetName}
+          >
+            {position.assetName}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function OpenTradesTable({ positions, onAssetClick }: OpenTradesTableProps) {
   if (positions.length === 0) {
     return (
-      <div className="flex h-[300px] w-full items-center justify-center">
+      <div className="flex h-[200px] w-full items-center justify-center sm:h-[300px]">
         <EmptyPlaceholder
           className="mx-auto flex max-w-[400px] items-center justify-center"
           icon={<Icons.TrendingUp className="h-10 w-10" />}
@@ -36,7 +62,39 @@ export function OpenTradesTable({ positions, onAssetClick }: OpenTradesTableProp
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border">
+      {/* Mobile card layout */}
+      <div className="space-y-2 md:hidden">
+        {positions.map((position, index) => (
+          <div key={position.id}>
+            <div
+              className={cn(
+                "flex items-center justify-between p-3",
+                onAssetClick && "cursor-pointer",
+              )}
+              onClick={() => onAssetClick?.(position.assetId)}
+            >
+              <PositionInfo position={position} />
+              <div className="flex items-center gap-2 text-right">
+                <div>
+                  <GainAmount
+                    value={position.unrealizedPL}
+                    currency={position.currency}
+                    className="text-sm font-medium"
+                  />
+                  <GainPercent value={position.unrealizedReturnPercent} className="text-xs" />
+                </div>
+                <Badge variant="outline" className="text-xs">
+                  {position.daysOpen}d
+                </Badge>
+              </div>
+            </div>
+            {index < positions.length - 1 && <Separator />}
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop table layout */}
+      <div className="hidden rounded-md border md:block">
         <Table>
           <TableHeader>
             <TableRow>
