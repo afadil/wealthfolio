@@ -156,11 +156,38 @@ mod tests {
         async fn get_or_create_minimal_asset(
             &self,
             asset_id: &str,
-            _context_currency: Option<String>,
-            _metadata: Option<crate::assets::AssetMetadata>,
-            _quote_mode: Option<String>,
+            context_currency: Option<String>,
+            metadata: Option<crate::assets::AssetMetadata>,
+            quote_mode: Option<String>,
         ) -> Result<Asset> {
-            self.get_asset_by_id(asset_id)
+            if let Ok(asset) = self.get_asset_by_id(asset_id) {
+                return Ok(asset);
+            }
+
+            let metadata = metadata.unwrap_or_default();
+            let quote_mode = quote_mode
+                .as_deref()
+                .map(|mode| match mode.to_uppercase().as_str() {
+                    "MANUAL" => crate::assets::QuoteMode::Manual,
+                    _ => crate::assets::QuoteMode::Market,
+                })
+                .unwrap_or_default();
+            let asset = Asset {
+                id: asset_id.to_string(),
+                name: metadata.name,
+                display_code: metadata
+                    .display_code
+                    .or_else(|| metadata.instrument_symbol.clone()),
+                metadata: metadata.asset_metadata,
+                quote_mode,
+                quote_ccy: context_currency.unwrap_or_else(|| "USD".to_string()),
+                instrument_type: metadata.instrument_type,
+                instrument_symbol: metadata.instrument_symbol,
+                instrument_exchange_mic: metadata.instrument_exchange_mic,
+                ..Default::default()
+            };
+            self.assets.lock().unwrap().push(asset.clone());
+            Ok(asset)
         }
 
         async fn enrich_asset_profile(&self, _asset_id: &str) -> Result<Asset> {
@@ -190,15 +217,51 @@ mod tests {
             _activity_repository: &dyn crate::activities::ActivityRepositoryTrait,
         ) -> Result<crate::assets::EnsureAssetsResult> {
             let mut result = crate::assets::EnsureAssetsResult::default();
-            let assets = self.assets.lock().unwrap();
+            let mut assets = self.assets.lock().unwrap();
 
-            // Look up existing assets by spec ID
             for spec in specs {
                 if let Some(ref id) = spec.id {
-                    if let Some(asset) = assets.iter().find(|a| a.id == *id) {
-                        result.assets.insert(id.clone(), asset.clone());
+                    if let Some(asset) = assets.iter().find(|a| a.id == *id).cloned() {
+                        result.assets.insert(id.clone(), asset);
+                        continue;
                     }
                 }
+
+                let instrument_key = spec.instrument_key();
+                if let Some(existing) = instrument_key
+                    .as_deref()
+                    .and_then(|key| {
+                        assets
+                            .iter()
+                            .find(|asset| asset.instrument_key.as_deref() == Some(key))
+                    })
+                    .cloned()
+                {
+                    result.assets.insert(existing.id.clone(), existing);
+                    continue;
+                }
+
+                let id = spec
+                    .id
+                    .clone()
+                    .unwrap_or_else(|| format!("generated-asset-{}", assets.len() + 1));
+                let asset = Asset {
+                    id: id.clone(),
+                    kind: spec.kind,
+                    name: spec.name,
+                    display_code: spec.display_code,
+                    metadata: spec.metadata,
+                    quote_mode: spec.quote_mode.unwrap_or_default(),
+                    quote_ccy: spec.quote_ccy,
+                    instrument_type: spec.instrument_type,
+                    instrument_symbol: spec.instrument_symbol,
+                    instrument_exchange_mic: spec.instrument_exchange_mic,
+                    instrument_key,
+                    ..Default::default()
+                };
+                assets.push(asset.clone());
+                result.created_ids.push(id.clone());
+                result.assets.insert(id, asset);
             }
 
             Ok(result)
@@ -426,6 +489,46 @@ mod tests {
             query: &str,
             _account_currency: Option<&str>,
         ) -> Result<Vec<SymbolSearchResult>> {
+            if query.eq_ignore_ascii_case("DPZ") {
+                return Ok(vec![SymbolSearchResult {
+                    symbol: "DPZ".to_string(),
+                    short_name: "Domino's".to_string(),
+                    long_name: "Domino's Pizza Inc".to_string(),
+                    exchange: "NYSE".to_string(),
+                    exchange_mic: Some("XNYS".to_string()),
+                    exchange_name: Some("New York Stock Exchange".to_string()),
+                    quote_type: "EQUITY".to_string(),
+                    type_display: "Equity".to_string(),
+                    currency: Some("USD".to_string()),
+                    currency_source: Some("provider".to_string()),
+                    data_source: Some("YAHOO".to_string()),
+                    is_existing: false,
+                    existing_asset_id: None,
+                    index: String::new(),
+                    score: 1.0,
+                }]);
+            }
+
+            if query.eq_ignore_ascii_case("HD") {
+                return Ok(vec![SymbolSearchResult {
+                    symbol: "HD".to_string(),
+                    short_name: "Home Depot".to_string(),
+                    long_name: "The Home Depot, Inc.".to_string(),
+                    exchange: "NYSE".to_string(),
+                    exchange_mic: Some("XNYS".to_string()),
+                    exchange_name: Some("New York Stock Exchange".to_string()),
+                    quote_type: "EQUITY".to_string(),
+                    type_display: "Equity".to_string(),
+                    currency: Some("USD".to_string()),
+                    currency_source: Some("provider".to_string()),
+                    data_source: Some("YAHOO".to_string()),
+                    is_existing: false,
+                    existing_asset_id: None,
+                    index: String::new(),
+                    score: 1.0,
+                }]);
+            }
+
             if query.eq_ignore_ascii_case("VWRPL") {
                 return Ok(vec![SymbolSearchResult {
                     symbol: "VWRPL".to_string(),
@@ -455,6 +558,15 @@ mod tests {
             exchange_mic: Option<&str>,
             _instrument_type: Option<&InstrumentType>,
         ) -> Result<ResolvedQuote> {
+            let is_us_equity = exchange_mic == Some("XNYS")
+                && (symbol.eq_ignore_ascii_case("DPZ") || symbol.eq_ignore_ascii_case("HD"));
+            if is_us_equity {
+                return Ok(ResolvedQuote {
+                    currency: Some("USD".to_string()),
+                    price: Some(dec!(100)),
+                });
+            }
+
             let is_uk_vwrp = (exchange_mic == Some("XLON") || exchange_mic == Some("CXE"))
                 && (symbol.eq_ignore_ascii_case("VWRPL")
                     || symbol.eq_ignore_ascii_case("VWRPL.XC"));
@@ -1429,7 +1541,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_create_rejects_new_equity_without_requested_quote_ccy() {
+    async fn test_create_live_resolves_new_equity_without_preknown_quote_ccy() {
         let account_service = Arc::new(MockAccountService::new());
         let asset_service = Arc::new(MockAssetService::new());
         let fx_service = Arc::new(MockFxService::new());
@@ -1451,8 +1563,7 @@ mod tests {
             id: Some("activity-missing-quote".to_string()),
             account_id: "acc-1".to_string(),
             symbol: Some(SymbolInput {
-                symbol: Some("NFLX".to_string()),
-                exchange_mic: Some("XNAS".to_string()),
+                symbol: Some("DPZ".to_string()),
                 instrument_type: Some("EQUITY".to_string()),
                 quote_mode: Some("MARKET".to_string()),
                 ..Default::default()
@@ -1477,16 +1588,16 @@ mod tests {
         };
 
         let result = activity_service.create_activity(new_activity).await;
-        assert!(result.is_err());
-        let error = result.err().unwrap().to_string();
+        assert!(result.is_ok(), "unexpected error: {:?}", result.err());
+        let created = result.unwrap();
         assert!(
-            error.contains("Quote currency is required"),
-            "unexpected error: {error}"
+            created.asset_id.is_some(),
+            "new equity should create an asset"
         );
     }
 
     #[tokio::test]
-    async fn test_bulk_create_rejects_new_equity_without_requested_quote_ccy() {
+    async fn test_bulk_create_live_resolves_new_equity_without_preknown_quote_ccy() {
         let account_service = Arc::new(MockAccountService::new());
         let asset_service = Arc::new(MockAssetService::new());
         let fx_service = Arc::new(MockFxService::new());
@@ -1509,8 +1620,7 @@ mod tests {
                 id: Some("temp-1".to_string()),
                 account_id: "acc-1".to_string(),
                 symbol: Some(SymbolInput {
-                    symbol: Some("NVDA".to_string()),
-                    exchange_mic: Some("XNAS".to_string()),
+                    symbol: Some("HD".to_string()),
                     instrument_type: Some("EQUITY".to_string()),
                     quote_mode: Some("MARKET".to_string()),
                     ..Default::default()
@@ -1541,15 +1651,13 @@ mod tests {
             .bulk_mutate_activities(request)
             .await
             .unwrap();
-        assert_eq!(result.errors.len(), 1);
-        assert_eq!(result.errors[0].action, "create");
         assert!(
-            result.errors[0]
-                .message
-                .contains("Quote currency is required"),
-            "unexpected error: {}",
-            result.errors[0].message
+            result.errors.is_empty(),
+            "unexpected errors: {:?}",
+            result.errors
         );
+        assert_eq!(result.created.len(), 1);
+        assert!(result.created[0].asset_id.is_some());
     }
 
     /// Test: For NEW activities, symbol takes priority over asset_id to ensure canonical ID generation
@@ -2655,6 +2763,135 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_import_apply_live_resolves_new_equity_without_preknown_mic_or_quote_ccy() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let import = ActivityImport {
+            id: None,
+            date: "2024-01-15".to_string(),
+            symbol: "DPZ".to_string(),
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(1)),
+            unit_price: Some(dec!(400)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(400)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: None,
+            exchange_mic: None,
+            quote_ccy: None,
+            instrument_type: Some("EQUITY".to_string()),
+            quote_mode: Some("MARKET".to_string()),
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+        };
+
+        let checked = activity_service
+            .check_activities_import("acc-1".to_string(), vec![import])
+            .await
+            .expect("import check should succeed");
+        assert_eq!(checked[0].exchange_mic.as_deref(), Some("XNYS"));
+        assert_eq!(checked[0].quote_ccy.as_deref(), Some("USD"));
+
+        let result = activity_service
+            .import_activities("acc-1".to_string(), checked)
+            .await
+            .expect("import should succeed");
+
+        assert!(result.summary.success);
+        assert_eq!(result.summary.imported, 1);
+
+        let stored = activity_repository
+            .get_activities()
+            .expect("stored activities should be readable");
+        assert_eq!(stored.len(), 1);
+        assert!(
+            stored[0].asset_id.is_some(),
+            "import apply should persist a linked asset"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_create_rejects_unresolved_market_equity_symbol() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let new_activity = NewActivity {
+            id: Some("activity-unknown-symbol".to_string()),
+            account_id: "acc-1".to_string(),
+            symbol: Some(SymbolInput {
+                symbol: Some("NOTAREAL".to_string()),
+                instrument_type: Some("EQUITY".to_string()),
+                quote_mode: Some("MARKET".to_string()),
+                ..Default::default()
+            }),
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(dec!(1)),
+            unit_price: Some(dec!(10)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(10)),
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+        };
+
+        let result = activity_service.create_activity(new_activity).await;
+        assert!(result.is_err());
+        let error = result.err().unwrap().to_string();
+        assert!(
+            error.contains("Could not find 'NOTAREAL' in market data"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[tokio::test]
     async fn test_import_accepts_manual_equity_without_exchange_mic() {
         let account_service = Arc::new(MockAccountService::new());
         let asset_service = Arc::new(MockAssetService::new());
@@ -2723,8 +2960,8 @@ mod tests {
             .expect("stored activities should be readable");
         assert_eq!(stored.len(), 1);
         assert!(
-            stored[0].asset_id.is_none(),
-            "import apply should not live-resolve missing MIC during persistence"
+            stored[0].asset_id.as_deref() != Some("vwrpl-uuid"),
+            "manual quote import should not live-resolve missing MIC to the existing market asset"
         );
     }
 

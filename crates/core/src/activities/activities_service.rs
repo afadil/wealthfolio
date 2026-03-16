@@ -142,6 +142,73 @@ impl ActivityService {
             .and_then(|asset| normalize_quote_ccy_code(Some(asset.quote_ccy.as_str())))
     }
 
+    fn should_live_resolve_market_equity(
+        instrument_type: Option<&InstrumentType>,
+        quote_mode: Option<QuoteMode>,
+    ) -> bool {
+        matches!(instrument_type, Some(InstrumentType::Equity))
+            && !matches!(quote_mode, Some(QuoteMode::Manual))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn enrich_symbol_quote_metadata(
+        &self,
+        symbol: &str,
+        asset_id: Option<&str>,
+        exchange_mic: Option<String>,
+        instrument_type: Option<&InstrumentType>,
+        quote_mode: Option<QuoteMode>,
+        explicit_quote_ccy: Option<&str>,
+        terminal_fallback: &str,
+        allow_live_resolution: bool,
+    ) -> (
+        Option<String>,
+        String,
+        Option<String>,
+        QuoteCcyResolutionSource,
+    ) {
+        let allow_provider_lookup = allow_live_resolution
+            && Self::should_live_resolve_market_equity(instrument_type, quote_mode);
+        let exchange_mic = if allow_provider_lookup && exchange_mic.is_none() {
+            self.resolve_symbol_exchange_mic(symbol, terminal_fallback)
+                .await
+                .or(exchange_mic)
+        } else {
+            exchange_mic
+        };
+
+        let existing_asset_quote_ccy =
+            self.existing_asset_quote_ccy_by_id(asset_id).or_else(|| {
+                self.asset_service.existing_quote_ccy_by_symbol(
+                    symbol,
+                    exchange_mic.as_deref(),
+                    instrument_type,
+                )
+            });
+        let (resolved_quote_ccy, resolution_source) = self
+            .resolve_quote_ccy(
+                symbol,
+                exchange_mic.as_deref(),
+                instrument_type,
+                explicit_quote_ccy,
+                existing_asset_quote_ccy.as_deref(),
+                terminal_fallback,
+                allow_provider_lookup,
+            )
+            .await;
+        let validation_quote_ccy = match resolution_source {
+            QuoteCcyResolutionSource::TerminalFallback => None,
+            _ => Some(resolved_quote_ccy.clone()),
+        };
+
+        (
+            exchange_mic,
+            resolved_quote_ccy,
+            validation_quote_ccy,
+            resolution_source,
+        )
+    }
+
     #[allow(clippy::too_many_arguments)]
     async fn resolve_quote_ccy(
         &self,
@@ -837,7 +904,7 @@ impl ActivityService {
             .map(Self::kind_from_instrument_type)
             .or_else(|| inferred.as_ref().map(|(kind, _)| kind.clone()));
 
-        // Normalize symbol + MIC using payload/suffix only (no live lookup for user save paths).
+        // Normalize symbol + MIC using payload/suffix first, then enrich market equities before validation.
         let is_crypto = effective_instrument_type.as_ref() == Some(&InstrumentType::Crypto);
         let is_option = effective_instrument_type.as_ref() == Some(&InstrumentType::Option);
         let is_non_security_instrument = matches!(
@@ -848,7 +915,7 @@ impl ActivityService {
             .as_deref()
             .map(parse_symbol_with_exchange_suffix)
             .unwrap_or(("", None));
-        let exchange_mic = if is_non_security_instrument {
+        let mut exchange_mic = if is_non_security_instrument {
             None
         } else {
             exchange_mic.or_else(|| suffix_mic.map(|mic| mic.to_string()))
@@ -872,11 +939,50 @@ impl ActivityService {
             Some(base_symbol.to_string())
         };
 
+        let existing_symbol_id = activity.get_symbol_id().filter(|id| !id.trim().is_empty());
+        let quote_lookup_symbol = normalized_symbol_for_lookup.clone().unwrap_or_default();
+        let (resolved_quote_ccy, validation_quote_ccy, quote_resolution_source) =
+            if is_crypto || is_non_security_instrument || quote_lookup_symbol.is_empty() {
+                (
+                    quote_ccy_input.clone().unwrap_or_else(|| currency.clone()),
+                    quote_ccy_input.clone(),
+                    QuoteCcyResolutionSource::TerminalFallback,
+                )
+            } else {
+                let (resolved_exchange_mic, resolved_quote_ccy, validation_quote_ccy, source) =
+                    self.enrich_symbol_quote_metadata(
+                        quote_lookup_symbol.as_str(),
+                        existing_symbol_id,
+                        exchange_mic.clone(),
+                        effective_instrument_type.as_ref(),
+                        parsed_quote_mode,
+                        quote_ccy_input.as_deref(),
+                        currency.as_str(),
+                        true,
+                    )
+                    .await;
+                exchange_mic = resolved_exchange_mic;
+                (resolved_quote_ccy, validation_quote_ccy, source)
+            };
+
         match symbol.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
             Some(raw_symbol) => {
                 if is_garbage_symbol(raw_symbol) {
                     return Err(ActivityError::InvalidData(format!(
                         "Invalid symbol '{}'. Please search for a valid ticker.",
+                        raw_symbol
+                    ))
+                    .into());
+                }
+
+                if Self::should_live_resolve_market_equity(
+                    effective_instrument_type.as_ref(),
+                    parsed_quote_mode,
+                ) && existing_symbol_id.is_none()
+                    && validation_quote_ccy.is_none()
+                {
+                    return Err(ActivityError::InvalidData(format!(
+                        "Could not find '{}' in market data. Please search for the correct ticker symbol.",
                         raw_symbol
                     ))
                     .into());
@@ -890,7 +996,7 @@ impl ActivityService {
                     exchange_mic.as_deref(),
                     effective_instrument_type.as_ref(),
                     parsed_quote_mode,
-                    quote_ccy_input.as_deref(),
+                    validation_quote_ccy.as_deref(),
                 )?;
             }
             None if activity
@@ -907,10 +1013,8 @@ impl ActivityService {
             None => {}
         }
 
-        let quote_lookup_symbol = normalized_symbol_for_lookup.clone().unwrap_or_default();
-
         // Use pair quote for crypto/FX; otherwise resolve from payload and existing data:
-        // explicit input -> existing asset -> MIC fallback -> activity/account.
+        // explicit input -> existing asset -> provider quote -> MIC fallback -> activity/account.
         let mut quote_ccy_for_asset = quote_ccy_input.clone();
         let asset_currency = if is_crypto {
             symbol
@@ -922,35 +1026,11 @@ impl ActivityService {
         } else if is_non_security_instrument {
             quote_ccy_input.clone().unwrap_or(currency.clone())
         } else {
-            let existing_asset_quote_ccy = self
-                .existing_asset_quote_ccy_by_id(
-                    activity.get_symbol_id().filter(|id| !id.trim().is_empty()),
-                )
-                .or_else(|| {
-                    normalized_symbol_for_lookup
-                        .as_deref()
-                        .and_then(|resolved_symbol| {
-                            self.asset_service.existing_quote_ccy_by_symbol(
-                                resolved_symbol,
-                                exchange_mic.as_deref(),
-                                effective_instrument_type.as_ref(),
-                            )
-                        })
-                });
-            let (resolved_quote_ccy, resolution_source) = self
-                .resolve_quote_ccy(
-                    quote_lookup_symbol.as_str(),
-                    exchange_mic.as_deref(),
-                    effective_instrument_type.as_ref(),
-                    quote_ccy_input.as_deref(),
-                    existing_asset_quote_ccy.as_deref(),
-                    currency.as_str(),
-                    false,
-                )
-                .await;
             if matches!(
-                resolution_source,
-                QuoteCcyResolutionSource::ExplicitInput | QuoteCcyResolutionSource::ProviderQuote
+                quote_resolution_source,
+                QuoteCcyResolutionSource::ExplicitInput
+                    | QuoteCcyResolutionSource::ProviderQuote
+                    | QuoteCcyResolutionSource::MicFallback
             ) {
                 quote_ccy_for_asset = Some(resolved_quote_ccy.clone());
             }
@@ -1229,7 +1309,7 @@ impl ActivityService {
             .map(Self::kind_from_instrument_type)
             .or_else(|| inferred.as_ref().map(|(kind, _)| kind.clone()));
 
-        // Normalize symbol + MIC using payload/suffix only (no live lookup for user save paths).
+        // Normalize symbol + MIC using payload/suffix first, then enrich market equities before validation.
         let is_crypto = effective_instrument_type.as_ref() == Some(&InstrumentType::Crypto);
         let is_non_security_instrument = matches!(
             effective_instrument_type.as_ref(),
@@ -1239,7 +1319,7 @@ impl ActivityService {
             .as_deref()
             .map(parse_symbol_with_exchange_suffix)
             .unwrap_or(("", None));
-        let exchange_mic = if is_non_security_instrument {
+        let mut exchange_mic = if is_non_security_instrument {
             None
         } else {
             exchange_mic.or_else(|| suffix_mic.map(|mic| mic.to_string()))
@@ -1262,11 +1342,50 @@ impl ActivityService {
             Some(base_symbol.to_string())
         };
 
+        let existing_symbol_id = activity.get_symbol_id().filter(|id| !id.trim().is_empty());
+        let quote_lookup_symbol = normalized_symbol_for_lookup.clone().unwrap_or_default();
+        let (resolved_quote_ccy, validation_quote_ccy, quote_resolution_source) =
+            if is_crypto || is_non_security_instrument || quote_lookup_symbol.is_empty() {
+                (
+                    quote_ccy_input.clone().unwrap_or_else(|| currency.clone()),
+                    quote_ccy_input.clone(),
+                    QuoteCcyResolutionSource::TerminalFallback,
+                )
+            } else {
+                let (resolved_exchange_mic, resolved_quote_ccy, validation_quote_ccy, source) =
+                    self.enrich_symbol_quote_metadata(
+                        quote_lookup_symbol.as_str(),
+                        existing_symbol_id,
+                        exchange_mic.clone(),
+                        effective_instrument_type.as_ref(),
+                        parsed_quote_mode,
+                        quote_ccy_input.as_deref(),
+                        currency.as_str(),
+                        true,
+                    )
+                    .await;
+                exchange_mic = resolved_exchange_mic;
+                (resolved_quote_ccy, validation_quote_ccy, source)
+            };
+
         match symbol.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
             Some(raw_symbol) => {
                 if is_garbage_symbol(raw_symbol) {
                     return Err(ActivityError::InvalidData(format!(
                         "Invalid symbol '{}'. Please search for a valid ticker.",
+                        raw_symbol
+                    ))
+                    .into());
+                }
+
+                if Self::should_live_resolve_market_equity(
+                    effective_instrument_type.as_ref(),
+                    parsed_quote_mode,
+                ) && existing_symbol_id.is_none()
+                    && validation_quote_ccy.is_none()
+                {
+                    return Err(ActivityError::InvalidData(format!(
+                        "Could not find '{}' in market data. Please search for the correct ticker symbol.",
                         raw_symbol
                     ))
                     .into());
@@ -1280,7 +1399,7 @@ impl ActivityService {
                     exchange_mic.as_deref(),
                     effective_instrument_type.as_ref(),
                     parsed_quote_mode,
-                    quote_ccy_input.as_deref(),
+                    validation_quote_ccy.as_deref(),
                 )?;
             }
             None if activity
@@ -1297,7 +1416,6 @@ impl ActivityService {
             None => {}
         }
 
-        let quote_lookup_symbol = normalized_symbol_for_lookup.clone().unwrap_or_default();
         let mut quote_ccy_for_asset = quote_ccy_input.clone();
         let asset_currency = if is_crypto {
             symbol
@@ -1309,35 +1427,11 @@ impl ActivityService {
         } else if is_non_security_instrument {
             quote_ccy_input.clone().unwrap_or(currency.clone())
         } else {
-            let existing_asset_quote_ccy = self
-                .existing_asset_quote_ccy_by_id(
-                    activity.get_symbol_id().filter(|id| !id.trim().is_empty()),
-                )
-                .or_else(|| {
-                    normalized_symbol_for_lookup
-                        .as_deref()
-                        .and_then(|resolved_symbol| {
-                            self.asset_service.existing_quote_ccy_by_symbol(
-                                resolved_symbol,
-                                exchange_mic.as_deref(),
-                                effective_instrument_type.as_ref(),
-                            )
-                        })
-                });
-            let (resolved_quote_ccy, resolution_source) = self
-                .resolve_quote_ccy(
-                    quote_lookup_symbol.as_str(),
-                    exchange_mic.as_deref(),
-                    effective_instrument_type.as_ref(),
-                    quote_ccy_input.as_deref(),
-                    existing_asset_quote_ccy.as_deref(),
-                    currency.as_str(),
-                    false,
-                )
-                .await;
             if matches!(
-                resolution_source,
-                QuoteCcyResolutionSource::ExplicitInput | QuoteCcyResolutionSource::ProviderQuote
+                quote_resolution_source,
+                QuoteCcyResolutionSource::ExplicitInput
+                    | QuoteCcyResolutionSource::ProviderQuote
+                    | QuoteCcyResolutionSource::MicFallback
             ) {
                 quote_ccy_for_asset = Some(resolved_quote_ccy.clone());
             }
@@ -1602,19 +1696,6 @@ impl ActivityService {
         // Strip Yahoo suffix from symbol (e.g. GOOG.TO → GOOG + XTSE)
         let (base_symbol, suffix_mic) = parse_symbol_with_exchange_suffix(&symbol);
 
-        // Get exchange MIC: prefer explicit value, then cache, then suffix-derived
-        let allow_live_resolution = mode.allows_live_resolution();
-        let cached_exchange_mic = if allow_live_resolution {
-            symbol_mic_cache.get(&symbol).cloned().flatten()
-        } else {
-            None
-        };
-        let exchange_mic = activity
-            .get_exchange_mic()
-            .map(|s| s.to_string())
-            .or(cached_exchange_mic)
-            .or_else(|| suffix_mic.map(|s| s.to_string()));
-
         // Determine currency
         let currency = if !activity.currency.is_empty() {
             activity.currency.clone()
@@ -1623,10 +1704,17 @@ impl ActivityService {
         };
 
         let instrument_type_input = Self::parse_instrument_type(activity.get_instrument_type());
+        let exchange_mic_for_inference = activity
+            .get_exchange_mic()
+            .map(|s| s.to_string())
+            .or_else(|| suffix_mic.map(|s| s.to_string()));
 
         // Infer asset kind and instrument type using base symbol
-        let (inferred_kind, inferred_instrument_type) =
-            self.infer_asset_kind(base_symbol, exchange_mic.as_deref(), activity.get_kind());
+        let (inferred_kind, inferred_instrument_type) = self.infer_asset_kind(
+            base_symbol,
+            exchange_mic_for_inference.as_deref(),
+            activity.get_kind(),
+        );
         let instrument_type = instrument_type_input.clone().or(inferred_instrument_type);
         let kind = instrument_type_input
             .as_ref()
@@ -1642,6 +1730,21 @@ impl ActivityService {
                 _ => None,
             });
 
+        // Get exchange MIC: prefer explicit value, then cache, then suffix-derived
+        let allow_live_resolution = mode.allows_live_resolution()
+            || (matches!(mode, PreparationMode::ImportApply | PreparationMode::Save)
+                && Self::should_live_resolve_market_equity(instrument_type.as_ref(), quote_mode));
+        let cached_exchange_mic = if allow_live_resolution {
+            symbol_mic_cache.get(&symbol).cloned().flatten()
+        } else {
+            None
+        };
+        let mut exchange_mic = activity
+            .get_exchange_mic()
+            .map(|s| s.to_string())
+            .or(cached_exchange_mic)
+            .or(exchange_mic_for_inference);
+
         // Crypto/FX assets don't have exchange MICs — clear any that leaked from frontend/suffix
         let is_crypto = instrument_type.as_ref() == Some(&InstrumentType::Crypto);
         let is_non_security = matches!(
@@ -1650,7 +1753,7 @@ impl ActivityService {
         );
         let is_option = instrument_type.as_ref() == Some(&InstrumentType::Option);
         // OCC option symbols are globally unique — exchange MIC would fragment identity
-        let exchange_mic = if is_non_security || is_option {
+        exchange_mic = if is_non_security || is_option {
             None
         } else {
             exchange_mic
@@ -1667,56 +1770,65 @@ impl ActivityService {
         };
         let quote_lookup_symbol = normalized_symbol.clone();
 
-        if !allow_live_resolution {
-            self.asset_service.validate_persisted_symbol_metadata(
-                normalized_symbol.as_str(),
-                activity.get_symbol_id(),
-                exchange_mic.as_deref(),
-                instrument_type.as_ref(),
-                quote_mode,
-                quote_ccy_input.as_deref(),
-            )?;
+        let (resolved_quote_ccy, validation_quote_ccy, quote_resolution_source) = if is_crypto {
+            (
+                parse_crypto_pair_symbol(base_symbol)
+                    .map(|(_, quote)| quote)
+                    .or_else(|| quote_ccy_input.clone())
+                    .unwrap_or_else(|| currency.clone()),
+                quote_ccy_input.clone(),
+                QuoteCcyResolutionSource::TerminalFallback,
+            )
+        } else {
+            let (resolved_exchange_mic, resolved_quote_ccy, validation_quote_ccy, source) = self
+                .enrich_symbol_quote_metadata(
+                    quote_lookup_symbol.as_str(),
+                    activity.get_symbol_id().filter(|id| !id.trim().is_empty()),
+                    exchange_mic.clone(),
+                    instrument_type.as_ref(),
+                    quote_mode,
+                    quote_ccy_input.as_deref(),
+                    currency.as_str(),
+                    allow_live_resolution,
+                )
+                .await;
+            exchange_mic = resolved_exchange_mic;
+            (resolved_quote_ccy, validation_quote_ccy, source)
+        };
+
+        if Self::should_live_resolve_market_equity(instrument_type.as_ref(), quote_mode)
+            && activity
+                .get_symbol_id()
+                .filter(|id| !id.trim().is_empty())
+                .is_none()
+            && validation_quote_ccy.is_none()
+        {
+            return Err(ActivityError::InvalidData(format!(
+                "Could not find '{}' in market data. Please search for the correct ticker symbol.",
+                symbol
+            ))
+            .into());
         }
+
+        self.asset_service.validate_persisted_symbol_metadata(
+            normalized_symbol.as_str(),
+            activity.get_symbol_id(),
+            exchange_mic.as_deref(),
+            instrument_type.as_ref(),
+            quote_mode,
+            validation_quote_ccy.as_deref(),
+        )?;
 
         // For crypto, use the quote currency from the pair if available
         let mut quote_ccy_for_asset = quote_ccy_input.clone();
         let asset_currency = if is_crypto {
-            parse_crypto_pair_symbol(base_symbol)
-                .map(|(_, quote)| quote)
-                .or_else(|| quote_ccy_input.clone())
-                .unwrap_or_else(|| currency.clone())
+            resolved_quote_ccy
         } else {
-            let existing_asset_quote_ccy = self
-                .existing_asset_quote_ccy_by_id(
-                    activity.get_symbol_id().filter(|id| !id.trim().is_empty()),
-                )
-                .or_else(|| {
-                    self.asset_service.existing_quote_ccy_by_symbol(
-                        normalized_symbol.as_str(),
-                        exchange_mic.as_deref(),
-                        instrument_type.as_ref(),
-                    )
-                });
-            let allow_provider_lookup = allow_live_resolution
-                && quote_mode != Some(QuoteMode::Manual)
-                && !matches!(
-                    instrument_type.as_ref(),
-                    Some(InstrumentType::Crypto | InstrumentType::Fx)
-                );
-            let (resolved_quote_ccy, resolution_source) = self
-                .resolve_quote_ccy(
-                    quote_lookup_symbol.as_str(),
-                    exchange_mic.as_deref(),
-                    instrument_type.as_ref(),
-                    quote_ccy_input.as_deref(),
-                    existing_asset_quote_ccy.as_deref(),
-                    currency.as_str(),
-                    allow_provider_lookup,
-                )
-                .await;
             if matches!(
-                resolution_source,
-                QuoteCcyResolutionSource::ExplicitInput | QuoteCcyResolutionSource::ProviderQuote
+                quote_resolution_source,
+                QuoteCcyResolutionSource::ExplicitInput
+                    | QuoteCcyResolutionSource::ProviderQuote
+                    | QuoteCcyResolutionSource::MicFallback
             ) {
                 quote_ccy_for_asset = Some(resolved_quote_ccy.clone());
             }
@@ -2949,21 +3061,44 @@ impl ActivityService {
         let base_ccy = self.account_service.get_base_currency().unwrap_or_default();
         let account_currency = resolve_currency(&[&account.currency, &base_ccy]);
 
-        // 1. Batch resolve symbols → MICs when live resolution is enabled.
-        let symbol_mic_cache = if mode.allows_live_resolution() {
+        // 1. Batch resolve symbols → MICs for sync, and for import apply on new market equities.
+        let symbol_mic_cache = if mode.allows_live_resolution()
+            || matches!(mode, PreparationMode::ImportApply | PreparationMode::Save)
+        {
             let symbols_to_resolve: HashSet<String> = activities
                 .iter()
                 .filter_map(|a| {
                     let symbol = a.get_symbol_code()?;
                     let has_mic = a.get_exchange_mic().is_some();
+                    let quote_mode =
+                        a.get_quote_mode()
+                            .and_then(|value| match value.to_uppercase().as_str() {
+                                "MARKET" => Some(QuoteMode::Market),
+                                "MANUAL" => Some(QuoteMode::Manual),
+                                _ => None,
+                            });
                     let instrument_type_input =
                         Self::parse_instrument_type(a.get_instrument_type());
+                    let inferred_instrument_type = if instrument_type_input.is_none() {
+                        let (base_symbol, _) = parse_symbol_with_exchange_suffix(symbol);
+                        self.infer_asset_kind(base_symbol, None, a.get_kind()).1
+                    } else {
+                        None
+                    };
+                    let effective_instrument_type =
+                        instrument_type_input.clone().or(inferred_instrument_type);
                     let is_non_security_instrument = matches!(
-                        instrument_type_input,
+                        effective_instrument_type,
                         Some(InstrumentType::Crypto | InstrumentType::Fx)
                     );
                     let is_cash = symbol.starts_with("CASH:");
-                    if !has_mic && !is_cash && !is_non_security_instrument {
+                    let should_resolve = mode.allows_live_resolution()
+                        || (matches!(mode, PreparationMode::ImportApply | PreparationMode::Save)
+                            && Self::should_live_resolve_market_equity(
+                                effective_instrument_type.as_ref(),
+                                quote_mode,
+                            ));
+                    if should_resolve && !has_mic && !is_cash && !is_non_security_instrument {
                         Some(symbol.to_string())
                     } else {
                         None
