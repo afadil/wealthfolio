@@ -40,9 +40,9 @@ use wealthfolio_market_data::{
     mic_to_currency, mic_to_exchange_name, yahoo_exchange_to_mic, yahoo_suffix_to_mic,
     AlphaVantageProvider, AssetProfile as MarketAssetProfile, BoerseFrankfurtProvider,
     BondQuoteMetadata, FinnhubProvider, MarketDataAppProvider, MetalPriceApiProvider,
-    OpenFigiProvider, ProviderId, ProviderRegistry, Quote as MarketQuote, QuoteContext,
-    ResolverChain, SearchResult as MarketSearchResult, SplitEvent, UsTreasuryCalcProvider,
-    YahooProvider,
+    OpenFigiProvider, ProviderId, ProviderInstrument, ProviderOverrides, ProviderRegistry,
+    Quote as MarketQuote, QuoteContext, ResolverChain, SearchResult as MarketSearchResult,
+    SplitEvent, UsTreasuryCalcProvider, YahooProvider,
 };
 
 /// Market data error types.
@@ -339,9 +339,28 @@ impl MarketDataClient {
         })?;
 
         // Build provider overrides from asset.provider_config JSON
-        let overrides = asset
+        let mut overrides = asset
             .provider_overrides()
             .and_then(|json| wealthfolio_market_data::ProviderOverrides::from_json(json).ok());
+
+        // BF supports ISIN-based lookup for Frankfurt/Xetra-listed ETFs/equities.
+        // Synthesize an internal provider override when we already have a stable ISIN.
+        if asset.instrument_type == Some(crate::assets::InstrumentType::Equity)
+            && matches!(
+                asset.instrument_exchange_mic.as_deref(),
+                Some("XFRA" | "XETR")
+            )
+        {
+            if let Some(isin) = asset.identifier_isin() {
+                let overrides_ref = overrides.get_or_insert_with(ProviderOverrides::new);
+                if !overrides_ref.contains(DATA_SOURCE_BOERSE_FRANKFURT) {
+                    overrides_ref.insert(
+                        DATA_SOURCE_BOERSE_FRANKFURT.to_string(),
+                        ProviderInstrument::Isin { isin: isin.into() },
+                    );
+                }
+            }
+        }
 
         // Currency hint: prefer asset.quote_ccy, fall back to MIC-derived currency
         let currency_hint: Option<Cow<'static, str>> = if !asset.quote_ccy.is_empty() {
@@ -1045,6 +1064,62 @@ mod tests {
             context.bond_metadata.is_none(),
             "bond_metadata should be None when no bond spec exists"
         );
+    }
+
+    #[test]
+    fn test_build_quote_context_adds_boerse_frankfurt_isin_override_for_xetra_equity() {
+        let mut asset = create_test_asset(AssetKind::Investment, "XMME", "EUR");
+        asset.instrument_exchange_mic = Some("XETR".to_string());
+        asset.metadata = Some(serde_json::json!({
+            "identifiers": {
+                "isin": "IE00BTJRMP35"
+            }
+        }));
+
+        let client = create_test_client();
+        let context = client.build_quote_context(&asset).unwrap();
+        let instrument = context
+            .overrides
+            .as_ref()
+            .and_then(|o| o.get(DATA_SOURCE_BOERSE_FRANKFURT))
+            .expect("expected synthesized BF override");
+
+        match instrument {
+            ProviderInstrument::Isin { isin } => assert_eq!(isin.as_ref(), "IE00BTJRMP35"),
+            other => panic!("expected ISIN override, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_build_quote_context_preserves_existing_boerse_frankfurt_override() {
+        let mut asset = create_test_asset(AssetKind::Investment, "XMME", "EUR");
+        asset.instrument_exchange_mic = Some("XFRA".to_string());
+        asset.metadata = Some(serde_json::json!({
+            "identifiers": {
+                "isin": "IE00BTJRMP35"
+            }
+        }));
+        asset.provider_config = Some(serde_json::json!({
+            "overrides": {
+                "BOERSE_FRANKFURT": {
+                    "type": "equity_symbol",
+                    "symbol": "XMME"
+                }
+            }
+        }));
+
+        let client = create_test_client();
+        let context = client.build_quote_context(&asset).unwrap();
+        let instrument = context
+            .overrides
+            .as_ref()
+            .and_then(|o| o.get(DATA_SOURCE_BOERSE_FRANKFURT))
+            .expect("expected BF override");
+
+        match instrument {
+            ProviderInstrument::EquitySymbol { symbol } => assert_eq!(symbol.as_ref(), "XMME"),
+            other => panic!("expected existing equity override, got {:?}", other),
+        }
     }
 
     // =========================================================================

@@ -1,8 +1,8 @@
-//! Boerse Frankfurt (Deutsche Boerse) provider for bond market data.
+//! Boerse Frankfurt (Deutsche Boerse) provider for ISIN-backed securities.
 //!
-//! Fetches bond price history from the Deutsche Boerse live API (XFRA exchange).
-//! Prices are quoted as percentage-of-par and converted to decimal fractions
-//! (e.g., 97.025 -> 0.97025).
+//! Fetches price history from the Deutsche Boerse live API (XFRA exchange).
+//! Bond prices may be quoted as percentage-of-par and are converted to decimal
+//! fractions when `tradedInPercent` is true.
 //!
 //! No API key required. Authentication uses a salt scraped from the frontend JS bundle
 //! to compute per-request headers (`x-security`, `x-client-traceid`).
@@ -73,7 +73,7 @@ struct InstrumentName {
     original_value: Option<String>,
 }
 
-/// Boerse Frankfurt provider for bond market data.
+/// Boerse Frankfurt provider for ISIN-backed securities.
 pub struct BoerseFrankfurtProvider {
     client: Client,
     salt: Arc<RwLock<Option<String>>>,
@@ -209,7 +209,7 @@ impl BoerseFrankfurtProvider {
         headers
     }
 
-    /// Fetch the instrument name for a bond ISIN.
+    /// Fetch the instrument name for an ISIN-backed security.
     async fn fetch_instrument_name(&self, isin: &str) -> Result<String, MarketDataError> {
         let salt = self.get_salt().await?;
 
@@ -258,7 +258,26 @@ impl BoerseFrankfurtProvider {
             })
     }
 
-    /// Fetch price history for a bond ISIN.
+    fn extract_isin(instrument: &ProviderInstrument) -> Result<String, MarketDataError> {
+        match instrument {
+            ProviderInstrument::Isin { isin } | ProviderInstrument::BondIsin { isin } => {
+                Ok(isin.to_string())
+            }
+            _ => Err(MarketDataError::UnsupportedAssetType(format!(
+                "{:?}",
+                instrument
+            ))),
+        }
+    }
+
+    fn convert_price(raw: f64, traded_in_percent: bool) -> Result<Decimal, MarketDataError> {
+        let normalized = if traded_in_percent { raw / 100.0 } else { raw };
+        Decimal::try_from(normalized).map_err(|_| MarketDataError::ValidationFailed {
+            message: format!("Failed to convert price {} to decimal", raw),
+        })
+    }
+
+    /// Fetch price history for an ISIN-backed security.
     async fn fetch_price_history(
         &self,
         isin: &str,
@@ -312,6 +331,8 @@ impl BoerseFrankfurtProvider {
             return Err(MarketDataError::SymbolNotFound(isin.to_string()));
         }
 
+        let traded_in_percent = body.traded_in_percent.unwrap_or(false);
+
         // Use the asset's quote_ccy from context, or default to EUR for XFRA
         let currency = currency_hint.unwrap_or("EUR").to_string();
 
@@ -324,21 +345,21 @@ impl BoerseFrankfurtProvider {
                 }
             })?;
 
-            let close_pct = match point.close {
+            let close_raw = match point.close {
                 Some(c) => c,
                 None => continue,
             };
 
-            // Prices are %-of-par: 97.025 means 97.025% → 0.97025
-            let close = Decimal::try_from(close_pct / 100.0).map_err(|_| {
-                MarketDataError::ValidationFailed {
-                    message: format!("Failed to convert close {} to decimal", close_pct),
-                }
-            })?;
-
-            let open = point.open.and_then(|v| Decimal::try_from(v / 100.0).ok());
-            let high = point.high.and_then(|v| Decimal::try_from(v / 100.0).ok());
-            let low = point.low.and_then(|v| Decimal::try_from(v / 100.0).ok());
+            let close = Self::convert_price(close_raw, traded_in_percent)?;
+            let open = point
+                .open
+                .and_then(|v| Self::convert_price(v, traded_in_percent).ok());
+            let high = point
+                .high
+                .and_then(|v| Self::convert_price(v, traded_in_percent).ok());
+            let low = point
+                .low
+                .and_then(|v| Self::convert_price(v, traded_in_percent).ok());
             let volume = point
                 .turnover_pieces
                 .and_then(|v| Decimal::try_from(v).ok());
@@ -408,7 +429,7 @@ impl MarketDataProvider for BoerseFrankfurtProvider {
 
     fn capabilities(&self) -> ProviderCapabilities {
         ProviderCapabilities {
-            instrument_kinds: &[InstrumentKind::Bond],
+            instrument_kinds: &[InstrumentKind::Bond, InstrumentKind::Equity],
             coverage: Coverage::global_best_effort(),
             supports_latest: true,
             supports_historical: true,
@@ -430,15 +451,7 @@ impl MarketDataProvider for BoerseFrankfurtProvider {
         context: &QuoteContext,
         instrument: ProviderInstrument,
     ) -> Result<Quote, MarketDataError> {
-        let isin = match &instrument {
-            ProviderInstrument::BondIsin { isin } => isin.to_string(),
-            _ => {
-                return Err(MarketDataError::UnsupportedAssetType(format!(
-                    "{:?}",
-                    instrument
-                )))
-            }
-        };
+        let isin = Self::extract_isin(&instrument)?;
 
         let currency_hint = context.currency_hint.as_deref();
 
@@ -465,15 +478,7 @@ impl MarketDataProvider for BoerseFrankfurtProvider {
         start: DateTime<Utc>,
         end: DateTime<Utc>,
     ) -> Result<Vec<Quote>, MarketDataError> {
-        let isin = match &instrument {
-            ProviderInstrument::BondIsin { isin } => isin.to_string(),
-            _ => {
-                return Err(MarketDataError::UnsupportedAssetType(format!(
-                    "{:?}",
-                    instrument
-                )))
-            }
-        };
+        let isin = Self::extract_isin(&instrument)?;
 
         let currency_hint = context.currency_hint.as_deref();
         let min_date = start.format("%Y-%m-%d").to_string();
@@ -509,7 +514,10 @@ mod tests {
     fn test_capabilities() {
         let provider = BoerseFrankfurtProvider::new();
         let caps = provider.capabilities();
-        assert_eq!(caps.instrument_kinds, &[InstrumentKind::Bond]);
+        assert_eq!(
+            caps.instrument_kinds,
+            &[InstrumentKind::Bond, InstrumentKind::Equity]
+        );
         assert!(caps.supports_latest);
         assert!(caps.supports_historical);
         assert!(!caps.supports_search);
@@ -612,5 +620,39 @@ mod tests {
         let pct = 100.0_f64;
         let decimal = Decimal::try_from(pct / 100.0).unwrap();
         assert_eq!(decimal.to_string(), "1");
+    }
+
+    #[test]
+    fn test_convert_price_preserves_absolute_prices_for_etfs() {
+        let price = BoerseFrankfurtProvider::convert_price(68.71, false).unwrap();
+        assert_eq!(price.to_string(), "68.71");
+    }
+
+    #[test]
+    fn test_extract_isin_accepts_generic_isin_and_bond_isin() {
+        let generic = ProviderInstrument::Isin {
+            isin: Arc::from("IE00BTJRMP35"),
+        };
+        let bond = ProviderInstrument::BondIsin {
+            isin: Arc::from("XS2530331413"),
+        };
+
+        assert_eq!(
+            BoerseFrankfurtProvider::extract_isin(&generic).unwrap(),
+            "IE00BTJRMP35"
+        );
+        assert_eq!(
+            BoerseFrankfurtProvider::extract_isin(&bond).unwrap(),
+            "XS2530331413"
+        );
+    }
+
+    #[test]
+    fn test_extract_isin_rejects_non_isin_instruments() {
+        let instrument = ProviderInstrument::EquitySymbol {
+            symbol: Arc::from("XMME"),
+        };
+        let error = BoerseFrankfurtProvider::extract_isin(&instrument).unwrap_err();
+        assert!(matches!(error, MarketDataError::UnsupportedAssetType(_)));
     }
 }

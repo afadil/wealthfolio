@@ -33,6 +33,9 @@ pub enum ProviderInstrument {
         quote: Currency,
     },
 
+    /// Generic security identified by ISIN
+    Isin { isin: ProviderSymbol },
+
     /// Bond identified by ISIN
     BondIsin { isin: ProviderSymbol },
 }
@@ -50,6 +53,7 @@ impl ProviderInstrument {
             ProviderInstrument::FxSymbol { symbol } => symbol.to_string(),
             ProviderInstrument::FxPair { from, to } => format!("{}{}=X", from, to),
             ProviderInstrument::MetalSymbol { symbol, .. } => symbol.to_string(),
+            ProviderInstrument::Isin { isin } => isin.to_string(),
             ProviderInstrument::BondIsin { isin } => isin.to_string(),
         }
     }
@@ -133,6 +137,16 @@ mod tests {
         assert!(json.contains("fx_pair"));
         assert!(json.contains("EUR"));
         assert!(json.contains("USD"));
+    }
+
+    #[test]
+    fn test_isin_serialization() {
+        let instrument = ProviderInstrument::Isin {
+            isin: Arc::from("IE00BTJRMP35"),
+        };
+        let json = serde_json::to_string(&instrument).unwrap();
+        assert!(json.contains("isin"));
+        assert!(json.contains("IE00BTJRMP35"));
     }
 
     #[test]

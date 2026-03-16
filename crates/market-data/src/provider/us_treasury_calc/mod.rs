@@ -523,6 +523,7 @@ impl MarketDataProvider for UsTreasuryCalcProvider {
 
 fn extract_isin(instrument: &ProviderInstrument) -> Result<String, MarketDataError> {
     match instrument {
+        ProviderInstrument::Isin { isin } => Ok(isin.to_string()),
         ProviderInstrument::BondIsin { isin } => Ok(isin.to_string()),
         _ => Err(MarketDataError::UnsupportedAssetType(format!(
             "{:?}",

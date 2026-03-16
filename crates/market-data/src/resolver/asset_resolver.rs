@@ -151,4 +151,39 @@ mod tests {
         // Should return None when no override for this provider
         assert!(result.is_none());
     }
+
+    #[test]
+    fn test_resolve_isin_override() {
+        let resolver = AssetResolver::new();
+
+        let mut overrides = ProviderOverrides::new();
+        overrides.insert(
+            "BOERSE_FRANKFURT".to_string(),
+            ProviderInstrument::Isin {
+                isin: Arc::from("IE00BTJRMP35"),
+            },
+        );
+
+        let context = QuoteContext {
+            instrument: InstrumentId::Equity {
+                ticker: Arc::from("XMME"),
+                mic: Some("XETR".into()),
+            },
+            overrides: Some(overrides),
+            currency_hint: Some("EUR".into()),
+            preferred_provider: None,
+            bond_metadata: None,
+        };
+
+        let result = resolver.resolve(&"BOERSE_FRANKFURT".into(), &context);
+
+        assert!(result.is_some());
+        let resolved = result.unwrap().unwrap();
+        assert_eq!(resolved.source, ResolutionSource::Override);
+
+        match resolved.instrument {
+            ProviderInstrument::Isin { isin } => assert_eq!(isin.as_ref(), "IE00BTJRMP35"),
+            _ => panic!("Expected ISIN override"),
+        }
+    }
 }

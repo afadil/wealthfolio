@@ -277,6 +277,9 @@ impl FinnhubProvider {
             ProviderInstrument::MetalSymbol { .. } => Err(MarketDataError::UnsupportedAssetType(
                 "Finnhub does not support metals directly".to_string(),
             )),
+            ProviderInstrument::Isin { .. } => Err(MarketDataError::UnsupportedAssetType(
+                "Finnhub does not support ISIN-based securities directly".to_string(),
+            )),
             ProviderInstrument::BondIsin { .. } => Err(MarketDataError::UnsupportedAssetType(
                 "Finnhub does not support bonds directly".to_string(),
             )),

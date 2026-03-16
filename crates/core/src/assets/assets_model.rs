@@ -427,6 +427,17 @@ impl Asset {
             .and_then(|v| serde_json::from_value(v.clone()).ok())
     }
 
+    /// Get an ISIN identifier from generic asset metadata when present.
+    pub fn identifier_isin(&self) -> Option<String> {
+        self.metadata
+            .as_ref()
+            .and_then(|m| m.get("identifiers"))
+            .and_then(|v| v.get("isin"))
+            .and_then(|v| v.as_str())
+            .filter(|isin| !isin.is_empty())
+            .map(|isin| isin.to_uppercase())
+    }
+
     /// Convert to canonical instrument for market data resolution.
     /// Returns None for asset kinds that are not resolvable to market data.
     pub fn to_instrument_id(&self) -> Option<InstrumentId> {
