@@ -1010,6 +1010,7 @@ pub async fn get_snapshot_by_date(
             id: asset.id.clone(),
             symbol: asset.display_code.clone().unwrap_or_default(),
             name: asset.name.clone(),
+            exchange_mic: asset.instrument_exchange_mic.clone(),
             currency: asset.quote_ccy.clone(),
             notes: asset.notes.clone(),
             pricing_mode: asset.quote_mode.as_db_str().to_string(),

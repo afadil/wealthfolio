@@ -593,7 +593,7 @@ impl HoldingsServiceTrait for HoldingsService {
             let purchase_price: Option<Decimal> =
                 asset.metadata.as_ref().and_then(extract_purchase_price);
 
-            let instrument = instrument_from_asset(&asset);
+            let instrument = instrument_from_asset(asset);
 
             let holding = Holding {
                 id: format!(

@@ -635,7 +635,7 @@ impl AllocationServiceTrait for AllocationService {
             .map(|(holding, weight)| {
                 let weight_decimal = Decimal::from(weight) / dec!(10000);
                 let weighted_value = holding.market_value.base * weight_decimal;
-                holding_summary_from_holding(&holding, weighted_value, total_matched_value)
+                holding_summary_from_holding(holding, weighted_value, total_matched_value)
             })
             .collect();
 
