@@ -24,6 +24,7 @@ pub enum HoldingType {
 pub struct Instrument {
     pub id: String,
     pub symbol: String,
+    pub exchange_mic: Option<String>,
     pub name: Option<String>,
     pub currency: String,
     pub notes: Option<String>,
@@ -57,6 +58,7 @@ impl MonetaryValue {
 pub struct HoldingSummary {
     pub id: String,
     pub symbol: String,
+    pub exchange_mic: Option<String>,
     pub name: Option<String>,
     pub holding_type: HoldingType,
     pub quantity: Decimal,

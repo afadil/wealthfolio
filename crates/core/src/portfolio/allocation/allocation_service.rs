@@ -14,6 +14,42 @@ use crate::taxonomies::{Category, TaxonomyServiceTrait};
 
 use super::{AllocationHoldings, CategoryAllocation, PortfolioAllocations, TaxonomyAllocation};
 
+fn holding_summary_from_holding(
+    holding: &Holding,
+    weighted_value: Decimal,
+    total_matched_value: Decimal,
+) -> HoldingSummary {
+    let weight_in_category = if total_matched_value > Decimal::ZERO {
+        (weighted_value / total_matched_value * dec!(100)).round_dp(2)
+    } else {
+        Decimal::ZERO
+    };
+
+    HoldingSummary {
+        // Use instrument.id (the asset ID) for navigation, not holding.id (composite ID)
+        id: holding
+            .instrument
+            .as_ref()
+            .map(|i| i.id.clone())
+            .unwrap_or_else(|| holding.id.clone()),
+        symbol: holding
+            .instrument
+            .as_ref()
+            .map(|i| i.symbol.clone())
+            .unwrap_or_default(),
+        exchange_mic: holding
+            .instrument
+            .as_ref()
+            .and_then(|i| i.exchange_mic.clone()),
+        name: holding.instrument.as_ref().and_then(|i| i.name.clone()),
+        holding_type: holding.holding_type.clone(),
+        quantity: holding.quantity,
+        market_value: weighted_value,
+        currency: holding.base_currency.clone(),
+        weight_in_category,
+    }
+}
+
 /// Trait for allocation service.
 #[async_trait]
 pub trait AllocationServiceTrait: Send + Sync {
@@ -599,31 +635,7 @@ impl AllocationServiceTrait for AllocationService {
             .map(|(holding, weight)| {
                 let weight_decimal = Decimal::from(weight) / dec!(10000);
                 let weighted_value = holding.market_value.base * weight_decimal;
-                let weight_in_category = if total_matched_value > Decimal::ZERO {
-                    (weighted_value / total_matched_value * dec!(100)).round_dp(2)
-                } else {
-                    Decimal::ZERO
-                };
-
-                HoldingSummary {
-                    // Use instrument.id (the asset ID) for navigation, not holding.id (composite ID)
-                    id: holding
-                        .instrument
-                        .as_ref()
-                        .map(|i| i.id.clone())
-                        .unwrap_or_else(|| holding.id.clone()),
-                    symbol: holding
-                        .instrument
-                        .as_ref()
-                        .map(|i| i.symbol.clone())
-                        .unwrap_or_default(),
-                    name: holding.instrument.as_ref().and_then(|i| i.name.clone()),
-                    holding_type: holding.holding_type.clone(),
-                    quantity: holding.quantity,
-                    market_value: weighted_value,
-                    currency: holding.base_currency.clone(),
-                    weight_in_category,
-                }
+                holding_summary_from_holding(&holding, weighted_value, total_matched_value)
             })
             .collect();
 
@@ -640,5 +652,64 @@ impl AllocationServiceTrait for AllocationService {
             total_value: total_matched_value,
             currency: base_currency.to_string(),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::portfolio::holdings::{Instrument, MonetaryValue};
+    use chrono::Utc;
+
+    #[test]
+    fn holding_summary_from_holding_preserves_exchange_mic() {
+        let holding = Holding {
+            id: "holding-1".to_string(),
+            account_id: "acc-1".to_string(),
+            holding_type: HoldingType::Security,
+            instrument: Some(Instrument {
+                id: "asset-1".to_string(),
+                symbol: "DTE".to_string(),
+                exchange_mic: Some("XETR".to_string()),
+                name: Some("Deutsche Telekom AG".to_string()),
+                currency: "EUR".to_string(),
+                notes: None,
+                pricing_mode: "MARKET".to_string(),
+                preferred_provider: None,
+                classifications: None,
+            }),
+            asset_kind: None,
+            quantity: dec!(10),
+            open_date: Some(Utc::now()),
+            lots: None,
+            contract_multiplier: Decimal::ONE,
+            local_currency: "EUR".to_string(),
+            base_currency: "EUR".to_string(),
+            fx_rate: None,
+            market_value: MonetaryValue {
+                local: dec!(230),
+                base: dec!(230),
+            },
+            cost_basis: None,
+            price: Some(dec!(23)),
+            purchase_price: None,
+            unrealized_gain: None,
+            unrealized_gain_pct: None,
+            realized_gain: None,
+            realized_gain_pct: None,
+            total_gain: None,
+            total_gain_pct: None,
+            day_change: None,
+            day_change_pct: None,
+            prev_close_value: None,
+            weight: dec!(1),
+            as_of_date: chrono::Utc::now().date_naive(),
+            metadata: None,
+        };
+
+        let summary = holding_summary_from_holding(&holding, dec!(230), dec!(230));
+
+        assert_eq!(summary.symbol, "DTE");
+        assert_eq!(summary.exchange_mic.as_deref(), Some("XETR"));
     }
 }

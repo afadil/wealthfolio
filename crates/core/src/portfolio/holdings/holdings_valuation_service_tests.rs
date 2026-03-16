@@ -458,6 +458,7 @@ mod tests {
             Some(Instrument {
                 id: symbol_or_cash_code.to_string(), // Use symbol as ID to match mock quote keys
                 symbol: symbol_or_cash_code.to_string(),
+                exchange_mic: None,
                 name: Some(name.unwrap_or(symbol_or_cash_code).to_string()),
                 currency: local_currency.to_string(),
                 notes: None,

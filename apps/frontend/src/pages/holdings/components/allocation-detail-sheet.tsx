@@ -331,7 +331,11 @@ export function AllocationDetailSheet({
                       className="hover:bg-muted/30 flex cursor-pointer items-center gap-3 py-3 transition-colors"
                       onClick={() => handleHoldingClick(holding)}
                     >
-                      <TickerAvatar symbol={holding.symbol} className="h-9 w-9" />
+                      <TickerAvatar
+                        symbol={holding.symbol}
+                        exchangeMic={holding.exchangeMic ?? undefined}
+                        className="h-9 w-9"
+                      />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold">{holding.symbol}</p>
                         <p className="text-muted-foreground truncate text-xs">
