@@ -124,7 +124,7 @@ export function SplitForm({
             <input type="hidden" {...form.register("symbolInstrumentType")} />
 
             {/* Date Picker */}
-            <DatePicker name="activityDate" label="Date" />
+            <DatePicker name="activityDate" label="Date" allowFutureDates={true} />
 
             {/* Split Ratio */}
             <QuantityInput

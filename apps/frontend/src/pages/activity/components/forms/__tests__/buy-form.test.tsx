@@ -4,6 +4,20 @@ import userEvent from "@testing-library/user-event";
 import { BuyForm } from "../buy-form";
 import type { AccountSelectOption } from "../fields";
 
+const { mockDatePicker } = vi.hoisted(() => ({
+  mockDatePicker: vi.fn(
+    ({
+      name,
+      label,
+    }: {
+      name: string;
+      label: string;
+      allowFutureDates?: boolean;
+      enableTime?: boolean;
+    }) => <div data-testid={`date-picker-${name}`}>{label}</div>,
+  ),
+}));
+
 // Mock useSettings hook to avoid AuthProvider dependency
 vi.mock("@/hooks/use-settings", () => ({
   useSettings: () => ({
@@ -28,9 +42,7 @@ vi.mock("../fields", () => ({
   SymbolSearch: ({ name }: { name: string }) => (
     <input data-testid={`symbol-search-${name}`} name={name} />
   ),
-  DatePicker: ({ name, label }: { name: string; label: string }) => (
-    <div data-testid={`date-picker-${name}`}>{label}</div>
-  ),
+  DatePicker: mockDatePicker,
   AmountInput: ({ name, label }: { name: string; label: string }) => (
     <div>
       <label htmlFor={name}>{label}</label>
@@ -131,6 +143,18 @@ describe("BuyForm", () => {
       expect(screen.getByTestId("input-fee")).toBeInTheDocument();
       // Amount is now calculated and displayed as text, not as an input field
       expect(screen.getByTestId("textarea-comment")).toBeInTheDocument();
+    });
+
+    it("allows future dates for the activity date picker", () => {
+      render(<BuyForm accounts={mockAccounts} onSubmit={mockOnSubmit} />);
+
+      expect(mockDatePicker).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "activityDate",
+          allowFutureDates: true,
+        }),
+        undefined,
+      );
     });
 
     it("renders submit button with correct text for new buy", () => {

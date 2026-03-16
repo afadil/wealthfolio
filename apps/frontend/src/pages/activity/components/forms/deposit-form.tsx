@@ -103,7 +103,7 @@ export function DepositForm({
             <AccountSelect name="accountId" accounts={accounts} currencyName="currency" />
 
             {/* Date Picker */}
-            <DatePicker name="activityDate" label="Date" />
+            <DatePicker name="activityDate" label="Date" allowFutureDates={true} />
 
             {/* Amount */}
             <AmountInput name="amount" label="Amount" currency={currency} />

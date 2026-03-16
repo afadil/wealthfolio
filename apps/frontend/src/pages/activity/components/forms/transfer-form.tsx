@@ -448,7 +448,7 @@ export function TransferForm({
             )}
 
             {/* Date Picker */}
-            <DatePicker name="activityDate" label="Date" />
+            <DatePicker name="activityDate" label="Date" allowFutureDates={true} />
 
             {/* Securities mode: Symbol and Quantity at top */}
             {!isCashMode && (

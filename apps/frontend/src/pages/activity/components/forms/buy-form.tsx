@@ -300,7 +300,7 @@ export function BuyForm({
             <AccountSelect name="accountId" accounts={accounts} currencyName="currency" />
 
             {/* Date Picker */}
-            <DatePicker name="activityDate" label="Date" enableTime={true} />
+            <DatePicker name="activityDate" label="Date" enableTime={true} allowFutureDates={true} />
 
             {/* Symbol / Option Contract Fields */}
             {isOption ? (
