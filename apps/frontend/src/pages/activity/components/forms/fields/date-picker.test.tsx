@@ -36,11 +36,7 @@ vi.mock("@wealthfolio/ui", () => ({
   FormMessage: () => null,
 }));
 
-function TestForm({
-  allowFutureDates,
-}: {
-  allowFutureDates?: boolean;
-}) {
+function TestForm({ allowFutureDates }: { allowFutureDates?: boolean }) {
   const form = useForm<{ activityDate?: Date }>({
     defaultValues: { activityDate: undefined },
   });
