@@ -10,17 +10,56 @@
   "permissions": [
     {
       "category": "portfolio",
-      "functions": ["getHoldings"],
+      "functions": [
+        {
+          "name": "getHoldings",
+          "isDeclared": true,
+          "isDetected": false,
+          "detectedAt": null
+        }
+      ],
       "purpose": "Read the current portfolio holdings and map the largest positions to Adanos ticker sentiment"
     },
     {
       "category": "secrets",
-      "functions": ["set", "get", "delete"],
+      "functions": [
+        {
+          "name": "set",
+          "isDeclared": true,
+          "isDetected": false,
+          "detectedAt": null
+        },
+        {
+          "name": "get",
+          "isDeclared": true,
+          "isDetected": false,
+          "detectedAt": null
+        },
+        {
+          "name": "delete",
+          "isDeclared": true,
+          "isDetected": false,
+          "detectedAt": null
+        }
+      ],
       "purpose": "Store the Adanos API key securely in addon-scoped encrypted storage"
     },
     {
       "category": "ui",
-      "functions": ["sidebar.addItem", "router.add"],
+      "functions": [
+        {
+          "name": "sidebar.addItem",
+          "isDeclared": true,
+          "isDetected": false,
+          "detectedAt": null
+        },
+        {
+          "name": "router.add",
+          "isDeclared": true,
+          "isDetected": false,
+          "detectedAt": null
+        }
+      ],
       "purpose": "Add navigation and settings pages for the Adanos sentiment dashboard"
     }
   ]
