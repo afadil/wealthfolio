@@ -5311,4 +5311,199 @@ mod tests {
             "Cost basis must carry through A→B→C chain: 10 * $50 = $500"
         );
     }
+
+    // ── Lot shadow-write tests ────────────────────────────────────────────────
+
+    type LotCallLog = Arc<RwLock<Vec<(String, Vec<crate::lots::LotRecord>)>>>;
+
+    /// Records every call to replace_lots_for_account for post-run assertions.
+    #[derive(Clone, Default)]
+    struct MockLotRepository {
+        calls: LotCallLog,
+    }
+
+    impl MockLotRepository {
+        fn new() -> Self {
+            Self::default()
+        }
+
+        fn calls(&self) -> Vec<(String, Vec<crate::lots::LotRecord>)> {
+            self.calls.read().unwrap().clone()
+        }
+    }
+
+    #[async_trait]
+    impl crate::lots::LotRepositoryTrait for MockLotRepository {
+        async fn replace_lots_for_account(
+            &self,
+            account_id: &str,
+            lots: &[crate::lots::LotRecord],
+        ) -> AppResult<()> {
+            self.calls
+                .write()
+                .unwrap()
+                .push((account_id.to_string(), lots.to_vec()));
+            Ok(())
+        }
+
+        fn count_open_lots(&self) -> AppResult<i64> {
+            Ok(self
+                .calls
+                .read()
+                .unwrap()
+                .iter()
+                .map(|(_, lots)| lots.len() as i64)
+                .sum())
+        }
+    }
+
+    /// Verifies that after a recalculation the lot repository receives one call
+    /// per account containing the correct lot quantities.
+    ///
+    /// Portfolio:
+    ///   acc-ira-001 (USD)
+    ///     AAPL  — 3 buys: 50 shares @ $185, 30 @ $192.50, 20 @ $225  → 100 total
+    ///     LQD   — 2 buys: 100 shares @ $107.25, 50 @ $112.10         → 150 total
+    ///     AAPL260619C00200000 — 1 buy: 5 contracts @ $8.50            → 5 total
+    #[tokio::test]
+    async fn shadow_write_calls_lot_repo_with_correct_quantities() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc-ira-001", "USD", "IRA Account");
+        account_repo.add_account(acc.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2024, 2, 1).unwrap();
+        let d3 = NaiveDate::from_ymd_opt(2024, 6, 1).unwrap();
+        let d4 = NaiveDate::from_ymd_opt(2024, 8, 15).unwrap();
+        let d5 = NaiveDate::from_ymd_opt(2024, 10, 15).unwrap();
+        let d6 = NaiveDate::from_ymd_opt(2025, 11, 1).unwrap();
+
+        let activities = vec![
+            // Fund the account
+            create_test_activity(
+                "dep1",
+                &acc.id,
+                Some("CASH:USD"),
+                "DEPOSIT",
+                d1,
+                None,
+                None,
+                Some(dec!(100_000)),
+                "USD",
+            ),
+            // AAPL — 3 lots
+            create_test_activity(
+                "buy-aapl-1",
+                &acc.id,
+                Some("AAPL"),
+                "BUY",
+                d1,
+                Some(dec!(50)),
+                Some(dec!(185.00)),
+                Some(dec!(9250)),
+                "USD",
+            ),
+            create_test_activity(
+                "buy-aapl-2",
+                &acc.id,
+                Some("AAPL"),
+                "BUY",
+                d3,
+                Some(dec!(30)),
+                Some(dec!(192.50)),
+                Some(dec!(5775)),
+                "USD",
+            ),
+            create_test_activity(
+                "buy-aapl-3",
+                &acc.id,
+                Some("AAPL"),
+                "BUY",
+                d5,
+                Some(dec!(20)),
+                Some(dec!(225.00)),
+                Some(dec!(4500)),
+                "USD",
+            ),
+            // LQD — 2 lots
+            create_test_activity(
+                "buy-lqd-1",
+                &acc.id,
+                Some("LQD"),
+                "BUY",
+                d2,
+                Some(dec!(100)),
+                Some(dec!(107.25)),
+                Some(dec!(10725)),
+                "USD",
+            ),
+            create_test_activity(
+                "buy-lqd-2",
+                &acc.id,
+                Some("LQD"),
+                "BUY",
+                d4,
+                Some(dec!(50)),
+                Some(dec!(112.10)),
+                Some(dec!(5605)),
+                "USD",
+            ),
+            // AAPL Jun 2026 $200 call — 1 lot
+            create_test_activity(
+                "buy-opt-1",
+                &acc.id,
+                Some("AAPL260619C00200000"),
+                "BUY",
+                d6,
+                Some(dec!(5)),
+                Some(dec!(8.50)),
+                Some(dec!(42.50)),
+                "USD",
+            ),
+        ];
+
+        let lot_repo = Arc::new(MockLotRepository::new());
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            Arc::new(MockActivityRepositoryWithData::new(activities)),
+            Arc::new(MockSnapshotRepository::new()),
+            Arc::new(MockAssetRepository::new()),
+            Arc::new(MockFxService::new()),
+        )
+        .with_lot_repository(lot_repo.clone());
+
+        svc.recalculate_holdings_snapshots(None, SnapshotRecalcMode::Full)
+            .await
+            .unwrap();
+
+        let calls = lot_repo.calls();
+        assert_eq!(calls.len(), 1, "should be called once for the one account");
+
+        let (called_account_id, lots) = &calls[0];
+        assert_eq!(called_account_id, "acc-ira-001");
+
+        let aapl_qty: Decimal = lots
+            .iter()
+            .filter(|l| l.asset_id == "AAPL")
+            .map(|l| l.remaining_quantity.parse::<Decimal>().unwrap())
+            .sum();
+        assert_eq!(aapl_qty, dec!(100), "AAPL: 50+30+20 = 100");
+
+        let lqd_qty: Decimal = lots
+            .iter()
+            .filter(|l| l.asset_id == "LQD")
+            .map(|l| l.remaining_quantity.parse::<Decimal>().unwrap())
+            .sum();
+        assert_eq!(lqd_qty, dec!(150), "LQD: 100+50 = 150");
+
+        let opt_qty: Decimal = lots
+            .iter()
+            .filter(|l| l.asset_id == "AAPL260619C00200000")
+            .map(|l| l.remaining_quantity.parse::<Decimal>().unwrap())
+            .sum();
+        assert_eq!(opt_qty, dec!(5), "option: 5 contracts");
+    }
 }

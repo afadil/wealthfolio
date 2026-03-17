@@ -389,7 +389,7 @@ impl SnapshotService {
                     continue;
                 }
                 let lot_records = extract_lot_records(snapshot);
-                check_lot_quantity_consistency(snapshot, &lot_records);
+                let _ = check_lot_quantity_consistency(snapshot, &lot_records);
                 if let Err(e) = lot_repo
                     .replace_lots_for_account(acc_id, &lot_records)
                     .await
