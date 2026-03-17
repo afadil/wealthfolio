@@ -5359,6 +5359,21 @@ mod tests {
             Ok(Vec::new())
         }
 
+        async fn get_lots_as_of_date(
+            &self,
+            _account_ids: &[String],
+            _date: chrono::NaiveDate,
+        ) -> AppResult<Vec<crate::lots::LotRecord>> {
+            Ok(Vec::new())
+        }
+
+        async fn get_all_lots_for_account(
+            &self,
+            _account_id: &str,
+        ) -> AppResult<Vec<crate::lots::LotRecord>> {
+            Ok(Vec::new())
+        }
+
         async fn sync_lots_for_account(
             &self,
             account_id: &str,

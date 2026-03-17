@@ -257,6 +257,7 @@ pub async fn initialize_context(
         account_repository.clone(),
         asset_repository.clone(),
         snapshot_repository.clone(),
+        lots_repository.clone(),
         quote_service.clone(),
         valuation_repository.clone(),
         fx_service.clone(),

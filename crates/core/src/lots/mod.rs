@@ -17,7 +17,7 @@
 //! maintenance replaces the full-replay approach.
 
 use async_trait::async_trait;
-use chrono::Utc;
+use chrono::{NaiveDate, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -47,6 +47,19 @@ pub trait LotRepositoryTrait: Send + Sync {
 
     /// Returns all open (is_closed = 0) lot rows for the given account.
     async fn get_open_lots_for_account(&self, account_id: &str) -> Result<Vec<LotRecord>>;
+
+    /// Returns all lots that were active on `date` for the specified accounts.
+    /// A lot is active if: `open_date <= date AND (is_closed=0 OR close_date > date)`.
+    async fn get_lots_as_of_date(
+        &self,
+        account_ids: &[String],
+        date: NaiveDate,
+    ) -> Result<Vec<LotRecord>>;
+
+    /// Returns every lot row (open and closed) for the given account.
+    /// Callers that need positions at multiple historical dates can fetch once
+    /// and filter in memory using the `open_date` / `close_date` fields.
+    async fn get_all_lots_for_account(&self, account_id: &str) -> Result<Vec<LotRecord>>;
 
     /// Syncs the lots table for the given account without ever deleting rows:
     /// - Open lots in `open_lots` are upserted (inserted if new, remaining_quantity updated if changed).

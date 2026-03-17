@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
+use chrono::NaiveDate;
 use wealthfolio_core::errors::Result;
 use wealthfolio_core::lots::{HoldingPeriod, LotClosure, LotRecord, LotRepositoryTrait};
 
@@ -150,6 +151,41 @@ impl LotRepositoryTrait for LotsRepository {
             .load(&mut conn)
             .map_err(StorageError::from)?;
 
+        Ok(rows.into_iter().map(LotRecord::from).collect())
+    }
+
+    async fn get_lots_as_of_date(
+        &self,
+        account_ids: &[String],
+        date: NaiveDate,
+    ) -> Result<Vec<LotRecord>> {
+        use crate::schema::lots::dsl;
+        use diesel::NullableExpressionMethods;
+
+        let date_str = date.format("%Y-%m-%d").to_string();
+        let mut conn = get_connection(&self.pool)?;
+        let rows: Vec<LotRecordDB> = dsl::lots
+            .filter(dsl::account_id.eq_any(account_ids))
+            .filter(dsl::open_date.le(&date_str))
+            .filter(
+                dsl::is_closed
+                    .eq(0)
+                    .or(dsl::close_date.assume_not_null().gt(&date_str)),
+            )
+            .load(&mut conn)
+            .map_err(StorageError::from)?;
+        Ok(rows.into_iter().map(LotRecord::from).collect())
+    }
+
+    async fn get_all_lots_for_account(&self, account_id: &str) -> Result<Vec<LotRecord>> {
+        use crate::schema::lots::dsl;
+
+        let account_id = account_id.to_string();
+        let mut conn = get_connection(&self.pool)?;
+        let rows: Vec<LotRecordDB> = dsl::lots
+            .filter(dsl::account_id.eq(&account_id))
+            .load(&mut conn)
+            .map_err(StorageError::from)?;
         Ok(rows.into_iter().map(LotRecord::from).collect())
     }
 
