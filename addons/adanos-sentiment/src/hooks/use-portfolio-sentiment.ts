@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import type { AddonContext } from "@wealthfolio/addon-sdk";
+import React from "react";
 import { fetchPortfolioSentiment } from "../lib/adanos-client";
+import { saveStoredAccountStatus } from "../lib/account-status-storage";
 import { buildTrackedHoldings } from "../lib/utils";
-import type { AdanosPreferences } from "../types";
+import type { AdanosPreferences, PortfolioSentimentResult } from "../types";
 
 interface UsePortfolioSentimentArgs {
   ctx: AddonContext;
@@ -11,10 +13,10 @@ interface UsePortfolioSentimentArgs {
 }
 
 export function usePortfolioSentiment({ ctx, apiKey, preferences }: UsePortfolioSentimentArgs) {
-  return useQuery({
+  const query = useQuery<PortfolioSentimentResult>({
     queryKey: [
       "adanos-portfolio-sentiment",
-      apiKey ? "configured" : "missing",
+      apiKey ? apiKey.slice(-6) : "missing",
       preferences.days,
       preferences.enabledPlatforms.join(","),
     ],
@@ -31,6 +33,7 @@ export function usePortfolioSentiment({ ctx, apiKey, preferences }: UsePortfolio
           holdings: [],
           errors: [],
           fetchedAt: new Date().toISOString(),
+          quota: null,
         };
       }
 
@@ -45,4 +48,12 @@ export function usePortfolioSentiment({ ctx, apiKey, preferences }: UsePortfolio
     staleTime: 60 * 1000,
     gcTime: 5 * 60 * 1000,
   });
+
+  React.useEffect(() => {
+    if (apiKey && query.data?.quota) {
+      saveStoredAccountStatus(apiKey, query.data.quota);
+    }
+  }, [apiKey, query.data?.quota]);
+
+  return query;
 }

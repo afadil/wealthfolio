@@ -3,14 +3,14 @@ import type { AddonContext, AddonEnableFunction } from "@wealthfolio/addon-sdk";
 import React from "react";
 import DashboardPage from "./pages/dashboard-page";
 import SettingsPage from "./pages/settings-page";
-import { AdanosPulseIcon } from "./components/adanos-pulse-icon";
+import { AdanosSentimentIcon } from "./components/adanos-sentiment-icon";
 
-function AdanosPulseDashboard({ ctx }: { ctx: AddonContext }) {
+function AdanosSentimentDashboard({ ctx }: { ctx: AddonContext }) {
   return <DashboardPage ctx={ctx} />;
 }
 
 const enable: AddonEnableFunction = (context: AddonContext) => {
-  context.api.logger.info("Adanos Pulse addon is being enabled");
+  context.api.logger.info("Adanos Sentiment addon is being enabled");
 
   const addedItems: Array<{ remove: () => void }> = [];
 
@@ -22,25 +22,26 @@ const enable: AddonEnableFunction = (context: AddonContext) => {
 
   try {
     const sidebarItem = context.sidebar.addItem({
-      id: "adanos-pulse",
-      label: "Adanos Pulse",
-      icon: <AdanosPulseIcon />,
-      route: "/addons/adanos-pulse",
+      id: "adanos-sentiment",
+      label: "Adanos Sentiment",
+      icon: <AdanosSentimentIcon />,
+      route: "/addons/adanos-sentiment",
       order: 180,
     });
     addedItems.push(sidebarItem);
 
     context.router.add({
-      path: "/addons/adanos-pulse",
+      path: "/addons/adanos-sentiment",
       component: React.lazy(() =>
         Promise.resolve({
-          default: () => withSharedQueryClient(() => <AdanosPulseDashboard ctx={context} />),
+          default: () =>
+            withSharedQueryClient(() => <AdanosSentimentDashboard ctx={context} />),
         }),
       ),
     });
 
     context.router.add({
-      path: "/addons/adanos-pulse/settings",
+      path: "/addons/adanos-sentiment/settings",
       component: React.lazy(() =>
         Promise.resolve({
           default: () => withSharedQueryClient(() => <SettingsPage ctx={context} />),
@@ -48,16 +49,16 @@ const enable: AddonEnableFunction = (context: AddonContext) => {
       ),
     });
 
-    context.api.logger.info("Adanos Pulse addon enabled successfully");
+    context.api.logger.info("Adanos Sentiment addon enabled successfully");
   } catch (error) {
     context.api.logger.error(
-      "Failed to initialize Adanos Pulse addon: " + (error as Error).message,
+      "Failed to initialize Adanos Sentiment addon: " + (error as Error).message,
     );
     throw error;
   }
 
   context.onDisable(() => {
-    context.api.logger.info("Adanos Pulse addon is being disabled");
+    context.api.logger.info("Adanos Sentiment addon is being disabled");
 
     for (const item of addedItems) {
       try {
