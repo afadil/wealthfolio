@@ -34,6 +34,9 @@ pub trait LotRepositoryTrait: Send + Sync {
     /// Replaces all open lot rows for the given account with the provided records.
     /// Existing rows for the account are deleted before inserting new ones.
     async fn replace_lots_for_account(&self, account_id: &str, lots: &[LotRecord]) -> Result<()>;
+
+    /// Returns the total number of rows currently in the lots table.
+    fn count_open_lots(&self) -> Result<i64>;
 }
 
 // ── Domain types ──────────────────────────────────────────────────────────────

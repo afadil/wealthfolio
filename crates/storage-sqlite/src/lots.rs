@@ -6,7 +6,7 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::sqlite::SqliteConnection;
 use std::sync::Arc;
 
-use crate::db::WriteHandle;
+use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
 use wealthfolio_core::errors::Result;
 use wealthfolio_core::lots::{HoldingPeriod, LotRecord, LotRepositoryTrait};
@@ -68,7 +68,6 @@ impl From<&LotRecord> for LotRecordDB {
 // ── Repository ────────────────────────────────────────────────────────────────
 
 pub struct LotsRepository {
-    #[allow(dead_code)]
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
     writer: WriteHandle,
 }
@@ -103,5 +102,17 @@ impl LotRepositoryTrait for LotsRepository {
                 Ok(())
             })
             .await
+    }
+
+    fn count_open_lots(&self) -> Result<i64> {
+        use crate::schema::lots::dsl;
+        use diesel::dsl::count_star;
+
+        let mut conn = get_connection(&self.pool)?;
+        let n: i64 = dsl::lots
+            .select(count_star())
+            .first(&mut conn)
+            .map_err(StorageError::from)?;
+        Ok(n)
     }
 }

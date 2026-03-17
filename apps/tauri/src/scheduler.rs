@@ -106,3 +106,34 @@ pub async fn run_startup_sync(handle: &AppHandle, context: &Arc<ServiceContext>)
 
 #[cfg(not(feature = "connect-sync"))]
 pub async fn run_startup_sync(_handle: &AppHandle, _context: &std::sync::Arc<ServiceContext>) {}
+
+/// Backfills the lots table on first launch after it was introduced.
+///
+/// If the lots table is empty but holdings snapshots exist, a full holdings
+/// recalculation is triggered so every existing account gets its lot rows
+/// written. This runs once; subsequent launches skip it because the table is
+/// no longer empty.
+pub async fn backfill_lots_if_needed(context: &std::sync::Arc<ServiceContext>) {
+    use wealthfolio_core::portfolio::snapshot::SnapshotRecalcMode;
+
+    let count = match context.lots_repository.count_open_lots() {
+        Ok(n) => n,
+        Err(e) => {
+            warn!("Lot backfill skipped: could not count lots ({})", e);
+            return;
+        }
+    };
+
+    if count > 0 {
+        return;
+    }
+
+    info!("Lots table is empty — running full holdings recalculation to populate it");
+    if let Err(e) = context
+        .snapshot_service
+        .recalculate_holdings_snapshots(None, SnapshotRecalcMode::Full)
+        .await
+    {
+        warn!("Lot backfill recalculation failed: {}", e);
+    }
+}

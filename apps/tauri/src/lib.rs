@@ -89,6 +89,12 @@ mod desktop {
         // The frontend will trigger the initial portfolio update and update check after it's mounted
         emit_app_ready(&handle);
 
+        // Backfill lots table for existing users on first launch after it was introduced.
+        let backfill_context = Arc::clone(&context);
+        tauri::async_runtime::spawn(async move {
+            scheduler::backfill_lots_if_needed(&backfill_context).await;
+        });
+
         // Trigger startup sync (async, non-blocking)
         // After this, user manually triggers sync via button
         let startup_handle = handle.clone();
