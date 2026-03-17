@@ -256,6 +256,29 @@ diesel::table! {
 }
 
 diesel::table! {
+    lots (id) {
+        id -> Text,
+        account_id -> Text,
+        asset_id -> Text,
+        open_date -> Text,
+        open_activity_id -> Nullable<Text>,
+        original_quantity -> Text,
+        remaining_quantity -> Text,
+        cost_per_unit -> Text,
+        total_cost_basis -> Text,
+        fee_allocated -> Text,
+        disposal_method -> Text,
+        is_closed -> Integer,
+        close_date -> Nullable<Text>,
+        close_activity_id -> Nullable<Text>,
+        is_wash_sale -> Integer,
+        holding_period -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
     import_runs (id) {
         id -> Text,
         account_id -> Text,
@@ -454,6 +477,8 @@ diesel::joinable!(accounts -> platforms (platform_id));
 diesel::joinable!(activities -> accounts (account_id));
 diesel::joinable!(activities -> assets (asset_id));
 diesel::joinable!(activities -> import_runs (import_run_id));
+diesel::joinable!(lots -> accounts (account_id));
+diesel::joinable!(lots -> assets (asset_id));
 diesel::joinable!(ai_messages -> ai_threads (thread_id));
 diesel::joinable!(ai_thread_tags -> ai_threads (thread_id));
 diesel::joinable!(asset_taxonomy_assignments -> assets (asset_id));
@@ -487,6 +512,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     holdings_snapshots,
     import_templates,
     import_runs,
+    lots,
     market_data_providers,
     platforms,
     quote_sync_state,
