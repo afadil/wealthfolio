@@ -13,7 +13,7 @@ use wealthfolio_core::lots::{HoldingPeriod, LotRecord, LotRepositoryTrait};
 
 // ── Diesel model ──────────────────────────────────────────────────────────────
 
-#[derive(Debug, Insertable)]
+#[derive(Debug, Queryable, Selectable, Insertable)]
 #[diesel(table_name = crate::schema::lots)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 struct LotRecordDB {
@@ -35,6 +35,41 @@ struct LotRecordDB {
     holding_period: Option<String>,
     created_at: String,
     updated_at: String,
+}
+
+impl From<LotRecordDB> for LotRecord {
+    fn from(r: LotRecordDB) -> Self {
+        LotRecord {
+            id: r.id,
+            account_id: r.account_id,
+            asset_id: r.asset_id,
+            open_date: r.open_date,
+            open_activity_id: r.open_activity_id,
+            original_quantity: r.original_quantity,
+            remaining_quantity: r.remaining_quantity,
+            cost_per_unit: r.cost_per_unit,
+            total_cost_basis: r.total_cost_basis,
+            fee_allocated: r.fee_allocated,
+            disposal_method: match r.disposal_method.as_str() {
+                "LIFO" => wealthfolio_core::lots::DisposalMethod::Lifo,
+                "HIFO" => wealthfolio_core::lots::DisposalMethod::Hifo,
+                "AVG_COST" => wealthfolio_core::lots::DisposalMethod::AvgCost,
+                "SPECIFIC_ID" => wealthfolio_core::lots::DisposalMethod::SpecificId,
+                _ => wealthfolio_core::lots::DisposalMethod::Fifo,
+            },
+            is_closed: r.is_closed != 0,
+            close_date: r.close_date,
+            close_activity_id: r.close_activity_id,
+            is_wash_sale: r.is_wash_sale != 0,
+            holding_period: r.holding_period.as_deref().and_then(|s| match s {
+                "SHORT_TERM" => Some(HoldingPeriod::ShortTerm),
+                "LONG_TERM" => Some(HoldingPeriod::LongTerm),
+                _ => None,
+            }),
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+        }
+    }
 }
 
 impl From<&LotRecord> for LotRecordDB {
@@ -102,6 +137,20 @@ impl LotRepositoryTrait for LotsRepository {
                 Ok(())
             })
             .await
+    }
+
+    async fn get_open_lots_for_account(&self, account_id: &str) -> Result<Vec<LotRecord>> {
+        use crate::schema::lots::dsl;
+
+        let account_id = account_id.to_string();
+        let mut conn = get_connection(&self.pool)?;
+        let rows: Vec<LotRecordDB> = dsl::lots
+            .filter(dsl::account_id.eq(&account_id))
+            .filter(dsl::is_closed.eq(0))
+            .load(&mut conn)
+            .map_err(StorageError::from)?;
+
+        Ok(rows.into_iter().map(LotRecord::from).collect())
     }
 
     fn count_open_lots(&self) -> Result<i64> {

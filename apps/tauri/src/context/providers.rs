@@ -243,6 +243,7 @@ pub async fn initialize_context(
         snapshot_service.clone(),
         holdings_valuation_service.clone(),
         classification_service.clone(),
+        lots_repository.clone(),
         timezone.clone(),
     ));
 

@@ -2,15 +2,17 @@ use crate::assets::{Asset, AssetClassificationService, AssetKind, AssetServiceTr
 use crate::constants::DECIMAL_PRECISION;
 use crate::errors::{CalculatorError, Error as CoreError, Result};
 use crate::fx::currency::{get_normalization_rule, normalize_currency_code};
+use crate::lots::{LotRecord, LotRepositoryTrait};
 use crate::portfolio::holdings::holdings_model::{Holding, HoldingType, Instrument, MonetaryValue};
 use crate::portfolio::snapshot::{self, SnapshotServiceTrait};
 use crate::utils::time_utils::{parse_user_timezone_or_default, user_today};
 use async_trait::async_trait;
+use chrono::NaiveDate;
 use log::{debug, error, warn};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, RwLock};
 
 use super::HoldingsValuationServiceTrait;
@@ -41,6 +43,7 @@ pub struct HoldingsService {
     snapshot_service: Arc<dyn SnapshotServiceTrait>,
     valuation_service: Arc<dyn HoldingsValuationServiceTrait>,
     classification_service: Arc<AssetClassificationService>,
+    lot_repository: Arc<dyn LotRepositoryTrait>,
     timezone: Arc<RwLock<String>>,
 }
 
@@ -49,6 +52,7 @@ struct AssetInfo {
     kind: AssetKind,
     metadata: Option<Value>,
     purchase_price: Option<Decimal>,
+    contract_multiplier: Decimal,
 }
 
 impl HoldingsService {
@@ -57,12 +61,14 @@ impl HoldingsService {
         snapshot_service: Arc<dyn SnapshotServiceTrait>,
         valuation_service: Arc<dyn HoldingsValuationServiceTrait>,
         classification_service: Arc<AssetClassificationService>,
+        lot_repository: Arc<dyn LotRepositoryTrait>,
     ) -> Self {
         Self::new_with_timezone(
             asset_service,
             snapshot_service,
             valuation_service,
             classification_service,
+            lot_repository,
             Arc::new(RwLock::new(String::new())),
         )
     }
@@ -72,6 +78,7 @@ impl HoldingsService {
         snapshot_service: Arc<dyn SnapshotServiceTrait>,
         valuation_service: Arc<dyn HoldingsValuationServiceTrait>,
         classification_service: Arc<AssetClassificationService>,
+        lot_repository: Arc<dyn LotRepositoryTrait>,
         timezone: Arc<RwLock<String>>,
     ) -> Self {
         Self {
@@ -79,6 +86,7 @@ impl HoldingsService {
             snapshot_service,
             valuation_service,
             classification_service,
+            lot_repository,
             timezone,
         }
     }
@@ -96,17 +104,36 @@ impl HoldingsService {
         lots_asset_id: Option<&str>,
     ) -> Vec<Holding> {
         let today = self.today_in_user_timezone();
-        let snapshot_positions: Vec<snapshot::Position> = latest_snapshot
-            .positions
-            .values()
-            .filter(|p| p.quantity != Decimal::ZERO)
-            .cloned()
-            .collect();
         let cash_balances_map: &HashMap<String, Decimal> = &latest_snapshot.cash_balances;
 
-        let asset_ids: Vec<String> = snapshot_positions
-            .iter()
-            .map(|p| p.asset_id.clone())
+        // --- Security positions: read from lots table ---
+        let open_lots = match self
+            .lot_repository
+            .get_open_lots_for_account(account_id)
+            .await
+        {
+            Ok(lots) => lots,
+            Err(e) => {
+                error!(
+                    "Failed to load lots for account {}: {}. Security holdings will be empty.",
+                    account_id, e
+                );
+                Vec::new()
+            }
+        };
+
+        // Group lots by asset_id
+        let mut lots_by_asset: HashMap<String, Vec<LotRecord>> = HashMap::new();
+        for lot in open_lots {
+            lots_by_asset
+                .entry(lot.asset_id.clone())
+                .or_default()
+                .push(lot);
+        }
+
+        let asset_ids: Vec<String> = lots_by_asset
+            .keys()
+            .cloned()
             .collect::<HashSet<_>>()
             .into_iter()
             .collect();
@@ -119,6 +146,7 @@ impl HoldingsService {
                         let metadata: Option<Value> = asset.metadata.clone();
                         let purchase_price: Option<Decimal> =
                             metadata.as_ref().and_then(extract_purchase_price);
+                        let contract_multiplier = asset.contract_multiplier();
 
                         let instrument = Instrument {
                             id: asset.id.clone(),
@@ -136,6 +164,7 @@ impl HoldingsService {
                             kind: asset.kind,
                             metadata,
                             purchase_price,
+                            contract_multiplier,
                         };
                         (asset.id, asset_info)
                     })
@@ -154,14 +183,35 @@ impl HoldingsService {
 
         let mut holdings: Vec<Holding> = Vec::new();
 
-        for snapshot_pos in &snapshot_positions {
-            let Some(asset_info) = assets_info_map.get(&snapshot_pos.asset_id) else {
+        for (asset_id, asset_lots) in &lots_by_asset {
+            let Some(asset_info) = assets_info_map.get(asset_id) else {
                 warn!(
                     "Asset details not found for asset_id: {}. Skipping this holding view.",
-                    snapshot_pos.asset_id
+                    asset_id
                 );
                 continue;
             };
+
+            let quantity: Decimal = asset_lots
+                .iter()
+                .filter_map(|l| l.remaining_quantity.parse::<Decimal>().ok())
+                .sum();
+
+            if quantity == Decimal::ZERO {
+                continue;
+            }
+
+            let total_cost_basis: Decimal = asset_lots
+                .iter()
+                .filter_map(|l| l.total_cost_basis.parse::<Decimal>().ok())
+                .sum();
+
+            let inception_date = asset_lots
+                .iter()
+                .filter_map(|l| NaiveDate::parse_from_str(&l.open_date, "%Y-%m-%d").ok())
+                .min()
+                .map(|d| d.and_hms_opt(0, 0, 0).unwrap().and_utc())
+                .unwrap_or_else(chrono::Utc::now);
 
             let (holding_type, id_prefix) = if asset_info.kind.is_alternative() {
                 (HoldingType::AlternativeAsset, "ALT")
@@ -170,25 +220,33 @@ impl HoldingsService {
             };
 
             let include_lots = lots_asset_id
-                .map(|id| id == snapshot_pos.asset_id)
+                .map(|id| id == asset_id.as_str())
                 .unwrap_or(false);
 
+            let lot_display: Option<VecDeque<snapshot::Lot>> = if include_lots {
+                Some(lot_records_to_display_lots(
+                    asset_lots, account_id, asset_id,
+                ))
+            } else {
+                None
+            };
+
             let holding_view = Holding {
-                id: format!("{}-{}-{}", id_prefix, account_id, snapshot_pos.asset_id),
+                id: format!("{}-{}-{}", id_prefix, account_id, asset_id),
                 account_id: account_id.to_string(),
                 holding_type,
                 instrument: Some(asset_info.instrument.clone()),
                 asset_kind: Some(asset_info.kind.clone()),
-                quantity: snapshot_pos.quantity,
-                open_date: Some(snapshot_pos.inception_date),
-                lots: include_lots.then(|| snapshot_pos.lots.clone()),
-                contract_multiplier: snapshot_pos.contract_multiplier,
-                local_currency: snapshot_pos.currency.clone(),
+                quantity,
+                open_date: Some(inception_date),
+                lots: lot_display,
+                contract_multiplier: asset_info.contract_multiplier,
+                local_currency: asset_info.instrument.currency.clone(),
                 base_currency: base_currency.to_string(),
                 fx_rate: None,
                 market_value: MonetaryValue::zero(),
                 cost_basis: Some(MonetaryValue {
-                    local: snapshot_pos.total_cost_basis,
+                    local: total_cost_basis,
                     base: Decimal::ZERO,
                 }),
                 price: None,
@@ -290,6 +348,41 @@ impl HoldingsService {
             );
         }
     }
+}
+
+fn lot_records_to_display_lots(
+    records: &[LotRecord],
+    account_id: &str,
+    asset_id: &str,
+) -> VecDeque<snapshot::Lot> {
+    let position_id = format!("POS-{}-{}", asset_id, account_id);
+    records
+        .iter()
+        .filter_map(|r| {
+            let quantity = r.remaining_quantity.parse::<Decimal>().ok()?;
+            let cost_basis = r.total_cost_basis.parse::<Decimal>().ok()?;
+            let acquisition_price = r.cost_per_unit.parse::<Decimal>().ok()?;
+            let acquisition_fees = r
+                .fee_allocated
+                .parse::<Decimal>()
+                .ok()
+                .unwrap_or(Decimal::ZERO);
+            let acquisition_date = NaiveDate::parse_from_str(&r.open_date, "%Y-%m-%d")
+                .ok()?
+                .and_hms_opt(0, 0, 0)?
+                .and_utc();
+            Some(snapshot::Lot {
+                id: r.id.clone(),
+                position_id: position_id.clone(),
+                acquisition_date,
+                quantity,
+                cost_basis,
+                acquisition_price,
+                acquisition_fees,
+                fx_rate_to_position: None,
+            })
+        })
+        .collect()
 }
 
 fn apply_factor_to_monetary_value(value: &mut MonetaryValue, factor: Decimal) {

@@ -35,6 +35,9 @@ pub trait LotRepositoryTrait: Send + Sync {
     /// Existing rows for the account are deleted before inserting new ones.
     async fn replace_lots_for_account(&self, account_id: &str, lots: &[LotRecord]) -> Result<()>;
 
+    /// Returns all open (is_closed = 0) lot rows for the given account.
+    async fn get_open_lots_for_account(&self, account_id: &str) -> Result<Vec<LotRecord>>;
+
     /// Returns the total number of rows currently in the lots table.
     fn count_open_lots(&self) -> Result<i64>;
 }

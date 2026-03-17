@@ -5346,6 +5346,13 @@ mod tests {
             Ok(())
         }
 
+        async fn get_open_lots_for_account(
+            &self,
+            _account_id: &str,
+        ) -> AppResult<Vec<crate::lots::LotRecord>> {
+            Ok(Vec::new())
+        }
+
         fn count_open_lots(&self) -> AppResult<i64> {
             Ok(self
                 .calls
