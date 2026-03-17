@@ -100,6 +100,9 @@ pub struct FifoReductionResult {
     /// The lots that were fully or partially removed, with their removed quantities.
     /// Each lot preserves the original acquisition date, price, and fee data.
     pub removed_lots: Vec<Lot>,
+    /// IDs of lots that were fully consumed (remaining_quantity → 0) by this reduction.
+    /// Used by the lot persistence layer to mark those rows as closed.
+    pub fully_consumed_lot_ids: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -427,6 +430,7 @@ impl Position {
                 quantity_reduced: Decimal::ZERO,
                 cost_basis_removed: Decimal::ZERO,
                 removed_lots: Vec::new(),
+                fully_consumed_lot_ids: Vec::new(),
             });
         }
 
@@ -450,6 +454,8 @@ impl Position {
         let mut cost_basis_of_sold_lots_asset_currency = Decimal::ZERO;
         // Track removed lots for transfer carry-over
         let mut removed_lots: Vec<Lot> = Vec::new();
+        // Track fully consumed lot IDs for persistence (mark as closed)
+        let mut fully_consumed_lot_ids: Vec<String> = Vec::new();
 
         // Iterate over the sorted Vec
         for (index, lot) in vec_lots.iter().enumerate() {
@@ -497,6 +503,7 @@ impl Position {
 
             if remaining_lot_qty <= Decimal::ZERO || !is_quantity_significant(&remaining_lot_qty) {
                 lot_indices_to_remove.push(index);
+                fully_consumed_lot_ids.push(lot.id.clone());
             } else {
                 // Calculate remaining cost basis and fees (asset currency)
                 let remaining_lot_basis = lot.cost_basis - cost_basis_removed;
@@ -541,6 +548,7 @@ impl Position {
             quantity_reduced: actual_quantity_reduced,
             cost_basis_removed: cost_basis_of_sold_lots_asset_currency,
             removed_lots,
+            fully_consumed_lot_ids,
         })
     }
 

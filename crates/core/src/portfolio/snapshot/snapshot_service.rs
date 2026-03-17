@@ -388,13 +388,14 @@ impl SnapshotService {
                 if acc_id == PORTFOLIO_TOTAL_ACCOUNT_ID {
                     continue;
                 }
-                let lot_records = extract_lot_records(snapshot);
-                let _ = check_lot_quantity_consistency(snapshot, &lot_records);
+                let open_lots = extract_lot_records(snapshot);
+                let _ = check_lot_quantity_consistency(snapshot, &open_lots);
+                let closures = self.holdings_calculator.take_disposed_lots(acc_id);
                 if let Err(e) = lot_repo
-                    .replace_lots_for_account(acc_id, &lot_records)
+                    .sync_lots_for_account(acc_id, &open_lots, &closures)
                     .await
                 {
-                    error!("Failed to write lot rows for account {}: {}", acc_id, e);
+                    error!("Failed to sync lot rows for account {}: {}", acc_id, e);
                 }
             }
         }
@@ -724,8 +725,9 @@ impl SnapshotService {
         let mut all_warnings: Vec<HoldingsCalculationWarning> = Vec::new();
         let date_range = get_days_between(calculation_min_date, calculation_end_date);
 
-        // Clear lot-level transfer cache from any previous run
+        // Clear lot-level caches from any previous run
         self.holdings_calculator.clear_transfer_lots_cache();
+        self.holdings_calculator.clear_disposed_lots();
 
         for current_date in date_range {
             // Process only accounts whose effective start date is today or earlier.

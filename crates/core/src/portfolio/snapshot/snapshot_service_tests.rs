@@ -5315,11 +5315,13 @@ mod tests {
     // ── Lot shadow-write tests ────────────────────────────────────────────────
 
     type LotCallLog = Arc<RwLock<Vec<(String, Vec<crate::lots::LotRecord>)>>>;
+    type ClosureCallLog = Arc<RwLock<Vec<(String, Vec<crate::lots::LotClosure>)>>>;
 
-    /// Records every call to replace_lots_for_account for post-run assertions.
+    /// Records every call to sync_lots_for_account for post-run assertions.
     #[derive(Clone, Default)]
     struct MockLotRepository {
         calls: LotCallLog,
+        closure_calls: ClosureCallLog,
     }
 
     impl MockLotRepository {
@@ -5329,6 +5331,10 @@ mod tests {
 
         fn calls(&self) -> Vec<(String, Vec<crate::lots::LotRecord>)> {
             self.calls.read().unwrap().clone()
+        }
+
+        fn closure_calls(&self) -> Vec<(String, Vec<crate::lots::LotClosure>)> {
+            self.closure_calls.read().unwrap().clone()
         }
     }
 
@@ -5351,6 +5357,23 @@ mod tests {
             _account_id: &str,
         ) -> AppResult<Vec<crate::lots::LotRecord>> {
             Ok(Vec::new())
+        }
+
+        async fn sync_lots_for_account(
+            &self,
+            account_id: &str,
+            open_lots: &[crate::lots::LotRecord],
+            closures: &[crate::lots::LotClosure],
+        ) -> AppResult<()> {
+            self.calls
+                .write()
+                .unwrap()
+                .push((account_id.to_string(), open_lots.to_vec()));
+            self.closure_calls
+                .write()
+                .unwrap()
+                .push((account_id.to_string(), closures.to_vec()));
+            Ok(())
         }
 
         fn count_open_lots(&self) -> AppResult<i64> {
@@ -5512,5 +5535,122 @@ mod tests {
             .map(|l| l.remaining_quantity.parse::<Decimal>().unwrap())
             .sum();
         assert_eq!(opt_qty, dec!(5), "option: 5 contracts");
+    }
+
+    /// Verifies that a fully-consumed lot (BUY then full SELL) ends up in
+    /// the closures list rather than in the open lots list.
+    ///
+    /// Portfolio:
+    ///   acc-sell-001 (USD)
+    ///     AAPL — buy 50 shares on 2024-01-15, sell all 50 on 2024-06-01
+    ///     LQD  — buy 100 shares on 2024-01-15 (stays open)
+    #[tokio::test]
+    async fn sync_lots_records_closures_for_full_sell() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc-sell-001", "USD", "Sell Test Account");
+        account_repo.add_account(acc.clone());
+
+        let buy_date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+        let sell_date = NaiveDate::from_ymd_opt(2024, 6, 1).unwrap();
+
+        let activities = vec![
+            create_test_activity(
+                "dep1",
+                &acc.id,
+                Some("CASH:USD"),
+                "DEPOSIT",
+                buy_date,
+                None,
+                None,
+                Some(dec!(25_000)),
+                "USD",
+            ),
+            // Buy 50 AAPL
+            create_test_activity(
+                "buy-aapl",
+                &acc.id,
+                Some("AAPL"),
+                "BUY",
+                buy_date,
+                Some(dec!(50)),
+                Some(dec!(185.00)),
+                Some(dec!(9250)),
+                "USD",
+            ),
+            // Buy 100 LQD (stays open)
+            create_test_activity(
+                "buy-lqd",
+                &acc.id,
+                Some("LQD"),
+                "BUY",
+                buy_date,
+                Some(dec!(100)),
+                Some(dec!(107.25)),
+                Some(dec!(10725)),
+                "USD",
+            ),
+            // Sell all 50 AAPL — fully consumes the lot
+            create_test_activity(
+                "sell-aapl",
+                &acc.id,
+                Some("AAPL"),
+                "SELL",
+                sell_date,
+                Some(dec!(50)),
+                Some(dec!(200.00)),
+                Some(dec!(10000)),
+                "USD",
+            ),
+        ];
+
+        let lot_repo = Arc::new(MockLotRepository::new());
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            Arc::new(MockActivityRepositoryWithData::new(activities)),
+            Arc::new(MockSnapshotRepository::new()),
+            Arc::new(MockAssetRepository::new()),
+            Arc::new(MockFxService::new()),
+        )
+        .with_lot_repository(lot_repo.clone());
+
+        svc.recalculate_holdings_snapshots(None, SnapshotRecalcMode::Full)
+            .await
+            .unwrap();
+
+        let calls = lot_repo.calls();
+        assert_eq!(calls.len(), 1, "one call per account");
+        let (_, open_lots) = &calls[0];
+
+        // AAPL lot was fully sold — must not appear in open lots
+        assert!(
+            !open_lots.iter().any(|l| l.asset_id == "AAPL"),
+            "AAPL lot should be closed, not in open lots"
+        );
+
+        // LQD lot must still be open
+        let lqd_qty: Decimal = open_lots
+            .iter()
+            .filter(|l| l.asset_id == "LQD")
+            .map(|l| l.remaining_quantity.parse::<Decimal>().unwrap())
+            .sum();
+        assert_eq!(lqd_qty, dec!(100), "LQD should remain open with 100 shares");
+
+        // The AAPL lot must appear in closures with the sell date
+        let closure_calls = lot_repo.closure_calls();
+        assert_eq!(closure_calls.len(), 1);
+        let (_, closures) = &closure_calls[0];
+        assert_eq!(closures.len(), 1, "one lot fully consumed");
+        assert_eq!(
+            closures[0].close_date, "2024-06-01",
+            "close date = sell date"
+        );
+        assert_eq!(
+            closures[0].close_activity_id.as_deref(),
+            Some("sell-aapl"),
+            "close_activity_id = sell activity id"
+        );
     }
 }

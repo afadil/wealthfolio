@@ -2,6 +2,7 @@ use crate::activities::{Activity, ActivityType};
 use crate::assets::AssetRepositoryTrait;
 use crate::errors::{CalculatorError, Error, Result};
 use crate::fx::FxServiceTrait;
+use crate::lots::LotClosure;
 use crate::portfolio::snapshot::AccountStateSnapshot;
 use crate::portfolio::snapshot::HoldingsCalculationResult;
 use crate::portfolio::snapshot::HoldingsCalculationWarning;
@@ -38,6 +39,9 @@ pub struct HoldingsCalculator {
     /// the lots are consumed from this cache and added to the destination position,
     /// preserving original acquisition dates and cost basis.
     transfer_lots_cache: Arc<Mutex<HashMap<String, Vec<super::Lot>>>>,
+    /// Accumulates lot closures (fully consumed lots) during a recalculation run,
+    /// keyed by account_id. Cleared at the start of each run.
+    disposed_lots: Arc<Mutex<HashMap<String, Vec<LotClosure>>>>,
 }
 impl HoldingsCalculator {
     pub fn new(
@@ -65,6 +69,7 @@ impl HoldingsCalculator {
             timezone,
             asset_repository,
             transfer_lots_cache: Arc::new(Mutex::new(HashMap::new())),
+            disposed_lots: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -73,6 +78,41 @@ impl HoldingsCalculator {
     pub fn clear_transfer_lots_cache(&self) {
         if let Ok(mut cache) = self.transfer_lots_cache.lock() {
             cache.clear();
+        }
+    }
+
+    /// Clears the disposed lots log. Should be called at the start of each recalculation run.
+    pub fn clear_disposed_lots(&self) {
+        if let Ok(mut log) = self.disposed_lots.lock() {
+            log.clear();
+        }
+    }
+
+    /// Returns and removes all accumulated lot closures for the given account.
+    pub fn take_disposed_lots(&self, account_id: &str) -> Vec<LotClosure> {
+        if let Ok(mut log) = self.disposed_lots.lock() {
+            log.remove(account_id).unwrap_or_default()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Records a lot closure in the disposed lots log.
+    fn record_lot_closure(
+        &self,
+        account_id: &str,
+        lot_id: &str,
+        close_date: &str,
+        activity_id: &str,
+    ) {
+        if let Ok(mut log) = self.disposed_lots.lock() {
+            log.entry(account_id.to_string())
+                .or_default()
+                .push(LotClosure {
+                    lot_id: lot_id.to_string(),
+                    close_date: close_date.to_string(),
+                    close_activity_id: Some(activity_id.to_string()),
+                });
         }
     }
 
@@ -361,7 +401,11 @@ impl HoldingsCalculator {
         }
 
         if let Some(position) = state.positions.get_mut(asset_id) {
-            let _reduction = position.reduce_lots_fifo(activity.qty())?;
+            let reduction = position.reduce_lots_fifo(activity.qty())?;
+            let close_date = self.activity_local_date(activity).to_string();
+            for lot_id in &reduction.fully_consumed_lot_ids {
+                self.record_lot_closure(&state.account_id, lot_id, &close_date, &activity.id);
+            }
         } else {
             warn!(
                 "Attempted to Sell non-existent/zero position {} via activity {}. Applying cash effect only.",
@@ -778,6 +822,12 @@ impl HoldingsCalculator {
                 let reduction = position.reduce_lots_fifo(activity.qty())?;
                 let cost_basis_removed = reduction.cost_basis_removed;
 
+                // Record fully consumed lots as closed
+                let close_date = activity_date.to_string();
+                for lot_id in &reduction.fully_consumed_lot_ids {
+                    self.record_lot_closure(&state.account_id, lot_id, &close_date, &activity.id);
+                }
+
                 // Cache removed lots for paired TRANSFER_IN (lot-level transfer)
                 if let Some(ref group_id) = activity.source_group_id {
                     if !reduction.removed_lots.is_empty() {
@@ -844,6 +894,15 @@ impl HoldingsCalculator {
                 if let Some(position) = state.positions.get_mut(asset_id) {
                     let qty = activity.qty();
                     let reduction = position.reduce_lots_fifo(qty)?;
+                    let close_date = self.activity_local_date(activity).to_string();
+                    for lot_id in &reduction.fully_consumed_lot_ids {
+                        self.record_lot_closure(
+                            &state.account_id,
+                            lot_id,
+                            &close_date,
+                            &activity.id,
+                        );
+                    }
                     debug!(
                         "OPTION_EXPIRY: removed qty={} cost_basis={} from {} (activity {})",
                         reduction.quantity_reduced,

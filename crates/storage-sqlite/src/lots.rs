@@ -9,7 +9,7 @@ use std::sync::Arc;
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
 use wealthfolio_core::errors::Result;
-use wealthfolio_core::lots::{HoldingPeriod, LotRecord, LotRepositoryTrait};
+use wealthfolio_core::lots::{HoldingPeriod, LotClosure, LotRecord, LotRepositoryTrait};
 
 // ── Diesel model ──────────────────────────────────────────────────────────────
 
@@ -151,6 +151,64 @@ impl LotRepositoryTrait for LotsRepository {
             .map_err(StorageError::from)?;
 
         Ok(rows.into_iter().map(LotRecord::from).collect())
+    }
+
+    async fn sync_lots_for_account(
+        &self,
+        account_id: &str,
+        open_lots: &[LotRecord],
+        closures: &[LotClosure],
+    ) -> Result<()> {
+        use crate::schema::lots::dsl;
+
+        let account_id = account_id.to_string();
+        let db_lots: Vec<LotRecordDB> = open_lots.iter().map(LotRecordDB::from).collect();
+        let closures: Vec<LotClosure> = closures.to_vec();
+
+        self.writer
+            .exec(move |conn| {
+                // Upsert open lots one at a time (SQLite Diesel doesn't support
+                // batch ON CONFLICT)
+                for lot in &db_lots {
+                    diesel::insert_into(dsl::lots)
+                        .values(lot)
+                        .on_conflict(dsl::id)
+                        .do_update()
+                        .set((
+                            dsl::remaining_quantity
+                                .eq(diesel::upsert::excluded(dsl::remaining_quantity)),
+                            dsl::total_cost_basis
+                                .eq(diesel::upsert::excluded(dsl::total_cost_basis)),
+                            dsl::updated_at.eq(diesel::upsert::excluded(dsl::updated_at)),
+                        ))
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
+                }
+
+                // Mark closed lots
+                for closure in &closures {
+                    diesel::update(dsl::lots.filter(dsl::id.eq(&closure.lot_id)))
+                        .set((
+                            dsl::is_closed.eq(1),
+                            dsl::close_date.eq(&closure.close_date),
+                            dsl::close_activity_id.eq(&closure.close_activity_id),
+                            dsl::remaining_quantity.eq("0"),
+                            dsl::updated_at.eq(chrono::Utc::now()
+                                .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+                                .to_string()),
+                        ))
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
+                }
+
+                // Insert any open lots not yet in the DB (new lots from this run)
+                // The ON CONFLICT above handles updates; new rows are inserted automatically.
+                // Remove closed lots from the account that are no longer referenced
+                // (lots closed in a prior run and not in open_lots are already marked closed — no delete needed)
+                let _ = account_id; // keep borrow alive
+                Ok(())
+            })
+            .await
     }
 
     fn count_open_lots(&self) -> Result<i64> {

@@ -28,6 +28,16 @@ use crate::portfolio::snapshot::AccountStateSnapshot;
 
 // ── Repository trait ──────────────────────────────────────────────────────────
 
+/// Records a lot that was fully disposed (remaining_quantity → 0).
+#[derive(Debug, Clone)]
+pub struct LotClosure {
+    pub lot_id: String,
+    /// ISO 8601 date the lot was fully consumed ("YYYY-MM-DD").
+    pub close_date: String,
+    /// The activity that fully disposed the lot, if known.
+    pub close_activity_id: Option<String>,
+}
+
 /// Persistence interface for lot rows.
 #[async_trait]
 pub trait LotRepositoryTrait: Send + Sync {
@@ -37,6 +47,19 @@ pub trait LotRepositoryTrait: Send + Sync {
 
     /// Returns all open (is_closed = 0) lot rows for the given account.
     async fn get_open_lots_for_account(&self, account_id: &str) -> Result<Vec<LotRecord>>;
+
+    /// Syncs the lots table for the given account without ever deleting rows:
+    /// - Open lots in `open_lots` are upserted (inserted if new, remaining_quantity updated if changed).
+    /// - Lots listed in `closures` are marked is_closed=1 with their close_date/activity.
+    ///
+    /// Replaces `replace_lots_for_account` once the transition to incremental lot maintenance
+    /// is complete.
+    async fn sync_lots_for_account(
+        &self,
+        account_id: &str,
+        open_lots: &[LotRecord],
+        closures: &[LotClosure],
+    ) -> Result<()>;
 
     /// Returns the total number of rows currently in the lots table.
     fn count_open_lots(&self) -> Result<i64>;
