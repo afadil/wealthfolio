@@ -1,4 +1,4 @@
--- A1: Create materialized lots table.
+-- Create materialized lots table.
 --
 -- Lots are the persistent, relational form of tax lots. Each row represents
 -- a specific acquisition of an asset with its own cost basis and disposal
@@ -6,7 +6,7 @@
 -- changes) from "what is it worth?" (quotes × lots, computed on read).
 --
 -- Initially empty. The holdings calculator will begin shadow-writing lot rows
--- alongside existing JSON snapshots in a subsequent step (A2).
+-- alongside existing JSON snapshots once the lot repository is wired in.
 
 CREATE TABLE lots (
     id                  TEXT    PRIMARY KEY NOT NULL,

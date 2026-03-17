@@ -544,7 +544,13 @@ impl Position {
         })
     }
 
-    /// Applies stock split.
+    /// Applies a stock split by scaling each lot's quantity by `split_ratio` and
+    /// adjusting the per-unit acquisition price inversely.
+    ///
+    /// Reverse splits (ratio < 1) and non-integer forward splits (e.g. 3-for-2)
+    /// can leave fractional shares. Most exchanges cash out fractional remainders;
+    /// that cash-out is not modelled here. Users should record a separate SELL
+    /// activity for any fractional shares that were liquidated by the broker.
     pub fn apply_split(&mut self, split_ratio: Decimal, activity_id: &str) -> Result<()> {
         if !split_ratio.is_sign_positive() {
             return Err(CalculatorError::InvalidActivity(format!(
