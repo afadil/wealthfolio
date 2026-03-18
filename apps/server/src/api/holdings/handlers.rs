@@ -237,6 +237,15 @@ pub async fn delete_snapshot_handler(
         q.date
     );
 
+    // Refresh lots from the new latest snapshot (or clear them if none remains).
+    if let Err(e) = state
+        .snapshot_service
+        .refresh_lots_from_latest_snapshot(&q.account_id)
+        .await
+    {
+        tracing::warn!("Failed to refresh lots after snapshot delete: {}", e);
+    }
+
     // Recalculate valuations for the affected account
     if let Err(e) = state
         .valuation_service
