@@ -130,6 +130,16 @@ impl Coverage {
         }
     }
 
+    /// Deutsche Boerse exchanges (Xetra + Frankfurt floor).
+    pub const fn dach_exchanges() -> Self {
+        Self {
+            equity_mic_allow: Some(&["XETR", "XFRA"]),
+            equity_mic_deny: None,
+            allow_unknown_mic: false,
+            metal_quote_ccy_allow: None,
+        }
+    }
+
     /// Metals only, USD quotes only.
     pub const fn metals_usd_only() -> Self {
         Self {

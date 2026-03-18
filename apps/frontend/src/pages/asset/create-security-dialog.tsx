@@ -32,7 +32,7 @@ import {
   SelectValue,
 } from "@wealthfolio/ui/components/ui/select";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -49,8 +49,9 @@ const QUOTE_MODE_OPTIONS = [
   { value: "MARKET", label: "Market (auto-sync)" },
 ] as const;
 
-/** Map search result quoteType to our InstrumentType form values */
-function mapQuoteTypeToInstrumentType(quoteType: string): string {
+/** Map search result quoteType to our InstrumentType form values.
+ *  Returns null for unrecognized types so the caller can fall back to manual mode. */
+function mapQuoteTypeToInstrumentType(quoteType: string): string | null {
   switch (quoteType.toUpperCase()) {
     case "EQUITY":
     case "ETF":
@@ -66,7 +67,7 @@ function mapQuoteTypeToInstrumentType(quoteType: string): string {
     case "OPTION":
       return "OPTION";
     default:
-      return "EQUITY";
+      return null;
   }
 }
 
@@ -103,6 +104,7 @@ export function CreateSecurityDialog({
 }: CreateSecurityDialogProps) {
   const { settings } = useSettingsContext();
   const defaultCurrency = settings?.baseCurrency || "USD";
+  const [selectedResult, setSelectedResult] = useState<SymbolSearchResult | undefined>();
 
   const { data: exchanges = [] } = useQuery({
     queryKey: ["exchanges"],
@@ -134,6 +136,7 @@ export function CreateSecurityDialog({
 
   useEffect(() => {
     if (open) {
+      setSelectedResult(undefined);
       form.reset({
         symbol: "",
         name: "",
@@ -150,11 +153,14 @@ export function CreateSecurityDialog({
     (_symbol: string, result?: SymbolSearchResult) => {
       if (!result) return;
 
+      setSelectedResult(result);
       form.setValue("symbol", result.symbol.toUpperCase(), { shouldValidate: true });
       form.setValue("name", result.longName || result.shortName || "", { shouldValidate: true });
 
-      if (result.quoteType) {
-        form.setValue("instrumentType", mapQuoteTypeToInstrumentType(result.quoteType));
+      const mappedType = result.quoteType ? mapQuoteTypeToInstrumentType(result.quoteType) : null;
+
+      if (mappedType) {
+        form.setValue("instrumentType", mappedType);
       }
       if (result.currency) {
         form.setValue("quoteCcy", result.currency, { shouldValidate: true });
@@ -163,9 +169,14 @@ export function CreateSecurityDialog({
         form.setValue("instrumentExchangeMic", normalizeMic(result.exchangeMic));
       }
 
-      // If the result comes from a data source (not manual), default to auto-sync
-      const isManual = result.dataSource === "MANUAL";
-      form.setValue("quoteMode", isManual ? "MANUAL" : "MARKET");
+      // If the type is unrecognized, fall back to manual mode.
+      // Otherwise auto-sync unless the result is from MANUAL source.
+      if (!mappedType) {
+        form.setValue("quoteMode", "MANUAL");
+      } else {
+        const isManual = result.dataSource === "MANUAL";
+        form.setValue("quoteMode", isManual ? "MANUAL" : "MARKET");
+      }
     },
     [form],
   );
@@ -233,7 +244,16 @@ export function CreateSecurityDialog({
                       <Input
                         placeholder="e.g., AAPL"
                         {...field}
-                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                        onChange={(e) => {
+                          const next = e.target.value.toUpperCase();
+                          if (
+                            selectedResult &&
+                            next.trim() !== selectedResult.symbol.toUpperCase()
+                          ) {
+                            setSelectedResult(undefined);
+                          }
+                          field.onChange(next);
+                        }}
                         className="uppercase"
                       />
                     </FormControl>

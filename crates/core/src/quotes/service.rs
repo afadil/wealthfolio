@@ -25,8 +25,8 @@ use super::sync_state::{QuoteSyncState, SymbolSyncPlan, SyncMode, SyncStateStore
 use super::types::{quote_id, AssetId, Day, QuoteSource};
 use crate::activities::ActivityRepositoryTrait;
 use crate::assets::{
-    symbol_resolution_candidates, Asset, AssetKind, AssetRepositoryTrait, InstrumentType,
-    ProviderProfile, QuoteMode,
+    canonicalize_market_identity, symbol_resolution_candidates, Asset, AssetKind,
+    AssetRepositoryTrait, AssetSpec, InstrumentType, ProviderProfile, QuoteMode,
 };
 use crate::errors::Result;
 use crate::fx::currency::{get_normalization_rule, normalize_currency_code};
@@ -87,6 +87,45 @@ fn reconcile_quote_currency(quote: &mut Quote, asset: &Asset) {
     if let Some(effective) = resolve_effective_quote_currency(&asset.quote_ccy, &quote.currency) {
         quote.currency = effective;
     }
+}
+
+fn instrument_type_from_search_result(quote_type: &str) -> Option<InstrumentType> {
+    match quote_type.to_uppercase().as_str() {
+        "EQUITY" | "STOCK" | "ETF" | "MUTUALFUND" | "MUTUAL FUND" | "INDEX" | "ECNQUOTE" => {
+            Some(InstrumentType::Equity)
+        }
+        "CRYPTOCURRENCY" | "CRYPTO" => Some(InstrumentType::Crypto),
+        "CURRENCY" | "FOREX" | "FX" => Some(InstrumentType::Fx),
+        "OPTION" => Some(InstrumentType::Option),
+        "COMMODITY" => Some(InstrumentType::Metal),
+        "BOND" | "MONEYMARKET" => Some(InstrumentType::Bond),
+        _ => None,
+    }
+}
+
+fn instrument_key_from_search_result(result: &SymbolSearchResult) -> Option<String> {
+    let instrument_type = instrument_type_from_search_result(&result.quote_type)?;
+    let canonical = canonicalize_market_identity(
+        Some(instrument_type.clone()),
+        Some(result.symbol.as_str()),
+        result.exchange_mic.as_deref(),
+        result.currency.as_deref(),
+    );
+
+    AssetSpec {
+        id: None,
+        display_code: canonical.display_code,
+        instrument_symbol: canonical.instrument_symbol,
+        instrument_exchange_mic: canonical.instrument_exchange_mic,
+        instrument_type: Some(instrument_type),
+        quote_ccy: canonical.quote_ccy.unwrap_or_default(),
+        requested_quote_ccy: None,
+        kind: AssetKind::Investment,
+        quote_mode: None,
+        name: None,
+        metadata: None,
+    }
+    .instrument_key()
 }
 
 fn extract_provider_id_from_sync_error(error: &str) -> Option<&'static str> {
@@ -847,11 +886,30 @@ where
             .unwrap_or_default();
 
         // 3. Convert existing assets to SymbolSearchResult with is_existing flag
-        let existing_summaries: Vec<SymbolSearchResult> = existing_assets
+        let mut existing_summaries: Vec<SymbolSearchResult> = existing_assets
             .iter()
             .filter(|a| a.kind != AssetKind::Fx)
             .map(|asset| Self::asset_to_quote_summary(asset))
             .collect();
+        let mut existing_asset_ids: HashSet<String> = existing_summaries
+            .iter()
+            .filter_map(|s| s.existing_asset_id.clone())
+            .collect();
+
+        let mut unmatched_provider_results = Vec::with_capacity(provider_results.len());
+        for result in provider_results {
+            let existing_asset = instrument_key_from_search_result(&result)
+                .and_then(|key| self.asset_repo.find_by_instrument_key(&key).ok().flatten());
+
+            if let Some(asset) = existing_asset.filter(|a| a.kind != AssetKind::Fx) {
+                if existing_asset_ids.insert(asset.id.clone()) {
+                    existing_summaries.push(Self::asset_to_quote_summary(&asset));
+                }
+                continue;
+            }
+
+            unmatched_provider_results.push(result);
+        }
 
         // 4. Build a set of existing (symbol, exchange_mic) pairs for deduplication
         let existing_keys: HashSet<(String, Option<String>)> = existing_summaries
@@ -860,7 +918,7 @@ where
             .collect();
 
         // 5. Filter provider results to exclude duplicates
-        let new_provider_results: Vec<SymbolSearchResult> = provider_results
+        let new_provider_results: Vec<SymbolSearchResult> = unmatched_provider_results
             .into_iter()
             .filter(|r| {
                 // Check if this symbol+exchange combo already exists
@@ -1856,6 +1914,38 @@ mod tests {
     use rust_decimal_macros::dec;
     use std::collections::HashMap;
     use std::sync::Arc;
+
+    #[test]
+    fn test_instrument_key_from_bf_search_result_uses_isin_and_mic() {
+        let result = SymbolSearchResult {
+            symbol: "IE00BTJRMP35".to_string(),
+            quote_type: "ETF".to_string(),
+            exchange_mic: Some("XETR".to_string()),
+            currency: Some("EUR".to_string()),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            instrument_key_from_search_result(&result).as_deref(),
+            Some("EQUITY:IE00BTJRMP35@XETR")
+        );
+    }
+
+    #[test]
+    fn test_instrument_key_from_yahoo_search_result_canonicalizes_suffix() {
+        let result = SymbolSearchResult {
+            symbol: "SHOP.TO".to_string(),
+            quote_type: "EQUITY".to_string(),
+            exchange_mic: Some("XTSE".to_string()),
+            currency: Some("CAD".to_string()),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            instrument_key_from_search_result(&result).as_deref(),
+            Some("EQUITY:SHOP@XTSE")
+        );
+    }
 
     #[derive(Default)]
     struct NoopQuoteStore;
