@@ -106,6 +106,48 @@ const AccountSummaryComponent = React.memo(
       : item.totalGainLossAmountBaseCurrency;
     const gainDisplayCurrency = currency;
     const gainPercentToDisplay = item.totalGainLossPercent;
+    const hasAnyGainData = gainAmountToDisplay != null || gainPercentToDisplay != null;
+    const isZeroGain =
+      (gainAmountToDisplay ?? 0) === 0 && (gainPercentToDisplay ?? 0) === 0 && hasAnyGainData;
+    const shouldRenderSecondaryMetric = isNested || (hasAnyGainData && !isZeroGain);
+
+    let secondaryMetricContent: React.ReactNode = null;
+
+    if (shouldRenderSecondaryMetric) {
+      if (!hasAnyGainData) {
+        secondaryMetricContent = (
+          <div
+            className="text-muted-foreground text-xs font-medium md:text-sm md:font-medium"
+            data-testid="account-summary-secondary-placeholder"
+          >
+            -
+          </div>
+        );
+      } else {
+        secondaryMetricContent = (
+          <>
+            {gainAmountToDisplay != null && (
+              <GainAmount
+                className="text-xs font-medium md:text-sm md:font-medium"
+                value={gainAmountToDisplay}
+                currency={gainDisplayCurrency}
+                displayCurrency={false}
+                showSign={false}
+              />
+            )}
+            {gainAmountToDisplay != null && gainPercentToDisplay != null && (
+              <Separator orientation="vertical" className="h-3 md:h-4" />
+            )}
+            {gainPercentToDisplay != null && (
+              <GainPercent
+                className="text-xs font-medium md:text-sm md:font-medium"
+                value={gainPercentToDisplay}
+              />
+            )}
+          </>
+        );
+      }
+    }
 
     const content = (
       <>
@@ -120,29 +162,14 @@ const AccountSummaryComponent = React.memo(
             <p className="text-sm font-semibold leading-tight md:text-base md:font-semibold">
               <PrivacyAmount value={totalValue} currency={currency} />
             </p>
-            {(gainAmountToDisplay !== null || gainPercentToDisplay !== null) &&
-              !(gainAmountToDisplay === 0 && gainPercentToDisplay === 0) && (
-                <div className="flex items-center gap-1.5 md:gap-2">
-                  {gainAmountToDisplay !== null && (
-                    <GainAmount
-                      className="text-xs font-medium md:text-sm md:font-medium"
-                      value={gainAmountToDisplay ?? 0}
-                      currency={gainDisplayCurrency}
-                      displayCurrency={false}
-                      showSign={false}
-                    />
-                  )}
-                  {gainAmountToDisplay !== null && gainPercentToDisplay !== null && (
-                    <Separator orientation="vertical" className="h-3 md:h-4" />
-                  )}
-                  {gainPercentToDisplay !== null && (
-                    <GainPercent
-                      className="text-xs font-medium md:text-sm md:font-medium"
-                      value={gainPercentToDisplay}
-                    />
-                  )}
-                </div>
-              )}
+            {secondaryMetricContent && (
+              <div
+                className="flex items-center gap-1.5 md:gap-2"
+                data-testid="account-summary-secondary-metric"
+              >
+                {secondaryMetricContent}
+              </div>
+            )}
           </div>
           {isGroup ? (
             <div className="flex items-center justify-center">
