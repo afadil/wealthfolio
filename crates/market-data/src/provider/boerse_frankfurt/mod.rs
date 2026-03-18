@@ -819,7 +819,7 @@ mod tests {
 
     #[test]
     fn test_resolve_isin_requires_exact_mic_match() {
-        let results = vec![
+        let results = [
             TvSearchResult {
                 symbol: "XFRA:DE0007164600".to_string(),
                 description: "SAP SE".to_string(),
