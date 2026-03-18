@@ -358,6 +358,30 @@ impl MarketDataProvider for MarketDataAppProvider {
             return Err(MarketDataError::NoDataForRange);
         }
 
+        // The candles endpoint never includes the current trading day's data.
+        // Supplement with the real-time prices endpoint if `end` covers today
+        // and the candles don't already include it.
+        let today = Utc::now().date_naive();
+        let end_date = end.date_naive();
+        let last_candle_date = quotes.last().map(|q| q.timestamp.date_naive());
+
+        if end_date >= today && last_candle_date.is_some_and(|d| d < today) {
+            match self.get_latest_quote(context, instrument).await {
+                Ok(latest) => {
+                    // Avoid duplicates: only append if the real-time quote is
+                    // newer than the last candle (e.g., skip on weekends when
+                    // the prices endpoint returns the same day as the last candle).
+                    if latest.timestamp.date_naive() > last_candle_date.unwrap() {
+                        quotes.push(latest);
+                    }
+                }
+                Err(e) => warn!(
+                    "MarketData.app: failed to fetch current-day price for {}: {}",
+                    symbol, e
+                ),
+            }
+        }
+
         Ok(quotes)
     }
 }
