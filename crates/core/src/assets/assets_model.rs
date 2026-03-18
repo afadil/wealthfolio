@@ -382,6 +382,8 @@ impl Asset {
     /// Returns the contract multiplier for this asset.
     ///
     /// For options, this is the number of shares per contract (typically 100).
+    /// For precious metals with a weight suffix (e.g. XAU-1KG), this is the
+    /// weight in troy ounces so that a per-oz spot quote is scaled correctly.
     /// For all other instruments it is 1.
     pub fn contract_multiplier(&self) -> Decimal {
         if let Some(spec) = self.option_spec() {
@@ -389,6 +391,8 @@ impl Asset {
         } else if self.is_option() {
             // Option without metadata — default to standard 100 multiplier
             Decimal::from(100)
+        } else if self.is_metal() {
+            self.metal_weight_oz()
         } else {
             Decimal::ONE
         }
