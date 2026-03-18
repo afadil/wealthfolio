@@ -68,6 +68,10 @@ pub struct AssetProfile {
     /// 52-week low price
     #[serde(skip_serializing_if = "Option::is_none")]
     pub week_52_low: Option<f64>,
+
+    /// ISIN (International Securities Identification Number)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub isin: Option<String>,
 }
 
 impl AssetProfile {
@@ -99,6 +103,12 @@ impl AssetProfile {
     /// Set the country
     pub fn country(mut self, country: impl Into<String>) -> Self {
         self.country = Some(country.into());
+        self
+    }
+
+    /// Set the ISIN
+    pub fn isin(mut self, isin: impl Into<String>) -> Self {
+        self.isin = Some(isin.into());
         self
     }
 }

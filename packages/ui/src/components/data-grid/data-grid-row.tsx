@@ -204,6 +204,7 @@ function DataGridRowImpl<TData>({
             key={cell.id}
             role="gridcell"
             aria-colindex={colIndex + 1}
+            data-column-id={columnId}
             data-highlighted={isCellFocused ? "" : undefined}
             data-slot="grid-cell"
             tabIndex={-1}

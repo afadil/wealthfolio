@@ -5,6 +5,7 @@ use std::sync::Arc;
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::quotes::QuoteServiceTrait;
 use crate::taxonomies::TaxonomyServiceTrait;
+use crate::utils::isin::looks_like_isin;
 use futures::stream::{self, StreamExt};
 
 use super::assets_model::{
@@ -56,6 +57,29 @@ impl AssetService {
             AssetKind::Investment | AssetKind::Fx => QuoteMode::Market,
             _ => QuoteMode::Manual,
         }
+    }
+
+    fn inferred_provider_config(
+        quote_mode: QuoteMode,
+        instrument_type: Option<&InstrumentType>,
+        instrument_symbol: Option<&str>,
+        exchange_mic: Option<&str>,
+    ) -> Option<serde_json::Value> {
+        if quote_mode != QuoteMode::Market {
+            return None;
+        }
+
+        if matches!(instrument_type, Some(InstrumentType::Equity))
+            && exchange_mic
+                .is_some_and(|mic| matches!(mic.trim().to_uppercase().as_str(), "XETR" | "XFRA"))
+            && instrument_symbol
+                .map(str::trim)
+                .is_some_and(looks_like_isin)
+        {
+            return Some(serde_json::json!({ "preferred_provider": "BOERSE_FRANKFURT" }));
+        }
+
+        None
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -220,7 +244,16 @@ impl AssetService {
                 // Bonds use specialized providers (US_TREASURY_CALC, BOERSE_FRANKFURT);
                 // don't override with Yahoo which can't resolve ISINs.
                 Some(InstrumentType::Bond) => None,
-                _ => Some(serde_json::json!({ "preferred_provider": "YAHOO" })),
+                _ => Self::inferred_provider_config(
+                    quote_mode,
+                    spec.instrument_type.as_ref(),
+                    canonical
+                        .instrument_symbol
+                        .as_deref()
+                        .or(spec.instrument_symbol.as_deref()),
+                    resolved_mic.as_deref(),
+                )
+                .or(Some(serde_json::json!({ "preferred_provider": "YAHOO" }))),
             },
             QuoteMode::Manual => None,
         };
@@ -381,6 +414,14 @@ impl AssetServiceTrait for AssetService {
                 )
             })
             .unwrap_or(new_asset.quote_ccy);
+        if new_asset.provider_config.is_none() {
+            new_asset.provider_config = Self::inferred_provider_config(
+                new_asset.quote_mode,
+                new_asset.instrument_type.as_ref(),
+                new_asset.instrument_symbol.as_deref(),
+                new_asset.instrument_exchange_mic.as_deref(),
+            );
+        }
 
         let instrument_type = new_asset.instrument_type.clone();
         let kind = new_asset.kind.clone();
@@ -539,15 +580,6 @@ impl AssetServiceTrait for AssetService {
             )
             .await;
 
-        // Set preferred provider based on quote mode
-        let provider_config = match quote_mode {
-            QuoteMode::Market => match instrument_type.as_ref() {
-                Some(InstrumentType::Bond) => None,
-                _ => Some(serde_json::json!({ "preferred_provider": "YAHOO" })),
-            },
-            QuoteMode::Manual => None,
-        };
-
         let name = metadata.as_ref().and_then(|m| m.name.clone());
         let asset_metadata_json = metadata.as_ref().and_then(|m| m.asset_metadata.clone());
         let canonical_identity = canonicalize_market_identity(
@@ -558,6 +590,22 @@ impl AssetServiceTrait for AssetService {
             exchange_mic.as_deref(),
             Some(currency.as_str()),
         );
+        let provider_config = match quote_mode {
+            QuoteMode::Market => match instrument_type.as_ref() {
+                Some(InstrumentType::Bond) => None,
+                _ => Self::inferred_provider_config(
+                    quote_mode,
+                    instrument_type.as_ref(),
+                    canonical_identity.instrument_symbol.as_deref(),
+                    canonical_identity
+                        .instrument_exchange_mic
+                        .as_deref()
+                        .or(exchange_mic.as_deref()),
+                )
+                .or(Some(serde_json::json!({ "preferred_provider": "YAHOO" }))),
+            },
+            QuoteMode::Manual => None,
+        };
 
         let new_asset = NewAsset {
             id: Some(asset_id.to_string()),
@@ -1283,6 +1331,7 @@ impl AssetServiceTrait for AssetService {
 
 #[cfg(test)]
 mod tests {
+    use super::super::assets_model::InstrumentType;
     use super::{AssetService, QuoteMode};
 
     #[test]
@@ -1321,8 +1370,6 @@ mod tests {
 
     #[test]
     fn test_bond_provider_config_is_none() {
-        use super::super::assets_model::InstrumentType;
-
         // The provider_config logic in new_asset_from_spec:
         // Bond → None (no Yahoo override)
         let quote_mode = QuoteMode::Market;
@@ -1344,23 +1391,34 @@ mod tests {
 
     #[test]
     fn test_equity_provider_config_is_yahoo() {
-        use super::super::assets_model::InstrumentType;
-
-        let quote_mode = QuoteMode::Market;
-        let instrument_type = Some(InstrumentType::Equity);
-
-        let provider_config = match quote_mode {
-            QuoteMode::Market => match instrument_type.as_ref() {
-                Some(InstrumentType::Bond) => None,
-                _ => Some(serde_json::json!({ "preferred_provider": "YAHOO" })),
-            },
-            QuoteMode::Manual => None,
-        };
+        let provider_config = AssetService::inferred_provider_config(
+            QuoteMode::Market,
+            Some(&InstrumentType::Equity),
+            Some("SHOP"),
+            Some("XTSE"),
+        )
+        .or(Some(serde_json::json!({ "preferred_provider": "YAHOO" })));
 
         assert_eq!(
             provider_config,
             Some(serde_json::json!({ "preferred_provider": "YAHOO" })),
             "Equities should get Yahoo preferred_provider"
+        );
+    }
+
+    #[test]
+    fn test_bf_isin_equity_prefers_boerse_frankfurt() {
+        let provider_config = AssetService::inferred_provider_config(
+            QuoteMode::Market,
+            Some(&InstrumentType::Equity),
+            Some("IE00BTJRMP35"),
+            Some("XETR"),
+        );
+
+        assert_eq!(
+            provider_config,
+            Some(serde_json::json!({ "preferred_provider": "BOERSE_FRANKFURT" })),
+            "ISIN-backed XETR/XFRA equities should prefer Boerse Frankfurt"
         );
     }
 }

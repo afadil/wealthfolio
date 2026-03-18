@@ -53,13 +53,6 @@ import { useFieldArray, useForm } from "react-hook-form";
 import * as z from "zod";
 import { useAssetProfileMutations } from "./hooks/use-asset-profile-mutations";
 
-const PROVIDERS = [
-  { value: "YAHOO", label: "Yahoo Finance" },
-  { value: "ALPHA_VANTAGE", label: "Alpha Vantage" },
-  { value: "FINNHUB", label: "Finnhub" },
-  { value: "MARKETDATA_APP", label: "MarketData.app" },
-] as const;
-
 // Schema for a single provider override (type is derived from asset kind)
 const providerOverrideSchema = z.object({
   provider: z.string(),
@@ -825,9 +818,9 @@ export function AssetEditSheet({
                                               <ResponsiveSelect
                                                 value={providerField.value}
                                                 onValueChange={providerField.onChange}
-                                                options={PROVIDERS.map((p) => ({
-                                                  label: p.label,
-                                                  value: p.value,
+                                                options={marketDataProviders.map((p) => ({
+                                                  label: p.name,
+                                                  value: p.id,
                                                 }))}
                                                 placeholder="Select provider"
                                                 sheetTitle="Data Provider"

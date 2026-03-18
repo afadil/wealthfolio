@@ -557,10 +557,13 @@ impl MarketDataClient {
     /// 3. Look up friendly exchange name from MIC
     /// 4. Preserve provider-reported currency only (do NOT infer from MIC)
     fn convert_search_result(result: MarketSearchResult) -> SymbolSearchResult {
-        // Try to determine MIC from Yahoo's exchange code first
-        let mut exchange_mic = yahoo_exchange_to_mic(&result.exchange).map(|mic| mic.to_string());
+        // Prefer provider-supplied MIC (e.g., BF sets this directly).
+        // Fall back to Yahoo-specific helpers when the provider didn't set it.
+        let mut exchange_mic = result.exchange_mic.clone();
 
-        // If no MIC from exchange code, try extracting from symbol suffix
+        if exchange_mic.is_none() {
+            exchange_mic = yahoo_exchange_to_mic(&result.exchange).map(|mic| mic.to_string());
+        }
         if exchange_mic.is_none() {
             if let Some(dot_pos) = result.symbol.rfind('.') {
                 let suffix = &result.symbol[dot_pos + 1..];
@@ -668,7 +671,7 @@ impl MarketDataClient {
 
         ProviderProfile {
             id: Some(symbol.to_string()),
-            isin: None,
+            isin: profile.isin,
             name: profile.name,
             asset_type: profile.quote_type, // Maps to AssetKind during enrichment
             symbol: symbol.to_string(),
