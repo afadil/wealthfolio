@@ -180,6 +180,34 @@ impl ActivityService {
         })
     }
 
+    /// Fetches the provider's quote currency for a symbol, caching the raw result by
+    /// (symbol, mic, instrument_type) so we only hit the provider once per unique symbol
+    /// within a batch operation (validation run or sync pass).
+    async fn fetch_provider_quote_ccy(
+        &self,
+        symbol: &str,
+        exchange_mic: Option<&str>,
+        instrument_type: Option<&InstrumentType>,
+        cache: &mut HashMap<(String, Option<String>, Option<String>), Option<String>>,
+    ) -> Option<String> {
+        let key = (
+            symbol.to_string(),
+            exchange_mic.map(str::to_string),
+            instrument_type.map(|t| t.as_db_str().to_string()),
+        );
+        if let Some(cached) = cache.get(&key) {
+            return cached.clone();
+        }
+        let result = self
+            .quote_service
+            .resolve_symbol_quote(symbol, exchange_mic, instrument_type)
+            .await
+            .ok()
+            .and_then(|q| q.currency);
+        cache.insert(key, result.clone());
+        result
+    }
+
     /// Creates a new ActivityService instance with injected dependencies
     pub fn new(
         activity_repository: Arc<dyn ActivityRepositoryTrait>,
@@ -1533,6 +1561,7 @@ impl ActivityService {
         account: &Account,
         symbol_mic_cache: &HashMap<String, Option<String>>,
         mode: PreparationMode,
+        quote_ccy_cache: &mut HashMap<(String, Option<String>, Option<String>), Option<String>>,
     ) -> Result<Option<crate::assets::AssetSpec>> {
         use crate::assets::{parse_crypto_pair_symbol, AssetSpec};
 
@@ -1703,17 +1732,28 @@ impl ActivityService {
                     instrument_type.as_ref(),
                     Some(InstrumentType::Crypto | InstrumentType::Fx)
                 );
-            let (resolved_quote_ccy, resolution_source) = self
-                .resolve_quote_ccy(
+            let has_deterministic_precedence = normalize_quote_ccy_code(quote_ccy_input.as_deref())
+                .is_some()
+                || normalize_quote_ccy_code(existing_asset_quote_ccy.as_deref()).is_some();
+            let provider_ccy = if allow_provider_lookup && !has_deterministic_precedence {
+                self.fetch_provider_quote_ccy(
                     quote_lookup_symbol.as_str(),
                     exchange_mic.as_deref(),
                     instrument_type.as_ref(),
-                    quote_ccy_input.as_deref(),
-                    existing_asset_quote_ccy.as_deref(),
-                    currency.as_str(),
-                    allow_provider_lookup,
+                    quote_ccy_cache,
                 )
-                .await;
+                .await
+            } else {
+                None
+            };
+            let (resolved_quote_ccy, resolution_source) = resolve_quote_ccy_precedence(
+                quote_ccy_input.as_deref(),
+                existing_asset_quote_ccy.as_deref(),
+                provider_ccy.as_deref(),
+                exchange_mic.as_deref().and_then(mic_to_currency),
+                Some(currency.as_str()),
+            )
+            .unwrap_or_else(|| (currency.clone(), QuoteCcyResolutionSource::TerminalFallback));
             if matches!(
                 resolution_source,
                 QuoteCcyResolutionSource::ExplicitInput | QuoteCcyResolutionSource::ProviderQuote
@@ -2123,6 +2163,11 @@ impl ActivityServiceTrait for ActivityService {
 
         let symbol_mic_cache = self.resolve_symbols_batch(symbol_currency_pairs).await;
 
+        // Cache raw provider quote-currency results by (symbol, mic, instrument_type) to avoid
+        // hitting the provider once per row for the same symbol. Precedence logic runs per-row.
+        let mut quote_ccy_cache: HashMap<(String, Option<String>, Option<String>), Option<String>> =
+            HashMap::new();
+
         let mut activities_with_status: Vec<ActivityImport> = Vec::new();
 
         for mut activity in activities {
@@ -2341,16 +2386,33 @@ impl ActivityServiceTrait for ActivityService {
                     )
                     .await
                 } else {
-                    self.resolve_quote_ccy(
-                        &normalized_symbol,
-                        resolved_mic.as_deref(),
-                        effective_instrument_type.as_ref(),
+                    let has_deterministic = normalize_quote_ccy_code(explicit_quote_ccy.as_deref())
+                        .is_some()
+                        || normalize_quote_ccy_code(asset_currency.as_deref()).is_some();
+                    let provider_ccy = if !has_deterministic {
+                        self.fetch_provider_quote_ccy(
+                            &normalized_symbol,
+                            resolved_mic.as_deref(),
+                            effective_instrument_type.as_ref(),
+                            &mut quote_ccy_cache,
+                        )
+                        .await
+                    } else {
+                        None
+                    };
+                    resolve_quote_ccy_precedence(
                         explicit_quote_ccy.as_deref(),
                         asset_currency.as_deref(),
-                        terminal_fallback,
-                        true,
+                        provider_ccy.as_deref(),
+                        resolved_mic.as_deref().and_then(mic_to_currency),
+                        Some(terminal_fallback),
                     )
-                    .await
+                    .unwrap_or_else(|| {
+                        (
+                            terminal_fallback.to_string(),
+                            QuoteCcyResolutionSource::TerminalFallback,
+                        )
+                    })
                 };
 
                 activity.quote_ccy = Some(resolved_quote_ccy);
@@ -2980,10 +3042,18 @@ impl ActivityService {
         // 2. Build AssetSpecs for each activity
         let mut asset_specs: Vec<AssetSpec> = Vec::new();
         let mut activity_asset_map: Vec<Option<String>> = Vec::with_capacity(activities.len());
+        let mut quote_ccy_cache: HashMap<(String, Option<String>, Option<String>), Option<String>> =
+            HashMap::new();
 
         for (idx, activity) in activities.iter().enumerate() {
             match self
-                .build_asset_spec(activity, account, &symbol_mic_cache, mode)
+                .build_asset_spec(
+                    activity,
+                    account,
+                    &symbol_mic_cache,
+                    mode,
+                    &mut quote_ccy_cache,
+                )
                 .await
             {
                 Ok(Some(spec)) => {
