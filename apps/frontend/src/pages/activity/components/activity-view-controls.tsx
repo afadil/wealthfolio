@@ -223,6 +223,7 @@ export function ActivityViewControls({
                 </>
               ),
               title: "Edit mode",
+              "data-testid": "edit-mode-toggle",
             },
           ]}
         />
