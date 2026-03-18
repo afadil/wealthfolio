@@ -5374,6 +5374,14 @@ mod tests {
             Ok(Vec::new())
         }
 
+        async fn get_all_lots(&self) -> AppResult<Vec<crate::lots::LotRecord>> {
+            Ok(Vec::new())
+        }
+
+        async fn get_all_open_lots(&self) -> AppResult<Vec<crate::lots::LotRecord>> {
+            Ok(Vec::new())
+        }
+
         async fn sync_lots_for_account(
             &self,
             account_id: &str,

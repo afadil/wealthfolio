@@ -154,6 +154,17 @@ impl LotRepositoryTrait for LotsRepository {
         Ok(rows.into_iter().map(LotRecord::from).collect())
     }
 
+    async fn get_all_open_lots(&self) -> Result<Vec<LotRecord>> {
+        use crate::schema::lots::dsl;
+
+        let mut conn = get_connection(&self.pool)?;
+        let rows: Vec<LotRecordDB> = dsl::lots
+            .filter(dsl::is_closed.eq(0))
+            .load(&mut conn)
+            .map_err(StorageError::from)?;
+        Ok(rows.into_iter().map(LotRecord::from).collect())
+    }
+
     async fn get_lots_as_of_date(
         &self,
         account_ids: &[String],
@@ -186,6 +197,14 @@ impl LotRepositoryTrait for LotsRepository {
             .filter(dsl::account_id.eq(&account_id))
             .load(&mut conn)
             .map_err(StorageError::from)?;
+        Ok(rows.into_iter().map(LotRecord::from).collect())
+    }
+
+    async fn get_all_lots(&self) -> Result<Vec<LotRecord>> {
+        use crate::schema::lots::dsl;
+
+        let mut conn = get_connection(&self.pool)?;
+        let rows: Vec<LotRecordDB> = dsl::lots.load(&mut conn).map_err(StorageError::from)?;
         Ok(rows.into_iter().map(LotRecord::from).collect())
     }
 

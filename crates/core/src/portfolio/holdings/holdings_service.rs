@@ -108,11 +108,14 @@ impl HoldingsService {
         let cash_balances_map: &HashMap<String, Decimal> = &latest_snapshot.cash_balances;
 
         // --- Security positions: read from lots table ---
-        let open_lots = match self
-            .lot_repository
-            .get_open_lots_for_account(account_id)
-            .await
-        {
+        // For TOTAL pseudo-account, aggregate open lots across all accounts.
+        let open_lots = match if account_id == "TOTAL" {
+            self.lot_repository.get_all_open_lots().await
+        } else {
+            self.lot_repository
+                .get_open_lots_for_account(account_id)
+                .await
+        } {
             Ok(lots) => lots,
             Err(e) => {
                 error!(
