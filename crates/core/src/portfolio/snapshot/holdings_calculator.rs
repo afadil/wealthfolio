@@ -316,8 +316,24 @@ impl HoldingsCalculator {
                 // Broker converted at transaction time — book in account currency
                 add_cash(state, account_currency, -(total_cost * fx_rate));
             } else {
-                // No fx_rate — book in activity currency (multi-currency account)
-                add_cash(state, activity_currency, -total_cost);
+                // No explicit fx_rate — convert to account currency using historical rate
+                // to avoid creating phantom multi-currency cash positions.
+                let activity_date = self.activity_local_date(activity);
+                match self.fx_service.convert_currency_for_date(
+                    total_cost,
+                    activity_currency,
+                    account_currency,
+                    activity_date,
+                ) {
+                    Ok(converted) => add_cash(state, account_currency, -converted),
+                    Err(e) => {
+                        warn!(
+                            "Holdings Calc (Buy Cash {}): Failed to convert {} {} -> {} on {}: {}. Booking in activity currency.",
+                            activity.id, total_cost, activity_currency, account_currency, activity_date, e
+                        );
+                        add_cash(state, activity_currency, -total_cost);
+                    }
+                }
             }
         } else {
             add_cash(state, activity_currency, -total_cost);
@@ -353,8 +369,24 @@ impl HoldingsCalculator {
                 // Broker converted at transaction time — book in account currency
                 add_cash(state, account_currency, total_proceeds * fx_rate);
             } else {
-                // No fx_rate — book in activity currency (multi-currency account)
-                add_cash(state, activity_currency, total_proceeds);
+                // No explicit fx_rate — convert to account currency using historical rate
+                // to avoid creating phantom multi-currency cash positions.
+                let activity_date = self.activity_local_date(activity);
+                match self.fx_service.convert_currency_for_date(
+                    total_proceeds,
+                    activity_currency,
+                    account_currency,
+                    activity_date,
+                ) {
+                    Ok(converted) => add_cash(state, account_currency, converted),
+                    Err(e) => {
+                        warn!(
+                            "Holdings Calc (Sell Cash {}): Failed to convert {} {} -> {} on {}: {}. Booking in activity currency.",
+                            activity.id, total_proceeds, activity_currency, account_currency, activity_date, e
+                        );
+                        add_cash(state, activity_currency, total_proceeds);
+                    }
+                }
             }
         } else {
             add_cash(state, activity_currency, total_proceeds);

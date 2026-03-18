@@ -800,21 +800,22 @@ mod tests {
         assert_eq!(position.total_cost_basis, dec!(1010)); // Expected: (10 * 100) + 10
         assert_eq!(position.currency, activity_currency); // USD
 
-        // Check cash balance (booked in ACTIVITY currency - USD, per design spec)
+        // Check cash balance (converted to ACCOUNT currency - CAD, via FxService)
         // Cost in USD: (10 shares * 100 USD/share) + 10 USD fee = 1000 + 10 = 1010 USD
+        // Converted to CAD: 1010 * 1.25 = 1262.5 CAD
         let buy_cost_usd =
             buy_activity_usd.qty() * buy_activity_usd.price() + buy_activity_usd.fee_amt();
-        let expected_cash_usd = -buy_cost_usd; // -1010 USD
-        assert_eq!(
-            next_state.cash_balances.get(activity_currency),
-            Some(&expected_cash_usd)
+        let expected_cash_cad = -(buy_cost_usd * rate_usd_cad); // -1262.5 CAD
+        assert!(
+            next_state.cash_balances.get(activity_currency).is_none(),
+            "No phantom USD cash balance should be created"
         );
-        // Verify cash_total_account_currency is computed correctly (converted to CAD)
-        let expected_cash_total_cad = expected_cash_usd * rate_usd_cad; // -1262.5 CAD
         assert_eq!(
-            next_state.cash_total_account_currency,
-            expected_cash_total_cad
+            next_state.cash_balances.get(account_currency),
+            Some(&expected_cash_cad)
         );
+        // Verify cash_total_account_currency matches (already in CAD)
+        assert_eq!(next_state.cash_total_account_currency, expected_cash_cad);
 
         // Check overall cost_basis of the snapshot (should be in account currency - CAD)
         // Position cost basis is 1010 USD. Converted to CAD: 1010 USD * 1.25 CAD/USD = 1262.5 CAD
@@ -1955,32 +1956,29 @@ mod tests {
         assert_eq!(position_msft.average_cost, dec!(300.5)); // 300.5 USD
         assert_eq!(position_msft.total_cost_basis, dec!(4507.5)); // 15 shares * 300.5 USD
 
-        // --- Check Cash Balance (booked in ACTIVITY currency - USD, per design spec) ---
-        // Buy cost: (20 shares * 300 USD) + 10 USD fee = 6010 USD
-        // Sell proceeds: (5 shares * 310 USD) - 5 USD fee = 1545 USD
-        // Net USD cash: -6010 + 1545 = -4465 USD
+        // --- Check Cash Balance (converted to ACCOUNT currency - CAD, via FxService) ---
+        // Buy cost: (20 * 300 + 10) = 6010 USD → 6010 * 1.30 = 7813 CAD deducted
+        // Sell proceeds: (5 * 310 - 5) = 1545 USD → 1545 * 1.30 = 2008.5 CAD added
+        // Net CAD change: -7813 + 2008.5 = -5804.5 CAD
 
         let buy_cost_usd =
             buy_activity_usd.qty() * buy_activity_usd.price() + buy_activity_usd.fee_amt();
         let sell_proceeds_usd =
             sell_activity_usd.qty() * sell_activity_usd.price() - sell_activity_usd.fee_amt();
-        let expected_usd_cash = -buy_cost_usd + sell_proceeds_usd; // -6010 + 1545 = -4465 USD
+        let expected_cad_change = (-buy_cost_usd + sell_proceeds_usd) * rate_usd_cad;
 
-        assert_eq!(
-            next_state.cash_balances.get(asset_currency),
-            Some(&expected_usd_cash) // -4465 USD
+        assert!(
+            next_state.cash_balances.get(asset_currency).is_none(),
+            "No phantom USD cash balance should be created"
         );
-        // CAD balance unchanged
+        // CAD balance updated with converted buy/sell amounts
+        let expected_cad_balance = dec!(1000000) + expected_cad_change;
         assert_eq!(
             next_state.cash_balances.get(account_currency),
-            Some(&dec!(1000000)) // Initial 1,000,000 CAD unchanged
+            Some(&expected_cad_balance)
         );
-        // Verify cash_total_account_currency (consolidated to CAD)
-        let expected_cash_total_cad = dec!(1000000) + (expected_usd_cash * rate_usd_cad); // 1000000 - 5804.5 = 994195.5 CAD
-        assert_eq!(
-            next_state.cash_total_account_currency,
-            expected_cash_total_cad
-        );
+        // Verify cash_total_account_currency
+        assert_eq!(next_state.cash_total_account_currency, expected_cad_balance);
 
         // --- Check Snapshot Cost Basis (CAD) ---
         // Remaining position cost basis is 4507.5 USD.
@@ -2165,30 +2163,30 @@ mod tests {
         let next_state = result.unwrap().snapshot;
 
         // --- Assert Cash Balances ---
-        // Cash is booked in ACTIVITY currency per design spec (multi-currency cash tracking)
-        // Each currency has its own balance, not consolidated into account currency
+        // Deposits are booked in activity currency. Buy cash outflow is converted to
+        // account currency when no fx_rate is provided.
         assert_eq!(
             next_state.cash_balances.len(),
             3,
             "Should have cash balances in 3 currencies (CAD, USD, EUR)"
         );
 
-        // CAD Balance: Initial 1000 CAD (no CAD activities)
+        // CAD Balance: Initial 1000 CAD + buy cost converted from USD
+        // USD Buy Stock: 51 USD * 1.25 = 63.75 CAD deducted
+        let buy_cost_in_cad = dec!(51) * rate_usd_cad; // 63.75
         assert_eq!(
             next_state.cash_balances.get(account_currency),
-            Some(&dec!(1000)),
-            "CAD balance should be unchanged (no CAD activities)"
+            Some(&(dec!(1000) - buy_cost_in_cad)),
+            "CAD balance should reflect converted buy deduction"
         );
 
-        // USD Balance:
+        // USD Balance: only deposit (buy no longer goes here)
         // USD Deposit: +98 USD (100 - 2 fee)
-        // USD Buy Stock: -51 USD (10*5 + 1 fee)
-        // Total: 98 - 51 = 47 USD
-        let expected_usd_cash = dec!(98) - dec!(51);
+        let expected_usd_cash = dec!(98);
         assert_eq!(
             next_state.cash_balances.get(usd_currency),
-            Some(&expected_usd_cash), // 47 USD
-            "USD cash balance mismatch"
+            Some(&expected_usd_cash), // 98 USD
+            "USD cash balance should only contain deposit"
         );
 
         // EUR Balance: 195 EUR (200 - 5 fee)
@@ -2200,12 +2198,13 @@ mod tests {
         );
 
         // Verify cash_total_account_currency is computed correctly (consolidated to CAD)
-        // CAD: 1000
-        // USD: 47 * 1.25 = 58.75
+        // CAD: 1000 - 63.75 = 936.25
+        // USD: 98 * 1.25 = 122.50
         // EUR: 195 * 1.50 = 292.50
-        // Total: 1000 + 58.75 + 292.50 = 1351.25 CAD
-        let expected_cash_total_cad =
-            dec!(1000) + (expected_usd_cash * rate_usd_cad) + (expected_eur_cash * rate_eur_cad);
+        // Total: 936.25 + 122.50 + 292.50 = 1351.25 CAD
+        let expected_cash_total_cad = (dec!(1000) - buy_cost_in_cad)
+            + (expected_usd_cash * rate_usd_cad)
+            + (expected_eur_cash * rate_eur_cad);
         assert_eq!(
             next_state.cash_total_account_currency, expected_cash_total_cad,
             "Consolidated CAD cash total mismatch"
@@ -2450,27 +2449,23 @@ mod tests {
             "Average cost should be weighted average in USD"
         );
 
-        // Verify cash balance - second buy deducts $222 from USD balance (not EUR)
-        // Per design spec, cash is booked in ACTIVITY currency
+        // Verify cash balance - second buy (USD) converted to account currency (EUR)
         // First buy: EUR balance = 10000 - 190 = 9810 EUR
-        // Second buy: USD balance = -222 USD (new USD cash balance)
+        // Second buy: 222 USD * 0.85 EUR/USD = 188.70 EUR deducted from EUR balance
+        let buy2_cost_in_eur = dec!(222) * rate_usd_eur_date2; // 188.70
         assert_eq!(
             final_snapshot
                 .cash_balances
                 .get("EUR")
                 .copied()
                 .unwrap_or_default(),
-            expected_eur_after_first, // EUR unchanged at 9810
-            "EUR cash should remain at 9810 (unchanged by USD activity)"
+            expected_eur_after_first - buy2_cost_in_eur,
+            "EUR cash should be reduced by FX-converted USD buy cost"
         );
-        assert_eq!(
-            final_snapshot
-                .cash_balances
-                .get("USD")
-                .copied()
-                .unwrap_or_default(),
-            dec!(-222), // USD deducted
-            "USD cash should be -222 (deducted for second buy)"
+        assert!(
+            final_snapshot.cash_balances.get("USD").is_none()
+                || final_snapshot.cash_balances.get("USD") == Some(&Decimal::ZERO),
+            "No phantom USD cash balance should be created"
         );
     }
 
@@ -2905,7 +2900,8 @@ mod tests {
 
     #[test]
     fn test_buy_activity_falls_back_to_service_when_fx_rate_is_none() {
-        // When activity.fx_rate is None, the calculator should use FxService as before
+        // When activity.fx_rate is None, the calculator should convert to account
+        // currency using FxService historical rate
 
         let mut mock_fx_service = MockFxService::new();
         let account_currency = "CAD";
@@ -2943,27 +2939,31 @@ mod tests {
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
         let next_state = result.unwrap().snapshot;
 
-        // Cash is booked in ACTIVITY currency (USD) per design spec
+        // Cash converted to account currency (CAD) using FxService rate
         let expected_cost_usd = dec!(10) * dec!(100) + dec!(5);
+        let expected_cost_cad = expected_cost_usd * service_rate;
 
+        assert!(
+            next_state.cash_balances.get(activity_currency).is_none(),
+            "No phantom USD cash balance should be created"
+        );
         assert_eq!(
-            next_state.cash_balances.get(activity_currency),
-            Some(&(-expected_cost_usd)), // -1005 USD
-            "Cash should be booked in activity currency (USD)"
+            next_state.cash_balances.get(account_currency),
+            Some(&(-expected_cost_cad)),
+            "Cash should be converted to account currency (CAD)"
         );
 
-        // Verify cash_total_account_currency uses FxService rate when fx_rate is None
-        let expected_cash_total_cad = -expected_cost_usd * service_rate;
+        // cash_total_account_currency should match
         assert_eq!(
-            next_state.cash_total_account_currency, expected_cash_total_cad,
-            "cash_total_account_currency should use FxService rate when fx_rate is None"
+            next_state.cash_total_account_currency, -expected_cost_cad,
+            "cash_total_account_currency should match converted amount"
         );
     }
 
     #[test]
     fn test_buy_activity_falls_back_to_service_when_fx_rate_is_zero() {
         // When activity.fx_rate is Some(0), the calculator should use FxService
-        // Zero is not a valid exchange rate
+        // Zero is not a valid exchange rate — same behavior as fx_rate = None
 
         let mut mock_fx_service = MockFxService::new();
         let account_currency = "CAD";
@@ -3001,20 +3001,24 @@ mod tests {
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
         let next_state = result.unwrap().snapshot;
 
-        // Cash is booked in ACTIVITY currency (USD) per design spec
+        // Cash converted to account currency (CAD) using FxService rate
         let expected_cost_usd = dec!(10) * dec!(100) + dec!(5);
+        let expected_cost_cad = expected_cost_usd * service_rate;
 
+        assert!(
+            next_state.cash_balances.get(activity_currency).is_none(),
+            "No phantom USD cash balance should be created"
+        );
         assert_eq!(
-            next_state.cash_balances.get(activity_currency),
-            Some(&(-expected_cost_usd)), // -1005 USD
-            "Cash should be booked in activity currency (USD)"
+            next_state.cash_balances.get(account_currency),
+            Some(&(-expected_cost_cad)),
+            "Cash should be converted to account currency (CAD)"
         );
 
-        // Verify cash_total_account_currency uses FxService rate when fx_rate is zero
-        let expected_cash_total_cad = -expected_cost_usd * service_rate;
+        // cash_total_account_currency should match
         assert_eq!(
-            next_state.cash_total_account_currency, expected_cash_total_cad,
-            "cash_total_account_currency should use FxService rate when fx_rate is zero"
+            next_state.cash_total_account_currency, -expected_cost_cad,
+            "cash_total_account_currency should match converted amount"
         );
     }
 
@@ -4235,8 +4239,8 @@ mod tests {
 
     #[test]
     fn test_buy_without_fx_rate_still_books_in_activity_currency() {
-        // When no fx_rate is provided, cash should still be booked in
-        // activity currency (multi-currency account behavior is preserved).
+        // When no fx_rate is provided, cash should be converted to account currency
+        // using historical FX rate, to avoid phantom multi-currency cash positions.
 
         let mut mock_fx_service = MockFxService::new();
         let account_currency = "EUR";
@@ -4272,16 +4276,16 @@ mod tests {
             .unwrap();
         let state = result.snapshot;
 
-        // Without fx_rate: cash booked in USD (existing behavior)
-        assert_eq!(
-            state.cash_balances.get("USD"),
-            Some(&dec!(-1000)),
-            "Without fx_rate, cash is booked in activity currency"
+        // Without fx_rate: cash converted to account currency using historical rate
+        // 1000 USD * 0.92 EUR/USD = 920 EUR deducted
+        assert!(
+            state.cash_balances.get("USD").is_none(),
+            "No phantom USD cash balance should be created"
         );
         assert_eq!(
             state.cash_balances.get("EUR"),
-            Some(&dec!(10000)),
-            "EUR cash unchanged"
+            Some(&dec!(9080)), // 10000 - 920
+            "EUR cash reduced by FX-converted amount"
         );
     }
 
