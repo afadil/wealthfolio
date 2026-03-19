@@ -438,7 +438,11 @@ export const HoldingsEditMode = ({
                         {/* Symbol */}
                         <div className="col-span-5">
                           <div className="flex items-center gap-2">
-                            <TickerAvatar symbol={holding.symbol} className="h-7 w-7 shrink-0" />
+                            <TickerAvatar
+                              symbol={holding.symbol}
+                              exchangeMic={holding.exchangeMic}
+                              className="h-7 w-7 shrink-0"
+                            />
                             <div className="min-w-0">
                               <div className="truncate text-sm font-medium">{holding.symbol}</div>
                               {holding.name && (

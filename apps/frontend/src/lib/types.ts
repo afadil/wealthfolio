@@ -444,6 +444,7 @@ export type ValidationResult = { status: "success" } | { status: "error"; errors
 export interface Instrument {
   id: string;
   symbol: string;
+  exchangeMic?: string | null;
   name?: string | null;
   currency: string;
   notes?: string | null;
@@ -524,6 +525,7 @@ export interface Holding {
 export interface HoldingSummary {
   id: string;
   symbol: string;
+  exchangeMic?: string | null;
   name?: string | null;
   holdingType: HoldingType;
   quantity: number;

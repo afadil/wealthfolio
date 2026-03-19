@@ -207,6 +207,7 @@ const getColumns = (
         <div className="flex items-center">
           <TickerAvatar
             symbol={parsedOption ? parsedOption.underlying : symbol}
+            exchangeMic={holding.instrument?.exchangeMic ?? undefined}
             className="mr-2 h-8 w-8"
           />
           <div className="flex flex-col">

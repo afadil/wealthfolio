@@ -66,7 +66,11 @@ function HoldingRow({
       onKeyDown={(e) => e.key === "Enter" && onClick?.()}
     >
       <div className="flex items-center gap-3">
-        <TickerAvatar symbol={avatarSymbol} className="size-9" />
+        <TickerAvatar
+          symbol={avatarSymbol}
+          exchangeMic={holding.instrument?.exchangeMic ?? undefined}
+          className="size-9"
+        />
         <div className="flex flex-col">
           <span className="text-sm font-semibold">{displayName}</span>
           <span className="text-muted-foreground text-xs">{subtitle}</span>
@@ -126,7 +130,11 @@ function StackedAvatars({ holdings, totalRemaining, onClick }: StackedAvatarsPro
               className={cn("relative", index > 0 && "-ml-2")}
               style={{ zIndex: displayedHoldings.length - index }}
             >
-              <TickerAvatar symbol={avatarSym} className="ring-background size-8 ring-2" />
+              <TickerAvatar
+                symbol={avatarSym}
+                exchangeMic={holding.instrument?.exchangeMic ?? undefined}
+                className="ring-background size-8 ring-2"
+              />
             </div>
           );
         })}

@@ -51,6 +51,20 @@ struct AssetInfo {
     purchase_price: Option<Decimal>,
 }
 
+fn instrument_from_asset(asset: &Asset) -> Instrument {
+    Instrument {
+        id: asset.id.clone(),
+        symbol: asset.display_code.clone().unwrap_or_default(),
+        exchange_mic: asset.instrument_exchange_mic.clone(),
+        name: asset.name.clone(),
+        currency: asset.quote_ccy.clone(),
+        notes: asset.notes.clone(),
+        pricing_mode: asset.quote_mode.as_db_str().to_string(),
+        preferred_provider: asset.preferred_provider(),
+        classifications: None,
+    }
+}
+
 impl HoldingsService {
     pub fn new(
         asset_service: Arc<dyn AssetServiceTrait>,
@@ -120,16 +134,7 @@ impl HoldingsService {
                         let purchase_price: Option<Decimal> =
                             metadata.as_ref().and_then(extract_purchase_price);
 
-                        let instrument = Instrument {
-                            id: asset.id.clone(),
-                            symbol: asset.display_code.clone().unwrap_or_default(),
-                            name: asset.name.clone(),
-                            currency: asset.quote_ccy.clone(),
-                            notes: asset.notes.clone(),
-                            pricing_mode: asset.quote_mode.as_db_str().to_string(),
-                            preferred_provider: asset.preferred_provider(),
-                            classifications: None,
-                        };
+                        let instrument = instrument_from_asset(&asset);
 
                         let asset_info = AssetInfo {
                             instrument,
@@ -217,6 +222,7 @@ impl HoldingsService {
             let cash_instrument = Instrument {
                 id: format!("cash:{}", currency),
                 symbol: currency.clone(),
+                exchange_mic: None,
                 name: Some(format!("Cash ({})", currency)),
                 currency: currency.clone(),
                 notes: None,
@@ -587,16 +593,7 @@ impl HoldingsServiceTrait for HoldingsService {
             let purchase_price: Option<Decimal> =
                 asset.metadata.as_ref().and_then(extract_purchase_price);
 
-            let instrument = Instrument {
-                id: asset.id.clone(),
-                symbol: asset.display_code.clone().unwrap_or_default(),
-                name: asset.name.clone(),
-                currency: asset.quote_ccy.clone(),
-                notes: asset.notes.clone(),
-                pricing_mode: asset.quote_mode.as_db_str().to_string(),
-                preferred_provider: asset.preferred_provider(),
-                classifications: None,
-            };
+            let instrument = instrument_from_asset(asset);
 
             let holding = Holding {
                 id: format!(
@@ -692,10 +689,30 @@ mod tests {
     use crate::utils::time_utils::valuation_date_today;
 
     use super::*;
+    use crate::assets::{InstrumentType, QuoteMode};
     use chrono::Utc;
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
     use std::collections::VecDeque;
+
+    #[test]
+    fn instrument_from_asset_preserves_exchange_mic() {
+        let asset = Asset {
+            id: "asset-1".to_string(),
+            display_code: Some("DTE".to_string()),
+            instrument_exchange_mic: Some("XETR".to_string()),
+            name: Some("Deutsche Telekom AG".to_string()),
+            quote_ccy: "EUR".to_string(),
+            quote_mode: QuoteMode::Market,
+            instrument_type: Some(InstrumentType::Equity),
+            ..Default::default()
+        };
+
+        let instrument = instrument_from_asset(&asset);
+
+        assert_eq!(instrument.symbol, "DTE");
+        assert_eq!(instrument.exchange_mic.as_deref(), Some("XETR"));
+    }
 
     #[test]
     fn normalize_holding_currency_converts_minor_security_units() {
@@ -707,6 +724,7 @@ mod tests {
             instrument: Some(Instrument {
                 id: "TEST".to_string(),
                 symbol: "TEST".to_string(),
+                exchange_mic: None,
                 name: Some("Test".to_string()),
                 currency: "GBp".to_string(),
                 notes: None,
