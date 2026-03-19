@@ -306,6 +306,21 @@ impl ActivityService {
             .ok()
     }
 
+    /// Build a symbol-based asset identifier for idempotency key computation.
+    /// Uses raw symbol text + exchange MIC instead of resolved UUID so that
+    /// keys are stable across imports and match between the review step
+    /// (`build_import_idempotency_key`) and the import step.
+    fn symbol_based_asset_id(
+        symbol_code: Option<&str>,
+        exchange_mic: Option<&str>,
+    ) -> Option<String> {
+        let symbol = symbol_code.map(|s| s.trim()).filter(|s| !s.is_empty())?;
+        match exchange_mic {
+            Some(mic) => Some(format!("{}@{}", symbol, mic)),
+            None => Some(symbol.to_string()),
+        }
+    }
+
     fn build_import_idempotency_key(
         activity: &ActivityImport,
         default_account_id: &str,
@@ -317,14 +332,10 @@ impl ActivityService {
         } else {
             activity.currency.as_str()
         };
-        let symbol = activity.symbol.trim();
-        let asset_id = if symbol.is_empty() {
-            None
-        } else if let Some(exchange_mic) = activity.exchange_mic.as_deref() {
-            Some(format!("{}@{}", symbol, exchange_mic))
-        } else {
-            Some(symbol.to_string())
-        };
+        let asset_id = Self::symbol_based_asset_id(
+            Some(activity.symbol.as_str()),
+            activity.exchange_mic.as_deref(),
+        );
 
         Some(compute_idempotency_key(
             account_id,
@@ -2619,11 +2630,17 @@ impl ActivityServiceTrait for ActivityService {
                     .ok();
 
                 if let Some(date) = date {
+                    // Build asset_id from symbol+MIC (not UUID) to match
+                    // build_import_idempotency_key used in the review step.
+                    let asset_id_for_key = Self::symbol_based_asset_id(
+                        activity.get_symbol_code(),
+                        activity.get_exchange_mic(),
+                    );
                     let key = compute_idempotency_key(
                         &activity.account_id,
                         &activity.activity_type,
                         &date,
-                        activity.get_symbol_id(),
+                        asset_id_for_key.as_deref(),
                         activity.quantity,
                         activity.unit_price,
                         activity.amount,

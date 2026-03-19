@@ -661,12 +661,29 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
         self.writer
             .exec_tx(move |tx| -> Result<usize> {
-                let num_inserted = diesel::insert_into(activities::table)
-                    .values(&activities_db_owned)
-                    .execute(tx.conn())
-                    .map_err(StorageError::from)?;
+                let mut num_inserted = 0usize;
                 for activity_db in &activities_db_owned {
-                    tx.insert(activity_db)?;
+                    match diesel::insert_into(activities::table)
+                        .values(activity_db)
+                        .execute(tx.conn())
+                    {
+                        Ok(count) => {
+                            if count > 0 {
+                                tx.insert(activity_db)?;
+                                num_inserted += count;
+                            }
+                        }
+                        Err(diesel::result::Error::DatabaseError(
+                            diesel::result::DatabaseErrorKind::UniqueViolation,
+                            _,
+                        )) => {
+                            log::debug!(
+                                "Skipping duplicate activity {} (idempotency_key constraint)",
+                                activity_db.id
+                            );
+                        }
+                        Err(e) => return Err(StorageError::from(e).into()),
+                    }
                 }
                 Ok(num_inserted)
             })
