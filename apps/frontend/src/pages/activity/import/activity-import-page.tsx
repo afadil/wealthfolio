@@ -18,9 +18,11 @@ import {
   useImportContext,
   nextStep,
   prevStep,
+  setDraftActivities,
   setMapping,
   type ImportStep,
 } from "./context";
+import { createDraftActivities } from "./utils/draft-utils";
 
 // Components
 import { WizardStepIndicator, type WizardStep } from "./components/wizard-step-indicator";
@@ -226,7 +228,7 @@ function useStepValidation(isHoldingsMode: boolean) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ImportWizardContent() {
-  const { state, dispatch } = useImportContext();
+  const { state, dispatch, validateDrafts } = useImportContext();
   const navigate = useNavigate();
   const { isMobile } = usePlatform();
 
@@ -296,8 +298,49 @@ function ImportWizardContent() {
       );
     }
 
+    // At the mapping→review transition (activity mode), create drafts and kick off
+    // backend validation before navigating so ReviewStep mounts with data + spinner.
+    if (
+      state.step === "mapping" &&
+      !isHoldingsMode &&
+      state.mapping &&
+      state.parsedRows.length > 0
+    ) {
+      const drafts = createDraftActivities(
+        state.parsedRows,
+        state.headers,
+        {
+          fieldMappings: state.mapping.fieldMappings,
+          activityMappings: state.mapping.activityMappings,
+          symbolMappings: state.mapping.symbolMappings,
+          accountMappings: state.mapping.accountMappings || {},
+          symbolMappingMeta: state.mapping.symbolMappingMeta || {},
+        },
+        {
+          dateFormat: state.parseConfig.dateFormat,
+          decimalSeparator: state.parseConfig.decimalSeparator,
+          thousandsSeparator: state.parseConfig.thousandsSeparator,
+          defaultCurrency: state.parseConfig.defaultCurrency,
+        },
+        state.accountId,
+      );
+      dispatch(setDraftActivities(drafts));
+      void validateDrafts(drafts);
+    }
+
     dispatch(nextStep());
-  }, [dispatch, canGoNext, state.step, state.headers, state.mapping, state.accountId]);
+  }, [
+    dispatch,
+    canGoNext,
+    state.step,
+    state.headers,
+    state.mapping,
+    state.accountId,
+    state.parsedRows,
+    state.parseConfig,
+    isHoldingsMode,
+    validateDrafts,
+  ]);
 
   const handleBack = useCallback(() => {
     if (canGoBack) {
