@@ -30,19 +30,19 @@ const PLATFORM_CONFIG: Record<
     label: "Reddit",
     stockPath: "/reddit/stocks/v1/stock",
     activityMetricLabel: "Mentions",
-    activityMetricKey: "total_mentions",
+    activityMetricKey: "mentions",
   },
   x: {
     label: "X.com",
     stockPath: "/x/stocks/v1/stock",
     activityMetricLabel: "Mentions",
-    activityMetricKey: "total_mentions",
+    activityMetricKey: "mentions",
   },
   news: {
     label: "News",
     stockPath: "/news/stocks/v1/stock",
     activityMetricLabel: "Mentions",
-    activityMetricKey: "total_mentions",
+    activityMetricKey: "mentions",
   },
   polymarket: {
     label: "Polymarket",
@@ -170,7 +170,10 @@ export async function fetchPortfolioSentiment({
         trend: normalizeTrend(stock?.trend),
         sentiment: stock?.sentiment_score ?? null,
         activityMetricLabel: config.activityMetricLabel,
-        activityMetricValue: asNumber(stock?.[config.activityMetricKey]),
+        activityMetricValue:
+          config.activityMetricKey === "mentions"
+            ? asNumber(stock?.mentions ?? stock?.total_mentions)
+            : asNumber(stock?.[config.activityMetricKey]),
       };
     });
 

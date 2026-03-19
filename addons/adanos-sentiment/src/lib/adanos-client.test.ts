@@ -186,6 +186,7 @@ describe("adanos account status headers", () => {
             buzz_score: 75.2,
             sentiment_score: -0.01,
             bullish_pct: 32,
+            mentions: 650,
             total_mentions: 650,
             trend: "falling",
           }),

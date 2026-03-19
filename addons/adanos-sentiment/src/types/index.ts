@@ -24,6 +24,7 @@ export interface StockDetailRow {
   buzz_score?: number | null;
   sentiment_score?: number | null;
   bullish_pct?: number | null;
+  mentions?: number | null;
   total_mentions?: number | null;
   trade_count?: number | null;
   trend?: AdanosTrend | null;
