@@ -43,8 +43,9 @@ pub struct PerformanceMetrics {
     pub currency: String,
     /// Period gain in dollars (SOTA: change in unrealized P&L for HOLDINGS mode)
     pub period_gain: Decimal,
-    /// Period return percentage (SOTA formula for HOLDINGS mode)
-    pub period_return: Decimal,
+    /// Period return percentage (SOTA formula for HOLDINGS mode).
+    /// None when period return cannot be computed (e.g. start_value ≤ 0).
+    pub period_return: Option<Decimal>,
     /// Time-weighted return (None for HOLDINGS mode - requires cash flow tracking)
     pub cumulative_twr: Option<Decimal>,
     /// Legacy field for backward compatibility

@@ -5,7 +5,15 @@ import { HoldingType, isAlternativeAssetKind, type AssetKind } from "@/lib/const
 import { parseOccSymbol } from "@/lib/occ-symbol";
 import { Holding } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { AmountDisplay, Button, GainAmount, GainPercent, Icons } from "@wealthfolio/ui";
+import {
+  AmountDisplay,
+  Button,
+  GainAmount,
+  GainPercent,
+  Icons,
+  usePersistentState,
+} from "@wealthfolio/ui";
+import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
@@ -23,10 +31,17 @@ interface HoldingRowProps {
   holding: Holding;
   baseCurrency: string;
   isHidden?: boolean;
+  showTotalReturn: boolean;
   onClick?: () => void;
 }
 
-function HoldingRow({ holding, baseCurrency, isHidden, onClick }: HoldingRowProps) {
+function HoldingRow({
+  holding,
+  baseCurrency,
+  isHidden,
+  showTotalReturn,
+  onClick,
+}: HoldingRowProps) {
   const symbol = holding.instrument?.symbol ?? holding.id;
   const parsedOption = parseOccSymbol(symbol);
   const displayName = parsedOption ? parsedOption.underlying : symbol.split(".")[0];
@@ -35,8 +50,12 @@ function HoldingRow({ holding, baseCurrency, isHidden, onClick }: HoldingRowProp
     : `${(holding.quantity ?? 0).toLocaleString(undefined, { maximumFractionDigits: 3 })} shares`;
   const avatarSymbol = parsedOption ? parsedOption.underlying : symbol;
   const marketValue = holding.marketValue?.base ?? 0;
-  const gainAmount = holding.unrealizedGain?.base ?? 0;
-  const gainPercent = holding.unrealizedGainPct ?? 0;
+  const gainAmount = showTotalReturn
+    ? (holding.unrealizedGain?.base ?? 0)
+    : (holding.dayChange?.base ?? 0);
+  const gainPercent = showTotalReturn
+    ? (holding.unrealizedGainPct ?? 0)
+    : (holding.dayChangePct ?? 0);
 
   return (
     <div
@@ -185,6 +204,14 @@ function TopHoldingsEmptyState() {
 export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsProps) {
   const navigate = useNavigate();
   const { isBalanceHidden } = useBalancePrivacy();
+  const [showTotalReturn, setShowTotalReturn] = usePersistentState<boolean>(
+    "holdings-show-total-return",
+    true,
+  );
+  const [sortBy, setSortBy] = usePersistentState<"value" | "gain">(
+    "holdings-widget-sort-by",
+    "value",
+  );
 
   // Filter out cash holdings and alternative assets, then sort by market value
   // Dashboard shows only investment holdings (securities, crypto, etc.)
@@ -197,8 +224,15 @@ export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsPr
         if (h.assetKind && isAlternativeAssetKind(h.assetKind as AssetKind)) return false;
         return true;
       })
-      .sort((a, b) => (b.marketValue?.base ?? 0) - (a.marketValue?.base ?? 0));
-  }, [holdings]);
+      .sort((a, b) => {
+        if (sortBy === "gain") {
+          const gainA = showTotalReturn ? (a.unrealizedGain?.base ?? 0) : (a.dayChange?.base ?? 0);
+          const gainB = showTotalReturn ? (b.unrealizedGain?.base ?? 0) : (b.dayChange?.base ?? 0);
+          return gainB - gainA;
+        }
+        return (b.marketValue?.base ?? 0) - (a.marketValue?.base ?? 0);
+      });
+  }, [holdings, sortBy, showTotalReturn]);
 
   // Show one extra holding directly rather than displaying "+1 more"
   const displayCount =
@@ -221,15 +255,80 @@ export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsPr
     <Card className="w-full border-0 bg-transparent p-0 shadow-none">
       <CardHeader className="flex flex-row items-center justify-between px-0 py-2">
         <CardTitle className="text-md">Holdings</CardTitle>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground hover:bg-success/10 text-xs"
-          onClick={() => navigate("/holdings")}
-        >
-          View All
-          <Icons.ChevronRight className="ml-1 h-3 w-3" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:bg-success/10 h-8 w-8 p-0"
+              >
+                <Icons.ListFilter className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              className="border-border/50 bg-card min-w-[200px] rounded-2xl border p-2 shadow-lg backdrop-blur-xl"
+            >
+              <p className="text-muted-foreground px-2 py-1.5 text-xs font-medium uppercase tracking-wider">
+                Show
+              </p>
+              {(["total", "daily"] as const).map((v) => (
+                <button
+                  key={v}
+                  className="hover:bg-accent flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm font-medium transition-colors"
+                  onClick={() => setShowTotalReturn(v === "total")}
+                >
+                  {v === "total" ? "Total Return" : "Daily Change"}
+                  <span
+                    className={cn(
+                      "flex h-4 w-4 items-center justify-center rounded-full border-2",
+                      (v === "total") === showTotalReturn
+                        ? "border-primary bg-primary"
+                        : "border-muted-foreground",
+                    )}
+                  >
+                    {(v === "total") === showTotalReturn && (
+                      <span className="bg-primary-foreground h-1.5 w-1.5 rounded-full" />
+                    )}
+                  </span>
+                </button>
+              ))}
+              <div className="bg-border/70 mx-2 my-1.5 h-px" />
+              <p className="text-muted-foreground px-2 py-1.5 text-xs font-medium uppercase tracking-wider">
+                Sort by
+              </p>
+              {(["value", "gain"] as const).map((v) => (
+                <button
+                  key={v}
+                  className="hover:bg-accent flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm font-medium transition-colors"
+                  onClick={() => setSortBy(v)}
+                >
+                  {v === "value" ? "Total Value" : "Gain"}
+                  <span
+                    className={cn(
+                      "flex h-4 w-4 items-center justify-center rounded-full border-2",
+                      sortBy === v ? "border-primary bg-primary" : "border-muted-foreground",
+                    )}
+                  >
+                    {sortBy === v && (
+                      <span className="bg-primary-foreground h-1.5 w-1.5 rounded-full" />
+                    )}
+                  </span>
+                </button>
+              ))}
+            </PopoverContent>
+          </Popover>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:bg-success/10 text-xs"
+            onClick={() => navigate("/holdings")}
+          >
+            View All
+            <Icons.ChevronRight className="ml-1 h-3 w-3" />
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="p-0">
         <Card className="shadow-xs w-full">
@@ -242,6 +341,7 @@ export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsPr
                   holding={holding}
                   baseCurrency={baseCurrency}
                   isHidden={isBalanceHidden}
+                  showTotalReturn={showTotalReturn}
                   onClick={() => navigate(`/holdings/${encodeURIComponent(assetId)}`)}
                 />
               );

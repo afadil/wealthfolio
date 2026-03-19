@@ -450,6 +450,13 @@ pub mod test_env {
             Ok(self.valuations.clone())
         }
 
+        fn get_accounts_with_negative_balance(
+            &self,
+            _account_ids: &[String],
+        ) -> CoreResult<Vec<String>> {
+            Ok(Vec::new())
+        }
+
         async fn calculate_valuation_history(
             &self,
             _account_id: &str,
@@ -1006,7 +1013,7 @@ pub mod test_env {
                 period_end_date: None,
                 currency: "USD".to_string(),
                 period_gain: rust_decimal::Decimal::ZERO,
-                period_return: rust_decimal::Decimal::ZERO,
+                period_return: Some(rust_decimal::Decimal::ZERO),
                 cumulative_twr: Some(rust_decimal::Decimal::ZERO),
                 gain_loss_amount: Some(rust_decimal::Decimal::ZERO),
                 annualized_twr: Some(rust_decimal::Decimal::ZERO),
@@ -1035,7 +1042,7 @@ pub mod test_env {
                 period_end_date: None,
                 currency: "USD".to_string(),
                 period_gain: rust_decimal::Decimal::ZERO,
-                period_return: rust_decimal::Decimal::ZERO,
+                period_return: Some(rust_decimal::Decimal::ZERO),
                 cumulative_twr: Some(rust_decimal::Decimal::ZERO),
                 gain_loss_amount: Some(rust_decimal::Decimal::ZERO),
                 annualized_twr: Some(rust_decimal::Decimal::ZERO),

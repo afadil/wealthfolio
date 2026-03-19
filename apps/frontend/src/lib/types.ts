@@ -799,8 +799,8 @@ export interface PerformanceMetrics {
   currency: string;
   /** Period gain in dollars (SOTA: change in unrealized P&L for HOLDINGS mode) */
   periodGain: number;
-  /** Period return percentage (SOTA formula for HOLDINGS mode) */
-  periodReturn: number;
+  /** Period return percentage (SOTA formula for HOLDINGS mode). Null when start value ≤ 0. */
+  periodReturn: number | null;
   /** Time-weighted return (null for HOLDINGS mode - requires cash flow tracking) */
   cumulativeTwr?: number | null;
   /** Legacy field for backward compatibility */

@@ -212,6 +212,34 @@ describe("validation-utils", () => {
       expect(activity.fee).toBe(10.0); // converted to positive
     });
 
+    it("should correct unitPrice when CSV amount disagrees with qty*price (bond import)", () => {
+      const testData = [
+        {
+          lineNumber: "1",
+          date: "2024-01-05T00:00:00.000Z",
+          symbol: "BBG0140BZHN4",
+          activityType: "BUY",
+          quantity: "6000",
+          unitPrice: "97.04917", // bond price as % of par
+          amount: "5822.95", // correct tel quel amount from broker
+          fee: "2.95",
+          currency: "EUR",
+        },
+      ];
+
+      const result = validateActivityImport(testData, testMapping, "test-account", "EUR");
+
+      expect(result.activities).toHaveLength(1);
+      const activity = result.activities[0];
+
+      // Amount should be the CSV value, not qty*price
+      expect(activity.amount).toBe(5822.95);
+      // unitPrice should be derived from amount/quantity (fraction of par)
+      expect(activity.unitPrice).toBeCloseTo(5822.95 / 6000, 10);
+      expect(activity.quantity).toBe(6000);
+      expect(activity.fee).toBe(2.95);
+    });
+
     it("should handle SPLIT activities with no cash impact", () => {
       const testData = [
         {
