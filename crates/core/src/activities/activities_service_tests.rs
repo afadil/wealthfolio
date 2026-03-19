@@ -2250,6 +2250,7 @@ mod tests {
             line_number: Some(1),
             fx_rate: None,
             subtype: None,
+            asset_id: None,
         };
 
         let result = activity_service
@@ -2310,6 +2311,7 @@ mod tests {
             line_number: Some(1),
             fx_rate: None,
             subtype: None,
+            asset_id: None,
         };
 
         let result = activity_service
@@ -2377,6 +2379,7 @@ mod tests {
             line_number: Some(1),
             fx_rate: None,
             subtype: None,
+            asset_id: None,
         };
 
         let result = activity_service
@@ -2438,6 +2441,7 @@ mod tests {
             line_number: Some(1),
             fx_rate: None,
             subtype: None,
+            asset_id: None,
         };
 
         let result = activity_service
@@ -2505,6 +2509,7 @@ mod tests {
             line_number: Some(1),
             fx_rate: None,
             subtype: None,
+            asset_id: None,
         };
 
         let result = activity_service
@@ -2566,6 +2571,7 @@ mod tests {
             line_number: Some(1),
             fx_rate: None,
             subtype: None,
+            asset_id: None,
         };
 
         let result = activity_service
@@ -2640,6 +2646,7 @@ mod tests {
             line_number: Some(1),
             fx_rate: None,
             subtype: None,
+            asset_id: None,
         };
 
         let result = activity_service
@@ -2707,6 +2714,7 @@ mod tests {
             line_number: Some(1),
             fx_rate: None,
             subtype: None,
+            asset_id: None,
         };
 
         let result = activity_service
@@ -2774,6 +2782,7 @@ mod tests {
             line_number: Some(1),
             fx_rate: None,
             subtype: None,
+            asset_id: None,
         };
 
         let result = activity_service
@@ -2839,6 +2848,7 @@ mod tests {
             line_number: Some(1),
             fx_rate: None,
             subtype: None,
+            asset_id: None,
         };
 
         let result = activity_service
@@ -2901,6 +2911,7 @@ mod tests {
             line_number: Some(1),
             fx_rate: None,
             subtype: None,
+            asset_id: None,
         };
 
         let transfer_in = ActivityImport {
@@ -2930,6 +2941,7 @@ mod tests {
             line_number: Some(2),
             fx_rate: None,
             subtype: None,
+            asset_id: None,
         };
 
         let result = activity_service
@@ -3304,6 +3316,7 @@ mod tests {
             line_number: Some(1),
             fx_rate: None,
             subtype: None,
+            asset_id: None,
         };
 
         let result = activity_service
@@ -3366,6 +3379,7 @@ mod tests {
             line_number: Some(1),
             fx_rate: None,
             subtype: None,
+            asset_id: None,
         };
 
         let result = activity_service
@@ -3428,6 +3442,7 @@ mod tests {
                 line_number: Some(1),
                 fx_rate: None,
                 subtype: None,
+                asset_id: None,
             };
 
             let result = activity_service
@@ -3502,6 +3517,7 @@ mod tests {
             line_number: Some(1),
             fx_rate: None,
             subtype: None,
+            asset_id: None,
         };
 
         let result = activity_service
@@ -3577,6 +3593,7 @@ mod tests {
             line_number: Some(1),
             fx_rate: None,
             subtype: None,
+            asset_id: None,
         };
 
         let result = activity_service
@@ -3640,6 +3657,7 @@ mod tests {
             line_number: Some(1),
             fx_rate: None,
             subtype: None,
+            asset_id: None,
         };
 
         let result = activity_service
@@ -3712,6 +3730,7 @@ mod tests {
             line_number: Some(1),
             fx_rate: None,
             subtype: None,
+            asset_id: None,
         };
 
         let result = activity_service

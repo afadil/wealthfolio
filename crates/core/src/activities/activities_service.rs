@@ -340,13 +340,13 @@ impl ActivityService {
     ) -> Option<String> {
         let date = Self::parse_import_date_for_idempotency(&activity.date)?;
         let account_id = activity.account_id.as_deref().unwrap_or(default_account_id);
-        let currency = if activity.currency.trim().is_empty() {
-            "USD"
-        } else {
-            activity.currency.as_str()
-        };
+
+        // Use UUID when the asset already exists in the DB (set during validation).
+        // Falls back to symbol@mic for new assets, matching the apply-step convention.
         let symbol = activity.symbol.trim();
-        let asset_id = if symbol.is_empty() {
+        let asset_id = if let Some(id) = activity.asset_id.as_deref() {
+            Some(id.to_string())
+        } else if symbol.is_empty() {
             None
         } else if let Some(exchange_mic) = activity.exchange_mic.as_deref() {
             Some(format!("{}@{}", symbol, exchange_mic))
@@ -354,14 +354,39 @@ impl ActivityService {
             Some(symbol.to_string())
         };
 
+        // Normalize to absolute values and major currencies, matching what
+        // prepare_activities_internal does before the apply-step key computation.
+        let quantity = activity.quantity.map(|v| v.abs());
+        let (unit_price, amount, currency) =
+            if let Some(rule) = get_normalization_rule(activity.currency.as_str()) {
+                let unit_price = activity
+                    .unit_price
+                    .map(|v| normalize_amount(v.abs(), activity.currency.as_str()).0);
+                let amount = activity
+                    .amount
+                    .map(|v| normalize_amount(v.abs(), activity.currency.as_str()).0);
+                (unit_price, amount, rule.major_code)
+            } else {
+                let ccy = if activity.currency.trim().is_empty() {
+                    "USD"
+                } else {
+                    activity.currency.as_str()
+                };
+                (
+                    activity.unit_price.map(|v| v.abs()),
+                    activity.amount.map(|v| v.abs()),
+                    ccy,
+                )
+            };
+
         Some(compute_idempotency_key(
             account_id,
             &activity.activity_type,
             &date,
             asset_id.as_deref(),
-            activity.quantity,
-            activity.unit_price,
-            activity.amount,
+            quantity,
+            unit_price,
+            amount,
             currency,
             None,
             activity.comment.as_deref(),
@@ -2350,6 +2375,7 @@ impl ActivityServiceTrait for ActivityService {
                 quote_ccy_input.as_deref(),
             );
             if let Some(ref id) = existing_id {
+                activity.asset_id = Some(id.clone());
                 if let Ok(asset) = self.asset_service.get_asset_by_id(id) {
                     activity.symbol_name = asset.name;
                     asset_currency = Some(asset.quote_ccy.clone());
