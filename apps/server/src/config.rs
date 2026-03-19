@@ -99,8 +99,16 @@ impl Config {
             if auth_required {
                 panic!(
                     "Refusing to start: listening on non-loopback address {listen_addr} without \
-                     authentication. Set WF_AUTH_PASSWORD_HASH to enable auth, or set \
-                     WF_AUTH_REQUIRED=false if a reverse proxy handles authentication."
+                     authentication.\n\
+                     \n\
+                     To fix this, do one of the following:\n\
+                     \n\
+                     1. Set WF_AUTH_PASSWORD_HASH to an Argon2id hash of your password.\n\
+                        Generate one with: printf 'your-password' | argon2 yoursalt16chars! -id -e\n\
+                        In a .env file, no escaping is needed.\n\
+                        In Docker Compose YAML, double every $ sign: '$$argon2id$$v=19$$...'\n\
+                     \n\
+                     2. Set WF_AUTH_REQUIRED=false if a reverse proxy handles authentication."
                 );
             }
         }
