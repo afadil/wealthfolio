@@ -107,7 +107,7 @@ function getStatusTitle(
   if (warnings) {
     const warningDetails = Object.entries(warnings)
       .flatMap(([field, msgs]) =>
-        msgs.map((msg) => `${field === "_duplicate" ? "duplicate" : field}: ${msg}`),
+        msgs.map((msg) => (field.startsWith("_") ? msg : `${field}: ${msg}`)),
       )
       .join("\n");
     if (warningDetails) {

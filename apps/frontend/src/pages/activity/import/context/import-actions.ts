@@ -180,3 +180,10 @@ export function bulkSetCurrency(rowIndexes: number[], currency: string): ImportA
 export function bulkSetAccount(rowIndexes: number[], accountId: string): ImportAction {
   return bulkUpdateDrafts(rowIndexes, { accountId });
 }
+
+/**
+ * Set the validating flag.
+ */
+export function setIsValidating(value: boolean): ImportAction {
+  return { type: "SET_IS_VALIDATING", payload: value };
+}
