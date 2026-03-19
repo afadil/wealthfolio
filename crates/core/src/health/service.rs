@@ -14,6 +14,7 @@ use crate::accounts::AccountServiceTrait;
 use crate::assets::AssetServiceTrait;
 use crate::errors::Result;
 use crate::portfolio::holdings::HoldingsServiceTrait;
+use crate::portfolio::valuation::ValuationServiceTrait;
 use crate::quotes::QuoteServiceTrait;
 use crate::taxonomies::TaxonomyServiceTrait;
 
@@ -223,6 +224,7 @@ impl HealthService {
         quote_service: Arc<dyn QuoteServiceTrait>,
         asset_service: Arc<dyn AssetServiceTrait>,
         taxonomy_service: Arc<dyn TaxonomyServiceTrait>,
+        valuation_service: Arc<dyn ValuationServiceTrait>,
         configured_timezone: Option<&str>,
         client_timezone: Option<&str>,
     ) -> Result<HealthStatus> {
@@ -363,7 +365,25 @@ impl HealthService {
                 .collect()
         };
         let unclassified_assets: Vec<UnclassifiedAssetInfo> = Vec::new();
-        let consistency_issues: Vec<ConsistencyIssueInfo> = Vec::new();
+
+        // Detect accounts with negative portfolio balance in their history
+        let account_ids: Vec<String> = accounts.iter().map(|a| a.id.clone()).collect();
+        let negative_balance_accounts = valuation_service
+            .get_accounts_with_negative_balance(&account_ids)
+            .unwrap_or_else(|e| {
+                warn!("Failed to check for negative account balances: {}", e);
+                Vec::new()
+            });
+        let consistency_issues: Vec<ConsistencyIssueInfo> = negative_balance_accounts
+            .into_iter()
+            .map(|acc_id| ConsistencyIssueInfo {
+                issue_type: super::checks::ConsistencyIssueType::NegativeAccountBalance,
+                record_id: acc_id.clone(),
+                description: format!("Account {} has negative total value in history", acc_id),
+                account_id: Some(acc_id),
+                asset_id: None,
+            })
+            .collect();
 
         // Gather accounts without tracking mode set
         let unconfigured_accounts: Vec<UnconfiguredAccountInfo> = accounts
@@ -590,6 +610,7 @@ impl HealthServiceTrait for HealthService {
         quote_service: Arc<dyn QuoteServiceTrait>,
         asset_service: Arc<dyn AssetServiceTrait>,
         taxonomy_service: Arc<dyn TaxonomyServiceTrait>,
+        valuation_service: Arc<dyn ValuationServiceTrait>,
         configured_timezone: Option<&str>,
         client_timezone: Option<&str>,
     ) -> Result<HealthStatus> {
@@ -601,6 +622,7 @@ impl HealthServiceTrait for HealthService {
             quote_service,
             asset_service,
             taxonomy_service,
+            valuation_service,
             configured_timezone,
             client_timezone,
         )

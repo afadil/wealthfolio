@@ -54,17 +54,15 @@ export const getLatestValuations = async (accountIds: string[]): Promise<Account
 export const calculatePerformanceHistory = async (
   itemType: "account" | "symbol",
   itemId: string,
-  startDate: string,
-  endDate: string,
+  startDate: string | undefined,
+  endDate: string | undefined,
   trackingMode?: "HOLDINGS" | "TRANSACTIONS",
 ): Promise<PerformanceMetrics> => {
-  const response = await invoke<PerformanceMetrics>("calculate_performance_history", {
-    itemType,
-    itemId,
-    startDate,
-    endDate,
-    trackingMode,
-  });
+  const args: Record<string, unknown> = { itemType, itemId };
+  if (startDate) args.startDate = startDate;
+  if (endDate) args.endDate = endDate;
+  if (trackingMode) args.trackingMode = trackingMode;
+  const response = await invoke<PerformanceMetrics>("calculate_performance_history", args);
 
   if (typeof response === "string" || !response || Object.keys(response).length === 0) {
     throw new Error(

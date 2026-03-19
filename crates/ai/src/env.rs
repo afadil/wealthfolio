@@ -450,6 +450,13 @@ pub mod test_env {
             Ok(self.valuations.clone())
         }
 
+        fn get_accounts_with_negative_balance(
+            &self,
+            _account_ids: &[String],
+        ) -> CoreResult<Vec<String>> {
+            Ok(Vec::new())
+        }
+
         async fn calculate_valuation_history(
             &self,
             _account_id: &str,
