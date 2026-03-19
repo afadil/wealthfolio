@@ -125,7 +125,7 @@ export function InterestForm({
             <input type="hidden" {...form.register("symbolInstrumentType")} />
 
             {/* Date Picker */}
-            <DatePicker name="activityDate" label="Date" allowFutureDates={true} />
+            <DatePicker name="activityDate" label="Date" />
 
             {/* Amount */}
             <AmountInput name="amount" label="Amount" currency={currency} />

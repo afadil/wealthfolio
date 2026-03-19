@@ -53,16 +53,16 @@ describe("DatePicker", () => {
     mockDatePickerInput.mockClear();
   });
 
-  it("passes maxValue by default", () => {
+  it("does not pass maxValue by default", () => {
     render(<TestForm />);
 
     expect(screen.getByTestId("date-picker")).toBeInTheDocument();
-    expect(mockDatePickerInput.mock.lastCall?.[0]?.maxValue).toBeDefined();
+    expect(mockDatePickerInput.mock.lastCall?.[0]?.maxValue).toBeUndefined();
   });
 
-  it("does not pass maxValue when future dates are allowed", () => {
-    render(<TestForm allowFutureDates={true} />);
+  it("passes maxValue when future dates are explicitly disabled", () => {
+    render(<TestForm allowFutureDates={false} />);
 
-    expect(mockDatePickerInput.mock.lastCall?.[0]?.maxValue).toBeUndefined();
+    expect(mockDatePickerInput.mock.lastCall?.[0]?.maxValue).toBeDefined();
   });
 });
