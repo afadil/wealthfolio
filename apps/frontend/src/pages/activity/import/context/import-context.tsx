@@ -1,5 +1,14 @@
-import { createContext, useContext, useReducer, type ReactNode, type Dispatch } from "react";
-import type { ImportMappingData, QuoteMode } from "@/lib/types";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useReducer,
+  useRef,
+  type ReactNode,
+  type Dispatch,
+} from "react";
+import { checkActivitiesImport, logger } from "@/adapters";
+import type { ActivityImport, ImportMappingData } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -87,6 +96,7 @@ export interface ImportState {
   importResult: ImportResult | null;
   accountId: string;
   holdingsCheckPassed: boolean;
+  isValidating: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -118,6 +128,7 @@ const INITIAL_STATE: ImportState = {
   importResult: null,
   accountId: "",
   holdingsCheckPassed: false,
+  isValidating: false,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -142,6 +153,7 @@ export type ImportAction =
   | { type: "SET_STEP"; payload: ImportStep }
   | { type: "NEXT_STEP" }
   | { type: "PREV_STEP" }
+  | { type: "SET_IS_VALIDATING"; payload: boolean }
   | { type: "RESET" };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -241,9 +253,12 @@ function importReducer(state: ImportState, action: ImportAction): ImportState {
       return {
         ...state,
         step: prevStepValue,
-        ...(clearDrafts && { draftActivities: [] }),
+        ...(clearDrafts && { draftActivities: [], isValidating: false }),
       };
     }
+
+    case "SET_IS_VALIDATING":
+      return { ...state, isValidating: action.payload };
 
     case "RESET":
       return { ...INITIAL_STATE };
@@ -260,9 +275,27 @@ function importReducer(state: ImportState, action: ImportAction): ImportState {
 interface ImportContextValue {
   state: ImportState;
   dispatch: Dispatch<ImportAction>;
+  validateDrafts: (drafts: DraftActivity[]) => Promise<void>;
 }
 
 const ImportContext = createContext<ImportContextValue | null>(null);
+
+// Inline helper — avoids a circular import with draft-utils (which imports DraftActivity from here)
+function mergeIssueMaps(
+  current: Record<string, string[]>,
+  incoming: Record<string, string[]>,
+): Record<string, string[]> {
+  const merged: Record<string, string[]> = { ...current };
+  for (const [key, messages] of Object.entries(incoming)) {
+    const existing = merged[key] ?? [];
+    const next = [...existing];
+    for (const message of messages) {
+      if (!next.includes(message)) next.push(message);
+    }
+    merged[key] = next;
+  }
+  return merged;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Provider
@@ -279,7 +312,142 @@ export function ImportProvider({ children, initialAccountId }: ImportProviderPro
     accountId: initialAccountId ?? "",
   });
 
-  return <ImportContext.Provider value={{ state, dispatch }}>{children}</ImportContext.Provider>;
+  const validationRunRef = useRef(0);
+  // "Latest ref" pattern — keeps validateDrafts stable while reading current values
+  const accountIdRef = useRef(state.accountId);
+  accountIdRef.current = state.accountId;
+  const defaultCurrencyRef = useRef(state.parseConfig.defaultCurrency);
+  defaultCurrencyRef.current = state.parseConfig.defaultCurrency;
+
+  const validateDrafts = useCallback(
+    async (drafts: DraftActivity[]) => {
+      const run = ++validationRunRef.current;
+      dispatch({ type: "SET_IS_VALIDATING", payload: true });
+      try {
+        const accountId = accountIdRef.current;
+        if (!accountId) {
+          logger.warn("No account selected - skipping backend validation");
+          if (run === validationRunRef.current) {
+            dispatch({ type: "SET_DRAFT_ACTIVITIES", payload: drafts });
+          }
+          return;
+        }
+
+        const activitiesToValidate = drafts
+          .filter((d) => d.status !== "skipped" && d.activityType)
+          .map(
+            (draft) =>
+              ({
+                accountId: draft.accountId || accountId,
+                activityType: draft.activityType as ActivityImport["activityType"],
+                date: draft.activityDate || "",
+                symbol: draft.symbol || "",
+                exchangeMic: draft.exchangeMic,
+                quoteCcy: draft.quoteCcy,
+                instrumentType: draft.instrumentType,
+                quoteMode: draft.quoteMode,
+                quantity: draft.quantity,
+                unitPrice: draft.unitPrice,
+                amount: draft.amount,
+                currency: draft.currency || defaultCurrencyRef.current,
+                fee: draft.fee,
+                isDraft: true,
+                isValid: draft.status === "valid" || draft.status === "warning",
+                lineNumber: draft.rowIndex + 1,
+                comment: draft.comment,
+                fxRate: draft.fxRate,
+                subtype: draft.subtype,
+              }) satisfies Partial<ActivityImport>,
+          ) as ActivityImport[];
+
+        let updatedDrafts = drafts;
+        if (activitiesToValidate.length > 0) {
+          const validated = await checkActivitiesImport({
+            accountId,
+            activities: activitiesToValidate,
+          });
+          if (run !== validationRunRef.current) {
+            return;
+          }
+
+          updatedDrafts = drafts.map((draft) => {
+            const backendResult = validated.find((v) => v.lineNumber === draft.rowIndex + 1);
+            if (!backendResult) {
+              return {
+                ...draft,
+                accountId: draft.accountId || accountId,
+                duplicateOfId: undefined,
+                duplicateOfLineNumber: undefined,
+              };
+            }
+
+            const backendErrors: Record<string, string[]> = {};
+            if (backendResult.errors) {
+              for (const [key, value] of Object.entries(backendResult.errors)) {
+                backendErrors[key] = Array.isArray(value) ? value : [String(value)];
+              }
+            }
+            const backendWarnings: Record<string, string[]> = {};
+            if (backendResult.warnings) {
+              for (const [key, value] of Object.entries(backendResult.warnings)) {
+                backendWarnings[key] = Array.isArray(value) ? value : [String(value)];
+              }
+            }
+            if (!backendResult.isValid && Object.keys(backendErrors).length === 0) {
+              backendErrors.general = ["Validation failed"];
+            }
+
+            const mergedErrors = mergeIssueMaps(draft.errors || {}, backendErrors);
+            const retainedWarnings = { ...(draft.warnings || {}) };
+            delete retainedWarnings._duplicate;
+            const mergedWarnings = mergeIssueMaps(retainedWarnings, backendWarnings);
+            const hasErrors = Object.keys(mergedErrors).length > 0;
+            const hasWarnings = Object.keys(mergedWarnings).length > 0;
+
+            return {
+              ...draft,
+              accountId: draft.accountId || accountId,
+              errors: mergedErrors,
+              warnings: mergedWarnings,
+              duplicateOfId: backendResult.duplicateOfId,
+              duplicateOfLineNumber: backendResult.duplicateOfLineNumber,
+              symbolName: backendResult.symbolName,
+              exchangeMic: backendResult.exchangeMic,
+              quoteCcy: backendResult.quoteCcy,
+              instrumentType: backendResult.instrumentType,
+              status:
+                draft.status === "skipped"
+                  ? draft.status
+                  : hasErrors
+                    ? "error"
+                    : hasWarnings
+                      ? "warning"
+                      : "valid",
+            } as DraftActivity;
+          });
+        }
+        if (run === validationRunRef.current) {
+          dispatch({ type: "SET_DRAFT_ACTIVITIES", payload: updatedDrafts });
+        }
+      } catch (error) {
+        logger.error(`Backend validation failed: ${error}`);
+        if (run === validationRunRef.current) {
+          dispatch({ type: "SET_DRAFT_ACTIVITIES", payload: drafts });
+        }
+      } finally {
+        if (run === validationRunRef.current) {
+          dispatch({ type: "SET_IS_VALIDATING", payload: false });
+        }
+      }
+    },
+    [dispatch],
+  );
+
+  return (
+    <ImportContext.Provider value={{ state, dispatch, validateDrafts }}>
+      {children}
+    </ImportContext.Provider>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -291,11 +459,11 @@ export function ImportProvider({ children, initialAccountId }: ImportProviderPro
  * Throws if used outside ImportProvider.
  */
 export function useImportContext(): ImportContextValue {
-  const context = useContext(ImportContext);
-  if (!context) {
+  const ctx = useContext(ImportContext);
+  if (!ctx) {
     throw new Error("useImportContext must be used within ImportProvider");
   }
-  return context;
+  return ctx;
 }
 
 /**

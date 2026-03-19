@@ -2492,11 +2492,12 @@ impl ActivityServiceTrait for ActivityService {
                 activity.quote_ccy = Some(resolved_quote_ccy);
 
                 if resolution_source == QuoteCcyResolutionSource::MicFallback {
-                    Self::add_activity_warning(
-                        &mut activity,
-                        "_quote_ccy_fallback",
-                        "Quote currency inferred from exchange MIC fallback. Verify symbol quote currency.",
+                    let msg = format!(
+                        "{} price currency was inferred as {} from the exchange. Please confirm it is correct.",
+                        activity.symbol,
+                        activity.quote_ccy.as_deref().unwrap_or_default(),
                     );
+                    Self::add_activity_warning(&mut activity, "_quote_ccy_fallback", &msg);
                 }
             }
 
