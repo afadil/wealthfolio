@@ -61,6 +61,13 @@ impl RulesResolver {
         mic: &Option<std::borrow::Cow<'static, str>>,
         provider: &ProviderId,
     ) -> Option<ProviderInstrument> {
+        if provider.as_ref() == "BOERSE_FRANKFURT" {
+            let mic = mic.as_deref().unwrap_or("XETR");
+            return Some(ProviderInstrument::EquitySymbol {
+                symbol: Arc::from(format!("{}:{}", mic, ticker)),
+            });
+        }
+
         let symbol = match mic {
             Some(mic) => {
                 // Look up suffix for this MIC and provider, fallback to ticker only if not found
@@ -482,6 +489,25 @@ mod tests {
         // No MIC
         let currency = resolver.get_equity_currency(&None, &"YAHOO".into());
         assert!(currency.is_none());
+    }
+
+    #[test]
+    fn test_resolve_equity_boerse_frankfurt_bare_ticker() {
+        // BF needs the MIC to distinguish Xetra vs Frankfurt for both quotes and profiles.
+        let resolver = RulesResolver::new();
+        let context = make_equity_context("XDWD", Some("XETR"));
+
+        let result = resolver.resolve(&"BOERSE_FRANKFURT".into(), &context);
+
+        assert!(result.is_some());
+        let resolved = result.unwrap().unwrap();
+
+        match resolved.instrument {
+            ProviderInstrument::EquitySymbol { symbol } => {
+                assert_eq!(symbol.as_ref(), "XETR:XDWD");
+            }
+            _ => panic!("Expected EquitySymbol"),
+        }
     }
 
     #[test]

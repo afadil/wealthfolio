@@ -80,6 +80,10 @@ pub trait ValuationServiceTrait: Send + Sync {
         account_ids: &[String],
         date: NaiveDate,
     ) -> CoreResult<Vec<DailyAccountValuation>>;
+
+    /// Returns account IDs that have at least one negative total_value in their history.
+    fn get_accounts_with_negative_balance(&self, account_ids: &[String])
+        -> CoreResult<Vec<String>>;
 }
 
 #[derive(Clone)]
@@ -291,42 +295,42 @@ impl ValuationServiceTrait for ValuationService {
                     .cloned()
                     .unwrap_or_default();
 
-                // Check for assets missing quotes that SHOULD have quotes
-                // (i.e., they have quotes elsewhere, just not for this date - indicates a gap)
-                // Assets with NO quotes at all are skipped - they'll be valued at ZERO
-                // and the health check will detect them
-                let missing_quotes_with_gap: Vec<_> = holdings_snapshot
+                // Count quotable positions (those with quotes somewhere in the range)
+                // and how many are missing a quote on this specific date.
+                let quotable_positions: Vec<_> = holdings_snapshot
                     .positions
                     .iter()
                     .filter(|(_, position)| !position.quantity.is_zero())
                     .map(|(symbol, _)| symbol)
-                    // Only flag as missing if the asset HAS quotes (somewhere) but not for this date
                     .filter(|symbol| assets_with_quotes.contains(*symbol))
+                    .cloned()
+                    .collect();
+
+                let missing_quotes: Vec<_> = quotable_positions
+                    .iter()
                     .filter(|symbol| !quotes_for_current_date.contains_key(*symbol))
                     .cloned()
                     .collect();
 
-                if !missing_quotes_with_gap.is_empty() {
+                // Full gap: no quotes at all for any quotable position → skip day
+                // to avoid recording a fake zero-value valuation.
+                if !quotable_positions.is_empty() && missing_quotes.len() == quotable_positions.len()
+                {
                     debug!(
-                        "Quote gap for {:?} on {} (account '{}'). Skipping day.",
-                        missing_quotes_with_gap, current_date, account_id_clone
+                        "No quotes for any quotable position on {} (account '{}'). Skipping day.",
+                        current_date, account_id_clone
                     );
                     return None;
                 }
 
-                // Check if there are any positions that need quotes
-                // but only consider positions that HAVE quotes somewhere
-                let has_quotable_positions = holdings_snapshot
-                    .positions
-                    .keys()
-                    .any(|symbol| assets_with_quotes.contains(symbol));
-
-                if quotes_for_current_date.is_empty() && has_quotable_positions {
+                // Partial gap: some quotes present, some missing → proceed.
+                // Missing positions valued at ZERO by the calculator, which is
+                // better than dropping the entire day (see #683).
+                if !missing_quotes.is_empty() {
                     debug!(
-                        "No quotes for date {} (account '{}'). Skipping day.",
-                        current_date, account_id_clone
+                        "Partial quote gap for {:?} on {} (account '{}').",
+                        missing_quotes, current_date, account_id_clone
                     );
-                    return None;
                 }
                 let account_curr = &holdings_snapshot.currency;
                 if account_curr != &base_curr_clone
@@ -410,5 +414,13 @@ impl ValuationServiceTrait for ValuationService {
         );
         self.valuation_repository
             .get_valuations_on_date(account_ids, date)
+    }
+
+    fn get_accounts_with_negative_balance(
+        &self,
+        account_ids: &[String],
+    ) -> CoreResult<Vec<String>> {
+        self.valuation_repository
+            .get_accounts_with_negative_balance(account_ids)
     }
 }

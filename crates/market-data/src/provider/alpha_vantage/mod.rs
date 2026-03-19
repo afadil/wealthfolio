@@ -421,6 +421,7 @@ impl EtfProfileResponse {
                 .and_then(|s| Self::parse_weight(s)),
             week_52_high: None,
             week_52_low: None,
+            isin: None,
         }
     }
 }
@@ -473,6 +474,7 @@ impl CompanyOverviewResponse {
             dividend_yield: Self::parse_f64(&self.dividend_yield),
             week_52_high: Self::parse_f64(&self.week_52_high),
             week_52_low: Self::parse_f64(&self.week_52_low),
+            isin: None,
         }
     }
 }

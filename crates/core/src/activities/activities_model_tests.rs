@@ -683,6 +683,7 @@ mod tests {
             line_number: Some(1),
             fx_rate: None,
             subtype: None,
+            asset_id: None,
         };
 
         let converted = NewActivity::from(import);

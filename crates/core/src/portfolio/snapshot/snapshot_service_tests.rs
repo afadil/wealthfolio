@@ -417,7 +417,10 @@ mod tests {
         fn calculate_average_cost(&self, _account_id: &str, _asset_id: &str) -> AppResult<Decimal> {
             unimplemented!()
         }
-        fn get_income_activities_data(&self) -> AppResult<Vec<ActivityIncomeData>> {
+        fn get_income_activities_data(
+            &self,
+            _account_id: Option<&str>,
+        ) -> AppResult<Vec<ActivityIncomeData>> {
             unimplemented!()
         }
         fn get_first_activity_date_overall(&self) -> AppResult<DateTime<Utc>> {
@@ -566,7 +569,10 @@ mod tests {
         fn calculate_average_cost(&self, _acc: &str, _asset: &str) -> AppResult<Decimal> {
             unimplemented!()
         }
-        fn get_income_activities_data(&self) -> AppResult<Vec<ActivityIncomeData>> {
+        fn get_income_activities_data(
+            &self,
+            _account_id: Option<&str>,
+        ) -> AppResult<Vec<ActivityIncomeData>> {
             unimplemented!()
         }
         fn get_first_activity_date_overall(&self) -> AppResult<DateTime<Utc>> {

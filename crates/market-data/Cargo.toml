@@ -7,7 +7,6 @@ edition = "2021"
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 log = "0.4"
-md5 = "0.7"
 num-traits = "0.2"
 reqwest = { version = "0.12", features = ["json"] }
 rust_decimal = { version = "1", features = ["serde"] }
