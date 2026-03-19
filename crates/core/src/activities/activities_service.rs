@@ -1589,7 +1589,7 @@ impl ActivityService {
         account: &Account,
         symbol_mic_cache: &HashMap<String, Option<String>>,
         mode: PreparationMode,
-        quote_ccy_cache: &mut HashMap<(String, Option<String>, Option<String>), Option<String>>,
+        quote_ccy_cache: &mut QuoteCcyCache,
     ) -> Result<Option<crate::assets::AssetSpec>> {
         use crate::assets::{parse_crypto_pair_symbol, AssetSpec};
 
@@ -2193,8 +2193,7 @@ impl ActivityServiceTrait for ActivityService {
 
         // Cache raw provider quote-currency results by (symbol, mic, instrument_type) to avoid
         // hitting the provider once per row for the same symbol. Precedence logic runs per-row.
-        let mut quote_ccy_cache: HashMap<(String, Option<String>, Option<String>), Option<String>> =
-            HashMap::new();
+        let mut quote_ccy_cache: QuoteCcyCache = HashMap::new();
 
         let mut activities_with_status: Vec<ActivityImport> = Vec::new();
 
@@ -3071,8 +3070,7 @@ impl ActivityService {
         // 2. Build AssetSpecs for each activity
         let mut asset_specs: Vec<AssetSpec> = Vec::new();
         let mut activity_asset_map: Vec<Option<String>> = Vec::with_capacity(activities.len());
-        let mut quote_ccy_cache: HashMap<(String, Option<String>, Option<String>), Option<String>> =
-            HashMap::new();
+        let mut quote_ccy_cache: QuoteCcyCache = HashMap::new();
 
         for (idx, activity) in activities.iter().enumerate() {
             match self
