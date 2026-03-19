@@ -291,23 +291,40 @@ impl ValuationServiceTrait for ValuationService {
                     .cloned()
                     .unwrap_or_default();
 
-                // Log any assets with partial quote coverage for diagnostics.
-                // We no longer skip the day — the calculator values missing
-                // quotes at ZERO, which is better than dropping the entire day
-                // and creating gaps in the valuation timeline (see #683).
-                let missing_quotes: Vec<_> = holdings_snapshot
+                // Count quotable positions (those with quotes somewhere in the range)
+                // and how many are missing a quote on this specific date.
+                let quotable_positions: Vec<_> = holdings_snapshot
                     .positions
                     .iter()
                     .filter(|(_, position)| !position.quantity.is_zero())
                     .map(|(symbol, _)| symbol)
                     .filter(|symbol| assets_with_quotes.contains(*symbol))
+                    .cloned()
+                    .collect();
+
+                let missing_quotes: Vec<_> = quotable_positions
+                    .iter()
                     .filter(|symbol| !quotes_for_current_date.contains_key(*symbol))
                     .cloned()
                     .collect();
 
+                // Full gap: no quotes at all for any quotable position → skip day
+                // to avoid recording a fake zero-value valuation.
+                if !quotable_positions.is_empty() && missing_quotes.len() == quotable_positions.len()
+                {
+                    debug!(
+                        "No quotes for any quotable position on {} (account '{}'). Skipping day.",
+                        current_date, account_id_clone
+                    );
+                    return None;
+                }
+
+                // Partial gap: some quotes present, some missing → proceed.
+                // Missing positions valued at ZERO by the calculator, which is
+                // better than dropping the entire day (see #683).
                 if !missing_quotes.is_empty() {
                     debug!(
-                        "Quote gap for {:?} on {} (account '{}').",
+                        "Partial quote gap for {:?} on {} (account '{}').",
                         missing_quotes, current_date, account_id_clone
                     );
                 }
