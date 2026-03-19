@@ -28,6 +28,9 @@ use crate::fx::FxServiceTrait;
 use crate::quotes::{DataSource, Quote, QuoteServiceTrait};
 use crate::Result;
 use log::warn;
+
+/// Cache key: (symbol, exchange_mic, instrument_type) → provider quote currency
+type QuoteCcyCache = HashMap<(String, Option<String>, Option<String>), Option<String>>;
 use uuid::Uuid;
 use wealthfolio_market_data::mic_to_currency;
 
@@ -188,7 +191,7 @@ impl ActivityService {
         symbol: &str,
         exchange_mic: Option<&str>,
         instrument_type: Option<&InstrumentType>,
-        cache: &mut HashMap<(String, Option<String>, Option<String>), Option<String>>,
+        cache: &mut QuoteCcyCache,
     ) -> Option<String> {
         let key = (
             symbol.to_string(),
