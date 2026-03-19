@@ -93,11 +93,25 @@ impl IncomeServiceTrait for IncomeService {
         let two_years_ago = current_year - 2;
         let current_month = current_date.month();
 
-        let oldest_date = match self.activity_repository.get_first_activity_date_overall() {
-            Ok(date) => date,
-            Err(e) => {
-                error!("Error getting first transaction date: {:?}", e);
-                return Err(e);
+        // Scope the baseline date to the filtered account so monthly-average
+        // denominators are correct.  Falls back to portfolio-wide when no filter.
+        let oldest_date = if let Some(id) = account_id {
+            let ids = vec![id.to_string()];
+            match self.activity_repository.get_first_activity_date(Some(&ids)) {
+                Ok(Some(date)) => date,
+                Ok(None) => return Ok(Vec::new()),
+                Err(e) => {
+                    error!("Error getting first activity date for account: {:?}", e);
+                    return Err(e);
+                }
+            }
+        } else {
+            match self.activity_repository.get_first_activity_date_overall() {
+                Ok(date) => date,
+                Err(e) => {
+                    error!("Error getting first transaction date: {:?}", e);
+                    return Err(e);
+                }
             }
         };
         let mut months_since_first_transaction: i32 =
