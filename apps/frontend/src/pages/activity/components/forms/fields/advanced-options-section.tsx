@@ -51,6 +51,8 @@ interface AdvancedOptionsSectionProps<TFieldValues extends FieldValues = FieldVa
   defaultOpen?: boolean;
   /** Variant for different layouts */
   variant?: "desktop" | "mobile";
+  /** Additional content rendered inside the collapsible section */
+  children?: React.ReactNode;
 }
 
 /**
@@ -70,6 +72,7 @@ export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldV
   showSubtype = true,
   defaultOpen = false,
   variant = "desktop",
+  children,
 }: AdvancedOptionsSectionProps<TFieldValues>) {
   const isMobile = variant === "mobile";
   const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -101,7 +104,8 @@ export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldV
   const hasContent =
     (showCurrency && currencyName) ||
     (showFxRate && fxRateName) ||
-    (showSubtype && subtypeName && availableSubtypes.length > 0);
+    (showSubtype && subtypeName && availableSubtypes.length > 0) ||
+    children;
   if (!hasContent) {
     return null;
   }
@@ -238,6 +242,7 @@ export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldV
             />
           )}
         </div>
+        {children}
       </CollapsibleContent>
     </Collapsible>
   );
