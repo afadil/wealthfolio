@@ -432,15 +432,23 @@ export const AccountsSummary = React.memo(
               0,
             );
 
-            // Market-value-weighted average of individual period returns.
-            // Uses per-account backend returns (correct for both HOLDINGS and TRANSACTIONS).
+            // Market-value-weighted average — only over accounts with a computable return.
+            // Accounts with null return (negative start value) are excluded and the
+            // denominator is reweighted to their combined value, so they don't dilute the result.
+            const knownReturnAccounts = groupAccounts.filter(
+              (acc) => acc.totalGainLossPercent !== null,
+            );
+            const knownReturnTotalValue = knownReturnAccounts.reduce(
+              (sum, acc) => sum + Number(acc.totalValueBaseCurrency),
+              0,
+            );
             const groupTotalReturnPercentBase =
-              totalValueBaseCurrency !== 0
-                ? groupAccounts.reduce(
+              knownReturnAccounts.length > 0 && knownReturnTotalValue > 0
+                ? knownReturnAccounts.reduce(
                     (sum, acc) =>
                       sum +
-                      (acc.totalGainLossPercent ?? 0) *
-                        (Number(acc.totalValueBaseCurrency) / totalValueBaseCurrency),
+                      (acc.totalGainLossPercent as number) *
+                        (Number(acc.totalValueBaseCurrency) / knownReturnTotalValue),
                     0,
                   )
                 : null;
