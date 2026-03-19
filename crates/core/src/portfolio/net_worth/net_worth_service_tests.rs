@@ -792,6 +792,10 @@ impl ValuationRepositoryTrait for MockValuationRepository {
             .collect();
         Ok(filtered)
     }
+
+    fn get_accounts_with_negative_balance(&self, _account_ids: &[String]) -> Result<Vec<String>> {
+        Ok(Vec::new())
+    }
 }
 
 // ============================================================================

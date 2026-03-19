@@ -188,6 +188,7 @@ use super::model::{FixAction, HealthStatus};
 use crate::accounts::AccountServiceTrait;
 use crate::assets::AssetServiceTrait;
 use crate::portfolio::holdings::HoldingsServiceTrait;
+use crate::portfolio::valuation::ValuationServiceTrait;
 use crate::quotes::QuoteServiceTrait;
 use crate::taxonomies::TaxonomyServiceTrait;
 use std::collections::HashMap;
@@ -322,6 +323,7 @@ pub trait HealthServiceTrait: Send + Sync {
         quote_service: Arc<dyn QuoteServiceTrait>,
         asset_service: Arc<dyn AssetServiceTrait>,
         taxonomy_service: Arc<dyn TaxonomyServiceTrait>,
+        valuation_service: Arc<dyn ValuationServiceTrait>,
         configured_timezone: Option<&str>,
         client_timezone: Option<&str>,
     ) -> Result<HealthStatus>;

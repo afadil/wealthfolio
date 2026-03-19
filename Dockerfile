@@ -3,7 +3,7 @@ ARG RUST_IMAGE=rust:1.91-alpine
 
 # Stage 1: build frontend
 # Use --platform=$BUILDPLATFORM to run on the native runner (fast)
-FROM --platform=$BUILDPLATFORM node:20-alpine AS frontend
+FROM --platform=$BUILDPLATFORM node:24-alpine AS frontend
 
 # Wealthfolio Connect configuration (baked into JS bundle at build time)
 # Pass via --build-arg to enable; omit to build without Connect.

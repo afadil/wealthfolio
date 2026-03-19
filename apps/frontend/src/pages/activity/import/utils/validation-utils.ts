@@ -494,6 +494,22 @@ function transformRowToActivity(
   activity.amount = logic.calculateAmount(currentActivityState);
   activity.fee = logic.calculateFee(currentActivityState);
 
+  // For BUY/SELL: if CSV amount significantly disagrees with qty*price,
+  // trust CSV amount and derive unitPrice (handles bond % of par, etc.)
+  if (
+    (activity.activityType === ActivityType.BUY || activity.activityType === ActivityType.SELL) &&
+    activity.amount !== undefined &&
+    activity.amount > 0
+  ) {
+    const csvAmount = toNum(currentActivityState.amount);
+    if (csvAmount && csvAmount > 0 && activity.amount / csvAmount > 1.02) {
+      activity.amount = csvAmount;
+      if (activity.quantity && activity.quantity > 0) {
+        activity.unitPrice = csvAmount / activity.quantity;
+      }
+    }
+  }
+
   // 4. Final Cleanup & Defaulting
   // Handle NaN values resulting from calculations or initial parsing
   if (activity.quantity !== undefined && isNaN(activity.quantity)) activity.quantity = undefined;

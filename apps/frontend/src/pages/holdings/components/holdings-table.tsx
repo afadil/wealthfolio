@@ -386,11 +386,11 @@ const getColumns = (
       <DataTableColumnHeader
         className="justify-end"
         column={column}
-        title={showTotalReturn ? "Total Gain/Loss" : "Day Change"}
+        title={showTotalReturn ? "Unrealized Gain" : "Day Change"}
       />
     ),
     meta: {
-      label: "Total Gain/Loss",
+      label: "Unrealized Gain",
     },
     cell: ({ row }) => {
       const holding = row.original;

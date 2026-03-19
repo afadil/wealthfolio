@@ -88,7 +88,18 @@ pub fn plan_portfolio_job(
                     }
                 }
             }
-            DomainEvent::AssetsMerged { .. } | DomainEvent::TrackingModeChanged { .. } => {}
+            DomainEvent::AssetsMerged { .. } => {}
+            DomainEvent::TrackingModeChanged {
+                account_id,
+                old_mode,
+                new_mode,
+                ..
+            } => {
+                if *old_mode == TrackingMode::Holdings && *new_mode == TrackingMode::Transactions {
+                    account_ids.insert(account_id.clone());
+                    has_recalc_events = true;
+                }
+            }
         }
     }
 

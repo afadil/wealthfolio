@@ -498,8 +498,13 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       if (qs) url += `?${qs}`;
       break;
     }
-    case "get_income_summary":
+    case "get_income_summary": {
+      const { accountId: incomeAccountId } = payload as { accountId?: string };
+      if (incomeAccountId) {
+        url += `?accountId=${encodeURIComponent(incomeAccountId)}`;
+      }
       break;
+    }
     case "delete_goal": {
       const { goalId } = payload as { goalId: string };
       url += `/${encodeURIComponent(goalId)}`;

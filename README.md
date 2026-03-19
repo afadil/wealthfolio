@@ -287,12 +287,12 @@ All configuration is done via environment variables in `.env.web`.
   **Dollar-sign (`$`) escaping cheat-sheet** — Argon2 hashes contain `$`
   characters that shells and Compose interpret as variable references:
 
-  | Context                    | Syntax                          | Notes                                 |
-  | -------------------------- | ------------------------------- | ------------------------------------- |
-  | `.env` file                | `WF_AUTH_PASSWORD_HASH=$...`    | No quotes, no escaping needed         |
-  | Docker Compose YAML inline | `HASH: '$$argon2id$$v=19$$...'` | Double every `$` for Compose          |
-  | `docker run` (single)      | `-e HASH='$argon2id$...'`       | Single quotes prevent shell expansion |
-  | `docker run` (double)      | `-e HASH="\$argon2id\$..."`     | Backslash-escape each `$`             |
+  | Context                      | Syntax                                | Notes                                            |
+  | ---------------------------- | ------------------------------------- | ------------------------------------------------ |
+  | `.env` file                  | `WF_AUTH_PASSWORD_HASH=$argon2id$...` | No quotes, no escaping needed                    |
+  | Docker Compose YAML inline   | `HASH: '$$argon2id$$v=19$$...'`       | Double every `$` to escape Compose interpolation |
+  | `docker run` (single quotes) | `-e HASH='$argon2id$...'`             | Single quotes prevent shell expansion            |
+  | `docker run` (double quotes) | `-e HASH="\$argon2id\$..."`           | Backslash-escape each `$`                        |
 
 - Sessions are cookie-based (`HttpOnly`, `SameSite=Lax`, `Path=/api`). The login
   endpoint sets the session cookie automatically — no token is exposed to

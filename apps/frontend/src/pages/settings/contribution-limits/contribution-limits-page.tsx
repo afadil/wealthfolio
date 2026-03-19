@@ -107,15 +107,15 @@ const SettingsContributionLimitPage = () => {
           {previousYearsLimits.length > 0 && (
             <div className="mt-8">
               <div className="flex items-center justify-center">
-                <Separator className="w-1/3" />
+                <Separator className="flex-1" />
                 <Button
                   variant="outline"
-                  className="mx-4 rounded-full"
+                  className="mx-4 shrink-0 rounded-full"
                   onClick={() => setShowPreviousYears(!showPreviousYears)}
                 >
                   {showPreviousYears ? "Hide" : "Show"} Previous Years
                 </Button>
-                <Separator className="w-1/3" />
+                <Separator className="flex-1" />
               </div>
 
               {showPreviousYears && (

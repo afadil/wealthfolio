@@ -56,6 +56,7 @@ async fn run_health_checks_internal(
             state.quote_service(),
             state.asset_service(),
             state.taxonomy_service(),
+            state.valuation_service(),
             Some(configured_timezone.as_str()),
             client_timezone,
         )

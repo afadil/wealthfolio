@@ -61,6 +61,7 @@ interface ToggleGroupItem<T extends string = string> {
   value: T;
   label: ReactNode;
   title?: string;
+  "data-testid"?: string;
 }
 
 interface AnimatedToggleGroupProps<T extends string = string> extends VariantProps<typeof animatedToggleVariants> {
@@ -104,6 +105,7 @@ export function AnimatedToggleGroup<T extends string = string>(props: AnimatedTo
           key={item.value}
           onClick={() => handleSelect(item.value)}
           title={item.title}
+          data-testid={item["data-testid"]}
           className={cn(
             animatedToggleItemVariants({ size, rounded }),
             selected === item.value ? "text-foreground" : "text-foreground/90 hover:text-foreground/80",

@@ -27,8 +27,8 @@ export const getHoldings = async (accountId: string): Promise<Holding[]> => {
   return invoke<Holding[]>("get_holdings", { accountId });
 };
 
-export const getIncomeSummary = async (): Promise<IncomeSummary[]> => {
-  return invoke<IncomeSummary[]>("get_income_summary");
+export const getIncomeSummary = async (accountId?: string): Promise<IncomeSummary[]> => {
+  return invoke<IncomeSummary[]>("get_income_summary", { accountId });
 };
 
 export const getHistoricalValuations = async (
@@ -54,17 +54,15 @@ export const getLatestValuations = async (accountIds: string[]): Promise<Account
 export const calculatePerformanceHistory = async (
   itemType: "account" | "symbol",
   itemId: string,
-  startDate: string,
-  endDate: string,
+  startDate: string | undefined,
+  endDate: string | undefined,
   trackingMode?: "HOLDINGS" | "TRANSACTIONS",
 ): Promise<PerformanceMetrics> => {
-  const response = await invoke<PerformanceMetrics>("calculate_performance_history", {
-    itemType,
-    itemId,
-    startDate,
-    endDate,
-    trackingMode,
-  });
+  const args: Record<string, unknown> = { itemType, itemId };
+  if (startDate) args.startDate = startDate;
+  if (endDate) args.endDate = endDate;
+  if (trackingMode) args.trackingMode = trackingMode;
+  const response = await invoke<PerformanceMetrics>("calculate_performance_history", args);
 
   if (typeof response === "string" || !response || Object.keys(response).length === 0) {
     throw new Error(
