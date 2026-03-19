@@ -358,6 +358,31 @@ describe("validation-utils", () => {
       expect(buyActivity.fee).toBe(0);
     });
 
+    it("should not reconcile when qty*price roughly matches CSV amount", () => {
+      const testData = [
+        {
+          lineNumber: "1",
+          date: "2024-06-01T00:00:00.000Z",
+          symbol: "AAPL",
+          activityType: "BUY",
+          quantity: "10",
+          unitPrice: "150.50",
+          amount: "1505.00",
+          fee: "5.00",
+          currency: "USD",
+        },
+      ];
+
+      const result = validateActivityImport(testData, testMapping, "test-account", "USD");
+
+      expect(result.activities).toHaveLength(1);
+      const activity = result.activities[0];
+
+      // No reconciliation needed — qty*price matches CSV amount
+      expect(activity.amount).toBe(1505);
+      expect(activity.unitPrice).toBe(150.5);
+    });
+
     it("should handle FEE activities with fee value only (no amount)", () => {
       const testData = [
         {
