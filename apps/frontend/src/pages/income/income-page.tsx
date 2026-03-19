@@ -105,29 +105,29 @@ export default function IncomePage() {
             setSelectedAccount={setSelectedAccount}
             variant="dropdown"
             includePortfolio
+            className="h-9"
           />
           <IncomePeriodSelector
             selectedPeriod={selectedPeriod}
             onPeriodSelect={setSelectedPeriod}
           />
         </div>
-        <div className="flex items-center justify-between md:hidden">
-          <Button
-            variant="outline"
-            size="sm"
-            className="bg-secondary/30 relative rounded-full border-none"
-            onClick={() => setIsFilterSheetOpen(true)}
-          >
-            <Icons.ListFilter className="mr-1.5 h-4 w-4" />
-            {selectedAccount?.id !== PORTFOLIO_ACCOUNT_ID && (
-              <span className="bg-destructive absolute -right-1 -top-1 h-2 w-2 rounded-full" />
-            )}
-            Filter
-          </Button>
+        <div className="flex items-center justify-end gap-2 md:hidden">
           <IncomePeriodSelector
             selectedPeriod={selectedPeriod}
             onPeriodSelect={setSelectedPeriod}
           />
+          <Button
+            variant="outline"
+            size="icon"
+            className="bg-secondary/30 relative h-9 w-9 rounded-full border-none"
+            onClick={() => setIsFilterSheetOpen(true)}
+          >
+            <Icons.ListFilter className="h-4 w-4" />
+            {selectedAccount?.id !== PORTFOLIO_ACCOUNT_ID && (
+              <span className="bg-destructive absolute -right-1 -top-1 h-2 w-2 rounded-full" />
+            )}
+          </Button>
         </div>
         <EmptyPlaceholder
           className="mx-auto flex max-w-[420px] items-center justify-center pt-12"
@@ -215,29 +215,29 @@ export default function IncomePage() {
           setSelectedAccount={setSelectedAccount}
           variant="dropdown"
           includePortfolio
+          className="h-9"
         />
         <IncomePeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
       </div>
 
       <div className="space-y-6">
-        {/* Mobile: filter button + period toggle */}
-        <div className="flex items-center justify-between md:hidden">
-          <Button
-            variant="outline"
-            size="sm"
-            className="bg-secondary/30 relative rounded-full border-none"
-            onClick={() => setIsFilterSheetOpen(true)}
-          >
-            <Icons.ListFilter className="mr-1.5 h-4 w-4" />
-            {selectedAccount?.id !== PORTFOLIO_ACCOUNT_ID && (
-              <span className="bg-destructive absolute -right-1 -top-1 h-2 w-2 rounded-full" />
-            )}
-            Filter
-          </Button>
+        {/* Mobile: filter icon button + period toggle */}
+        <div className="flex items-center justify-end gap-2 md:hidden">
           <IncomePeriodSelector
             selectedPeriod={selectedPeriod}
             onPeriodSelect={setSelectedPeriod}
           />
+          <Button
+            variant="outline"
+            size="icon"
+            className="bg-secondary/30 relative h-9 w-9 rounded-full border-none"
+            onClick={() => setIsFilterSheetOpen(true)}
+          >
+            <Icons.ListFilter className="h-4 w-4" />
+            {selectedAccount?.id !== PORTFOLIO_ACCOUNT_ID && (
+              <span className="bg-destructive absolute -right-1 -top-1 h-2 w-2 rounded-full" />
+            )}
+          </Button>
         </div>
         <div className="grid gap-6 md:grid-cols-3">
           <Card className="border-yellow-500/10 bg-yellow-500/10">
