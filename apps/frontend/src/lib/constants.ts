@@ -9,6 +9,26 @@ export const WEALTHFOLIO_CONNECT_PORTAL_URL = "https://connect.wealthfolio.app";
 
 export const PORTFOLIO_ACCOUNT_ID = "TOTAL";
 
+/**
+ * Creates a synthetic "All Portfolio" account used as default selection
+ * in account filter dropdowns. Not a real DB account.
+ */
+export function createPortfolioAccount(baseCurrency: string) {
+  return {
+    id: PORTFOLIO_ACCOUNT_ID,
+    name: "All Portfolio",
+    accountType: "PORTFOLIO" as never,
+    balance: 0,
+    currency: baseCurrency,
+    isDefault: false,
+    isActive: true,
+    isArchived: false,
+    trackingMode: "NOT_SET" as const,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+}
+
 /** JSON metadata key for a non-standard option contract multiplier (e.g. mini options = 10). */
 export const METADATA_CONTRACT_MULTIPLIER = "contract_multiplier";
 

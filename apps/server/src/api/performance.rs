@@ -1,7 +1,11 @@
 use std::sync::Arc;
 
 use crate::{error::ApiResult, main_lib::AppState};
-use axum::{extract::State, routing::post, Json, Router};
+use axum::{
+    extract::{Query, State},
+    routing::post,
+    Json, Router,
+};
 use wealthfolio_core::{
     accounts::{AccountServiceTrait, TrackingMode},
     portfolio::{
@@ -91,10 +95,19 @@ async fn calculate_performance_summary(
     Ok(Json(metrics))
 }
 
+#[derive(serde::Deserialize)]
+struct IncomeSummaryQuery {
+    #[serde(rename = "accountId")]
+    account_id: Option<String>,
+}
+
 async fn get_income_summary(
     State(state): State<Arc<AppState>>,
+    Query(query): Query<IncomeSummaryQuery>,
 ) -> ApiResult<Json<Vec<IncomeSummary>>> {
-    let items = state.income_service.get_income_summary()?;
+    let items = state
+        .income_service
+        .get_income_summary(query.account_id.as_deref())?;
     Ok(Json(items))
 }
 

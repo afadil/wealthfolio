@@ -27,8 +27,8 @@ export const getHoldings = async (accountId: string): Promise<Holding[]> => {
   return invoke<Holding[]>("get_holdings", { accountId });
 };
 
-export const getIncomeSummary = async (): Promise<IncomeSummary[]> => {
-  return invoke<IncomeSummary[]>("get_income_summary");
+export const getIncomeSummary = async (accountId?: string): Promise<IncomeSummary[]> => {
+  return invoke<IncomeSummary[]>("get_income_summary", { accountId });
 };
 
 export const getHistoricalValuations = async (

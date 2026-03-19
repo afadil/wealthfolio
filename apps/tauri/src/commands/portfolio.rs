@@ -224,11 +224,12 @@ pub async fn get_latest_valuations(
 #[tauri::command]
 pub async fn get_income_summary(
     state: State<'_, Arc<ServiceContext>>,
+    account_id: Option<String>,
 ) -> Result<Vec<IncomeSummary>, String> {
     debug!("Fetching income summary...");
     state
         .income_service()
-        .get_income_summary()
+        .get_income_summary(account_id.as_deref())
         .map_err(|e| e.to_string())
 }
 

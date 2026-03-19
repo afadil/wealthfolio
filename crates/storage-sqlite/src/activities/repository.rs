@@ -755,7 +755,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
         Ok(activities)
     }
 
-    fn get_income_activities_data(&self) -> Result<Vec<IncomeData>> {
+    fn get_income_activities_data(&self, account_id: Option<&str>) -> Result<Vec<IncomeData>> {
         let mut conn = get_connection(&self.pool)?;
 
         // For income reporting, we need to handle different subtypes:
@@ -763,7 +763,13 @@ impl ActivityRepositoryTrait for ActivityRepository {
         // - STAKING_REWARD/DRIP/DIVIDEND_IN_KIND subtypes: if amount is 0, calculate from:
         //   1. quantity * unit_price (if unit_price is available)
         //   2. quantity * market_price from quotes table (fallback)
-        let query = "SELECT strftime('%Y-%m', a.activity_date) as date,
+        let account_filter = match account_id {
+            Some(_) => "AND a.account_id = ?",
+            None => "",
+        };
+
+        let query = format!(
+            "SELECT strftime('%Y-%m', a.activity_date) as date,
              a.activity_type as income_type,
              COALESCE(a.asset_id, 'CASH') as asset_id,
              COALESCE(ast.kind, 'CASH') as asset_kind,
@@ -789,7 +795,9 @@ impl ActivityRepositoryTrait for ActivityRepository {
                  AND date(a.activity_date) = q.day
              WHERE a.activity_type IN ('DIVIDEND', 'INTEREST', 'OTHER_INCOME')
              AND acc.is_archived = 0
-             ORDER BY a.activity_date";
+             {account_filter}
+             ORDER BY a.activity_date"
+        );
 
         // Define a struct to hold the raw query results
         #[derive(QueryableByName, Debug)]
@@ -812,9 +820,16 @@ impl ActivityRepositoryTrait for ActivityRepository {
             pub amount: String,
         }
 
-        let raw_results = diesel::sql_query(query)
-            .load::<RawIncomeData>(&mut conn)
-            .map_err(ActivityError::from)?;
+        let raw_results = if let Some(id) = account_id {
+            diesel::sql_query(&query)
+                .bind::<diesel::sql_types::Text, _>(id)
+                .load::<RawIncomeData>(&mut conn)
+                .map_err(ActivityError::from)?
+        } else {
+            diesel::sql_query(&query)
+                .load::<RawIncomeData>(&mut conn)
+                .map_err(ActivityError::from)?
+        };
 
         // Transform raw results into IncomeData
         let results = raw_results
