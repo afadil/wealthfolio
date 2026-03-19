@@ -447,7 +447,7 @@ export const AccountsSummary = React.memo(
                 ? knownReturnAccounts.reduce(
                     (sum, acc) =>
                       sum +
-                      (acc.totalGainLossPercent as number) *
+                      acc.totalGainLossPercent! *
                         (Number(acc.totalValueBaseCurrency) / knownReturnTotalValue),
                     0,
                   )
