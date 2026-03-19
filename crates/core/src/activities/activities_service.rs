@@ -822,24 +822,40 @@ impl ActivityService {
 
         // Fallback key for OCC option symbols that were previously misclassified
         // as EQUITY due to exchange MIC taking priority over OCC heuristic.
+        // Must mirror the key format the old code would have produced (with MIC when present).
         let fallback_equity_key = if matches!(instrument_type, Some(InstrumentType::Option)) {
-            Some(format!(
-                "{}:{}",
-                InstrumentType::Equity.as_db_str(),
-                upper_symbol
-            ))
+            exchange_mic
+                .filter(|mic| !mic.trim().is_empty())
+                .map(|mic| {
+                    format!(
+                        "{}:{}@{}",
+                        InstrumentType::Equity.as_db_str(),
+                        upper_symbol,
+                        mic.trim().to_uppercase()
+                    )
+                })
+                .or_else(|| {
+                    Some(format!(
+                        "{}:{}",
+                        InstrumentType::Equity.as_db_str(),
+                        upper_symbol,
+                    ))
+                })
         } else {
             None
         };
 
         if let Some(ref key) = expected_key {
+            // Pass 1: exact instrument key match
             for asset in &assets {
-                let asset_key = asset.instrument_key.as_deref();
-                if asset_key == Some(key) {
+                if asset.instrument_key.as_deref() == Some(key) {
                     return Some(asset.id.clone());
                 }
-                if let Some(ref fallback) = fallback_equity_key {
-                    if asset_key == Some(fallback.as_str()) {
+            }
+            // Pass 2: fallback for legacy misclassified options
+            if let Some(ref fallback) = fallback_equity_key {
+                for asset in &assets {
+                    if asset.instrument_key.as_deref() == Some(fallback.as_str()) {
                         return Some(asset.id.clone());
                     }
                 }
