@@ -756,12 +756,20 @@ impl ActivityService {
             }
         }
 
-        // 3. If exchange MIC is provided, it's an equity
+        // 3. OCC option symbol heuristic (e.g. AAPL240119C00150000)
+        // Must be checked before exchange MIC — search providers may attach an
+        // exchange MIC (e.g. "OPRA") to option symbols, which would otherwise
+        // cause them to be misclassified as equities.
+        if crate::utils::occ_symbol::looks_like_occ_symbol(&upper_symbol) {
+            return (AssetKind::Investment, Some(InstrumentType::Option));
+        }
+
+        // 4. If exchange MIC is provided, it's an equity
         if exchange_mic.is_some() {
             return (AssetKind::Investment, Some(InstrumentType::Equity));
         }
 
-        // 4. Common crypto symbols heuristic (no MIC, bare symbol like BTC, ETH)
+        // 5. Common crypto symbols heuristic (no MIC, bare symbol like BTC, ETH)
         let common_crypto = [
             "BTC", "ETH", "XRP", "LTC", "BCH", "ADA", "DOT", "LINK", "XLM", "DOGE", "UNI", "SOL",
             "AVAX", "MATIC", "ATOM", "ALGO", "VET", "FIL", "TRX", "ETC", "XMR", "AAVE", "MKR",
@@ -769,11 +777,6 @@ impl ActivityService {
         ];
         if common_crypto.contains(&upper_symbol.as_str()) {
             return (AssetKind::Investment, Some(InstrumentType::Crypto));
-        }
-
-        // 5. OCC option symbol heuristic (e.g. AAPL240119C00150000)
-        if crate::utils::occ_symbol::looks_like_occ_symbol(&upper_symbol) {
-            return (AssetKind::Investment, Some(InstrumentType::Option));
         }
 
         // 6. Default to equity (most common case)
@@ -817,10 +820,44 @@ impl ActivityService {
                 .or_else(|| Some(format!("{}:{}", itype.as_db_str(), upper_symbol))),
         });
 
+        // Fallback key for OCC option symbols that were previously misclassified
+        // as EQUITY due to exchange MIC taking priority over OCC heuristic.
+        // Must mirror the key format the old code would have produced (with MIC when present).
+        let fallback_equity_key = if matches!(instrument_type, Some(InstrumentType::Option)) {
+            exchange_mic
+                .filter(|mic| !mic.trim().is_empty())
+                .map(|mic| {
+                    format!(
+                        "{}:{}@{}",
+                        InstrumentType::Equity.as_db_str(),
+                        upper_symbol,
+                        mic.trim().to_uppercase()
+                    )
+                })
+                .or_else(|| {
+                    Some(format!(
+                        "{}:{}",
+                        InstrumentType::Equity.as_db_str(),
+                        upper_symbol,
+                    ))
+                })
+        } else {
+            None
+        };
+
         if let Some(ref key) = expected_key {
+            // Pass 1: exact instrument key match
             for asset in &assets {
                 if asset.instrument_key.as_deref() == Some(key) {
                     return Some(asset.id.clone());
+                }
+            }
+            // Pass 2: fallback for legacy misclassified options
+            if let Some(ref fallback) = fallback_equity_key {
+                for asset in &assets {
+                    if asset.instrument_key.as_deref() == Some(fallback.as_str()) {
+                        return Some(asset.id.clone());
+                    }
                 }
             }
         }
