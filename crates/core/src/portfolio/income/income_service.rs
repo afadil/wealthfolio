@@ -14,7 +14,7 @@ use rust_decimal::Decimal;
 use std::sync::{Arc, RwLock};
 // Define the trait for the income service
 pub trait IncomeServiceTrait: Send + Sync {
-    fn get_income_summary(&self) -> Result<Vec<IncomeSummary>>;
+    fn get_income_summary(&self, account_id: Option<&str>) -> Result<Vec<IncomeSummary>>;
 }
 
 pub struct IncomeService {
@@ -68,10 +68,13 @@ impl IncomeService {
 
 // Implement the trait for IncomeService
 impl IncomeServiceTrait for IncomeService {
-    fn get_income_summary(&self) -> Result<Vec<IncomeSummary>> {
+    fn get_income_summary(&self, account_id: Option<&str>) -> Result<Vec<IncomeSummary>> {
         debug!("Getting income summary...");
 
-        let activities = match self.activity_repository.get_income_activities_data() {
+        let activities = match self
+            .activity_repository
+            .get_income_activities_data(account_id)
+        {
             Ok(activity) => activity,
             Err(e) => {
                 error!("Error getting aggregated income data: {:?}", e);

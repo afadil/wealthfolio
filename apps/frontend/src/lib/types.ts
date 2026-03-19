@@ -23,6 +23,7 @@ export {
   ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES,
   AssetKind,
   ASSET_KIND_DISPLAY_NAMES,
+  createPortfolioAccount,
   DataSource,
   defaultGroupForAccountType,
   ExportDataType,

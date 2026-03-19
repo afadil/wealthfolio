@@ -778,7 +778,7 @@ mod tests {
             unimplemented!()
         }
 
-        fn get_income_activities_data(&self) -> Result<Vec<IncomeData>> {
+        fn get_income_activities_data(&self, _account_id: Option<&str>) -> Result<Vec<IncomeData>> {
             unimplemented!()
         }
 

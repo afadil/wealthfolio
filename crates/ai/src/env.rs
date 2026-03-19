@@ -976,7 +976,7 @@ pub mod test_env {
     pub struct MockIncomeService;
 
     impl IncomeServiceTrait for MockIncomeService {
-        fn get_income_summary(&self) -> CoreResult<Vec<IncomeSummary>> {
+        fn get_income_summary(&self, _account_id: Option<&str>) -> CoreResult<Vec<IncomeSummary>> {
             Ok(vec![
                 IncomeSummary::new("TOTAL", "USD".to_string()),
                 IncomeSummary::new("YTD", "USD".to_string()),

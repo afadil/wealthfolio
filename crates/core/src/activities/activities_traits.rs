@@ -55,7 +55,7 @@ pub trait ActivityRepositoryTrait: Send + Sync {
     async fn save_import_mapping(&self, mapping: &ImportMapping) -> Result<()>;
     // Add other repository methods if necessary, e.g., calculate_average_cost, get_deposit_activities
     fn calculate_average_cost(&self, account_id: &str, asset_id: &str) -> Result<Decimal>;
-    fn get_income_activities_data(&self) -> Result<Vec<IncomeData>>;
+    fn get_income_activities_data(&self, account_id: Option<&str>) -> Result<Vec<IncomeData>>;
     fn get_first_activity_date_overall(&self) -> Result<DateTime<Utc>>;
 
     /// Gets the first and last activity dates for each asset in the provided list.
