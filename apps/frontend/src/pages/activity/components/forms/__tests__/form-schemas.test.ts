@@ -1,15 +1,15 @@
-import { describe, expect, it } from "vitest";
-import { ACTIVITY_FORM_CONFIG } from "../../../config/activity-form-config";
+import { describe, it, expect } from "vitest";
 import { buyFormSchema } from "../buy-form";
+import { sellFormSchema } from "../sell-form";
 import { depositFormSchema } from "../deposit-form";
+import { withdrawalFormSchema } from "../withdrawal-form";
 import { dividendFormSchema } from "../dividend-form";
+import { transferFormSchema } from "../transfer-form";
+import { splitFormSchema } from "../split-form";
 import { feeFormSchema } from "../fee-form";
 import { interestFormSchema } from "../interest-form";
-import { sellFormSchema } from "../sell-form";
-import { splitFormSchema } from "../split-form";
 import { taxFormSchema } from "../tax-form";
-import { transferFormSchema } from "../transfer-form";
-import { withdrawalFormSchema } from "../withdrawal-form";
+import { ACTIVITY_FORM_CONFIG } from "../../../config/activity-form-config";
 
 describe("Form Schemas Validation", () => {
   describe("buyFormSchema", () => {
