@@ -106,7 +106,10 @@ export const ACTIVITY_FORM_CONFIG: Record<
         // Advanced options
         currency: activity?.currency,
         fxRate: activity?.fxRate ?? undefined,
+        includeCashDeposit: false,
         exchangeMic: activity?.exchangeMic,
+        // Carry all original metadata through so unrecognised keys aren't silently dropped on save
+        existingMetadata: activity?.metadata,
       };
 
       // Populate option-specific fields from OCC symbol when editing
@@ -141,6 +144,23 @@ export const ACTIVITY_FORM_CONFIG: Record<
     },
     toPayload: (data) => {
       const d = data as BuyFormValues;
+
+      // Start from all existing metadata so unrecognised keys (e.g. from import/sync) survive.
+      // Then explicitly set or delete each key this form manages.
+      const metadata: Record<string, unknown> = { ...(d.existingMetadata ?? {}) };
+
+      if (
+        d.symbolInstrumentType === InstrumentType.OPTION &&
+        d.contractMultiplier != null &&
+        d.contractMultiplier !== 100
+      ) {
+        metadata[METADATA_CONTRACT_MULTIPLIER] = d.contractMultiplier;
+      } else {
+        delete metadata[METADATA_CONTRACT_MULTIPLIER];
+      }
+
+      delete metadata.include_cash_deposit;
+
       return {
         accountId: d.accountId,
         activityDate: d.activityDate,
@@ -163,11 +183,8 @@ export const ACTIVITY_FORM_CONFIG: Record<
               exchangeMic: d.assetMetadata.exchangeMic ?? undefined,
             }
           : undefined,
-        ...(d.symbolInstrumentType === InstrumentType.OPTION &&
-          d.contractMultiplier != null &&
-          d.contractMultiplier !== 100 && {
-            metadata: { [METADATA_CONTRACT_MULTIPLIER]: d.contractMultiplier },
-          }),
+        ...(Object.keys(metadata).length > 0 && { metadata }),
+        ...(d.includeCashDeposit && { includeCashDeposit: true }),
       };
     },
   },
