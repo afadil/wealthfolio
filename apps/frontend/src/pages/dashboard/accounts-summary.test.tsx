@@ -338,8 +338,6 @@ describe("AccountsSummary", () => {
     expect(within(badRow as HTMLElement).getByTestId("account-summary-secondary-placeholder"));
     expect(within(badRow as HTMLElement).queryByText("gain-amount:USD:25")).not.toBeInTheDocument();
 
-    expect(
-      within(badRow as HTMLElement).getByText(/return % unavailable/i),
-    ).toBeInTheDocument();
+    expect(within(badRow as HTMLElement).getByText(/return % unavailable/i)).toBeInTheDocument();
   });
 });
