@@ -174,7 +174,7 @@ function renderAccountsSummary({
     error: null,
   });
 
-  mockUseQueries.mockImplementation(({ queries }: { queries: Array<{ queryKey: unknown[] }> }) =>
+  mockUseQueries.mockImplementation(({ queries }: { queries: { queryKey: unknown[] }[] }) =>
     queries.map((query) => {
       const accountId = String(query.queryKey[2]);
       return {
