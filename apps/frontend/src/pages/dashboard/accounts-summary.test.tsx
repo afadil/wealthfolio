@@ -6,7 +6,13 @@ import { calculatePerformanceSummary } from "@/adapters";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useLatestValuations } from "@/hooks/use-latest-valuations";
 import { useSettingsContext } from "@/lib/settings-provider";
-import type { Account, AccountValuation, Settings, TrackingMode } from "@/lib/types";
+import type {
+  Account,
+  AccountValuation,
+  PerformanceMetrics,
+  Settings,
+  TrackingMode,
+} from "@/lib/types";
 import { AccountType } from "@/lib/types";
 import { useQueries } from "@tanstack/react-query";
 import { AccountsSummary } from "./accounts-summary";
@@ -134,6 +140,28 @@ function createValuation(overrides: Partial<AccountValuation>): AccountValuation
   };
 }
 
+function createPerformanceMetrics(overrides: Partial<PerformanceMetrics> = {}): PerformanceMetrics {
+  return {
+    id: overrides.id ?? "performance-1",
+    returns: overrides.returns ?? [],
+    periodStartDate: overrides.periodStartDate ?? null,
+    periodEndDate: overrides.periodEndDate ?? null,
+    currency: overrides.currency ?? "USD",
+    periodGain: overrides.periodGain ?? 0,
+    periodReturn: overrides.periodReturn ?? 0,
+    cumulativeTwr: overrides.cumulativeTwr ?? null,
+    gainLossAmount: overrides.gainLossAmount ?? null,
+    annualizedTwr: overrides.annualizedTwr ?? null,
+    simpleReturn: overrides.simpleReturn ?? 0,
+    annualizedSimpleReturn: overrides.annualizedSimpleReturn ?? 0,
+    cumulativeMwr: overrides.cumulativeMwr ?? null,
+    annualizedMwr: overrides.annualizedMwr ?? null,
+    volatility: overrides.volatility ?? 0,
+    maxDrawdown: overrides.maxDrawdown ?? 0,
+    isHoldingsMode: overrides.isHoldingsMode,
+  };
+}
+
 function renderAccountsSummary({
   accounts,
   valuations,
@@ -184,10 +212,7 @@ function renderAccountsSummary({
     }),
   );
 
-  mockCalculatePerformanceSummary.mockResolvedValue({
-    periodGain: 0,
-    periodReturn: 0,
-  });
+  mockCalculatePerformanceSummary.mockResolvedValue(createPerformanceMetrics());
 
   return render(
     <MemoryRouter>
