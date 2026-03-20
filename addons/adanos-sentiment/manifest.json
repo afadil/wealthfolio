@@ -1,0 +1,66 @@
+{
+  "id": "adanos-sentiment",
+  "name": "Adanos Sentiment",
+  "version": "1.0.0",
+  "description": "Overlay Adanos stock sentiment from Reddit, X, news, and Polymarket on your largest portfolio holdings",
+  "author": "Adanos Sentiment",
+  "main": "dist/addon.js",
+  "sdkVersion": "3.1.2",
+  "enabled": true,
+  "permissions": [
+    {
+      "category": "portfolio",
+      "functions": [
+        {
+          "name": "getHoldings",
+          "isDeclared": true,
+          "isDetected": false,
+          "detectedAt": null
+        }
+      ],
+      "purpose": "Read the current portfolio holdings and map the largest positions to Adanos ticker sentiment"
+    },
+    {
+      "category": "secrets",
+      "functions": [
+        {
+          "name": "set",
+          "isDeclared": true,
+          "isDetected": false,
+          "detectedAt": null
+        },
+        {
+          "name": "get",
+          "isDeclared": true,
+          "isDetected": false,
+          "detectedAt": null
+        },
+        {
+          "name": "delete",
+          "isDeclared": true,
+          "isDetected": false,
+          "detectedAt": null
+        }
+      ],
+      "purpose": "Store the Adanos API key securely in addon-scoped encrypted storage"
+    },
+    {
+      "category": "ui",
+      "functions": [
+        {
+          "name": "sidebar.addItem",
+          "isDeclared": true,
+          "isDetected": false,
+          "detectedAt": null
+        },
+        {
+          "name": "router.add",
+          "isDeclared": true,
+          "isDetected": false,
+          "detectedAt": null
+        }
+      ],
+      "purpose": "Add navigation and settings pages for the Adanos sentiment dashboard"
+    }
+  ]
+}
