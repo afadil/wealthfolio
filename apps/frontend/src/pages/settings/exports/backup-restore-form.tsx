@@ -17,8 +17,8 @@ const desktopNotes = [
 ] as const;
 
 const webNotes = [
-  "Backups include WAL and SHM files and are stored in the server data directory.",
-  "Download or copy backup files directly from the host environment when needed.",
+  "Backups include WAL and SHM files and are downloaded directly to your browser.",
+  "Store downloaded backups somewhere safe so they can be restored later in desktop or iOS.",
   "Restores are only available in the desktop application.",
   "Create backups regularly, especially before bulk imports or migrations.",
 ] as const;
@@ -132,7 +132,7 @@ const WebBackupPanel = ({ performBackup, isBackingUp }: WebPanelProps) => {
 
       <BackupCard
         title="Create Backup"
-        description="Create a complete backup with WAL and SHM files stored automatically in the server data directory for safekeeping."
+        description="Create a complete backup with WAL and SHM files and download it directly to your device."
         isLoading={isBackingUp}
         disabled={isBackingUp}
         actionLabel="Backup Database"

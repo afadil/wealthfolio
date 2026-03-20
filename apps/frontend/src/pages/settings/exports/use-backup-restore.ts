@@ -21,13 +21,17 @@ export function useBackupRestore() {
       : "desktop";
 
   const { mutateAsync: backupWithDirectorySelection, isPending: isBackingUp } = useMutation<{
-    location: "local" | "server";
+    location: "local";
     value: string;
   } | null>({
     mutationFn: async () => {
       if (isWeb) {
-        const { filename } = await backupDatabase();
-        return { location: "server" as const, value: filename };
+        const { filename, data } = await backupDatabase();
+        const saved = await openFileSaveDialog(data, filename);
+        if (!saved) {
+          return null;
+        }
+        return { location: "local" as const, value: filename };
       }
 
       const runtimePlatform = await getRuntimePlatform();
@@ -59,14 +63,9 @@ export function useBackupRestore() {
         return;
       }
 
-      const description =
-        result.location === "server"
-          ? `Backup created on the server as ${result.value}`
-          : `Backup saved as ${result.value}`;
-
       toast({
         title: "Backup completed successfully",
-        description,
+        description: `Backup saved as ${result.value}`,
         variant: "success",
       });
     },
