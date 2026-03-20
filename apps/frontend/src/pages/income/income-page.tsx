@@ -1,5 +1,6 @@
 import { getIncomeSummary } from "@/adapters";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import {
   ChartContainer,
@@ -10,6 +11,10 @@ import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholde
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { AccountSelector } from "@/components/account-selector";
+import { createPortfolioAccount, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import type { Account } from "@/lib/types";
+import { useSettingsContext } from "@/lib/settings-provider";
 
 import { QueryKeys } from "@/lib/query-keys";
 import type { IncomeSummary } from "@/lib/types";
@@ -18,6 +23,7 @@ import { AmountDisplay, AnimatedToggleGroup, GainPercent, PrivacyAmount } from "
 import React, { useState } from "react";
 import { Cell, Pie, PieChart } from "recharts";
 import { IncomeHistoryChart } from "./income-history-chart";
+import { IncomeMobileFilterSheet } from "./income-mobile-filter-sheet";
 
 const periods = [
   { value: "YTD" as const, label: "Year to Date" },
@@ -60,14 +66,23 @@ const IncomePeriodSelector: React.FC<{
 export default function IncomePage() {
   const [selectedPeriod, setSelectedPeriod] = useState<"TOTAL" | "YTD" | "LAST_YEAR">("TOTAL");
   const { isBalanceHidden } = useBalancePrivacy();
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(
+    () => createPortfolioAccount(baseCurrency) as Account,
+  );
+
+  const accountId = selectedAccount?.id === PORTFOLIO_ACCOUNT_ID ? undefined : selectedAccount?.id;
 
   const {
     data: incomeData,
     isLoading,
     error,
   } = useQuery<IncomeSummary[], Error>({
-    queryKey: [QueryKeys.INCOME_SUMMARY],
-    queryFn: getIncomeSummary,
+    queryKey: [QueryKeys.INCOME_SUMMARY, accountId ?? "ALL"],
+    queryFn: () => getIncomeSummary(accountId),
   });
 
   if (isLoading) {
@@ -84,7 +99,31 @@ export default function IncomePage() {
   if (!periodSummary || !totalSummary) {
     return (
       <>
-        <div className="pointer-events-auto fixed right-2 top-4 z-20 lg:right-4">
+        <div className="pointer-events-auto fixed right-2 top-4 z-20 hidden items-center gap-2 md:flex lg:right-4">
+          <AccountSelector
+            selectedAccount={selectedAccount}
+            setSelectedAccount={setSelectedAccount}
+            variant="dropdown"
+            includePortfolio
+          />
+          <IncomePeriodSelector
+            selectedPeriod={selectedPeriod}
+            onPeriodSelect={setSelectedPeriod}
+          />
+        </div>
+        <div className="flex items-center justify-between md:hidden">
+          <Button
+            variant="outline"
+            size="sm"
+            className="bg-secondary/30 relative rounded-full border-none"
+            onClick={() => setIsFilterSheetOpen(true)}
+          >
+            <Icons.ListFilter className="mr-1.5 h-4 w-4" />
+            {selectedAccount?.id !== PORTFOLIO_ACCOUNT_ID && (
+              <span className="bg-destructive absolute -right-1 -top-1 h-2 w-2 rounded-full" />
+            )}
+            Filter
+          </Button>
           <IncomePeriodSelector
             selectedPeriod={selectedPeriod}
             onPeriodSelect={setSelectedPeriod}
@@ -95,6 +134,12 @@ export default function IncomePage() {
           icon={<Icons.DollarSign className="h-10 w-10" />}
           title="No income data available"
           description="There is no income data for the selected period. Try selecting a different time range or check back later."
+        />
+        <IncomeMobileFilterSheet
+          open={isFilterSheetOpen}
+          onOpenChange={setIsFilterSheetOpen}
+          selectedAccount={selectedAccount}
+          onAccountChange={setSelectedAccount}
         />
       </>
     );
@@ -163,13 +208,32 @@ export default function IncomePage() {
 
   return (
     <>
-      {/* Period selector - fixed position in header area */}
-      <div className="pointer-events-auto fixed right-2 top-4 z-20 hidden md:block lg:right-4">
+      {/* Desktop: fixed header with account selector + period toggle */}
+      <div className="pointer-events-auto fixed right-2 top-4 z-20 hidden items-center gap-2 md:flex lg:right-4">
+        <AccountSelector
+          selectedAccount={selectedAccount}
+          setSelectedAccount={setSelectedAccount}
+          variant="dropdown"
+          includePortfolio
+        />
         <IncomePeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
       </div>
 
       <div className="space-y-6">
-        <div className="flex justify-end md:hidden">
+        {/* Mobile: filter button + period toggle */}
+        <div className="flex items-center justify-between md:hidden">
+          <Button
+            variant="outline"
+            size="sm"
+            className="bg-secondary/30 relative rounded-full border-none"
+            onClick={() => setIsFilterSheetOpen(true)}
+          >
+            <Icons.ListFilter className="mr-1.5 h-4 w-4" />
+            {selectedAccount?.id !== PORTFOLIO_ACCOUNT_ID && (
+              <span className="bg-destructive absolute -right-1 -top-1 h-2 w-2 rounded-full" />
+            )}
+            Filter
+          </Button>
           <IncomePeriodSelector
             selectedPeriod={selectedPeriod}
             onPeriodSelect={setSelectedPeriod}
@@ -437,6 +501,13 @@ export default function IncomePage() {
           </Card>
         </div>
       </div>
+
+      <IncomeMobileFilterSheet
+        open={isFilterSheetOpen}
+        onOpenChange={setIsFilterSheetOpen}
+        selectedAccount={selectedAccount}
+        onAccountChange={setSelectedAccount}
+      />
     </>
   );
 }

@@ -212,6 +212,39 @@ impl ValuationRepositoryTrait for ValuationRepository {
         Ok(ordered_results)
     }
 
+    fn get_accounts_with_negative_balance(
+        &self,
+        input_account_ids: &[String],
+    ) -> Result<Vec<String>> {
+        if input_account_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut conn = get_connection(&self.pool)?;
+        let placeholders: String = input_account_ids
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<&str>>()
+            .join(", ");
+        let sql = format!(
+            "SELECT DISTINCT account_id FROM daily_account_valuation \
+             WHERE CAST(total_value AS REAL) < 0 AND account_id IN ({})",
+            placeholders
+        );
+        let mut query_builder = sql_query(sql).into_boxed::<Sqlite>();
+        for acc_id in input_account_ids {
+            query_builder = query_builder.bind::<Text, _>(acc_id);
+        }
+        #[derive(QueryableByName)]
+        struct AccountIdRow {
+            #[diesel(sql_type = diesel::sql_types::Text, column_name = "account_id")]
+            acc_id: String,
+        }
+        let rows: Vec<AccountIdRow> = query_builder
+            .load::<AccountIdRow>(&mut conn)
+            .map_err(StorageError::from)?;
+        Ok(rows.into_iter().map(|r| r.acc_id).collect())
+    }
+
     fn get_valuations_on_date(
         &self,
         input_account_ids: &[String],

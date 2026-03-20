@@ -492,6 +492,7 @@ impl FinnhubProvider {
             dividend_yield: None,
             week_52_high: None,
             week_52_low: None,
+            isin: None,
         })
     }
 

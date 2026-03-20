@@ -197,7 +197,7 @@ impl PerformanceService {
                 || curr_point.total_value.is_sign_negative()
             {
                 return Err(errors::Error::Validation(ValidationError::InvalidInput(
-                    "Negative total value found in valuation history records".to_string(),
+                    "Account has negative portfolio value in its history. This may be caused by missing buy activities. Please review your transactions on the Activities page.".to_string(),
                 )));
             }
 
@@ -325,10 +325,16 @@ impl PerformanceService {
                 }
             };
 
-            (period_gain, period_return)
+            (period_gain, Some(period_return))
         } else {
             // TRANSACTIONS mode: use standard calculations
-            (gain_loss_amount, simple_total_return)
+            // Return is undefined when starting value is zero (division by zero)
+            let period_return = if start_value_for_gain_calc.is_zero() {
+                None
+            } else {
+                Some(simple_total_return)
+            };
+            (gain_loss_amount, period_return)
         };
 
         let result = PerformanceMetrics {
@@ -338,7 +344,7 @@ impl PerformanceService {
             period_end_date: Some(actual_end_date),
             currency,
             period_gain: period_gain.round_dp(DECIMAL_PRECISION),
-            period_return: period_return.round_dp(DECIMAL_PRECISION),
+            period_return: period_return.map(|r| r.round_dp(DECIMAL_PRECISION)),
             // For HOLDINGS mode, TWR/MWR are not meaningful (no cash flow tracking)
             cumulative_twr: if is_holdings_mode {
                 None
@@ -398,7 +404,7 @@ impl PerformanceService {
 
         let gain_loss_amount = end_value - start_value - net_cash_flow;
 
-        let simple_total_return = if start_value.is_zero() {
+        let simple_total_return = if start_value <= Decimal::ZERO {
             Decimal::ZERO
         } else {
             (end_value - start_value - net_cash_flow) / start_value
@@ -432,9 +438,15 @@ impl PerformanceService {
                 }
             };
 
-            (period_gain, period_return)
+            (period_gain, Some(period_return))
         } else {
-            (gain_loss_amount, simple_total_return)
+            // Return is undefined when starting value is non-positive (division by zero or sign inversion)
+            let period_return = if start_value <= Decimal::ZERO {
+                None
+            } else {
+                Some(simple_total_return)
+            };
+            (gain_loss_amount, period_return)
         };
 
         let result = PerformanceMetrics {
@@ -444,7 +456,7 @@ impl PerformanceService {
             period_end_date: Some(actual_end_date),
             currency,
             period_gain: period_gain.round_dp(DECIMAL_PRECISION),
-            period_return: period_return.round_dp(DECIMAL_PRECISION),
+            period_return: period_return.map(|r| r.round_dp(DECIMAL_PRECISION)),
             cumulative_twr: if is_holdings_mode {
                 None
             } else {
@@ -603,7 +615,7 @@ impl PerformanceService {
             period_end_date: Some(actual_end_date),
             currency,
             period_gain: Decimal::ZERO, // Not applicable for symbol performance
-            period_return: total_return.round_dp(DECIMAL_PRECISION),
+            period_return: Some(total_return.round_dp(DECIMAL_PRECISION)),
             cumulative_twr: Some(total_return.round_dp(DECIMAL_PRECISION)),
             gain_loss_amount: None,
             annualized_twr: Some(annualized_return.round_dp(DECIMAL_PRECISION)),
@@ -627,7 +639,7 @@ impl PerformanceService {
             period_end_date: None,
             currency: "".to_string(),
             period_gain: Decimal::ZERO,
-            period_return: Decimal::ZERO,
+            period_return: Some(Decimal::ZERO),
             cumulative_twr: Some(Decimal::ZERO),
             gain_loss_amount: None,
             annualized_twr: Some(Decimal::ZERO),

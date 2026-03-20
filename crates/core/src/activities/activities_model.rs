@@ -609,6 +609,11 @@ pub struct ActivityImport {
     )]
     pub fx_rate: Option<Decimal>,
     pub subtype: Option<String>,
+    /// Resolved asset UUID, populated during validation when the asset already exists in the DB.
+    /// Used to align the review-step idempotency key with the apply-step key (which uses UUIDs).
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset_id: Option<String>,
 }
 
 /// Model for sorting activities

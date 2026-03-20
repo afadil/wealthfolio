@@ -19,6 +19,8 @@ pub enum ConsistencyIssueType {
     NegativePosition,
     /// Asset has legacy sector/country data not migrated to taxonomy
     LegacyClassification,
+    /// Account has negative total portfolio value in its history
+    NegativeAccountBalance,
 }
 
 /// Data about a consistency issue.
@@ -188,6 +190,37 @@ impl DataConsistencyCheck {
             );
         }
 
+        // Emit health issue for accounts with negative portfolio balance
+        if let Some(negative_balance_issues) =
+            by_type.get(&ConsistencyIssueType::NegativeAccountBalance)
+        {
+            let count = negative_balance_issues.len();
+            let account_ids: Vec<String> = negative_balance_issues
+                .iter()
+                .map(|i| i.record_id.clone())
+                .collect();
+            let data_hash = compute_data_hash(&account_ids);
+
+            health_issues.push(
+                HealthIssue::builder()
+                    .id(format!("negative_account_balance:{}", data_hash))
+                    .severity(Severity::Warning)
+                    .category(HealthCategory::DataConsistency)
+                    .title(if count == 1 {
+                        "Account has negative portfolio balance".to_string()
+                    } else {
+                        format!("{} accounts have negative portfolio balance", count)
+                    })
+                    .message(
+                        "One or more accounts show a negative total value in their history. This is usually caused by missing buy transactions. Review your activities to fix this.",
+                    )
+                    .affected_count(count as u32)
+                    .navigate_action(NavigateAction::to_activities(None))
+                    .data_hash(data_hash)
+                    .build(),
+            );
+        }
+
         health_issues
     }
 }
@@ -322,6 +355,26 @@ mod tests {
         let issues = check.analyze(&issues_data, &ctx);
         // Should have 2 issues: one for orphan accounts (2 records), one for negative (1 record)
         assert_eq!(issues.len(), 2);
+    }
+
+    #[test]
+    fn test_negative_account_balance() {
+        let check = DataConsistencyCheck::new();
+        let ctx = HealthContext::new(HealthConfig::default(), "USD", 100_000.0);
+
+        let issues_data = vec![ConsistencyIssueInfo {
+            issue_type: ConsistencyIssueType::NegativeAccountBalance,
+            record_id: "acc_123".to_string(),
+            description: "Account has negative total value".to_string(),
+            account_id: Some("acc_123".to_string()),
+            asset_id: None,
+        }];
+
+        let issues = check.analyze(&issues_data, &ctx);
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].severity, Severity::Warning);
+        assert_eq!(issues[0].category, HealthCategory::DataConsistency);
+        assert!(issues[0].navigate_action.is_some());
     }
 
     #[test]

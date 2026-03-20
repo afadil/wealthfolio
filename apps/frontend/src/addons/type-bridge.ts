@@ -91,7 +91,7 @@ export interface InternalHostAPI {
   // Portfolio
   updatePortfolio(): Promise<void>;
   recalculatePortfolio(): Promise<void>;
-  getIncomeSummary(): Promise<IncomeSummary[]>;
+  getIncomeSummary(accountId?: string): Promise<IncomeSummary[]>;
   getHistoricalValuations(
     accountId?: string,
     startDate?: string,

@@ -130,6 +130,17 @@ impl Coverage {
         }
     }
 
+    /// Deutsche Boerse exchanges (Xetra + Frankfurt floor).
+    /// Accepts mic=None so ISIN-only entries (no exchange set) can fall back to BF.
+    pub const fn dach_exchanges() -> Self {
+        Self {
+            equity_mic_allow: Some(&["XETR", "XFRA"]),
+            equity_mic_deny: None,
+            allow_unknown_mic: true,
+            metal_quote_ccy_allow: None,
+        }
+    }
+
     /// Metals only, USD quotes only.
     pub const fn metals_usd_only() -> Self {
         Self {
@@ -226,6 +237,26 @@ mod tests {
             quote: Cow::Borrowed("GBP"),
         };
         assert!(coverage.supports(&inst));
+    }
+
+    #[test]
+    fn test_dach_allows_unknown_mic() {
+        let coverage = Coverage::dach_exchanges();
+        let inst = InstrumentId::Equity {
+            ticker: Arc::from("DE0007164600"),
+            mic: None,
+        };
+        assert!(coverage.supports(&inst));
+    }
+
+    #[test]
+    fn test_dach_rejects_non_dach_mic() {
+        let coverage = Coverage::dach_exchanges();
+        let inst = InstrumentId::Equity {
+            ticker: Arc::from("AAPL"),
+            mic: Some(Cow::Borrowed("XNAS")),
+        };
+        assert!(!coverage.supports(&inst));
     }
 
     #[test]

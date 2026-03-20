@@ -2,12 +2,18 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { calculatePerformanceSummary } from "@/adapters";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useLatestValuations } from "@/hooks/use-latest-valuations";
 import { useSettingsContext } from "@/lib/settings-provider";
 import type { Account, AccountValuation, Settings, TrackingMode } from "@/lib/types";
 import { AccountType } from "@/lib/types";
+import { useQueries } from "@tanstack/react-query";
 import { AccountsSummary } from "./accounts-summary";
+
+vi.mock("@/adapters", () => ({
+  calculatePerformanceSummary: vi.fn(),
+}));
 
 vi.mock("@/hooks/use-accounts", () => ({
   useAccounts: vi.fn(),
@@ -19,6 +25,10 @@ vi.mock("@/hooks/use-latest-valuations", () => ({
 
 vi.mock("@/lib/settings-provider", () => ({
   useSettingsContext: vi.fn(),
+}));
+
+vi.mock("@tanstack/react-query", () => ({
+  useQueries: vi.fn(),
 }));
 
 vi.mock("@wealthfolio/ui", () => ({
@@ -58,9 +68,17 @@ vi.mock("@wealthfolio/ui/components/ui/skeleton", () => ({
   Skeleton: () => <div>loading</div>,
 }));
 
+vi.mock("@wealthfolio/ui/components/ui/tooltip", () => ({
+  Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  TooltipTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  TooltipContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+const mockCalculatePerformanceSummary = vi.mocked(calculatePerformanceSummary);
 const mockUseAccounts = vi.mocked(useAccounts);
 const mockUseLatestValuations = vi.mocked(useLatestValuations);
 const mockUseSettingsContext = vi.mocked(useSettingsContext);
+const mockUseQueries = vi.mocked(useQueries);
 
 const mockSettings: Settings = {
   theme: "light",
@@ -119,9 +137,17 @@ function createValuation(overrides: Partial<AccountValuation>): AccountValuation
 function renderAccountsSummary({
   accounts,
   valuations,
+  performanceByAccountId = {},
 }: {
   accounts: Account[];
   valuations: AccountValuation[];
+  performanceByAccountId?: Record<
+    string,
+    {
+      periodGain: number | null;
+      periodReturn: number | null;
+    }
+  >;
 }) {
   mockUseSettingsContext.mockReturnValue({
     settings: mockSettings,
@@ -146,6 +172,21 @@ function renderAccountsSummary({
     latestValuations: valuations,
     isLoading: false,
     error: null,
+  });
+
+  mockUseQueries.mockImplementation(({ queries }: { queries: Array<{ queryKey: unknown[] }> }) =>
+    queries.map((query) => {
+      const accountId = String(query.queryKey[2]);
+      return {
+        isLoading: false,
+        data: performanceByAccountId[accountId],
+      };
+    }),
+  );
+
+  mockCalculatePerformanceSummary.mockResolvedValue({
+    periodGain: 0,
+    periodReturn: 0,
   });
 
   return render(
@@ -185,6 +226,16 @@ describe("AccountsSummary", () => {
           costBasis: 100,
         }),
       ],
+      performanceByAccountId: {
+        "a-positive": {
+          periodGain: 10,
+          periodReturn: 0.1,
+        },
+        "a-zero": {
+          periodGain: 0,
+          periodReturn: 0,
+        },
+      },
     });
 
     await user.click(screen.getByText("Brokerage"));
@@ -231,6 +282,16 @@ describe("AccountsSummary", () => {
           netContribution: 200,
         }),
       ],
+      performanceByAccountId: {
+        "a-one": {
+          periodGain: 0,
+          periodReturn: 0,
+        },
+        "a-two": {
+          periodGain: 0,
+          periodReturn: 0,
+        },
+      },
     });
 
     expect(screen.queryByTestId("account-summary-secondary-metric")).not.toBeInTheDocument();
@@ -238,5 +299,47 @@ describe("AccountsSummary", () => {
     await user.click(screen.getByText("Cash Group"));
 
     expect(screen.getAllByTestId("account-summary-secondary-metric")).toHaveLength(2);
+  });
+
+  it("preserves bad-data warning behavior while keeping a placeholder slot for nested rows", async () => {
+    const user = userEvent.setup();
+
+    renderAccountsSummary({
+      accounts: [
+        createAccount({ id: "a-bad", name: "Bad Data", group: "Brokerage" }),
+        createAccount({ id: "a-good", name: "Good Data", group: "Brokerage" }),
+      ],
+      valuations: [
+        createValuation({
+          accountId: "a-bad",
+          totalValue: 125,
+        }),
+        createValuation({
+          accountId: "a-good",
+          totalValue: 150,
+        }),
+      ],
+      performanceByAccountId: {
+        "a-bad": {
+          periodGain: 25,
+          periodReturn: null,
+        },
+        "a-good": {
+          periodGain: 50,
+          periodReturn: 0.5,
+        },
+      },
+    });
+
+    await user.click(screen.getByText("Brokerage"));
+
+    const badRow = screen.getByText("Bad Data").closest("a");
+    expect(badRow).not.toBeNull();
+    expect(within(badRow as HTMLElement).getByTestId("account-summary-secondary-placeholder"));
+    expect(within(badRow as HTMLElement).queryByText("gain-amount:USD:25")).not.toBeInTheDocument();
+
+    expect(
+      within(badRow as HTMLElement).getByText(/return % unavailable/i),
+    ).toBeInTheDocument();
   });
 });
