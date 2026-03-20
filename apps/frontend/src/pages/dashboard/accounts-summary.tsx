@@ -110,6 +110,9 @@ const AccountSummaryComponent = React.memo(
       : item.totalGainLossAmountBaseCurrency;
     const gainDisplayCurrency = currency;
     const gainPercentToDisplay = item.totalGainLossPercent;
+    const hasAnyGainData = gainAmountToDisplay != null || gainPercentToDisplay != null;
+    const isZeroGain =
+      (gainAmountToDisplay ?? 0) === 0 && (gainPercentToDisplay ?? 0) === 0 && hasAnyGainData;
 
     // Has a non-zero gain but return % is unavailable (e.g. negative start value).
     // Only flag accounts with actual value — zero-value/empty accounts are not "bad data".
@@ -118,6 +121,42 @@ const AccountSummaryComponent = React.memo(
       gainPercentToDisplay === null &&
       gainAmountToDisplay !== null &&
       gainAmountToDisplay !== 0;
+    const shouldRenderNestedPlaceholder = isNested && (!hasAnyGainData || hasBadData);
+    const shouldRenderGainMetrics = gainPercentToDisplay !== null && (isNested || !isZeroGain);
+
+    let secondaryMetricContent: React.ReactNode = null;
+
+    if (shouldRenderNestedPlaceholder) {
+      secondaryMetricContent = (
+        <div
+          className="text-muted-foreground text-xs font-medium md:text-sm md:font-medium"
+          data-testid="account-summary-secondary-placeholder"
+        >
+          -
+        </div>
+      );
+    } else if (shouldRenderGainMetrics) {
+      secondaryMetricContent = (
+        <>
+          {gainAmountToDisplay != null && (
+            <>
+              <GainAmount
+                className="text-xs font-medium md:text-sm md:font-medium"
+                value={gainAmountToDisplay}
+                currency={gainDisplayCurrency}
+                displayCurrency={false}
+                showSign={false}
+              />
+              <Separator orientation="vertical" className="h-3 md:h-4" />
+            </>
+          )}
+          <GainPercent
+            className="text-xs font-medium md:text-sm md:font-medium"
+            value={gainPercentToDisplay}
+          />
+        </>
+      );
+    }
 
     const content = (
       <>
@@ -143,27 +182,14 @@ const AccountSummaryComponent = React.memo(
             <p className="text-sm font-semibold leading-tight md:text-base md:font-semibold">
               <PrivacyAmount value={totalValue} currency={currency} />
             </p>
-            {gainPercentToDisplay !== null &&
-              !(gainAmountToDisplay === 0 && gainPercentToDisplay === 0) && (
-                <div className="flex items-center gap-1.5 md:gap-2">
-                  {gainAmountToDisplay != null && (
-                    <>
-                      <GainAmount
-                        className="text-xs font-medium md:text-sm md:font-medium"
-                        value={gainAmountToDisplay}
-                        currency={gainDisplayCurrency}
-                        displayCurrency={false}
-                        showSign={false}
-                      />
-                      <Separator orientation="vertical" className="h-3 md:h-4" />
-                    </>
-                  )}
-                  <GainPercent
-                    className="text-xs font-medium md:text-sm md:font-medium"
-                    value={gainPercentToDisplay}
-                  />
-                </div>
-              )}
+            {secondaryMetricContent && (
+              <div
+                className="flex items-center gap-1.5 md:gap-2"
+                data-testid="account-summary-secondary-metric"
+              >
+                {secondaryMetricContent}
+              </div>
+            )}
           </div>
           {isGroup ? (
             <div className="flex items-center justify-center">
