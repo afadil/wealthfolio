@@ -423,6 +423,26 @@ impl AssetServiceTrait for AssetService {
             );
         }
 
+        // Pre-check: return existing asset if instrument_key already exists (avoids unique constraint error)
+        let key_spec = AssetSpec {
+            id: None,
+            display_code: new_asset.display_code.clone(),
+            instrument_symbol: new_asset.instrument_symbol.clone(),
+            instrument_exchange_mic: new_asset.instrument_exchange_mic.clone(),
+            instrument_type: new_asset.instrument_type.clone(),
+            quote_ccy: new_asset.quote_ccy.clone(),
+            requested_quote_ccy: None,
+            kind: new_asset.kind.clone(),
+            quote_mode: Some(new_asset.quote_mode),
+            name: new_asset.name.clone(),
+            metadata: None,
+        };
+        if let Some(key) = key_spec.instrument_key() {
+            if let Ok(Some(existing)) = self.asset_repository.find_by_instrument_key(&key) {
+                return Ok(existing);
+            }
+        }
+
         let instrument_type = new_asset.instrument_type.clone();
         let kind = new_asset.kind.clone();
         let asset = self.asset_repository.create(new_asset).await?;

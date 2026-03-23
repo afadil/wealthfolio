@@ -1,10 +1,10 @@
-import type { ImportMappingData } from "@/lib/types";
+import type { ImportMappingData, ImportTemplateScope } from "@/lib/types";
 import type {
+  DraftActivity,
   ImportAction,
+  ImportResult,
   ImportStep,
   ParseConfig,
-  DraftActivity,
-  ImportResult,
 } from "./import-context";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -132,7 +132,7 @@ export function reset(): ImportAction {
 export function skipDraft(rowIndex: number, reason?: string): ImportAction {
   return updateDraft(rowIndex, {
     status: "skipped",
-    skipReason: reason ?? "Skipped by user",
+    skipReason: reason ?? "Skipped",
   });
 }
 
@@ -151,20 +151,26 @@ export function unskipDraft(rowIndex: number): ImportAction {
  * Skip multiple draft activities.
  */
 export function bulkSkipDrafts(rowIndexes: number[], reason?: string): ImportAction {
-  return bulkUpdateDrafts(rowIndexes, {
-    status: "skipped",
-    skipReason: reason ?? "Skipped by user",
-  });
+  return {
+    type: "BULK_SKIP_DRAFTS",
+    payload: {
+      rowIndexes,
+      updates: { status: "skipped", skipReason: reason ?? "Skipped" },
+    },
+  };
 }
 
 /**
  * Unskip multiple draft activities.
  */
 export function bulkUnskipDrafts(rowIndexes: number[]): ImportAction {
-  return bulkUpdateDrafts(rowIndexes, {
-    status: "valid",
-    skipReason: undefined,
-  });
+  return {
+    type: "BULK_SKIP_DRAFTS",
+    payload: {
+      rowIndexes,
+      updates: { status: "valid", skipReason: undefined },
+    },
+  };
 }
 
 /**
@@ -186,4 +192,14 @@ export function bulkSetAccount(rowIndexes: number[], accountId: string): ImportA
  */
 export function setIsValidating(value: boolean): ImportAction {
   return { type: "SET_IS_VALIDATING", payload: value };
+}
+
+/**
+ * Track the template currently applied in the mapping step.
+ */
+export function setSelectedTemplate(
+  id: string | null,
+  scope: ImportTemplateScope | null,
+): ImportAction {
+  return { type: "SET_SELECTED_TEMPLATE", payload: { id, scope } };
 }

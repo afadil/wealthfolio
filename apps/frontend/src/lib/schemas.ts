@@ -40,6 +40,7 @@ export const parseConfigSchema = z.object({
 
 export const importMappingSchema = z.object({
   accountId: z.string(),
+  templateId: z.string().optional(),
   name: z.string().optional().default(""),
   fieldMappings: z.record(z.string(), z.string()).optional().default({}),
   activityMappings: z.record(z.string(), z.array(z.string())).optional().default({}),
@@ -163,6 +164,7 @@ export const importActivitySchema = z
     warnings: z.record(z.string(), z.array(z.string())).optional(),
     duplicateOfId: z.string().optional(),
     duplicateOfLineNumber: z.number().optional(),
+    assetId: z.string().optional(),
     isValid: z.boolean().default(false),
     lineNumber: z.number().optional(),
     isDraft: z.boolean(),

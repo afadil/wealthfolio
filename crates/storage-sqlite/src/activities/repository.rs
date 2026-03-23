@@ -13,16 +13,16 @@ use wealthfolio_core::activities::ActivityError;
 use wealthfolio_core::activities::{
     Activity, ActivityBulkIdentifierMapping, ActivityBulkMutationResult, ActivityDetails,
     ActivityRepositoryTrait, ActivitySearchResponse, ActivitySearchResponseMeta, ActivityUpdate,
-    ActivityUpsert, BulkUpsertResult, ImportMapping, IncomeData, NewActivity, Sort,
+    ActivityUpsert, BulkUpsertResult, ImportMapping, ImportTemplate, IncomeData, NewActivity, Sort,
     INCOME_ACTIVITY_TYPES, TRADING_ACTIVITY_TYPES,
 };
 use wealthfolio_core::limits::ContributionActivity;
 use wealthfolio_core::{Error, Result};
 
-use super::model::{ActivityDB, ActivityDetailsDB, ImportMappingDB};
+use super::model::{ActivityDB, ActivityDetailsDB, ImportAccountTemplateDB, ImportTemplateDB};
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
-use crate::schema::{accounts, activities, activity_import_profiles, assets};
+use crate::schema::{accounts, activities, assets, import_account_templates, import_templates};
 use crate::utils::chunk_for_sqlite;
 use async_trait::async_trait;
 use diesel::dsl::{max, min};
@@ -611,31 +611,189 @@ impl ActivityRepositoryTrait for ActivityRepository {
         Ok(Decimal::from_str(&result.average_cost).unwrap_or_default())
     }
 
-    /// Gets the import mapping for a given account ID
+    /// Gets the import mapping for a given account ID by joining import_account_templates + import_templates
     fn get_import_mapping(&self, some_account_id: &str) -> Result<Option<ImportMapping>> {
         let mut conn = get_connection(&self.pool)?;
 
-        let result = activity_import_profiles::table
-            .filter(activity_import_profiles::account_id.eq(some_account_id))
-            .first::<ImportMappingDB>(&mut conn)
+        let result = import_account_templates::table
+            .inner_join(
+                import_templates::table
+                    .on(import_templates::id.eq(import_account_templates::template_id)),
+            )
+            .filter(import_account_templates::account_id.eq(some_account_id))
+            .select((
+                import_account_templates::account_id,
+                import_templates::id,
+                import_templates::name,
+                import_templates::config,
+                import_account_templates::created_at,
+                import_account_templates::updated_at,
+            ))
+            .first::<(
+                String,
+                String,
+                String,
+                String,
+                chrono::NaiveDateTime,
+                chrono::NaiveDateTime,
+            )>(&mut conn)
             .optional()
             .map_err(StorageError::from)?;
 
-        Ok(result.map(ImportMapping::from))
+        Ok(result.map(
+            |(account_id, template_id, name, config, created_at, updated_at)| ImportMapping {
+                account_id,
+                template_id: Some(template_id),
+                name,
+                config,
+                created_at,
+                updated_at,
+            },
+        ))
     }
 
     async fn save_import_mapping(&self, mapping: &ImportMapping) -> Result<()> {
-        let mapping_db: ImportMappingDB = mapping.clone().into();
+        let mapping = mapping.clone();
         self.writer
             .exec_tx(move |tx| -> Result<()> {
-                diesel::insert_into(activity_import_profiles::table)
-                    .values(&mapping_db)
-                    .on_conflict(activity_import_profiles::account_id)
-                    .do_update()
-                    .set(&mapping_db)
+                use chrono::Utc;
+
+                // Check if account already has a linked template
+                let existing_link = import_account_templates::table
+                    .filter(import_account_templates::account_id.eq(&mapping.account_id))
+                    .first::<ImportAccountTemplateDB>(tx.conn())
+                    .optional()
+                    .map_err(StorageError::from)?;
+
+                let now = Utc::now().naive_utc();
+                let template_id = if let Some(link) = existing_link {
+                    // Update the existing linked template
+                    diesel::update(
+                        import_templates::table.filter(import_templates::id.eq(&link.template_id)),
+                    )
+                    .set((
+                        import_templates::name.eq(&mapping.name),
+                        import_templates::config.eq(&mapping.config),
+                        import_templates::updated_at.eq(now),
+                    ))
                     .execute(tx.conn())
                     .map_err(StorageError::from)?;
-                tx.update(&mapping_db)?;
+                    link.template_id
+                } else {
+                    // Create a new template and link it
+                    let new_id = format!("acct_{}", mapping.account_id);
+                    let template_db = ImportTemplateDB {
+                        id: new_id.clone(),
+                        name: mapping.name.clone(),
+                        scope: "user".to_string(),
+                        config: mapping.config.clone(),
+                        created_at: now,
+                        updated_at: now,
+                    };
+                    diesel::insert_into(import_templates::table)
+                        .values(&template_db)
+                        .on_conflict(import_templates::id)
+                        .do_update()
+                        .set(&template_db)
+                        .execute(tx.conn())
+                        .map_err(StorageError::from)?;
+                    new_id
+                };
+
+                // Upsert the account → template link
+                let link_db = ImportAccountTemplateDB {
+                    account_id: mapping.account_id.clone(),
+                    template_id,
+                    created_at: now,
+                    updated_at: now,
+                };
+                diesel::insert_into(import_account_templates::table)
+                    .values(&link_db)
+                    .on_conflict(import_account_templates::account_id)
+                    .do_update()
+                    .set(&link_db)
+                    .execute(tx.conn())
+                    .map_err(StorageError::from)?;
+                tx.update(&link_db)?;
+                Ok(())
+            })
+            .await
+    }
+
+    async fn link_account_template(&self, account_id: &str, template_id: &str) -> Result<()> {
+        let account_id = account_id.to_string();
+        let template_id = template_id.to_string();
+        self.writer
+            .exec_tx(move |tx| -> Result<()> {
+                use chrono::Utc;
+                let now = Utc::now().naive_utc();
+                let link_db = ImportAccountTemplateDB {
+                    account_id: account_id.clone(),
+                    template_id,
+                    created_at: now,
+                    updated_at: now,
+                };
+                diesel::insert_into(import_account_templates::table)
+                    .values(&link_db)
+                    .on_conflict(import_account_templates::account_id)
+                    .do_update()
+                    .set(&link_db)
+                    .execute(tx.conn())
+                    .map_err(StorageError::from)?;
+                tx.update(&link_db)?;
+                Ok(())
+            })
+            .await
+    }
+
+    fn list_import_templates(&self) -> Result<Vec<ImportTemplate>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let rows = import_templates::table
+            .order((import_templates::scope.asc(), import_templates::name.asc()))
+            .load::<ImportTemplateDB>(&mut conn)
+            .map_err(StorageError::from)?;
+
+        Ok(rows.into_iter().map(ImportTemplate::from).collect())
+    }
+
+    fn get_import_template(&self, template_id: &str) -> Result<Option<ImportTemplate>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let result = import_templates::table
+            .filter(import_templates::id.eq(template_id))
+            .first::<ImportTemplateDB>(&mut conn)
+            .optional()
+            .map_err(StorageError::from)?;
+
+        Ok(result.map(ImportTemplate::from))
+    }
+
+    async fn save_import_template(&self, template: &ImportTemplate) -> Result<()> {
+        let template_db: ImportTemplateDB = template.clone().into();
+        self.writer
+            .exec_tx(move |tx| -> Result<()> {
+                diesel::insert_into(import_templates::table)
+                    .values(&template_db)
+                    .on_conflict(import_templates::id)
+                    .do_update()
+                    .set(&template_db)
+                    .execute(tx.conn())
+                    .map_err(StorageError::from)?;
+                Ok(())
+            })
+            .await
+    }
+
+    async fn delete_import_template(&self, template_id: &str) -> Result<()> {
+        let template_id = template_id.to_string();
+        self.writer
+            .exec_tx(move |tx| -> Result<()> {
+                diesel::delete(
+                    import_templates::table.filter(import_templates::id.eq(&template_id)),
+                )
+                .execute(tx.conn())
+                .map_err(StorageError::from)?;
                 Ok(())
             })
             .await

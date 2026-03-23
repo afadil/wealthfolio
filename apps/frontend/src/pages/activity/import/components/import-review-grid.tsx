@@ -586,17 +586,7 @@ export function ImportReviewGrid({
 
   // Symbol search handler
   const handleSymbolSearch = useCallback(async (query: string): Promise<SymbolSearchResult[]> => {
-    const results = await searchTicker(query);
-    return results.map((result) => ({
-      symbol: result.symbol,
-      shortName: result.shortName,
-      longName: result.longName,
-      exchange: result.exchange,
-      exchangeMic: result.exchangeMic,
-      currency: result.currency,
-      score: result.score,
-      dataSource: result.dataSource,
-    }));
+    return searchTicker(query);
   }, []);
 
   // Symbol selection handler - update draft with symbol and currency from search result
@@ -614,6 +604,13 @@ export function ImportReviewGrid({
       onDraftUpdate(rowIndex, {
         symbol: result.symbol,
         currency,
+        exchangeMic: result.exchangeMic,
+        quoteCcy: result.currency ?? draft.quoteCcy,
+        instrumentType: result.quoteType,
+        quoteMode: result.dataSource === "MANUAL" ? "MANUAL" : undefined,
+        symbolName: result.longName || result.shortName || draft.symbolName,
+        assetId: undefined,
+        importAssetKey: undefined,
       });
     },
     [drafts, fallbackCurrency, onDraftUpdate],
@@ -639,6 +636,13 @@ export function ImportReviewGrid({
       onDraftUpdate(rowIndex, {
         symbol: result.symbol,
         currency,
+        exchangeMic: result.exchangeMic,
+        quoteCcy: result.currency ?? draft.quoteCcy,
+        instrumentType: result.quoteType,
+        quoteMode: result.dataSource === "MANUAL" ? "MANUAL" : undefined,
+        symbolName: result.longName || result.shortName || draft.symbolName,
+        assetId: undefined,
+        importAssetKey: undefined,
       });
 
       setCustomAssetDialog({ open: false, rowIndex: -1, symbol: "" });

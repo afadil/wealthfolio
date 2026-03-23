@@ -172,16 +172,27 @@ function AccountIdDisplayCell({
   handleAccountIdMapping,
 }: AccountIdDisplayCellProps) {
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
-
-  if (!csvAccountId || csvAccountId.trim() === "") {
-    return null;
-  }
+  const trimmedAccountId = csvAccountId.trim();
+  const sourceLabel = trimmedAccountId || "Missing account";
 
   if (mappedAccountId) {
+    // When csvAccountId is empty the account comes from the default (no CSV column),
+    // so skip the "Missing account →" prefix and just show the resolved account.
+    if (!trimmedAccountId) {
+      return (
+        <Badge
+          variant="secondary"
+          className="hover:bg-secondary/80 cursor-pointer text-xs transition-colors"
+          onClick={() => handleAccountIdMapping(csvAccountId, "")}
+        >
+          {mappedAccountId}
+        </Badge>
+      );
+    }
     return (
       <div className="flex items-center gap-2">
-        <span className="text-muted-foreground shrink-0 truncate text-xs" title={csvAccountId}>
-          {csvAccountId}
+        <span className="text-muted-foreground shrink-0 truncate text-xs" title={trimmedAccountId}>
+          {trimmedAccountId}
         </span>
         <span className="text-muted-foreground shrink-0">→</span>
         <Badge
@@ -202,9 +213,9 @@ function AccountIdDisplayCell({
           "shrink-0 truncate text-xs",
           isInvalid ? "text-destructive" : "text-muted-foreground",
         )}
-        title={csvAccountId}
+        title={sourceLabel}
       >
-        {csvAccountId}
+        {sourceLabel}
       </span>
       <span className="text-muted-foreground shrink-0">→</span>
       <div className="ml-auto min-w-[180px]">
@@ -212,7 +223,7 @@ function AccountIdDisplayCell({
           selectedAccount={selectedAccount}
           setSelectedAccount={(account) => {
             setSelectedAccount(account);
-            handleAccountIdMapping(csvAccountId, account.id);
+            handleAccountIdMapping(trimmedAccountId, account.id);
           }}
           variant="form"
           className={MAPPING_TRIGGER_UNMAPPED_CLASS}
@@ -342,6 +353,8 @@ export function MappingCell({
     // For symbol field, if it's invalid (e.g. empty but required), we might still want to render SymbolDisplayCell
     if (field === ImportFormat.SYMBOL && invalidSymbols.includes(value || "")) {
       // Fall through to SymbolDisplayCell rendering
+    } else if (field === ImportFormat.ACCOUNT) {
+      // Fall through so the row shows the missing-account state.
     } else {
       return <span className="text-muted-foreground text-xs">-</span>;
     }
@@ -380,8 +393,9 @@ export function MappingCell({
   }
 
   if (field === ImportFormat.ACCOUNT) {
-    const isInvalid = invalidAccounts.includes(value || "");
-    const mappedAccountId = mapping.accountMappings?.[value];
+    const mappingKey = value?.trim() || "";
+    const isInvalid = mappingKey === "" || invalidAccounts.includes(mappingKey);
+    const mappedAccountId = mapping.accountMappings?.[mappingKey];
     const account = accounts.find((acc) => acc.id === mappedAccountId);
     return (
       <AccountIdDisplayCell

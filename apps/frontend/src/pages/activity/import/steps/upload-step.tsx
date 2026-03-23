@@ -1,12 +1,17 @@
-import { getAccountImportMapping, parseCsv } from "@/adapters";
+import {
+  parseCsv,
+  listImportTemplates,
+  getAccountImportMapping,
+  linkAccountTemplate,
+} from "@/adapters";
 import { AccountSelector } from "@/components/account-selector";
 import { AccountSelectorMobile } from "@/components/account-selector-mobile";
 import { useAccounts } from "@/hooks/use-accounts";
 import { usePlatform } from "@/hooks/use-platform";
-import type { Account } from "@/lib/types";
+import { QueryKeys } from "@/lib/query-keys";
+import type { Account, ImportTemplateData } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { QueryKeys } from "@/lib/query-keys";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
 import { Checkbox } from "@wealthfolio/ui/components/ui/checkbox";
@@ -37,6 +42,7 @@ import {
   setMapping,
   setParseConfig,
   setParsedData,
+  setSelectedTemplate,
 } from "../context/import-actions";
 import { useImportContext, type ParseConfig } from "../context/import-context";
 
@@ -94,7 +100,6 @@ function CsvPreviewTable({ headers, rows, maxRows = 50 }: CsvPreviewTableProps) 
                   {cell || <span className="text-muted-foreground italic">-</span>}
                 </td>
               ))}
-              {/* Fill empty cells if row has fewer columns than headers */}
               {row.length < headers.length &&
                 Array.from({ length: headers.length - row.length }).map((_, idx) => (
                   <td key={`empty-${idx}`} className="border-r px-2 py-1 last:border-r-0">
@@ -186,7 +191,6 @@ const dateFormatSelectOptions = DATE_FORMAT_OPTIONS.map((o) => ({
   label: o.label,
 }));
 
-// Add the "Custom…" sentinel at the end
 const DATE_FORMAT_SELECT_OPTIONS = [
   ...dateFormatSelectOptions,
   { value: "__custom__", label: "Custom…" },
@@ -203,19 +207,17 @@ function DateFormatPicker({
   const [showCustom, setShowCustom] = useState(isCustom);
   const [customValue, setCustomValue] = useState(isCustom ? value : "");
 
-  // Determine what the SearchableSelect should show
   const selectValue = showCustom ? "__custom__" : value;
 
   return (
     <div className="space-y-1.5">
-      <Label className="text-sm">Date format</Label>
+      <Label className="text-muted-foreground text-xs">Date format</Label>
       <SearchableSelect
         options={DATE_FORMAT_SELECT_OPTIONS}
         value={selectValue}
         onValueChange={(v) => {
           if (v === "__custom__") {
             setShowCustom(true);
-            // Apply custom value if already typed, otherwise keep current
             if (customValue) {
               onChange({ dateFormat: customValue });
             }
@@ -244,16 +246,6 @@ function DateFormatPicker({
       )}
     </div>
   );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Parse Settings Panel Component
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface ParseSettingsPanelProps {
-  config: ParseConfig;
-  onChange: (config: Partial<ParseConfig>) => void;
-  hasErrors?: boolean;
 }
 
 // Format config value for display
@@ -285,7 +277,6 @@ function formatConfigValue(key: string, value: string | number | boolean): strin
 function buildConfigSummary(config: ParseConfig): string {
   const parts: string[] = [];
 
-  // Only show non-default/non-auto values
   if (config.delimiter && config.delimiter !== "auto") {
     parts.push(`Delimiter: ${formatConfigValue("delimiter", config.delimiter)}`);
   }
@@ -308,63 +299,110 @@ function buildConfigSummary(config: ParseConfig): string {
   return parts.length > 0 ? parts.join(" · ") : "Auto-detect";
 }
 
-function ParseSettingsPanel({ config, onChange, hasErrors = false }: ParseSettingsPanelProps) {
-  const [isOpen, setIsOpen] = useState(hasErrors);
+// ─────────────────────────────────────────────────────────────────────────────
+// Template Selector Component (includes Parse Settings)
+// ─────────────────────────────────────────────────────────────────────────────
 
-  // Auto-open if there are errors
+interface TemplateSelectorProps {
+  templates: ImportTemplateData[];
+  selectedTemplateId: string | null;
+  onSelect: (templateId: string) => void;
+  onClear: () => void;
+  config: ParseConfig;
+  onConfigChange: (updates: Partial<ParseConfig>) => void;
+  hasConfigErrors?: boolean;
+}
+
+function TemplateSelector({
+  templates,
+  selectedTemplateId,
+  onSelect,
+  onClear,
+  config,
+  onConfigChange,
+  hasConfigErrors = false,
+}: TemplateSelectorProps) {
+  const [settingsOpen, setSettingsOpen] = useState(hasConfigErrors);
+  const options = templates.map((t) => ({ value: t.id, label: t.name }));
+
   useEffect(() => {
-    if (hasErrors) {
-      setIsOpen(true);
-    }
-  }, [hasErrors]);
+    if (hasConfigErrors) setSettingsOpen(true);
+  }, [hasConfigErrors]);
 
   const configSummary = buildConfigSummary(config);
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <Card>
+    <div className="bg-muted/20 rounded-lg border">
+      {/* Template picker row */}
+      <div className="flex items-center gap-2 p-3">
+        <div className="flex-1">
+          <SearchableSelect
+            options={options}
+            value={selectedTemplateId ?? ""}
+            onValueChange={onSelect}
+            placeholder="Select format…"
+            searchPlaceholder="Search by name…"
+            emptyMessage="No templates. Configure mappings manually in the next step."
+          />
+        </div>
+        {selectedTemplateId && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-muted-foreground hover:text-foreground shrink-0 rounded transition-colors"
+            aria-label="Clear template"
+          >
+            <Icons.X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Parse Settings — collapsible */}
+      <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
         <CollapsibleTrigger asChild>
-          <CardHeader className="hover:bg-muted/50 cursor-pointer px-4 py-3 transition-colors">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Icons.Settings2 className="text-muted-foreground h-4 w-4" />
-                <CardTitle className="text-sm font-medium">Parse Settings</CardTitle>
-                {hasErrors && (
-                  <span className="bg-destructive/10 text-destructive rounded-full px-2 py-0.5 text-xs">
-                    Adjust settings to fix errors
-                  </span>
-                )}
-                {!isOpen && !hasErrors && (
-                  <span className="text-muted-foreground text-xs font-normal">{configSummary}</span>
-                )}
-              </div>
-              <Icons.ChevronDown
-                className={cn(
-                  "text-muted-foreground h-4 w-4 transition-transform duration-200",
-                  isOpen && "rotate-180",
-                )}
-              />
+          <div
+            className={cn(
+              "hover:bg-muted/40 flex cursor-pointer items-center justify-between px-3 py-2 transition-colors",
+              "border-t",
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <Icons.Settings2 className="text-muted-foreground h-3.5 w-3.5" />
+              <span className="text-muted-foreground text-xs font-medium">Parse Settings</span>
+              {hasConfigErrors && (
+                <span className="bg-destructive/10 text-destructive rounded-full px-2 py-px text-[10px]">
+                  Adjust settings to fix errors
+                </span>
+              )}
+              {!settingsOpen && !hasConfigErrors && (
+                <span className="text-muted-foreground text-[11px]">{configSummary}</span>
+              )}
             </div>
-          </CardHeader>
+            <Icons.ChevronDown
+              className={cn(
+                "text-muted-foreground h-3.5 w-3.5 transition-transform duration-200",
+                settingsOpen && "rotate-180",
+              )}
+            />
+          </div>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <CardContent className="border-t pt-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {/* Has Header Row */}
-              <div className="flex items-center gap-2">
+          <div className="border-t px-3 pb-4 pt-3">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+              {/* Header row checkbox spans full width on mobile */}
+              <div className="col-span-2 flex items-center gap-2 sm:col-span-3">
                 <Checkbox
                   id="hasHeaderRow"
                   checked={config.hasHeaderRow}
-                  onCheckedChange={(checked) => onChange({ hasHeaderRow: checked === true })}
+                  onCheckedChange={(checked) => onConfigChange({ hasHeaderRow: checked === true })}
                 />
                 <Label htmlFor="hasHeaderRow" className="cursor-pointer text-sm">
                   First row is header
                 </Label>
               </div>
 
-              {/* Skip Top Rows */}
               <div className="space-y-1.5">
-                <Label htmlFor="skipTopRows" className="text-sm">
+                <Label htmlFor="skipTopRows" className="text-muted-foreground text-xs">
                   Skip top rows
                 </Label>
                 <Input
@@ -373,15 +411,14 @@ function ParseSettingsPanel({ config, onChange, hasErrors = false }: ParseSettin
                   min={0}
                   value={config.skipTopRows}
                   onChange={(e) =>
-                    onChange({ skipTopRows: Math.max(0, parseInt(e.target.value) || 0) })
+                    onConfigChange({ skipTopRows: Math.max(0, parseInt(e.target.value) || 0) })
                   }
-                  className="h-9"
+                  className="h-8 text-sm"
                 />
               </div>
 
-              {/* Skip Bottom Rows */}
               <div className="space-y-1.5">
-                <Label htmlFor="skipBottomRows" className="text-sm">
+                <Label htmlFor="skipBottomRows" className="text-muted-foreground text-xs">
                   Skip bottom rows
                 </Label>
                 <Input
@@ -390,22 +427,21 @@ function ParseSettingsPanel({ config, onChange, hasErrors = false }: ParseSettin
                   min={0}
                   value={config.skipBottomRows}
                   onChange={(e) =>
-                    onChange({ skipBottomRows: Math.max(0, parseInt(e.target.value) || 0) })
+                    onConfigChange({ skipBottomRows: Math.max(0, parseInt(e.target.value) || 0) })
                   }
-                  className="h-9"
+                  className="h-8 text-sm"
                 />
               </div>
 
-              {/* Delimiter */}
               <div className="space-y-1.5">
-                <Label htmlFor="delimiter" className="text-sm">
+                <Label htmlFor="delimiter" className="text-muted-foreground text-xs">
                   Delimiter
                 </Label>
                 <Select
                   value={config.delimiter}
-                  onValueChange={(value) => onChange({ delimiter: value })}
+                  onValueChange={(value) => onConfigChange({ delimiter: value })}
                 >
-                  <SelectTrigger id="delimiter" className="h-9">
+                  <SelectTrigger id="delimiter" className="h-8 text-sm">
                     <SelectValue placeholder="Select delimiter" />
                   </SelectTrigger>
                   <SelectContent>
@@ -417,19 +453,17 @@ function ParseSettingsPanel({ config, onChange, hasErrors = false }: ParseSettin
                 </Select>
               </div>
 
-              {/* Date Format */}
-              <DateFormatPicker value={config.dateFormat} onChange={onChange} />
+              <DateFormatPicker value={config.dateFormat} onChange={onConfigChange} />
 
-              {/* Decimal Separator */}
               <div className="space-y-1.5">
-                <Label htmlFor="decimalSeparator" className="text-sm">
+                <Label htmlFor="decimalSeparator" className="text-muted-foreground text-xs">
                   Decimal separator
                 </Label>
                 <Select
                   value={config.decimalSeparator}
-                  onValueChange={(value) => onChange({ decimalSeparator: value })}
+                  onValueChange={(value) => onConfigChange({ decimalSeparator: value })}
                 >
-                  <SelectTrigger id="decimalSeparator" className="h-9">
+                  <SelectTrigger id="decimalSeparator" className="h-8 text-sm">
                     <SelectValue placeholder="Select separator" />
                   </SelectTrigger>
                   <SelectContent>
@@ -440,10 +474,10 @@ function ParseSettingsPanel({ config, onChange, hasErrors = false }: ParseSettin
                 </Select>
               </div>
             </div>
-          </CardContent>
+          </div>
         </CollapsibleContent>
-      </Card>
-    </Collapsible>
+      </Collapsible>
+    </div>
   );
 }
 
@@ -457,50 +491,108 @@ export function UploadStep() {
   const { accounts } = useAccounts();
   const { isMobile } = usePlatform();
 
-  // Derive selected account from context (covers both URL params and user selection)
+  // Templates
+  const { data: templates = [] } = useQuery<ImportTemplateData[], Error>({
+    queryKey: [QueryKeys.IMPORT_TEMPLATES],
+    queryFn: listImportTemplates,
+  });
+
+  const applyTemplate = useCallback(
+    async (template: ImportTemplateData) => {
+      const nextParseConfig = template.parseConfig
+        ? { ...state.parseConfig, ...template.parseConfig }
+        : state.parseConfig;
+
+      if (template.parseConfig) {
+        dispatch(setParseConfig(template.parseConfig));
+      }
+      dispatch(
+        setMapping({
+          accountId: state.accountId || "",
+          name: template.name,
+          fieldMappings: template.fieldMappings,
+          activityMappings: template.activityMappings,
+          symbolMappings: template.symbolMappings,
+          accountMappings: template.accountMappings || {},
+          symbolMappingMeta: template.symbolMappingMeta || {},
+          parseConfig: template.parseConfig,
+        }),
+      );
+      dispatch(setSelectedTemplate(template.id, template.scope));
+
+      if (state.file) {
+        try {
+          const result = await parseCsv(state.file, nextParseConfig);
+          setParseError(null);
+          dispatch(setParsedData(result.headers, result.rows));
+          dispatch(setParseConfig(result.detectedConfig));
+        } catch (err) {
+          setParseError(err instanceof Error ? err.message : "Failed to re-parse CSV");
+        }
+      }
+    },
+    [dispatch, state.accountId, state.file, state.parseConfig],
+  );
+
+  const handleTemplateSelect = useCallback(
+    async (templateId: string) => {
+      const template = templates.find((t) => t.id === templateId);
+      if (!template) return;
+      await applyTemplate(template);
+      if (state.accountId) {
+        linkAccountTemplate(state.accountId, templateId).catch(() => {
+          /* non-critical */
+        });
+      }
+    },
+    [applyTemplate, state.accountId, templates],
+  );
+
+  const handleTemplateClear = useCallback(() => {
+    dispatch(setSelectedTemplate(null, null));
+  }, [dispatch]);
+
   const selectedAccount = useMemo(
     () => accounts?.find((a: Account) => a.id === state.accountId) ?? null,
     [accounts, state.accountId],
   );
 
-  // Fetch import profile for the selected account
-  const { data: mappingProfile } = useQuery({
-    queryKey: [QueryKeys.IMPORT_MAPPING, state.accountId],
-    queryFn: () => getAccountImportMapping(state.accountId),
-    enabled: !!state.accountId,
-  });
+  // Auto-suggest linked template when account changes
+  const templatesRef = useRef(templates);
+  templatesRef.current = templates;
+  useEffect(() => {
+    if (!state.accountId || state.selectedTemplateId) return;
+    getAccountImportMapping(state.accountId)
+      .then((mapping) => {
+        if (!mapping?.templateId) return;
+        const linked = templatesRef.current.find((t) => t.id === mapping.templateId);
+        if (linked) {
+          applyTemplate(linked).catch(() => {
+            /* non-critical */
+          });
+        }
+      })
+      .catch(() => {
+        /* no saved mapping — ignore */
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.accountId]);
 
-  // Apply profile (mapping + parseConfig) when it loads or account changes.
-  // Refs avoid re-firing when file/parseConfig change.
   const fileRef = useRef(state.file);
   fileRef.current = state.file;
   const parseConfigRef = useRef(state.parseConfig);
   parseConfigRef.current = state.parseConfig;
 
   useEffect(() => {
-    if (!mappingProfile || !selectedAccount) return;
-
-    dispatch(setMapping(mappingProfile));
+    if (!selectedAccount || state.parseConfig.defaultCurrency === selectedAccount.currency) {
+      return;
+    }
 
     const updates: Partial<ParseConfig> = {
       defaultCurrency: selectedAccount.currency,
     };
-    if (mappingProfile.parseConfig) {
-      const pc = mappingProfile.parseConfig;
-      if (pc.hasHeaderRow !== undefined) updates.hasHeaderRow = pc.hasHeaderRow;
-      if (pc.headerRowIndex !== undefined) updates.headerRowIndex = pc.headerRowIndex;
-      if (pc.delimiter) updates.delimiter = pc.delimiter;
-      if (pc.skipTopRows !== undefined) updates.skipTopRows = pc.skipTopRows;
-      if (pc.skipBottomRows !== undefined) updates.skipBottomRows = pc.skipBottomRows;
-      if (pc.skipEmptyRows !== undefined) updates.skipEmptyRows = pc.skipEmptyRows;
-      if (pc.dateFormat) updates.dateFormat = pc.dateFormat;
-      if (pc.decimalSeparator) updates.decimalSeparator = pc.decimalSeparator;
-      if (pc.thousandsSeparator) updates.thousandsSeparator = pc.thousandsSeparator;
-      if (pc.defaultCurrency) updates.defaultCurrency = pc.defaultCurrency;
-    }
     dispatch(setParseConfig(updates));
 
-    // Re-parse file with profile config if already loaded
     if (fileRef.current) {
       const newConfig = { ...parseConfigRef.current, ...updates };
       parseCsv(fileRef.current, newConfig)
@@ -512,9 +604,8 @@ export function UploadStep() {
           setParseError(error instanceof Error ? error.message : "Failed to parse CSV file");
         });
     }
-  }, [mappingProfile, selectedAccount, dispatch]);
+  }, [dispatch, selectedAccount, state.parseConfig.defaultCurrency]);
 
-  // User selects account — just set the ID; useQuery + effect handle the rest
   const handleAccountSelect = useCallback(
     (account: Account) => {
       dispatch(setAccountId(account.id));
@@ -527,7 +618,6 @@ export function UploadStep() {
     onSuccess: (result) => {
       setParseError(null);
       dispatch(setParsedData(result.headers, result.rows));
-      // Update config with auto-detected values
       dispatch(setParseConfig(result.detectedConfig));
     },
     onError: (error) => {
@@ -548,11 +638,9 @@ export function UploadStep() {
     [dispatch, parseFile],
   );
 
-  // Re-parse when settings change
   const handleConfigChange = useCallback(
     (updates: Partial<ParseConfig>) => {
       dispatch(setParseConfig(updates));
-      // Re-parse with new config if we have a file
       if (state.file) {
         const newConfig = { ...state.parseConfig, ...updates };
         parseCsv(state.file, newConfig)
@@ -572,20 +660,21 @@ export function UploadStep() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Row 1: Account and file selection */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {/* Account Selection */}
-        <div>
-          <div className="mb-1 flex items-center">
-            <h2 className="font-semibold">Select Account</h2>
+      {/* Primary actions: Account + File upload */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {/* Account */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground font-mono text-[10px] tabular-nums">01</span>
+            <h2 className="text-sm font-semibold">Select Account</h2>
             <HelpTooltip content="Choose the default account for imported activities. If your CSV includes an Account column with valid account ids, those will take priority for each row." />
           </div>
-          <div className="h-[120px]">
+          <div className="h-[116px]">
             {isMobile ? (
               <div
                 className={cn(
                   "flex h-full flex-col items-center justify-center gap-3 rounded-lg border p-4 transition-colors",
-                  selectedAccount && state.file
+                  selectedAccount
                     ? "border-border bg-background"
                     : "border-border bg-background/50 hover:border-muted-foreground/50 hover:bg-background/80 border-dashed",
                 )}
@@ -626,13 +715,14 @@ export function UploadStep() {
           </div>
         </div>
 
-        {/* File Upload */}
-        <div>
-          <div className="mb-1 flex items-center">
-            <h2 className="font-semibold">Upload CSV File</h2>
-            <HelpTooltip content="Upload a CSV file containing your investment activities. The file should include headers in the first row." />
+        {/* File upload */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground font-mono text-[10px] tabular-nums">02</span>
+            <h2 className="text-sm font-semibold">Upload CSV File</h2>
+            <HelpTooltip content="After uploading, double-check the Parse Settings below — make sure the delimiter, date format, and rows to skip match your file." />
           </div>
-          <div className="h-[120px]">
+          <div className="h-[116px]">
             <FileDropzone
               file={state.file}
               onFileChange={handleFileSelect}
@@ -645,16 +735,27 @@ export function UploadStep() {
         </div>
       </div>
 
-      {/* Parse Settings - collapsed by default, opens on errors */}
-      {state.file && (
-        <ParseSettingsPanel
+      {/* Select Format */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-1.5">
+          <span className="text-muted-foreground font-mono text-[10px] tabular-nums">03</span>
+          <h2 className="text-sm font-semibold">Select Format</h2>
+          <span className="text-muted-foreground rounded border px-1.5 py-px text-[10px] leading-none">
+            optional
+          </span>
+        </div>
+        <TemplateSelector
+          templates={templates}
+          selectedTemplateId={state.selectedTemplateId}
+          onSelect={handleTemplateSelect}
+          onClear={handleTemplateClear}
           config={state.parseConfig}
-          onChange={handleConfigChange}
-          hasErrors={hasParseErrors}
+          onConfigChange={handleConfigChange}
+          hasConfigErrors={hasParseErrors}
         />
-      )}
+      </div>
 
-      {/* CSV Preview with tabs */}
+      {/* CSV Preview */}
       {state.file && state.headers.length > 0 && (
         <CsvPreviewTabs file={state.file} headers={state.headers} rows={state.parsedRows} />
       )}

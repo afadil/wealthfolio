@@ -1,4 +1,4 @@
-import { createAsset, previewImportAssets } from "@/adapters";
+import { createAsset } from "@/adapters";
 import TickerSearchInput from "@/components/ticker-search";
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { CreateSecurityDialog } from "@/pages/asset/create-security-dialog";
@@ -7,10 +7,11 @@ import { getExchangeDisplayName } from "@/lib/constants";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { ProgressIndicator } from "@wealthfolio/ui/components/ui/progress-indicator";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ImportAlert } from "../components/import-alert";
-import { useImportContext, type DraftActivity, type PendingImportAsset } from "../context";
+import { useImportContext, type DraftActivity } from "../context";
 import {
+  applyAssetResolution,
   buildImportAssetCandidateFromDraft,
   buildNewAssetFromSearchResult,
 } from "../utils/asset-review-utils";
@@ -21,31 +22,6 @@ interface AssetDialogState {
   symbol: string;
   mode: "create" | "edit";
   initialAsset?: Partial<NewAsset>;
-}
-
-function applyAssetResolution(
-  drafts: DraftActivity[],
-  key: string,
-  draft: NewAsset,
-  options: { assetId?: string; importAssetKey?: string },
-): DraftActivity[] {
-  return drafts.map((row) => {
-    if (row.assetCandidateKey !== key) {
-      return row;
-    }
-
-    return {
-      ...row,
-      symbol: draft.instrumentSymbol || draft.displayCode || row.symbol,
-      symbolName: draft.name || row.symbolName,
-      exchangeMic: draft.instrumentExchangeMic || undefined,
-      quoteCcy: draft.quoteCcy || row.quoteCcy,
-      instrumentType: draft.instrumentType || row.instrumentType,
-      quoteMode: draft.quoteMode || row.quoteMode,
-      assetId: options.assetId,
-      importAssetKey: options.importAssetKey,
-    };
-  });
 }
 
 function buildEditableAssetDraft(
@@ -270,7 +246,7 @@ function ReadyAssetRow({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function AssetReviewStep() {
-  const { state, dispatch } = useImportContext();
+  const { state, dispatch, previewAssets } = useImportContext();
   const { draftActivities, assetPreviewItems, isPreviewingAssets } = state;
   const [activeSearchKey, setActiveSearchKey] = useState<string | null>(null);
   const [assetDialog, setAssetDialog] = useState<AssetDialogState>({
@@ -294,58 +270,6 @@ export function AssetReviewStep() {
     }
     return next;
   }, [draftActivities]);
-
-  const loadPreview = useCallback(async () => {
-    const candidates = Array.from(candidateMap.values())
-      .map(({ draft }) => buildImportAssetCandidateFromDraft(draft))
-      .filter((candidate): candidate is NonNullable<typeof candidate> => Boolean(candidate));
-
-    dispatch({ type: "SET_IS_PREVIEWING_ASSETS", payload: true });
-    dispatch({ type: "SET_ASSET_PREVIEW_ERROR", payload: null });
-    try {
-      const preview = await previewImportAssets({ candidates });
-      dispatch({ type: "SET_ASSET_PREVIEW_ITEMS", payload: preview });
-      dispatch({ type: "CLEAR_PENDING_IMPORT_ASSETS" });
-
-      let nextDrafts = draftActivities;
-      for (const item of preview) {
-        if (!item.draft) continue;
-        if (item.status === "EXISTING_ASSET") {
-          nextDrafts = applyAssetResolution(nextDrafts, item.key, item.draft, {
-            assetId: item.assetId,
-          });
-        }
-        if (item.status === "AUTO_RESOLVED_NEW_ASSET") {
-          nextDrafts = applyAssetResolution(nextDrafts, item.key, item.draft, {
-            importAssetKey: item.key,
-          });
-          dispatch({
-            type: "SET_PENDING_IMPORT_ASSET",
-            payload: {
-              key: item.key,
-              draft: item.draft,
-              source: "auto",
-            } satisfies PendingImportAsset,
-          });
-        }
-      }
-      dispatch({ type: "SET_DRAFT_ACTIVITIES", payload: nextDrafts });
-    } catch (error) {
-      dispatch({
-        type: "SET_ASSET_PREVIEW_ERROR",
-        payload: error instanceof Error ? error.message : "Failed to preview import assets.",
-      });
-    } finally {
-      dispatch({ type: "SET_IS_PREVIEWING_ASSETS", payload: false });
-    }
-  }, [candidateMap, dispatch, draftActivities]);
-
-  useEffect(() => {
-    if (candidateMap.size === 0 || assetPreviewItems.length > 0 || isPreviewingAssets) {
-      return;
-    }
-    void loadPreview();
-  }, [assetPreviewItems.length, candidateMap.size, isPreviewingAssets, loadPreview]);
 
   const updatePreviewItem = useCallback(
     (key: string, update: Partial<ImportAssetPreviewItem>) => {
@@ -494,7 +418,7 @@ export function AssetReviewStep() {
         description={state.assetPreviewError}
       >
         <div className="mt-3">
-          <Button size="sm" variant="outline" onClick={() => void loadPreview()}>
+          <Button size="sm" variant="outline" onClick={() => void previewAssets(draftActivities)}>
             Retry
           </Button>
         </div>

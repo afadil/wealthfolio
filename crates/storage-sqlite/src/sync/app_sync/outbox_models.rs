@@ -1,7 +1,7 @@
 //! Centralized sync-entity mappings for projected outbox models.
 
 use crate::accounts::AccountDB;
-use crate::activities::{ActivityDB, ImportMappingDB};
+use crate::activities::{ActivityDB, ImportAccountTemplateDB};
 use crate::ai_chat::{AiMessageDB, AiThreadDB, AiThreadTagDB};
 use crate::assets::AssetDB;
 use crate::goals::{GoalDB, GoalsAllocationDB};
@@ -77,7 +77,7 @@ impl SyncOutboxModel for ActivityDB {
     }
 }
 
-impl SyncOutboxModel for ImportMappingDB {
+impl SyncOutboxModel for ImportAccountTemplateDB {
     const ENTITY: SyncEntity = SyncEntity::ActivityImportProfile;
 
     fn sync_entity_id(&self) -> &str {

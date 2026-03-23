@@ -775,6 +775,10 @@ mod tests {
             unimplemented!()
         }
 
+        async fn link_account_template(&self, _account_id: &str, _template_id: &str) -> Result<()> {
+            unimplemented!()
+        }
+
         fn calculate_average_cost(&self, _account_id: &str, _asset_id: &str) -> Result<Decimal> {
             unimplemented!()
         }

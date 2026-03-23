@@ -9,6 +9,7 @@ import { isValid, parse, parseISO } from "date-fns";
 import { findMappedActivityType } from "./activity-type-mapping";
 import { getDateFnsPattern } from "./date-format-options";
 import { normalizeInstrumentType, splitInstrumentPrefixedSymbol } from "./instrument-type";
+import { buildImportAssetCandidateKey } from "./asset-review-utils";
 import {
   parseNumericValue,
   toNumber,
@@ -398,7 +399,7 @@ export function createDraftActivities(
     const subtype = rawSubtype?.trim().toUpperCase() || undefined;
 
     // Resolve account ID: use CSV account mapping, or fall back to default
-    let accountId = defaultAccountId;
+    let accountId = accountMappings[""] || defaultAccountId;
     if (rawAccount?.trim()) {
       const mappedAccount = accountMappings[rawAccount.trim()];
       if (mappedAccount) {
@@ -425,6 +426,16 @@ export function createDraftActivities(
       quoteCcy: mappedQuoteCcy,
       instrumentType: resolvedInstrumentType,
       quoteMode: mappedQuoteMode,
+      assetCandidateKey:
+        symbol && activityType
+          ? buildImportAssetCandidateKey({
+              accountId,
+              symbol,
+              instrumentType: resolvedInstrumentType,
+              quoteMode: mappedQuoteMode,
+              quoteCcy: mappedQuoteCcy || currency,
+            })
+          : undefined,
       quantity: resolved.quantity,
       unitPrice,
       amount: resolved.amount,

@@ -7,14 +7,24 @@ import {
   type ReactNode,
   type Dispatch,
 } from "react";
-import { checkActivitiesImport, logger } from "@/adapters";
-import type { ActivityImport, ImportMappingData } from "@/lib/types";
+import { checkActivitiesImport, previewImportAssets, logger } from "@/adapters";
+import type {
+  ActivityImport,
+  ImportAssetPreviewItem,
+  ImportMappingData,
+  ImportTemplateScope,
+  NewAsset,
+} from "@/lib/types";
+import {
+  applyAssetResolution,
+  buildImportAssetCandidateFromDraft,
+} from "../utils/asset-review-utils";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type ImportStep = "upload" | "mapping" | "review" | "confirm" | "result";
+export type ImportStep = "upload" | "mapping" | "assets" | "review" | "confirm" | "result";
 
 export interface ParseConfig {
   hasHeaderRow: boolean;
@@ -57,11 +67,10 @@ export interface DraftActivity {
   symbolName?: string;
   quoteCcy?: string;
   instrumentType?: string;
-  quoteMode?: QuoteMode;
+  quoteMode?: string;
 
   // Asset resolution (set during asset-review step)
   assetCandidateKey?: string;
-  assetId?: string;
   importAssetKey?: string;
 
   // Validation state
@@ -72,6 +81,12 @@ export interface DraftActivity {
   duplicateOfId?: string;
   duplicateOfLineNumber?: number;
   isEdited: boolean;
+}
+
+export interface PendingImportAsset {
+  key: string;
+  draft: NewAsset;
+  source: "auto" | "manual";
 }
 
 export interface ImportResultStats {
@@ -97,11 +112,20 @@ export interface ImportState {
   parsedRows: string[][];
   mapping: ImportMappingData | null;
   draftActivities: DraftActivity[];
+  assetPreviewItems: ImportAssetPreviewItem[];
+  pendingImportAssets: Record<string, PendingImportAsset>;
+  selectedTemplateId: string | null;
+  selectedTemplateScope: ImportTemplateScope | null;
   duplicates: Record<string, string>; // idempotencyKey -> existingActivityId
   importResult: ImportResult | null;
   accountId: string;
   holdingsCheckPassed: boolean;
   isValidating: boolean;
+  validationError: string | null;
+  draftRevision: number;
+  lastValidatedRevision: number | null;
+  isPreviewingAssets: boolean;
+  assetPreviewError: string | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -129,11 +153,20 @@ const INITIAL_STATE: ImportState = {
   parsedRows: [],
   mapping: null,
   draftActivities: [],
+  assetPreviewItems: [],
+  pendingImportAssets: {},
+  selectedTemplateId: null,
+  selectedTemplateScope: null,
   duplicates: {},
   importResult: null,
   accountId: "",
   holdingsCheckPassed: false,
   isValidating: false,
+  validationError: null,
+  draftRevision: 0,
+  lastValidatedRevision: null,
+  isPreviewingAssets: false,
+  assetPreviewError: null,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -147,10 +180,23 @@ export type ImportAction =
   | { type: "SET_PARSED_DATA"; payload: { headers: string[]; rows: string[][] } }
   | { type: "SET_MAPPING"; payload: ImportMappingData }
   | { type: "SET_DRAFT_ACTIVITIES"; payload: DraftActivity[] }
+  | { type: "SET_VALIDATED_DRAFT_ACTIVITIES"; payload: DraftActivity[] }
   | { type: "UPDATE_DRAFT"; payload: { rowIndex: number; updates: Partial<DraftActivity> } }
   | {
       type: "BULK_UPDATE_DRAFTS";
       payload: { rowIndexes: number[]; updates: Partial<DraftActivity> };
+    }
+  | {
+      type: "BULK_SKIP_DRAFTS";
+      payload: { rowIndexes: number[]; updates: Partial<DraftActivity> };
+    }
+  | { type: "SET_ASSET_PREVIEW_ITEMS"; payload: ImportAssetPreviewItem[] }
+  | { type: "SET_PENDING_IMPORT_ASSET"; payload: PendingImportAsset }
+  | { type: "REMOVE_PENDING_IMPORT_ASSET"; payload: string }
+  | { type: "CLEAR_PENDING_IMPORT_ASSETS" }
+  | {
+      type: "SET_SELECTED_TEMPLATE";
+      payload: { id: string | null; scope: ImportTemplateScope | null };
     }
   | { type: "SET_DUPLICATES"; payload: Record<string, string> }
   | { type: "SET_IMPORT_RESULT"; payload: ImportResult }
@@ -159,13 +205,17 @@ export type ImportAction =
   | { type: "NEXT_STEP" }
   | { type: "PREV_STEP" }
   | { type: "SET_IS_VALIDATING"; payload: boolean }
+  | { type: "SET_VALIDATION_ERROR"; payload: string | null }
+  | { type: "MARK_VALIDATED"; payload: number }
+  | { type: "SET_IS_PREVIEWING_ASSETS"; payload: boolean }
+  | { type: "SET_ASSET_PREVIEW_ERROR"; payload: string | null }
   | { type: "RESET" };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Step Navigation Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-const STEP_ORDER: ImportStep[] = ["upload", "mapping", "review", "confirm", "result"];
+const STEP_ORDER: ImportStep[] = ["upload", "mapping", "assets", "review", "confirm", "result"];
 
 function getNextStep(current: ImportStep): ImportStep {
   const idx = STEP_ORDER.indexOf(current);
@@ -188,6 +238,20 @@ function getPrevStep(current: ImportStep): ImportStep {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function importReducer(state: ImportState, action: ImportAction): ImportState {
+  const updatesAffectAssetPreview = (updates: Partial<DraftActivity>) =>
+    [
+      "activityType",
+      "symbol",
+      "assetId",
+      "exchangeMic",
+      "quoteCcy",
+      "instrumentType",
+      "quoteMode",
+      "accountId",
+      "assetCandidateKey",
+      "importAssetKey",
+    ].some((field) => field in updates);
+
   switch (action.type) {
     case "SET_FILE":
       return { ...state, file: action.payload };
@@ -212,28 +276,97 @@ function importReducer(state: ImportState, action: ImportAction): ImportState {
       return { ...state, mapping: action.payload };
 
     case "SET_DRAFT_ACTIVITIES":
+      return {
+        ...state,
+        draftActivities: action.payload,
+        draftRevision: state.draftRevision + 1,
+        lastValidatedRevision: null,
+        validationError: null,
+      };
+
+    case "SET_VALIDATED_DRAFT_ACTIVITIES":
       return { ...state, draftActivities: action.payload };
 
     case "UPDATE_DRAFT": {
       const { rowIndex, updates } = action.payload;
+      const shouldClearAssetPreview = updatesAffectAssetPreview(updates);
       return {
         ...state,
         draftActivities: state.draftActivities.map((draft) =>
           draft.rowIndex === rowIndex ? { ...draft, ...updates, isEdited: true } : draft,
         ),
+        ...(shouldClearAssetPreview
+          ? {
+              assetPreviewItems: [],
+              pendingImportAssets: {},
+              assetPreviewError: null,
+            }
+          : {}),
+        draftRevision: state.draftRevision + 1,
+        validationError: null,
       };
     }
 
     case "BULK_UPDATE_DRAFTS": {
       const { rowIndexes, updates } = action.payload;
       const indexSet = new Set(rowIndexes);
+      const shouldClearAssetPreview = updatesAffectAssetPreview(updates);
       return {
         ...state,
         draftActivities: state.draftActivities.map((draft) =>
           indexSet.has(draft.rowIndex) ? { ...draft, ...updates, isEdited: true } : draft,
         ),
+        ...(shouldClearAssetPreview
+          ? {
+              assetPreviewItems: [],
+              pendingImportAssets: {},
+              assetPreviewError: null,
+            }
+          : {}),
+        draftRevision: state.draftRevision + 1,
+        validationError: null,
       };
     }
+
+    case "BULK_SKIP_DRAFTS": {
+      const { rowIndexes, updates } = action.payload;
+      const indexSet = new Set(rowIndexes);
+      return {
+        ...state,
+        draftActivities: state.draftActivities.map((draft) =>
+          indexSet.has(draft.rowIndex) ? { ...draft, ...updates } : draft,
+        ),
+        // draftRevision intentionally NOT incremented — skip/unskip doesn't invalidate validation
+      };
+    }
+
+    case "SET_ASSET_PREVIEW_ITEMS":
+      return { ...state, assetPreviewItems: action.payload };
+
+    case "SET_PENDING_IMPORT_ASSET":
+      return {
+        ...state,
+        pendingImportAssets: {
+          ...state.pendingImportAssets,
+          [action.payload.key]: action.payload,
+        },
+      };
+
+    case "REMOVE_PENDING_IMPORT_ASSET": {
+      const next = { ...state.pendingImportAssets };
+      delete next[action.payload];
+      return { ...state, pendingImportAssets: next };
+    }
+
+    case "CLEAR_PENDING_IMPORT_ASSETS":
+      return { ...state, pendingImportAssets: {} };
+
+    case "SET_SELECTED_TEMPLATE":
+      return {
+        ...state,
+        selectedTemplateId: action.payload.id,
+        selectedTemplateScope: action.payload.scope,
+      };
 
     case "SET_DUPLICATES":
       return { ...state, duplicates: action.payload };
@@ -252,18 +385,39 @@ function importReducer(state: ImportState, action: ImportAction): ImportState {
 
     case "PREV_STEP": {
       const prevStepValue = getPrevStep(state.step);
-      // Clear draft activities when going back from review to mapping
-      // so they get regenerated with the (potentially updated) mappings.
-      const clearDrafts = state.step === "review" && prevStepValue === "mapping";
+      const clearDrafts =
+        (state.step === "assets" && prevStepValue === "mapping") ||
+        (state.step === "review" && prevStepValue === "assets");
       return {
         ...state,
         step: prevStepValue,
-        ...(clearDrafts && { draftActivities: [], isValidating: false }),
+        ...(clearDrafts && {
+          draftActivities: prevStepValue === "mapping" ? [] : state.draftActivities,
+          assetPreviewItems: prevStepValue === "mapping" ? [] : state.assetPreviewItems,
+          pendingImportAssets: prevStepValue === "mapping" ? {} : state.pendingImportAssets,
+          isValidating: false,
+          isPreviewingAssets: false,
+          validationError: null,
+          assetPreviewError: null,
+          lastValidatedRevision: prevStepValue === "mapping" ? null : state.lastValidatedRevision,
+        }),
       };
     }
 
     case "SET_IS_VALIDATING":
       return { ...state, isValidating: action.payload };
+
+    case "SET_VALIDATION_ERROR":
+      return { ...state, validationError: action.payload };
+
+    case "MARK_VALIDATED":
+      return { ...state, lastValidatedRevision: action.payload, validationError: null };
+
+    case "SET_IS_PREVIEWING_ASSETS":
+      return { ...state, isPreviewingAssets: action.payload };
+
+    case "SET_ASSET_PREVIEW_ERROR":
+      return { ...state, assetPreviewError: action.payload };
 
     case "RESET":
       return { ...INITIAL_STATE };
@@ -277,10 +431,16 @@ function importReducer(state: ImportState, action: ImportAction): ImportState {
 // Context
 // ─────────────────────────────────────────────────────────────────────────────
 
+export interface ValidationResult {
+  ok: boolean;
+  hasErrors: boolean;
+}
+
 interface ImportContextValue {
   state: ImportState;
   dispatch: Dispatch<ImportAction>;
-  validateDrafts: (drafts: DraftActivity[]) => Promise<void>;
+  validateDrafts: (drafts: DraftActivity[]) => Promise<ValidationResult>;
+  previewAssets: (drafts: DraftActivity[]) => Promise<void>;
 }
 
 const ImportContext = createContext<ImportContextValue | null>(null);
@@ -323,30 +483,26 @@ export function ImportProvider({ children, initialAccountId }: ImportProviderPro
   accountIdRef.current = state.accountId;
   const defaultCurrencyRef = useRef(state.parseConfig.defaultCurrency);
   defaultCurrencyRef.current = state.parseConfig.defaultCurrency;
+  const draftRevisionRef = useRef(state.draftRevision);
+  draftRevisionRef.current = state.draftRevision;
 
   const validateDrafts = useCallback(
-    async (drafts: DraftActivity[]) => {
+    async (drafts: DraftActivity[]): Promise<ValidationResult> => {
       const run = ++validationRunRef.current;
+      const requestedRevision = draftRevisionRef.current;
       dispatch({ type: "SET_IS_VALIDATING", payload: true });
+      dispatch({ type: "SET_VALIDATION_ERROR", payload: null });
       try {
-        const accountId = accountIdRef.current;
-        if (!accountId) {
-          logger.warn("No account selected - skipping backend validation");
-          if (run === validationRunRef.current) {
-            dispatch({ type: "SET_DRAFT_ACTIVITIES", payload: drafts });
-          }
-          return;
-        }
-
         const activitiesToValidate = drafts
           .filter((d) => d.status !== "skipped" && d.activityType)
           .map(
             (draft) =>
               ({
-                accountId: draft.accountId || accountId,
+                accountId: draft.accountId,
                 activityType: draft.activityType as ActivityImport["activityType"],
                 date: draft.activityDate || "",
                 symbol: draft.symbol || "",
+                assetId: draft.assetId,
                 exchangeMic: draft.exchangeMic,
                 quoteCcy: draft.quoteCcy,
                 instrumentType: draft.instrumentType,
@@ -367,12 +523,9 @@ export function ImportProvider({ children, initialAccountId }: ImportProviderPro
 
         let updatedDrafts = drafts;
         if (activitiesToValidate.length > 0) {
-          const validated = await checkActivitiesImport({
-            accountId,
-            activities: activitiesToValidate,
-          });
+          const validated = await checkActivitiesImport({ activities: activitiesToValidate });
           if (run !== validationRunRef.current) {
-            return;
+            return { ok: false, hasErrors: false };
           }
 
           updatedDrafts = drafts.map((draft) => {
@@ -380,7 +533,6 @@ export function ImportProvider({ children, initialAccountId }: ImportProviderPro
             if (!backendResult) {
               return {
                 ...draft,
-                accountId: draft.accountId || accountId,
                 duplicateOfId: undefined,
                 duplicateOfLineNumber: undefined,
               };
@@ -411,7 +563,7 @@ export function ImportProvider({ children, initialAccountId }: ImportProviderPro
 
             return {
               ...draft,
-              accountId: draft.accountId || accountId,
+              assetId: backendResult.assetId,
               errors: mergedErrors,
               warnings: mergedWarnings,
               duplicateOfId: backendResult.duplicateOfId,
@@ -432,13 +584,20 @@ export function ImportProvider({ children, initialAccountId }: ImportProviderPro
           });
         }
         if (run === validationRunRef.current) {
-          dispatch({ type: "SET_DRAFT_ACTIVITIES", payload: updatedDrafts });
+          dispatch({ type: "SET_VALIDATED_DRAFT_ACTIVITIES", payload: updatedDrafts });
+          dispatch({ type: "MARK_VALIDATED", payload: requestedRevision });
         }
+        const hasErrors = updatedDrafts.some((d) => d.status !== "skipped" && d.status === "error");
+        return { ok: true, hasErrors };
       } catch (error) {
         logger.error(`Backend validation failed: ${error}`);
         if (run === validationRunRef.current) {
-          dispatch({ type: "SET_DRAFT_ACTIVITIES", payload: drafts });
+          dispatch({
+            type: "SET_VALIDATION_ERROR",
+            payload: "Backend validation failed. Retry validation before importing.",
+          });
         }
+        return { ok: false, hasErrors: false };
       } finally {
         if (run === validationRunRef.current) {
           dispatch({ type: "SET_IS_VALIDATING", payload: false });
@@ -448,8 +607,59 @@ export function ImportProvider({ children, initialAccountId }: ImportProviderPro
     [dispatch],
   );
 
+  const previewAssets = useCallback(
+    async (drafts: DraftActivity[]) => {
+      const candidates = drafts
+        .map(buildImportAssetCandidateFromDraft)
+        .filter((c): c is NonNullable<typeof c> => c !== null)
+        .filter((c, i, arr) => arr.findIndex((x) => x.key === c.key) === i);
+
+      if (candidates.length === 0) return;
+
+      dispatch({ type: "SET_IS_PREVIEWING_ASSETS", payload: true });
+      dispatch({ type: "SET_ASSET_PREVIEW_ERROR", payload: null });
+      try {
+        const preview = await previewImportAssets({ candidates });
+        dispatch({ type: "SET_ASSET_PREVIEW_ITEMS", payload: preview });
+        dispatch({ type: "CLEAR_PENDING_IMPORT_ASSETS" });
+
+        let nextDrafts = drafts;
+        for (const item of preview) {
+          if (!item.draft) continue;
+          if (item.status === "EXISTING_ASSET") {
+            nextDrafts = applyAssetResolution(nextDrafts, item.key, item.draft, {
+              assetId: item.assetId,
+            });
+          }
+          if (item.status === "AUTO_RESOLVED_NEW_ASSET") {
+            nextDrafts = applyAssetResolution(nextDrafts, item.key, item.draft, {
+              importAssetKey: item.key,
+            });
+            dispatch({
+              type: "SET_PENDING_IMPORT_ASSET",
+              payload: {
+                key: item.key,
+                draft: item.draft,
+                source: "auto",
+              } satisfies PendingImportAsset,
+            });
+          }
+        }
+        dispatch({ type: "SET_DRAFT_ACTIVITIES", payload: nextDrafts });
+      } catch (error) {
+        dispatch({
+          type: "SET_ASSET_PREVIEW_ERROR",
+          payload: error instanceof Error ? error.message : "Failed to preview import assets.",
+        });
+      } finally {
+        dispatch({ type: "SET_IS_PREVIEWING_ASSETS", payload: false });
+      }
+    },
+    [dispatch],
+  );
+
   return (
-    <ImportContext.Provider value={{ state, dispatch, validateDrafts }}>
+    <ImportContext.Provider value={{ state, dispatch, validateDrafts, previewAssets }}>
       {children}
     </ImportContext.Provider>
   );

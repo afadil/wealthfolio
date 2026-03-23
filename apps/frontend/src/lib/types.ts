@@ -291,6 +291,28 @@ export interface ActivityBulkMutationResult {
 export type ActivityImport = z.infer<typeof importActivitySchema>;
 export type ImportMappingData = z.infer<typeof importMappingSchema>;
 export type ParseConfig = z.infer<typeof parseConfigSchema>;
+export type ImportTemplateScope = "SYSTEM" | "USER";
+
+export interface ImportTemplateData {
+  id: string;
+  name: string;
+  scope: ImportTemplateScope;
+  fieldMappings: Record<string, string>;
+  activityMappings: Record<string, string[]>;
+  symbolMappings: Record<string, string>;
+  accountMappings: Record<string, string>;
+  symbolMappingMeta: Record<
+    string,
+    {
+      exchangeMic?: string;
+      symbolName?: string;
+      quoteCcy?: string;
+      instrumentType?: string;
+      quoteMode?: string;
+    }
+  >;
+  parseConfig?: ParseConfig;
+}
 
 // Define a generic type for the parsed row data
 export type CsvRowData = Record<string, string> & { lineNumber: string };

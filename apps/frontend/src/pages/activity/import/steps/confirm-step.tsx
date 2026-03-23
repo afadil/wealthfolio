@@ -13,7 +13,8 @@ import {
 import { useActivityImportMutations } from "../hooks/use-activity-import-mutations";
 import { ImportAlert } from "../components/import-alert";
 import type { ActivityImport } from "@/lib/types";
-import { saveAccountImportMapping, logger } from "@/adapters";
+import { createAsset } from "@/adapters";
+import { buildNewAssetFromDraft } from "../utils/asset-review-utils";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -106,6 +107,7 @@ function draftToActivityImport(draft: DraftActivity): ActivityImport {
   return {
     id: undefined,
     accountId: draft.accountId,
+    assetId: draft.assetId,
     currency: draft.currency,
     activityType: draft.activityType as ActivityImport["activityType"],
     date: draft.activityDate,
@@ -175,24 +177,11 @@ const ACTIVITY_TYPE_CONFIG: Record<string, { label: string; icon: Icon; color: s
 export function ConfirmStep() {
   const { state, dispatch } = useImportContext();
   const [importError, setImportError] = useState<string | null>(null);
+  const [isPreparingAssets, setIsPreparingAssets] = useState(false);
 
   const { confirmImportMutation } = useActivityImportMutations({
-    onSuccess: async (_activities, result) => {
+    onSuccess: (_activities, result) => {
       setImportError(null);
-
-      // Save the mapping profile for future imports (include parseConfig)
-      if (state.mapping && state.accountId) {
-        try {
-          await saveAccountImportMapping({
-            ...state.mapping,
-            accountId: state.accountId,
-            parseConfig: state.parseConfig,
-          });
-        } catch (error) {
-          // Log but don't fail the import - mapping save is not critical
-          logger.error(`Failed to save mapping profile: ${error}`);
-        }
-      }
 
       const frontendSkipped = summary.skipped + summary.errors;
       dispatch(
@@ -215,24 +204,121 @@ export function ConfirmStep() {
     },
   });
 
-  const isProcessing = confirmImportMutation.isPending;
+  const isProcessing = confirmImportMutation.isPending || isPreparingAssets;
 
   const summary = useMemo(() => computeSummary(state.draftActivities), [state.draftActivities]);
 
   const skippedTotal = summary.skipped + summary.errors;
 
-  const handleImport = () => {
-    // Filter only valid/warning activities for import
-    const activitiesToImport = state.draftActivities
-      .filter((d) => d.status === "valid" || d.status === "warning")
-      .map(draftToActivityImport);
+  const persistCreatedAssets = (assetIdByKey: Record<string, string>) => {
+    const createdKeys = Object.keys(assetIdByKey);
+    if (createdKeys.length === 0) {
+      return;
+    }
 
-    if (activitiesToImport.length === 0) {
+    const nextDrafts = state.draftActivities.map((draft) => {
+      const resolvedAssetId =
+        (draft.importAssetKey ? assetIdByKey[draft.importAssetKey] : undefined) ||
+        (draft.assetCandidateKey ? assetIdByKey[draft.assetCandidateKey] : undefined);
+
+      if (!resolvedAssetId) {
+        return draft;
+      }
+
+      return {
+        ...draft,
+        assetId: resolvedAssetId,
+        importAssetKey: undefined,
+      };
+    });
+
+    dispatch({ type: "SET_VALIDATED_DRAFT_ACTIVITIES", payload: nextDrafts });
+    dispatch({
+      type: "SET_ASSET_PREVIEW_ITEMS",
+      payload: state.assetPreviewItems.map((item) => {
+        const assetId = assetIdByKey[item.key];
+        if (!assetId) {
+          return item;
+        }
+
+        return {
+          ...item,
+          status: "EXISTING_ASSET",
+          resolutionSource: "created_on_import",
+          assetId,
+        };
+      }),
+    });
+
+    for (const key of createdKeys) {
+      dispatch({ type: "REMOVE_PENDING_IMPORT_ASSET", payload: key });
+    }
+  };
+
+  const handleImport = async () => {
+    // Filter only valid/warning activities for import
+    const draftsToImport = state.draftActivities.filter(
+      (d) => d.status === "valid" || d.status === "warning",
+    );
+    if (draftsToImport.length === 0) {
       setImportError("No valid activities to import");
       return;
     }
 
-    confirmImportMutation.mutate({ activities: activitiesToImport });
+    setImportError(null);
+    setIsPreparingAssets(true);
+    const createdAssetIdsByKey: Record<string, string> = {};
+
+    try {
+      const pendingAssets = new Map<string, ReturnType<typeof buildNewAssetFromDraft>>();
+
+      for (const pending of Object.values(state.pendingImportAssets)) {
+        pendingAssets.set(pending.key, pending.draft);
+      }
+
+      for (const draft of draftsToImport) {
+        if (draft.assetId) {
+          continue;
+        }
+        const key = draft.importAssetKey || draft.assetCandidateKey;
+        if (!key || pendingAssets.has(key)) {
+          continue;
+        }
+        const nextAsset = buildNewAssetFromDraft(draft);
+        if (nextAsset) {
+          pendingAssets.set(key, nextAsset);
+        }
+      }
+
+      for (const [key, assetDraft] of pendingAssets.entries()) {
+        if (!assetDraft) {
+          continue;
+        }
+        const created = await createAsset(assetDraft);
+        createdAssetIdsByKey[key] = created.id;
+      }
+
+      persistCreatedAssets(createdAssetIdsByKey);
+
+      const activitiesToImport = draftsToImport.map((draft) =>
+        draftToActivityImport({
+          ...draft,
+          assetId:
+            draft.assetId ||
+            (draft.importAssetKey ? createdAssetIdsByKey[draft.importAssetKey] : undefined) ||
+            (draft.assetCandidateKey ? createdAssetIdsByKey[draft.assetCandidateKey] : undefined),
+        }),
+      );
+
+      confirmImportMutation.mutate({ activities: activitiesToImport });
+    } catch (error) {
+      persistCreatedAssets(createdAssetIdsByKey);
+      setImportError(
+        error instanceof Error ? error.message : "Failed to prepare assets for import.",
+      );
+    } finally {
+      setIsPreparingAssets(false);
+    }
   };
 
   const handleBack = () => {
@@ -388,13 +474,13 @@ export function ConfirmStep() {
         <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
           <Button
             size="lg"
-            onClick={handleImport}
+            onClick={() => void handleImport()}
             disabled={summary.toImport === 0 || isProcessing}
           >
             {isProcessing ? (
               <>
                 <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                Importing...
+                {isPreparingAssets ? "Preparing assets..." : "Importing..."}
               </>
             ) : (
               <>

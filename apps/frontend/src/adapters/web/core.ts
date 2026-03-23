@@ -69,9 +69,14 @@ export const COMMANDS: CommandMap = {
   delete_activity: { method: "DELETE", path: "/activities" },
   // Activity import
   check_activities_import: { method: "POST", path: "/activities/import/check" },
+  preview_import_assets: { method: "POST", path: "/activities/import/assets/preview" },
   import_activities: { method: "POST", path: "/activities/import" },
   get_account_import_mapping: { method: "GET", path: "/activities/import/mapping" },
   save_account_import_mapping: { method: "POST", path: "/activities/import/mapping" },
+  list_import_templates: { method: "GET", path: "/activities/import/templates" },
+  get_import_template: { method: "GET", path: "/activities/import/templates/item" },
+  save_import_template: { method: "POST", path: "/activities/import/templates" },
+  delete_import_template: { method: "DELETE", path: "/activities/import/templates" },
   // Market data providers
   get_exchanges: { method: "GET", path: "/exchanges" },
   get_market_data_providers: { method: "GET", path: "/providers" },
@@ -568,6 +573,7 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     }
     case "check_activities_import":
+    case "preview_import_assets":
     case "import_activities": {
       body = JSON.stringify(payload);
       break;
@@ -582,6 +588,19 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "save_account_import_mapping": {
       const { mapping } = payload as { mapping: Record<string, unknown> };
       body = JSON.stringify({ mapping });
+      break;
+    }
+    case "get_import_template":
+    case "delete_import_template": {
+      const { id } = payload as { id: string };
+      const params = new URLSearchParams();
+      params.set("id", id);
+      url += `?${params.toString()}`;
+      break;
+    }
+    case "save_import_template": {
+      const { template } = payload as { template: Record<string, unknown> };
+      body = JSON.stringify({ template });
       break;
     }
     case "update_market_data_provider_settings": {

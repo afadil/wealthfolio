@@ -1,25 +1,19 @@
-import { logger, saveAccountImportMapping } from "@/adapters";
-import type { SymbolSearchResult } from "@/lib/types";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 import { ProgressIndicator } from "@wealthfolio/ui/components/ui/progress-indicator";
 import { useCallback, useMemo, useState } from "react";
 import { ImportAlert } from "../components/import-alert";
 import { ImportReviewGrid, type ImportReviewFilter } from "../components/import-review-grid";
 import {
-  SymbolResolutionPanel,
-  type UnresolvedSymbol,
-} from "../components/symbol-resolution-panel";
-import {
   bulkSetAccount,
   bulkSetCurrency,
   bulkSkipDrafts,
   bulkUnskipDrafts,
-  setDraftActivities,
-  setMapping,
   updateDraft,
   useImportContext,
   type DraftActivity,
 } from "../context";
+import { buildImportAssetCandidateFromDraft } from "../utils/asset-review-utils";
 import { hasDuplicateWarning, validateDraft } from "../utils/draft-utils";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -94,7 +88,7 @@ function FilterStatsBar({ stats, currentFilter, onFilterChange }: FilterStatsPro
 
 export function ReviewStep() {
   const { state, dispatch, validateDrafts } = useImportContext();
-  const { parsedRows, mapping, accountId, draftActivities } = state;
+  const { parsedRows, mapping, draftActivities } = state;
   const isValidating = state.isValidating;
 
   const [selectedRows, setSelectedRows] = useState<number[]>([]);
@@ -147,7 +141,20 @@ export function ReviewStep() {
       // Find the current draft and merge with updates
       const currentDraft = draftActivities.find((d) => d.rowIndex === rowIndex);
       if (currentDraft) {
-        const mergedDraft = { ...currentDraft, ...updates };
+        const changesAssetIdentity = [
+          "symbol",
+          "exchangeMic",
+          "quoteCcy",
+          "instrumentType",
+          "quoteMode",
+          "accountId",
+          "activityType",
+        ].some((field) => field in updates);
+        const mergedDraft = {
+          ...currentDraft,
+          ...updates,
+        } as DraftActivity;
+        const nextCandidate = buildImportAssetCandidateFromDraft(mergedDraft);
         // Re-validate the merged draft
         const validation = validateDraft(mergedDraft);
         // Don't override status if it was explicitly skipped.
@@ -155,6 +162,13 @@ export function ReviewStep() {
         dispatch(
           updateDraft(rowIndex, {
             ...updates,
+            ...(changesAssetIdentity
+              ? {
+                  assetId: undefined,
+                  importAssetKey: undefined,
+                  assetCandidateKey: nextCandidate?.key,
+                }
+              : {}),
             ...(shouldRevalidateStatus
               ? {
                   status: validation.status,
@@ -175,7 +189,7 @@ export function ReviewStep() {
 
   const handleBulkSkip = useCallback(
     (rowIndexes: number[]) => {
-      dispatch(bulkSkipDrafts(rowIndexes, "Skipped by user"));
+      dispatch(bulkSkipDrafts(rowIndexes, "Skipped"));
       setSelectedRows([]);
     },
     [dispatch],
@@ -202,96 +216,6 @@ export function ReviewStep() {
     },
     [dispatch],
   );
-
-  const handleSymbolResolution = useCallback(
-    (mappings: Record<string, SymbolSearchResult>) => {
-      // 1. Update all affected drafts in-memory, then run backend validation+dedupe again.
-      const nextDrafts = draftActivities.map((draft) => {
-        const result = draft.symbol ? mappings[draft.symbol] : undefined;
-        if (!result || !draft.errors.symbol) {
-          return draft;
-        }
-
-        const symbolUpdates: Partial<DraftActivity> = {
-          symbol: result.symbol,
-          exchangeMic: result.exchangeMic,
-          symbolName: result.longName,
-          quoteCcy: result.currency,
-          instrumentType: result.quoteType,
-          quoteMode: result.dataSource === "MANUAL" ? "MANUAL" : undefined,
-        };
-        const { symbol: _removed, ...otherErrors } = draft.errors;
-        const merged = { ...draft, ...symbolUpdates };
-        const validation = validateDraft(merged);
-        const finalErrors = { ...otherErrors, ...validation.errors };
-        const hasErrors = Object.keys(finalErrors).length > 0;
-        const hasWarnings = Object.keys(validation.warnings).length > 0;
-
-        return {
-          ...merged,
-          errors: finalErrors,
-          warnings: validation.warnings,
-          duplicateOfId: undefined,
-          duplicateOfLineNumber: undefined,
-          status:
-            draft.status === "skipped"
-              ? draft.status
-              : hasErrors
-                ? "error"
-                : hasWarnings
-                  ? "warning"
-                  : "valid",
-        } as DraftActivity;
-      });
-      dispatch(setDraftActivities(nextDrafts));
-      void validateDrafts(nextDrafts);
-
-      // 2. Save resolved symbols to mapping profile for future imports
-      if (mapping) {
-        const newSymbolMappings = { ...mapping.symbolMappings };
-        const newSymbolMappingMeta = { ...(mapping.symbolMappingMeta || {}) };
-
-        for (const [csvSymbol, result] of Object.entries(mappings)) {
-          newSymbolMappings[csvSymbol] = result.symbol;
-          newSymbolMappingMeta[csvSymbol] = {
-            exchangeMic: result.exchangeMic,
-            symbolName: result.longName,
-            quoteCcy: result.currency,
-            instrumentType: result.quoteType,
-            quoteMode: result.dataSource === "MANUAL" ? "MANUAL" : undefined,
-          };
-        }
-
-        const updatedMapping = {
-          ...mapping,
-          symbolMappings: newSymbolMappings,
-          symbolMappingMeta: newSymbolMappingMeta,
-        };
-
-        dispatch(setMapping(updatedMapping));
-
-        // Persist to backend
-        if (accountId) {
-          saveAccountImportMapping({ ...updatedMapping, accountId }).catch((err) =>
-            logger.error(`Failed to save symbol mappings: ${err}`),
-          );
-        }
-      }
-    },
-    [draftActivities, dispatch, mapping, accountId, validateDrafts],
-  );
-
-  const unresolvedSymbols = useMemo<UnresolvedSymbol[]>(() => {
-    const symbolMap = new Map<string, number>();
-    for (const draft of draftActivities) {
-      if (draft.errors.symbol && draft.symbol) {
-        symbolMap.set(draft.symbol, (symbolMap.get(draft.symbol) || 0) + 1);
-      }
-    }
-    return Array.from(symbolMap.entries())
-      .map(([csvSymbol, count]) => ({ csvSymbol, affectedCount: count }))
-      .sort((a, b) => (b.affectedCount ?? 0) - (a.affectedCount ?? 0));
-  }, [draftActivities]);
 
   // --- All hooks above this line ---
 
@@ -333,15 +257,45 @@ export function ReviewStep() {
   const hasErrors = filterStats.errors > 0;
   const hasWarnings = filterStats.warnings > 0;
   const hasIssues = hasErrors || hasWarnings;
+  const hasSkipped = filterStats.skipped > 0;
+  const importCount = validCount; // skipped are excluded
+  const isStale = state.lastValidatedRevision !== state.draftRevision;
 
   return (
     <div className="flex flex-col gap-4">
       {/* Summary alert */}
-      {hasIssues ? (
+      {state.validationError ? (
+        <ImportAlert
+          variant="destructive"
+          title="Backend validation failed"
+          description={state.validationError}
+        />
+      ) : isStale ? (
+        <ImportAlert
+          variant="warning"
+          title="Review validation is out of date"
+          description="You changed one or more activities after the last backend validation. Revalidate before continuing to import."
+        >
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-2"
+            onClick={() => void validateDrafts(draftActivities)}
+          >
+            Revalidate
+          </Button>
+        </ImportAlert>
+      ) : hasIssues ? (
         <ImportAlert
           variant={hasErrors ? "destructive" : "warning"}
           title={`${validCount} of ${filterStats.all} activities ready to import`}
-          description={`${filterStats.errors} errors, ${filterStats.warnings} warnings. Review and fix issues below, or skip problematic rows.`}
+          description={`${filterStats.errors} errors, ${filterStats.warnings} warnings.${hasSkipped ? ` ${filterStats.skipped} skipped.` : ""} Review and fix issues below, or skip problematic rows.`}
+        />
+      ) : hasSkipped ? (
+        <ImportAlert
+          variant="success"
+          title={`${importCount} of ${filterStats.all} activities will be imported`}
+          description={`${filterStats.skipped} ${filterStats.skipped === 1 ? "activity is" : "activities are"} excluded. Your data is ready for import.`}
         />
       ) : (
         <ImportAlert
@@ -350,12 +304,6 @@ export function ReviewStep() {
           description="Your data is ready for import. You can still review and make adjustments if needed."
         />
       )}
-
-      {/* Symbol resolution for unrecognized symbols */}
-      <SymbolResolutionPanel
-        unresolvedSymbols={unresolvedSymbols}
-        onApplyMappings={handleSymbolResolution}
-      />
 
       {/* Stats and filter */}
       <div className="flex flex-col gap-3">

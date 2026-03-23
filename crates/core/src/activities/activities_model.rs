@@ -2,6 +2,7 @@
 
 use crate::{activities::activities_errors::ActivityError, QuoteMode};
 use crate::activities::csv_parser::ParseConfig;
+use crate::assets::NewAsset;
 use crate::Result;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use rust_decimal::Decimal;
@@ -629,6 +630,7 @@ pub struct Sort {
 #[serde(rename_all = "camelCase")]
 pub struct ImportMapping {
     pub account_id: String,
+    pub template_id: Option<String>,
     pub name: String,
     /// JSON containing all config: fieldMappings, activityMappings, symbolMappings, accountMappings, parseConfig
     pub config: String,
@@ -659,6 +661,9 @@ pub struct ImportMappingData {
     pub account_id: String,
     #[serde(default)]
     pub name: String,
+    /// The ID of the template this mapping is linked to (if any)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub template_id: Option<String>,
     #[serde(default)]
     pub field_mappings: std::collections::HashMap<String, String>,
     #[serde(default)]
@@ -673,6 +678,85 @@ pub struct ImportMappingData {
     /// CSV parsing configuration (delimiter, date format, etc.)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parse_config: Option<ParseConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ImportTemplateScope {
+    System,
+    User,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportTemplate {
+    pub id: String,
+    pub name: String,
+    pub scope: ImportTemplateScope,
+    /// JSON containing all config: fieldMappings, activityMappings, symbolMappings, accountMappings, parseConfig
+    pub config: String,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportTemplateData {
+    pub id: String,
+    pub name: String,
+    pub scope: ImportTemplateScope,
+    #[serde(default)]
+    pub field_mappings: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    pub activity_mappings: std::collections::HashMap<String, Vec<String>>,
+    #[serde(default)]
+    pub symbol_mappings: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    pub account_mappings: std::collections::HashMap<String, String>,
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    pub symbol_mapping_meta: std::collections::HashMap<String, SymbolMappingMeta>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parse_config: Option<ParseConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportAssetCandidate {
+    pub key: String,
+    pub account_id: String,
+    pub symbol: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instrument_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quote_ccy: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quote_mode: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ImportAssetPreviewStatus {
+    ExistingAsset,
+    AutoResolvedNewAsset,
+    NeedsFixing,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportAssetPreviewItem {
+    pub key: String,
+    pub status: ImportAssetPreviewStatus,
+    pub resolution_source: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asset_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub draft: Option<NewAsset>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub errors: Option<std::collections::HashMap<String, Vec<String>>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub warnings: Option<std::collections::HashMap<String, Vec<String>>>,
 }
 
 /// Internal config structure for JSON serialization
@@ -724,6 +808,7 @@ impl Default for ImportMappingData {
 
         ImportMappingData {
             account_id: String::new(),
+            template_id: None,
             name: String::new(),
             field_mappings,
             activity_mappings,
@@ -735,6 +820,24 @@ impl Default for ImportMappingData {
     }
 }
 
+impl Default for ImportTemplateData {
+    fn default() -> Self {
+        let mapping = ImportMappingData::default();
+
+        Self {
+            id: String::new(),
+            name: String::new(),
+            scope: ImportTemplateScope::User,
+            field_mappings: mapping.field_mappings,
+            activity_mappings: mapping.activity_mappings,
+            symbol_mappings: mapping.symbol_mappings,
+            account_mappings: mapping.account_mappings,
+            symbol_mapping_meta: mapping.symbol_mapping_meta,
+            parse_config: mapping.parse_config,
+        }
+    }
+}
+
 impl ImportMapping {
     pub fn to_mapping_data(&self) -> std::result::Result<ImportMappingData, serde_json::Error> {
         // Parse the config JSON blob
@@ -742,6 +845,7 @@ impl ImportMapping {
 
         Ok(ImportMappingData {
             account_id: self.account_id.clone(),
+            template_id: self.template_id.clone(),
             name: self.name.clone(),
             field_mappings: config.field_mappings,
             activity_mappings: config.activity_mappings,
@@ -767,7 +871,48 @@ impl ImportMapping {
 
         Ok(Self {
             account_id: data.account_id.clone(),
+            template_id: data.template_id.clone(),
             name: data.name.clone(),
+            config: serde_json::to_string(&config)?,
+            created_at: chrono::Utc::now().naive_utc(),
+            updated_at: chrono::Utc::now().naive_utc(),
+        })
+    }
+}
+
+impl ImportTemplate {
+    pub fn to_template_data(&self) -> std::result::Result<ImportTemplateData, serde_json::Error> {
+        let config: ImportMappingConfig = serde_json::from_str(&self.config)?;
+
+        Ok(ImportTemplateData {
+            id: self.id.clone(),
+            name: self.name.clone(),
+            scope: self.scope.clone(),
+            field_mappings: config.field_mappings,
+            activity_mappings: config.activity_mappings,
+            symbol_mappings: config.symbol_mappings,
+            account_mappings: config.account_mappings,
+            symbol_mapping_meta: config.symbol_mapping_meta,
+            parse_config: config.parse_config,
+        })
+    }
+
+    pub fn from_template_data(
+        data: &ImportTemplateData,
+    ) -> std::result::Result<Self, serde_json::Error> {
+        let config = ImportMappingConfig {
+            field_mappings: data.field_mappings.clone(),
+            activity_mappings: data.activity_mappings.clone(),
+            symbol_mappings: data.symbol_mappings.clone(),
+            account_mappings: data.account_mappings.clone(),
+            symbol_mapping_meta: data.symbol_mapping_meta.clone(),
+            parse_config: data.parse_config.clone(),
+        };
+
+        Ok(Self {
+            id: data.id.clone(),
+            name: data.name.clone(),
+            scope: data.scope.clone(),
             config: serde_json::to_string(&config)?,
             created_at: chrono::Utc::now().naive_utc(),
             updated_at: chrono::Utc::now().naive_utc(),
@@ -1102,10 +1247,19 @@ pub struct PrepareActivitiesResult {
 impl From<ActivityImport> for NewActivity {
     fn from(import: ActivityImport) -> Self {
         let symbol = if import.symbol.is_empty() {
-            None
+            import.asset_id.as_ref().map(|asset_id| SymbolInput {
+                id: Some(asset_id.clone()),
+                symbol: None,
+                exchange_mic: None,
+                kind: None,
+                name: import.symbol_name.clone(),
+                quote_mode: import.quote_mode.clone(),
+                quote_ccy: import.quote_ccy.clone(),
+                instrument_type: import.instrument_type.clone(),
+            })
         } else {
             Some(SymbolInput {
-                id: None,
+                id: import.asset_id.clone(),
                 symbol: Some(import.symbol),
                 exchange_mic: import.exchange_mic,
                 kind: None,

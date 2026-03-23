@@ -23,8 +23,10 @@ pub use activities_model::{
     ActivityBulkMutationError, ActivityBulkMutationRequest, ActivityBulkMutationResult,
     ActivityDetails, ActivityImport, ActivitySearchResponse, ActivitySearchResponseMeta,
     ActivityStatus, ActivityType, ActivityUpdate, ActivityUpsert, BulkUpsertResult,
-    ImportActivitiesResult, ImportActivitiesSummary, ImportMapping, ImportMappingData, IncomeData,
-    NewActivity, PrepareActivitiesResult, Sort, SymbolInput,
+    ImportActivitiesResult, ImportActivitiesSummary, ImportAssetCandidate,
+    ImportAssetPreviewItem, ImportAssetPreviewStatus, ImportMapping, ImportMappingData,
+    ImportTemplate, ImportTemplateData, ImportTemplateScope, IncomeData, NewActivity,
+    PrepareActivitiesResult, Sort, SymbolInput,
 };
 pub use activities_service::ActivityService;
 pub use activities_traits::{ActivityRepositoryTrait, ActivityServiceTrait};

@@ -195,18 +195,32 @@ impl ActivityDetailsDB {
     }
 }
 
-/// Database model for activity import profile mapping
+/// Database model for account → import template association
 #[derive(
     Debug, Clone, Serialize, Deserialize, Queryable, Identifiable, AsChangeset, Insertable,
 )]
 #[diesel(primary_key(account_id))]
-#[diesel(table_name = crate::schema::activity_import_profiles)]
+#[diesel(table_name = crate::schema::import_account_templates)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 #[serde(rename_all = "camelCase")]
-pub struct ImportMappingDB {
+pub struct ImportAccountTemplateDB {
     pub account_id: String,
+    pub template_id: String,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+}
+
+#[derive(
+    Debug, Clone, Serialize, Deserialize, Queryable, Identifiable, AsChangeset, Insertable,
+)]
+#[diesel(primary_key(id))]
+#[diesel(table_name = crate::schema::import_templates)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[serde(rename_all = "camelCase")]
+pub struct ImportTemplateDB {
+    pub id: String,
     pub name: String,
-    /// JSON containing all mapping config: fieldMappings, activityMappings, symbolMappings, accountMappings, parseConfig
+    pub scope: String,
     pub config: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
@@ -295,11 +309,19 @@ impl From<ActivityDetailsDB> for wealthfolio_core::activities::ActivityDetails {
     }
 }
 
-impl From<ImportMappingDB> for wealthfolio_core::activities::ImportMapping {
-    fn from(db: ImportMappingDB) -> Self {
+impl From<ImportTemplateDB> for wealthfolio_core::activities::ImportTemplate {
+    fn from(db: ImportTemplateDB) -> Self {
+        use wealthfolio_core::activities::ImportTemplateScope;
+
+        let scope = match db.scope.as_str() {
+            "SYSTEM" => ImportTemplateScope::System,
+            _ => ImportTemplateScope::User,
+        };
+
         Self {
-            account_id: db.account_id,
+            id: db.id,
             name: db.name,
+            scope,
             config: db.config,
             created_at: db.created_at,
             updated_at: db.updated_at,
@@ -307,11 +329,17 @@ impl From<ImportMappingDB> for wealthfolio_core::activities::ImportMapping {
     }
 }
 
-impl From<wealthfolio_core::activities::ImportMapping> for ImportMappingDB {
-    fn from(domain: wealthfolio_core::activities::ImportMapping) -> Self {
+impl From<wealthfolio_core::activities::ImportTemplate> for ImportTemplateDB {
+    fn from(domain: wealthfolio_core::activities::ImportTemplate) -> Self {
+        let scope = match domain.scope {
+            wealthfolio_core::activities::ImportTemplateScope::System => "SYSTEM",
+            wealthfolio_core::activities::ImportTemplateScope::User => "USER",
+        };
+
         Self {
-            account_id: domain.account_id,
+            id: domain.id,
             name: domain.name,
+            scope: scope.to_string(),
             config: domain.config,
             created_at: domain.created_at,
             updated_at: domain.updated_at,

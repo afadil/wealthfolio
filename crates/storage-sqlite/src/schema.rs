@@ -54,9 +54,19 @@ diesel::table! {
 }
 
 diesel::table! {
-    activity_import_profiles (account_id) {
+    import_account_templates (account_id) {
         account_id -> Text,
+        template_id -> Text,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    import_templates (id) {
+        id -> Text,
         name -> Text,
+        scope -> Text,
         config -> Text,
         created_at -> Timestamp,
         updated_at -> Timestamp,
@@ -433,10 +443,12 @@ diesel::joinable!(import_runs -> accounts (account_id));
 diesel::joinable!(quotes -> assets (asset_id));
 diesel::joinable!(taxonomy_categories -> taxonomies (taxonomy_id));
 
+diesel::joinable!(import_account_templates -> import_templates (template_id));
+
 diesel::allow_tables_to_appear_in_same_query!(
+    import_account_templates,
     accounts,
     activities,
-    activity_import_profiles,
     ai_messages,
     ai_thread_tags,
     ai_threads,
@@ -450,6 +462,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     goals_allocation,
     health_issue_dismissals,
     holdings_snapshots,
+    import_templates,
     import_runs,
     market_data_providers,
     platforms,

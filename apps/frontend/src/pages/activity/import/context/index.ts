@@ -15,6 +15,7 @@ export type {
   DraftActivityStatus,
   ImportResult,
   ImportResultStats,
+  PendingImportAsset,
   ImportState,
   ImportAction,
 } from "./import-context";

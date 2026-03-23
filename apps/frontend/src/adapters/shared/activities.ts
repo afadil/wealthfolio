@@ -8,10 +8,11 @@ import type {
   ActivitySearchResponse,
   ActivityUpdate,
   ActivityImport,
-  ImportActivitiesResult,
-  ImportMappingData,
   ImportAssetCandidate,
   ImportAssetPreviewItem,
+  ImportActivitiesResult,
+  ImportMappingData,
+  ImportTemplateData,
 } from "@/lib/types";
 
 import { invoke, logger } from "./platform";
@@ -144,7 +145,6 @@ export const deleteActivity = async (activityId: string): Promise<Activity> => {
  * Import activities into the system.
  * Expects activities that already passed backend check/preview resolution.
  * Apply is persistence-only and rejects missing resolved symbol fields.
- * Extracts accountId from the first activity for the backend call.
  * Returns ImportActivitiesResult with activities, import_run_id, and summary.
  */
 export const importActivities = async ({
@@ -153,10 +153,7 @@ export const importActivities = async ({
   activities: ActivityImport[];
 }): Promise<ImportActivitiesResult> => {
   try {
-    return await invoke<ImportActivitiesResult>("import_activities", {
-      accountId: activities[0].accountId,
-      activities,
-    });
+    return await invoke<ImportActivitiesResult>("import_activities", { activities });
   } catch (err) {
     logger.error(`Error importing activities: ${err}`);
     throw err;
@@ -167,23 +164,55 @@ export const importActivities = async ({
  * Check activities before import (read-only validation/preview).
  * This performs read-only validation without creating assets or FX pairs.
  * Asset creation happens during the actual import when user confirms.
- * @param accountId - The account ID to import activities into
  * @param activities - The activities to validate
  */
 export const checkActivitiesImport = async ({
-  accountId,
   activities,
 }: {
-  accountId: string;
   activities: ActivityImport[];
 }): Promise<ActivityImport[]> => {
   try {
-    return await invoke<ActivityImport[]>("check_activities_import", {
-      accountId,
-      activities,
-    });
+    return await invoke<ActivityImport[]>("check_activities_import", { activities });
   } catch (err) {
     logger.error(`Error checking activities import: ${err}`);
+    throw err;
+  }
+};
+
+export const listImportTemplates = async (): Promise<ImportTemplateData[]> => {
+  try {
+    return await invoke<ImportTemplateData[]>("list_import_templates");
+  } catch (err) {
+    logger.error("Error listing import templates.");
+    throw err;
+  }
+};
+
+export const getImportTemplate = async (id: string): Promise<ImportTemplateData> => {
+  try {
+    return await invoke<ImportTemplateData>("get_import_template", { id });
+  } catch (err) {
+    logger.error("Error fetching import template.");
+    throw err;
+  }
+};
+
+export const saveImportTemplate = async (
+  template: ImportTemplateData,
+): Promise<ImportTemplateData> => {
+  try {
+    return await invoke<ImportTemplateData>("save_import_template", { template });
+  } catch (err) {
+    logger.error("Error saving import template.");
+    throw err;
+  }
+};
+
+export const deleteImportTemplate = async (id: string): Promise<void> => {
+  try {
+    await invoke<void>("delete_import_template", { id });
+  } catch (err) {
+    logger.error("Error deleting import template.");
     throw err;
   }
 };
@@ -212,6 +241,18 @@ export const getAccountImportMapping = async (accountId: string): Promise<Import
     return await invoke<ImportMappingData>("get_account_import_mapping", { accountId });
   } catch (err) {
     logger.error("Error fetching mapping.");
+    throw err;
+  }
+};
+
+/**
+ * Link an account to an existing import template.
+ */
+export const linkAccountTemplate = async (accountId: string, templateId: string): Promise<void> => {
+  try {
+    await invoke<void>("link_account_template", { accountId, templateId });
+  } catch (err) {
+    logger.error("Error linking account to template.");
     throw err;
   }
 };

@@ -1,10 +1,30 @@
 import { isCashSymbol, isSymbolRequired } from "@/lib/activity-utils";
-import type {
-  ImportAssetCandidate,
-  NewAsset,
-  SymbolSearchResult,
-} from "@/lib/types";
+import type { ImportAssetCandidate, NewAsset, SymbolSearchResult } from "@/lib/types";
 import type { DraftActivity } from "../context";
+
+export function applyAssetResolution(
+  drafts: DraftActivity[],
+  key: string,
+  draft: NewAsset,
+  options: { assetId?: string; importAssetKey?: string },
+): DraftActivity[] {
+  return drafts.map((row) => {
+    if (row.assetCandidateKey !== key) {
+      return row;
+    }
+    return {
+      ...row,
+      symbol: draft.instrumentSymbol || draft.displayCode || row.symbol,
+      symbolName: draft.name || row.symbolName,
+      exchangeMic: draft.instrumentExchangeMic || undefined,
+      quoteCcy: draft.quoteCcy || row.quoteCcy,
+      instrumentType: draft.instrumentType || row.instrumentType,
+      quoteMode: draft.quoteMode || row.quoteMode,
+      assetId: options.assetId,
+      importAssetKey: options.importAssetKey,
+    };
+  });
+}
 
 export function mapQuoteTypeToInstrumentType(quoteType?: string): string | undefined {
   switch ((quoteType ?? "").toUpperCase()) {
@@ -87,11 +107,7 @@ export function buildNewAssetFromSearchResult(
 ): NewAsset {
   const instrumentType = mapQuoteTypeToInstrumentType(result.quoteType);
   const kind =
-    instrumentType === "METAL"
-      ? "PRECIOUS_METAL"
-      : instrumentType === "FX"
-        ? "FX"
-        : "INVESTMENT";
+    instrumentType === "METAL" ? "PRECIOUS_METAL" : instrumentType === "FX" ? "FX" : "INVESTMENT";
   const quoteMode = result.dataSource === "MANUAL" ? "MANUAL" : "MARKET";
 
   return {

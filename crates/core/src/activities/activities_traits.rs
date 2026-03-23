@@ -53,6 +53,11 @@ pub trait ActivityRepositoryTrait: Send + Sync {
     ) -> Result<Option<DateTime<Utc>>>;
     fn get_import_mapping(&self, account_id: &str) -> Result<Option<ImportMapping>>;
     async fn save_import_mapping(&self, mapping: &ImportMapping) -> Result<()>;
+    async fn link_account_template(&self, account_id: &str, template_id: &str) -> Result<()>;
+    fn list_import_templates(&self) -> Result<Vec<ImportTemplate>>;
+    fn get_import_template(&self, template_id: &str) -> Result<Option<ImportTemplate>>;
+    async fn save_import_template(&self, template: &ImportTemplate) -> Result<()>;
+    async fn delete_import_template(&self, template_id: &str) -> Result<()>;
     // Add other repository methods if necessary, e.g., calculate_average_cost, get_deposit_activities
     fn calculate_average_cost(&self, account_id: &str, asset_id: &str) -> Result<Decimal>;
     fn get_income_activities_data(&self, account_id: Option<&str>) -> Result<Vec<IncomeData>>;
@@ -131,6 +136,8 @@ pub trait ActivityServiceTrait: Send + Sync {
         account_ids: Option<&[String]>,
     ) -> Result<Option<DateTime<Utc>>>;
     fn get_import_mapping(&self, account_id: String) -> Result<ImportMappingData>;
+    fn list_import_templates(&self) -> Result<Vec<ImportTemplateData>>;
+    fn get_import_template(&self, template_id: String) -> Result<ImportTemplateData>;
     async fn create_activity(&self, activity: NewActivity) -> Result<Activity>;
     async fn update_activity(&self, activity: ActivityUpdate) -> Result<Activity>;
     async fn delete_activity(&self, activity_id: String) -> Result<Activity>;
@@ -140,18 +147,26 @@ pub trait ActivityServiceTrait: Send + Sync {
     ) -> Result<ActivityBulkMutationResult>;
     async fn check_activities_import(
         &self,
-        account_id: String,
         activities: Vec<ActivityImport>,
     ) -> Result<Vec<ActivityImport>>;
+    async fn preview_import_assets(
+        &self,
+        candidates: Vec<ImportAssetCandidate>,
+    ) -> Result<Vec<ImportAssetPreviewItem>>;
     async fn import_activities(
         &self,
-        account_id: String,
         activities: Vec<ActivityImport>,
     ) -> Result<ImportActivitiesResult>;
+    async fn link_account_template(&self, account_id: String, template_id: String) -> Result<()>;
     async fn save_import_mapping(
         &self,
         mapping_data: ImportMappingData,
     ) -> Result<ImportMappingData>;
+    async fn save_import_template(
+        &self,
+        template_data: ImportTemplateData,
+    ) -> Result<ImportTemplateData>;
+    async fn delete_import_template(&self, template_id: String) -> Result<()>;
 
     /// Checks for existing activities with the given idempotency keys.
     ///
