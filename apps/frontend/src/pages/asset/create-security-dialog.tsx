@@ -94,6 +94,10 @@ interface CreateSecurityDialogProps {
   onOpenChange: (open: boolean) => void;
   onSubmit: (payload: NewAsset) => void;
   isPending?: boolean;
+  title?: string;
+  description?: string;
+  submitLabel?: string;
+  initialAsset?: Partial<NewAsset>;
 }
 
 export function CreateSecurityDialog({
@@ -101,6 +105,10 @@ export function CreateSecurityDialog({
   onOpenChange,
   onSubmit,
   isPending = false,
+  title,
+  description,
+  submitLabel,
+  initialAsset,
 }: CreateSecurityDialogProps) {
   const { settings } = useSettingsContext();
   const defaultCurrency = settings?.baseCurrency || "USD";
@@ -138,16 +146,16 @@ export function CreateSecurityDialog({
     if (open) {
       setSelectedResult(undefined);
       form.reset({
-        symbol: "",
-        name: "",
-        instrumentType: "EQUITY",
-        quoteCcy: defaultCurrency,
-        quoteMode: "MANUAL",
-        instrumentExchangeMic: "",
-        notes: "",
+        symbol: initialAsset?.instrumentSymbol || initialAsset?.displayCode || "",
+        name: initialAsset?.name || "",
+        instrumentType: initialAsset?.instrumentType || "EQUITY",
+        quoteCcy: initialAsset?.quoteCcy || defaultCurrency,
+        quoteMode: initialAsset?.quoteMode || "MANUAL",
+        instrumentExchangeMic: initialAsset?.instrumentExchangeMic || "",
+        notes: initialAsset?.notes || "",
       });
     }
-  }, [open, defaultCurrency, form]);
+  }, [open, defaultCurrency, form, initialAsset]);
 
   const handleTickerSelect = useCallback(
     (_symbol: string, result?: SymbolSearchResult) => {
@@ -211,9 +219,9 @@ export function CreateSecurityDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add Security</DialogTitle>
+          <DialogTitle>{title ?? "Add Security"}</DialogTitle>
           <DialogDescription>
-            Search for a security to auto-fill details, or enter them manually.
+            {description ?? "Search for a security to auto-fill details, or enter them manually."}
           </DialogDescription>
         </DialogHeader>
 
@@ -406,7 +414,7 @@ export function CreateSecurityDialog({
                     <Icons.Spinner className="h-4 w-4 animate-spin" /> Creating...
                   </span>
                 ) : (
-                  "Create Security"
+                  (submitLabel ?? "Create Security")
                 )}
               </Button>
             </DialogFooter>

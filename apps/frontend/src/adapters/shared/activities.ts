@@ -10,6 +10,8 @@ import type {
   ActivityImport,
   ImportActivitiesResult,
   ImportMappingData,
+  ImportAssetCandidate,
+  ImportAssetPreviewItem,
 } from "@/lib/types";
 
 import { invoke, logger } from "./platform";
@@ -182,6 +184,22 @@ export const checkActivitiesImport = async ({
     });
   } catch (err) {
     logger.error(`Error checking activities import: ${err}`);
+    throw err;
+  }
+};
+
+/**
+ * Preview which assets would be created or matched for a set of import candidates.
+ */
+export const previewImportAssets = async ({
+  candidates,
+}: {
+  candidates: ImportAssetCandidate[];
+}): Promise<ImportAssetPreviewItem[]> => {
+  try {
+    return await invoke<ImportAssetPreviewItem[]>("preview_import_assets", { candidates });
+  } catch (err) {
+    logger.error(`Error previewing import assets: ${err}`);
     throw err;
   }
 };

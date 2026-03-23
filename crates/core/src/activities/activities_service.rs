@@ -34,6 +34,13 @@ type QuoteCcyCache = HashMap<(String, Option<String>, Option<String>), Option<St
 use uuid::Uuid;
 use wealthfolio_market_data::mic_to_currency;
 
+/// Resolved symbol info from a market data provider search.
+#[derive(Debug, Default)]
+struct ResolvedSymbolInfo {
+    exchange_mic: Option<String>,
+    name: Option<String>,
+}
+
 /// Service for managing activities
 pub struct ActivityService {
     activity_repository: Arc<dyn ActivityRepositoryTrait>,
@@ -532,20 +539,19 @@ impl ActivityService {
         validated
     }
 
-    /// Resolves (symbol, currency) pairs to exchange MICs in batch.
-    /// Uses the activity-level currency to rank exchange results correctly.
-    /// First checks existing assets in the database, then falls back to quote service.
+    /// Resolves (symbol, currency) pairs to exchange MIC + provider name in batch.
+    /// First checks existing assets in the database, then falls back to the quote service.
     async fn resolve_symbols_batch(
         &self,
         symbol_currency_pairs: HashSet<(String, String)>,
-    ) -> HashMap<(String, String), Option<String>> {
-        let mut cache: HashMap<(String, String), Option<String>> = HashMap::new();
+    ) -> HashMap<(String, String), ResolvedSymbolInfo> {
+        let mut cache: HashMap<(String, String), ResolvedSymbolInfo> = HashMap::new();
 
         if symbol_currency_pairs.is_empty() {
             return cache;
         }
 
-        // 1. Get all existing assets and build a lookup map (case-insensitive)
+        // 1. Build a lookup map from existing assets (case-insensitive)
         let existing_assets = self.asset_service.get_assets().unwrap_or_default();
         let existing_map: HashMap<String, Option<String>> = existing_assets
             .into_iter()
@@ -560,7 +566,10 @@ impl ActivityService {
 
         for (symbol, currency) in &symbol_currency_pairs {
             if symbol.trim().is_empty() {
-                cache.insert((symbol.clone(), currency.clone()), None);
+                cache.insert(
+                    (symbol.clone(), currency.clone()),
+                    ResolvedSymbolInfo::default(),
+                );
                 continue;
             }
             let mut existing_match = None;
@@ -572,23 +581,30 @@ impl ActivityService {
             }
 
             if let Some(exchange_mic) = existing_match {
-                cache.insert((symbol.clone(), currency.clone()), exchange_mic);
+                // Existing DB assets: name comes from get_asset_by_id, not needed here
+                cache.insert(
+                    (symbol.clone(), currency.clone()),
+                    ResolvedSymbolInfo {
+                        exchange_mic,
+                        name: None,
+                    },
+                );
             } else {
                 missing.push((symbol.clone(), currency.clone()));
             }
         }
 
-        // 3. Resolve missing symbols via quote service using the activity currency
+        // 3. Resolve missing symbols via quote service
         for (symbol, currency) in missing {
-            let exchange_mic = self.resolve_symbol_exchange_mic(&symbol, &currency).await;
-            cache.insert((symbol, currency), exchange_mic);
+            let info = self.resolve_symbol_exchange_mic(&symbol, &currency).await;
+            cache.insert((symbol, currency), info);
         }
 
         cache
     }
 
     /// Convenience wrapper: resolves symbols using a single currency for all.
-    /// Used by callers where per-activity currency isn't available (broker sync, prepare).
+    /// Used by callers that only need exchange MICs (broker sync, prepare).
     async fn resolve_symbols_batch_single_currency(
         &self,
         symbols: HashSet<String>,
@@ -601,26 +617,35 @@ impl ActivityService {
         self.resolve_symbols_batch(pairs)
             .await
             .into_iter()
-            .map(|((sym, _), mic)| (sym, mic))
+            .map(|((sym, _), info)| (sym, info.exchange_mic))
             .collect()
     }
 
-    /// Resolve a single symbol to exchange MIC using a currency input.
-    async fn resolve_symbol_exchange_mic(&self, symbol: &str, currency: &str) -> Option<String> {
+    /// Resolve a single symbol via market data, returning MIC and provider name.
+    async fn resolve_symbol_exchange_mic(
+        &self,
+        symbol: &str,
+        currency: &str,
+    ) -> ResolvedSymbolInfo {
         for candidate in symbol_resolution_candidates(symbol) {
-            let exchange_mic = self
+            let result = self
                 .quote_service
                 .search_symbol_with_currency(&candidate, Some(currency))
                 .await
                 .ok()
-                .and_then(|results| results.first().and_then(|r| r.exchange_mic.clone()));
+                .and_then(|results| results.into_iter().next());
 
-            if exchange_mic.is_some() {
-                return exchange_mic;
+            if let Some(r) = result {
+                if r.exchange_mic.is_some() {
+                    return ResolvedSymbolInfo {
+                        exchange_mic: r.exchange_mic,
+                        name: Some(r.long_name).filter(|n| !n.is_empty()),
+                    };
+                }
             }
         }
 
-        None
+        ResolvedSymbolInfo::default()
     }
 
     /// Creates a quote from activity data to serve as a price fallback.
@@ -2234,7 +2259,15 @@ impl ActivityServiceTrait for ActivityService {
             })
             .collect();
 
-        let symbol_mic_cache = self.resolve_symbols_batch(symbol_currency_pairs).await;
+        let symbol_batch = self.resolve_symbols_batch(symbol_currency_pairs).await;
+        let symbol_mic_cache: HashMap<(String, String), Option<String>> = symbol_batch
+            .iter()
+            .map(|(k, info)| (k.clone(), info.exchange_mic.clone()))
+            .collect();
+        let symbol_name_cache: HashMap<(String, String), Option<String>> = symbol_batch
+            .into_iter()
+            .map(|(k, info)| (k, info.name))
+            .collect();
 
         // Cache raw provider quote-currency results by (symbol, mic, instrument_type) to avoid
         // hitting the provider once per row for the same symbol. Precedence logic runs per-row.
@@ -2324,7 +2357,7 @@ impl ActivityServiceTrait for ActivityService {
             };
             let exchange_mic = activity.exchange_mic.clone().or_else(|| {
                 symbol_mic_cache
-                    .get(&(activity.symbol.clone(), resolve_ccy))
+                    .get(&(activity.symbol.clone(), resolve_ccy.clone()))
                     .cloned()
                     .flatten()
             });
@@ -2394,9 +2427,15 @@ impl ActivityServiceTrait for ActivityService {
                     asset_currency = Some(asset.quote_ccy.clone());
                     activity.quote_mode = Some(asset.quote_mode.as_db_str().to_string());
                 }
-            }
-            if activity.symbol_name.is_none() {
-                activity.symbol_name = Some(normalized_symbol.clone());
+            } else {
+                // Use provider-supplied name when available; fall back to symbol
+                let provider_name = symbol_name_cache
+                    .get(&(symbol.clone(), resolve_ccy.clone()))
+                    .and_then(|n| n.clone())
+                    .filter(|n| {
+                        !n.is_empty() && n.to_uppercase() != normalized_symbol.to_uppercase()
+                    });
+                activity.symbol_name = provider_name.or_else(|| Some(normalized_symbol.clone()));
             }
 
             // Parse quote_mode from the activity (same pattern as prepare_new_activity)

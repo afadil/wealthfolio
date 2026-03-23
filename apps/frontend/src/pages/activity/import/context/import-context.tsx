@@ -59,6 +59,11 @@ export interface DraftActivity {
   instrumentType?: string;
   quoteMode?: QuoteMode;
 
+  // Asset resolution (set during asset-review step)
+  assetCandidateKey?: string;
+  assetId?: string;
+  importAssetKey?: string;
+
   // Validation state
   status: DraftActivityStatus;
   errors: Record<string, string[]>;

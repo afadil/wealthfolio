@@ -834,6 +834,31 @@ export interface NewAsset {
   notes?: string;
 }
 
+export interface ImportAssetCandidate {
+  key: string;
+  accountId: string;
+  symbol: string;
+  currency?: string;
+  instrumentType?: string;
+  quoteCcy?: string;
+  quoteMode?: string;
+}
+
+export type ImportAssetPreviewStatus =
+  | "EXISTING_ASSET"
+  | "AUTO_RESOLVED_NEW_ASSET"
+  | "NEEDS_FIXING";
+
+export interface ImportAssetPreviewItem {
+  key: string;
+  status: ImportAssetPreviewStatus;
+  resolutionSource: string;
+  assetId?: string;
+  draft?: NewAsset;
+  errors?: Record<string, string[]>;
+  warnings?: Record<string, string[]>;
+}
+
 export interface UpdateAssetProfile {
   id: string;
   displayCode?: string | null;
