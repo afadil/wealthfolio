@@ -2319,6 +2319,32 @@ mod tests {
             unimplemented!("unused in this test")
         }
 
+        async fn link_account_template(&self, _account_id: &str, _template_id: &str) -> Result<()> {
+            unimplemented!("unused in this test")
+        }
+
+        fn list_import_templates(&self) -> Result<Vec<crate::activities::ImportTemplate>> {
+            Ok(Vec::new())
+        }
+
+        fn get_import_template(
+            &self,
+            _template_id: &str,
+        ) -> Result<Option<crate::activities::ImportTemplate>> {
+            Ok(None)
+        }
+
+        async fn save_import_template(
+            &self,
+            _template: &crate::activities::ImportTemplate,
+        ) -> Result<()> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn delete_import_template(&self, _template_id: &str) -> Result<()> {
+            unimplemented!("unused in this test")
+        }
+
         fn calculate_average_cost(
             &self,
             _account_id: &str,

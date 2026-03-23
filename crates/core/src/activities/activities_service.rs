@@ -3118,7 +3118,7 @@ impl ActivityServiceTrait for ActivityService {
                 account_id: Some(candidate.account_id.clone()),
                 account_name: None,
                 symbol_name: None,
-                exchange_mic: None,
+                exchange_mic: candidate.exchange_mic.clone(),
                 quote_ccy: candidate.quote_ccy.clone(),
                 instrument_type: candidate.instrument_type.clone(),
                 quote_mode: candidate.quote_mode.clone(),

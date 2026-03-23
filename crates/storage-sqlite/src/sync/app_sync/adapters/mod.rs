@@ -38,6 +38,10 @@ pub fn default_adapter_descriptors() -> Vec<EntityAdapterDescriptor> {
             table_name: "import_account_templates",
         },
         EntityAdapterDescriptor {
+            entity: SyncEntity::ImportTemplate,
+            table_name: "import_templates",
+        },
+        EntityAdapterDescriptor {
             entity: SyncEntity::Goal,
             table_name: "goals",
         },

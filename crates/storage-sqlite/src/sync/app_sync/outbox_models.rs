@@ -1,7 +1,7 @@
 //! Centralized sync-entity mappings for projected outbox models.
 
 use crate::accounts::AccountDB;
-use crate::activities::{ActivityDB, ImportAccountTemplateDB};
+use crate::activities::{ActivityDB, ImportAccountTemplateDB, ImportTemplateDB};
 use crate::ai_chat::{AiMessageDB, AiThreadDB, AiThreadTagDB};
 use crate::assets::AssetDB;
 use crate::goals::{GoalDB, GoalsAllocationDB};
@@ -86,6 +86,14 @@ impl SyncOutboxModel for ImportAccountTemplateDB {
 
     fn delete_payload(entity_id: &str) -> serde_json::Value {
         serde_json::json!({ "accountId": entity_id })
+    }
+}
+
+impl SyncOutboxModel for ImportTemplateDB {
+    const ENTITY: SyncEntity = SyncEntity::ImportTemplate;
+
+    fn sync_entity_id(&self) -> &str {
+        &self.id
     }
 }
 

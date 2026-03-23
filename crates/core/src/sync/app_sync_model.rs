@@ -37,6 +37,7 @@ pub enum SyncEntity {
     AssetTaxonomyAssignment,
     Activity,
     ActivityImportProfile,
+    ImportTemplate,
     Goal,
     GoalsAllocation,
     AiThread,

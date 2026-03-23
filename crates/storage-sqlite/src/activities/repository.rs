@@ -666,8 +666,11 @@ impl ActivityRepositoryTrait for ActivityRepository {
                     .map_err(StorageError::from)?;
 
                 let now = Utc::now().naive_utc();
-                let template_id = if let Some(link) = existing_link {
-                    // Update the existing linked template
+                let account_local_id = format!("acct_{}", mapping.account_id);
+                let template_id = if let Some(link) =
+                    existing_link.filter(|l| l.template_id == account_local_id)
+                {
+                    // Update the existing account-local template in place
                     diesel::update(
                         import_templates::table.filter(import_templates::id.eq(&link.template_id)),
                     )
@@ -680,8 +683,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
                     .map_err(StorageError::from)?;
                     link.template_id
                 } else {
-                    // Create a new template and link it
-                    let new_id = format!("acct_{}", mapping.account_id);
+                    // Linked template is shared/system or no link — create a new account-local one
+                    let new_id = account_local_id;
                     let template_db = ImportTemplateDB {
                         id: new_id.clone(),
                         name: mapping.name.clone(),
@@ -780,6 +783,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
                     .set(&template_db)
                     .execute(tx.conn())
                     .map_err(StorageError::from)?;
+                tx.update(&template_db)?;
                 Ok(())
             })
             .await
@@ -794,6 +798,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 )
                 .execute(tx.conn())
                 .map_err(StorageError::from)?;
+                tx.delete::<ImportTemplateDB>(&template_id);
                 Ok(())
             })
             .await

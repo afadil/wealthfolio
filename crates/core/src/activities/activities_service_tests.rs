@@ -779,6 +779,22 @@ mod tests {
             unimplemented!()
         }
 
+        fn list_import_templates(&self) -> Result<Vec<ImportTemplate>> {
+            Ok(Vec::new())
+        }
+
+        fn get_import_template(&self, _template_id: &str) -> Result<Option<ImportTemplate>> {
+            Ok(None)
+        }
+
+        async fn save_import_template(&self, _template: &ImportTemplate) -> Result<()> {
+            unimplemented!()
+        }
+
+        async fn delete_import_template(&self, _template_id: &str) -> Result<()> {
+            unimplemented!()
+        }
+
         fn calculate_average_cost(&self, _account_id: &str, _asset_id: &str) -> Result<Decimal> {
             unimplemented!()
         }
@@ -2259,7 +2275,7 @@ mod tests {
         };
 
         let result = activity_service
-            .check_activities_import("acc-1".to_string(), vec![import])
+            .check_activities_import(vec![import])
             .await
             .expect("import check should succeed");
 
@@ -2320,7 +2336,7 @@ mod tests {
         };
 
         let result = activity_service
-            .check_activities_import("acc-1".to_string(), vec![import])
+            .check_activities_import(vec![import])
             .await
             .expect("import check should succeed");
 
@@ -2388,7 +2404,7 @@ mod tests {
         };
 
         let result = activity_service
-            .check_activities_import("acc-1".to_string(), vec![import])
+            .check_activities_import(vec![import])
             .await
             .expect("import check should succeed");
 
@@ -2450,7 +2466,7 @@ mod tests {
         };
 
         let result = activity_service
-            .check_activities_import("acc-1".to_string(), vec![import])
+            .check_activities_import(vec![import])
             .await
             .expect("import check should succeed");
 
@@ -2660,7 +2676,7 @@ mod tests {
         };
 
         let result = activity_service
-            .check_activities_import("acc-1".to_string(), vec![import])
+            .check_activities_import(vec![import])
             .await
             .expect("import check should succeed");
 
@@ -2722,7 +2738,7 @@ mod tests {
         };
 
         let result = activity_service
-            .import_activities("acc-1".to_string(), vec![unresolved])
+            .import_activities(vec![unresolved])
             .await
             .expect("import should complete with validation feedback");
 
@@ -2797,7 +2813,7 @@ mod tests {
         };
 
         let result = activity_service
-            .import_activities("acc-1".to_string(), vec![resolved])
+            .import_activities(vec![resolved])
             .await
             .expect("import should succeed");
 
@@ -2865,7 +2881,7 @@ mod tests {
         };
 
         let result = activity_service
-            .import_activities("acc-1".to_string(), vec![manual_row])
+            .import_activities(vec![manual_row])
             .await
             .expect("manual quote import should succeed");
 
@@ -2933,7 +2949,7 @@ mod tests {
         };
 
         let result = activity_service
-            .import_activities("acc-1".to_string(), vec![invalid_date_row])
+            .import_activities(vec![invalid_date_row])
             .await
             .expect("import should return validation feedback");
 
@@ -2999,7 +3015,7 @@ mod tests {
         };
 
         let result = activity_service
-            .import_activities("acc-1".to_string(), vec![cash_row])
+            .import_activities(vec![cash_row])
             .await
             .expect("cash import should succeed");
 
@@ -3092,7 +3108,7 @@ mod tests {
         };
 
         let result = activity_service
-            .import_activities("acc-1".to_string(), vec![transfer_out, transfer_in])
+            .import_activities(vec![transfer_out, transfer_in])
             .await
             .expect("transfer import should succeed");
 
@@ -3467,7 +3483,7 @@ mod tests {
         };
 
         let result = activity_service
-            .check_activities_import("acc-1".to_string(), vec![import])
+            .check_activities_import(vec![import])
             .await
             .expect("import check should succeed");
 
@@ -3530,7 +3546,7 @@ mod tests {
         };
 
         let result = activity_service
-            .import_activities("acc-1".to_string(), vec![resolved])
+            .import_activities(vec![resolved])
             .await
             .expect("import should succeed for bond");
 
@@ -3593,7 +3609,7 @@ mod tests {
             };
 
             let result = activity_service
-                .import_activities("acc-1".to_string(), vec![resolved])
+                .import_activities(vec![resolved])
                 .await
                 .unwrap_or_else(|_| panic!("import should succeed for alias '{}'", alias));
 
@@ -3668,7 +3684,7 @@ mod tests {
         };
 
         let result = activity_service
-            .check_activities_import("acc-1".to_string(), vec![import])
+            .check_activities_import(vec![import])
             .await
             .expect("import check should succeed");
 
@@ -3744,7 +3760,7 @@ mod tests {
         };
 
         let result = activity_service
-            .check_activities_import("acc-1".to_string(), vec![import])
+            .check_activities_import(vec![import])
             .await
             .expect("import check should succeed");
 
@@ -3808,7 +3824,7 @@ mod tests {
         };
 
         let result = activity_service
-            .import_activities("acc-1".to_string(), vec![resolved])
+            .import_activities(vec![resolved])
             .await
             .expect("import should succeed for option");
 
@@ -3881,7 +3897,7 @@ mod tests {
         };
 
         let result = activity_service
-            .check_activities_import("acc-1".to_string(), vec![import])
+            .check_activities_import(vec![import])
             .await
             .expect("import check should succeed");
 

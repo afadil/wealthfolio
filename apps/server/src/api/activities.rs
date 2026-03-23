@@ -259,6 +259,25 @@ async fn delete_import_template(
 }
 
 #[derive(serde::Deserialize)]
+struct LinkAccountTemplateBody {
+    #[serde(rename = "accountId")]
+    account_id: String,
+    #[serde(rename = "templateId")]
+    template_id: String,
+}
+
+async fn link_account_template(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<LinkAccountTemplateBody>,
+) -> ApiResult<Json<serde_json::Value>> {
+    state
+        .activity_service
+        .link_account_template(body.account_id, body.template_id)
+        .await?;
+    Ok(Json(serde_json::json!({ "success": true })))
+}
+
+#[derive(serde::Deserialize)]
 struct CheckDuplicatesBody {
     #[serde(rename = "idempotencyKeys")]
     idempotency_keys: Vec<String>,
@@ -332,7 +351,10 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/activities/bulk", post(save_activities))
         .route("/activities/{id}", delete(delete_activity))
         .route("/activities/import/check", post(check_activities_import))
-        .route("/activities/import/assets/preview", post(preview_import_assets))
+        .route(
+            "/activities/import/assets/preview",
+            post(preview_import_assets),
+        )
         .route("/activities/import", post(import_activities))
         .route("/activities/import/parse", post(parse_csv_endpoint))
         .route(
@@ -345,7 +367,14 @@ pub fn router() -> Router<Arc<AppState>> {
                 .post(save_import_template)
                 .delete(delete_import_template),
         )
-        .route("/activities/import/templates/item", get(get_import_template))
+        .route(
+            "/activities/import/templates/item",
+            get(get_import_template),
+        )
+        .route(
+            "/activities/import/templates/link",
+            post(link_account_template),
+        )
         .route(
             "/activities/import/check-duplicates",
             post(check_existing_duplicates),

@@ -396,10 +396,8 @@ function ImportWizardContent() {
       }
 
       if (state.step === "review" && !isHoldingsMode) {
-        if (state.lastValidatedRevision !== state.draftRevision) {
-          const result = await validateDrafts(state.draftActivities);
-          if (!result.ok || result.hasErrors) return;
-        }
+        const result = await validateDrafts(state.draftActivities);
+        if (!result.ok || result.hasErrors) return;
       }
 
       dispatch(nextStep());
@@ -414,8 +412,6 @@ function ImportWizardContent() {
     state.parsedRows,
     state.parseConfig,
     state.draftActivities,
-    state.lastValidatedRevision,
-    state.draftRevision,
     isHoldingsMode,
     validateDrafts,
     previewAssets,

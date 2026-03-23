@@ -73,6 +73,7 @@ export const COMMANDS: CommandMap = {
   import_activities: { method: "POST", path: "/activities/import" },
   get_account_import_mapping: { method: "GET", path: "/activities/import/mapping" },
   save_account_import_mapping: { method: "POST", path: "/activities/import/mapping" },
+  link_account_template: { method: "POST", path: "/activities/import/templates/link" },
   list_import_templates: { method: "GET", path: "/activities/import/templates" },
   get_import_template: { method: "GET", path: "/activities/import/templates/item" },
   save_import_template: { method: "POST", path: "/activities/import/templates" },

@@ -864,6 +864,7 @@ export interface ImportAssetCandidate {
   instrumentType?: string;
   quoteCcy?: string;
   quoteMode?: string;
+  exchangeMic?: string;
 }
 
 export type ImportAssetPreviewStatus =

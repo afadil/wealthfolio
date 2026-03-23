@@ -336,6 +336,7 @@ fn entity_storage_mapping(entity: &SyncEntity) -> Option<(&'static str, &'static
         SyncEntity::AssetTaxonomyAssignment => Some(("asset_taxonomy_assignments", "id")),
         SyncEntity::Activity => Some(("activities", "id")),
         SyncEntity::ActivityImportProfile => Some(("import_account_templates", "account_id")),
+        SyncEntity::ImportTemplate => Some(("import_templates", "id")),
         SyncEntity::Goal => Some(("goals", "id")),
         SyncEntity::GoalsAllocation => Some(("goals_allocation", "id")),
         SyncEntity::AiThread => Some(("ai_threads", "id")),

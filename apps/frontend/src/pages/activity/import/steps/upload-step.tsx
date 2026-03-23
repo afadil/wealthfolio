@@ -560,8 +560,12 @@ export function UploadStep() {
   // Auto-suggest linked template when account changes
   const templatesRef = useRef(templates);
   templatesRef.current = templates;
+  const prevAccountIdRef = useRef(state.accountId);
   useEffect(() => {
-    if (!state.accountId || state.selectedTemplateId) return;
+    const accountChanged = prevAccountIdRef.current !== state.accountId;
+    prevAccountIdRef.current = state.accountId;
+    // Skip if no account, or if a template is already selected and the account hasn't changed
+    if (!state.accountId || (state.selectedTemplateId && !accountChanged)) return;
     getAccountImportMapping(state.accountId)
       .then((mapping) => {
         if (!mapping?.templateId) return;

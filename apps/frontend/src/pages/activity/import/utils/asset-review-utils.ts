@@ -59,6 +59,7 @@ export function buildImportAssetCandidateKey(input: {
   instrumentType?: string;
   quoteMode?: string;
   quoteCcy?: string;
+  exchangeMic?: string;
 }): string {
   return [
     input.accountId.trim(),
@@ -66,6 +67,7 @@ export function buildImportAssetCandidateKey(input: {
     input.instrumentType?.trim().toUpperCase() ?? "",
     input.quoteMode?.trim().toUpperCase() ?? "",
     input.quoteCcy?.trim().toUpperCase() ?? "",
+    input.exchangeMic?.trim().toUpperCase() ?? "",
   ].join("::");
 }
 
@@ -91,6 +93,7 @@ export function buildImportAssetCandidateFromDraft(
         instrumentType: draft.instrumentType,
         quoteMode: draft.quoteMode,
         quoteCcy: draft.quoteCcy || draft.currency,
+        exchangeMic: draft.exchangeMic,
       }),
     accountId: draft.accountId,
     symbol: draft.symbol,
@@ -98,6 +101,7 @@ export function buildImportAssetCandidateFromDraft(
     instrumentType: draft.instrumentType,
     quoteCcy: draft.quoteCcy,
     quoteMode: draft.quoteMode,
+    exchangeMic: draft.exchangeMic,
   };
 }
 
