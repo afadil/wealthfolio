@@ -84,13 +84,19 @@ test.describe("CSV Import Wizard", () => {
     await continueBtn.click();
     await page.waitForTimeout(1000);
 
-    // Mapping step — proceed to review
-    const reviewBtn = page.getByRole("button", { name: /Review Activities/i });
-    await expect(reviewBtn).toBeEnabled({ timeout: 10000 });
-    await reviewBtn.click();
+    // Mapping step — proceed to asset review
+    const reviewAssetsBtn = page.getByRole("button", { name: /Review Assets/i });
+    await expect(reviewAssetsBtn).toBeEnabled({ timeout: 10000 });
+    await reviewAssetsBtn.click();
     await page.waitForTimeout(2000);
 
-    // Review step — wait for backend validation and proceed to confirm
+    // Asset review step — wait for asset resolution, then proceed to activity review
+    const reviewActivitiesBtn = page.getByRole("button", { name: /Review Activities/i });
+    await expect(reviewActivitiesBtn).toBeEnabled({ timeout: 30000 });
+    await reviewActivitiesBtn.click();
+    await page.waitForTimeout(2000);
+
+    // Activity review step — wait for backend validation and proceed to confirm
     const continueToImportBtn = page.getByRole("button", { name: /Continue to Import/i });
     await expect(continueToImportBtn).toBeEnabled({ timeout: 30000 });
     await continueToImportBtn.click();
@@ -149,9 +155,14 @@ test.describe("CSV Import Wizard", () => {
     await continueBtn.click();
     await page.waitForTimeout(1000);
 
-    const reviewBtn = page.getByRole("button", { name: /Review Activities/i });
-    await expect(reviewBtn).toBeEnabled({ timeout: 10000 });
-    await reviewBtn.click();
+    const reviewAssetsBtn = page.getByRole("button", { name: /Review Assets/i });
+    await expect(reviewAssetsBtn).toBeEnabled({ timeout: 10000 });
+    await reviewAssetsBtn.click();
+    await page.waitForTimeout(2000);
+
+    const reviewActivitiesBtn = page.getByRole("button", { name: /Review Activities/i });
+    await expect(reviewActivitiesBtn).toBeEnabled({ timeout: 30000 });
+    await reviewActivitiesBtn.click();
     await page.waitForTimeout(2000);
 
     const continueToImportBtn = page.getByRole("button", { name: /Continue to Import/i });
@@ -205,9 +216,14 @@ test.describe("CSV Import Wizard", () => {
     await continueBtn.click();
     await page.waitForTimeout(1000);
 
-    const reviewBtn = page.getByRole("button", { name: /Review Activities/i });
-    await expect(reviewBtn).toBeEnabled({ timeout: 10000 });
-    await reviewBtn.click();
+    const reviewAssetsBtn = page.getByRole("button", { name: /Review Assets/i });
+    await expect(reviewAssetsBtn).toBeEnabled({ timeout: 10000 });
+    await reviewAssetsBtn.click();
+    await page.waitForTimeout(2000);
+
+    const reviewActivitiesBtn = page.getByRole("button", { name: /Review Activities/i });
+    await expect(reviewActivitiesBtn).toBeEnabled({ timeout: 30000 });
+    await reviewActivitiesBtn.click();
     await page.waitForTimeout(3000);
 
     // On Review step: some activities should be marked as duplicates
@@ -259,7 +275,7 @@ test.describe("CSV Import Wizard", () => {
     await page.waitForTimeout(1000);
 
     // We should be on the Mapping step now
-    await expect(page.getByRole("button", { name: /Review Activities/i })).toBeVisible({
+    await expect(page.getByRole("button", { name: /Review Assets/i })).toBeVisible({
       timeout: 5000,
     });
 
@@ -276,7 +292,7 @@ test.describe("CSV Import Wizard", () => {
     await page.waitForTimeout(300);
 
     await expect(page.getByRole("alertdialog")).not.toBeVisible({ timeout: 3000 });
-    await expect(page.getByRole("button", { name: /Review Activities/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Review Assets/i })).toBeVisible();
 
     // Click Cancel again and confirm cancel
     await page.getByRole("button", { name: "Cancel" }).click();

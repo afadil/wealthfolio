@@ -82,7 +82,11 @@ test.describe("Asset Creation", () => {
     await page.goto(`${BASE_URL}/settings/securities`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Securities" })).toBeVisible({ timeout: 10000 });
 
-    // Skip if AAPL already exists (likely from earlier specs)
+    // Wait for table data to load before checking for existing assets
+    await expect(page.getByRole("table")).toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(1000);
+
+    // Skip if AAPL already exists (likely from earlier specs like CSV import)
     const existingRow = page.getByRole("row").filter({ hasText: "AAPL" });
     if (await existingRow.isVisible().catch(() => false)) {
       return;
@@ -91,8 +95,13 @@ test.describe("Asset Creation", () => {
     await page.getByRole("button", { name: "Add Security" }).click();
     await expect(page.getByRole("dialog")).toBeVisible({ timeout: 5000 });
 
-    // Search for Apple in the ticker search
-    const searchInput = page.getByPlaceholder("Search by name or symbol...");
+    // Click the search combobox trigger to open the search popover
+    const searchTrigger = page.getByRole("combobox", { name: /search/i });
+    await searchTrigger.click();
+    await page.waitForTimeout(300);
+
+    // Fill the actual CommandInput inside the popover
+    const searchInput = page.getByPlaceholder("Search for symbol");
     await searchInput.fill("AAPL");
     await page.waitForTimeout(500);
 
