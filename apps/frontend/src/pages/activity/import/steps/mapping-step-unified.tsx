@@ -1,8 +1,4 @@
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getAccounts,
   deleteImportTemplate,
@@ -42,6 +38,7 @@ import { isCashSymbol, isSymbolRequired } from "@/lib/activity-utils";
 import { IMPORT_REQUIRED_FIELDS, ImportFormat } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, CsvRowData, ImportTemplateData } from "@/lib/types";
+import { ImportType } from "@/lib/types";
 
 export function MappingStepUnified() {
   const { state, dispatch } = useImportContext();
@@ -84,6 +81,7 @@ export function MappingStepUnified() {
     accountId,
     defaultMapping: mapping || {
       accountId: accountId || "",
+      importType: ImportType.ACTIVITY,
       name: "",
       fieldMappings: {},
       activityMappings: {},
@@ -155,9 +153,7 @@ export function MappingStepUnified() {
     if (!localMapping.fieldMappings[ImportFormat.ACCOUNT]) return [];
     return Array.from(
       new Set(
-        data
-          .map((row) => getMappedValue(row, ImportFormat.ACCOUNT)?.trim() || "")
-          .filter(Boolean),
+        data.map((row) => getMappedValue(row, ImportFormat.ACCOUNT)?.trim() || "").filter(Boolean),
       ),
     );
   }, [data, localMapping.fieldMappings, getMappedValue]);
@@ -165,8 +161,7 @@ export function MappingStepUnified() {
   const validAccountIds = useMemo(() => new Set(accounts.map((account) => account.id)), [accounts]);
   const invalidAccounts = useMemo(() => {
     return distinctAccountIds.filter(
-      (account) =>
-        !validAccountIds.has(account) && !localMapping.accountMappings?.[account],
+      (account) => !validAccountIds.has(account) && !localMapping.accountMappings?.[account],
     );
   }, [distinctAccountIds, localMapping.accountMappings, validAccountIds]);
 
@@ -242,12 +237,7 @@ export function MappingStepUnified() {
     }
 
     return Boolean(accountId);
-  }, [
-    accountId,
-    accountsToMapCount,
-    localMapping.fieldMappings,
-    missingAccountRowsCount,
-  ]);
+  }, [accountId, accountsToMapCount, localMapping.fieldMappings, missingAccountRowsCount]);
 
   const accountsDescription = useMemo(() => {
     if (!localMapping.fieldMappings[ImportFormat.ACCOUNT]) {
@@ -573,7 +563,7 @@ export function MappingStepUnified() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mb-4 rounded-lg border bg-muted/20 p-4">
+      <div className="bg-muted/20 mb-4 rounded-lg border p-4">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
           <div className="space-y-1.5">
             <Label htmlFor="import-template-select">Template</Label>

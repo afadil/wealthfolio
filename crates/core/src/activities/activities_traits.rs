@@ -51,9 +51,18 @@ pub trait ActivityRepositoryTrait: Send + Sync {
         &self,
         account_ids: Option<&[String]>,
     ) -> Result<Option<DateTime<Utc>>>;
-    fn get_import_mapping(&self, account_id: &str) -> Result<Option<ImportMapping>>;
+    fn get_import_mapping(
+        &self,
+        account_id: &str,
+        import_type: &str,
+    ) -> Result<Option<ImportMapping>>;
     async fn save_import_mapping(&self, mapping: &ImportMapping) -> Result<()>;
-    async fn link_account_template(&self, account_id: &str, template_id: &str) -> Result<()>;
+    async fn link_account_template(
+        &self,
+        account_id: &str,
+        template_id: &str,
+        import_type: &str,
+    ) -> Result<()>;
     fn list_import_templates(&self) -> Result<Vec<ImportTemplate>>;
     fn get_import_template(&self, template_id: &str) -> Result<Option<ImportTemplate>>;
     async fn save_import_template(&self, template: &ImportTemplate) -> Result<()>;
@@ -135,7 +144,11 @@ pub trait ActivityServiceTrait: Send + Sync {
         &self,
         account_ids: Option<&[String]>,
     ) -> Result<Option<DateTime<Utc>>>;
-    fn get_import_mapping(&self, account_id: String) -> Result<ImportMappingData>;
+    fn get_import_mapping(
+        &self,
+        account_id: String,
+        import_type: String,
+    ) -> Result<ImportMappingData>;
     fn list_import_templates(&self) -> Result<Vec<ImportTemplateData>>;
     fn get_import_template(&self, template_id: String) -> Result<ImportTemplateData>;
     async fn create_activity(&self, activity: NewActivity) -> Result<Activity>;
@@ -157,7 +170,12 @@ pub trait ActivityServiceTrait: Send + Sync {
         &self,
         activities: Vec<ActivityImport>,
     ) -> Result<ImportActivitiesResult>;
-    async fn link_account_template(&self, account_id: String, template_id: String) -> Result<()>;
+    async fn link_account_template(
+        &self,
+        account_id: String,
+        template_id: String,
+        import_type: String,
+    ) -> Result<()>;
     async fn save_import_mapping(
         &self,
         mapping_data: ImportMappingData,

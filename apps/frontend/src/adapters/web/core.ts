@@ -580,9 +580,10 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     }
     case "get_account_import_mapping": {
-      const { accountId } = payload as { accountId: string };
+      const { accountId, importType } = payload as { accountId: string; importType?: string };
       const params = new URLSearchParams();
       params.set("accountId", accountId);
+      if (importType) params.set("importType", importType);
       url += `?${params.toString()}`;
       break;
     }

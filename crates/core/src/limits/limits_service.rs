@@ -360,13 +360,18 @@ mod tests {
         fn get_first_activity_date(&self, _: Option<&[String]>) -> Result<Option<DateTime<Utc>>> {
             unimplemented!()
         }
-        fn get_import_mapping(&self, _: &str) -> Result<Option<ImportMapping>> {
+        fn get_import_mapping(&self, _: &str, _import_type: &str) -> Result<Option<ImportMapping>> {
             unimplemented!()
         }
         async fn save_import_mapping(&self, _: &ImportMapping) -> Result<()> {
             unimplemented!()
         }
-        async fn link_account_template(&self, _account_id: &str, _template_id: &str) -> Result<()> {
+        async fn link_account_template(
+            &self,
+            _account_id: &str,
+            _template_id: &str,
+            _import_type: &str,
+        ) -> Result<()> {
             unimplemented!()
         }
         fn list_import_templates(&self) -> Result<Vec<crate::activities::ImportTemplate>> {

@@ -1,4 +1,5 @@
 import { importActivitySchema, importMappingSchema, parseConfigSchema } from "@/lib/schemas";
+export { ImportType } from "@/lib/schemas";
 import * as z from "zod";
 import {
   AccountType,

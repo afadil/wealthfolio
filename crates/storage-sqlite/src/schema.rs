@@ -54,8 +54,10 @@ diesel::table! {
 }
 
 diesel::table! {
-    import_account_templates (account_id) {
+    import_account_templates (id) {
+        id -> Text,
         account_id -> Text,
+        import_type -> Text,
         template_id -> Text,
         created_at -> Timestamp,
         updated_at -> Timestamp,

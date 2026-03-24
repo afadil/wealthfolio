@@ -408,6 +408,7 @@ mod tests {
         fn get_import_mapping(
             &self,
             _account_id: &str,
+            _import_type: &str,
         ) -> AppResult<Option<ActivityImportMapping>> {
             unimplemented!()
         }
@@ -418,6 +419,7 @@ mod tests {
             &self,
             _account_id: &str,
             _template_id: &str,
+            _import_type: &str,
         ) -> AppResult<()> {
             unimplemented!()
         }
@@ -585,7 +587,11 @@ mod tests {
         ) -> AppResult<Option<DateTime<Utc>>> {
             Ok(None)
         }
-        fn get_import_mapping(&self, _id: &str) -> AppResult<Option<ActivityImportMapping>> {
+        fn get_import_mapping(
+            &self,
+            _id: &str,
+            _import_type: &str,
+        ) -> AppResult<Option<ActivityImportMapping>> {
             Ok(None)
         }
         async fn save_import_mapping(&self, _m: &ActivityImportMapping) -> AppResult<()> {
@@ -595,6 +601,7 @@ mod tests {
             &self,
             _account_id: &str,
             _template_id: &str,
+            _import_type: &str,
         ) -> AppResult<()> {
             Ok(())
         }

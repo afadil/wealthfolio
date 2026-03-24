@@ -3,6 +3,7 @@ import {
   ImportFormat,
   ActivityType,
   ImportMappingData,
+  ImportType,
   type SymbolSearchResult,
 } from "@/lib/types";
 import { ACTIVITY_TYPE_PREFIX_LENGTH } from "@/lib/types";
@@ -350,6 +351,7 @@ export function computeFieldMappings(
 
 const emptyMapping: ImportMappingData = {
   accountId: "",
+  importType: ImportType.ACTIVITY,
   name: "",
   fieldMappings: {},
   activityMappings: {},

@@ -60,16 +60,30 @@ WHERE NOT EXISTS (
 );
 
 -- Create account → template association table
+-- id is the sync PK; (account_id, import_type) is a UNIQUE constraint that enforces
+-- one template per (account, import_type) pair without exposing a composite PK to sync.
+-- import_type values: 'ACTIVITY' | 'HOLDINGS'
 CREATE TABLE import_account_templates (
-    account_id TEXT PRIMARY KEY NOT NULL,
+    id TEXT PRIMARY KEY NOT NULL,
+    account_id TEXT NOT NULL,
+    import_type TEXT NOT NULL DEFAULT 'ACTIVITY',
     template_id TEXT NOT NULL REFERENCES import_templates(id) ON DELETE CASCADE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (account_id, import_type)
 );
 
--- Link each account to its migrated template
-INSERT INTO import_account_templates (account_id, template_id, created_at, updated_at)
-SELECT account_id, account_id, created_at, updated_at
+-- Link each account to its migrated template (all existing profiles are ACTIVITY imports).
+-- Reuse account_id as the id for migrated rows (UUIDs already).
+INSERT INTO import_account_templates (id, account_id, import_type, template_id, created_at, updated_at)
+SELECT account_id, account_id, 'ACTIVITY', account_id, created_at, updated_at
 FROM activity_import_profiles;
 
 DROP TABLE activity_import_profiles;
+
+-- Update sync_table_state: remove stale entry for the dropped table,
+-- seed entries for the two replacement tables.
+DELETE FROM sync_table_state WHERE table_name = 'activity_import_profiles';
+INSERT OR IGNORE INTO sync_table_state (table_name, enabled) VALUES
+    ('import_templates', 1),
+    ('import_account_templates', 1);

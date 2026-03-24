@@ -1,9 +1,15 @@
 //! Activity domain models.
 
-use crate::{activities::activities_errors::ActivityError, QuoteMode};
+/// Discriminator values for `import_account_templates.import_type`.
+pub mod import_type {
+    pub const ACTIVITY: &str = "ACTIVITY";
+    pub const HOLDINGS: &str = "HOLDINGS";
+}
+
 use crate::activities::csv_parser::ParseConfig;
 use crate::assets::NewAsset;
 use crate::Result;
+use crate::{activities::activities_errors::ActivityError, QuoteMode};
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -630,6 +636,7 @@ pub struct Sort {
 #[serde(rename_all = "camelCase")]
 pub struct ImportMapping {
     pub account_id: String,
+    pub import_type: String,
     pub template_id: Option<String>,
     pub name: String,
     /// JSON containing all config: fieldMappings, activityMappings, symbolMappings, accountMappings, parseConfig
@@ -654,11 +661,17 @@ pub struct SymbolMappingMeta {
     pub quote_mode: Option<QuoteMode>,
 }
 
+fn default_activity_import_type() -> String {
+    import_type::ACTIVITY.to_string()
+}
+
 /// Model for activity import mapping data with structured mappings
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportMappingData {
     pub account_id: String,
+    #[serde(default = "default_activity_import_type")]
+    pub import_type: String,
     #[serde(default)]
     pub name: String,
     /// The ID of the template this mapping is linked to (if any)
@@ -810,6 +823,7 @@ impl Default for ImportMappingData {
 
         ImportMappingData {
             account_id: String::new(),
+            import_type: import_type::ACTIVITY.to_string(),
             template_id: None,
             name: String::new(),
             field_mappings,
@@ -847,6 +861,7 @@ impl ImportMapping {
 
         Ok(ImportMappingData {
             account_id: self.account_id.clone(),
+            import_type: self.import_type.clone(),
             template_id: self.template_id.clone(),
             name: self.name.clone(),
             field_mappings: config.field_mappings,
@@ -873,6 +888,7 @@ impl ImportMapping {
 
         Ok(Self {
             account_id: data.account_id.clone(),
+            import_type: data.import_type.clone(),
             template_id: data.template_id.clone(),
             name: data.name.clone(),
             config: serde_json::to_string(&config)?,

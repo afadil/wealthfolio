@@ -199,12 +199,13 @@ impl ActivityDetailsDB {
 #[derive(
     Debug, Clone, Serialize, Deserialize, Queryable, Identifiable, AsChangeset, Insertable,
 )]
-#[diesel(primary_key(account_id))]
 #[diesel(table_name = crate::schema::import_account_templates)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 #[serde(rename_all = "camelCase")]
 pub struct ImportAccountTemplateDB {
+    pub id: String,
     pub account_id: String,
+    pub import_type: String,
     pub template_id: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,

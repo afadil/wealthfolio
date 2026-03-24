@@ -1,4 +1,5 @@
 // Activity Commands
+import { ImportType } from "@/lib/types";
 import type {
   Activity,
   ActivityBulkMutationRequest,
@@ -236,9 +237,12 @@ export const previewImportAssets = async ({
 /**
  * Get the import mapping configuration for an account.
  */
-export const getAccountImportMapping = async (accountId: string): Promise<ImportMappingData> => {
+export const getAccountImportMapping = async (
+  accountId: string,
+  importType: string = ImportType.ACTIVITY,
+): Promise<ImportMappingData> => {
   try {
-    return await invoke<ImportMappingData>("get_account_import_mapping", { accountId });
+    return await invoke<ImportMappingData>("get_account_import_mapping", { accountId, importType });
   } catch (err) {
     logger.error("Error fetching mapping.");
     throw err;
@@ -248,9 +252,13 @@ export const getAccountImportMapping = async (accountId: string): Promise<Import
 /**
  * Link an account to an existing import template.
  */
-export const linkAccountTemplate = async (accountId: string, templateId: string): Promise<void> => {
+export const linkAccountTemplate = async (
+  accountId: string,
+  templateId: string,
+  importType: string = ImportType.ACTIVITY,
+): Promise<void> => {
   try {
-    await invoke<void>("link_account_template", { accountId, templateId });
+    await invoke<void>("link_account_template", { accountId, templateId, importType });
   } catch (err) {
     logger.error("Error linking account to template.");
     throw err;

@@ -8,7 +8,7 @@ use axum::{
     Json, Router,
 };
 use wealthfolio_core::activities::{
-    Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
+    import_type, Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
     ActivitySearchResponse, ActivityUpdate, ImportActivitiesResult, ImportAssetCandidate,
     ImportAssetPreviewItem, ImportMappingData, ImportTemplateData, NewActivity, ParseConfig,
     ParsedCsvResult,
@@ -190,13 +190,21 @@ async fn preview_import_assets(
 struct MappingQuery {
     #[serde(rename = "accountId")]
     account_id: String,
+    #[serde(rename = "importType", default = "default_activity_import_type")]
+    import_type: String,
+}
+
+fn default_activity_import_type() -> String {
+    import_type::ACTIVITY.to_string()
 }
 
 async fn get_account_import_mapping(
     State(state): State<Arc<AppState>>,
     Query(q): Query<MappingQuery>,
 ) -> ApiResult<Json<ImportMappingData>> {
-    let res = state.activity_service.get_import_mapping(q.account_id)?;
+    let res = state
+        .activity_service
+        .get_import_mapping(q.account_id, q.import_type)?;
     Ok(Json(res))
 }
 
@@ -264,6 +272,8 @@ struct LinkAccountTemplateBody {
     account_id: String,
     #[serde(rename = "templateId")]
     template_id: String,
+    #[serde(rename = "importType", default = "default_activity_import_type")]
+    import_type: String,
 }
 
 async fn link_account_template(
@@ -272,7 +282,7 @@ async fn link_account_template(
 ) -> ApiResult<Json<serde_json::Value>> {
     state
         .activity_service
-        .link_account_template(body.account_id, body.template_id)
+        .link_account_template(body.account_id, body.template_id, body.import_type)
         .await?;
     Ok(Json(serde_json::json!({ "success": true })))
 }

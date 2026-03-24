@@ -2311,7 +2311,11 @@ mod tests {
             unimplemented!("unused in this test")
         }
 
-        fn get_import_mapping(&self, _account_id: &str) -> Result<Option<ImportMapping>> {
+        fn get_import_mapping(
+            &self,
+            _account_id: &str,
+            _import_type: &str,
+        ) -> Result<Option<ImportMapping>> {
             unimplemented!("unused in this test")
         }
 
@@ -2319,7 +2323,12 @@ mod tests {
             unimplemented!("unused in this test")
         }
 
-        async fn link_account_template(&self, _account_id: &str, _template_id: &str) -> Result<()> {
+        async fn link_account_template(
+            &self,
+            _account_id: &str,
+            _template_id: &str,
+            _import_type: &str,
+        ) -> Result<()> {
             unimplemented!("unused in this test")
         }
 

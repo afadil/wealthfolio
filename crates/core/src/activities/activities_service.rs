@@ -3308,9 +3308,15 @@ impl ActivityServiceTrait for ActivityService {
             .get_first_activity_date(account_ids)
     }
 
-    /// Gets the import mapping for a given account ID
-    fn get_import_mapping(&self, account_id: String) -> Result<ImportMappingData> {
-        let mapping = self.activity_repository.get_import_mapping(&account_id)?;
+    /// Gets the import mapping for a given account ID and import type
+    fn get_import_mapping(
+        &self,
+        account_id: String,
+        import_type: String,
+    ) -> Result<ImportMappingData> {
+        let mapping = self
+            .activity_repository
+            .get_import_mapping(&account_id, &import_type)?;
 
         let mut result = match mapping {
             Some(m) => m.to_mapping_data().map_err(|e| {
@@ -3319,6 +3325,7 @@ impl ActivityServiceTrait for ActivityService {
             None => ImportMappingData::default(),
         };
         result.account_id = account_id;
+        result.import_type = import_type;
         Ok(result)
     }
 
@@ -3344,17 +3351,21 @@ impl ActivityServiceTrait for ActivityService {
                 ActivityError::InvalidData(format!("Failed to parse import template data: {}", e))
                     .into()
             }),
-            None => {
-                let mut template = ImportTemplateData::default();
-                template.id = template_id;
-                Ok(template)
-            }
+            None => Ok(ImportTemplateData {
+                id: template_id,
+                ..ImportTemplateData::default()
+            }),
         }
     }
 
-    async fn link_account_template(&self, account_id: String, template_id: String) -> Result<()> {
+    async fn link_account_template(
+        &self,
+        account_id: String,
+        template_id: String,
+        import_type: String,
+    ) -> Result<()> {
         self.activity_repository
-            .link_account_template(&account_id, &template_id)
+            .link_account_template(&account_id, &template_id, &import_type)
             .await
     }
 

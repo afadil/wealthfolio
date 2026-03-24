@@ -10,6 +10,7 @@ import { useAccounts } from "@/hooks/use-accounts";
 import { usePlatform } from "@/hooks/use-platform";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, ImportTemplateData } from "@/lib/types";
+import { ImportType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
@@ -497,6 +498,14 @@ export function UploadStep() {
     queryFn: listImportTemplates,
   });
 
+  // Derive import type from the selected account's tracking mode
+  const selectedAccount = useMemo(
+    () => accounts?.find((a: Account) => a.id === state.accountId) ?? null,
+    [accounts, state.accountId],
+  );
+  const importType =
+    selectedAccount?.trackingMode === "HOLDINGS" ? ImportType.HOLDINGS : ImportType.ACTIVITY;
+
   const applyTemplate = useCallback(
     async (template: ImportTemplateData) => {
       const nextParseConfig = template.parseConfig
@@ -509,6 +518,7 @@ export function UploadStep() {
       dispatch(
         setMapping({
           accountId: state.accountId || "",
+          importType,
           name: template.name,
           fieldMappings: template.fieldMappings,
           activityMappings: template.activityMappings,
@@ -531,7 +541,7 @@ export function UploadStep() {
         }
       }
     },
-    [dispatch, state.accountId, state.file, state.parseConfig],
+    [dispatch, importType, state.accountId, state.file, state.parseConfig],
   );
 
   const handleTemplateSelect = useCallback(
@@ -540,47 +550,51 @@ export function UploadStep() {
       if (!template) return;
       await applyTemplate(template);
       if (state.accountId) {
-        linkAccountTemplate(state.accountId, templateId).catch(() => {
+        linkAccountTemplate(state.accountId, templateId, importType).catch(() => {
           /* non-critical */
         });
       }
     },
-    [applyTemplate, state.accountId, templates],
+    [applyTemplate, importType, state.accountId, templates],
   );
 
   const handleTemplateClear = useCallback(() => {
     dispatch(setSelectedTemplate(null, null));
   }, [dispatch]);
 
-  const selectedAccount = useMemo(
-    () => accounts?.find((a: Account) => a.id === state.accountId) ?? null,
-    [accounts, state.accountId],
-  );
-
-  // Auto-suggest linked template when account changes
-  const templatesRef = useRef(templates);
-  templatesRef.current = templates;
+  // Auto-suggest linked template when account changes.
+  // Two-phase approach: fetch the linked template ID, then apply once templates are loaded.
+  const [pendingLinkedTemplateId, setPendingLinkedTemplateId] = useState<string | null>(null);
   const prevAccountIdRef = useRef(state.accountId);
   useEffect(() => {
     const accountChanged = prevAccountIdRef.current !== state.accountId;
     prevAccountIdRef.current = state.accountId;
+    if (accountChanged) setPendingLinkedTemplateId(null);
     // Skip if no account, or if a template is already selected and the account hasn't changed
     if (!state.accountId || (state.selectedTemplateId && !accountChanged)) return;
-    getAccountImportMapping(state.accountId)
+    getAccountImportMapping(state.accountId, importType)
       .then((mapping) => {
-        if (!mapping?.templateId) return;
-        const linked = templatesRef.current.find((t) => t.id === mapping.templateId);
-        if (linked) {
-          applyTemplate(linked).catch(() => {
-            /* non-critical */
-          });
-        }
+        setPendingLinkedTemplateId(mapping?.templateId ?? null);
       })
       .catch(() => {
         /* no saved mapping — ignore */
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.accountId]);
+  }, [state.accountId, importType]);
+
+  // Apply the pending linked template once the template list is available
+  const applyTemplateRef = useRef(applyTemplate);
+  applyTemplateRef.current = applyTemplate;
+  useEffect(() => {
+    if (!pendingLinkedTemplateId || state.selectedTemplateId) return;
+    const linked = templates.find((t) => t.id === pendingLinkedTemplateId);
+    if (linked) {
+      setPendingLinkedTemplateId(null);
+      applyTemplateRef.current(linked).catch(() => {
+        /* non-critical */
+      });
+    }
+  }, [pendingLinkedTemplateId, templates, state.selectedTemplateId]);
 
   const fileRef = useRef(state.file);
   fileRef.current = state.file;

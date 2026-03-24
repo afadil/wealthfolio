@@ -38,8 +38,15 @@ export const parseConfigSchema = z.object({
   defaultCurrency: z.string().optional(),
 });
 
+export const ImportType = {
+  ACTIVITY: "ACTIVITY",
+  HOLDINGS: "HOLDINGS",
+} as const;
+export type ImportType = (typeof ImportType)[keyof typeof ImportType];
+
 export const importMappingSchema = z.object({
   accountId: z.string(),
+  importType: z.enum([ImportType.ACTIVITY, ImportType.HOLDINGS]).default(ImportType.ACTIVITY),
   templateId: z.string().optional(),
   name: z.string().optional().default(""),
   fieldMappings: z.record(z.string(), z.string()).optional().default({}),

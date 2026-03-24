@@ -767,7 +767,11 @@ mod tests {
             unimplemented!()
         }
 
-        fn get_import_mapping(&self, _account_id: &str) -> Result<Option<ImportMapping>> {
+        fn get_import_mapping(
+            &self,
+            _account_id: &str,
+            _import_type: &str,
+        ) -> Result<Option<ImportMapping>> {
             unimplemented!()
         }
 
@@ -775,7 +779,12 @@ mod tests {
             unimplemented!()
         }
 
-        async fn link_account_template(&self, _account_id: &str, _template_id: &str) -> Result<()> {
+        async fn link_account_template(
+            &self,
+            _account_id: &str,
+            _template_id: &str,
+            _import_type: &str,
+        ) -> Result<()> {
             unimplemented!()
         }
 

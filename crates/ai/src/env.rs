@@ -286,7 +286,11 @@ pub mod test_env {
             Ok(None)
         }
 
-        fn get_import_mapping(&self, _account_id: String) -> CoreResult<ImportMappingData> {
+        fn get_import_mapping(
+            &self,
+            _account_id: String,
+            _import_type: String,
+        ) -> CoreResult<ImportMappingData> {
             // Return error to simulate no saved mapping (tests will use auto-detection)
             Err(wealthfolio_core::errors::DatabaseError::NotFound(
                 "No saved import mapping".to_string(),

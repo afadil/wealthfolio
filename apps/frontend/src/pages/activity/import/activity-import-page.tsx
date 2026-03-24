@@ -3,6 +3,7 @@ import { usePlatform } from "@/hooks/use-platform";
 import { canImportCSV } from "@/lib/activity-restrictions";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account } from "@/lib/types";
+import { ImportType } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { AlertFeedback, Page, PageContent, PageHeader } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
@@ -343,6 +344,7 @@ function ImportWizardContent() {
           setMapping({
             ...(state.mapping ?? {
               accountId: state.accountId || "",
+              importType: ImportType.ACTIVITY,
               name: "",
               fieldMappings: {},
               activityMappings: {},

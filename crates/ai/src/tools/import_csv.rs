@@ -18,7 +18,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use rust_decimal::Decimal;
-use wealthfolio_core::activities::{ImportMappingData, ParseConfig, ParsedCsvResult};
+use wealthfolio_core::activities::{import_type, ImportMappingData, ParseConfig, ParsedCsvResult};
 
 use super::constants::MAX_IMPORT_ROWS;
 use super::record_activity::AccountOption;
@@ -1052,7 +1052,7 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
             match self
                 .env
                 .activity_service()
-                .get_import_mapping(account_id.clone())
+                .get_import_mapping(account_id.clone(), import_type::ACTIVITY.to_string())
             {
                 Ok(saved) => {
                     used_saved_profile = true;

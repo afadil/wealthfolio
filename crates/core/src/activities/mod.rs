@@ -18,15 +18,15 @@ mod activities_model_tests;
 
 pub use activities_constants::*;
 pub use activities_errors::ActivityError;
+pub use activities_model::import_type;
 pub use activities_model::{
     parse_decimal_string_tolerant, Activity, ActivityBulkIdentifierMapping,
     ActivityBulkMutationError, ActivityBulkMutationRequest, ActivityBulkMutationResult,
     ActivityDetails, ActivityImport, ActivitySearchResponse, ActivitySearchResponseMeta,
     ActivityStatus, ActivityType, ActivityUpdate, ActivityUpsert, BulkUpsertResult,
-    ImportActivitiesResult, ImportActivitiesSummary, ImportAssetCandidate,
-    ImportAssetPreviewItem, ImportAssetPreviewStatus, ImportMapping, ImportMappingData,
-    ImportTemplate, ImportTemplateData, ImportTemplateScope, IncomeData, NewActivity,
-    PrepareActivitiesResult, Sort, SymbolInput,
+    ImportActivitiesResult, ImportActivitiesSummary, ImportAssetCandidate, ImportAssetPreviewItem,
+    ImportAssetPreviewStatus, ImportMapping, ImportMappingData, ImportTemplate, ImportTemplateData,
+    ImportTemplateScope, IncomeData, NewActivity, PrepareActivitiesResult, Sort, SymbolInput,
 };
 pub use activities_service::ActivityService;
 pub use activities_traits::{ActivityRepositoryTrait, ActivityServiceTrait};

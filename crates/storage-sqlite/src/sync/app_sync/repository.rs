@@ -335,7 +335,7 @@ fn entity_storage_mapping(entity: &SyncEntity) -> Option<(&'static str, &'static
         SyncEntity::Quote => Some(("quotes", "id")),
         SyncEntity::AssetTaxonomyAssignment => Some(("asset_taxonomy_assignments", "id")),
         SyncEntity::Activity => Some(("activities", "id")),
-        SyncEntity::ActivityImportProfile => Some(("import_account_templates", "account_id")),
+        SyncEntity::ActivityImportProfile => Some(("import_account_templates", "id")),
         SyncEntity::ImportTemplate => Some(("import_templates", "id")),
         SyncEntity::Goal => Some(("goals", "id")),
         SyncEntity::GoalsAllocation => Some(("goals_allocation", "id")),
@@ -1645,6 +1645,17 @@ impl AppSyncRepository {
                     for table in &table_set {
                         let target_columns = load_table_columns(conn, "main", table)?;
                         let source_columns = load_table_columns(conn, &snapshot_alias, table)?;
+                        if source_columns.is_empty() {
+                            // Table is absent from the snapshot (e.g., snapshot was created by
+                            // an older client before this table was introduced). Skip it — the
+                            // local table retains whatever data it has, which is safer than
+                            // clearing it to empty.
+                            log::warn!(
+                                "Snapshot does not contain table '{}' — skipping restore for this table",
+                                table
+                            );
+                            continue;
+                        }
                         let source_column_set =
                             source_columns.into_iter().collect::<HashSet<String>>();
                         let common_columns = target_columns
@@ -1772,8 +1783,8 @@ mod tests {
 
     use crate::db::{create_pool, get_connection, init, run_migrations, write_actor::spawn_writer};
     use crate::schema::{
-        accounts, activity_import_profiles, assets, goals, platforms, sync_applied_events,
-        sync_device_config, sync_entity_metadata, sync_outbox,
+        accounts, assets, goals, import_account_templates, import_templates, platforms,
+        sync_applied_events, sync_device_config, sync_entity_metadata, sync_outbox,
     };
 
     fn setup_db() -> (
@@ -2602,24 +2613,47 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn replay_accepts_camel_case_non_id_primary_key_payload() {
+    async fn replay_accepts_import_profile_payload() {
         let (pool, writer) = setup_db();
         let repo = AppSyncRepository::new(pool.clone(), writer);
         let mut conn = get_connection(&pool).expect("conn");
         insert_account_for_test(&mut conn, "acc-import-profile").expect("insert account");
 
+        // Insert a template that the account link can reference
+        diesel::insert_into(import_templates::table)
+            .values((
+                import_templates::id.eq("tmpl-import-profile"),
+                import_templates::name.eq("Broker Mapping"),
+                import_templates::scope.eq("ACCOUNT"),
+                import_templates::config.eq("{\"rules\":[]}"),
+                import_templates::created_at.eq(chrono::NaiveDateTime::parse_from_str(
+                    "2026-02-19 00:00:00",
+                    "%Y-%m-%d %H:%M:%S",
+                )
+                .unwrap()),
+                import_templates::updated_at.eq(chrono::NaiveDateTime::parse_from_str(
+                    "2026-02-19 00:00:00",
+                    "%Y-%m-%d %H:%M:%S",
+                )
+                .unwrap()),
+            ))
+            .execute(&mut conn)
+            .expect("insert template");
+
+        // Current format: entity_id is the UUID `id` column; payload includes `id`.
         let applied = repo
             .apply_remote_event_lww(
                 SyncEntity::ActivityImportProfile,
-                "acc-import-profile".to_string(),
+                "link-uuid-001".to_string(),
                 SyncOperation::Create,
-                "evt-import-profile-camel".to_string(),
+                "evt-import-profile-new".to_string(),
                 "2026-02-19T00:00:00Z".to_string(),
                 1,
                 serde_json::json!({
+                    "id": "link-uuid-001",
                     "accountId": "acc-import-profile",
-                    "name": "Broker Mapping",
-                    "config": "{\"rules\":[]}",
+                    "importType": "ACTIVITY",
+                    "templateId": "tmpl-import-profile",
                     "createdAt": "2026-02-19 00:00:00",
                     "updatedAt": "2026-02-19 00:00:00"
                 }),
@@ -2628,12 +2662,49 @@ mod tests {
             .expect("apply import profile create");
         assert!(applied, "expected import profile create to apply");
 
-        let name_value: String = activity_import_profiles::table
-            .filter(activity_import_profiles::account_id.eq("acc-import-profile"))
-            .select(activity_import_profiles::name)
+        let template_id_value: String = import_account_templates::table
+            .filter(import_account_templates::account_id.eq("acc-import-profile"))
+            .filter(import_account_templates::import_type.eq("ACTIVITY"))
+            .select(import_account_templates::template_id)
             .first(&mut conn)
-            .expect("import profile row");
-        assert_eq!(name_value, "Broker Mapping");
+            .expect("import account template row");
+        assert_eq!(template_id_value, "tmpl-import-profile");
+
+        // Legacy format (pre-id-column): entity_id was the account_id UUID, no `id` in payload.
+        // The generic replay injects `id = entity_id`, so this maps cleanly for migrated rows
+        // (migration sets id = account_id for all pre-existing rows).
+        insert_account_for_test(&mut conn, "acc-import-legacy").expect("insert account");
+        let applied_legacy = repo
+            .apply_remote_event_lww(
+                SyncEntity::ActivityImportProfile,
+                "acc-import-legacy".to_string(), // old format: entity_id = account_id
+                SyncOperation::Create,
+                "evt-import-profile-legacy".to_string(),
+                "2026-02-19T00:00:00Z".to_string(),
+                2,
+                serde_json::json!({
+                    // no "id" field — legacy payload
+                    "accountId": "acc-import-legacy",
+                    "importType": "ACTIVITY",
+                    "templateId": "tmpl-import-profile",
+                    "createdAt": "2026-02-19 00:00:00",
+                    "updatedAt": "2026-02-19 00:00:00"
+                }),
+            )
+            .await
+            .expect("apply legacy import profile create");
+        assert!(
+            applied_legacy,
+            "expected legacy import profile create to apply"
+        );
+
+        let legacy_id: String = import_account_templates::table
+            .filter(import_account_templates::account_id.eq("acc-import-legacy"))
+            .select(import_account_templates::id)
+            .first(&mut conn)
+            .expect("legacy import account template row");
+        // id was injected from entity_id (= account_id), matching migration behaviour
+        assert_eq!(legacy_id, "acc-import-legacy");
     }
 
     #[tokio::test]

@@ -8,7 +8,7 @@ CREATE TABLE activity_import_profiles (
     account_mappings TEXT NOT NULL DEFAULT '{}'
 );
 
--- Restore data from migrated templates
+-- Restore data from migrated templates (ACTIVITY rows only)
 INSERT INTO activity_import_profiles (account_id, name, config, created_at, updated_at)
 SELECT
     iat.account_id,
@@ -17,7 +17,8 @@ SELECT
     iat.created_at,
     iat.updated_at
 FROM import_account_templates iat
-JOIN import_templates it ON it.id = iat.template_id;
+JOIN import_templates it ON it.id = iat.template_id
+WHERE iat.import_type = 'ACTIVITY';
 
 DROP TABLE import_account_templates;
 DROP TABLE IF EXISTS import_templates;

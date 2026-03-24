@@ -81,11 +81,7 @@ impl SyncOutboxModel for ImportAccountTemplateDB {
     const ENTITY: SyncEntity = SyncEntity::ActivityImportProfile;
 
     fn sync_entity_id(&self) -> &str {
-        &self.account_id
-    }
-
-    fn delete_payload(entity_id: &str) -> serde_json::Value {
-        serde_json::json!({ "accountId": entity_id })
+        &self.id
     }
 }
 
@@ -94,6 +90,12 @@ impl SyncOutboxModel for ImportTemplateDB {
 
     fn sync_entity_id(&self) -> &str {
         &self.id
+    }
+
+    fn should_sync_outbox(&self, _op: SyncOperation) -> bool {
+        // System templates are seeded by migrations — identical on every device.
+        // Only user-created templates need to travel over sync.
+        !self.scope.eq_ignore_ascii_case("SYSTEM")
     }
 }
 

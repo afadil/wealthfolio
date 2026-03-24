@@ -12,6 +12,7 @@ import { useImportContext } from "../context";
 import { setImportResult, nextStep } from "../context/import-actions";
 import { parseHoldingsSnapshots } from "./holdings-review-step";
 import type { ImportHoldingsCsvResult } from "@/lib/types";
+import { ImportType } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Holdings Confirm Step Component
@@ -59,6 +60,7 @@ export function HoldingsConfirmStep() {
           await saveAccountImportMapping({
             ...mapping,
             accountId,
+            importType: ImportType.HOLDINGS,
             parseConfig: parseConfig,
           });
         } catch (error) {
