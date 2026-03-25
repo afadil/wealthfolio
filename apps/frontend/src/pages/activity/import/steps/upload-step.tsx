@@ -33,6 +33,7 @@ import {
 } from "@wealthfolio/ui/components/ui/select";
 import { SearchableSelect } from "@wealthfolio/ui";
 import { DATE_FORMAT_OPTIONS, isPresetFormat } from "../utils/date-format-options";
+import { computeFieldMappings } from "../hooks/use-import-mapping";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CSVFileViewer, type CSVLine } from "../components/csv-file-viewer";
 import { FileDropzone } from "../components/file-dropzone";
@@ -64,7 +65,7 @@ function CsvPreviewTable({ headers, rows, maxRows = 50 }: CsvPreviewTableProps) 
   return (
     <>
       <table className="w-full">
-        <thead className="bg-muted/50 sticky top-0">
+        <thead className="bg-muted sticky top-0">
           <tr>
             <th className="text-muted-foreground bg-muted w-12 border-r px-2 py-1.5 text-right font-mono text-xs">
               #
@@ -515,12 +516,28 @@ export function UploadStep() {
       if (template.parseConfig) {
         dispatch(setParseConfig(template.parseConfig));
       }
+
+      // Re-parse with the template's config to get fresh headers, then compute mappings
+      // so auto-detected columns (e.g., ISIN) are merged with the saved template mappings.
+      let headers = state.headers;
+      if (state.file) {
+        try {
+          const result = await parseCsv(state.file, nextParseConfig);
+          setParseError(null);
+          dispatch(setParsedData(result.headers, result.rows));
+          dispatch(setParseConfig(result.detectedConfig));
+          headers = result.headers;
+        } catch (err) {
+          setParseError(err instanceof Error ? err.message : "Failed to re-parse CSV");
+        }
+      }
+
       dispatch(
         setMapping({
           accountId: state.accountId || "",
           importType,
           name: template.name,
-          fieldMappings: template.fieldMappings,
+          fieldMappings: computeFieldMappings(headers, template.fieldMappings),
           activityMappings: template.activityMappings,
           symbolMappings: template.symbolMappings,
           accountMappings: template.accountMappings || {},
@@ -529,19 +546,8 @@ export function UploadStep() {
         }),
       );
       dispatch(setSelectedTemplate(template.id, template.scope));
-
-      if (state.file) {
-        try {
-          const result = await parseCsv(state.file, nextParseConfig);
-          setParseError(null);
-          dispatch(setParsedData(result.headers, result.rows));
-          dispatch(setParseConfig(result.detectedConfig));
-        } catch (err) {
-          setParseError(err instanceof Error ? err.message : "Failed to re-parse CSV");
-        }
-      }
     },
-    [dispatch, importType, state.accountId, state.file, state.parseConfig],
+    [dispatch, importType, state.accountId, state.file, state.parseConfig, state.headers],
   );
 
   const handleTemplateSelect = useCallback(

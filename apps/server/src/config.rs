@@ -33,9 +33,9 @@ impl Config {
             .filter(|s| !s.is_empty())
             .collect();
         let timeout_ms: u64 = std::env::var("WF_REQUEST_TIMEOUT_MS")
-            .unwrap_or_else(|_| "30000".into())
+            .unwrap_or_else(|_| "300000".into())
             .parse()
-            .unwrap_or(30000);
+            .unwrap_or(300000);
         let static_dir = std::env::var("WF_STATIC_DIR").unwrap_or_else(|_| "dist".into());
         let secret_key = std::env::var("WF_SECRET_KEY")
             .unwrap_or_else(|_| panic!("WF_SECRET_KEY must be set and contain a 32-byte key"))

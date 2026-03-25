@@ -357,6 +357,7 @@ export function createDraftActivities(
     const rawDate = getColumnValue(row, ImportFormat.DATE);
     const rawType = getColumnValue(row, ImportFormat.ACTIVITY_TYPE);
     const rawSymbol = getColumnValue(row, ImportFormat.SYMBOL);
+    const rawIsin = getColumnValue(row, ImportFormat.ISIN);
     const rawQuantity = getColumnValue(row, ImportFormat.QUANTITY);
     const rawUnitPrice = getColumnValue(row, ImportFormat.UNIT_PRICE);
     const rawAmount = getColumnValue(row, ImportFormat.AMOUNT);
@@ -421,6 +422,7 @@ export function createDraftActivities(
       activityDate,
       activityType,
       symbol,
+      isin: rawIsin?.trim() || undefined,
       exchangeMic: mappedExchangeMic,
       symbolName: mappedSymbolName,
       quoteCcy: mappedQuoteCcy,

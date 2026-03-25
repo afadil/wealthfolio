@@ -236,7 +236,7 @@ export function CreateSecurityDialog({
                 <label className="text-sm font-medium">Search</label>
                 <TickerSearchInput
                   onSelectResult={handleTickerSelect}
-                  placeholder="Search by name or symbol..."
+                  placeholder="Search by ticker, name or ISIN…"
                   defaultCurrency={defaultCurrency}
                   autoFocusSearch
                   hideCustomCreate

@@ -280,6 +280,7 @@ function ImportWizardContent() {
   const { isMobile } = usePlatform();
 
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [isNextLoading, setIsNextLoading] = useState(false);
 
   // Fetch accounts to determine tracking mode based on selected account
   const { data: accounts } = useQuery<Account[], Error>({
@@ -391,15 +392,25 @@ function ImportWizardContent() {
       }
 
       if (state.step === "assets" && !isHoldingsMode) {
-        const result = await validateDrafts(state.draftActivities);
-        if (!result.ok) return; // network/race error only — activity errors are shown in review step
-        dispatch(nextStep());
+        setIsNextLoading(true);
+        try {
+          const result = await validateDrafts(state.draftActivities);
+          if (!result.ok) return; // network/race error only — activity errors are shown in review step
+          dispatch(nextStep());
+        } finally {
+          setIsNextLoading(false);
+        }
         return;
       }
 
       if (state.step === "review" && !isHoldingsMode) {
-        const result = await validateDrafts(state.draftActivities);
-        if (!result.ok || result.hasErrors) return;
+        setIsNextLoading(true);
+        try {
+          const result = await validateDrafts(state.draftActivities);
+          if (!result.ok || result.hasErrors) return;
+        } finally {
+          setIsNextLoading(false);
+        }
       }
 
       dispatch(nextStep());
@@ -534,6 +545,7 @@ function ImportWizardContent() {
                           canGoBack={canGoBack}
                           canGoNext={canGoNext}
                           nextLabel={getNextLabel()}
+                          isNextLoading={isNextLoading}
                         />
                       </div>
                     )}

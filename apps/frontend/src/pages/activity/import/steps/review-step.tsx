@@ -288,8 +288,16 @@ export function ReviewStep() {
       ) : hasIssues ? (
         <ImportAlert
           variant={hasErrors ? "destructive" : "warning"}
-          title={`${validCount} of ${filterStats.all} activities ready to import`}
-          description={`${filterStats.errors} errors, ${filterStats.warnings} warnings.${hasSkipped ? ` ${filterStats.skipped} skipped.` : ""} Review and fix issues below, or skip problematic rows.`}
+          title={
+            hasErrors
+              ? `${filterStats.errors} ${filterStats.errors === 1 ? "row needs fixing" : "rows need fixing"}`
+              : `${filterStats.warnings} ${filterStats.warnings === 1 ? "warning" : "warnings"} to review`
+          }
+          description={
+            hasErrors
+              ? `${validCount} of ${filterStats.all} rows are valid and ready to import. Fix errors below, or skip them to continue.`
+              : `All ${filterStats.all} activities are importable. Review warnings below or proceed.`
+          }
         />
       ) : hasSkipped ? (
         <ImportAlert

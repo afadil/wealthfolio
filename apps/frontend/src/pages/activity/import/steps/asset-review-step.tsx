@@ -57,7 +57,7 @@ function buildEditableAssetDraft(
   };
 }
 
-// ─── Needs Fixing Item ────────────────────────────────────────────────────────
+// ─── Needs Fixing Row ─────────────────────────────────────────────────────────
 
 interface NeedsFixingRowProps {
   item: ImportAssetPreviewItem;
@@ -91,7 +91,7 @@ function NeedsFixingRow({
         <div className="flex min-w-0 flex-col">
           <div className="flex items-center gap-1.5">
             <span className="font-mono text-sm font-bold tracking-tight">{symbol}</span>
-            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
               {count}×
             </span>
           </div>
@@ -99,13 +99,13 @@ function NeedsFixingRow({
             <span className="text-muted-foreground truncate text-[11px]">{symbolName}</span>
           )}
         </div>
-        <Icons.ArrowRight className="ml-auto h-3.5 w-3.5 shrink-0 text-amber-400" />
+        <Icons.ArrowRight className="ml-auto h-3.5 w-3.5 shrink-0 text-amber-400 dark:text-amber-500/70" />
       </div>
 
       {/* Col 2: search input */}
       <TickerSearchInput
         defaultValue={symbol}
-        placeholder="Search ticker to map to…"
+        placeholder="Search by ticker, name or ISIN…"
         onSelectResult={(_sym, result) => onSearch(item, result)}
         className="h-8 w-full py-1 text-xs"
       />
@@ -113,14 +113,16 @@ function NeedsFixingRow({
       {/* Col 3: "or" separator + Create manually */}
       <div className="flex items-center gap-2 sm:gap-3">
         <div className="flex flex-col items-center gap-0.5">
-          <div className="h-3 w-px bg-amber-300" />
-          <span className="text-[10px] font-medium leading-none text-amber-400">or</span>
-          <div className="h-3 w-px bg-amber-300" />
+          <div className="h-3 w-px bg-amber-300 dark:bg-amber-500/30" />
+          <span className="text-[10px] font-medium leading-none text-amber-400 dark:text-amber-500/70">
+            or
+          </span>
+          <div className="h-3 w-px bg-amber-300 dark:bg-amber-500/30" />
         </div>
         <button
           type="button"
           onClick={onCreateAsset}
-          className="text-muted-foreground whitespace-nowrap text-[11px] transition-colors hover:text-amber-700"
+          className="text-muted-foreground whitespace-nowrap text-[11px] transition-colors hover:text-amber-700 dark:hover:text-amber-400"
         >
           Create<span className="hidden sm:inline"> manually</span>
         </button>
@@ -128,11 +130,125 @@ function NeedsFixingRow({
 
       {/* Errors span all 3 columns */}
       {meaningfulErrors.length > 0 && (
-        <p className="col-span-3 flex items-start gap-1.5 text-[11px] text-red-600">
+        <p className="col-span-3 flex items-start gap-1.5 text-[11px] text-red-600 dark:text-red-400">
           <Icons.AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
           {meaningfulErrors.join(" ")}
         </p>
       )}
+    </div>
+  );
+}
+
+// ─── Auto-Resolved Row ────────────────────────────────────────────────────────
+
+/** Collapse pence/cent variants to their parent currency for mismatch detection. */
+function normalizeCurrency(c: string): string {
+  const u = c.toUpperCase();
+  if (u === "GBX" || u === "GBP" || u === "GBP") return "GBP";
+  if (u === "ZAC") return "ZAR";
+  return u;
+}
+
+interface AutoResolvedRowProps {
+  item: ImportAssetPreviewItem;
+  symbol: string;
+  count: number;
+  isSuspicious: boolean;
+  csvCurrency?: string;
+  isSearchOpen: boolean;
+  onToggleSearch: () => void;
+  onSearch: (item: ImportAssetPreviewItem, result?: SymbolSearchResult) => void;
+  onEdit: () => void;
+}
+
+function AutoResolvedRow({
+  item,
+  symbol,
+  count,
+  isSuspicious,
+  csvCurrency,
+  isSearchOpen,
+  onToggleSearch,
+  onSearch,
+  onEdit,
+}: AutoResolvedRowProps) {
+  const asset = item.draft;
+  const assetName =
+    asset?.name && asset.name.toUpperCase() !== symbol.toUpperCase() ? asset.name : undefined;
+  const exchangeDisplay = asset?.instrumentExchangeMic
+    ? getExchangeDisplayName(asset.instrumentExchangeMic)
+    : undefined;
+  const metaPills = [asset?.instrumentType, asset?.quoteCcy, exchangeDisplay].filter(Boolean);
+
+  return (
+    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1.5 px-3 py-3 transition-colors hover:bg-blue-50/60 sm:grid-cols-[12rem_1fr_auto] sm:px-4 sm:py-3.5 dark:hover:bg-blue-500/[0.05]">
+      {/* Col 1: avatar + symbol + name */}
+      <div className="flex items-center gap-2.5">
+        <TickerAvatar symbol={symbol} className="size-7 shrink-0" />
+        <div className="flex min-w-0 flex-col">
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono text-sm font-bold tracking-tight">{symbol}</span>
+            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+              {count}×
+            </span>
+          </div>
+          {assetName && (
+            <span className="text-muted-foreground truncate text-[11px]">{assetName}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Col 2: metadata pills OR search input */}
+      {isSearchOpen ? (
+        <TickerSearchInput
+          defaultValue={asset?.instrumentSymbol || asset?.displayCode || symbol}
+          placeholder="Search by ticker, name or ISIN…"
+          onSelectResult={(_sym, result) => onSearch(item, result)}
+          className="h-8 w-full py-1 text-xs"
+        />
+      ) : (
+        <div className="flex min-w-0 flex-wrap items-center gap-1">
+          {isSuspicious && (
+            <span
+              className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-300"
+              title={`CSV currency is ${csvCurrency} but resolved to ${asset?.quoteCcy}`}
+            >
+              <Icons.AlertTriangle className="h-3 w-3 shrink-0" />
+              {csvCurrency} → {asset?.quoteCcy}
+            </span>
+          )}
+          {metaPills.map((pill) => (
+            <span
+              key={pill}
+              className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] text-blue-700 dark:border-blue-400/25 dark:bg-blue-400/10 dark:text-blue-300"
+            >
+              {pill}
+            </span>
+          ))}
+          {metaPills.length === 0 && (
+            <span className="text-muted-foreground text-[11px] italic">No metadata resolved</span>
+          )}
+        </div>
+      )}
+
+      {/* Col 3: actions */}
+      <div className="flex shrink-0 items-center gap-1">
+        <Button
+          size="sm"
+          variant={isSearchOpen ? "secondary" : "ghost"}
+          className="h-7 gap-1 px-2 text-[11px]"
+          onClick={onToggleSearch}
+        >
+          <Icons.Search className="h-3 w-3" />
+          <span className="hidden sm:inline">{isSearchOpen ? "Cancel" : "Remap"}</span>
+        </Button>
+        {!isSearchOpen && (
+          <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-[11px]" onClick={onEdit}>
+            <Icons.Pencil className="h-3 w-3" />
+            <span className="hidden sm:inline">Edit</span>
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
@@ -159,86 +275,73 @@ function ReadyAssetRow({
   onEdit,
 }: ReadyAssetRowProps) {
   const asset = item.draft;
-  const isExisting = item.status === "EXISTING_ASSET";
-  // Only show name when it differs from the symbol (avoid redundant "AAPL → AAPL")
   const assetName =
     asset?.name && asset.name.toUpperCase() !== symbol.toUpperCase() ? asset.name : undefined;
   const exchangeDisplay = asset?.instrumentExchangeMic
     ? getExchangeDisplayName(asset.instrumentExchangeMic)
     : undefined;
-  const metaParts = [asset?.instrumentType, asset?.quoteCcy, exchangeDisplay].filter(Boolean);
+  const metaPills = [asset?.instrumentType, asset?.quoteCcy, exchangeDisplay].filter(Boolean);
 
   return (
-    <div className="group">
-      {/* Main row */}
-      <div className="hover:bg-muted/30 flex items-center gap-3 px-3 py-2.5 transition-colors sm:px-4">
-        {/* Avatar */}
+    <div className="hover:bg-muted/30 grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1.5 px-3 py-3 transition-colors sm:grid-cols-[12rem_1fr_auto] sm:px-4 sm:py-3.5">
+      {/* Col 1: avatar + symbol + name */}
+      <div className="flex items-center gap-2.5">
         <TickerAvatar symbol={symbol} className="size-7 shrink-0" />
-
-        {/* Symbol + name + meta */}
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-w-0 flex-col">
           <div className="flex items-center gap-1.5">
-            <span className="shrink-0 font-mono text-sm font-semibold">{symbol}</span>
-            {isExisting ? (
-              <span className="shrink-0 rounded border px-1 py-px text-[10px] text-blue-600 dark:text-blue-400">
-                Existing
-              </span>
-            ) : (
-              <span className="shrink-0 rounded bg-emerald-100 px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                New
-              </span>
-            )}
+            <span className="font-mono text-sm font-bold tracking-tight">{symbol}</span>
+            <span className="bg-success/15 text-success rounded px-1.5 py-0.5 text-[10px] font-semibold">
+              {count}×
+            </span>
           </div>
           {assetName && (
             <span className="text-muted-foreground truncate text-[11px]">{assetName}</span>
           )}
-          {metaParts.length > 0 && (
-            <span className="text-muted-foreground truncate text-[11px]">
-              {metaParts.join(" · ")}
-            </span>
-          )}
-        </div>
-
-        {/* Row count + actions */}
-        <div className="flex shrink-0 items-center gap-1">
-          <span className="text-muted-foreground w-8 text-right text-[11px] sm:w-12">{count}×</span>
-
-          <Button
-            size="sm"
-            variant={isSearchOpen ? "secondary" : "ghost"}
-            className="h-6 gap-1 px-2 text-[11px] transition-opacity data-[active=true]:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
-            data-active={isSearchOpen}
-            onClick={onToggleSearch}
-          >
-            <Icons.Search className="h-3 w-3" />
-            <span className="hidden sm:inline">Remap</span>
-          </Button>
-
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 gap-1 px-2 text-[11px] transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
-            onClick={onEdit}
-          >
-            <Icons.Pencil className="h-3 w-3" />
-            <span className="hidden sm:inline">Edit</span>
-          </Button>
         </div>
       </div>
 
-      {/* Expandable search panel */}
-      {isSearchOpen && (
-        <div className="bg-muted/20 mx-4 mb-1 rounded-md border border-dashed px-3 py-2.5">
-          <p className="text-muted-foreground mb-2 text-[11px]">
-            Search for a different asset to remap these rows
-          </p>
-          <TickerSearchInput
-            defaultValue={asset?.instrumentSymbol || asset?.displayCode || symbol}
-            placeholder="Search for a different asset…"
-            onSelectResult={(_sym, result) => onSearch(item, result)}
-          />
+      {/* Col 2: metadata pills OR search input */}
+      {isSearchOpen ? (
+        <TickerSearchInput
+          defaultValue={asset?.instrumentSymbol || asset?.displayCode || symbol}
+          placeholder="Search by ticker, name or ISIN…"
+          onSelectResult={(_sym, result) => onSearch(item, result)}
+          className="h-8 w-full py-1 text-xs"
+        />
+      ) : (
+        <div className="flex min-w-0 flex-wrap items-center gap-1">
+          {metaPills.map((pill) => (
+            <span
+              key={pill}
+              className="border-success/30 bg-success/10 text-success rounded border px-1.5 py-0.5 text-[10px]"
+            >
+              {pill}
+            </span>
+          ))}
+          {metaPills.length === 0 && (
+            <span className="text-muted-foreground text-[11px] italic">No metadata</span>
+          )}
         </div>
       )}
+
+      {/* Col 3: actions */}
+      <div className="flex shrink-0 items-center gap-1">
+        <Button
+          size="sm"
+          variant={isSearchOpen ? "secondary" : "ghost"}
+          className="h-7 gap-1 px-2 text-[11px]"
+          onClick={onToggleSearch}
+        >
+          <Icons.Search className="h-3 w-3" />
+          <span className="hidden sm:inline">{isSearchOpen ? "Cancel" : "Remap"}</span>
+        </Button>
+        {!isSearchOpen && (
+          <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-[11px]" onClick={onEdit}>
+            <Icons.Pencil className="h-3 w-3" />
+            <span className="hidden sm:inline">Edit</span>
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
@@ -255,6 +358,14 @@ export function AssetReviewStep() {
     symbol: "",
     mode: "create",
   });
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(["existingAssets"]));
+  const toggleSection = (key: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   const candidateMap = useMemo(() => {
     const next = new Map<string, { count: number; draft: DraftActivity }>();
@@ -297,13 +408,25 @@ export function AssetReviewStep() {
           assetId: result.existingAssetId,
         });
         dispatch({ type: "REMOVE_PENDING_IMPORT_ASSET", payload: item.key });
-        updatePreviewItem(item.key, {
-          status: "EXISTING_ASSET",
-          resolutionSource: "manual_search_existing",
-          assetId: result.existingAssetId,
-          draft: { ...assetDraft, id: result.existingAssetId },
-          errors: undefined,
-        });
+        // If another preview item already covers this assetId, just remove the current one
+        // instead of duplicating it in the Existing Assets section.
+        const alreadyExists = assetPreviewItems.some(
+          (p) => p.key !== item.key && p.assetId === result.existingAssetId,
+        );
+        if (alreadyExists) {
+          dispatch({
+            type: "SET_ASSET_PREVIEW_ITEMS",
+            payload: assetPreviewItems.filter((p) => p.key !== item.key),
+          });
+        } else {
+          updatePreviewItem(item.key, {
+            status: "EXISTING_ASSET",
+            resolutionSource: "manual_search_existing",
+            assetId: result.existingAssetId,
+            draft: { ...assetDraft, id: result.existingAssetId },
+            errors: undefined,
+          });
+        }
       } else {
         nextDrafts = applyAssetResolution(nextDrafts, item.key, assetDraft, {
           importAssetKey: item.key,
@@ -383,7 +506,10 @@ export function AssetReviewStep() {
   );
 
   const needsFixing = assetPreviewItems.filter((item) => item.status === "NEEDS_FIXING");
-  const readyItems = assetPreviewItems.filter((item) => item.status !== "NEEDS_FIXING");
+  const autoResolvedItems = assetPreviewItems.filter(
+    (item) => item.status === "AUTO_RESOLVED_NEW_ASSET",
+  );
+  const existingItems = assetPreviewItems.filter((item) => item.status === "EXISTING_ASSET");
 
   // ── Empty state ──────────────────────────────────────────────────────────────
   if (candidateMap.size === 0) {
@@ -428,8 +554,8 @@ export function AssetReviewStep() {
 
   return (
     <div className="space-y-4">
-      {/* ── Summary banner (success only) ─────────────────────────────────── */}
-      {needsFixing.length === 0 && (
+      {/* ── Summary banner ────────────────────────────────────────────────── */}
+      {needsFixing.length === 0 && autoResolvedItems.length === 0 && (
         <ImportAlert
           variant="success"
           title="All assets resolved"
@@ -439,107 +565,231 @@ export function AssetReviewStep() {
 
       {/* ── Needs Fixing section ──────────────────────────────────────────── */}
       {needsFixing.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-amber-200 bg-amber-50/40">
+        <div className="overflow-hidden rounded-lg border border-amber-200 bg-amber-50/40 dark:border-amber-500/20 dark:bg-amber-500/[0.04]">
           {/* Section header */}
-          <div className="flex items-start gap-2 border-b border-amber-200 bg-amber-50/60 px-4 py-2.5">
-            <Icons.AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+          <button
+            type="button"
+            className="flex w-full items-start gap-2 border-b border-amber-200 bg-amber-50/60 px-4 py-2.5 text-left dark:border-amber-500/20 dark:bg-amber-500/[0.06]"
+            onClick={() => toggleSection("needsFixing")}
+          >
+            <Icons.AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
             <div className="flex-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-amber-800">
+              <span className="text-xs font-semibold uppercase tracking-wider text-amber-800 dark:text-amber-300">
                 Needs Fixing
               </span>
-              <p className="mt-0.5 text-[11px] text-amber-700/80">
+              <p className="mt-0.5 text-[11px] text-amber-700/80 dark:text-amber-400/80">
                 Search for the correct ticker or create a custom asset for each symbol.
               </p>
             </div>
-            <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-900">
+            <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-900 dark:bg-amber-500/20 dark:text-amber-200">
               {needsFixing.length}
             </span>
-          </div>
+            <Icons.ChevronDown
+              className={`mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500 transition-transform dark:text-amber-400/70 ${collapsed.has("needsFixing") ? "" : "rotate-180"}`}
+            />
+          </button>
 
           {/* Items */}
-          <div className="divide-y divide-amber-100">
-            {needsFixing.map((item) => {
-              const candidate = candidateMap.get(item.key);
-              const symbol = candidate?.draft.symbol || item.key;
-              const symbolName = item.draft?.name || candidate?.draft.symbolName;
-              const count = candidate?.count ?? 0;
-              return (
-                <NeedsFixingRow
-                  key={item.key}
-                  item={item}
-                  symbol={symbol}
-                  symbolName={symbolName}
-                  count={count}
-                  onSearch={handleSearchSelection}
-                  onCreateAsset={() =>
-                    setAssetDialog({
-                      open: true,
-                      key: item.key,
-                      symbol,
-                      mode: "create",
-                    })
-                  }
-                />
-              );
-            })}
-          </div>
+          {!collapsed.has("needsFixing") && (
+            <div className="divide-y divide-amber-100 dark:divide-amber-500/10">
+              {needsFixing.map((item) => {
+                const candidate = candidateMap.get(item.key);
+                const symbol = candidate?.draft.symbol || item.key;
+                const symbolName = item.draft?.name || candidate?.draft.symbolName;
+                const count = candidate?.count ?? 0;
+                return (
+                  <NeedsFixingRow
+                    key={item.key}
+                    item={item}
+                    symbol={symbol}
+                    symbolName={symbolName}
+                    count={count}
+                    onSearch={handleSearchSelection}
+                    onCreateAsset={() =>
+                      setAssetDialog({
+                        open: true,
+                        key: item.key,
+                        symbol,
+                        mode: "create",
+                      })
+                    }
+                  />
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
-      {/* ── Ready Assets section ──────────────────────────────────────────── */}
-      {readyItems.length > 0 && (
-        <div className="overflow-hidden rounded-lg border">
+      {/* ── New Assets section (auto-resolved, needs confirmation) ────────── */}
+      {autoResolvedItems.length > 0 &&
+        (() => {
+          const isItemSuspicious = (item: (typeof autoResolvedItems)[number]) => {
+            const csvCcy = candidateMap.get(item.key)?.draft.currency;
+            const assetCcy = item.draft?.quoteCcy;
+            return Boolean(
+              csvCcy && assetCcy && normalizeCurrency(csvCcy) !== normalizeCurrency(assetCcy),
+            );
+          };
+          const sortedItems = [...autoResolvedItems].sort((a, b) => {
+            const aSusp = isItemSuspicious(a) ? 0 : 1;
+            const bSusp = isItemSuspicious(b) ? 0 : 1;
+            if (aSusp !== bSusp) return aSusp - bSusp;
+            return (a.draft?.instrumentExchangeMic ?? "").localeCompare(
+              b.draft?.instrumentExchangeMic ?? "",
+            );
+          });
+          const suspiciousCount = sortedItems.filter(isItemSuspicious).length;
+          return (
+            <div className="overflow-hidden rounded-lg border border-blue-200 bg-blue-50/40 dark:border-blue-400/20 dark:bg-blue-500/[0.06]">
+              {/* Section header */}
+              <button
+                type="button"
+                className="flex w-full items-start gap-2 border-b border-blue-200 bg-blue-50/60 px-4 py-2.5 text-left dark:border-blue-400/20 dark:bg-blue-500/10"
+                onClick={() => toggleSection("newAssets")}
+              >
+                <Icons.Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-600 dark:text-blue-400" />
+                <div className="flex-1">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-blue-800 dark:text-blue-300">
+                    New Assets
+                  </span>
+                  <p className="mt-0.5 text-[11px] text-blue-700/80 dark:text-blue-400/80">
+                    Auto-resolved from market data. Review and edit if anything looks off before
+                    importing.
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {suspiciousCount > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+                      <Icons.AlertTriangle className="h-3 w-3" />
+                      {suspiciousCount}
+                    </span>
+                  )}
+                  <span className="rounded-full bg-blue-200 px-2 py-0.5 text-[10px] font-bold text-blue-900 dark:bg-blue-500/20 dark:text-blue-200">
+                    {autoResolvedItems.length}
+                  </span>
+                </div>
+                <Icons.ChevronDown
+                  className={`mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500 transition-transform dark:text-blue-400/70 ${collapsed.has("newAssets") ? "" : "rotate-180"}`}
+                />
+              </button>
+
+              {/* Items */}
+              {!collapsed.has("newAssets") && (
+                <div className="divide-y divide-blue-100 dark:divide-blue-400/10">
+                  {sortedItems.map((item) => {
+                    const candidate = candidateMap.get(item.key);
+                    const symbol =
+                      item.draft?.displayCode ||
+                      item.draft?.instrumentSymbol ||
+                      candidate?.draft.symbol ||
+                      item.key;
+                    const count = candidate?.count ?? 0;
+                    const csvCcy = candidate?.draft.currency;
+                    const assetCcy = item.draft?.quoteCcy;
+                    const isSuspicious = Boolean(
+                      csvCcy &&
+                      assetCcy &&
+                      normalizeCurrency(csvCcy) !== normalizeCurrency(assetCcy),
+                    );
+                    return (
+                      <AutoResolvedRow
+                        key={item.key}
+                        item={item}
+                        symbol={symbol}
+                        count={count}
+                        isSuspicious={isSuspicious}
+                        csvCurrency={csvCcy}
+                        isSearchOpen={activeSearchKey === item.key}
+                        onToggleSearch={() =>
+                          setActiveSearchKey((cur) => (cur === item.key ? null : item.key))
+                        }
+                        onSearch={(i, result) => handleSearchSelection(i, result)}
+                        onEdit={() =>
+                          setAssetDialog({
+                            open: true,
+                            key: item.key,
+                            symbol: item.draft?.instrumentSymbol || item.draft?.displayCode || "",
+                            mode: "edit",
+                            initialAsset: buildEditableAssetDraft(
+                              item,
+                              candidate?.draft,
+                              state.parseConfig.defaultCurrency,
+                            ),
+                          })
+                        }
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+      {/* ── Existing Assets section ───────────────────────────────────────── */}
+      {existingItems.length > 0 && (
+        <div className="border-success/30 bg-success/[0.04] overflow-hidden rounded-lg border">
           {/* Section header */}
-          <div className="bg-muted/40 flex items-center gap-2 border-b px-4 py-2.5">
-            <Icons.CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
-            <span className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
-              Ready Assets
+          <button
+            type="button"
+            className="border-success/30 bg-success/[0.06] flex w-full items-center gap-2 border-b px-4 py-2.5 text-left"
+            onClick={() => toggleSection("existingAssets")}
+          >
+            <Icons.CheckCircle className="text-success h-3.5 w-3.5 shrink-0" />
+            <span className="text-success flex-1 text-xs font-semibold uppercase tracking-wider">
+              Existing Assets
             </span>
-            <span className="bg-muted text-muted-foreground ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold">
-              {readyItems.length}
+            <span className="bg-success/20 text-success rounded-full px-2 py-0.5 text-[10px] font-bold">
+              {existingItems.length}
             </span>
-          </div>
+            <Icons.ChevronDown
+              className={`text-success/60 h-3.5 w-3.5 shrink-0 transition-transform ${collapsed.has("existingAssets") ? "" : "rotate-180"}`}
+            />
+          </button>
 
           {/* Items */}
-          <div className="divide-y">
-            {readyItems.map((item) => {
-              const candidate = candidateMap.get(item.key);
-              const symbol =
-                item.draft?.displayCode ||
-                item.draft?.instrumentSymbol ||
-                candidate?.draft.symbol ||
-                item.key;
-              const count = candidate?.count ?? 0;
-              return (
-                <ReadyAssetRow
-                  key={item.key}
-                  item={item}
-                  symbol={symbol}
-                  count={count}
-                  isSearchOpen={activeSearchKey === item.key}
-                  onToggleSearch={() =>
-                    setActiveSearchKey((cur) => (cur === item.key ? null : item.key))
-                  }
-                  onSearch={(i, result) => {
-                    handleSearchSelection(i, result);
-                  }}
-                  onEdit={() =>
-                    setAssetDialog({
-                      open: true,
-                      key: item.key,
-                      symbol: item.draft?.instrumentSymbol || item.draft?.displayCode || "",
-                      mode: "edit",
-                      initialAsset: buildEditableAssetDraft(
-                        item,
-                        candidate?.draft,
-                        state.parseConfig.defaultCurrency,
-                      ),
-                    })
-                  }
-                />
-              );
-            })}
-          </div>
+          {!collapsed.has("existingAssets") && (
+            <div className="divide-success/15 divide-y">
+              {existingItems.map((item) => {
+                const candidate = candidateMap.get(item.key);
+                const symbol =
+                  item.draft?.displayCode ||
+                  item.draft?.instrumentSymbol ||
+                  candidate?.draft.symbol ||
+                  item.key;
+                const count = candidate?.count ?? 0;
+                return (
+                  <ReadyAssetRow
+                    key={item.key}
+                    item={item}
+                    symbol={symbol}
+                    count={count}
+                    isSearchOpen={activeSearchKey === item.key}
+                    onToggleSearch={() =>
+                      setActiveSearchKey((cur) => (cur === item.key ? null : item.key))
+                    }
+                    onSearch={(i, result) => {
+                      handleSearchSelection(i, result);
+                    }}
+                    onEdit={() =>
+                      setAssetDialog({
+                        open: true,
+                        key: item.key,
+                        symbol: item.draft?.instrumentSymbol || item.draft?.displayCode || "",
+                        mode: "edit",
+                        initialAsset: buildEditableAssetDraft(
+                          item,
+                          candidate?.draft,
+                          state.parseConfig.defaultCurrency,
+                        ),
+                      })
+                    }
+                  />
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

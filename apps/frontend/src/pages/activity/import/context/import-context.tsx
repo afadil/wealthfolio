@@ -62,6 +62,8 @@ export interface DraftActivity {
   /** Whether this is an external transfer (for TRANSFER_IN/TRANSFER_OUT) */
   isExternal?: boolean;
 
+  isin?: string;
+
   // Enriched by backend check
   exchangeMic?: string;
   symbolName?: string;
@@ -507,6 +509,7 @@ export function ImportProvider({ children, initialAccountId }: ImportProviderPro
                 quoteCcy: draft.quoteCcy,
                 instrumentType: draft.instrumentType,
                 quoteMode: draft.quoteMode,
+                isin: draft.isin,
                 quantity: draft.quantity,
                 unitPrice: draft.unitPrice,
                 amount: draft.amount,

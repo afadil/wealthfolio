@@ -32,7 +32,27 @@ use log::warn;
 /// Cache key: (symbol, exchange_mic, instrument_type) → provider quote currency
 type QuoteCcyCache = HashMap<(String, Option<String>, Option<String>), Option<String>>;
 use uuid::Uuid;
-use wealthfolio_market_data::mic_to_currency;
+use wealthfolio_market_data::{
+    exchanges_for_currency, mic_to_currency, yahoo_exchange_suffixes, yahoo_suffix_to_mic,
+};
+
+/// Return the Yahoo Finance ticker suffix (e.g., ".L") for a given MIC,
+/// or `None` if the exchange uses no suffix (US exchanges) or is unknown.
+fn yahoo_suffix_for_mic(mic: &str) -> Option<&'static str> {
+    let mic_upper = mic.to_uppercase();
+    // yahoo_exchange_suffixes() returns suffixes WITH leading dot (e.g., ".L", ".TO")
+    // yahoo_suffix_to_mic() expects the key WITHOUT dot, uppercased
+    for &suffix in yahoo_exchange_suffixes() {
+        let key = suffix.trim_start_matches('.');
+        if yahoo_suffix_to_mic(key)
+            .map(|m| m.to_uppercase() == mic_upper)
+            .unwrap_or(false)
+        {
+            return Some(suffix);
+        }
+    }
+    None
+}
 
 /// Resolved symbol information from a market data provider or asset DB lookup.
 #[derive(Debug, Default)]
@@ -644,6 +664,7 @@ impl ActivityService {
     async fn resolve_symbols_batch(
         &self,
         symbol_currency_pairs: HashSet<(String, String)>,
+        isin_map: &HashMap<String, String>,
     ) -> HashMap<(String, String), ResolvedSymbolInfo> {
         let mut cache: HashMap<(String, String), ResolvedSymbolInfo> = HashMap::new();
 
@@ -651,13 +672,27 @@ impl ActivityService {
             return cache;
         }
 
-        // 1. Build a lookup map from existing assets (case-insensitive)
+        // 1. Build a lookup map from existing assets (case-insensitive symbol and ISIN)
         let existing_assets = self.asset_service.get_assets().unwrap_or_default();
         let existing_map: HashMap<String, Option<String>> = existing_assets
-            .into_iter()
+            .iter()
             .filter_map(|a| {
-                let symbol = a.display_code.or(a.instrument_symbol)?;
-                Some((symbol.to_lowercase(), a.instrument_exchange_mic))
+                let symbol = a.display_code.as_ref().or(a.instrument_symbol.as_ref())?;
+                Some((symbol.to_lowercase(), a.instrument_exchange_mic.clone()))
+            })
+            .collect();
+
+        // Build ISIN → exchange_mic from existing asset metadata
+        let existing_isin_map: HashMap<String, Option<String>> = existing_assets
+            .iter()
+            .filter_map(|a| {
+                let isin = a
+                    .metadata
+                    .as_ref()
+                    .and_then(|m| m.get("identifiers"))
+                    .and_then(|i| i.get("isin"))
+                    .and_then(|v| v.as_str())?;
+                Some((isin.to_uppercase(), a.instrument_exchange_mic.clone()))
             })
             .collect();
 
@@ -694,8 +729,70 @@ impl ActivityService {
             }
         }
 
-        // 3. Resolve missing symbols via quote service
+        // 3. Resolve missing symbols: ISIN-first (zero-network hit or provider search), then ticker fallback
+        debug!("resolve_symbols_batch: isin_map={:?}", isin_map);
         for (symbol, currency) in missing {
+            if let Some(isin) = isin_map.get(&symbol) {
+                debug!(
+                    "resolve_symbols_batch: resolving symbol={} via ISIN={}",
+                    symbol, isin
+                );
+                // ① existing asset by ISIN (zero network)
+                if let Some(exchange_mic) = existing_isin_map.get(&isin.to_uppercase()) {
+                    cache.insert(
+                        (symbol, currency),
+                        ResolvedSymbolInfo {
+                            exchange_mic: exchange_mic.clone(),
+                            name: None,
+                        },
+                    );
+                    continue;
+                }
+                // ② provider search by ISIN — no currency bias (ISIN is globally unique)
+                match self
+                    .quote_service
+                    .search_symbol_with_currency(isin, None)
+                    .await
+                {
+                    Err(e) => {
+                        warn!(
+                            "resolve_symbols_batch: ISIN search failed isin={} err={}",
+                            isin, e
+                        );
+                    }
+                    Ok(results) => {
+                        debug!(
+                            "resolve_symbols_batch: ISIN={} got {} results: {:?}",
+                            isin,
+                            results.len(),
+                            results
+                                .iter()
+                                .map(|r| (&r.symbol, &r.exchange_mic))
+                                .collect::<Vec<_>>()
+                        );
+                        if let Some(r) = results.into_iter().find(|r| r.exchange_mic.is_some()) {
+                            debug!(
+                                "resolve_symbols_batch: ISIN={} resolved to symbol={} mic={:?}",
+                                isin, r.symbol, r.exchange_mic
+                            );
+                            cache.insert(
+                                (symbol, currency),
+                                ResolvedSymbolInfo {
+                                    exchange_mic: r.exchange_mic,
+                                    name: Some(r.long_name).filter(|n| !n.is_empty()),
+                                },
+                            );
+                            continue;
+                        } else {
+                            warn!(
+                                "resolve_symbols_batch: ISIN={} returned no result with exchange_mic",
+                                isin
+                            );
+                        }
+                    }
+                }
+            }
+            // ③ ticker fallback
             let info = self.resolve_symbol_exchange_mic(&symbol, &currency).await;
             cache.insert((symbol, currency), info);
         }
@@ -715,7 +812,7 @@ impl ActivityService {
             .into_iter()
             .map(|s| (s, currency.to_string()))
             .collect();
-        self.resolve_symbols_batch(pairs)
+        self.resolve_symbols_batch(pairs, &HashMap::new())
             .await
             .into_iter()
             .map(|((sym, _), info)| (sym, info.exchange_mic))
@@ -723,15 +820,44 @@ impl ActivityService {
     }
 
     /// Resolve a single symbol via market data provider, returning MIC and name.
+    ///
+    /// Candidate ordering:
+    /// 1. Exchange-suffix-qualified forms derived from the currency hint
+    ///    (e.g., GBX → XLON → ".L" → "NG.L" is tried before "NG").
+    ///    This is essential for non-US brokers where the raw CSV ticker has no suffix.
+    /// 2. Base candidates from `symbol_resolution_candidates` (handles suffix-stripping
+    ///    for already-qualified symbols like "SHOP.TO").
     async fn resolve_symbol_exchange_mic(
         &self,
         symbol: &str,
         currency: &str,
     ) -> ResolvedSymbolInfo {
-        for candidate in symbol_resolution_candidates(symbol) {
+        let mut candidates: Vec<String> = Vec::new();
+
+        // Currency-hinted: try "SYMBOL.SUFFIX" first when the symbol is bare (no dot)
+        // Only when the currency maps to exactly ONE exchange — avoids expensive multi-exchange
+        // fan-out for EUR (5 exchanges) or USD (6 exchanges) where most guesses will miss.
+        // GBX/GBP → ["XLON"] qualifies; EUR → ["XETR","XPAR",...] does not.
+        let preferred = exchanges_for_currency(currency);
+        if !symbol.contains('.') && preferred.len() == 1 {
+            if let Some(suffix) = yahoo_suffix_for_mic(preferred[0]) {
+                if !suffix.is_empty() {
+                    candidates.push(format!("{}{}", symbol, suffix));
+                }
+            }
+        }
+
+        // Base candidates (deduplicating against already-added suffixed forms)
+        for c in symbol_resolution_candidates(symbol) {
+            if !candidates.iter().any(|e| e.eq_ignore_ascii_case(&c)) {
+                candidates.push(c);
+            }
+        }
+
+        for candidate in &candidates {
             let result = self
                 .quote_service
-                .search_symbol_with_currency(&candidate, Some(currency))
+                .search_symbol_with_currency(candidate, Some(currency))
                 .await
                 .ok()
                 .and_then(|results| results.into_iter().next());
@@ -2045,7 +2171,16 @@ impl ActivityService {
             })
             .collect();
 
-        let symbol_batch = self.resolve_symbols_batch(symbol_currency_pairs).await;
+        let isin_map: HashMap<String, String> = activities
+            .iter()
+            .filter_map(|a| {
+                let isin = a.isin.as_deref().filter(|i| !i.is_empty())?;
+                Some((a.symbol.clone(), isin.to_string()))
+            })
+            .collect();
+        let symbol_batch = self
+            .resolve_symbols_batch(symbol_currency_pairs, &isin_map)
+            .await;
         let symbol_mic_cache: HashMap<(String, String), Option<String>> = symbol_batch
             .iter()
             .map(|(k, info)| (k.clone(), info.exchange_mic.clone()))
@@ -3132,6 +3267,7 @@ impl ActivityServiceTrait for ActivityService {
                 fx_rate: None,
                 subtype: None,
                 asset_id: None,
+                isin: None,
             })
             .collect();
 

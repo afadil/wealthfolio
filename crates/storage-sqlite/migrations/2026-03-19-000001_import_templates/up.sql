@@ -40,6 +40,87 @@ VALUES (
     CURRENT_TIMESTAMP
 );
 
+-- Trading 212 brokerage transaction export
+-- Columns: Action, Time, ISIN, Ticker, Name, No. of shares, Price / share, Currency (Price / share),
+--          Exchange rate, Result, Currency (Result), Total, Currency (Total),
+--          Withholding tax, Currency (Withholding tax), Notes, ID,
+--          Currency conversion fee, Currency (Currency conversion fee)
+-- No header metadata rows → skipTopRows: 0
+-- Row 1: column headers → hasHeaderRow: true
+-- Date format: yyyy-MM-dd HH:mm:ss (e.g. "2024-01-15 09:30:03")
+-- Note: "Currency conversion" rows (FX conversions) have no Ticker and cannot be mapped
+--       to a single activity; they will surface as unresolved rows in the review step.
+INSERT OR IGNORE INTO import_templates (id, name, scope, config, created_at, updated_at)
+VALUES (
+    'system_trading212',
+    'Trading 212',
+    'SYSTEM',
+    '{"fieldMappings":{"date":"Time","activityType":"Action","symbol":"Ticker","isin":"ISIN","quantity":"No. of shares","unitPrice":"Price / share","fee":"Currency conversion fee","amount":"Total","currency":"Currency (Total)","comment":"Notes"},"activityMappings":{"BUY":["Market buy","Limit buy","Stop buy","Stock distribution","Stock split open"],"SELL":["Market sell","Limit sell","Stop sell","Stock split close","Transfer out"],"DIVIDEND":["Dividend (Ordinary)","Dividend (Dividend)","Dividend (Dividend manufactured payment)","Dividend (Tax exempted)","Dividend (Return of capital)"],"INTEREST":["Interest on cash","Lending interest"],"FEE":["ADR Fee","Card debit","New card cost"],"DEPOSIT":["Deposit"],"WITHDRAWAL":["Withdrawal","Spending"]},"symbolMappings":{},"accountMappings":{},"symbolMappingMeta":{},"parseConfig":{"delimiter":",","dateFormat":"YYYY-MM-DD HH:mm:ss","decimalSeparator":"auto","thousandsSeparator":"auto","hasHeaderRow":true,"skipTopRows":0,"skipBottomRows":0}}',
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+);
+
+-- Interactive Brokers Flex Query — Trades export
+-- The standard Activity Statement CSV is a multi-section file (every row is prefixed with
+-- section name + row type) and cannot be parsed as a flat table. Use a Flex Query instead.
+--
+-- Setup: Client Portal → Reports → Flex Queries → Create / Edit Flex Query
+--   · Sections to include: Trades
+--   · Fields (add in this order):
+--       Symbol, TradeDate, Buy/Sell, Quantity, TradePrice, IBCommission, Currency, Description
+--   · Date Format: yyyy-MM-dd  (avoids the embedded comma in the default datetime format)
+--   · Output Format: CSV
+--   · Download and import the resulting file.
+--
+-- Quirks:
+--   · IBCommission is always negative (a deduction); stored as-is — same as Schwab "Fees & Comm".
+--   · Quantity should be unsigned in the Flex Query output; if you get negative quantities for
+--     sells, edit the Flex Query and check "Unsigned Quantity" (or similar) in IB's field settings.
+--   · Only BUY/SELL trades are covered. Dividends, interest, and deposits require a separate
+--     Flex Query and cannot be combined with trades in a single flat-table import.
+--   · Option symbols include expiry + strike (e.g. "SPY 18MAR22 440.0 P") and will not resolve
+--     to a market-data quote automatically — map them manually in the symbol review step.
+INSERT OR IGNORE INTO import_templates (id, name, scope, config, created_at, updated_at)
+VALUES (
+    'system_ibkr',
+    'Interactive Brokers',
+    'SYSTEM',
+    '{"fieldMappings":{"date":"TradeDate","activityType":"Buy/Sell","symbol":"Symbol","quantity":"Quantity","unitPrice":"TradePrice","fee":"IBCommission","currency":"Currency","comment":"Description"},"activityMappings":{"BUY":["BUY","Buy"],"SELL":["SELL","Sell"]},"symbolMappings":{},"accountMappings":{},"symbolMappingMeta":{},"parseConfig":{"delimiter":",","dateFormat":"ISO8601","decimalSeparator":".","thousandsSeparator":"auto","hasHeaderRow":true,"skipTopRows":0,"skipBottomRows":0}}',
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+);
+
+-- Wealthsimple "Custom Statement" CSV export
+-- Columns (14-col format): transaction_date, settlement_date, account_id,
+--          account_type, activity_type, activity_sub_type, direction,
+--          symbol, name, currency, quantity, unit_price, commission,
+--          net_cash_amount
+-- Some exports include a 15th column (ticker) between symbol and name;
+-- since mapping is by header name this works either way.
+-- Row 1: column headers  →  hasHeaderRow: true
+-- Last row: quoted timestamp footer ("As of …")  →  skipBottomRows: 1
+-- Date format: YYYY-MM-DD (ISO 8601)
+--
+-- Quirks:
+--   · "Trade" covers both buys and sells — the sub_type column (BUY/SELL)
+--     distinguishes them but cannot be used as the primary mapping column.
+--     All Trade rows map to BUY; SELL trades must be re-typed in review.
+--   · "MoneyMovement" covers deposits and withdrawals. Since numeric signs
+--     are stripped during import, withdrawals also appear as DEPOSIT and
+--     must be re-typed in review.
+--   · "FxExchange" and "LegacyCorporateAction" rows have no canonical
+--     equivalent and will surface as unresolved — users can skip them.
+--   · commission is typically 0 (zero-commission trading).
+INSERT OR IGNORE INTO import_templates (id, name, scope, config, created_at, updated_at)
+VALUES (
+    'system_wealthsimple',
+    'Wealthsimple',
+    'SYSTEM',
+    '{"fieldMappings":{"date":"transaction_date","activityType":"activity_type","symbol":"symbol","quantity":"quantity","unitPrice":"unit_price","fee":"commission","amount":"net_cash_amount","currency":"currency","account":"account_id","comment":"name"},"activityMappings":{"BUY":["Trade"],"DIVIDEND":["Dividend"],"INTEREST":["Interest"],"DEPOSIT":["MoneyMovement"],"SPLIT":["CorporateAction"],"TAX":["NonResidentTax"],"FEE":["Fee"],"CREDIT":["Refund","AdministrativePayment"],"TRANSFER_OUT":["InternalSecurityTransfer"],"ADJUSTMENT":["Correction"]},"symbolMappings":{},"accountMappings":{},"symbolMappingMeta":{},"parseConfig":{"delimiter":",","dateFormat":"ISO8601","decimalSeparator":".","thousandsSeparator":"auto","hasHeaderRow":true,"skipTopRows":0,"skipBottomRows":1}}',
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+);
+
 -- Migrate existing profiles to templates (use account_id as template id)
 INSERT INTO import_templates (id, name, scope, config, created_at, updated_at)
 SELECT

@@ -621,6 +621,10 @@ pub struct ActivityImport {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub asset_id: Option<String>,
+    /// ISIN identifier from the CSV (e.g. GB0007188757). Used for unambiguous exchange resolution.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub isin: Option<String>,
 }
 
 /// Model for sorting activities

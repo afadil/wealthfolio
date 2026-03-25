@@ -128,6 +128,15 @@
       "yahoo": { "suffix": ".XC", "codes": ["CXE"] }
     },
     {
+      "mic": "DXE",
+      "name": "Cboe Europe",
+      "long_name": "Cboe Europe Equities (EUR)",
+      "currency": "EUR",
+      "timezone": "Europe/London",
+      "close": [16, 30],
+      "yahoo": { "suffix": ".XD", "codes": ["DXE"] }
+    },
+    {
       "mic": "XLON_IL",
       "name": null,
       "yahoo": { "suffix": ".IL", "currency": "GBp" }
@@ -392,6 +401,60 @@
       "yahoo": { "suffix": ".IS", "codes": ["IST"] }
     },
     {
+      "mic": "XBSE",
+      "name": "Bucharest",
+      "long_name": "Bucharest Stock Exchange",
+      "currency": "RON",
+      "timezone": "Europe/Bucharest",
+      "close": [17, 30],
+      "yahoo": { "suffix": ".RO", "codes": ["BVB"] }
+    },
+    {
+      "mic": "XTAL",
+      "name": "Nasdaq Tallinn",
+      "long_name": "Nasdaq Tallinn Stock Exchange",
+      "currency": "EUR",
+      "timezone": "Europe/Tallinn",
+      "close": [16, 30],
+      "yahoo": { "suffix": ".TL", "codes": ["TLX"] }
+    },
+    {
+      "mic": "XRIS",
+      "name": "Nasdaq Riga",
+      "long_name": "Nasdaq Riga Stock Exchange",
+      "currency": "EUR",
+      "timezone": "Europe/Riga",
+      "close": [16, 0],
+      "yahoo": { "suffix": ".RG", "codes": ["RIS"] }
+    },
+    {
+      "mic": "XLIT",
+      "name": "Nasdaq Vilnius",
+      "long_name": "Nasdaq Vilnius Stock Exchange",
+      "currency": "EUR",
+      "timezone": "Europe/Vilnius",
+      "close": [16, 0],
+      "yahoo": { "suffix": ".VS", "codes": ["VSE"] }
+    },
+    {
+      "mic": "XZAG",
+      "name": "ZSE",
+      "long_name": "Zagreb Stock Exchange",
+      "currency": "EUR",
+      "timezone": "Europe/Zagreb",
+      "close": [16, 30],
+      "yahoo": { "suffix": ".ZA", "codes": ["ZSE"] }
+    },
+    {
+      "mic": "XLJU",
+      "name": "LJSE",
+      "long_name": "Ljubljana Stock Exchange",
+      "currency": "EUR",
+      "timezone": "Europe/Ljubljana",
+      "close": [16, 30],
+      "yahoo": { "suffix": ".LJ", "codes": ["LJU"] }
+    },
+    {
       "mic": "XSHG",
       "name": "Shanghai",
       "long_name": "Shanghai Stock Exchange",
@@ -637,6 +700,8 @@
     "USD": ["XNYS", "XNAS", "ARCX", "BATS", "XASE", "OTCM"],
     "CAD": ["XTSE", "XTSX", "XCNQ", "XNEO"],
     "GBP": ["XLON"],
+    "GBX": ["XLON"],
+    "GBp": ["XLON"],
     "EUR": ["XETR", "XPAR", "XAMS", "XMIL", "XMAD"],
     "CHF": ["XSWX"],
     "HKD": ["XHKG"],

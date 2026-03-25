@@ -72,11 +72,9 @@ const COLUMN_ALIASES: Record<string, string[]> = {
     "asset id",
     "asset_id",
     "instrument",
-    "isin",
     "cusip",
-    "security id",
-    "securityid",
   ],
+  [ImportFormat.ISIN]: ["isin", "security id", "securityid"],
   [ImportFormat.INSTRUMENT_TYPE]: [
     "instrumenttype",
     "instrument type",
