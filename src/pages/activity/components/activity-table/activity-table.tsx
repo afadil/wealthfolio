@@ -370,6 +370,28 @@ export const ActivityTable = ({
           }
 
           const displayValue = calculateActivityValue(activity);
+          const isInflow = activityType === "DEPOSIT" || activityType === "TRANSFER_IN";
+          const isOutflow = activityType === "WITHDRAWAL" || activityType === "TRANSFER_OUT";
+          const valueToDisplay = isOutflow ? -displayValue : displayValue;
+
+          // Add + sign for inflows (deposit, transfer_in)
+          if (isInflow) {
+            return (
+              <div className="pr-4 text-right text-green-600 dark:text-green-500">
+                +{formatAmount(valueToDisplay, currency)}
+              </div>
+            );
+          }
+
+          // Add - sign for outflows (withdrawal, transfer_out)
+          if (isOutflow) {
+            return (
+              <div className="pr-4 text-right text-destructive">
+                {formatAmount(valueToDisplay, currency)}
+              </div>
+            );
+          }
+
           return <div className="pr-4 text-right">{formatAmount(displayValue, currency)}</div>;
         },
       },
