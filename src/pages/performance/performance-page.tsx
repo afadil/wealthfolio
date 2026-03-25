@@ -1,12 +1,10 @@
 import { BenchmarkSymbolSelector } from "@/components/benchmark-symbol-selector";
 import { MetricLabelWithInfo } from "@/components/metric-display";
 import { PerformanceChart } from "@/components/performance-chart";
-import { PerformanceChartMobile } from "@/components/performance-chart-mobile";
 
 import { PERFORMANCE_CHART_COLORS } from "@/components/performance-chart-colors";
 import { EmptyPlaceholder } from "@/components/ui/empty-placeholder";
 import { usePersistentState } from "@/hooks/use-persistent-state";
-import { useIsMobileViewport } from "@/hooks/use-platform";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { DateRange, PerformanceMetrics, ReturnData, TrackedItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -24,10 +22,6 @@ import {
   CarouselContent,
   CarouselItem,
   DateRangeSelector,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   GainPercent,
   Icons,
   Page,
@@ -36,11 +30,9 @@ import {
   Separator,
 } from "@wealthvn/ui";
 import { subMonths } from "date-fns";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { AccountSelector } from "../../components/account-selector";
-import { AccountSelectorMobile } from "../../components/account-selector-mobile";
-import { BenchmarkSymbolSelectorMobile } from "../../components/benchmark-symbol-selector-mobile";
 import { useCalculatePerformanceHistory } from "./hooks/use-performance-data";
 
 // Define the type expected by the chart
@@ -61,13 +53,11 @@ function PerformanceContent({
   isLoading,
   hasErrors,
   errorMessages,
-  isMobile,
 }: {
   chartData: ChartDataItem[] | undefined;
   isLoading: boolean;
   hasErrors: boolean;
   errorMessages: string[];
-  isMobile: boolean;
 }) {
   const { t } = useTranslation("performance");
 
@@ -75,11 +65,7 @@ function PerformanceContent({
     <div className="relative flex h-full w-full flex-col">
       {chartData && chartData.length > 0 && (
         <div className="min-h-0 w-full flex-1">
-          {isMobile ? (
-            <PerformanceChartMobile data={chartData} />
-          ) : (
-            <PerformanceChart data={chartData} />
-          )}
+          <PerformanceChart data={chartData} />
         </div>
       )}
 
@@ -200,7 +186,6 @@ const SelectedItemBadge = ({
 
 export default function PerformancePage() {
   const { t } = useTranslation("performance");
-  const isMobile = useIsMobileViewport();
   const [selectedItems, setSelectedItems] = usePersistentState<TrackedItem[]>(
     "performance:selectedItems",
     [
@@ -222,10 +207,6 @@ export default function PerformancePage() {
       to: new Date(),
     },
   );
-
-  // State for mobile dropdown menu
-  const [accountSheetOpen, setAccountSheetOpen] = useState(false);
-  const [benchmarkSheetOpen, setBenchmarkSheetOpen] = useState(false);
 
   // Helper function to sort comparison items (accounts first, then symbols)
   const sortComparisonItems = (items: TrackedItem[]): TrackedItem[] => {
@@ -354,63 +335,8 @@ export default function PerformancePage() {
         actions={<DateRangeSelector value={dateRange} onChange={setDateRange} />}
       />
       <PageContent>
-        {/* Mobile: Carousel + Plus button in same row */}
-        <div className="flex items-center gap-2 md:hidden">
-          {/* Selected items badges carousel */}
-          {selectedItems.length > 0 && (
-            <Carousel
-              opts={{
-                align: "start",
-                loop: false,
-              }}
-              className="flex-1"
-            >
-              <CarouselContent className="-ml-2">
-                {selectedItems.map((item) => (
-                  <CarouselItem key={item.id} className="basis-auto pl-2">
-                    <SelectedItemBadge
-                      item={item}
-                      isSelected={selectedItemId === item.id}
-                      onSelect={() => handleBadgeSelect(item)}
-                      onDelete={(e) => handleBadgeDelete(e, item)}
-                      color={chartColorMap.get(item.id)}
-                    />
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-            </Carousel>
-          )}
-
-          {/* Mobile: Plus button with dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="bg-secondary/30 hover:bg-muted/80 size-9 flex-shrink-0 rounded-md border-[1.5px] border-none"
-                aria-label={t("actions.addItem")}
-              >
-                <Icons.Plus className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onSelect={() => setAccountSheetOpen(true)} className="py-4 md:py-2">
-                <Icons.Briefcase className="mr-2 h-4 w-4" />
-                {t("actions.addAccount")}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => setBenchmarkSheetOpen(true)}
-                className="py-4 md:py-2"
-              >
-                <Icons.TrendingUp className="mr-2 h-4 w-4" />
-                {t("actions.addBenchmark")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        {/* Desktop: Full layout with separator */}
-        <div className="hidden md:flex md:flex-row md:items-center">
+        {/* Full layout with separator */}
+        <div className="flex flex-row items-center">
           {/* Selected items badges - horizontal scroll carousel */}
           {selectedItems.length > 0 && (
             <div className="flex items-center gap-3">
@@ -441,7 +367,7 @@ export default function PerformancePage() {
             </div>
           )}
 
-          {/* Desktop: Full text buttons */}
+          {/* Full text buttons */}
           <div className="flex flex-shrink-0 items-center gap-2">
             <AccountSelector
               setSelectedAccount={handleAccountSelect}
@@ -453,233 +379,116 @@ export default function PerformancePage() {
           </div>
         </div>
 
-        {/* Mobile sheets controlled by dropdown - rendered but hidden by Sheet component */}
-        <AccountSelectorMobile
-          setSelectedAccount={(account) => {
-            handleAccountSelect(account);
-            setAccountSheetOpen(false);
-          }}
-          includePortfolio={true}
-          open={accountSheetOpen}
-          onOpenChange={setAccountSheetOpen}
-          className="hidden"
-        />
-        <BenchmarkSymbolSelectorMobile
-          onSelect={(symbol) => {
-            handleSymbolSelect(symbol);
-            setBenchmarkSheetOpen(false);
-          }}
-          open={benchmarkSheetOpen}
-          onOpenChange={setBenchmarkSheetOpen}
-          className="hidden"
-        />
-
-        <div className="flex h-[calc(100vh-19rem)] flex-col md:h-[calc(100vh-12rem)]">
+        <div className="flex h-[calc(100vh-12rem)] flex-col">
           <Card className="flex min-h-0 flex-1 flex-col">
-            <CardHeader className={cn("pb-2", isMobile ? "px-3 py-3" : "pb-1")}>
-              <div className={cn("space-y-3", isMobile ? "space-y-2" : "sm:space-y-4")}>
+            <CardHeader className="pb-2">
+              <div className="space-y-3 sm:space-y-4">
                 <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
                   <div>
-                    <CardTitle className={cn("text-lg sm:text-xl", isMobile && "text-sm")}>
+                    <CardTitle className="text-lg sm:text-xl">
                       {t("title")}
                     </CardTitle>
-                    <CardDescription
-                      className={cn("text-xs sm:text-sm", isMobile && "text-[10px]")}
-                    >
+                    <CardDescription className="text-xs sm:text-sm">
                       {displayDateRange}
                     </CardDescription>
                   </div>
                   {performanceData && performanceData.length > 0 && (
                     <>
-                      {/* Mobile compact metrics - horizontal scroll */}
-                      {isMobile ? (
-                        <Carousel
-                          opts={{
-                            align: "start",
-                            loop: false,
-                          }}
-                          className="w-full"
-                        >
-                          <CarouselContent className="-ml-2 md:-ml-4">
-                            <CarouselItem className="basis-[38%] pl-2 md:pl-4">
-                              <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
-                                <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
-                                  {t("metrics.totalReturn")}
-                                </span>
-                                <span
-                                  className={cn(
-                                    "text-base font-bold",
-                                    selectedItemData && selectedItemData.totalReturn >= 0
-                                      ? "text-success"
-                                      : "text-destructive",
-                                  )}
-                                >
-                                  <GainPercent
-                                    value={selectedItemData?.totalReturn ?? 0}
-                                    animated={true}
-                                    className="text-base"
-                                  />
-                                </span>
-                              </div>
-                            </CarouselItem>
-
-                            <CarouselItem className="basis-[38%] pl-2 md:pl-4">
-                              <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
-                                <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
-                                  {t("metrics.annualized")}
-                                </span>
-                                <span
-                                  className={cn(
-                                    "text-base font-bold",
-                                    selectedItemData && selectedItemData.annualizedReturn >= 0
-                                      ? "text-success"
-                                      : "text-destructive",
-                                  )}
-                                >
-                                  <GainPercent
-                                    value={selectedItemData?.annualizedReturn ?? 0}
-                                    animated={true}
-                                    className="text-base"
-                                  />
-                                </span>
-                              </div>
-                            </CarouselItem>
-
-                            <CarouselItem className="basis-[38%] pl-2 md:pl-4">
-                              <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
-                                <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
-                                  {t("metrics.volatility")}
-                                </span>
-                                <span className="text-foreground text-base font-bold">
-                                  <NumberFlow
-                                    value={selectedItemData?.volatility ?? 0}
-                                    animated={true}
-                                    format={{
-                                      style: "percent",
-                                      maximumFractionDigits: 2,
-                                    }}
-                                  />
-                                </span>
-                              </div>
-                            </CarouselItem>
-
-                            <CarouselItem className="basis-[38%] pl-2 md:pl-4">
-                              <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
-                                <span className="text-muted-foreground text-[9px] font-medium tracking-wide uppercase">
-                                  {t("metrics.maxDrawdown")}
-                                </span>
-                                <span className="text-destructive text-base font-bold">
-                                  <NumberFlow
-                                    value={(selectedItemData?.maxDrawdown ?? 0) * -1}
-                                    animated={true}
-                                    format={{
-                                      style: "percent",
-                                      maximumFractionDigits: 2,
-                                    }}
-                                  />
-                                </span>
-                              </div>
-                            </CarouselItem>
-                          </CarouselContent>
-                        </Carousel>
-                      ) : (
-                        /* Desktop metrics */
-                        <div className="grid grid-cols-2 gap-3 rounded-lg p-2 backdrop-blur-sm sm:gap-4 md:grid-cols-4 md:gap-6">
-                          <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                            <MetricLabelWithInfo
-                              label={t("metrics.totalReturn")}
-                              infoText={t("infoTexts.timeWeightedReturn")}
-                            />
-                            <div className="flex items-baseline justify-center">
-                              <span
-                                className={`text-base sm:text-lg ${
-                                  selectedItemData && selectedItemData.totalReturn >= 0
-                                    ? "text-success"
-                                    : "text-destructive"
-                                }`}
-                              >
-                                <GainPercent
-                                  value={selectedItemData?.totalReturn ?? 0}
-                                  animated={true}
-                                  className="text-base sm:text-lg"
-                                />
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                            <MetricLabelWithInfo
-                              label={t("metrics.annualizedReturn")}
-                              infoText={t("infoTexts.annualizedReturn")}
-                            />
-                            <div className="flex items-baseline justify-center">
-                              <span
-                                className={`text-base sm:text-lg ${
-                                  selectedItemData && selectedItemData.annualizedReturn >= 0
-                                    ? "text-success"
-                                    : "text-destructive"
-                                }`}
-                              >
-                                <GainPercent
-                                  value={selectedItemData?.annualizedReturn ?? 0}
-                                  animated={true}
-                                  className="text-base sm:text-lg"
-                                />
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                            <MetricLabelWithInfo
-                              label={t("metrics.volatility")}
-                              infoText={t("infoTexts.volatility")}
-                            />
-                            <div className="flex items-baseline justify-center">
-                              <span className="text-foreground text-base sm:text-lg">
-                                <NumberFlow
-                                  value={selectedItemData?.volatility ?? 0}
-                                  animated={true}
-                                  format={{
-                                    style: "percent",
-                                    maximumFractionDigits: 2,
-                                  }}
-                                />
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                            <MetricLabelWithInfo
-                              label={t("metrics.maxDrawdown")}
-                              infoText={t("infoTexts.maxDrawdown")}
-                            />
-                            <div className="flex items-baseline justify-center">
-                              <span className="text-destructive text-base sm:text-lg">
-                                <NumberFlow
-                                  value={(selectedItemData?.maxDrawdown ?? 0) * -1}
-                                  animated={true}
-                                  format={{
-                                    style: "percent",
-                                    maximumFractionDigits: 2,
-                                  }}
-                                />
-                              </span>
-                            </div>
+                      {/* Desktop metrics */}
+                      <div className="grid grid-cols-2 gap-3 rounded-lg p-2 backdrop-blur-sm sm:gap-4 md:grid-cols-4 md:gap-6">
+                        <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
+                          <MetricLabelWithInfo
+                            label={t("metrics.totalReturn")}
+                            infoText={t("infoTexts.timeWeightedReturn")}
+                          />
+                          <div className="flex items-baseline justify-center">
+                            <span
+                              className={`text-base sm:text-lg ${
+                                selectedItemData && selectedItemData.totalReturn >= 0
+                                  ? "text-success"
+                                  : "text-destructive"
+                              }`}
+                            >
+                              <GainPercent
+                                value={selectedItemData?.totalReturn ?? 0}
+                                animated={true}
+                                className="text-base sm:text-lg"
+                              />
+                            </span>
                           </div>
                         </div>
-                      )}
+
+                        <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
+                          <MetricLabelWithInfo
+                            label={t("metrics.annualizedReturn")}
+                            infoText={t("infoTexts.annualizedReturn")}
+                          />
+                          <div className="flex items-baseline justify-center">
+                            <span
+                              className={`text-base sm:text-lg ${
+                                selectedItemData && selectedItemData.annualizedReturn >= 0
+                                  ? "text-success"
+                                  : "text-destructive"
+                              }`}
+                            >
+                              <GainPercent
+                                value={selectedItemData?.annualizedReturn ?? 0}
+                                animated={true}
+                                className="text-base sm:text-lg"
+                              />
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
+                          <MetricLabelWithInfo
+                            label={t("metrics.volatility")}
+                            infoText={t("infoTexts.volatility")}
+                          />
+                          <div className="flex items-baseline justify-center">
+                            <span className="text-foreground text-base sm:text-lg">
+                              <NumberFlow
+                                value={selectedItemData?.volatility ?? 0}
+                                animated={true}
+                                format={{
+                                  style: "percent",
+                                  maximumFractionDigits: 2,
+                                }}
+                              />
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
+                          <MetricLabelWithInfo
+                            label={t("metrics.maxDrawdown")}
+                            infoText={t("infoTexts.maxDrawdown")}
+                          />
+                          <div className="flex items-baseline justify-center">
+                            <span className="text-destructive text-base sm:text-lg">
+                              <NumberFlow
+                                value={(selectedItemData?.maxDrawdown ?? 0) * -1}
+                                animated={true}
+                                format={{
+                                  style: "percent",
+                                  maximumFractionDigits: 2,
+                                }}
+                              />
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </>
                   )}
                 </div>
               </div>
             </CardHeader>
-            <CardContent className={cn("min-h-0 flex-1", isMobile ? "p-2" : "p-3 sm:p-6")}>
+            <CardContent className="min-h-0 flex-1 p-3 sm:p-6">
               <PerformanceContent
                 chartData={chartData}
                 isLoading={isLoadingPerformance}
                 hasErrors={hasErrors}
                 errorMessages={errorMessages}
-                isMobile={isMobile}
               />
             </CardContent>
           </Card>

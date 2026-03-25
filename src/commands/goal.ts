@@ -1,4 +1,4 @@
-import { getRunEnv, invokeTauri, invokeWeb, logger, RUN_ENV } from "@/adapters";
+import { invokeTauri, logger } from "@/adapters";
 import { newGoalSchema } from "@/lib/schemas";
 import { Goal, GoalAllocation } from "@/lib/types";
 import z from "zod";
@@ -29,14 +29,7 @@ const normalizeAllocation = (raw: RawGoalAllocation): GoalAllocation => {
 
 export const getGoals = async (): Promise<Goal[]> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("get_goals");
-      case RUN_ENV.WEB:
-        return invokeWeb("get_goals");
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return invokeTauri("get_goals");
   } catch (error) {
     logger.error("Error fetching goals.");
     throw error;
@@ -51,14 +44,7 @@ export const createGoal = async (goal: NewGoalInput): Promise<Goal> => {
     isAchieved: false,
   };
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("create_goal", { goal: newGoal });
-      case RUN_ENV.WEB:
-        return invokeWeb("create_goal", { goal: newGoal });
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return invokeTauri("create_goal", { goal: newGoal });
   } catch (error) {
     logger.error("Error creating goal.");
     throw error;
@@ -67,14 +53,7 @@ export const createGoal = async (goal: NewGoalInput): Promise<Goal> => {
 
 export const updateGoal = async (goal: Goal): Promise<Goal> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("update_goal", { goal });
-      case RUN_ENV.WEB:
-        return invokeWeb("update_goal", { goal });
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return invokeTauri("update_goal", { goal });
   } catch (error) {
     logger.error("Error updating goal.");
     throw error;
@@ -83,16 +62,8 @@ export const updateGoal = async (goal: Goal): Promise<Goal> => {
 
 export const deleteGoal = async (goalId: string): Promise<void> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        await invokeTauri("delete_goal", { goalId });
-        return;
-      case RUN_ENV.WEB:
-        await invokeWeb("delete_goal", { goalId });
-        return;
-      default:
-        throw new Error(`Unsupported`);
-    }
+    await invokeTauri("delete_goal", { goalId });
+    return;
   } catch (error) {
     logger.error("Error deleting goal.");
     throw error;
@@ -101,16 +72,8 @@ export const deleteGoal = async (goalId: string): Promise<void> => {
 
 export const updateGoalsAllocations = async (allocations: GoalAllocation[]): Promise<void> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        await invokeTauri("update_goal_allocations", { allocations });
-        return;
-      case RUN_ENV.WEB:
-        await invokeWeb("update_goal_allocations", { allocations });
-        return;
-      default:
-        throw new Error(`Unsupported`);
-    }
+    await invokeTauri("update_goal_allocations", { allocations });
+    return;
   } catch (error) {
     logger.error("Error saving goals allocations.");
     throw error;
@@ -119,17 +82,7 @@ export const updateGoalsAllocations = async (allocations: GoalAllocation[]): Pro
 
 export const getGoalsAllocation = async (): Promise<GoalAllocation[]> => {
   try {
-    let allocations: RawGoalAllocation[] = [];
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        allocations = await invokeTauri<RawGoalAllocation[]>("load_goals_allocations");
-        break;
-      case RUN_ENV.WEB:
-        allocations = await invokeWeb<RawGoalAllocation[]>("load_goals_allocations");
-        break;
-      default:
-        throw new Error(`Unsupported`);
-    }
+    const allocations: RawGoalAllocation[] = await invokeTauri<RawGoalAllocation[]>("load_goals_allocations");
     return allocations.map(normalizeAllocation);
   } catch (error) {
     logger.error("Error fetching goals allocations.");
@@ -161,14 +114,7 @@ export const getGoalProgress = async (
   date?: string
 ): Promise<GoalProgressSnapshot> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("get_goal_progress", { goalId, date });
-      case RUN_ENV.WEB:
-        return invokeWeb("get_goal_progress", { goalId, date });
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return invokeTauri("get_goal_progress", { goalId, date });
   } catch (error) {
     logger.error("Error fetching goal progress.");
     throw error;
@@ -180,17 +126,7 @@ export const getGoalAllocationsOnDate = async (
   date?: string
 ): Promise<GoalAllocation[]> => {
   try {
-    let allocations: RawGoalAllocation[] = [];
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        allocations = await invokeTauri<RawGoalAllocation[]>("get_goal_allocations_on_date", { goalId, date });
-        break;
-      case RUN_ENV.WEB:
-        allocations = await invokeWeb<RawGoalAllocation[]>("get_goal_allocations_on_date", { goalId, date });
-        break;
-      default:
-        throw new Error(`Unsupported`);
-    }
+    const allocations: RawGoalAllocation[] = await invokeTauri<RawGoalAllocation[]>("get_goal_allocations_on_date", { goalId, date });
     return allocations.map(normalizeAllocation);
   } catch (error) {
     logger.error("Error fetching goal allocations on date.");
@@ -215,14 +151,7 @@ export const validateAllocationConflict = async (
   request: AllocationConflictValidationRequest
 ): Promise<AllocationConflictValidationResponse> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("validate_allocation_conflict", { request });
-      case RUN_ENV.WEB:
-        return invokeWeb("validate_allocation_conflict", { request });
-      default:
-        throw new Error(`Unsupported`);
-    }
+    return invokeTauri("validate_allocation_conflict", { request });
   } catch (error) {
     logger.error("Error validating allocation conflict.");
     throw error;
@@ -231,16 +160,8 @@ export const validateAllocationConflict = async (
 
 export const deleteGoalAllocation = async (allocationId: string): Promise<void> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        await invokeTauri("delete_goal_allocation", { allocationId });
-        return;
-      case RUN_ENV.WEB:
-        await invokeWeb("delete_goal_allocation", { allocationId });
-        return;
-      default:
-        throw new Error(`Unsupported`);
-    }
+    await invokeTauri("delete_goal_allocation", { allocationId });
+    return;
   } catch (error) {
     logger.error("Error deleting goal allocation.");
     throw error;

@@ -1,7 +1,6 @@
 import { logger } from "@/adapters";
 import { getAccounts } from "@/commands/account";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { usePlatform } from "@/hooks/use-platform";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, ActivityImport, ImportMappingData } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
@@ -22,7 +21,6 @@ import { validateActivityImport } from "./utils/validation-utils";
 const ActivityImportPage = () => {
   const { t } = useTranslation("activity");
   const navigate = useNavigate();
-  const { isMobile } = usePlatform();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [activities, setActivities] = useState<ActivityImport[]>([]);
@@ -191,13 +189,7 @@ const ActivityImportPage = () => {
     <Page>
       <PageHeader
         heading={t("import.title")}
-        onBack={isMobile ? () => navigate("/activities") : undefined}
-        actions={
-          <>
-            {isMobile && <ImportHelpPopover />}
-            {!isMobile && <ImportHelpPopover />}
-          </>
-        }
+        actions={<ImportHelpPopover />}
       />
       <PageContent withPadding={false}>
         <ErrorBoundary>

@@ -8,13 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { InputTags } from "@/components/ui/tag-input";
-import { useHapticFeedback } from "@/hooks";
 import { useQuoteHistory } from "@/hooks/use-quote-history";
 import { DataSource, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { Asset, Country, Holding, Quote, Sector } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
-import { AnimatedToggleGroup, Page, PageContent, PageHeader, SwipableView } from "@wealthvn/ui";
+import { AnimatedToggleGroup, Page, PageContent, PageHeader } from "@wealthvn/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -27,7 +26,6 @@ import { useAssetPerformance } from "./hooks/use-asset-performance";
 import { useAssetProfileMutations } from "./hooks/use-asset-profile-mutations";
 import { useQuoteMutations } from "./hooks/use-quote-mutations";
 import QuoteHistoryTable from "./quote-history-table";
-import { logger } from "@/adapters";
 
 interface AssetProfileFormData {
   name: string;
@@ -74,7 +72,6 @@ export const AssetProfilePage = () => {
   const [activeTab, setActiveTab] = useState<AssetTab>(defaultTab);
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const triggerHaptic = useHapticFeedback();
   const [formData, setFormData] = useState<AssetProfileFormData>({
     name: "",
     sectors: [],
@@ -349,271 +346,6 @@ export const AssetProfilePage = () => {
     return items;
   }, [profile, holding, t]);
 
-  // Build swipable tabs for mobile
-  const swipableTabs = useMemo(() => {
-    const tabs: { name: string; content: React.ReactNode }[] = [];
-
-    if (profile) {
-      tabs.push({
-        name: t("assets:profile.tabs.overview"),
-        content: (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">
-              <AssetHistoryCard
-                symbol={profile.symbol ?? ""}
-                currency={profile.currency ?? "USD"}
-                marketPrice={profile.marketPrice}
-                totalGainAmount={profile.totalGainAmount}
-                totalGainPercent={profile.totalGainPercent}
-                quoteHistory={quoteHistory ?? []}
-                className={`col-span-1 ${holding ? "md:col-span-2" : "md:col-span-3"}`}
-              />
-              {symbolHolding && (
-                <AssetDetailCard assetData={symbolHolding} className="col-span-1 md:col-span-1" />
-              )}
-            </div>
-
-            <div className="group relative">
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold">{t("assets:profile.about")}</h3>
-                {!isEditing && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setIsEditing(true)}
-                    className="h-6 w-6 md:opacity-0 md:group-hover:opacity-100"
-                  >
-                    <Icons.Pencil className="h-3 w-3" />
-                  </Button>
-                )}
-              </div>
-              <div className="flex flex-row items-center space-x-2 py-4">
-                {isEditing ? (
-                  <Input
-                    value={formData.assetClass}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, assetClass: e.target.value }))
-                    }
-                    placeholder={t("assets:profile.placeholders.assetClass")}
-                    className="w-[180px]"
-                  />
-                ) : (
-                  formData.assetClass && (
-                    <Badge variant="secondary" className="flex-none uppercase">
-                      {formData.assetClass}
-                    </Badge>
-                  )
-                )}
-                {isEditing ? (
-                  <Input
-                    value={formData.assetSubClass}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, assetSubClass: e.target.value }))
-                    }
-                    placeholder={t("assets:profile.placeholders.subClass")}
-                    className="w-[180px]"
-                  />
-                ) : (
-                  formData.assetSubClass && (
-                    <Badge variant="secondary" className="flex-none uppercase">
-                      {formData.assetSubClass}
-                    </Badge>
-                  )
-                )}
-                {(formData.assetClass || formData.assetSubClass) && formData.sectors.length > 0 && (
-                  <Separator orientation="vertical" />
-                )}
-                {isEditing ? (
-                  <InputTags
-                    value={formData.sectors.map(
-                      (s) => `${s.name}:${s.weight <= 1 ? (s.weight * 100).toFixed(0) : s.weight}%`,
-                    )}
-                    placeholder={t("assets:profile.placeholders.sector")}
-                    onChange={(values) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        sectors: (values as string[]).map((value) => {
-                          const [name, weightStr] = value.split(":");
-                          return { name: name?.trim(), weight: parseFloat(weightStr) || 0 };
-                        }),
-                      }))
-                    }
-                  />
-                ) : (
-                  <div className="flex flex-wrap">
-                    {formData.sectors.map((sector) => (
-                      <Badge
-                        variant="secondary"
-                        key={sector.name}
-                        className="dark:text-primary-foreground m-1 cursor-help bg-indigo-100 uppercase"
-                        title={`${sector.name}: ${sector.weight <= 1 ? (sector.weight * 100).toFixed(2) : sector.weight}%`}
-                      >
-                        {sector.name}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                {formData.sectors.length > 0 && formData.countries.length > 0 && (
-                  <Separator orientation="vertical" />
-                )}
-                {isEditing ? (
-                  <InputTags
-                    placeholder={t("assets:profile.placeholders.country")}
-                    value={formData.countries.map(
-                      (c) => `${c.name}:${c.weight <= 1 ? (c.weight * 100).toFixed(0) : c.weight}%`,
-                    )}
-                    onChange={(values) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        countries: (values as string[]).map((value) => {
-                          const [name, weightStr] = value.split(":");
-                          return { name: name?.trim(), weight: parseFloat(weightStr) || 0 };
-                        }),
-                      }))
-                    }
-                  />
-                ) : (
-                  <div className="flex flex-wrap">
-                    {formData.countries.map((country) => (
-                      <Badge
-                        variant="secondary"
-                        key={country.name}
-                        className="dark:text-primary-foreground m-1 bg-purple-100 uppercase"
-                        title={`${country.name}: ${country.weight <= 1 ? (country.weight * 100).toFixed(2) : country.weight}%`}
-                      >
-                        {country.name}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                {(formData.sectors.length > 0 || formData.countries.length > 0) && (
-                  <Separator orientation="vertical" />
-                )}
-                {isEditing && (
-                  <>
-                    <Button variant="default" size="icon" className="min-w-10" onClick={handleSave}>
-                      <Icons.Check className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="min-w-10"
-                      onClick={handleCancel}
-                    >
-                      <Icons.Close className="h-4 w-4" />
-                    </Button>
-                  </>
-                )}
-              </div>
-              <div className="mt-2">
-                {isEditing ? (
-                  <textarea
-                    className="mt-12 w-full rounded-md border border-neutral-200 p-2 text-sm"
-                    value={formData.notes}
-                    placeholder={t("assets:profile.placeholders.description")}
-                    rows={6}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
-                  />
-                ) : (
-                  <p className="text-muted-foreground text-sm font-light">
-                    {formData.notes || t("assets:profile.noDescription")}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        ),
-      });
-    }
-
-    if (holding?.lots && holding.lots.length > 0 && profile) {
-      tabs.push({
-        name: t("assets:profile.tabs.lots"),
-        content: (
-          <AssetLotsTable
-            lots={holding.lots}
-            currency={profile.currency ?? "USD"}
-            marketPrice={profile.marketPrice}
-          />
-        ),
-      });
-    }
-
-    if (profile) {
-      tabs.push({
-        name: t("activity:page.title", { defaultValue: "Activities" }),
-        content: <AssetActivitiesTable symbol={symbol} />,
-      });
-    }
-
-    tabs.push({
-      name: t("assets:profile.tabs.quotes"),
-      content: (
-        <QuoteHistoryTable
-           data={quoteHistory ?? []}
-           currentDataSource={formData.dataSource}
-           originalDataSource={(assetProfile?.dataSource ?? formData.dataSource) as DataSource}
-           availableDataSources={[
-             DataSource.YAHOO,
-             DataSource.MARKET_DATA_APP,
-             DataSource.ALPHA_VANTAGE,
-             DataSource.METAL_PRICE_API,
-             DataSource.VN_MARKET,
-           ]}
-           onChangeDataSource={async (dataSource) => {
-             try {
-               await updateAssetDataSourceMutation.mutateAsync({
-                 symbol,
-                 dataSource,
-               });
-
-               // Update form state on successful change
-               setFormData((prev) => ({
-                 ...prev,
-                 dataSource,
-               }));
-
-               logger.info(`Data source changed successfully to ${dataSource}`);
-             } catch (error) {
-               logger.error(`Failed to change data source: ${error}`);
-             }
-           }}
-           onSaveQuote={(quote: Quote) => {
-             const updatedQuote = { ...quote };
-             if (!updatedQuote.id) {
-               const datePart = new Date(updatedQuote.timestamp)
-                 .toISOString()
-                 .slice(0, 10)
-                 .replace(/-/g, "");
-               updatedQuote.id = `${datePart}_${symbol.toUpperCase()}`;
-             }
-             if (!updatedQuote.currency) {
-               updatedQuote.currency = profile?.currency ?? "USD";
-             }
-             saveQuoteMutation.mutate(updatedQuote);
-           }}
-           onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
-         />
-      ),
-    });
-
-    return tabs;
-  }, [
-    profile,
-    holding,
-    symbolHolding,
-    quoteHistory,
-    isEditing,
-    formData,
-    saveQuoteMutation,
-    deleteQuoteMutation,
-    updateAssetDataSourceMutation,
-    symbol,
-    handleCancel,
-    handleSave,
-    t,
-  ]);
-
   const isLoading = isHoldingLoading || isQuotesLoading || isAssetProfileLoading;
 
   if (isLoading)
@@ -784,7 +516,6 @@ export const AssetProfilePage = () => {
                 if (next === activeTab) {
                   return;
                 }
-                triggerHaptic();
                 setActiveTab(next);
                 const url = `${location.pathname}?tab=${next}`;
                 navigate(url, { replace: true });
@@ -796,26 +527,7 @@ export const AssetProfilePage = () => {
         </div>
       </PageHeader>
       <PageContent>
-        {/* Mobile: SwipableView */}
-        <div className="md:hidden">
-          <SwipableView
-            items={swipableTabs}
-            displayToggle={true}
-            onViewChange={(_index: number, name: string) => {
-              const tabValue = name.toLowerCase() as AssetTab;
-              if (tabValue === activeTab) {
-                return;
-              }
-              triggerHaptic();
-              setActiveTab(tabValue);
-              const url = `${location.pathname}?tab=${tabValue}`;
-              navigate(url, { replace: true });
-            }}
-          />
-        </div>
-
-        {/* Desktop: Regular Tabs */}
-        <Tabs value={activeTab} className="hidden space-y-4 md:block">
+        <Tabs value={activeTab} className="space-y-4">
           {/* Overview Content: Requires profile */}
           {profile && (
             <TabsContent value="overview" className="space-y-4">

@@ -1,8 +1,6 @@
-import { RUN_ENV, getRunEnv } from "@/adapters";
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/ui/icons";
 import { Separator } from "@/components/ui/separator";
-import { useAuth } from "@/context/auth-context";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -10,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@wealthvn/ui";
-import { LogOut, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { type NavLink, type NavigationProps, isPathActive } from "./app-navigation";
@@ -21,8 +19,6 @@ interface AppSidebarProps {
 
 export function AppSidebar({ navigation }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(true);
-  const { logout } = useAuth();
-  const isWeb = getRunEnv() === RUN_ENV.WEB;
 
   return (
     <div
@@ -119,31 +115,6 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
               {navigation?.secondary?.map((item) => (
                 <NavItem key={item.title} item={item} collapsed={collapsed} />
               ))}
-              {isWeb && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={logout}
-                  className={cn(
-                    "text-foreground mb-1 h-12 rounded-md transition-all duration-300 [&_svg]:size-5!",
-                    collapsed ? "justify-center" : "justify-start",
-                  )}
-                  title="Logout"
-                >
-                  <span aria-hidden="true">
-                    <LogOut className="h-5 w-5" />
-                  </span>
-                  <span
-                    className={cn({
-                      "ml-2 transition-opacity delay-100 duration-300 ease-in-out": true,
-                      "sr-only opacity-0": collapsed,
-                      "block opacity-100": !collapsed,
-                    })}
-                  >
-                    Logout
-                  </span>
-                </Button>
-              )}
               <Separator className="mt-0" />
               <div className="flex justify-end">
                 <Button

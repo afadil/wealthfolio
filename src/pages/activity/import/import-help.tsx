@@ -3,18 +3,8 @@ import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { usePlatform } from "@/hooks/use-platform";
-import {
-  ScrollArea,
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@wealthvn/ui";
 
 export function ImportHelpPopover() {
-  const { isMobile } = usePlatform();
   const { t } = useTranslation("activity");
 
   const helpContent = (
@@ -126,24 +116,6 @@ export function ImportHelpPopover() {
       </p>
     </div>
   );
-
-  if (isMobile) {
-    return (
-      <Sheet>
-        <SheetTrigger asChild>
-          <Button type="button" variant="ghost" size="icon" className="h-9 w-9">
-            <Icons.HelpCircle className="h-6 w-6" />
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="bottom" className="mx-1 h-[85vh] rounded-t-4xl">
-          <SheetHeader>
-            <SheetTitle>{t("import.help.sheetTitle")}</SheetTitle>
-          </SheetHeader>
-          <ScrollArea className="h-[calc(85vh-4rem)] pr-4">{helpContent}</ScrollArea>
-        </SheetContent>
-      </Sheet>
-    );
-  }
 
   return (
     <Popover>

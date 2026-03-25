@@ -1,4 +1,4 @@
-import { getRunEnv, invokeTauri, invokeWeb, logger, RUN_ENV } from "@/adapters";
+import { invokeTauri, logger } from "@/adapters";
 
 export interface AppInfo {
   version: string;
@@ -20,14 +20,7 @@ export interface UpdateCheckPayload {
 
 export const getAppInfo = async (): Promise<AppInfo> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP:
-        return invokeTauri("get_app_info");
-      case RUN_ENV.WEB:
-        return invokeWeb("get_app_info");
-      default:
-        throw new Error("Unsupported environment");
-    }
+    return invokeTauri("get_app_info");
   } catch (error) {
     logger.error("Error fetching app info");
     console.error(error);
@@ -43,32 +36,24 @@ export const checkForUpdates = async (
   payload?: UpdateCheckPayload,
 ): Promise<UpdateCheckResult | null> => {
   try {
-    switch (getRunEnv()) {
-      case RUN_ENV.DESKTOP: {
-        if (!payload?.currentVersion) {
-          throw new Error("Current version is required for desktop update checks");
-        }
-
-        const { check } = await import("@tauri-apps/plugin-updater");
-        const update = await check();
-        if (!update) {
-          return {
-            updateAvailable: false,
-            latestVersion: payload.currentVersion,
-          };
-        }
-
-        return {
-          updateAvailable: true,
-          latestVersion: update.version,
-          notes: update.body ?? undefined,
-        };
-      }
-      case RUN_ENV.WEB:
-        return invokeWeb("check_update");
-      default:
-        return null;
+    if (!payload?.currentVersion) {
+      throw new Error("Current version is required for desktop update checks");
     }
+
+    const { check } = await import("@tauri-apps/plugin-updater");
+    const update = await check();
+    if (!update) {
+      return {
+        updateAvailable: false,
+        latestVersion: payload.currentVersion,
+      };
+    }
+
+    return {
+      updateAvailable: true,
+      latestVersion: update.version,
+      notes: update.body ?? undefined,
+    };
   } catch (error) {
     logger.error("Error checking for updates");
     console.error(error);

@@ -1,4 +1,3 @@
-import { getRunEnv, RUN_ENV } from "@/adapters";
 import { getAuthToken, setAuthToken, setUnauthorizedHandler } from "@/lib/auth-token";
 import {
   createContext,
@@ -26,7 +25,6 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [requiresAuth, setRequiresAuth] = useState(false);
-  const [statusLoading, setStatusLoading] = useState(getRunEnv() === RUN_ENV.WEB);
   const [token, setToken] = useState<string | null>(() => getAuthToken());
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -35,40 +33,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     tokenRef.current = token;
   }, [token]);
-
-  useEffect(() => {
-    if (getRunEnv() !== RUN_ENV.WEB) {
-      setStatusLoading(false);
-      return;
-    }
-    let cancelled = false;
-    const loadStatus = async () => {
-      try {
-        const response = await fetch("/api/v1/auth/status");
-        if (!response.ok) {
-          throw new Error(`Failed to check authentication status: ${response.status}`);
-        }
-        const data = (await response.json()) as { requiresPassword: boolean };
-        if (!cancelled) {
-          setRequiresAuth(Boolean(data?.requiresPassword));
-        }
-      } catch (error) {
-        console.error("Failed to load authentication status", error);
-        if (!cancelled) {
-          setRequiresAuth(false);
-        }
-      } finally {
-        if (!cancelled) {
-          setStatusLoading(false);
-        }
-      }
-    };
-
-    void loadStatus();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     const handler = () => {
@@ -138,14 +102,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     () => ({
       requiresAuth,
       isAuthenticated: !requiresAuth || Boolean(token),
-      statusLoading,
+      statusLoading: false,
       loginLoading,
       loginError,
       login,
       logout,
       clearError,
     }),
-    [requiresAuth, token, statusLoading, loginLoading, loginError, login, logout, clearError],
+    [requiresAuth, token, loginLoading, loginError, login, logout, clearError],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

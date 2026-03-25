@@ -1,11 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/ui/icons";
 import { ProgressIndicator } from "@/components/ui/progress-indicator";
-import { usePlatform } from "@/hooks/use-platform";
 import { Account, CsvRowError } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 import { AccountSelector } from "../../../../components/account-selector";
-import { AccountSelectorMobile } from "../../../../components/account-selector-mobile";
 import { CSVFileViewer } from "../components/csv-file-viewer";
 import { FileDropzone } from "../components/file-dropzone";
 import { HelpTooltip } from "../components/help-tooltip";
@@ -34,7 +32,6 @@ export const AccountSelectionStep = ({
   onNext,
   onBack,
 }: AccountSelectionStepProps) => {
-  const { isMobile } = usePlatform();
   const { t } = useTranslation("activity");
 
   // Check if there are any errors
@@ -128,43 +125,10 @@ export const AccountSelectionStep = ({
             <HelpTooltip content={t("import.accountSelection.selectAccountHelp")} />
           </div>
           <div className="h-[120px]">
-            {isMobile ? (
-              <div className="border-border bg-background/50 hover:border-muted-foreground/50 hover:bg-background/80 flex h-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-4 transition-colors">
-                {selectedAccount ? (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <Icons.Briefcase className="text-primary h-5 w-5" />
-                      <div className="text-center">
-                        <p className="text-sm font-medium">{selectedAccount.name}</p>
-                        <p className="text-muted-foreground text-xs">{selectedAccount.currency}</p>
-                      </div>
-                    </div>
-                    <AccountSelectorMobile
-                      setSelectedAccount={setSelectedAccount}
-                      includePortfolio={false}
-                      iconOnly={false}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <Icons.Briefcase className="text-muted-foreground h-8 w-8" />
-                    <p className="text-muted-foreground text-center text-sm">
-                      {t("import.accountSelection.noAccountSelected")}
-                    </p>
-                    <AccountSelectorMobile
-                      setSelectedAccount={setSelectedAccount}
-                      includePortfolio={false}
-                      iconOnly={false}
-                    />
-                  </>
-                )}
-              </div>
-            ) : (
-              <AccountSelector
-                selectedAccount={selectedAccount}
-                setSelectedAccount={setSelectedAccount}
-              />
-            )}
+            <AccountSelector
+              selectedAccount={selectedAccount}
+              setSelectedAccount={setSelectedAccount}
+            />
           </div>
         </div>
 

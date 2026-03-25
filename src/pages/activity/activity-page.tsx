@@ -1,6 +1,5 @@
 import { getAccounts } from "@/commands/account";
 import { usePersistentState } from "@/hooks/use-persistent-state";
-import { useIsMobileViewport } from "@/hooks/use-platform";
 import { ActivityType } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { Account, ActivityDetails } from "@/lib/types";
@@ -25,13 +24,10 @@ import { Link } from "react-router-dom";
 import { ActivityDatagrid } from "./components/activity-datagrid/activity-datagrid";
 import { ActivityDeleteModal } from "./components/activity-delete-modal";
 import { ActivityForm } from "./components/activity-form";
-import { ActivityMobileControls } from "./components/activity-mobile-controls";
 import { ActivityPagination } from "./components/activity-pagination";
 import ActivityTable from "./components/activity-table/activity-table";
-import ActivityTableMobile from "./components/activity-table/activity-table-mobile";
 import { ActivityViewControls, type ActivityViewMode } from "./components/activity-view-controls";
 import { BulkHoldingsModal } from "./components/forms/bulk-holdings-modal";
-import { MobileActivityForm } from "./components/mobile-forms/mobile-activity-form";
 import { useActivityMutations } from "./hooks/use-activity-mutations";
 import { useActivitySearch } from "./hooks/use-activity-search";
 
@@ -52,12 +48,6 @@ const ActivityPage = () => {
     "table",
   );
   const [sorting, setSorting] = useState<SortingState>([{ id: "date", desc: true }]);
-  const [isCompactView, setIsCompactView] = usePersistentState(
-    "activity-mobile-view-compact",
-    true,
-  );
-
-  const isMobileViewport = useIsMobileViewport();
 
   // Debounced search handler
   const debouncedUpdateSearch = useMemo(
@@ -139,47 +129,32 @@ const ActivityPage = () => {
 
   const headerActions = (
     <div className="flex flex-wrap items-center gap-2">
-      {/* Desktop dropdown menu */}
-      <div className="hidden sm:flex">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="sm">
-              <Icons.Plus className="mr-2 h-4 w-4" />
-              {t("page.addActivities")}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem asChild>
-              <Link to={"/import"} className="flex cursor-pointer items-center py-2.5">
-                <Icons.Import className="mr-2 h-4 w-4" />
-                {t("page.importFromCsv")}
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setShowBulkHoldingsForm(true)} className="py-2.5">
-              <Icons.Holdings className="mr-2 h-4 w-4" />
-              {t("page.addHoldings")}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => handleEdit(undefined)} className="py-2.5">
-              <Icons.Activity className="mr-2 h-4 w-4" />
-              {t("page.addTransaction")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {/* Mobile add button */}
-      <div className="flex items-center gap-2 sm:hidden">
-        <Button size="icon" title={t("page.import")} variant="outline" asChild>
-          <Link to={"/import"}>
-            <Icons.Import className="size-4" />
-          </Link>
-        </Button>
-        <Button size="icon" title={t("page.add")} onClick={() => handleEdit(undefined)}>
-          <Icons.Plus className="size-4" />
-        </Button>
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button size="sm">
+            <Icons.Plus className="mr-2 h-4 w-4" />
+            {t("page.addActivities")}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuItem asChild>
+            <Link to={"/import"} className="flex cursor-pointer items-center py-2.5">
+              <Icons.Import className="mr-2 h-4 w-4" />
+              {t("page.importFromCsv")}
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setShowBulkHoldingsForm(true)} className="py-2.5">
+            <Icons.Holdings className="mr-2 h-4 w-4" />
+            {t("page.addHoldings")}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => handleEdit(undefined)} className="py-2.5">
+            <Icons.Activity className="mr-2 h-4 w-4" />
+            {t("page.addTransaction")}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 
@@ -188,46 +163,24 @@ const ActivityPage = () => {
       <PageHeader heading={t("page.title")} actions={headerActions} />
       <PageContent>
         <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden">
-          {/* Unified Controls */}
-          {isMobileViewport ? (
-            <ActivityMobileControls
-              accounts={accounts}
-              searchQuery={searchInput}
-              onSearchQueryChange={handleSearchChange}
-              selectedAccountIds={selectedAccounts}
-              onAccountIdsChange={setSelectedAccounts}
-              selectedActivityTypes={selectedActivityTypes}
-              onActivityTypesChange={setSelectedActivityTypes}
-              isCompactView={isCompactView}
-              onCompactViewChange={setIsCompactView}
-            />
-          ) : (
-            <ActivityViewControls
-              accounts={accounts}
-              searchQuery={searchInput}
-              onSearchQueryChange={handleSearchChange}
-              selectedAccountIds={selectedAccounts}
-              onAccountIdsChange={setSelectedAccounts}
-              selectedActivityTypes={selectedActivityTypes}
-              onActivityTypesChange={setSelectedActivityTypes}
-              viewMode={viewMode}
-              onViewModeChange={setViewMode}
-              totalFetched={totalFetched}
-              totalRowCount={totalRowCount}
-              isFetching={isFetching}
-            />
-          )}
+          {/* Controls */}
+          <ActivityViewControls
+            accounts={accounts}
+            searchQuery={searchInput}
+            onSearchQueryChange={handleSearchChange}
+            selectedAccountIds={selectedAccounts}
+            onAccountIdsChange={setSelectedAccounts}
+            selectedActivityTypes={selectedActivityTypes}
+            onActivityTypesChange={setSelectedActivityTypes}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            totalFetched={totalFetched}
+            totalRowCount={totalRowCount}
+            isFetching={isFetching}
+          />
 
           {/* View-Specific Renderers */}
-          {isMobileViewport ? (
-            <ActivityTableMobile
-              activities={flatData}
-              isCompactView={isCompactView}
-              handleEdit={handleEdit}
-              handleDelete={handleDelete}
-              onDuplicate={handleDuplicate}
-            />
-          ) : isDatagridView ? (
+          {isDatagridView ? (
             <ActivityDatagrid
               accounts={accounts}
               activities={flatData}
@@ -253,39 +206,21 @@ const ActivityPage = () => {
             totalCount={totalRowCount}
           />
         </div>
-        {isMobileViewport ? (
-          <MobileActivityForm
-            key={selectedActivity?.id ?? "new"}
-            accounts={
-              accounts
-                ?.filter((acc) => acc.isActive)
-                .map((account) => ({
-                  value: account.id,
-                  label: account.name,
-                  currency: account.currency,
-                })) ?? []
-            }
-            activity={selectedActivity}
-            open={showForm}
-            onClose={handleFormClose}
-          />
-        ) : (
-          <ActivityForm
-            accounts={
-              accounts
-                ?.filter((acc) => acc.isActive)
-                .map((account) => ({
-                  value: account.id,
-                  label: account.name,
-                  currency: account.currency,
-                })) || []
-            }
-            activities={flatData}
-            activity={selectedActivity}
-            open={showForm}
-            onClose={handleFormClose}
-          />
-        )}
+        <ActivityForm
+          accounts={
+            accounts
+              ?.filter((acc) => acc.isActive)
+              .map((account) => ({
+                value: account.id,
+                label: account.name,
+                currency: account.currency,
+              })) || []
+          }
+          activities={flatData}
+          activity={selectedActivity}
+          open={showForm}
+          onClose={handleFormClose}
+        />
         <ActivityDeleteModal
           isOpen={showDeleteAlert}
           isDeleting={deleteActivityMutation.isPending}

@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Icons } from "@/components/ui/icons";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/components/ui/use-toast";
-import { usePlatform } from "@/hooks/use-platform";
 import { SettingsHeader } from "../settings-header";
 
 export default function AboutSettingsPage() {
@@ -16,7 +15,6 @@ export default function AboutSettingsPage() {
   const [version, setVersion] = useState<string>("");
   const [dbDir, setDbDir] = useState<string>("");
   const [logsDir, setLogsDir] = useState<string>("");
-  const { isMobile } = usePlatform();
 
   useEffect(() => {
     // Load version
@@ -24,24 +22,22 @@ export default function AboutSettingsPage() {
       .then(setVersion)
       .catch(() => setVersion("")); // ignore errors
 
-    // Resolve directories (OS-specific via Tauri path API) - only on desktop
-    if (!isMobile) {
-      (async () => {
-        try {
-          const dataDir = await appDataDir();
-          setDbDir(dataDir);
-        } catch {
-          setDbDir("");
-        }
-        try {
-          const logDir = await appLogDir();
-          setLogsDir(logDir);
-        } catch {
-          setLogsDir("");
-        }
-      })();
-    }
-  }, [isMobile]);
+    // Resolve directories (OS-specific via Tauri path API)
+    (async () => {
+      try {
+        const dataDir = await appDataDir();
+        setDbDir(dataDir);
+      } catch {
+        setDbDir("");
+      }
+      try {
+        const logDir = await appLogDir();
+        setLogsDir(logDir);
+      } catch {
+        setLogsDir("");
+      }
+    })();
+  }, []);
 
   const handleCopy = async (value: string, label: string) => {
     try {
@@ -104,11 +100,9 @@ export default function AboutSettingsPage() {
             </div>
           </div>
 
-          {!isMobile && (
-            <>
-              <Separator />
+          <Separator />
 
-              <div className="grid gap-4">
+          <div className="grid gap-4">
                 <div className="space-y-1">
                   <p className="text-muted-foreground text-xs tracking-wide uppercase">
                     {t("about.database.title")}
@@ -151,8 +145,6 @@ export default function AboutSettingsPage() {
                   </div>
                 </div>
               </div>
-            </>
-          )}
 
           <Separator />
 

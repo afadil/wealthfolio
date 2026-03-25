@@ -3,7 +3,6 @@ import { getAccounts } from "@/commands/account";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useIsMobileViewport } from "@/hooks/use-platform";
 import { ActivityType, DataSource } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { Account, ActivityDetails } from "@/lib/types";
@@ -21,7 +20,6 @@ import { HoldingsForm } from "./components/forms/holdings-form";
 import { IncomeForm } from "./components/forms/income-form";
 import { OtherForm } from "./components/forms/other-form";
 import { newActivitySchema, type NewActivityFormValues } from "./components/forms/schemas";
-import { MobileActivityForm } from "./components/mobile-forms/mobile-activity-form";
 import { useActivityMutations } from "./hooks/use-activity-mutations";
 
 const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
@@ -44,7 +42,6 @@ const ActivityManagerPage = () => {
   const { t } = useTranslation("activity");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const isMobileViewport = useIsMobileViewport();
 
   // Parse URL parameters
   const typeParam = searchParams.get("type") as ActivityType | null;
@@ -192,33 +189,6 @@ const ActivityManagerPage = () => {
 
   const defaultTab = ACTIVITY_TYPE_TO_TAB[initialActivity?.activityType ?? ""] ?? "trade";
 
-  // For mobile, use the existing mobile form component
-  if (isMobileViewport) {
-    return (
-      <Page>
-        <PageHeader
-          heading={t("manager.heading")}
-          text={
-            selectedAccountName
-              ? t("manager.descriptionWithAccount", { accountName: selectedAccountName })
-              : t("manager.description")
-          }
-          onBack={handleClose}
-        />
-        <PageContent>
-          <MobileActivityForm
-            key={initialActivity?.id ?? "new"}
-            accounts={accountOptions}
-            activity={initialActivity}
-            open={true}
-            onClose={handleClose}
-          />
-        </PageContent>
-      </Page>
-    );
-  }
-
-  // Desktop inline form
   return (
     <Page>
       <PageHeader

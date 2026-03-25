@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { getRunEnv, RUN_ENV } from "@/adapters";
 import { invoke } from "@tauri-apps/api/core";
 
 export interface PlatformInfo {
@@ -17,7 +16,6 @@ export interface UsePlatformResult {
   isMacOS: boolean;
   isWindows: boolean;
   isLinux: boolean;
-  isWeb: boolean;
   isTauri: boolean;
   loading: boolean;
 }
@@ -37,36 +35,22 @@ export function usePlatform(): UsePlatformResult {
       return;
     }
 
-    const runEnv = getRunEnv();
-
-    if (runEnv === RUN_ENV.DESKTOP) {
-      // We're in Tauri, get actual platform info
-      invoke<PlatformInfo>("get_platform")
-        .then((info) => {
-          cachedPlatform = info;
-          setPlatform(info);
-          setLoading(false);
-        })
-        .catch((error) => {
-          console.error("Failed to get platform info:", error);
-          // Fallback detection based on user agent
-          const fallbackInfo = detectPlatformFromUserAgent();
-          cachedPlatform = fallbackInfo;
-          setPlatform(fallbackInfo);
-          setLoading(false);
-        });
-    } else {
-      // We're in web environment, use user agent detection
-      const webPlatform = detectPlatformFromUserAgent();
-      cachedPlatform = webPlatform;
-      setPlatform(webPlatform);
-      setLoading(false);
-    }
+    // We're in Tauri, get actual platform info
+    invoke<PlatformInfo>("get_platform")
+      .then((info) => {
+        cachedPlatform = info;
+        setPlatform(info);
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error("Failed to get platform info:", error);
+        // Fallback detection based on user agent
+        const fallbackInfo = detectPlatformFromUserAgent();
+        cachedPlatform = fallbackInfo;
+        setPlatform(fallbackInfo);
+        setLoading(false);
+      });
   }, []);
-
-  const runEnv = getRunEnv();
-  const isTauri = runEnv === RUN_ENV.DESKTOP;
-  const isWeb = runEnv === RUN_ENV.WEB;
 
   return {
     platform,
@@ -77,8 +61,7 @@ export function usePlatform(): UsePlatformResult {
     isMacOS: platform?.os === "macos",
     isWindows: platform?.os === "windows",
     isLinux: platform?.os === "linux",
-    isWeb,
-    isTauri,
+    isTauri: true,
     loading,
   };
 }
@@ -131,22 +114,16 @@ export async function getPlatform(): Promise<PlatformInfo> {
     return cachedPlatform;
   }
 
-  const runEnv = getRunEnv();
-
-  if (runEnv === RUN_ENV.DESKTOP) {
-    try {
-      const info = await invoke<PlatformInfo>("get_platform");
-      cachedPlatform = info;
-      return info;
-    } catch (error) {
-      console.error("Failed to get platform info:", error);
-    }
+  try {
+    const info = await invoke<PlatformInfo>("get_platform");
+    cachedPlatform = info;
+    return info;
+  } catch (error) {
+    console.error("Failed to get platform info:", error);
+    const fallback = detectPlatformFromUserAgent();
+    cachedPlatform = fallback;
+    return fallback;
   }
-
-  // Fallback to user agent detection
-  const fallback = detectPlatformFromUserAgent();
-  cachedPlatform = fallback;
-  return fallback;
 }
 
 // Simple utility to check if device is mobile
