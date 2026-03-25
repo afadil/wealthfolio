@@ -511,6 +511,7 @@
       "cancel": "Cancel",
       "confirmImport": "Confirm Import",
       "importing": "Importing..."
-    }
+    },
+    "cannotChangeTransferType": "Transfer type cannot be changed when editing. Please delete and recreate to modify transfer details."
   }
 }

@@ -29,7 +29,13 @@ import { cashActivitySchema } from "./schemas";
 
 export type CashFormValues = z.infer<typeof cashActivitySchema>;
 
-export const CashForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
+export const CashForm = ({
+  accounts,
+  editingActivity
+}: {
+  accounts: AccountSelectOption[];
+  editingActivity?: Partial<ActivityDetails>;
+}) => {
   const { t } = useTranslation(["activity"]);
   const { control, watch } = useFormContext();
   const activityType = watch("activityType");
@@ -57,12 +63,26 @@ export const CashForm = ({ accounts }: { accounts: AccountSelectOption[] }) => {
   ];
 
   const isTransfer = activityType === "TRANSFER";
+  const isEditingTransfer = editingActivity?.id && (
+    editingActivity.activityType === "TRANSFER_IN" ||
+    editingActivity.activityType === "TRANSFER_OUT"
+  );
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex-1">
-          <ActivityTypeSelector control={control} types={cashTypes} columns={3} />
+          <ActivityTypeSelector
+            control={control}
+            types={cashTypes}
+            columns={3}
+            disabled={isEditingTransfer}
+          />
+          {isEditingTransfer && (
+            <p className="text-muted-foreground text-xs mt-2">
+              {t("form.cannotChangeTransferType")}
+            </p>
+          )}
         </div>
       </div>
       <Card>

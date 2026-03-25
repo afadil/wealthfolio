@@ -511,6 +511,7 @@
       "cancel": "Hủy",
       "confirmImport": "Xác nhận nhập",
       "importing": "Đang nhập..."
-    }
+    },
+    "cannotChangeTransferType": "Không thể thay đổi loại chuyển khoản khi chỉnh sửa. Vui lòng xóa và tạo lại để thay đổi chi tiết chuyển khoản."
   }
 }

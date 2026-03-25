@@ -35,6 +35,7 @@ export interface AccountSelectOption {
 
 interface ActivityFormProps {
   accounts: AccountSelectOption[];
+  activities?: ActivityDetails[];
   activity?: Partial<ActivityDetails>;
   open?: boolean;
   onClose?: () => void;
@@ -60,6 +61,7 @@ const ACTIVITY_TYPE_TO_TAB: Record<string, string> = {
 
 export function ActivityForm({
   accounts,
+  activities = [],
   activity,
   open,
   onClose,
@@ -83,7 +85,13 @@ export function ActivityForm({
   const defaultValues: Partial<NewActivityFormValues> = {
     id: activity?.id,
     accountId: activity?.accountId || "",
-    activityType: isValidActivityType(activity?.activityType) ? activity.activityType : undefined,
+    activityType: (() => {
+      // When editing a TRANSFER_IN or TRANSFER_OUT, show as TRANSFER type
+      if (activity?.activityType === "TRANSFER_IN" || activity?.activityType === "TRANSFER_OUT") {
+        return "TRANSFER" as const;
+      }
+      return isValidActivityType(activity?.activityType) ? activity.activityType : undefined;
+    })(),
     amount: activity?.amount,
     quantity: activity?.quantity,
     unitPrice: activity?.unitPrice,
@@ -91,6 +99,27 @@ export function ActivityForm({
     isDraft: activity?.isDraft ?? false,
     comment: activity?.comment ?? null,
     assetId: activity?.assetId,
+    toAccountId: (() => {
+      // When editing a TRANSFER_OUT, find the paired TRANSFER_IN to get destination account
+      if (activity?.activityType === "TRANSFER_OUT" && activity?.transferLinkId && activities?.length > 0) {
+        const pairedIn = activities.find(a =>
+          a.transferLinkId === activity.transferLinkId &&
+          a.activityType === "TRANSFER_IN"
+        );
+        return pairedIn?.accountId || undefined;
+      }
+      // When editing a TRANSFER_IN, find the paired TRANSFER_OUT to get destination account
+      if (activity?.activityType === "TRANSFER_IN" && activity?.transferLinkId && activities?.length > 0) {
+        const pairedOut = activities.find(a =>
+          a.transferLinkId === activity.transferLinkId &&
+          a.activityType === "TRANSFER_OUT"
+        );
+        // For TRANSFER_IN, the "destination" is actually the account of the TRANSFER_IN itself
+        // But we want to show where the transfer came FROM
+        return pairedOut?.accountId || undefined;
+      }
+      return undefined;
+    })(),
     activityDate: activity?.date
       ? (() => {
           return new Date(activity.date);
@@ -301,7 +330,7 @@ export function ActivityForm({
                   <HoldingsForm accounts={accounts} />
                 </TabsContent>
                 <TabsContent value="cash">
-                  <CashForm accounts={accounts} />
+                  <CashForm accounts={accounts} editingActivity={activity} />
                 </TabsContent>
                 <TabsContent value="income">
                   <IncomeForm accounts={accounts} />

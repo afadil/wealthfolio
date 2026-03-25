@@ -280,6 +280,7 @@ const ActivityPage = () => {
                   currency: account.currency,
                 })) || []
             }
+            activities={flatData}
             activity={selectedActivity}
             open={showForm}
             onClose={handleFormClose}

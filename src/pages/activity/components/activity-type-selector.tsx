@@ -17,6 +17,7 @@ interface ActivityTypeSelectorProps {
   types: ActivityType[];
   columns?: number;
   layout?: "horizontal" | "vertical";
+  disabled?: boolean;
 }
 
 export function ActivityTypeSelector({
@@ -24,6 +25,7 @@ export function ActivityTypeSelector({
   types,
   columns = 2,
   layout = "vertical",
+  disabled = false,
 }: ActivityTypeSelectorProps) {
   return (
     <FormField
@@ -47,7 +49,7 @@ export function ActivityTypeSelector({
                 const InfoIcon = Icons.Info;
                 return (
                   <div key={type.value}>
-                    <RadioGroupItem value={type.value} id={type.value} className="peer sr-only" />
+                    <RadioGroupItem value={type.value} id={type.value} className="peer sr-only" disabled={disabled} />
                     <label
                       htmlFor={type.value}
                       className={cn(
@@ -55,7 +57,7 @@ export function ActivityTypeSelector({
                         layout === "vertical" && "flex-col items-center justify-center py-3",
                         "min-h-16 sm:min-h-20",
                         "peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5",
-                        "cursor-pointer",
+                        disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
                         fieldState.error && "border-destructive text-destructive",
                       )}
                     >
