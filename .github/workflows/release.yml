@@ -68,7 +68,7 @@ jobs:
         run: rustup target add aarch64-pc-windows-msvc x86_64-pc-windows-msvc
 
       - name: Build the app
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v0.9
 
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

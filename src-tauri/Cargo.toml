@@ -4,7 +4,7 @@ version = "1.0.6"
 description = "A Portfolio Tracker for Vietnamese Market"
 authors = ["chipheo00"]
 license = "AGPL-3.0"
-repository = "https://github.com/chipheo00/vn-wealthfolio"
+repository = "https://github.com/chipheo00/wealth-vn"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
