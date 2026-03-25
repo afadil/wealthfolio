@@ -29,6 +29,8 @@ diesel::table! {
         amount -> Nullable<Text>,
         is_draft -> Bool,
         comment -> Nullable<Text>,
+        transfer_link_id -> Nullable<Text>,
+        to_account_id -> Nullable<Text>,
         created_at -> Text,
         updated_at -> Text,
     }

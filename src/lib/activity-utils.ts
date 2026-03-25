@@ -1,5 +1,5 @@
 import { ActivityType, CASH_ACTIVITY_TYPES, INCOME_ACTIVITY_TYPES } from "./constants";
-import { ActivityDetails } from "./types";
+import { ActivityDetails, Activity } from "./types";
 
 /**
  * Determines if an activity is a cash activity based on its type
@@ -30,6 +30,15 @@ export const isCashTransfer = (activityType: string, assetSymbol: string): boole
     (activityType === ActivityType.TRANSFER_IN || activityType === ActivityType.TRANSFER_OUT) &&
     assetSymbol.startsWith("$CASH")
   );
+};
+
+/**
+ * Determines if an activity is part of a transfer pair (has a transferLinkId)
+ * @param activity The activity to check
+ * @returns True if the activity has a transferLinkId
+ */
+export const isTransferPair = (activity: Activity | ActivityDetails): boolean => {
+  return activity.transferLinkId !== null && activity.transferLinkId !== undefined;
 };
 
 // Helper to check if activity is a trade type

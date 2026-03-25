@@ -59,6 +59,10 @@ pub struct Activity {
     pub amount: Option<Decimal>,
     pub is_draft: bool,
     pub comment: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transfer_link_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub to_account_id: Option<String>,
     #[serde(with = "timestamp_format")]
     pub created_at: DateTime<Utc>,
     #[serde(with = "timestamp_format")]
@@ -96,6 +100,8 @@ pub struct ActivityDB {
     pub amount: Option<String>,
     pub is_draft: bool,
     pub comment: Option<String>,
+    pub transfer_link_id: Option<String>,
+    pub to_account_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -116,6 +122,10 @@ pub struct NewActivity {
     pub amount: Option<Decimal>,
     pub is_draft: bool,
     pub comment: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transfer_link_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub to_account_id: Option<String>,
 }
 
 impl NewActivity {
@@ -166,6 +176,10 @@ pub struct ActivityUpdate {
     pub amount: Option<Decimal>,
     pub is_draft: bool,
     pub comment: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transfer_link_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub to_account_id: Option<String>,
 }
 
 impl ActivityUpdate {
@@ -270,6 +284,10 @@ pub struct ActivityDetails {
     pub is_draft: bool,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub comment: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub transfer_link_id: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub to_account_id: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Text)]
     pub created_at: String,
     #[diesel(sql_type = diesel::sql_types::Text)]
@@ -592,6 +610,8 @@ impl From<ActivityDB> for Activity {
                 .map(|s| parse_decimal_string_tolerant(&s, "amount")),
             is_draft: db.is_draft,
             comment: db.comment,
+            transfer_link_id: db.transfer_link_id,
+            to_account_id: db.to_account_id,
             created_at: DateTime::parse_from_rfc3339(&db.created_at)
                 .map(|dt| dt.with_timezone(&Utc))
                 .unwrap_or_else(|e| {
@@ -679,6 +699,8 @@ impl From<NewActivity> for ActivityDB {
             amount,
             is_draft: domain.is_draft,
             comment: domain.comment,
+            transfer_link_id: domain.transfer_link_id,
+            to_account_id: domain.to_account_id,
             created_at: now.to_rfc3339(),
             updated_at: now.to_rfc3339(),
         }
@@ -754,6 +776,8 @@ impl From<ActivityUpdate> for ActivityDB {
             amount,
             is_draft: domain.is_draft,
             comment: domain.comment,
+            transfer_link_id: domain.transfer_link_id,
+            to_account_id: domain.to_account_id,
             created_at: now.to_rfc3339(), // This should ideally preserve original created_at. Need to fetch before update.
             updated_at: now.to_rfc3339(),
         }

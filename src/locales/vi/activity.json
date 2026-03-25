@@ -190,7 +190,8 @@
     "ratio": "Tỷ lệ",
     "amount": "Số tiền",
     "price": "Giá",
-    "totalValue": "Tổng giá trị"
+    "totalValue": "Tổng giá trị",
+    "to": "đến"
   },
   "mobile": {
     "noActivitiesFound": "Không tìm thấy hoạt động",

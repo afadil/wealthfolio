@@ -6,7 +6,13 @@
       "Bash(lsof -ti:1420)",
       "Bash(xargs kill -9)",
       "Bash(pkill -f \"tauri\\|vite\\|cargo\")",
-      "Bash(cargo clean -p wealthfolio_core)"
+      "Bash(cargo clean -p wealthfolio_core)",
+      "Bash(pnpm exec:*)",
+      "mcp__zread__read_file",
+      "Bash(pnpm -r build)",
+      "Bash(sqlite3:*)",
+      "Bash(xargs kill:*)",
+      "Bash(/dev/null pkill:*)"
     ],
     "deny": [],
     "ask": []

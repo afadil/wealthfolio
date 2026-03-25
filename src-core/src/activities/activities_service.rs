@@ -366,6 +366,8 @@ impl ActivityServiceTrait for ActivityService {
                 amount: activity.amount,
                 is_draft: activity.is_draft,
                 comment: activity.comment.clone(),
+                transfer_link_id: None,
+                to_account_id: None,
             })
             .collect();
 

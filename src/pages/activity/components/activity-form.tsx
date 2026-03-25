@@ -148,24 +148,23 @@ export function ActivityForm({
           return;
         }
 
-        if (submitData.accountId && toAccountId && submitData.accountId === toAccountId) {
-          form.setError("toAccountId", {
-            type: "manual",
-            message: t("form.toAccountDifferent"),
-          });
-          return;
-        }
-
         const fromAccount = accounts.find((a) => a.value === submitData.accountId);
         const toAccount = accounts.find((a) => a.value === toAccountId);
 
         if (fromAccount && toAccount) {
+          // Generate a unique transfer link ID to pair the activities
+          const transferLinkId = typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : `transfer-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+
           // Create TRANSFER_OUT activity for source account
           const transferOutActivity = {
             ...submitData,
             activityType: "TRANSFER_OUT" as const,
             assetId: `$CASH-${fromAccount.currency}`,
             accountId: submitData.accountId,
+            transferLinkId,
+            toAccountId: String(toAccountId),
           };
 
           // Create TRANSFER_IN activity for destination account
@@ -174,6 +173,7 @@ export function ActivityForm({
             activityType: "TRANSFER_IN" as const,
             assetId: `$CASH-${toAccount.currency}`,
             accountId: toAccountId,
+            transferLinkId,
           };
 
           if (id) {

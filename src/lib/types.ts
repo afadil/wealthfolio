@@ -39,6 +39,8 @@ export interface Activity {
   isDraft: boolean;
   comment?: string | null;
   accountId?: string | null;
+  transferLinkId?: string | null;
+  toAccountId?: number | null;
   createdAt: Date | string;
   symbolProfileId: string;
   updatedAt: Date | string;
@@ -64,6 +66,8 @@ export interface ActivityDetails {
   assetSymbol: string;
   assetName?: string;
   assetDataSource?: DataSource;
+  transferLinkId?: string | null;
+  toAccountId?: number | null;
   subRows?: ActivityDetails[];
 }
 
@@ -87,6 +91,8 @@ export interface ActivityCreate {
   fee?: number;
   isDraft: boolean;
   comment?: string | null;
+  transferLinkId?: string | null;
+  toAccountId?: number | null;
 }
 
 export type ActivityUpdate = ActivityCreate & { id: string };

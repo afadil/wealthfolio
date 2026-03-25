@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { TickerAvatar } from "@/components/ticker-avatar";
@@ -78,6 +78,63 @@ export const ActivityTable = ({
     currency: false,
   });
 
+  // Phase 5: State for expanded transfers
+  const [expandedTransferIds, setExpandedTransferIds] = useState<Set<string>>(new Set());
+
+  // Phase 5: Process activities to group TRANSFER_IN as subRows of TRANSFER_OUT
+  const processedActivities = useMemo(() => {
+    const transferInByLinkId = new Map<string, ActivityDetails>();
+    const transferInIds = new Set<string>();
+
+    // First pass: collect all TRANSFER_IN activities by their transferLinkId
+    // Handle both camelCase (transferLinkId) and snake_case (transfer_link_id) from backend
+    for (const activity of activities) {
+      const linkId = activity.transferLinkId ?? (activity as any).transfer_link_id;
+      if (activity.activityType === ActivityType.TRANSFER_IN && linkId) {
+        transferInByLinkId.set(linkId, activity);
+        transferInIds.add(activity.id);
+      }
+    }
+
+    // Second pass: build result array in original order
+    const result: ActivityDetails[] = [];
+    for (const activity of activities) {
+      const linkId = activity.transferLinkId ?? (activity as any).transfer_link_id;
+
+      // Skip TRANSFER_IN that have been paired - they'll be shown as subRows
+      if (activity.activityType === ActivityType.TRANSFER_IN && linkId && transferInByLinkId.has(linkId)) {
+        continue;
+      }
+
+      // TRANSFER_OUT with linkId - add with subRows if paired TRANSFER_IN exists
+      if (activity.activityType === ActivityType.TRANSFER_OUT && linkId) {
+        const transferIn = transferInByLinkId.get(linkId);
+        result.push({
+          ...activity,
+          subRows: transferIn ? [transferIn] : undefined,
+        });
+      } else {
+        // All other activities (including transfers without linkId)
+        result.push(activity);
+      }
+    }
+
+    return result;
+  }, [activities]);
+
+  // Phase 6: Toggle function for expanded transfers
+  const toggleTransferExpanded = (transferLinkId: string) => {
+    setExpandedTransferIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(transferLinkId)) {
+        next.delete(transferLinkId);
+      } else {
+        next.add(transferLinkId);
+      }
+      return next;
+    });
+  };
+
   const columns: ColumnDef<ActivityDetails>[] = React.useMemo(
     () => [
       {
@@ -90,7 +147,7 @@ export const ActivityTable = ({
         cell: ({ row }) => {
           const activityType = row.getValue("activityType");
           return (
-            <div className="flex items-center text-sm">
+            <div className="flex items-center justify-center text-sm">
               <ActivityTypeBadge
                 type={activityType as ActivityType}
                 className="text-xs font-normal whitespace-nowrap"
@@ -183,6 +240,30 @@ export const ActivityTable = ({
         cell: ({ row }) => {
           const activityType = String(row.getValue("activityType"));
           const quantity = row.getValue("quantity");
+          const activity = row.original;
+          const linkId = activity.transferLinkId ?? (activity as any).transfer_link_id;
+          const isExpanded = expandedTransferIds.has(linkId || "");
+          const hasSubRows = activity.subRows && activity.subRows.length > 0;
+
+          // Show expander button for TRANSFER_OUT with transfer link
+          if (activityType === ActivityType.TRANSFER_OUT && linkId) {
+            return (
+              <div className="flex justify-center pr-4">
+                <button
+                  onClick={() => toggleTransferExpanded(linkId!)}
+                  className="flex h-6 w-6 items-center justify-center rounded hover:bg-muted transition-colors"
+                  aria-label={isExpanded ? "Collapse transfer details" : "Expand transfer details"}
+                  title={isExpanded ? "Hide transfer details" : "Show transfer details"}
+                >
+                  {isExpanded ? (
+                    <Icons.ChevronUp className="h-4 w-4 transition-transform duration-200 text-muted-foreground" />
+                  ) : (
+                    <Icons.ChevronDown className="h-4 w-4 transition-transform duration-200 text-muted-foreground" />
+                  )}
+                </button>
+              </div>
+            );
+          }
 
           if (
             isCashActivity(activityType) ||
@@ -190,10 +271,10 @@ export const ActivityTable = ({
             isSplitActivity(activityType) ||
             isFeeActivity(activityType)
           ) {
-            return <div className="pr-4 text-right">-</div>;
+            return <div className="pr-4 text-center">-</div>;
           }
 
-          return <div className="pr-4 text-right">{String(quantity)}</div>;
+          return <div className="pr-4 text-center">{String(quantity)}</div>;
         },
       },
       {
@@ -401,6 +482,7 @@ export const ActivityTable = ({
         enableHiding: false,
       },
     ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [handleEdit, handleDelete, handleDuplicate],
   );
 
@@ -414,7 +496,7 @@ export const ActivityTable = ({
   );
 
   const table = useReactTable({
-    data: activities,
+    data: processedActivities,
     columns,
     manualSorting: true,
     onSortingChange: handleSortingChange,
@@ -459,14 +541,113 @@ export const ActivityTable = ({
           <TableBody>
             {table.getRowModel().rows?.length > 0 ? (
               table.getRowModel().rows.map((row) => {
+                const activity = row.original;
+                const linkId = activity.transferLinkId ?? (activity as any).transfer_link_id;
+                const isExpanded = expandedTransferIds.has(linkId || "");
+                const subRows = activity.subRows || [];
+
                 return (
-                  <TableRow key={row.id}>
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
+                  <React.Fragment key={row.id}>
+                    <TableRow className={subRows.length > 0 ? "group/row" : undefined}>
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id}>
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                    {/* Render subRows for transfer pairing */}
+                    {isExpanded && subRows.length > 0 && subRows.map((subRowActivity, index) => (
+                      <TableRow key={`${row.id}-sub-${index}`} className="bg-muted/30">
+                        {row.getVisibleCells().map((cell) => {
+                          const columnId = cell.column.id;
+                          // Create sub-row cell content
+                          let subCellContent: React.ReactNode;
+
+                          switch (columnId) {
+                            case "activityType":
+                              subCellContent = (
+                                <div className="flex items-center justify-center text-sm">
+                                  <ActivityTypeBadge
+                                    type={subRowActivity.activityType as ActivityType}
+                                    className="text-xs font-normal whitespace-nowrap"
+                                  />
+                                </div>
+                              );
+                              break;
+                            case "date":
+                              const subDate = formatDateTimeDisplay(subRowActivity.date);
+                              subCellContent = (
+                                <div className="ml-2 flex flex-col">
+                                  <span>{subDate}</span>
+                                </div>
+                              );
+                              break;
+                            case "assetSymbol":
+                              subCellContent = (
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <span className="flex items-center gap-1">
+                                    <Icons.ArrowRight className="h-3 w-3" />
+                                    {t("activity:table.to")}: {subRowActivity.accountName}
+                                  </span>
+                                </div>
+                              );
+                              break;
+                            case "quantity":
+                              // Show indicator for transfer destination row
+                              subCellContent = (
+                                <div className="flex justify-center pr-4">
+                                  <Icons.ArrowRight className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                              );
+                              break;
+                            case "unitPrice":
+                            case "fee":
+                              subCellContent = <div className="text-right">-</div>;
+                              break;
+                            case "value":
+                              const subValue = calculateActivityValue(subRowActivity);
+                              subCellContent = (
+                                <div className="pr-4 text-right text-green-600">
+                                  +{formatAmount(subValue, subRowActivity.currency || "USD")}
+                                </div>
+                              );
+                              break;
+                            case "account":
+                              subCellContent = (
+                                <div className="ml-2 flex min-w-[150px] flex-col">
+                                  <span>{subRowActivity.accountName}</span>
+                                  <span className="text-muted-foreground text-xs font-light">
+                                    {subRowActivity.accountCurrency}
+                                  </span>
+                                </div>
+                              );
+                              break;
+                            case "currency":
+                              subCellContent = <div>{subRowActivity.currency}</div>;
+                              break;
+                            case "actions":
+                              subCellContent = (
+                                <ActivityOperations
+                                  activity={subRowActivity}
+                                  onEdit={handleEdit}
+                                  onDelete={handleDelete}
+                                  onDuplicate={handleDuplicate}
+                                />
+                              );
+                              break;
+                            default:
+                              subCellContent = null;
+                          }
+
+                          return (
+                            <TableCell key={`${row.id}-sub-${index}-${columnId}`}>
+                              {subCellContent}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
                     ))}
-                  </TableRow>
+                  </React.Fragment>
                 );
               })
             ) : (

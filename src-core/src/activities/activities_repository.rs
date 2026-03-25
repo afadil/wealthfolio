@@ -192,6 +192,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 activities::amount,
                 activities::is_draft,
                 activities::comment,
+                activities::transfer_link_id,
+                activities::to_account_id,
                 activities::created_at,
                 activities::updated_at,
                 accounts::name,

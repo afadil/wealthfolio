@@ -190,7 +190,8 @@
     "ratio": "Ratio",
     "amount": "Amount",
     "price": "Price",
-    "totalValue": "Total Value"
+    "totalValue": "Total Value",
+    "to": "to"
   },
   "mobile": {
     "noActivitiesFound": "No activities found",
