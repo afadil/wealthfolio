@@ -324,13 +324,13 @@ export function initializeColumnMapping(
  */
 export function computeFieldMappings(
   headers: string[],
-  savedFieldMappings?: Record<string, string>,
-): Record<string, string> {
+  savedFieldMappings?: Record<string, string | string[]>,
+): Record<string, string | string[]> {
   const autoDetected = initializeColumnMapping(headers);
   const headerSet = new Set(headers);
 
   // Start with auto-detected (all values are defined)
-  const result: Record<string, string> = {};
+  const result: Record<string, string | string[]> = {};
   for (const [field, header] of Object.entries(autoDetected)) {
     if (header) result[field] = header;
   }
@@ -338,7 +338,13 @@ export function computeFieldMappings(
   // Merge saved mappings on top (only entries pointing to headers that still exist)
   if (savedFieldMappings) {
     for (const [field, header] of Object.entries(savedFieldMappings)) {
-      if (header && headerSet.has(header)) {
+      if (!header) continue;
+      if (Array.isArray(header)) {
+        // Keep fallback array if at least one header exists in the CSV
+        if (header.some((h) => headerSet.has(h))) {
+          result[field] = header;
+        }
+      } else if (headerSet.has(header)) {
         result[field] = header;
       }
     }

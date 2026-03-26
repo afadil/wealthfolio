@@ -49,7 +49,10 @@ export const importMappingSchema = z.object({
   importType: z.enum([ImportType.ACTIVITY, ImportType.HOLDINGS]).default(ImportType.ACTIVITY),
   templateId: z.string().optional(),
   name: z.string().optional().default(""),
-  fieldMappings: z.record(z.string(), z.string()).optional().default({}),
+  fieldMappings: z
+    .record(z.string(), z.union([z.string(), z.array(z.string())]))
+    .optional()
+    .default({}),
   activityMappings: z.record(z.string(), z.array(z.string())).optional().default({}),
   symbolMappings: z.record(z.string(), z.string()).optional().default({}),
   accountMappings: z.record(z.string(), z.string()).optional().default({}),

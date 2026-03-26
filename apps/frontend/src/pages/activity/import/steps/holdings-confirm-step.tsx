@@ -25,7 +25,7 @@ export function HoldingsConfirmStep() {
 
   // Parse snapshots from CSV data
   const snapshots = useMemo(() => {
-    const fieldMappings = mapping?.fieldMappings || {};
+    const fieldMappings = (mapping?.fieldMappings || {}) as Record<string, string>;
     return parseHoldingsSnapshots(
       headers,
       parsedRows,

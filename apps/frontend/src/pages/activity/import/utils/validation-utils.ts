@@ -413,10 +413,18 @@ function transformRowToActivity(
 ): Partial<ActivityImport> {
   const activity: Partial<ActivityImport> = { accountId, isDraft: true, isValid: false };
 
-  // Helper to get mapped value
+  // Helper to get mapped value (supports fallback column arrays)
   const getMappedValue = (field: ImportFormat): string | undefined => {
     const headerName = mapping.fieldMappings[field];
     if (!headerName) return undefined;
+    if (Array.isArray(headerName)) {
+      for (const h of headerName) {
+        const value = row[h];
+        const trimmed = typeof value === "string" ? value.trim() : undefined;
+        if (trimmed) return trimmed;
+      }
+      return undefined;
+    }
     const value = row[headerName];
     return typeof value === "string" ? value.trim() : undefined;
   };

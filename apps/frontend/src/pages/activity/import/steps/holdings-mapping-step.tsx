@@ -194,7 +194,7 @@ export function HoldingsMappingStep() {
 
   // Local state for the field mappings being edited
   const [localFieldMappings, setLocalFieldMappings] = useState<Record<string, string>>(() => {
-    return mapping?.fieldMappings || {};
+    return (mapping?.fieldMappings || {}) as Record<string, string>;
   });
 
   // Auto-initialize: merge saved mapping from backend, then auto-detect from headers
@@ -208,7 +208,8 @@ export function HoldingsMappingStep() {
 
     // 1. Apply saved field mappings (only valid HoldingsFormat keys with headers in this CSV)
     if (savedMapping?.fieldMappings) {
-      for (const [field, header] of Object.entries(savedMapping.fieldMappings)) {
+      for (const [field, value] of Object.entries(savedMapping.fieldMappings)) {
+        const header = Array.isArray(value) ? value[0] : value;
         if (validHoldingsFields.has(field) && header && headers.includes(header)) {
           merged[field] = header;
         }

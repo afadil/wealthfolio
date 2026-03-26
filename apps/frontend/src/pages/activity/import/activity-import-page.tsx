@@ -49,6 +49,7 @@ import { isCashSymbol, isSymbolRequired } from "@/lib/activity-utils";
 import { IMPORT_REQUIRED_FIELDS, ImportFormat } from "@/lib/constants";
 import { computeFieldMappings } from "./hooks/use-import-mapping";
 import { buildImportAssetCandidateFromDraft } from "./utils/asset-review-utils";
+import { isFieldMapped, primaryHeader } from "./utils/draft-utils";
 import { findMappedActivityType, validateTickerSymbol } from "./utils/validation-utils";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -114,14 +115,13 @@ function useStepValidation(isHoldingsMode: boolean, accounts?: Account[]) {
         if (isHoldingsMode) {
           // Holdings mode: check if required holdings fields are mapped
           if (!mapping) return false;
-          const requiredFieldsMapped = HOLDINGS_REQUIRED_FIELDS.every(
-            (field) =>
-              mapping.fieldMappings[field] && headers.includes(mapping.fieldMappings[field]),
+          const requiredFieldsMapped = HOLDINGS_REQUIRED_FIELDS.every((field) =>
+            isFieldMapped(mapping.fieldMappings[field], headers),
           );
           if (!requiredFieldsMapped) return false;
 
           // Check if all non-$CASH symbols are valid or resolved
-          const symbolCol = mapping.fieldMappings[HoldingsFormat.SYMBOL];
+          const symbolCol = primaryHeader(mapping.fieldMappings[HoldingsFormat.SYMBOL]);
           if (symbolCol) {
             const symIndex = headers.indexOf(symbolCol);
             if (symIndex !== -1) {
@@ -148,7 +148,8 @@ function useStepValidation(isHoldingsMode: boolean, accounts?: Account[]) {
         }
 
         if (mapping.fieldMappings[ImportFormat.ACCOUNT]) {
-          const accountHeaderIndex = headers.indexOf(mapping.fieldMappings[ImportFormat.ACCOUNT]);
+          const accountCol = primaryHeader(mapping.fieldMappings[ImportFormat.ACCOUNT]);
+          const accountHeaderIndex = accountCol ? headers.indexOf(accountCol) : -1;
           if (accountHeaderIndex === -1) {
             return false;
           }
@@ -174,14 +175,24 @@ function useStepValidation(isHoldingsMode: boolean, accounts?: Account[]) {
         if (!requiredFieldsMapped) return false;
 
         // Check if all activity types have mappings
-        const activityTypeColumn = mapping.fieldMappings[ImportFormat.ACTIVITY_TYPE];
-        if (activityTypeColumn) {
-          const headerIndex = headers.indexOf(activityTypeColumn);
-          if (headerIndex !== -1) {
+        const activityTypeMapping = mapping.fieldMappings[ImportFormat.ACTIVITY_TYPE];
+        if (activityTypeMapping) {
+          // Build column indices for fallback resolution
+          const atHeaders = Array.isArray(activityTypeMapping)
+            ? activityTypeMapping
+            : [activityTypeMapping];
+          const atIndices = atHeaders.map((h) => headers.indexOf(h)).filter((i) => i !== -1);
+
+          if (atIndices.length > 0) {
             const uniqueValues = new Set<string>();
             parsedRows.forEach((row) => {
-              const value = row[headerIndex]?.trim();
-              if (value) uniqueValues.add(value);
+              for (const idx of atIndices) {
+                const value = row[idx]?.trim();
+                if (value) {
+                  uniqueValues.add(value);
+                  break;
+                }
+              }
             });
 
             for (const value of uniqueValues) {
@@ -193,11 +204,17 @@ function useStepValidation(isHoldingsMode: boolean, accounts?: Account[]) {
         }
 
         // Check if all symbols are resolved (only for non-cash activities)
-        const symbolColumn = mapping.fieldMappings[ImportFormat.SYMBOL];
-        const activityTypeCol = mapping.fieldMappings[ImportFormat.ACTIVITY_TYPE];
+        const symbolColumn = primaryHeader(mapping.fieldMappings[ImportFormat.SYMBOL]);
         if (symbolColumn) {
           const symbolHeaderIndex = headers.indexOf(symbolColumn);
-          const activityHeaderIndex = activityTypeCol ? headers.indexOf(activityTypeCol) : -1;
+
+          // Activity type indices for per-row type resolution
+          const atMapping = mapping.fieldMappings[ImportFormat.ACTIVITY_TYPE];
+          const atCols = atMapping
+            ? (Array.isArray(atMapping) ? atMapping : [atMapping])
+                .map((h) => headers.indexOf(h))
+                .filter((i) => i !== -1)
+            : [];
 
           if (symbolHeaderIndex !== -1) {
             const symbolsNeedingResolution = new Set<string>();
@@ -206,16 +223,22 @@ function useStepValidation(isHoldingsMode: boolean, accounts?: Account[]) {
               const symbol = row[symbolHeaderIndex]?.trim();
               if (!symbol) return;
 
-              // Skip symbols that don't need mapping
-              if (activityHeaderIndex !== -1) {
-                const csvActivityType = row[activityHeaderIndex]?.trim();
-                if (csvActivityType) {
-                  const mappedType = findMappedActivityType(
-                    csvActivityType,
-                    mapping.activityMappings || {},
-                  );
-                  if (mappedType && (!isSymbolRequired(mappedType) || isCashSymbol(symbol))) return;
+              // Resolve activity type with fallback
+              let csvActivityType: string | undefined;
+              for (const idx of atCols) {
+                const val = row[idx]?.trim();
+                if (val) {
+                  csvActivityType = val;
+                  break;
                 }
+              }
+
+              if (csvActivityType) {
+                const mappedType = findMappedActivityType(
+                  csvActivityType,
+                  mapping.activityMappings || {},
+                );
+                if (mappedType && (!isSymbolRequired(mappedType) || isCashSymbol(symbol))) return;
               }
 
               symbolsNeedingResolution.add(symbol);

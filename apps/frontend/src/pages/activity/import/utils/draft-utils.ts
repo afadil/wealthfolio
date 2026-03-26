@@ -19,6 +19,30 @@ import {
 } from "./review-draft-utils";
 import type { DraftActivity, DraftActivityStatus } from "../context";
 
+// ---------------------------------------------------------------------------
+// Skip sentinel — used in activity mappings to exclude rows from import
+// ---------------------------------------------------------------------------
+
+/** Sentinel value for activity types the user chooses to skip during import. */
+export const ACTIVITY_SKIP = "_SKIP_";
+
+// ---------------------------------------------------------------------------
+// Fallback-column helpers — support `string | string[]` in fieldMappings
+// ---------------------------------------------------------------------------
+
+/** Return the first (primary) header name, or undefined. */
+export function primaryHeader(value: string | string[] | undefined): string | undefined {
+  if (!value) return undefined;
+  return Array.isArray(value) ? value[0] : value;
+}
+
+/** True when at least one listed header exists in `headers`. */
+export function isFieldMapped(value: string | string[] | undefined, headers: string[]): boolean {
+  if (!value) return false;
+  if (Array.isArray(value)) return value.some((h) => headers.includes(h));
+  return headers.includes(value);
+}
+
 export function mergeIssueMaps(
   current: Record<string, string[]>,
   incoming: Record<string, string[]>,
@@ -316,7 +340,7 @@ export function createDraftActivities(
   parsedRows: string[][],
   headers: string[],
   mapping: {
-    fieldMappings: Record<string, string>;
+    fieldMappings: Record<string, string | string[]>;
     activityMappings: Record<string, string[]>;
     symbolMappings: Record<string, string>;
     accountMappings: Record<string, string>;
@@ -343,19 +367,35 @@ export function createDraftActivities(
     headerIndex[header] = idx;
   });
 
-  // Get column indices for each mapped field
+  // Get column value — supports fallback columns when mapping is an array
   const getColumnValue = (row: string[], field: ImportFormat): string | undefined => {
     const csvHeader = fieldMappings[field];
     if (!csvHeader) return undefined;
+
+    if (Array.isArray(csvHeader)) {
+      for (const h of csvHeader) {
+        const idx = headerIndex[h];
+        if (idx !== undefined) {
+          const val = row[idx]?.trim();
+          if (val) return val;
+        }
+      }
+      return undefined;
+    }
+
     const idx = headerIndex[csvHeader];
     if (idx === undefined) return undefined;
     return row[idx];
   };
 
-  return parsedRows.map((row, rowIndex): DraftActivity => {
+  return parsedRows.flatMap((row, rowIndex): DraftActivity[] => {
     // Extract raw values from CSV
     const rawDate = getColumnValue(row, ImportFormat.DATE);
     const rawType = getColumnValue(row, ImportFormat.ACTIVITY_TYPE);
+
+    // Skip rows mapped to SKIP
+    const preCheckType = mapActivityType(rawType, activityMappings);
+    if (preCheckType === ACTIVITY_SKIP) return [];
     const rawSymbol = getColumnValue(row, ImportFormat.SYMBOL);
     const rawIsin = getColumnValue(row, ImportFormat.ISIN);
     const rawQuantity = getColumnValue(row, ImportFormat.QUANTITY);
@@ -371,7 +411,22 @@ export function createDraftActivities(
 
     // Parse and normalize values
     const activityDate = parseDateValue(rawDate, dateFormat);
-    const activityType = mapActivityType(rawType, activityMappings);
+    let activityType = mapActivityType(rawType, activityMappings);
+
+    // Sign-based direction inference: peek at raw amount before sign is stripped.
+    // Flip DEPOSIT↔WITHDRAWAL when the CSV amount sign disagrees with the mapped type.
+    // Safe for all brokers — explicit labels already resolve correctly (no-op).
+    const rawAmountTrimmed = rawAmount?.trim();
+    const isNegativeRaw = rawAmountTrimmed?.startsWith("-") || rawAmountTrimmed?.startsWith("(");
+    if (isNegativeRaw && activityType === ActivityType.DEPOSIT) {
+      activityType = ActivityType.WITHDRAWAL;
+    } else if (!isNegativeRaw && rawAmountTrimmed && activityType === ActivityType.WITHDRAWAL) {
+      activityType = ActivityType.DEPOSIT;
+    } else if (isNegativeRaw && activityType === ActivityType.TRANSFER_IN) {
+      activityType = ActivityType.TRANSFER_OUT;
+    } else if (!isNegativeRaw && rawAmountTrimmed && activityType === ActivityType.TRANSFER_OUT) {
+      activityType = ActivityType.TRANSFER_IN;
+    }
     const {
       symbol: mappedSymbol,
       exchangeMic: mappedExchangeMic,
@@ -453,11 +508,13 @@ export function createDraftActivities(
     // Validate and get status
     const validation = validateDraft(draft);
 
-    return {
-      ...draft,
-      status: validation.status,
-      errors: validation.errors,
-      warnings: validation.warnings,
-    } as DraftActivity;
+    return [
+      {
+        ...draft,
+        status: validation.status,
+        errors: validation.errors,
+        warnings: validation.warnings,
+      } as DraftActivity,
+    ];
   });
 }

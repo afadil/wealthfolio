@@ -32,6 +32,7 @@ import {
   useImportContext,
 } from "../context";
 import { computeFieldMappings, useImportMapping } from "../hooks/use-import-mapping";
+import { isFieldMapped } from "../utils/draft-utils";
 import { validateTickerSymbol, findMappedActivityType } from "../utils/validation-utils";
 
 import { isCashSymbol, isSymbolRequired } from "@/lib/activity-utils";
@@ -100,25 +101,31 @@ export function MappingStepUnified() {
     setTemplateName(localMapping.name ?? "");
   }, [localMapping.name]);
 
-  // Helper to get mapped value from row
+  // Helper to get mapped value from row (supports fallback columns)
   const getMappedValue = useCallback(
     (row: CsvRowData, field: ImportFormat): string => {
-      const headerName = localMapping.fieldMappings[field] || "";
-      if (!headerName) return "";
-      return row[headerName] || "";
+      const mapping = localMapping.fieldMappings[field];
+      if (!mapping) return "";
+      if (Array.isArray(mapping)) {
+        for (const h of mapping) {
+          const val = row[h]?.trim();
+          if (val) return val;
+        }
+        return "";
+      }
+      return row[mapping] || "";
     },
     [localMapping.fieldMappings],
   );
 
   // Check if all required fields are mapped
-  const requiredFieldsMapped = IMPORT_REQUIRED_FIELDS.every(
-    (field) =>
-      localMapping.fieldMappings[field] && headers.includes(localMapping.fieldMappings[field]),
+  const requiredFieldsMapped = IMPORT_REQUIRED_FIELDS.every((field) =>
+    isFieldMapped(localMapping.fieldMappings[field], headers),
   );
 
   // Count how many fields are mapped
-  const mappedFieldsCount = Object.entries(localMapping.fieldMappings).filter(
-    ([_, headerName]) => headerName && headers.includes(headerName),
+  const mappedFieldsCount = Object.entries(localMapping.fieldMappings).filter(([_, headerName]) =>
+    isFieldMapped(headerName, headers),
   ).length;
   const totalFields = Object.values(ImportFormat).length;
 
@@ -381,8 +388,16 @@ export function MappingStepUnified() {
       const aNeedsMapping = rowsNeedingMapping.has(a);
       const bNeedsMapping = rowsNeedingMapping.has(b);
 
+      // Unmapped rows first
       if (aNeedsMapping !== bNeedsMapping) {
         return aNeedsMapping ? -1 : 1;
+      }
+
+      // Within unmapped: group by activity type
+      if (aNeedsMapping && bNeedsMapping) {
+        const aType = getMappedValue(a, ImportFormat.ACTIVITY_TYPE);
+        const bType = getMappedValue(b, ImportFormat.ACTIVITY_TYPE);
+        if (aType !== bType) return aType.localeCompare(bType);
       }
 
       return parseInt(a.lineNumber) - parseInt(b.lineNumber);

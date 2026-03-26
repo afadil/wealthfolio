@@ -56,10 +56,12 @@ export function MappingTable({
   invalidAccounts,
   className,
 }: MappingTableProps) {
-  // Check if a field is mapped
-  const isFieldMapped = (field: ImportFormat) => {
+  // Check if a field is mapped (supports fallback column arrays)
+  const checkFieldMapped = (field: ImportFormat) => {
     const mappedHeader = mapping.fieldMappings[field];
-    return typeof mappedHeader === "string" && headers.includes(mappedHeader);
+    if (!mappedHeader) return false;
+    if (Array.isArray(mappedHeader)) return mappedHeader.some((h) => headers.includes(h));
+    return headers.includes(mappedHeader);
   };
 
   return (
@@ -85,7 +87,7 @@ export function MappingTable({
                     className={cn(
                       "border-border whitespace-nowrap border-r p-2 transition-colors last:border-r-0",
                       IMPORT_REQUIRED_FIELDS.includes(field as ImportRequiredField)
-                        ? !isFieldMapped(field)
+                        ? !checkFieldMapped(field)
                           ? "bg-amber-50 dark:bg-amber-950/20"
                           : ""
                         : "",

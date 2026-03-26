@@ -340,7 +340,8 @@ export function HoldingsReviewStep() {
   const { state, dispatch } = useImportContext();
   const { headers, parsedRows, mapping, parseConfig, accountId } = state;
 
-  const fieldMappings = mapping?.fieldMappings || {};
+  // Holdings imports never use fallback-column arrays — narrow to Record<string, string>
+  const fieldMappings = (mapping?.fieldMappings || {}) as Record<string, string>;
   const symbolMappings = mapping?.symbolMappings || {};
   const parseOptions: ParseOptions = useMemo(
     () => ({

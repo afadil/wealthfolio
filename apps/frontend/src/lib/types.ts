@@ -298,7 +298,7 @@ export interface ImportTemplateData {
   id: string;
   name: string;
   scope: ImportTemplateScope;
-  fieldMappings: Record<string, string>;
+  fieldMappings: Record<string, string | string[]>;
   activityMappings: Record<string, string[]>;
   symbolMappings: Record<string, string>;
   accountMappings: Record<string, string>;
