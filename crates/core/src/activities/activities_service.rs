@@ -1,4 +1,5 @@
 use chrono::{DateTime, NaiveDate, TimeZone, Utc};
+use futures::StreamExt;
 use log::debug;
 use rust_decimal::Decimal;
 use std::collections::{HashMap, HashSet};
@@ -729,72 +730,71 @@ impl ActivityService {
             }
         }
 
-        // 3. Resolve missing symbols: ISIN-first (zero-network hit or provider search), then ticker fallback
-        debug!("resolve_symbols_batch: isin_map={:?}", isin_map);
-        for (symbol, currency) in missing {
-            if let Some(isin) = isin_map.get(&symbol) {
-                debug!(
-                    "resolve_symbols_batch: resolving symbol={} via ISIN={}",
-                    symbol, isin
-                );
-                // ① existing asset by ISIN (zero network)
-                if let Some(exchange_mic) = existing_isin_map.get(&isin.to_uppercase()) {
-                    cache.insert(
-                        (symbol, currency),
-                        ResolvedSymbolInfo {
-                            exchange_mic: exchange_mic.clone(),
-                            name: None,
-                        },
-                    );
-                    continue;
-                }
-                // ② provider search by ISIN — no currency bias (ISIN is globally unique)
-                match self
-                    .quote_service
-                    .search_symbol_with_currency(isin, None)
-                    .await
-                {
-                    Err(e) => {
-                        warn!(
-                            "resolve_symbols_batch: ISIN search failed isin={} err={}",
-                            isin, e
-                        );
-                    }
-                    Ok(results) => {
+        // 3. Resolve missing symbols concurrently: ISIN-first, then ticker fallback
+        const SYMBOL_RESOLVE_CONCURRENCY: usize = 5;
+        debug!(
+            "resolve_symbols_batch: resolving {} missing symbols (concurrency={})",
+            missing.len(),
+            SYMBOL_RESOLVE_CONCURRENCY
+        );
+
+        let resolved: Vec<((String, String), ResolvedSymbolInfo)> = futures::stream::iter(missing)
+            .map(|(symbol, currency)| {
+                let isin_map = &isin_map;
+                let existing_isin_map = &existing_isin_map;
+                async move {
+                    let info = if let Some(isin) = isin_map.get(&symbol) {
                         debug!(
-                            "resolve_symbols_batch: ISIN={} got {} results: {:?}",
-                            isin,
-                            results.len(),
-                            results
-                                .iter()
-                                .map(|r| (&r.symbol, &r.exchange_mic))
-                                .collect::<Vec<_>>()
+                            "resolve_symbols_batch: resolving symbol={} via ISIN={}",
+                            symbol, isin
                         );
-                        if let Some(r) = results.into_iter().find(|r| r.exchange_mic.is_some()) {
-                            debug!(
-                                "resolve_symbols_batch: ISIN={} resolved to symbol={} mic={:?}",
-                                isin, r.symbol, r.exchange_mic
-                            );
-                            cache.insert(
-                                (symbol, currency),
-                                ResolvedSymbolInfo {
-                                    exchange_mic: r.exchange_mic,
-                                    name: Some(r.long_name).filter(|n| !n.is_empty()),
-                                },
-                            );
-                            continue;
+                        // ① existing asset by ISIN (zero network)
+                        if let Some(exchange_mic) = existing_isin_map.get(&isin.to_uppercase()) {
+                            ResolvedSymbolInfo {
+                                exchange_mic: exchange_mic.clone(),
+                                name: None,
+                            }
                         } else {
-                            warn!(
-                                "resolve_symbols_batch: ISIN={} returned no result with exchange_mic",
-                                isin
-                            );
+                            // ② provider search by ISIN
+                            match self
+                                .quote_service
+                                .search_symbol_with_currency(isin, None)
+                                .await
+                            {
+                                Err(e) => {
+                                    warn!(
+                                        "resolve_symbols_batch: ISIN search failed isin={} err={}",
+                                        isin, e
+                                    );
+                                    self.resolve_symbol_exchange_mic(&symbol, &currency).await
+                                }
+                                Ok(results) => {
+                                    if let Some(r) =
+                                        results.into_iter().find(|r| r.exchange_mic.is_some())
+                                    {
+                                        ResolvedSymbolInfo {
+                                            exchange_mic: r.exchange_mic,
+                                            name: Some(r.long_name).filter(|n| !n.is_empty()),
+                                        }
+                                    } else {
+                                        self.resolve_symbol_exchange_mic(&symbol, &currency).await
+                                    }
+                                }
+                            }
                         }
-                    }
+                    } else {
+                        // ③ ticker fallback
+                        self.resolve_symbol_exchange_mic(&symbol, &currency).await
+                    };
+                    ((symbol, currency), info)
                 }
-            }
-            // ③ ticker fallback
-            let info = self.resolve_symbol_exchange_mic(&symbol, &currency).await;
-            cache.insert((symbol, currency), info);
+            })
+            .buffer_unordered(SYMBOL_RESOLVE_CONCURRENCY)
+            .collect()
+            .await;
+
+        for (key, info) in resolved {
+            cache.insert(key, info);
         }
 
         cache
