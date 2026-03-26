@@ -3629,7 +3629,7 @@ mod tests {
                 fx_rate: None,
                 subtype: None,
                 asset_id: None,
-            isin: None,
+                isin: None,
             };
 
             let result = activity_service

@@ -682,7 +682,7 @@ pub struct ImportMappingData {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub template_id: Option<String>,
     #[serde(default)]
-    pub field_mappings: std::collections::HashMap<String, String>,
+    pub field_mappings: std::collections::HashMap<String, FieldMappingValue>,
     #[serde(default)]
     pub activity_mappings: std::collections::HashMap<String, Vec<String>>,
     #[serde(default)]
@@ -716,6 +716,30 @@ pub struct ImportTemplate {
     pub updated_at: NaiveDateTime,
 }
 
+/// A field mapping value: either a single column name or an ordered list of
+/// fallback columns (first non-empty value per row wins).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum FieldMappingValue {
+    Single(String),
+    Fallback(Vec<String>),
+}
+
+impl From<String> for FieldMappingValue {
+    fn from(s: String) -> Self {
+        FieldMappingValue::Single(s)
+    }
+}
+
+/// Convert a simple String-keyed map into a FieldMappingValue-keyed map.
+pub fn into_field_mapping_values(
+    map: std::collections::HashMap<String, String>,
+) -> std::collections::HashMap<String, FieldMappingValue> {
+    map.into_iter()
+        .map(|(k, v)| (k, FieldMappingValue::Single(v)))
+        .collect()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportTemplateData {
@@ -723,7 +747,7 @@ pub struct ImportTemplateData {
     pub name: String,
     pub scope: ImportTemplateScope,
     #[serde(default)]
-    pub field_mappings: std::collections::HashMap<String, String>,
+    pub field_mappings: std::collections::HashMap<String, FieldMappingValue>,
     #[serde(default)]
     pub activity_mappings: std::collections::HashMap<String, Vec<String>>,
     #[serde(default)]
@@ -783,7 +807,7 @@ pub struct ImportAssetPreviewItem {
 #[serde(rename_all = "camelCase")]
 pub struct ImportMappingConfig {
     #[serde(default)]
-    pub field_mappings: std::collections::HashMap<String, String>,
+    pub field_mappings: std::collections::HashMap<String, FieldMappingValue>,
     #[serde(default)]
     pub activity_mappings: std::collections::HashMap<String, Vec<String>>,
     #[serde(default)]
@@ -799,16 +823,46 @@ pub struct ImportMappingConfig {
 impl Default for ImportMappingData {
     fn default() -> Self {
         let mut field_mappings = std::collections::HashMap::new();
-        field_mappings.insert("date".to_string(), "date".to_string());
-        field_mappings.insert("symbol".to_string(), "symbol".to_string());
-        field_mappings.insert("quantity".to_string(), "quantity".to_string());
-        field_mappings.insert("activityType".to_string(), "activityType".to_string());
-        field_mappings.insert("unitPrice".to_string(), "unitPrice".to_string());
-        field_mappings.insert("amount".to_string(), "amount".to_string());
-        field_mappings.insert("comment".to_string(), "comment".to_string());
-        field_mappings.insert("currency".to_string(), "currency".to_string());
-        field_mappings.insert("fee".to_string(), "fee".to_string());
-        field_mappings.insert("account".to_string(), "account".to_string());
+        field_mappings.insert(
+            "date".to_string(),
+            FieldMappingValue::Single("date".to_string()),
+        );
+        field_mappings.insert(
+            "symbol".to_string(),
+            FieldMappingValue::Single("symbol".to_string()),
+        );
+        field_mappings.insert(
+            "quantity".to_string(),
+            FieldMappingValue::Single("quantity".to_string()),
+        );
+        field_mappings.insert(
+            "activityType".to_string(),
+            FieldMappingValue::Single("activityType".to_string()),
+        );
+        field_mappings.insert(
+            "unitPrice".to_string(),
+            FieldMappingValue::Single("unitPrice".to_string()),
+        );
+        field_mappings.insert(
+            "amount".to_string(),
+            FieldMappingValue::Single("amount".to_string()),
+        );
+        field_mappings.insert(
+            "comment".to_string(),
+            FieldMappingValue::Single("comment".to_string()),
+        );
+        field_mappings.insert(
+            "currency".to_string(),
+            FieldMappingValue::Single("currency".to_string()),
+        );
+        field_mappings.insert(
+            "fee".to_string(),
+            FieldMappingValue::Single("fee".to_string()),
+        );
+        field_mappings.insert(
+            "account".to_string(),
+            FieldMappingValue::Single("account".to_string()),
+        );
 
         let mut activity_mappings = std::collections::HashMap::new();
         activity_mappings.insert("BUY".to_string(), vec!["BUY".to_string()]);
