@@ -5,6 +5,7 @@ import { parseOccSymbol } from "@/lib/occ-symbol";
 import { Account, Holding } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { AmountDisplay, GainPercent, Input, Separator } from "@wealthfolio/ui";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -162,6 +163,9 @@ export const HoldingsTableMobile = ({
             const symbol = holding.instrument?.symbol ?? holding.id;
             const isCash = symbol.startsWith("$CASH");
             const parsedOption = isCash ? null : parseOccSymbol(symbol);
+            const isExpiredOption = parsedOption
+              ? new Date(parsedOption.expiration + "T12:00:00") < new Date()
+              : false;
             const avatarSymbol = isCash ? "$CASH" : parsedOption ? parsedOption.underlying : symbol;
             const displaySymbol = isCash
               ? symbol.split("-")[0]
@@ -186,7 +190,14 @@ export const HoldingsTableMobile = ({
                   <div className="flex flex-1 items-center gap-3 overflow-hidden">
                     <TickerAvatar symbol={avatarSymbol} className="h-10 w-10" />
                     <div className="flex-1 overflow-hidden">
-                      <p className="truncate font-semibold">{displaySymbol}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate font-semibold">{displaySymbol}</p>
+                        {isExpiredOption && (
+                          <Badge variant="destructive" className="h-4 px-1 py-0 text-[10px]">
+                            Expired
+                          </Badge>
+                        )}
+                      </div>
                       {subtitle && (
                         <p className="text-muted-foreground truncate text-sm">{subtitle}</p>
                       )}

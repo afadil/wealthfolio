@@ -191,6 +191,11 @@ const getColumns = (
       const parsedOption = parseOccSymbol(symbol);
       const displaySymbol = parsedOption ? parsedOption.underlying : symbol;
 
+      // Check if option is expired
+      const isExpiredOption = parsedOption
+        ? new Date(parsedOption.expiration + "T12:00:00") < new Date()
+        : false;
+
       // Option subtitle: "Mar 29 $150 CALL"
       const optionSubtitle = parsedOption
         ? `${new Date(parsedOption.expiration + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} $${parsedOption.strikePrice} ${parsedOption.optionType}`
@@ -212,6 +217,11 @@ const getColumns = (
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
               <span className="font-medium">{displaySymbol}</span>
+              {isExpiredOption && (
+                <Badge variant="destructive" className="h-4 px-1 py-0 text-[10px]">
+                  Expired
+                </Badge>
+              )}
               {isManual && (
                 <Badge variant="secondary" className="h-4 px-1 py-0 text-[10px]">
                   Manual
