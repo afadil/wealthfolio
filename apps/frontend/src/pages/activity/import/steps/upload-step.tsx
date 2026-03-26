@@ -31,6 +31,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@wealthfolio/ui/components/ui/select";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandSeparator,
+} from "@wealthfolio/ui/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { SearchableSelect } from "@wealthfolio/ui";
 import { DATE_FORMAT_OPTIONS, isPresetFormat } from "../utils/date-format-options";
 import { computeFieldMappings } from "../hooks/use-import-mapping";
@@ -325,7 +335,7 @@ function TemplateSelector({
   hasConfigErrors = false,
 }: TemplateSelectorProps) {
   const [settingsOpen, setSettingsOpen] = useState(hasConfigErrors);
-  const options = templates.map((t) => ({ value: t.id, label: t.name }));
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     if (hasConfigErrors) setSettingsOpen(true);
@@ -333,30 +343,119 @@ function TemplateSelector({
 
   const configSummary = buildConfigSummary(config);
 
+  const systemTemplates = templates.filter((t) => t.scope === "SYSTEM");
+  const userTemplates = templates.filter((t) => t.scope === "USER");
+  const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
+
   return (
     <div className="bg-muted/20 rounded-lg border">
       {/* Template picker row */}
       <div className="flex items-center gap-2 p-3">
-        <div className="flex-1">
-          <SearchableSelect
-            options={options}
-            value={selectedTemplateId ?? ""}
-            onValueChange={onSelect}
-            placeholder="Select format…"
-            searchPlaceholder="Search by name…"
-            emptyMessage="No templates. Configure mappings manually in the next step."
-          />
-        </div>
-        {selectedTemplateId && (
-          <button
-            type="button"
-            onClick={onClear}
-            className="text-muted-foreground hover:text-foreground shrink-0 rounded transition-colors"
-            aria-label="Clear template"
-          >
-            <Icons.X className="h-4 w-4" />
-          </button>
-        )}
+        <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={pickerOpen}
+              className="w-full justify-between rounded-lg font-normal"
+            >
+              {selectedTemplate ? (
+                <span className="flex items-center gap-2 truncate">
+                  {selectedTemplate.scope === "SYSTEM" ? (
+                    <Icons.Building className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
+                  ) : (
+                    <Icons.User className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
+                  )}
+                  {selectedTemplate.name}
+                </span>
+              ) : (
+                <span className="text-muted-foreground">Select format…</span>
+              )}
+              <div className="flex shrink-0 items-center gap-1">
+                {selectedTemplateId && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onClear();
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.stopPropagation();
+                        onClear();
+                      }
+                    }}
+                    className="text-muted-foreground hover:text-foreground rounded-sm p-0.5 transition-colors"
+                    aria-label="Clear format"
+                  >
+                    <Icons.X className="h-3.5 w-3.5" />
+                  </span>
+                )}
+                <Icons.ChevronDown className="text-muted-foreground h-4 w-4" />
+              </div>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+            <Command>
+              <CommandInput placeholder="Search formats…" className="h-9" />
+              <CommandEmpty>
+                <div className="text-muted-foreground py-2 text-center text-sm">
+                  No matching formats.
+                </div>
+              </CommandEmpty>
+              {systemTemplates.length > 0 && (
+                <CommandGroup heading="Built-in">
+                  {systemTemplates.map((t) => (
+                    <CommandItem
+                      key={t.id}
+                      value={t.name}
+                      onSelect={() => {
+                        onSelect(t.id);
+                        setPickerOpen(false);
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <Icons.Building className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
+                      <span className="flex-1">{t.name}</span>
+                      <Icons.Check
+                        className={cn(
+                          "h-4 w-4 shrink-0",
+                          selectedTemplateId === t.id ? "opacity-100" : "opacity-0",
+                        )}
+                      />
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+              {systemTemplates.length > 0 && userTemplates.length > 0 && <CommandSeparator />}
+              {userTemplates.length > 0 && (
+                <CommandGroup heading="Custom">
+                  {userTemplates.map((t) => (
+                    <CommandItem
+                      key={t.id}
+                      value={t.name}
+                      onSelect={() => {
+                        onSelect(t.id);
+                        setPickerOpen(false);
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <Icons.User className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
+                      <span className="flex-1">{t.name}</span>
+                      <Icons.Check
+                        className={cn(
+                          "h-4 w-4 shrink-0",
+                          selectedTemplateId === t.id ? "opacity-100" : "opacity-0",
+                        )}
+                      />
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+            </Command>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* Parse Settings — collapsible */}

@@ -62,7 +62,6 @@ export function buildImportAssetCandidateKey(input: {
   exchangeMic?: string;
 }): string {
   return [
-    input.accountId.trim(),
     input.symbol.trim().toUpperCase(),
     input.instrumentType?.trim().toUpperCase() ?? "",
     input.quoteMode?.trim().toUpperCase() ?? "",

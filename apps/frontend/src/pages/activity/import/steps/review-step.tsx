@@ -1,6 +1,7 @@
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { ProgressIndicator } from "@wealthfolio/ui/components/ui/progress-indicator";
+import { FacetedFilter } from "@wealthfolio/ui";
 import { useCallback, useMemo, useState } from "react";
 import { ImportAlert } from "../components/import-alert";
 import { ImportReviewGrid, type ImportReviewFilter } from "../components/import-review-grid";
@@ -93,6 +94,9 @@ export function ReviewStep() {
 
   const [selectedRows, setSelectedRows] = useState<number[]>([]);
   const [filter, setFilter] = useState<ImportReviewFilter>("all");
+  const [typeFilter, setTypeFilter] = useState<Set<string>>(new Set());
+  const [accountFilter, setAccountFilter] = useState<Set<string>>(new Set());
+  const [symbolFilter, setSymbolFilter] = useState<Set<string>>(new Set());
 
   // Calculate filter stats
   const filterStats = useMemo<FilterStats>(() => {
@@ -134,6 +138,47 @@ export function ReviewStep() {
 
     return stats;
   }, [draftActivities]);
+
+  // Faceted filter options — derived from draft data
+  const facetedOptions = useMemo(() => {
+    const types = new Map<string, number>();
+    const accounts = new Map<string, number>();
+    const symbols = new Map<string, number>();
+
+    for (const d of draftActivities) {
+      if (d.activityType) types.set(d.activityType, (types.get(d.activityType) ?? 0) + 1);
+      if (d.accountId) accounts.set(d.accountId, (accounts.get(d.accountId) ?? 0) + 1);
+      if (d.symbol) symbols.set(d.symbol, (symbols.get(d.symbol) ?? 0) + 1);
+    }
+
+    return {
+      types: Array.from(types, ([value, count]) => ({ label: value, value, count })).sort((a, b) =>
+        a.label.localeCompare(b.label),
+      ),
+      accounts: Array.from(accounts, ([value, count]) => ({ label: value, value, count })).sort(
+        (a, b) => a.label.localeCompare(b.label),
+      ),
+      symbols: Array.from(symbols, ([value, count]) => ({ label: value, value, count })).sort(
+        (a, b) => a.label.localeCompare(b.label),
+      ),
+    };
+  }, [draftActivities]);
+
+  // Apply faceted filters on top of drafts passed to the grid
+  const facetFilteredDrafts = useMemo(() => {
+    if (typeFilter.size === 0 && accountFilter.size === 0 && symbolFilter.size === 0) {
+      return draftActivities;
+    }
+    return draftActivities.filter((d) => {
+      if (typeFilter.size > 0 && (!d.activityType || !typeFilter.has(d.activityType))) return false;
+      if (accountFilter.size > 0 && (!d.accountId || !accountFilter.has(d.accountId))) return false;
+      if (symbolFilter.size > 0 && (!d.symbol || !symbolFilter.has(d.symbol))) return false;
+      return true;
+    });
+  }, [draftActivities, typeFilter, accountFilter, symbolFilter]);
+
+  const hasActiveFacetFilters =
+    typeFilter.size > 0 || accountFilter.size > 0 || symbolFilter.size > 0;
 
   // Handlers
   const handleDraftUpdate = useCallback(
@@ -319,8 +364,45 @@ export function ReviewStep() {
           <h2 className="text-base font-semibold">Review Activities</h2>
           <FilterStatsBar stats={filterStats} currentFilter={filter} onFilterChange={setFilter} />
         </div>
+
+        {/* Faceted filters */}
+        <div className="flex flex-wrap items-center gap-2">
+          <FacetedFilter
+            title="Type"
+            options={facetedOptions.types}
+            selectedValues={typeFilter}
+            onFilterChange={setTypeFilter}
+          />
+          <FacetedFilter
+            title="Symbol"
+            options={facetedOptions.symbols}
+            selectedValues={symbolFilter}
+            onFilterChange={setSymbolFilter}
+          />
+          <FacetedFilter
+            title="Account"
+            options={facetedOptions.accounts}
+            selectedValues={accountFilter}
+            onFilterChange={setAccountFilter}
+          />
+          {hasActiveFacetFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground h-7 text-xs"
+              onClick={() => {
+                setTypeFilter(new Set());
+                setAccountFilter(new Set());
+                setSymbolFilter(new Set());
+              }}
+            >
+              Clear filters
+            </Button>
+          )}
+        </div>
+
         <ImportReviewGrid
-          drafts={draftActivities}
+          drafts={facetFilteredDrafts}
           onDraftUpdate={handleDraftUpdate}
           selectedRows={selectedRows}
           onSelectionChange={setSelectedRows}
