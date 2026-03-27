@@ -43,7 +43,7 @@ export const calculateFireProjection = async (
 export const runFireMonteCarlo = async (
   settings: FireSettings,
   currentPortfolio: number,
-  nSims = 10_000,
+  nSims = 100_000,
 ): Promise<MonteCarloResult> => {
   return invoke<MonteCarloResult>("run_fire_monte_carlo", {
     settings,

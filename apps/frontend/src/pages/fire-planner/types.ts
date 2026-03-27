@@ -21,6 +21,7 @@ export interface FireSettings {
   includedAccountIds?: string[];
   targetAllocations: Record<string, number>;
   currency: string;
+  linkedGoalId?: string;
 }
 
 export interface IncomeStream {

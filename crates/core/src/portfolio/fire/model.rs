@@ -52,6 +52,7 @@ pub struct FireSettings {
     pub included_account_ids: Option<Vec<String>>,
     pub target_allocations: HashMap<String, f64>,
     pub currency: String,
+    pub linked_goal_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

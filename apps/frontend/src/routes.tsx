@@ -38,6 +38,7 @@ import MarketDataSettingsPage from "./pages/settings/market-data/market-data-set
 import TaxonomiesPage from "./pages/settings/taxonomies/taxonomies-page";
 import ConnectSettingsPage from "./pages/settings/wealthfolio-connect/connect-settings-page";
 import FirePlannerPage from "./pages/fire-planner/fire-planner-page";
+import FirePlannerSettingsPage from "./pages/settings/fire-planner/fire-planner-settings-page";
 
 export function AppRoutes() {
   const [dynamicRoutes, setDynamicRoutes] = useState<
@@ -116,6 +117,7 @@ export function AppRoutes() {
             <Route path="about" element={<AboutSettingsPage />} />
             <Route path="exports" element={<ExportSettingsPage />} />
             <Route path="contribution-limits" element={<ContributionLimitPage />} />
+            <Route path="fire-planner" element={<FirePlannerSettingsPage />} />
             <Route path="market-data" element={<MarketDataSettingsPage />} />
             <Route path="market-data/import" element={<MarketDataImportPage />} />
             <Route path="securities" element={<AssetsPage />} />

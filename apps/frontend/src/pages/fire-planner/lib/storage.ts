@@ -15,4 +15,5 @@ export const DEFAULT_SETTINGS: FireSettings = {
   additionalIncomeStreams: [],
   targetAllocations: {},
   currency: "USD",
+  linkedGoalId: undefined,
 };

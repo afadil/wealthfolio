@@ -18,7 +18,7 @@ import { runAutoConfig, applyAutoConfig, type AutoConfigResult } from "../lib/au
 
 interface Props {
   settings: FireSettings;
-  onSave: (settings: FireSettings) => void;
+  onSave: (settings: FireSettings) => void | Promise<void>;
   isSaving: boolean;
   holdings: Holding[];
   activities: ActivityDetails[];
@@ -235,14 +235,14 @@ export default function SettingsPage({
     setShowResetConfirm(false);
   }
 
-  function handleSave() {
+  async function handleSave() {
     const resolved: FireSettings = {
       ...draft,
       additionalIncomeStreams: draft.additionalIncomeStreams.map((s) =>
         s.startAgeIsAuto ? { ...s, startAge: draft.targetFireAge } : s,
       ),
     };
-    onSave(resolved);
+    await onSave(resolved);
   }
 
   return (
@@ -572,7 +572,8 @@ export default function SettingsPage({
               (stream.accumulationReturn ?? 0) > 0;
             return (
               <div key={stream.id} className="rounded border p-3">
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                  {/* Label */}
                   <div className="col-span-2 sm:col-span-1">
                     <Label className="text-xs">Label</Label>
                     <Input
@@ -582,10 +583,9 @@ export default function SettingsPage({
                       className="mt-1 h-8 text-sm"
                     />
                   </div>
+                  {/* Monthly amount */}
                   <div>
-                    <Label className="text-xs">
-                      Monthly amount — today's {draft.currency} (real)
-                    </Label>
+                    <Label className="text-xs">Monthly amount ({draft.currency})</Label>
                     <Input
                       type="number"
                       value={stream.monthlyAmount}
@@ -596,6 +596,7 @@ export default function SettingsPage({
                       className="mt-1 h-8 text-sm"
                     />
                   </div>
+                  {/* Payout start age */}
                   <div>
                     <div className="flex items-center justify-between gap-2">
                       <Label className="text-xs">Payout start age</Label>
@@ -627,7 +628,8 @@ export default function SettingsPage({
                       />
                     )}
                   </div>
-                  <div className="flex flex-col items-start gap-1">
+                  {/* Inflation-adjusted */}
+                  <div className="flex flex-col gap-2">
                     <Label className="text-xs">Inflation-adjusted</Label>
                     <Switch
                       checked={stream.annualGrowthRate === undefined && stream.adjustForInflation}
@@ -635,12 +637,13 @@ export default function SettingsPage({
                       onCheckedChange={(v) => updateStream(stream.id, { adjustForInflation: v })}
                     />
                   </div>
-                  <div>
+                  {/* Custom growth rate */}
+                  <div className="col-span-1 sm:col-span-2">
                     <Label className="text-xs">
                       Custom growth rate (%/yr){" "}
                       <span className="text-muted-foreground">— overrides inflation flag</span>
                     </Label>
-                    <div className="mt-1 flex items-center gap-1">
+                    <div className="mt-1 flex w-40 items-center gap-1">
                       <Input
                         type="number"
                         value={

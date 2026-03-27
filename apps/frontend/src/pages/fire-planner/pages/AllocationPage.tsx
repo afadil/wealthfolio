@@ -187,7 +187,7 @@ export default function AllocationPage({
                   <th className="pb-2 text-center">Status</th>
                   <th className="pb-2 text-right">Value</th>
                   <th className="pb-2 text-right">Days since buy</th>
-                  <th className="pb-2 text-left">Action</th>
+                  <th className="pb-2 pl-4 text-left">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -228,9 +228,17 @@ export default function AllocationPage({
                     <td className="py-1.5 text-right">
                       {item.daysSinceLastBuy !== null ? `${item.daysSinceLastBuy}d` : "—"}
                     </td>
-                    <td className="text-muted-foreground py-1.5 text-left">
-                      {item.status === "underweight" && "Consider buying"}
-                      {item.status === "overweight" && "Skip next contribution"}
+                    <td className="py-1.5 pl-4 text-left">
+                      {item.status === "underweight" && (
+                        <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950/30 dark:text-blue-400">
+                          Buy
+                        </span>
+                      )}
+                      {item.status === "overweight" && (
+                        <span className="inline-flex items-center rounded-full bg-yellow-50 px-2 py-0.5 text-xs font-medium text-yellow-700 dark:bg-yellow-950/30 dark:text-yellow-400">
+                          Hold
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}

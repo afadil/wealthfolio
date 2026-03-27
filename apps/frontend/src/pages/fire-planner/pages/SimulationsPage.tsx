@@ -76,7 +76,7 @@ function MonteCarloSection({
   const run = async () => {
     setRunning(true);
     try {
-      const res = await runFireMonteCarlo(settings, totalValue, 10_000);
+      const res = await runFireMonteCarlo(settings, totalValue, 100_000);
       setResult(res);
     } finally {
       setRunning(false);
@@ -110,7 +110,7 @@ function MonteCarloSection({
         <div>
           <CardTitle className="text-sm">Monte Carlo Simulation</CardTitle>
           <p className="text-muted-foreground mt-1 text-xs">
-            10,000 simulations · fat-tailed two-regime returns (μ={" "}
+            100,000 simulations · fat-tailed two-regime returns (μ={" "}
             {(settings.expectedAnnualReturn * 100).toFixed(1)}%, σ={" "}
             {(settings.expectedReturnStdDev * 100).toFixed(1)}%) · stochastic inflation ·{" "}
             <span className="font-medium">
@@ -236,7 +236,7 @@ function MonteCarloSection({
               </ResponsiveContainer>
               <p className="text-muted-foreground mt-1 text-center text-xs">
                 Portfolio value from age {settings.currentAge} to {settings.planningHorizonAge}{" "}
-                across 10,000 simulations
+                across 100,000 simulations
               </p>
             </div>
           </div>
