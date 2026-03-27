@@ -571,6 +571,15 @@ pub fn run() {
             commands::health::execute_health_fix,
             commands::health::get_health_config,
             commands::health::update_health_config,
+            // FIRE planner commands
+            commands::fire::get_fire_settings,
+            commands::fire::save_fire_settings,
+            commands::fire::calculate_fire_projection,
+            commands::fire::run_fire_monte_carlo,
+            commands::fire::run_fire_scenario_analysis,
+            commands::fire::run_fire_sorr,
+            commands::fire::run_fire_sensitivity,
+            commands::fire::run_fire_strategy_comparison,
         ])
         .build(tauri::generate_context!())
         .expect("Failed to build Wealthfolio application")
