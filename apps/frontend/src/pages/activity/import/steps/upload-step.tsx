@@ -561,7 +561,11 @@ export function UploadStep() {
   useEffect(() => {
     const accountChanged = prevAccountIdRef.current !== state.accountId;
     prevAccountIdRef.current = state.accountId;
-    if (accountChanged) setPendingLinkedTemplateId(null);
+    if (accountChanged) {
+      setPendingLinkedTemplateId(null);
+      // Clear the previous account's template so the new account's linked template can apply
+      dispatch(setSelectedTemplate(null, null));
+    }
     // Skip if no account, or if a template is already selected and the account hasn't changed
     if (!state.accountId || (state.selectedTemplateId && !accountChanged)) return;
     getAccountImportMapping(state.accountId, importType)

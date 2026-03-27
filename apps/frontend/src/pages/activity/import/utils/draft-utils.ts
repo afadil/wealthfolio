@@ -491,6 +491,7 @@ export function createDraftActivities(
               instrumentType: resolvedInstrumentType,
               quoteMode: mappedQuoteMode,
               quoteCcy: mappedQuoteCcy || currency,
+              exchangeMic: mappedExchangeMic,
             })
           : undefined,
       quantity: resolved.quantity,
