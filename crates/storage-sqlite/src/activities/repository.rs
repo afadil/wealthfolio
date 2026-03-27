@@ -1451,7 +1451,7 @@ mod tests {
     use super::*;
     use crate::db::{create_pool, get_connection, init, run_migrations, write_actor::spawn_writer};
     use tempfile::tempdir;
-    use wealthfolio_core::activities::{import_type, ActivityServiceTrait};
+    use wealthfolio_core::activities::import_type;
 
     fn setup_db() -> (Arc<Pool<ConnectionManager<SqliteConnection>>>, WriteHandle) {
         std::env::set_var("CONNECT_API_URL", "http://test.local");

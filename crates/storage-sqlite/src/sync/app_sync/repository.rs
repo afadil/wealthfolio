@@ -2708,6 +2708,114 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn replay_updates_import_profile_with_stable_id() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+        let mut conn = get_connection(&pool).expect("conn");
+        insert_account_for_test(&mut conn, "acc-import-update").expect("insert account");
+
+        diesel::insert_into(import_templates::table)
+            .values(vec![
+                (
+                    import_templates::id.eq("tmpl-import-a"),
+                    import_templates::name.eq("Broker Mapping A"),
+                    import_templates::scope.eq("ACCOUNT"),
+                    import_templates::config.eq("{\"rules\":[]}"),
+                    import_templates::created_at.eq(chrono::NaiveDateTime::parse_from_str(
+                        "2026-02-19 00:00:00",
+                        "%Y-%m-%d %H:%M:%S",
+                    )
+                    .unwrap()),
+                    import_templates::updated_at.eq(chrono::NaiveDateTime::parse_from_str(
+                        "2026-02-19 00:00:00",
+                        "%Y-%m-%d %H:%M:%S",
+                    )
+                    .unwrap()),
+                ),
+                (
+                    import_templates::id.eq("tmpl-import-b"),
+                    import_templates::name.eq("Broker Mapping B"),
+                    import_templates::scope.eq("ACCOUNT"),
+                    import_templates::config.eq("{\"rules\":[]}"),
+                    import_templates::created_at.eq(chrono::NaiveDateTime::parse_from_str(
+                        "2026-02-19 00:00:00",
+                        "%Y-%m-%d %H:%M:%S",
+                    )
+                    .unwrap()),
+                    import_templates::updated_at.eq(chrono::NaiveDateTime::parse_from_str(
+                        "2026-02-19 00:00:00",
+                        "%Y-%m-%d %H:%M:%S",
+                    )
+                    .unwrap()),
+                ),
+            ])
+            .execute(&mut conn)
+            .expect("insert templates");
+
+        let created = repo
+            .apply_remote_event_lww(
+                SyncEntity::ActivityImportProfile,
+                "link-uuid-stable".to_string(),
+                SyncOperation::Create,
+                "evt-import-profile-create".to_string(),
+                "2026-02-19T00:00:00Z".to_string(),
+                1,
+                serde_json::json!({
+                    "id": "link-uuid-stable",
+                    "accountId": "acc-import-update",
+                    "importType": "ACTIVITY",
+                    "templateId": "tmpl-import-a",
+                    "createdAt": "2026-02-19 00:00:00",
+                    "updatedAt": "2026-02-19 00:00:00"
+                }),
+            )
+            .await
+            .expect("apply import profile create");
+        assert!(created, "expected import profile create to apply");
+
+        let updated = repo
+            .apply_remote_event_lww(
+                SyncEntity::ActivityImportProfile,
+                "link-uuid-stable".to_string(),
+                SyncOperation::Update,
+                "evt-import-profile-update".to_string(),
+                "2026-02-19T00:00:01Z".to_string(),
+                2,
+                serde_json::json!({
+                    "id": "link-uuid-stable",
+                    "accountId": "acc-import-update",
+                    "importType": "ACTIVITY",
+                    "templateId": "tmpl-import-b",
+                    "createdAt": "2026-02-19 00:00:00",
+                    "updatedAt": "2026-02-19 00:00:01"
+                }),
+            )
+            .await
+            .expect("apply import profile update");
+        assert!(updated, "expected import profile update to apply");
+
+        let row_count: i64 = import_account_templates::table
+            .filter(import_account_templates::account_id.eq("acc-import-update"))
+            .filter(import_account_templates::import_type.eq("ACTIVITY"))
+            .select(count_star())
+            .first(&mut conn)
+            .expect("import account template count");
+        assert_eq!(row_count, 1, "update should not duplicate the link row");
+
+        let (link_id, template_id): (String, String) = import_account_templates::table
+            .filter(import_account_templates::account_id.eq("acc-import-update"))
+            .filter(import_account_templates::import_type.eq("ACTIVITY"))
+            .select((
+                import_account_templates::id,
+                import_account_templates::template_id,
+            ))
+            .first(&mut conn)
+            .expect("import account template row");
+        assert_eq!(link_id, "link-uuid-stable");
+        assert_eq!(template_id, "tmpl-import-b");
+    }
+
+    #[tokio::test]
     async fn replay_batch_applies_out_of_order_account_and_platform_events() {
         let (pool, writer) = setup_db();
         let repo = AppSyncRepository::new(pool.clone(), writer);
