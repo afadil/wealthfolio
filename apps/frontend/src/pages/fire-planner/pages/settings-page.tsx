@@ -26,7 +26,7 @@ interface Props {
 }
 
 function generateId() {
-  return Math.random().toString(36).slice(2, 9);
+  return crypto.randomUUID();
 }
 
 function SliderField({
@@ -404,6 +404,38 @@ export default function SettingsPage({
         </CardContent>
       </Card>
 
+      {/* Healthcare Costs */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Healthcare Costs</CardTitle>
+          <p className="text-muted-foreground mt-1 text-xs">
+            Out-of-pocket healthcare expenses in retirement, on top of your living expenses. Set to
+            0 if already included above.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <NumberField
+            label={`Monthly healthcare cost at FIRE (${draft.currency}, today's money)`}
+            value={draft.healthcareMonthlyAtFire ?? 0}
+            onChange={(v) => update("healthcareMonthlyAtFire", v > 0 ? v : undefined)}
+            min={0}
+          />
+          {(draft.healthcareMonthlyAtFire ?? 0) > 0 && (
+            <SliderField
+              label="Healthcare inflation rate (typically higher than general inflation)"
+              value={draft.healthcareInflationRate ?? draft.inflationRate}
+              min={0.01}
+              max={0.08}
+              step={0.0025}
+              displayValue={
+                ((draft.healthcareInflationRate ?? draft.inflationRate) * 100).toFixed(2) + "%"
+              }
+              onChange={(v) => update("healthcareInflationRate", v)}
+            />
+          )}
+        </CardContent>
+      </Card>
+
       {/* Investment Parameters */}
       <Card>
         <CardHeader>
@@ -489,6 +521,87 @@ export default function SettingsPage({
             onChange={(v) => update("inflationRate", v)}
           />
         </CardContent>
+      </Card>
+
+      {/* Glide Path */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-sm">Glide Path (Bond Shift)</CardTitle>
+              <p className="text-muted-foreground mt-1 text-xs">
+                Gradually shift from equities to bonds during retirement to reduce
+                sequence-of-returns risk.
+              </p>
+            </div>
+            <Switch
+              checked={draft.glidePath?.enabled ?? false}
+              onCheckedChange={(v) =>
+                update(
+                  "glidePath",
+                  v
+                    ? {
+                        enabled: true,
+                        bondReturnRate: draft.glidePath?.bondReturnRate ?? 0.03,
+                        bondAllocationAtFire: draft.glidePath?.bondAllocationAtFire ?? 0.2,
+                        bondAllocationAtHorizon: draft.glidePath?.bondAllocationAtHorizon ?? 0.5,
+                      }
+                    : {
+                        ...(draft.glidePath ?? {
+                          bondReturnRate: 0.03,
+                          bondAllocationAtFire: 0.2,
+                          bondAllocationAtHorizon: 0.5,
+                        }),
+                        enabled: false,
+                      },
+                )
+              }
+            />
+          </div>
+        </CardHeader>
+        {draft.glidePath?.enabled && (
+          <CardContent className="space-y-4">
+            <SliderField
+              label="Bond return rate"
+              value={draft.glidePath.bondReturnRate}
+              min={0.01}
+              max={0.06}
+              step={0.0025}
+              displayValue={(draft.glidePath.bondReturnRate * 100).toFixed(2) + "%"}
+              onChange={(v) => update("glidePath", { ...draft.glidePath!, bondReturnRate: v })}
+            />
+            <SliderField
+              label="Bond allocation at FIRE date"
+              value={draft.glidePath.bondAllocationAtFire}
+              min={0}
+              max={0.6}
+              step={0.05}
+              displayValue={(draft.glidePath.bondAllocationAtFire * 100).toFixed(0) + "%"}
+              onChange={(v) =>
+                update("glidePath", { ...draft.glidePath!, bondAllocationAtFire: v })
+              }
+            />
+            <SliderField
+              label="Bond allocation at planning horizon"
+              value={draft.glidePath.bondAllocationAtHorizon}
+              min={0}
+              max={0.9}
+              step={0.05}
+              displayValue={(draft.glidePath.bondAllocationAtHorizon * 100).toFixed(0) + "%"}
+              onChange={(v) =>
+                update("glidePath", { ...draft.glidePath!, bondAllocationAtHorizon: v })
+              }
+            />
+            <p className="text-muted-foreground text-xs">
+              The portfolio shifts linearly from{" "}
+              {(draft.glidePath.bondAllocationAtFire * 100).toFixed(0)}% bonds at FIRE to{" "}
+              {(draft.glidePath.bondAllocationAtHorizon * 100).toFixed(0)}% bonds at age{" "}
+              {draft.planningHorizonAge}. Equity allocation ={" "}
+              {((1 - draft.glidePath.bondAllocationAtFire) * 100).toFixed(0)}% →{" "}
+              {((1 - draft.glidePath.bondAllocationAtHorizon) * 100).toFixed(0)}%.
+            </p>
+          </CardContent>
+        )}
       </Card>
 
       {/* Portfolio Accounts */}
@@ -783,7 +896,11 @@ export default function SettingsPage({
                     <p className="text-muted-foreground col-span-full text-xs">
                       Phase 1 (now → FIRE): fund grows with contributions + investment return. Phase
                       2 (FIRE → payout age): contributions stop, fund keeps growing. Phase 3 (payout
-                      age+): pays out as monthly income.
+                      age+): pays out as monthly income.{" "}
+                      <span className="text-amber-600 dark:text-amber-400">
+                        The fund balance is informational — the payout amount above is your manual
+                        estimate and is not derived from the accumulated balance.
+                      </span>
                     </p>
                   </div>
                 )}

@@ -8,6 +8,7 @@ import {
   Skeleton,
   formatAmount,
 } from "@wealthfolio/ui";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { useMemo } from "react";
 import type { FireSettings, IncomeStream } from "../types";
 import {
@@ -75,9 +76,10 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
     .filter((s) => s.startAge > fireAgeForBudget && s.monthlyAmount > 0)
     .sort((a, b) => a.startAge - b.startAge);
 
+  const healthcareMonthly = settings.healthcareMonthlyAtFire ?? 0;
   const totalActiveIncome = activeStreams.reduce((sum, s) => sum + s.monthlyAmount, 0);
-  const portfolioWithdrawalAtFire = Math.max(0, settings.monthlyExpensesAtFire - totalActiveIncome);
-  const totalBudget = settings.monthlyExpensesAtFire;
+  const totalBudget = settings.monthlyExpensesAtFire + healthcareMonthly;
+  const portfolioWithdrawalAtFire = Math.max(0, totalBudget - totalActiveIncome);
 
   const hasPensionFunds = settings.additionalIncomeStreams.some(
     (s) => (s.currentValue ?? 0) > 0 || (s.monthlyContribution ?? 0) > 0,
@@ -128,12 +130,38 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
 
   return (
     <div className="space-y-6">
+      {/* Warning: retirement triggered by age, not by FI */}
+      {!projection.fundedAtRetirement && (
+        <div className="rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+          <strong>Underfunded plan:</strong> at the current trajectory the portfolio does not reach
+          the FIRE target by age {settings.targetFireAge}. Retirement starts at the target age
+          anyway, but withdrawals may deplete the portfolio early. Increase contributions, extend
+          the target age, or reduce planned expenses.
+        </div>
+      )}
       {/* KPI Cards */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-              FIRE Target
+              <Tooltip>
+                <TooltipTrigger className="cursor-help underline decoration-dotted">
+                  FIRE Target (net)
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs text-xs">
+                  <p>
+                    <strong>Net target</strong> — portfolio needed after subtracting income streams
+                    that start at or before your FIRE age.
+                  </p>
+                  {netFireTarget < fireTarget && (
+                    <p className="mt-1">
+                      The <strong>FIRE (gross)</strong> goal on the Goals page shows{" "}
+                      {fmt(fireTarget, currency)} — the full amount before income offsets. Both
+                      numbers are correct; they measure different things.
+                    </p>
+                  )}
+                </TooltipContent>
+              </Tooltip>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -281,6 +309,12 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
           <div>
             <p className="mb-2 text-xs font-medium">
               At FIRE age {fireAgeForBudget} — {fmt(totalBudget, currency)}/mo total
+              {healthcareMonthly > 0 && (
+                <span className="text-muted-foreground ml-1">
+                  ({fmt(settings.monthlyExpensesAtFire, currency)} living +{" "}
+                  {fmt(healthcareMonthly, currency)} healthcare)
+                </span>
+              )}
             </p>
 
             {/* Visual bar */}
@@ -309,6 +343,22 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
 
             {/* Breakdown rows */}
             <div className="space-y-1">
+              {healthcareMonthly > 0 && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Living expenses</span>
+                  <span className="text-muted-foreground">
+                    {fmt(settings.monthlyExpensesAtFire, currency)}/mo
+                  </span>
+                </div>
+              )}
+              {healthcareMonthly > 0 && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Healthcare</span>
+                  <span className="text-muted-foreground">
+                    {fmt(healthcareMonthly, currency)}/mo
+                  </span>
+                </div>
+              )}
               {activeStreams.map((s, i) => {
                 const pctVal = totalBudget > 0 ? (s.monthlyAmount / totalBudget) * 100 : 0;
                 const colors = ["#3b82f6", "#22c55e", "#f97316", "#a855f7", "#ec4899"];

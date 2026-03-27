@@ -30,23 +30,31 @@ function sampleReturn(mean: number, std: number): number {
   return gaussianRandom(mean + 0.015, std * 0.8);
 }
 
+/**
+ * Compute total annual income from active streams at a given age.
+ * `cumulativeInflation`: if provided, inflation-indexed streams use this stochastic factor
+ * instead of the deterministic formula. Pass only from Monte Carlo paths.
+ */
 function additionalIncomeAtAge(
   streams: FireSettings["additionalIncomeStreams"],
   age: number,
   yearsFromNow: number,
   inflationRate: number,
+  cumulativeInflation?: number,
 ): number {
   return streams
     .filter((s) => age >= s.startAge)
     .reduce((sum, s) => {
       const annual = s.monthlyAmount * 12;
-      const rate =
-        s.annualGrowthRate !== undefined
-          ? s.annualGrowthRate
-          : s.adjustForInflation
-            ? inflationRate
-            : 0;
-      return sum + annual * Math.pow(1 + rate, yearsFromNow);
+      if (s.annualGrowthRate !== undefined) {
+        // Custom growth rate: always deterministic
+        return sum + annual * Math.pow(1 + s.annualGrowthRate, yearsFromNow);
+      } else if (s.adjustForInflation) {
+        // Inflation-indexed: use stochastic factor when available (MC path)
+        return sum + annual * (cumulativeInflation ?? Math.pow(1 + inflationRate, yearsFromNow));
+      } else {
+        return sum + annual;
+      }
     }, 0);
 }
 
@@ -55,11 +63,51 @@ function percentile(sorted: number[], p: number): number {
   return sorted[Math.min(idx, sorted.length - 1)];
 }
 
+/** Annual healthcare cost at simulation year i (years from current age). */
+function healthcareCostAtYear(settings: FireSettings, yearsFromNow: number): number {
+  const monthly = settings.healthcareMonthlyAtFire ?? 0;
+  if (monthly <= 0) return 0;
+  const rate = settings.healthcareInflationRate ?? settings.inflationRate;
+  return monthly * 12 * Math.pow(1 + rate, yearsFromNow);
+}
+
+/**
+ * Returns {mean, std} blended between equities and bonds according to the glide path.
+ * During accumulation (inFire=false) always returns base equity parameters.
+ */
+function blendedReturnParams(
+  settings: FireSettings,
+  i: number,
+  inFire: boolean,
+): { mean: number; std: number } {
+  const gp = settings.glidePath;
+  if (!gp?.enabled || !inFire) {
+    return { mean: settings.expectedAnnualReturn, std: settings.expectedReturnStdDev };
+  }
+  const yearsToFire = Math.max(0, settings.targetFireAge - settings.currentAge);
+  const yearsInRetirement = Math.max(1, settings.planningHorizonAge - settings.targetFireAge);
+  const yearsFromFire = Math.max(0, i - yearsToFire);
+  const t = Math.min(1, yearsFromFire / yearsInRetirement);
+  const bondPct = Math.min(
+    1,
+    Math.max(
+      0,
+      gp.bondAllocationAtFire + t * (gp.bondAllocationAtHorizon - gp.bondAllocationAtFire),
+    ),
+  );
+  const stockPct = 1 - bondPct;
+  return {
+    mean: stockPct * settings.expectedAnnualReturn + bondPct * gp.bondReturnRate,
+    std: stockPct * settings.expectedReturnStdDev,
+  };
+}
+
 // ─── Core FIRE Calculations ────────────────────────────────────────────────────
 
 // Gross FIRE target — ignores income streams. Used for display / SWR label.
 export function calculateFireTarget(settings: FireSettings): number {
-  return (settings.monthlyExpensesAtFire * 12) / settings.safeWithdrawalRate;
+  const totalMonthly = settings.monthlyExpensesAtFire + (settings.healthcareMonthlyAtFire ?? 0);
+  return (totalMonthly * 12) / settings.safeWithdrawalRate;
 }
 
 // Net FIRE target — subtracts income available from day-1 of FIRE (startAge <= targetFireAge).
@@ -69,7 +117,8 @@ export function calculateNetFireTarget(settings: FireSettings): number {
   const incomeAtFireAge = settings.additionalIncomeStreams
     .filter((s) => s.startAge <= settings.targetFireAge)
     .reduce((sum, s) => sum + s.monthlyAmount, 0);
-  const netMonthly = Math.max(0, settings.monthlyExpensesAtFire - incomeAtFireAge);
+  const totalMonthly = settings.monthlyExpensesAtFire + (settings.healthcareMonthlyAtFire ?? 0);
+  const netMonthly = Math.max(0, totalMonthly - incomeAtFireAge);
   return (netMonthly * 12) / settings.safeWithdrawalRate;
 }
 
@@ -126,13 +175,13 @@ export function projectFireDate(settings: FireSettings, currentPortfolio: number
   const coastAmount = calculateCoastFireAmount(settings);
   const startYear = new Date().getFullYear();
   const horizonYears = Math.max(1, settings.planningHorizonAge - settings.currentAge);
-  const r = settings.expectedAnnualReturn;
   const contribGrowth = settings.salaryGrowthRate ?? settings.contributionGrowthRate;
 
   let portfolio = currentPortfolio;
   let fireAge: number | null = null;
   let fireYear: number | null = null;
   let portfolioAtFire = 0;
+  let fundedAtRetirement = false;
   let inFire = false;
   const yearByYear: YearlySnapshot[] = [];
 
@@ -148,18 +197,30 @@ export function projectFireDate(settings: FireSettings, currentPortfolio: number
     // Snapshot uses start-of-year pension value (before stepping for this year)
     const pensionAssets = [...pensionBalances.values()].reduce((s, v) => s + v, 0);
 
-    // Trigger FIRE when nominal portfolio ≥ nominal target (real target × (1+inf)^i)
+    // Trigger retirement when FI target reached OR forced by targetFireAge.
+    // fireAge is only set when FI is actually reached (portfolio >= target).
     const nominalFireTarget = realFireTarget * Math.pow(1 + settings.inflationRate, i);
-    if (!inFire && (portfolio >= nominalFireTarget || age >= settings.targetFireAge)) {
-      inFire = true;
-      fireAge = age;
-      fireYear = year;
-      portfolioAtFire = portfolio;
+    if (!inFire) {
+      const fiReached = portfolio >= nominalFireTarget;
+      const ageForced = age >= settings.targetFireAge;
+      if (fiReached || ageForced) {
+        inFire = true;
+        if (fiReached) {
+          fireAge = age;
+          fireYear = year;
+        }
+        fundedAtRetirement = fiReached;
+        portfolioAtFire = portfolio;
+      }
     }
 
+    const { mean: effectiveReturn } = blendedReturnParams(settings, i, inFire);
+
     if (inFire) {
-      const annualExpenses =
+      const annualLiving =
         settings.monthlyExpensesAtFire * 12 * Math.pow(1 + settings.inflationRate, i);
+      const annualHealthcare = healthcareCostAtYear(settings, i);
+      const annualExpenses = annualLiving + annualHealthcare;
       const annualIncome = additionalIncomeAtAge(
         settings.additionalIncomeStreams,
         age,
@@ -184,7 +245,7 @@ export function projectFireDate(settings: FireSettings, currentPortfolio: number
         pensionAssets,
       });
 
-      portfolio = Math.max(0, portfolio * (1 + r) - netWithdrawal);
+      portfolio = Math.max(0, portfolio * (1 + effectiveReturn) - netWithdrawal);
     } else {
       const annualContribution = settings.monthlyContribution * 12 * Math.pow(1 + contribGrowth, i);
 
@@ -200,7 +261,7 @@ export function projectFireDate(settings: FireSettings, currentPortfolio: number
         pensionAssets,
       });
 
-      portfolio = portfolio * (1 + r) + annualContribution;
+      portfolio = portfolio * (1 + effectiveReturn) + annualContribution;
     }
 
     // Advance pension balances for the next iteration (contributions stop once in FIRE)
@@ -211,6 +272,7 @@ export function projectFireDate(settings: FireSettings, currentPortfolio: number
     fireAge,
     fireYear,
     portfolioAtFire,
+    fundedAtRetirement,
     coastFireAmount: coastAmount,
     coastFireReached: currentPortfolio >= coastAmount,
     yearByYear,
@@ -231,7 +293,7 @@ export function runMonteCarlo(
   // paths[simIndex][yearIndex] = portfolio value
   const paths: number[][] = [];
   let survivedCount = 0;
-  const fireAges: number[] = [];
+  const fiAges: number[] = []; // only ages where FI target was genuinely reached
 
   const useConstantPct =
     (settings.withdrawalStrategy ?? "constant-dollar") === "constant-percentage";
@@ -239,7 +301,8 @@ export function runMonteCarlo(
   for (let sim = 0; sim < nSims; sim++) {
     let portfolio = currentPortfolio;
     let inFire = false;
-    let simFireAge: number | null = null;
+    let simFiAge: number | null = null;
+    let portfolioAtRetirementStart = currentPortfolio;
     const path: number[] = [];
     let cumulativeInflation = 1.0;
 
@@ -248,23 +311,31 @@ export function runMonteCarlo(
       path.push(Math.max(0, portfolio));
 
       const nominalFireTarget = realFireTarget * Math.pow(1 + settings.inflationRate, i);
-      if (!inFire && (portfolio >= nominalFireTarget || age >= settings.targetFireAge)) {
-        inFire = true;
-        simFireAge = age;
+      if (!inFire) {
+        const fiReached = portfolio >= nominalFireTarget;
+        const ageForced = age >= settings.targetFireAge;
+        if (fiReached || ageForced) {
+          inFire = true;
+          portfolioAtRetirementStart = portfolio;
+          if (fiReached) simFiAge = age;
+        }
       }
 
-      const annualReturn = sampleReturn(
-        settings.expectedAnnualReturn,
-        settings.expectedReturnStdDev,
-      );
+      const { mean: blendedMean, std: blendedStd } = blendedReturnParams(settings, i, inFire);
+      const annualReturn = sampleReturn(blendedMean, blendedStd);
 
       if (inFire) {
-        const annualExpenses = settings.monthlyExpensesAtFire * 12 * cumulativeInflation;
+        const annualLiving = settings.monthlyExpensesAtFire * 12 * cumulativeInflation;
+        const annualHealthcare = healthcareCostAtYear(settings, i);
+        const annualExpenses = annualLiving + annualHealthcare;
+        // Pass cumulativeInflation so inflation-indexed income tracks the same stochastic
+        // path as expenses (fixes systematic inflation asymmetry in MC).
         const annualIncome = additionalIncomeAtAge(
           settings.additionalIncomeStreams,
           age,
           i,
           settings.inflationRate,
+          cumulativeInflation,
         );
         const netWithdrawal = useConstantPct
           ? settings.safeWithdrawalRate * portfolio
@@ -276,13 +347,15 @@ export function runMonteCarlo(
         portfolio = portfolio * (1 + annualReturn) + annualContribution;
       }
 
-      // Stochastic inflation: update cumulative factor for the next year
       cumulativeInflation *= 1 + gaussianRandom(settings.inflationRate, 0.01);
     }
 
     paths.push(path);
-    if (portfolio > 0) survivedCount++;
-    if (simFireAge !== null) fireAges.push(simFireAge);
+    // For constant-percentage, the portfolio never hits 0; define failure as dropping
+    // below 5% of the starting retirement portfolio.
+    const survived = useConstantPct ? portfolio > portfolioAtRetirementStart * 0.05 : portfolio > 0;
+    if (survived) survivedCount++;
+    if (simFiAge !== null) fiAges.push(simFiAge);
   }
 
   // Compute percentile paths across all simulations at each year
@@ -306,9 +379,10 @@ export function runMonteCarlo(
 
   const finalVals = paths.map((p) => p[yearCount - 1]).sort((a, b) => a - b);
 
-  fireAges.sort((a, b) => a - b);
-  const medianFireAge =
-    fireAges.length > 0 ? fireAges[Math.floor(fireAges.length / 2)] : settings.targetFireAge;
+  fiAges.sort((a, b) => a - b);
+  // None (null) when fewer than 50% of simulations genuinely reached FI
+  const medianFireAge: number | null =
+    fiAges.length > nSims / 2 ? fiAges[Math.floor(fiAges.length / 2)] : null;
 
   return {
     successRate: survivedCount / nSims,
@@ -404,8 +478,10 @@ export function runSequenceOfReturnsRisk(
       // yearsFromNow must be relative to currentAge (not FIRE date) so that
       // expenses and inflation-linked income are correctly priced in future money.
       const yearsFromNow = yearsToFire + i;
-      const annualExpenses =
+      const annualLiving =
         settings.monthlyExpensesAtFire * 12 * Math.pow(1 + settings.inflationRate, yearsFromNow);
+      const annualHealthcare = healthcareCostAtYear(settings, yearsFromNow);
+      const annualExpenses = annualLiving + annualHealthcare;
       const annualIncome = additionalIncomeAtAge(
         settings.additionalIncomeStreams,
         age,
@@ -415,7 +491,11 @@ export function runSequenceOfReturnsRisk(
       const netWithdrawal = useConstantPct
         ? settings.safeWithdrawalRate * portfolio
         : Math.max(0, annualExpenses - annualIncome);
-      portfolio = Math.max(0, portfolio * (1 + returns[i]) - netWithdrawal);
+      // For "normal" (non-shock) years use glide-path-adjusted return;
+      // shock/recovery years keep the scenario return as-is.
+      const { mean: glideReturn } = blendedReturnParams(settings, yearsFromNow, true);
+      const effectiveReturn = Math.abs(returns[i] - r) < 1e-9 ? glideReturn : returns[i];
+      portfolio = Math.max(0, portfolio * (1 + effectiveReturn) - netWithdrawal);
     }
     path.push(Math.max(0, portfolio));
 

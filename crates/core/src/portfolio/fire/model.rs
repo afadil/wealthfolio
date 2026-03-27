@@ -31,6 +31,19 @@ pub struct IncomeStream {
     pub accumulation_return: Option<f64>,
 }
 
+/// Gradual shift from equities to bonds during the withdrawal phase to reduce SORR.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlidepathSettings {
+    pub enabled: bool,
+    /// Expected annual return for the bond portion (e.g. 0.03 = 3 %).
+    pub bond_return_rate: f64,
+    /// Fraction held in bonds at the FIRE date (e.g. 0.2 = 20 %).
+    pub bond_allocation_at_fire: f64,
+    /// Fraction held in bonds at the planning horizon (e.g. 0.5 = 50 %).
+    pub bond_allocation_at_horizon: f64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FireSettings {
@@ -52,7 +65,17 @@ pub struct FireSettings {
     pub included_account_ids: Option<Vec<String>>,
     pub target_allocations: HashMap<String, f64>,
     pub currency: String,
+    #[serde(default)]
     pub linked_goal_id: Option<String>,
+    /// Monthly healthcare cost at FIRE in today's money (on top of monthly_expenses_at_fire).
+    #[serde(default)]
+    pub healthcare_monthly_at_fire: Option<f64>,
+    /// Annual inflation rate for healthcare costs. Defaults to inflation_rate when None.
+    #[serde(default)]
+    pub healthcare_inflation_rate: Option<f64>,
+    /// Glide-path settings for bond allocation shift during retirement.
+    #[serde(default)]
+    pub glide_path: Option<GlidepathSettings>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,9 +95,13 @@ pub struct YearlySnapshot {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FireProjection {
+    /// Age when portfolio first reached the FIRE target. None if target was never reached.
     pub fire_age: Option<u32>,
     pub fire_year: Option<u32>,
     pub portfolio_at_fire: f64,
+    /// True when retirement withdrawal phase started with portfolio >= FIRE target.
+    /// False means retirement was triggered by target_fire_age, not by financial independence.
+    pub funded_at_retirement: bool,
     pub coast_fire_amount: f64,
     pub coast_fire_reached: bool,
     pub year_by_year: Vec<YearlySnapshot>,
@@ -104,7 +131,9 @@ pub struct FinalPortfolioPercentiles {
 #[serde(rename_all = "camelCase")]
 pub struct MonteCarloResult {
     pub success_rate: f64,
-    pub median_fire_age: u32,
+    /// Median age at which FI target was reached across simulations. None if fewer than 50% of
+    /// simulations reached the target before the planning horizon.
+    pub median_fire_age: Option<u32>,
     pub percentiles: PercentilePaths,
     pub age_axis: Vec<u32>,
     pub final_portfolio_at_horizon: FinalPortfolioPercentiles,

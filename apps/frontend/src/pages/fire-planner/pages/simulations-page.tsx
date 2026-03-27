@@ -59,11 +59,13 @@ function MonteCarloSection({
 }) {
   const [result, setResult] = useState<MonteCarloResult | null>(null);
   const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [compResult, setCompResult] = useState<{
     constantDollar: MonteCarloResult;
     constantPercentage: MonteCarloResult;
   } | null>(null);
   const [comparing, setComparing] = useState(false);
+  const [compareError, setCompareError] = useState<string | null>(null);
   const fireTarget = useMemo(() => calculateNetFireTarget(settings), [settings]);
   const strategy = settings.withdrawalStrategy ?? "constant-dollar";
 
@@ -71,13 +73,18 @@ function MonteCarloSection({
   useEffect(() => {
     setResult(null);
     setCompResult(null);
+    setError(null);
+    setCompareError(null);
   }, [settings]);
 
   const run = async () => {
     setRunning(true);
+    setError(null);
     try {
       const res = await runFireMonteCarlo(settings, totalValue, 100_000);
       setResult(res);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setRunning(false);
     }
@@ -85,9 +92,12 @@ function MonteCarloSection({
 
   const compare = async () => {
     setComparing(true);
+    setCompareError(null);
     try {
       const res = await runFireStrategyComparison(settings, totalValue, 5_000);
       setCompResult(res);
+    } catch (e) {
+      setCompareError(e instanceof Error ? e.message : String(e));
     } finally {
       setComparing(false);
     }
@@ -128,6 +138,8 @@ function MonteCarloSection({
         </div>
       </CardHeader>
       <CardContent>
+        {error && <p className="text-destructive py-2 text-sm">{error}</p>}
+        {compareError && <p className="text-destructive py-2 text-sm">{compareError}</p>}
         {running && (
           <div className="space-y-2 py-4">
             <Skeleton className="h-4 w-full" />
@@ -155,13 +167,19 @@ function MonteCarloSection({
                 </p>
               </div>
               <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-700 dark:bg-amber-950/30">
-                <p className="text-muted-foreground text-xs">Median FIRE Age</p>
-                <p className="text-lg font-bold text-amber-600 dark:text-amber-400">
-                  {result.medianFireAge}
-                </p>
-                <p className="text-xs text-amber-600 dark:text-amber-400">
-                  {new Date().getFullYear() + (result.medianFireAge - settings.currentAge)}
-                </p>
+                <p className="text-muted-foreground text-xs">Median FI Age</p>
+                {result.medianFireAge !== null ? (
+                  <>
+                    <p className="text-lg font-bold text-amber-600 dark:text-amber-400">
+                      {result.medianFireAge}
+                    </p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      {new Date().getFullYear() + (result.medianFireAge - settings.currentAge)}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm font-semibold text-red-500">Not reached</p>
+                )}
               </div>
               <div>
                 <p className="text-muted-foreground text-xs">P50 Portfolio at Horizon</p>
@@ -209,18 +227,20 @@ function MonteCarloSection({
                       fill: "#94a3b8",
                     }}
                   />
-                  <ReferenceLine
-                    x={result.medianFireAge}
-                    stroke="#f59e0b"
-                    strokeWidth={2.5}
-                    label={{
-                      value: `FIRE: ${result.medianFireAge}`,
-                      position: "insideTopLeft",
-                      fontSize: 11,
-                      fontWeight: 700,
-                      fill: "#f59e0b",
-                    }}
-                  />
+                  {result.medianFireAge !== null && (
+                    <ReferenceLine
+                      x={result.medianFireAge}
+                      stroke="#f59e0b"
+                      strokeWidth={2.5}
+                      label={{
+                        value: `FI: ${result.medianFireAge}`,
+                        position: "insideTopLeft",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        fill: "#f59e0b",
+                      }}
+                    />
+                  )}
                   <Line dataKey="p90" name="P90" stroke="#22c55e" dot={false} strokeWidth={1.5} />
                   <Line dataKey="p75" name="P75" stroke="#86efac" dot={false} strokeWidth={1} />
                   <Line

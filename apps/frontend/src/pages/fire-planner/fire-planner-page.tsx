@@ -11,9 +11,9 @@ import {
 } from "@wealthfolio/ui";
 import { useFireSettings } from "./hooks/use-fire-settings";
 import { usePortfolioData } from "./hooks/use-portfolio";
-import DashboardPage from "./pages/DashboardPage";
-import SimulationsPage from "./pages/SimulationsPage";
-import AllocationPage from "./pages/AllocationPage";
+import DashboardPage from "./pages/dashboard-page";
+import SimulationsPage from "./pages/simulations-page";
+import AllocationPage from "./pages/allocation-page";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 

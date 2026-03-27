@@ -3,6 +3,16 @@
 
 export type WithdrawalStrategy = "constant-dollar" | "constant-percentage";
 
+export interface GlidepathSettings {
+  enabled: boolean;
+  /** Expected annual return for the bond portion (e.g. 0.03 = 3%). */
+  bondReturnRate: number;
+  /** Fraction held in bonds at the FIRE date (e.g. 0.2 = 20%). */
+  bondAllocationAtFire: number;
+  /** Fraction held in bonds at the planning horizon (e.g. 0.5 = 50%). */
+  bondAllocationAtHorizon: number;
+}
+
 export interface FireSettings {
   monthlyExpensesAtFire: number;
   safeWithdrawalRate: number;
@@ -22,6 +32,12 @@ export interface FireSettings {
   targetAllocations: Record<string, number>;
   currency: string;
   linkedGoalId?: string;
+  /** Monthly healthcare cost at FIRE in today's money (on top of monthlyExpensesAtFire). */
+  healthcareMonthlyAtFire?: number;
+  /** Annual inflation rate for healthcare costs. Defaults to inflationRate when undefined. */
+  healthcareInflationRate?: number;
+  /** Glide-path settings for bond allocation shift during retirement. */
+  glidePath?: GlidepathSettings;
 }
 
 export interface IncomeStream {
@@ -39,9 +55,13 @@ export interface IncomeStream {
 }
 
 export interface FireProjection {
+  /** Age when portfolio first reached the FIRE target. null if target was never reached. */
   fireAge: number | null;
   fireYear: number | null;
   portfolioAtFire: number;
+  /** True when withdrawal phase started with portfolio >= FIRE target (genuine FI).
+   *  False means retirement was forced by targetFireAge before the target was reached. */
+  fundedAtRetirement: boolean;
   coastFireAmount: number;
   coastFireReached: boolean;
   yearByYear: YearlySnapshot[];
@@ -61,7 +81,9 @@ export interface YearlySnapshot {
 
 export interface MonteCarloResult {
   successRate: number;
-  medianFireAge: number;
+  /** Median age at which the FI target was genuinely reached. null for underfunded plans
+   *  where fewer than 50% of simulations hit the target before the horizon. */
+  medianFireAge: number | null;
   percentiles: {
     p10: number[];
     p25: number[];

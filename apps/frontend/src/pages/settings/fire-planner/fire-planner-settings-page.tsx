@@ -2,8 +2,9 @@ import { createGoal, getGoalsAllocation, updateGoal, updateGoalsAllocations } fr
 import { useFireSettings } from "@/pages/fire-planner/hooks/use-fire-settings";
 import { usePortfolioData } from "@/pages/fire-planner/hooks/use-portfolio";
 import { timezoneToCountry } from "@/pages/fire-planner/lib/timezone";
-import FireSettingsForm from "@/pages/fire-planner/pages/SettingsPage";
-import GuidePage from "@/pages/fire-planner/pages/GuidePage";
+import { calculateFireTarget } from "@/pages/fire-planner/lib/fire-math";
+import FireSettingsForm from "@/pages/fire-planner/pages/settings-page";
+import GuidePage from "@/pages/fire-planner/pages/guide-page";
 import type { FireSettings } from "@/pages/fire-planner/types";
 import type { GoalAllocation } from "@/lib/types";
 import { Skeleton, Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui";
@@ -16,19 +17,19 @@ export default function FirePlannerSettingsPage() {
   const country = timezoneToCountry(timezone);
 
   const handleSave = async (updated: FireSettings) => {
-    const grossTarget = (updated.monthlyExpensesAtFire * 12) / updated.safeWithdrawalRate;
+    const grossTarget = calculateFireTarget(updated);
 
     let goalId = updated.linkedGoalId ?? null;
     try {
       if (goalId) {
         await updateGoal({
           id: goalId,
-          title: "FIRE",
+          title: "FIRE (gross)",
           targetAmount: grossTarget,
           isAchieved: false,
         });
       } else {
-        const goal = await createGoal({ title: "FIRE", targetAmount: grossTarget });
+        const goal = await createGoal({ title: "FIRE (gross)", targetAmount: grossTarget });
         goalId = goal.id;
       }
 

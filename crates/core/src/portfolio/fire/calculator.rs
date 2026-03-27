@@ -2,60 +2,139 @@ use std::collections::HashMap;
 
 use chrono::Datelike;
 use rand::Rng;
+use rand_distr::{Distribution, Normal};
 use rayon::prelude::*;
 
 use super::model::*;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
-fn gaussian_random<R: Rng>(rng: &mut R, mean: f64, std: f64) -> f64 {
-    let u: f64 = loop {
-        let v = rng.gen::<f64>();
-        if v > 0.0 {
-            break v;
-        }
-    };
-    let v: f64 = loop {
-        let v = rng.gen::<f64>();
-        if v > 0.0 {
-            break v;
-        }
-    };
-    mean + std * (-2.0 * u.ln()).sqrt() * (2.0 * std::f64::consts::PI * v).cos()
-}
-
-/// Two-regime fat-tailed return distribution.
+/// Two-regime fat-tailed return distribution using the ziggurat algorithm (rand_distr).
 /// 85% normal years: μ+1.5%, σ×0.8 — 15% stress years: μ−8.5%, σ×1.8
 /// Long-run mean preserved: 0.85×(μ+0.015) + 0.15×(μ−0.085) = μ
+/// NOTE: the mixture variance is higher than σ² by design — this is the fat-tail effect.
+/// A user-entered σ=12% will produce a wider fan than a single-normal model with σ=12%.
 fn sample_return<R: Rng>(rng: &mut R, mean: f64, std: f64) -> f64 {
     if rng.gen::<f64>() < 0.15 {
-        gaussian_random(rng, mean - 0.085, std * 1.8)
+        Normal::new(mean - 0.085, std * 1.8).unwrap().sample(rng)
     } else {
-        gaussian_random(rng, mean + 0.015, std * 0.8)
+        Normal::new(mean + 0.015, std * 0.8).unwrap().sample(rng)
     }
 }
 
+fn sample_inflation<R: Rng>(rng: &mut R, mean: f64) -> f64 {
+    Normal::new(mean, 0.01).unwrap().sample(rng)
+}
+
+/// Compute total annual income from all active streams at a given age.
+/// `cumulative_inflation`: if Some, inflation-indexed streams use this stochastic factor
+/// instead of the deterministic `(1+rate)^years` formula. Pass Some only from Monte Carlo.
 fn additional_income_at_age(
     streams: &[IncomeStream],
     age: u32,
     years_from_now: u32,
     inflation_rate: f64,
+    cumulative_inflation: Option<f64>,
 ) -> f64 {
     streams
         .iter()
         .filter(|s| age >= s.start_age)
         .map(|s| {
             let annual = s.monthly_amount * 12.0;
-            let rate = if let Some(r) = s.annual_growth_rate {
-                r
+            if let Some(r) = s.annual_growth_rate {
+                // Custom growth rate: always deterministic
+                annual * (1.0 + r).powi(years_from_now as i32)
             } else if s.adjust_for_inflation {
-                inflation_rate
+                // Inflation-indexed: use stochastic factor when available (MC path)
+                match cumulative_inflation {
+                    Some(cum) => annual * cum,
+                    None => annual * (1.0 + inflation_rate).powi(years_from_now as i32),
+                }
             } else {
-                0.0
-            };
-            annual * (1.0 + rate).powi(years_from_now as i32)
+                annual
+            }
         })
         .sum()
+}
+
+/// Annual healthcare cost at simulation year i (years from current age).
+fn healthcare_cost_at_year(settings: &FireSettings, i: u32) -> f64 {
+    let monthly = settings.healthcare_monthly_at_fire.unwrap_or(0.0);
+    if monthly <= 0.0 {
+        return 0.0;
+    }
+    let rate = settings
+        .healthcare_inflation_rate
+        .unwrap_or(settings.inflation_rate);
+    monthly * 12.0 * (1.0 + rate).powi(i as i32)
+}
+
+/// Returns (effective_mean_return, effective_std_dev) for a given simulation year.
+/// `i` = years from current age; `in_fire` = withdrawal phase.
+/// During accumulation the base equity parameters are returned unchanged.
+/// During withdrawal the parameters are blended with the bond allocation from the glide path.
+fn blended_return_params(settings: &FireSettings, i: u32, in_fire: bool) -> (f64, f64) {
+    let gp = match settings.glide_path.as_ref() {
+        Some(gp) if gp.enabled => gp,
+        _ => {
+            return (
+                settings.expected_annual_return,
+                settings.expected_return_std_dev,
+            )
+        }
+    };
+    if !in_fire {
+        return (
+            settings.expected_annual_return,
+            settings.expected_return_std_dev,
+        );
+    }
+    let years_to_fire =
+        (settings.target_fire_age as i32 - settings.current_age as i32).max(0) as f64;
+    let years_in_retirement =
+        (settings.planning_horizon_age as i32 - settings.target_fire_age as i32).max(1) as f64;
+    let years_from_fire = (i as f64 - years_to_fire).max(0.0);
+    let t = (years_from_fire / years_in_retirement).clamp(0.0, 1.0);
+    let bond_pct = (gp.bond_allocation_at_fire
+        + t * (gp.bond_allocation_at_horizon - gp.bond_allocation_at_fire))
+        .clamp(0.0, 1.0);
+    let stock_pct = 1.0 - bond_pct;
+    let mean = stock_pct * settings.expected_annual_return + bond_pct * gp.bond_return_rate;
+    let std = stock_pct * settings.expected_return_std_dev; // bonds ≈ low vol
+    (mean, std)
+}
+
+/// MC-closure–safe version of `blended_return_params` that works with owned primitives.
+fn blended_return_params_mc(
+    base_mean: f64,
+    base_std: f64,
+    current_age: u32,
+    target_fire_age: u32,
+    planning_horizon_age: u32,
+    gp: Option<&GlidepathSettings>,
+    i: u32,
+    in_fire: bool,
+) -> (f64, f64) {
+    let gp = match gp {
+        Some(gp) if gp.enabled => gp,
+        _ => return (base_mean, base_std),
+    };
+    if !in_fire {
+        return (base_mean, base_std);
+    }
+    let years_to_fire = (target_fire_age as i32 - current_age as i32).max(0) as f64;
+    let years_in_retirement =
+        (planning_horizon_age as i32 - target_fire_age as i32).max(1) as f64;
+    let years_from_fire = (i as f64 - years_to_fire).max(0.0);
+    let t = (years_from_fire / years_in_retirement).clamp(0.0, 1.0);
+    let bond_pct = (gp.bond_allocation_at_fire
+        + t * (gp.bond_allocation_at_horizon - gp.bond_allocation_at_fire))
+        .clamp(0.0, 1.0);
+    let stock_pct = 1.0 - bond_pct;
+    (
+        stock_pct * base_mean + bond_pct * gp.bond_return_rate,
+        stock_pct * base_std,
+    )
 }
 
 fn percentile(sorted: &[f64], p: f64) -> f64 {
@@ -66,7 +145,9 @@ fn percentile(sorted: &[f64], p: f64) -> f64 {
 // ─── Core FIRE Calculations ────────────────────────────────────────────────────
 
 pub fn calculate_fire_target(settings: &FireSettings) -> f64 {
-    (settings.monthly_expenses_at_fire * 12.0) / settings.safe_withdrawal_rate
+    let total_monthly =
+        settings.monthly_expenses_at_fire + settings.healthcare_monthly_at_fire.unwrap_or(0.0);
+    (total_monthly * 12.0) / settings.safe_withdrawal_rate
 }
 
 pub fn calculate_net_fire_target(settings: &FireSettings) -> f64 {
@@ -76,7 +157,9 @@ pub fn calculate_net_fire_target(settings: &FireSettings) -> f64 {
         .filter(|s| s.start_age <= settings.target_fire_age)
         .map(|s| s.monthly_amount)
         .sum();
-    let net_monthly = (settings.monthly_expenses_at_fire - income_at_fire_age).max(0.0);
+    let total_monthly =
+        settings.monthly_expenses_at_fire + settings.healthcare_monthly_at_fire.unwrap_or(0.0);
+    let net_monthly = (total_monthly - income_at_fire_age).max(0.0);
     (net_monthly * 12.0) / settings.safe_withdrawal_rate
 }
 
@@ -130,7 +213,6 @@ pub fn project_fire_date(settings: &FireSettings, current_portfolio: f64) -> Fir
     let start_year = chrono::Local::now().year() as u32;
     let horizon_years =
         (settings.planning_horizon_age as i32 - settings.current_age as i32).max(1) as u32;
-    let r = settings.expected_annual_return;
     let contrib_growth = settings
         .salary_growth_rate
         .unwrap_or(settings.contribution_growth_rate);
@@ -139,6 +221,7 @@ pub fn project_fire_date(settings: &FireSettings, current_portfolio: f64) -> Fir
     let mut fire_age: Option<u32> = None;
     let mut fire_year: Option<u32> = None;
     let mut portfolio_at_fire = 0.0;
+    let mut funded_at_retirement = false;
     let mut in_fire = false;
     let mut year_by_year = Vec::new();
 
@@ -155,25 +238,38 @@ pub fn project_fire_date(settings: &FireSettings, current_portfolio: f64) -> Fir
         // Snapshot uses start-of-year pension value (before stepping for this year)
         let pension_assets: f64 = pension_balances.values().sum();
 
-        // Trigger FIRE when nominal portfolio ≥ nominal target
+        // Trigger retirement when FI target reached OR forced by target_fire_age.
+        // fire_age is only set when FI is actually reached (portfolio >= target).
         let nominal_fire_target =
             real_fire_target * (1.0 + settings.inflation_rate).powi(i as i32);
-        if !in_fire && (portfolio >= nominal_fire_target || age >= settings.target_fire_age) {
-            in_fire = true;
-            fire_age = Some(age);
-            fire_year = Some(year);
-            portfolio_at_fire = portfolio;
+        if !in_fire {
+            let fi_reached = portfolio >= nominal_fire_target;
+            let age_forced = age >= settings.target_fire_age;
+            if fi_reached || age_forced {
+                in_fire = true;
+                if fi_reached {
+                    fire_age = Some(age);
+                    fire_year = Some(year);
+                }
+                funded_at_retirement = fi_reached;
+                portfolio_at_fire = portfolio;
+            }
         }
 
+        // Year-specific return accounting for glide path
+        let (r, _) = blended_return_params(settings, i, in_fire);
+
         if in_fire {
-            let annual_expenses = settings.monthly_expenses_at_fire
-                * 12.0
-                * (1.0 + settings.inflation_rate).powi(i as i32);
+            let annual_living =
+                settings.monthly_expenses_at_fire * 12.0 * (1.0 + settings.inflation_rate).powi(i as i32);
+            let annual_healthcare = healthcare_cost_at_year(settings, i);
+            let annual_expenses = annual_living + annual_healthcare;
             let annual_income = additional_income_at_age(
                 &settings.additional_income_streams,
                 age,
                 i,
                 settings.inflation_rate,
+                None,
             );
             let net_withdrawal = match settings.withdrawal_strategy {
                 WithdrawalStrategy::ConstantPercentage => settings.safe_withdrawal_rate * portfolio,
@@ -225,6 +321,7 @@ pub fn project_fire_date(settings: &FireSettings, current_portfolio: f64) -> Fir
         fire_age,
         fire_year,
         portfolio_at_fire,
+        funded_at_retirement,
         coast_fire_amount: coast_amount,
         coast_fire_reached: current_portfolio >= coast_amount,
         year_by_year,
@@ -255,19 +352,27 @@ pub fn run_monte_carlo(
     let std_dev = settings.expected_return_std_dev;
     let current_age = settings.current_age;
     let target_fire_age = settings.target_fire_age;
+    let planning_horizon_age = settings.planning_horizon_age;
     let inflation_rate = settings.inflation_rate;
     let monthly_expenses = settings.monthly_expenses_at_fire;
     let monthly_contribution = settings.monthly_contribution;
     let swr = settings.safe_withdrawal_rate;
+    let healthcare_monthly = settings.healthcare_monthly_at_fire.unwrap_or(0.0);
+    let healthcare_rate = settings
+        .healthcare_inflation_rate
+        .unwrap_or(settings.inflation_rate);
+    let glide_path = settings.glide_path.clone();
 
-    // paths[sim] = (year_values, survived, fire_age)
+    // paths[sim] = (year_values, survived, fi_age)
+    // fi_age: age when portfolio first reached the FIRE target (None if never reached)
     let sim_results: Vec<(Vec<f64>, bool, Option<u32>)> = (0..n_sims)
         .into_par_iter()
         .map(|_| {
             let mut rng = rand::thread_rng();
             let mut portfolio = current_portfolio;
             let mut in_fire = false;
-            let mut sim_fire_age: Option<u32> = None;
+            let mut sim_fi_age: Option<u32> = None;
+            let mut portfolio_at_retirement_start = current_portfolio;
             let mut path = Vec::with_capacity(horizon_years as usize + 1);
             let mut cumulative_inflation = 1.0_f64;
 
@@ -277,18 +382,39 @@ pub fn run_monte_carlo(
 
                 let nominal_fire_target =
                     real_fire_target * (1.0 + inflation_rate).powi(i as i32);
-                if !in_fire && (portfolio >= nominal_fire_target || age >= target_fire_age) {
-                    in_fire = true;
-                    sim_fire_age = Some(age);
+                if !in_fire {
+                    let fi_reached = portfolio >= nominal_fire_target;
+                    let age_forced = age >= target_fire_age;
+                    if fi_reached || age_forced {
+                        in_fire = true;
+                        portfolio_at_retirement_start = portfolio;
+                        if fi_reached {
+                            sim_fi_age = Some(age);
+                        }
+                    }
                 }
 
-                let annual_return = sample_return(&mut rng, mean, std_dev);
+                // Glide-path-blended return distribution for this year
+                let (eff_mean, eff_std) = blended_return_params_mc(
+                    mean, std_dev, current_age, target_fire_age, planning_horizon_age,
+                    glide_path.as_ref(), i, in_fire,
+                );
+                let annual_return = sample_return(&mut rng, eff_mean, eff_std);
 
                 if in_fire {
-                    let annual_expenses =
-                        monthly_expenses * 12.0 * cumulative_inflation;
-                    let annual_income =
-                        additional_income_at_age(&streams, age, i, inflation_rate);
+                    let annual_living = monthly_expenses * 12.0 * cumulative_inflation;
+                    let annual_healthcare = healthcare_monthly * 12.0
+                        * (1.0 + healthcare_rate).powi(i as i32);
+                    let annual_expenses = annual_living + annual_healthcare;
+                    // Pass cumulative_inflation so inflation-indexed income tracks the same
+                    // stochastic path as expenses (fixes systematic inflation asymmetry).
+                    let annual_income = additional_income_at_age(
+                        &streams,
+                        age,
+                        i,
+                        inflation_rate,
+                        Some(cumulative_inflation),
+                    );
                     let net_withdrawal = if use_constant_pct {
                         swr * portfolio
                     } else {
@@ -301,18 +427,23 @@ pub fn run_monte_carlo(
                     portfolio = portfolio * (1.0 + annual_return) + annual_contribution;
                 }
 
-                // Stochastic inflation
-                let inf_sample = gaussian_random(&mut rng, inflation_rate, 0.01);
-                cumulative_inflation *= 1.0 + inf_sample;
+                cumulative_inflation *= 1.0 + sample_inflation(&mut rng, inflation_rate);
             }
 
-            let survived = portfolio > 0.0;
-            (path, survived, sim_fire_age)
+            // For constant-percentage, the portfolio never mathematically hits 0,
+            // so define failure as dropping below 5% of the starting retirement value.
+            let survived = if use_constant_pct {
+                portfolio > portfolio_at_retirement_start * 0.05
+            } else {
+                portfolio > 0.0
+            };
+            (path, survived, sim_fi_age)
         })
         .collect();
 
     let year_count = horizon_years as usize + 1;
     let survived_count = sim_results.iter().filter(|(_, s, _)| *s).count();
+    // Only collect ages where FI target was genuinely reached (fi_age is Some)
     let mut fire_ages: Vec<u32> = sim_results
         .iter()
         .filter_map(|(_, _, fa)| *fa)
@@ -343,10 +474,11 @@ pub fn run_monte_carlo(
         .collect();
     final_vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
-    let median_fire_age = if fire_ages.is_empty() {
-        target_fire_age
+    // None when fewer than 50% of simulations reached FI (underfunded plan)
+    let median_fire_age = if fire_ages.len() > n_sims as usize / 2 {
+        Some(fire_ages[fire_ages.len() / 2])
     } else {
-        fire_ages[fire_ages.len() / 2]
+        None
     };
 
     MonteCarloResult {
@@ -458,21 +590,35 @@ pub fn run_sequence_of_returns_risk(
                 path.push(portfolio.max(0.0));
                 let age = settings.target_fire_age + i as u32;
                 let years_from_now = years_to_fire + i as u32;
-                let annual_expenses = settings.monthly_expenses_at_fire
+                let annual_living = settings.monthly_expenses_at_fire
                     * 12.0
                     * (1.0 + settings.inflation_rate).powi(years_from_now as i32);
+                let annual_healthcare = healthcare_cost_at_year(settings, years_from_now);
+                let annual_expenses = annual_living + annual_healthcare;
                 let annual_income = additional_income_at_age(
                     &settings.additional_income_streams,
                     age,
                     years_from_now,
                     settings.inflation_rate,
+                    None,
                 );
                 let net_withdrawal = if use_constant_pct {
                     settings.safe_withdrawal_rate * portfolio
                 } else {
                     (annual_expenses - annual_income).max(0.0)
                 };
-                portfolio = (portfolio * (1.0 + returns[i]) - net_withdrawal).max(0.0);
+                // Use scenario returns[i] but blend with glide path for the base-return component.
+                // For non-base scenarios the shock return overrides the actual return for that year;
+                // in subsequent years the scenario return already embeds the recovery premium.
+                let (glide_mean, _) = blended_return_params(settings, years_from_now, true);
+                let effective_return = if (returns[i] - r).abs() < 1e-9 {
+                    // "normal" year: use glide-path-adjusted mean
+                    glide_mean
+                } else {
+                    // shock or recovery year: keep scenario return as-is
+                    returns[i]
+                };
+                portfolio = (portfolio * (1.0 + effective_return) - net_withdrawal).max(0.0);
             }
             path.push(portfolio.max(0.0));
 
@@ -602,6 +748,10 @@ mod tests {
             included_account_ids: None,
             target_allocations: HashMap::new(),
             currency: "EUR".to_string(),
+            linked_goal_id: None,
+            healthcare_monthly_at_fire: None,
+            healthcare_inflation_rate: None,
+            glide_path: None,
         }
     }
 

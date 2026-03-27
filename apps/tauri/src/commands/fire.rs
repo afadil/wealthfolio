@@ -14,6 +14,22 @@ use wealthfolio_core::portfolio::fire::{
 
 const FIRE_SETTINGS_KEY: &str = "fire_planner_settings";
 
+fn validate_fire_settings(s: &FireSettings) -> Result<(), String> {
+    if s.safe_withdrawal_rate <= 0.0 {
+        return Err("Safe withdrawal rate must be positive".into());
+    }
+    if s.planning_horizon_age <= s.current_age {
+        return Err("Planning horizon age must exceed current age".into());
+    }
+    if s.target_fire_age < s.current_age {
+        return Err("Target FIRE age must be >= current age".into());
+    }
+    if s.monthly_expenses_at_fire < 0.0 || s.monthly_contribution < 0.0 {
+        return Err("Monetary amounts must be non-negative".into());
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn get_fire_settings(
     state: State<'_, Arc<ServiceContext>>,
@@ -37,6 +53,7 @@ pub async fn save_fire_settings(
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<(), String> {
     debug!("Saving FIRE planner settings...");
+    validate_fire_settings(&settings)?;
     let json = serde_json::to_string(&settings)
         .map_err(|e| format!("Failed to serialize FIRE settings: {}", e))?;
     state
@@ -46,12 +63,15 @@ pub async fn save_fire_settings(
         .map_err(|e| format!("Failed to save FIRE settings: {}", e))
 }
 
+const MAX_SIMS: u32 = 500_000;
+
 #[tauri::command]
 pub async fn calculate_fire_projection(
     settings: FireSettings,
     current_portfolio: f64,
 ) -> Result<FireProjection, String> {
     debug!("Calculating FIRE projection...");
+    validate_fire_settings(&settings)?;
     Ok(project_fire_date(&settings, current_portfolio))
 }
 
@@ -61,7 +81,8 @@ pub async fn run_fire_monte_carlo(
     current_portfolio: f64,
     n_sims: Option<u32>,
 ) -> Result<MonteCarloResult, String> {
-    let n = n_sims.unwrap_or(10_000);
+    validate_fire_settings(&settings)?;
+    let n = n_sims.unwrap_or(100_000).min(MAX_SIMS);
     debug!("Running FIRE Monte Carlo ({} simulations)...", n);
     Ok(run_monte_carlo(&settings, current_portfolio, n))
 }
@@ -72,6 +93,7 @@ pub async fn run_fire_scenario_analysis(
     current_portfolio: f64,
 ) -> Result<Vec<ScenarioResult>, String> {
     debug!("Running FIRE scenario analysis...");
+    validate_fire_settings(&settings)?;
     Ok(run_scenario_analysis(&settings, current_portfolio))
 }
 
@@ -81,6 +103,7 @@ pub async fn run_fire_sorr(
     portfolio_at_fire: f64,
 ) -> Result<Vec<SorrScenario>, String> {
     debug!("Running FIRE sequence-of-returns risk analysis...");
+    validate_fire_settings(&settings)?;
     Ok(run_sequence_of_returns_risk(&settings, portfolio_at_fire))
 }
 
@@ -90,6 +113,7 @@ pub async fn run_fire_sensitivity(
     current_portfolio: f64,
 ) -> Result<SensitivityResult, String> {
     debug!("Running FIRE sensitivity analysis...");
+    validate_fire_settings(&settings)?;
     Ok(run_sensitivity_analysis(&settings, current_portfolio))
 }
 
@@ -99,7 +123,8 @@ pub async fn run_fire_strategy_comparison(
     current_portfolio: f64,
     n_sims: Option<u32>,
 ) -> Result<StrategyComparisonResult, String> {
-    let n = n_sims.unwrap_or(10_000);
+    validate_fire_settings(&settings)?;
+    let n = n_sims.unwrap_or(5_000).min(MAX_SIMS);
     debug!("Running FIRE strategy comparison ({} simulations)...", n);
     Ok(run_strategy_comparison(&settings, current_portfolio, n))
 }
