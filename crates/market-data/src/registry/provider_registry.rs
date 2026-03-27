@@ -544,7 +544,7 @@ impl ProviderRegistry {
         let mut last_error: Option<MarketDataError> = None;
         let mut fallback_results: Option<Vec<SearchResult>> = None;
 
-        for provider in providers {
+        for (i, provider) in providers.iter().enumerate() {
             let provider_id: ProviderId = Cow::Borrowed(provider.id());
 
             if !self.circuit_breaker.is_allowed(&provider_id) {
@@ -552,7 +552,18 @@ impl ProviderRegistry {
                 continue;
             }
 
-            self.rate_limiter.acquire(&provider_id).await;
+            // Primary provider: wait for rate limit token.
+            // Fallback providers: skip if rate-limited (avoids multi-second stalls
+            // when the primary returns empty for a speculative candidate).
+            if i == 0 {
+                self.rate_limiter.acquire(&provider_id).await;
+            } else if !self.rate_limiter.try_acquire(&provider_id) {
+                debug!(
+                    "Search: skipping '{}' for '{}' — rate limited",
+                    provider_id, query
+                );
+                continue;
+            }
 
             match provider.search(query).await {
                 Ok(results) if !results.is_empty() => {

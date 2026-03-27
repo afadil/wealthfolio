@@ -832,31 +832,30 @@ impl ActivityService {
         symbol: &str,
         currency: &str,
     ) -> ResolvedSymbolInfo {
-        let mut candidates: Vec<String> = Vec::new();
-
-        // Currency-hinted: try "SYMBOL.SUFFIX" for the primary exchange when the symbol
-        // is bare (no dot). Uses the first exchange in the currency's priority list
-        // (e.g., CAD → XTSE → ".TO", GBP → XLON → ".L"). Skip for USD since US
-        // exchanges use no suffix and Yahoo resolves bare tickers to US by default.
+        // Build candidates: bare first, then currency-hinted suffix.
+        // Bare first avoids wasted searches for US ETFs in CAD accounts (EEMV, GLDM).
+        // Suffix is only needed for truly ambiguous symbols (T → TELUS vs AT&T).
+        let mut candidates = symbol_resolution_candidates(symbol);
         let preferred = exchanges_for_currency(currency);
         if !symbol.contains('.') && !preferred.is_empty() {
             if let Some(suffix) = yahoo_suffix_for_mic(preferred[0]) {
                 if !suffix.is_empty() {
-                    candidates.push(format!("{}{}", symbol, suffix));
+                    let suffixed = format!("{}{}", symbol, suffix);
+                    if !candidates.iter().any(|e| e.eq_ignore_ascii_case(&suffixed)) {
+                        candidates.push(suffixed);
+                    }
                 }
             }
         }
 
-        // Base candidates (deduplicating against already-added suffixed forms)
-        for c in symbol_resolution_candidates(symbol) {
-            if !candidates.iter().any(|e| e.eq_ignore_ascii_case(&c)) {
-                candidates.push(c);
-            }
-        }
+        // Currency-aware resolution: prefer a result whose exchange matches the
+        // activity currency. If no match, fall back to first valid result.
+        // e.g., "T" with CAD: bare "T" → AT&T (XNYS/USD, no match) → save fallback
+        //        → try "T.TO" → TELUS (XTSE/CAD, match) → accept.
+        // e.g., "EEMV" with CAD: bare "EEMV" → EEMV (BTS/USD, no match) → save fallback
+        //        → try "EEMV.TO" → empty → use fallback (EEMV/BTS). Correct.
+        let mut fallback: Option<ResolvedSymbolInfo> = None;
 
-        // Sequential candidate resolution — short-circuits on first success.
-        // Parallel candidates would waste rate-limit tokens on redundant queries
-        // (e.g., "XSH.TO" succeeds but "XSH" also fires, consuming a token).
         for candidate in &candidates {
             let result = self
                 .quote_service
@@ -866,16 +865,23 @@ impl ActivityService {
                 .and_then(|results| results.into_iter().next());
 
             if let Some(r) = result {
-                if r.exchange_mic.is_some() {
-                    return ResolvedSymbolInfo {
-                        exchange_mic: r.exchange_mic,
+                if let Some(ref mic) = r.exchange_mic {
+                    let info = ResolvedSymbolInfo {
+                        exchange_mic: Some(mic.clone()),
                         name: Some(r.long_name).filter(|n| !n.is_empty()),
                     };
+                    let exchange_matches = preferred.iter().any(|&p| p.eq_ignore_ascii_case(mic));
+                    if exchange_matches {
+                        return info; // Exchange matches currency — best result
+                    }
+                    if fallback.is_none() {
+                        fallback = Some(info);
+                    }
                 }
             }
         }
 
-        ResolvedSymbolInfo::default()
+        fallback.unwrap_or_default()
     }
 
     /// Creates a quote from activity data to serve as a price fallback.
