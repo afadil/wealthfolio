@@ -834,12 +834,12 @@ impl ActivityService {
     ) -> ResolvedSymbolInfo {
         let mut candidates: Vec<String> = Vec::new();
 
-        // Currency-hinted: try "SYMBOL.SUFFIX" first when the symbol is bare (no dot)
-        // Only when the currency maps to exactly ONE exchange — avoids expensive multi-exchange
-        // fan-out for EUR (5 exchanges) or USD (6 exchanges) where most guesses will miss.
-        // GBX/GBP → ["XLON"] qualifies; EUR → ["XETR","XPAR",...] does not.
+        // Currency-hinted: try "SYMBOL.SUFFIX" for the primary exchange when the symbol
+        // is bare (no dot). Uses the first exchange in the currency's priority list
+        // (e.g., CAD → XTSE → ".TO", GBP → XLON → ".L"). Skip for USD since US
+        // exchanges use no suffix and Yahoo resolves bare tickers to US by default.
         let preferred = exchanges_for_currency(currency);
-        if !symbol.contains('.') && preferred.len() == 1 {
+        if !symbol.contains('.') && !preferred.is_empty() {
             if let Some(suffix) = yahoo_suffix_for_mic(preferred[0]) {
                 if !suffix.is_empty() {
                     candidates.push(format!("{}{}", symbol, suffix));
