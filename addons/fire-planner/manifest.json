@@ -1,0 +1,42 @@
+{
+  "id": "fire-planner",
+  "name": "FIRE Planner",
+  "version": "1.0.0",
+  "description": "Financial Independence planning: FIRE projections, Monte Carlo simulations, allocation drift alerts, and sequence-of-returns analysis. Works with any portfolio and any currency.",
+  "author": "Wealthfolio",
+  "main": "dist/addon.js",
+  "sdkVersion": "3.0.0",
+  "enabled": true,
+  "permissions": [
+    {
+      "category": "accounts",
+      "functions": ["getAll"],
+      "purpose": "Read all portfolio accounts to aggregate total portfolio value"
+    },
+    {
+      "category": "portfolio",
+      "functions": ["getHoldings", "getHistoricalValuations", "getLatestValuations"],
+      "purpose": "Read holdings for allocation drift analysis and authoritative portfolio value"
+    },
+    {
+      "category": "activities",
+      "functions": ["getAll"],
+      "purpose": "Read activity history to compute days-since-last-buy for drift monitor"
+    },
+    {
+      "category": "settings",
+      "functions": ["get"],
+      "purpose": "Read base currency from application settings"
+    },
+    {
+      "category": "secrets",
+      "functions": ["get", "set"],
+      "purpose": "Persist FIRE planning settings (target age, SWR, expenses, etc.)"
+    },
+    {
+      "category": "ui",
+      "functions": ["sidebar.addItem", "router.add"],
+      "purpose": "Add FIRE Planner to sidebar navigation and register routes"
+    }
+  ]
+}
