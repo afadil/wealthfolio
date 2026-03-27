@@ -11,13 +11,6 @@ import { CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Label } from "@wealthfolio/ui/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@wealthfolio/ui/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -31,6 +24,7 @@ import {
   setSelectedTemplate,
   useImportContext,
 } from "../context";
+import { TemplatePicker } from "../components/template-picker";
 import { computeFieldMappings, useImportMapping } from "../hooks/use-import-mapping";
 import { isFieldMapped } from "../utils/draft-utils";
 import { validateTickerSymbol, findMappedActivityType } from "../utils/validation-utils";
@@ -581,24 +575,12 @@ export function MappingStepUnified() {
       <div className="bg-muted/20 mb-4 rounded-lg border p-4">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
           <div className="space-y-1.5">
-            <Label htmlFor="import-template-select">Template</Label>
-            <Select
-              value={state.selectedTemplateId ?? "__custom__"}
-              onValueChange={(value) => void applyTemplate(value)}
-            >
-              <SelectTrigger id="import-template-select">
-                <SelectValue placeholder="Choose a template" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__custom__">Custom / No Template</SelectItem>
-                {templates.map((template) => (
-                  <SelectItem key={template.id} value={template.id}>
-                    {template.name}
-                    {template.scope === "SYSTEM" ? " (System)" : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>Template</Label>
+            <TemplatePicker
+              templates={templates}
+              selectedTemplateId={state.selectedTemplateId}
+              onSelect={(id) => void applyTemplate(id)}
+            />
           </div>
 
           <div className="space-y-1.5">

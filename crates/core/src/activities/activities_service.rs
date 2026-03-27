@@ -731,7 +731,7 @@ impl ActivityService {
         }
 
         // 3. Resolve missing symbols concurrently: ISIN-first, then ticker fallback
-        const SYMBOL_RESOLVE_CONCURRENCY: usize = 5;
+        const SYMBOL_RESOLVE_CONCURRENCY: usize = 10;
         debug!(
             "resolve_symbols_batch: resolving {} missing symbols (concurrency={})",
             missing.len(),
@@ -854,6 +854,9 @@ impl ActivityService {
             }
         }
 
+        // Sequential candidate resolution — short-circuits on first success.
+        // Parallel candidates would waste rate-limit tokens on redundant queries
+        // (e.g., "XSH.TO" succeeds but "XSH" also fires, consuming a token).
         for candidate in &candidates {
             let result = self
                 .quote_service
