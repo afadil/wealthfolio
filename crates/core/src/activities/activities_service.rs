@@ -2313,27 +2313,6 @@ impl ActivityService {
                 .map(|m| m.to_uppercase() == "MANUAL")
                 .unwrap_or(false);
 
-            let is_equity = effective_kind == AssetKind::Investment
-                && effective_instrument_type.as_ref() == Some(&InstrumentType::Equity);
-            if is_equity
-                && resolved_mic.is_none()
-                && !is_manual_quote
-                && activity.asset_id.as_deref().is_none_or(str::is_empty)
-            {
-                activity.is_valid = false;
-                let mut errors = std::collections::HashMap::new();
-                errors.insert(
-                    "symbol".to_string(),
-                    vec![format!(
-                        "Could not find '{}' in market data. Please search for the correct ticker symbol.",
-                        &activity.symbol
-                    )],
-                );
-                activity.errors = Some(errors);
-                activities_with_status.push(activity);
-                continue;
-            }
-
             activity.exchange_mic = resolved_mic.clone();
             activity.symbol = normalized_symbol.clone();
             if activity.instrument_type.is_none() {
@@ -2369,6 +2348,26 @@ impl ActivityService {
                     quote_ccy_input.as_deref(),
                 )
             });
+
+            // Equity without MIC must either match an existing asset or be manual-quoted.
+            // Check AFTER find_existing_asset_id so custom assets (e.g. delisted TWTR)
+            // with no MIC are still matched.
+            let is_equity = effective_kind == AssetKind::Investment
+                && effective_instrument_type.as_ref() == Some(&InstrumentType::Equity);
+            if is_equity && resolved_mic.is_none() && !is_manual_quote && existing_id.is_none() {
+                activity.is_valid = false;
+                let mut errors = std::collections::HashMap::new();
+                errors.insert(
+                    "symbol".to_string(),
+                    vec![format!(
+                        "Could not find '{}' in market data. Please search for the correct ticker symbol.",
+                        &activity.symbol
+                    )],
+                );
+                activity.errors = Some(errors);
+                activities_with_status.push(activity);
+                continue;
+            }
             if let Some(ref id) = existing_id {
                 activity.asset_id = Some(id.clone());
                 if let Ok(asset) = self.asset_service.get_asset_by_id(id) {
