@@ -212,6 +212,8 @@ export const COMMANDS: CommandMap = {
   get_broker_ingest_states: { method: "GET", path: "/connect/sync-states" },
   get_import_runs: { method: "GET", path: "/connect/import-runs" },
   get_data_import_runs: { method: "GET", path: "/connect/import-runs" },
+  get_broker_sync_profile: { method: "GET", path: "/connect/broker-sync-profile" },
+  save_broker_sync_profile_rules: { method: "POST", path: "/connect/broker-sync-profile" },
   // Device Sync / Enrollment
   get_device_sync_state: { method: "GET", path: "/connect/device/sync-state" },
   enable_device_sync: { method: "POST", path: "/connect/device/enable" },
@@ -580,10 +582,10 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     }
     case "get_account_import_mapping": {
-      const { accountId, importType } = payload as { accountId: string; importType?: string };
+      const { accountId, contextKind } = payload as { accountId: string; contextKind?: string };
       const params = new URLSearchParams();
       params.set("accountId", accountId);
-      if (importType) params.set("importType", importType);
+      if (contextKind) params.set("contextKind", contextKind);
       url += `?${params.toString()}`;
       break;
     }
@@ -603,6 +605,15 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "save_import_template": {
       const { template } = payload as { template: Record<string, unknown> };
       body = JSON.stringify({ template });
+      break;
+    }
+    case "link_account_template": {
+      const { accountId, templateId, contextKind } = payload as {
+        accountId: string;
+        templateId: string;
+        contextKind?: string;
+      };
+      body = JSON.stringify({ accountId, templateId, contextKind });
       break;
     }
     case "update_market_data_provider_settings": {
@@ -1125,6 +1136,19 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       if (offset !== undefined) params.set("offset", String(offset));
       const qs = params.toString();
       if (qs) url += `?${qs}`;
+      break;
+    }
+    case "get_broker_sync_profile": {
+      const { accountId, sourceSystem } = payload as { accountId: string; sourceSystem: string };
+      const params = new URLSearchParams();
+      params.set("accountId", accountId);
+      params.set("sourceSystem", sourceSystem);
+      url += `?${params.toString()}`;
+      break;
+    }
+    case "save_broker_sync_profile_rules": {
+      const { request } = payload as { request: Record<string, unknown> };
+      body = JSON.stringify(request);
       break;
     }
     // Net Worth commands

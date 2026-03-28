@@ -479,12 +479,6 @@ export function UploadStep() {
   const { accounts } = useAccounts();
   const { isMobile } = usePlatform();
 
-  // Templates
-  const { data: templates = [] } = useQuery<ImportTemplateData[], Error>({
-    queryKey: [QueryKeys.IMPORT_TEMPLATES],
-    queryFn: listImportTemplates,
-  });
-
   // Derive import type from the selected account's tracking mode
   const selectedAccount = useMemo(
     () => accounts?.find((a: Account) => a.id === state.accountId) ?? null,
@@ -492,6 +486,16 @@ export function UploadStep() {
   );
   const importType =
     selectedAccount?.trackingMode === "HOLDINGS" ? ImportType.HOLDINGS : ImportType.ACTIVITY;
+
+  // Templates — filtered by the active import kind
+  const { data: allTemplates = [] } = useQuery<ImportTemplateData[], Error>({
+    queryKey: [QueryKeys.IMPORT_TEMPLATES],
+    queryFn: listImportTemplates,
+  });
+  const templates = useMemo(
+    () => allTemplates.filter((t) => t.kind === importType),
+    [allTemplates, importType],
+  );
 
   const applyTemplate = useCallback(
     async (template: ImportTemplateData) => {

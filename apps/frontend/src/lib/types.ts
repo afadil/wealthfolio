@@ -298,6 +298,7 @@ export interface ImportTemplateData {
   id: string;
   name: string;
   scope: ImportTemplateScope;
+  kind: TemplateKind;
   fieldMappings: Record<string, string | string[]>;
   activityMappings: Record<string, string[]>;
   symbolMappings: Record<string, string>;
@@ -313,6 +314,46 @@ export interface ImportTemplateData {
     }
   >;
   parseConfig?: ParseConfig;
+}
+
+export type TemplateKind = "CSV_ACTIVITY" | "CSV_HOLDINGS" | "BROKER_ACTIVITY";
+export type TemplateContextKind = TemplateKind;
+
+export type BrokerProfileScope = "ACCOUNT" | "BROKER";
+
+export interface BrokerSyncProfileData {
+  id: string;
+  name: string;
+  scope: ImportTemplateScope;
+  sourceSystem: string;
+  activityMappings: Record<string, string[]>;
+  symbolMappings: Record<string, string>;
+  symbolMappingMeta: Record<
+    string,
+    {
+      exchangeMic?: string;
+      symbolName?: string;
+      quoteCcy?: string;
+      instrumentType?: string;
+    }
+  >;
+}
+
+export interface SaveBrokerSyncProfileRulesRequest {
+  accountId: string;
+  sourceSystem: string;
+  scope: BrokerProfileScope;
+  activityRulePatches: Record<string, string[]>;
+  securityRulePatches: Record<string, string>;
+  securityRuleMetaPatches: Record<
+    string,
+    {
+      exchangeMic?: string;
+      symbolName?: string;
+      quoteCcy?: string;
+      instrumentType?: string;
+    }
+  >;
 }
 
 // Define a generic type for the parsed row data

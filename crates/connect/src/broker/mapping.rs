@@ -158,6 +158,43 @@ pub fn build_activity_metadata(activity: &AccountUniversalActivity) -> Option<St
         metadata.insert("institution".to_string(), serde_json::json!(institution));
     }
 
+    // Add symbol identity fields for broker sync learning
+    if let Some(ref symbol) = activity.symbol {
+        let mut sym_meta = serde_json::Map::new();
+
+        if let Some(ref id) = symbol.id {
+            sym_meta.insert("id".to_string(), serde_json::json!(id));
+        }
+        if let Some(ref sym) = symbol.symbol {
+            sym_meta.insert("symbol".to_string(), serde_json::json!(sym));
+        }
+        if let Some(ref raw) = symbol.raw_symbol {
+            sym_meta.insert("raw_symbol".to_string(), serde_json::json!(raw));
+        }
+        if let Some(ref figi) = symbol.figi_code {
+            sym_meta.insert("figi_code".to_string(), serde_json::json!(figi));
+        }
+        if let Some(ref exchange) = symbol.exchange {
+            if let Some(ref mic) = exchange.mic_code {
+                sym_meta.insert("exchange_mic".to_string(), serde_json::json!(mic));
+            }
+        }
+        if let Some(ref sym_type) = symbol.symbol_type {
+            if let Some(ref code) = sym_type.code {
+                sym_meta.insert("symbol_type_code".to_string(), serde_json::json!(code));
+            }
+        }
+        if let Some(ref currency) = symbol.currency {
+            if let Some(ref code) = currency.code {
+                sym_meta.insert("currency_code".to_string(), serde_json::json!(code));
+            }
+        }
+
+        if !sym_meta.is_empty() {
+            metadata.insert("symbol".to_string(), serde_json::Value::Object(sym_meta));
+        }
+    }
+
     if let Some(option_leg_type) = activity
         .option_type
         .as_ref()

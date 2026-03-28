@@ -458,6 +458,10 @@ pub fn run() {
             commands::brokers_sync::get_import_runs,
             #[cfg(feature = "connect-sync")]
             commands::brokers_sync::get_data_import_runs,
+            #[cfg(feature = "connect-sync")]
+            commands::brokers_sync::get_broker_sync_profile,
+            #[cfg(feature = "connect-sync")]
+            commands::brokers_sync::save_broker_sync_profile_rules,
             // Device sync commands
             #[cfg(feature = "device-sync")]
             commands::device_sync::enroll_device,

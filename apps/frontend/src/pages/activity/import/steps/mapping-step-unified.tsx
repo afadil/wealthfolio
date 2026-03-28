@@ -48,10 +48,14 @@ export function MappingStepUnified() {
     queryFn: () => getAccounts(),
   });
 
-  const { data: templates = [] } = useQuery<ImportTemplateData[], Error>({
+  const { data: allTemplates = [] } = useQuery<ImportTemplateData[], Error>({
     queryKey: [QueryKeys.IMPORT_TEMPLATES],
     queryFn: listImportTemplates,
   });
+  const templates = useMemo(
+    () => allTemplates.filter((t) => t.kind === ImportType.ACTIVITY),
+    [allTemplates],
+  );
 
   // Convert string[][] to CsvRowData[]
   const data: CsvRowData[] = useMemo(() => {
@@ -508,6 +512,7 @@ export function MappingStepUnified() {
       id,
       name: templateName.trim(),
       scope: "USER",
+      kind: ImportType.ACTIVITY,
       fieldMappings: localMapping.fieldMappings,
       activityMappings: localMapping.activityMappings,
       symbolMappings: localMapping.symbolMappings,

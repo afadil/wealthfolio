@@ -408,7 +408,7 @@ mod tests {
         fn get_import_mapping(
             &self,
             _account_id: &str,
-            _import_type: &str,
+            _context_kind: &str,
         ) -> AppResult<Option<ActivityImportMapping>> {
             unimplemented!()
         }
@@ -419,7 +419,7 @@ mod tests {
             &self,
             _account_id: &str,
             _template_id: &str,
-            _import_type: &str,
+            _context_kind: &str,
         ) -> AppResult<()> {
             unimplemented!()
         }
@@ -440,6 +440,27 @@ mod tests {
         }
         async fn delete_import_template(&self, _template_id: &str) -> AppResult<()> {
             unimplemented!()
+        }
+        fn get_broker_sync_profile(
+            &self,
+            _account_id: &str,
+            _source_system: &str,
+        ) -> AppResult<Option<crate::activities::ImportTemplate>> {
+            Ok(None)
+        }
+        async fn save_broker_sync_profile(
+            &self,
+            _template: &crate::activities::ImportTemplate,
+        ) -> AppResult<()> {
+            Ok(())
+        }
+        async fn link_broker_sync_profile(
+            &self,
+            _account_id: &str,
+            _template_id: &str,
+            _source_system: &str,
+        ) -> AppResult<()> {
+            Ok(())
         }
         fn calculate_average_cost(&self, _account_id: &str, _asset_id: &str) -> AppResult<Decimal> {
             unimplemented!()
@@ -590,7 +611,7 @@ mod tests {
         fn get_import_mapping(
             &self,
             _id: &str,
-            _import_type: &str,
+            _context_kind: &str,
         ) -> AppResult<Option<ActivityImportMapping>> {
             Ok(None)
         }
@@ -601,7 +622,7 @@ mod tests {
             &self,
             _account_id: &str,
             _template_id: &str,
-            _import_type: &str,
+            _context_kind: &str,
         ) -> AppResult<()> {
             Ok(())
         }
@@ -621,6 +642,27 @@ mod tests {
             Ok(())
         }
         async fn delete_import_template(&self, _template_id: &str) -> AppResult<()> {
+            Ok(())
+        }
+        fn get_broker_sync_profile(
+            &self,
+            _account_id: &str,
+            _source_system: &str,
+        ) -> AppResult<Option<crate::activities::ImportTemplate>> {
+            Ok(None)
+        }
+        async fn save_broker_sync_profile(
+            &self,
+            _template: &crate::activities::ImportTemplate,
+        ) -> AppResult<()> {
+            Ok(())
+        }
+        async fn link_broker_sync_profile(
+            &self,
+            _account_id: &str,
+            _template_id: &str,
+            _source_system: &str,
+        ) -> AppResult<()> {
             Ok(())
         }
         fn calculate_average_cost(&self, _acc: &str, _asset: &str) -> AppResult<Decimal> {

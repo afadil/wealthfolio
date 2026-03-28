@@ -190,11 +190,15 @@ async fn preview_import_assets(
 struct MappingQuery {
     #[serde(rename = "accountId")]
     account_id: String,
-    #[serde(rename = "importType", default = "default_activity_import_type")]
-    import_type: String,
+    #[serde(
+        rename = "contextKind",
+        alias = "importType",
+        default = "default_activity_context_kind"
+    )]
+    context_kind: String,
 }
 
-fn default_activity_import_type() -> String {
+fn default_activity_context_kind() -> String {
     import_type::ACTIVITY.to_string()
 }
 
@@ -204,7 +208,7 @@ async fn get_account_import_mapping(
 ) -> ApiResult<Json<ImportMappingData>> {
     let res = state
         .activity_service
-        .get_import_mapping(q.account_id, q.import_type)?;
+        .get_import_mapping(q.account_id, q.context_kind)?;
     Ok(Json(res))
 }
 
@@ -272,8 +276,12 @@ struct LinkAccountTemplateBody {
     account_id: String,
     #[serde(rename = "templateId")]
     template_id: String,
-    #[serde(rename = "importType", default = "default_activity_import_type")]
-    import_type: String,
+    #[serde(
+        rename = "contextKind",
+        alias = "importType",
+        default = "default_activity_context_kind"
+    )]
+    context_kind: String,
 }
 
 async fn link_account_template(
@@ -282,7 +290,7 @@ async fn link_account_template(
 ) -> ApiResult<Json<serde_json::Value>> {
     state
         .activity_service
-        .link_account_template(body.account_id, body.template_id, body.import_type)
+        .link_account_template(body.account_id, body.template_id, body.context_kind)
         .await?;
     Ok(Json(serde_json::json!({ "success": true })))
 }

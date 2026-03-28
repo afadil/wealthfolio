@@ -39,8 +39,8 @@ export const parseConfigSchema = z.object({
 });
 
 export const ImportType = {
-  ACTIVITY: "ACTIVITY",
-  HOLDINGS: "HOLDINGS",
+  ACTIVITY: "CSV_ACTIVITY",
+  HOLDINGS: "CSV_HOLDINGS",
 } as const;
 export type ImportType = (typeof ImportType)[keyof typeof ImportType];
 

@@ -1,9 +1,47 @@
 //! Activity domain models.
 
-/// Discriminator values for `import_account_templates.import_type`.
+/// Discriminator values for `import_account_templates.context_kind`.
 pub mod import_type {
-    pub const ACTIVITY: &str = "ACTIVITY";
-    pub const HOLDINGS: &str = "HOLDINGS";
+    pub const ACTIVITY: &str = "CSV_ACTIVITY";
+    pub const HOLDINGS: &str = "CSV_HOLDINGS";
+}
+
+/// Template kind — discriminates the config shape stored in import_templates.config.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum TemplateKind {
+    #[default]
+    CsvActivity,
+    CsvHoldings,
+    BrokerActivity,
+}
+
+fn default_csv_activity_kind() -> TemplateKind {
+    TemplateKind::CsvActivity
+}
+
+impl TemplateKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            TemplateKind::CsvActivity => "CSV_ACTIVITY",
+            TemplateKind::CsvHoldings => "CSV_HOLDINGS",
+            TemplateKind::BrokerActivity => "BROKER_ACTIVITY",
+        }
+    }
+
+    pub fn is_csv(&self) -> bool {
+        matches!(self, TemplateKind::CsvActivity | TemplateKind::CsvHoldings)
+    }
+}
+
+/// Value transformation for sync replay backward compat.
+/// Old payloads may send "ACTIVITY"/"HOLDINGS" instead of "CSV_ACTIVITY"/"CSV_HOLDINGS".
+pub fn normalize_context_kind_value(raw: &str) -> &str {
+    match raw {
+        "ACTIVITY" => import_type::ACTIVITY,
+        "HOLDINGS" => import_type::HOLDINGS,
+        _ => raw,
+    }
 }
 
 use crate::activities::csv_parser::ParseConfig;
@@ -640,10 +678,12 @@ pub struct Sort {
 #[serde(rename_all = "camelCase")]
 pub struct ImportMapping {
     pub account_id: String,
-    pub import_type: String,
+    /// context_kind value (CSV_ACTIVITY, CSV_HOLDINGS, BROKER_ACTIVITY)
+    pub context_kind: String,
+    pub source_system: String,
     pub template_id: Option<String>,
     pub name: String,
-    /// JSON containing all config: fieldMappings, activityMappings, symbolMappings, accountMappings, parseConfig
+    /// JSON config blob
     pub config: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
@@ -665,7 +705,7 @@ pub struct SymbolMappingMeta {
     pub quote_mode: Option<QuoteMode>,
 }
 
-fn default_activity_import_type() -> String {
+fn default_csv_activity_context_kind() -> String {
     import_type::ACTIVITY.to_string()
 }
 
@@ -674,8 +714,9 @@ fn default_activity_import_type() -> String {
 #[serde(rename_all = "camelCase")]
 pub struct ImportMappingData {
     pub account_id: String,
-    #[serde(default = "default_activity_import_type")]
-    pub import_type: String,
+    /// context_kind value — defaults to CSV_ACTIVITY for backward compat
+    #[serde(default = "default_csv_activity_context_kind", alias = "importType")]
+    pub context_kind: String,
     #[serde(default)]
     pub name: String,
     /// The ID of the template this mapping is linked to (if any)
@@ -697,10 +738,11 @@ pub struct ImportMappingData {
     pub parse_config: Option<ParseConfig>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ImportTemplateScope {
     System,
+    #[default]
     User,
 }
 
@@ -710,10 +752,19 @@ pub struct ImportTemplate {
     pub id: String,
     pub name: String,
     pub scope: ImportTemplateScope,
-    /// JSON containing all config: fieldMappings, activityMappings, symbolMappings, accountMappings, parseConfig
+    pub kind: TemplateKind,
+    #[serde(default)]
+    pub source_system: String,
+    #[serde(default = "default_config_version")]
+    pub config_version: i32,
+    /// JSON config blob — shape depends on `kind`
     pub config: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
+}
+
+fn default_config_version() -> i32 {
+    1
 }
 
 /// A field mapping value: either a single column name or an ordered list of
@@ -746,6 +797,8 @@ pub struct ImportTemplateData {
     pub id: String,
     pub name: String,
     pub scope: ImportTemplateScope,
+    #[serde(default = "default_csv_activity_kind")]
+    pub kind: TemplateKind,
     #[serde(default)]
     pub field_mappings: std::collections::HashMap<String, FieldMappingValue>,
     #[serde(default)]
@@ -820,6 +873,61 @@ pub struct ImportMappingConfig {
     pub parse_config: Option<ParseConfig>,
 }
 
+/// Config for broker activity profiles — only reusable normalization rules.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct BrokerActivityProfileConfig {
+    #[serde(default)]
+    pub activity_mappings: std::collections::HashMap<String, Vec<String>>,
+    #[serde(default)]
+    pub symbol_mappings: std::collections::HashMap<String, String>,
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    pub symbol_mapping_meta: std::collections::HashMap<String, SymbolMappingMeta>,
+}
+
+/// Frontend/backend DTO for broker sync profiles (separate from CSV ImportTemplateData).
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct BrokerSyncProfileData {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub scope: ImportTemplateScope,
+    #[serde(default)]
+    pub source_system: String,
+    #[serde(default)]
+    pub activity_mappings: std::collections::HashMap<String, Vec<String>>,
+    #[serde(default)]
+    pub symbol_mappings: std::collections::HashMap<String, String>,
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    pub symbol_mapping_meta: std::collections::HashMap<String, SymbolMappingMeta>,
+}
+
+/// Scope for saving broker sync profile rules.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum BrokerProfileScope {
+    Account,
+    Broker,
+}
+
+/// Request to save broker sync profile rules.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveBrokerSyncProfileRulesRequest {
+    pub account_id: String,
+    pub source_system: String,
+    pub scope: BrokerProfileScope,
+    #[serde(default)]
+    pub activity_rule_patches: std::collections::HashMap<String, Vec<String>>,
+    #[serde(default)]
+    pub security_rule_patches: std::collections::HashMap<String, String>,
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    pub security_rule_meta_patches: std::collections::HashMap<String, SymbolMappingMeta>,
+}
+
 impl Default for ImportMappingData {
     fn default() -> Self {
         let mut field_mappings = std::collections::HashMap::new();
@@ -881,7 +989,7 @@ impl Default for ImportMappingData {
 
         ImportMappingData {
             account_id: String::new(),
-            import_type: import_type::ACTIVITY.to_string(),
+            context_kind: import_type::ACTIVITY.to_string(),
             template_id: None,
             name: String::new(),
             field_mappings,
@@ -902,6 +1010,7 @@ impl Default for ImportTemplateData {
             id: String::new(),
             name: String::new(),
             scope: ImportTemplateScope::User,
+            kind: TemplateKind::CsvActivity,
             field_mappings: mapping.field_mappings,
             activity_mappings: mapping.activity_mappings,
             symbol_mappings: mapping.symbol_mappings,
@@ -919,7 +1028,7 @@ impl ImportMapping {
 
         Ok(ImportMappingData {
             account_id: self.account_id.clone(),
-            import_type: self.import_type.clone(),
+            context_kind: self.context_kind.clone(),
             template_id: self.template_id.clone(),
             name: self.name.clone(),
             field_mappings: config.field_mappings,
@@ -946,7 +1055,8 @@ impl ImportMapping {
 
         Ok(Self {
             account_id: data.account_id.clone(),
-            import_type: data.import_type.clone(),
+            context_kind: data.context_kind.clone(),
+            source_system: String::new(),
             template_id: data.template_id.clone(),
             name: data.name.clone(),
             config: serde_json::to_string(&config)?,
@@ -964,12 +1074,29 @@ impl ImportTemplate {
             id: self.id.clone(),
             name: self.name.clone(),
             scope: self.scope.clone(),
+            kind: self.kind.clone(),
             field_mappings: config.field_mappings,
             activity_mappings: config.activity_mappings,
             symbol_mappings: config.symbol_mappings,
             account_mappings: config.account_mappings,
             symbol_mapping_meta: config.symbol_mapping_meta,
             parse_config: config.parse_config,
+        })
+    }
+
+    pub fn to_broker_profile_data(
+        &self,
+    ) -> std::result::Result<BrokerSyncProfileData, serde_json::Error> {
+        let config: BrokerActivityProfileConfig = serde_json::from_str(&self.config)?;
+
+        Ok(BrokerSyncProfileData {
+            id: self.id.clone(),
+            name: self.name.clone(),
+            scope: self.scope.clone(),
+            source_system: self.source_system.clone(),
+            activity_mappings: config.activity_mappings,
+            symbol_mappings: config.symbol_mappings,
+            symbol_mapping_meta: config.symbol_mapping_meta,
         })
     }
 
@@ -989,6 +1116,31 @@ impl ImportTemplate {
             id: data.id.clone(),
             name: data.name.clone(),
             scope: data.scope.clone(),
+            kind: data.kind.clone(),
+            source_system: String::new(),
+            config_version: 1,
+            config: serde_json::to_string(&config)?,
+            created_at: chrono::Utc::now().naive_utc(),
+            updated_at: chrono::Utc::now().naive_utc(),
+        })
+    }
+
+    pub fn from_broker_profile_data(
+        data: &BrokerSyncProfileData,
+    ) -> std::result::Result<Self, serde_json::Error> {
+        let config = BrokerActivityProfileConfig {
+            activity_mappings: data.activity_mappings.clone(),
+            symbol_mappings: data.symbol_mappings.clone(),
+            symbol_mapping_meta: data.symbol_mapping_meta.clone(),
+        };
+
+        Ok(Self {
+            id: data.id.clone(),
+            name: data.name.clone(),
+            scope: data.scope.clone(),
+            kind: TemplateKind::BrokerActivity,
+            source_system: data.source_system.clone(),
+            config_version: 1,
             config: serde_json::to_string(&config)?,
             created_at: chrono::Utc::now().naive_utc(),
             updated_at: chrono::Utc::now().naive_utc(),

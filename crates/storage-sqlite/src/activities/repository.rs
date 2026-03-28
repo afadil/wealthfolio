@@ -611,11 +611,11 @@ impl ActivityRepositoryTrait for ActivityRepository {
         Ok(Decimal::from_str(&result.average_cost).unwrap_or_default())
     }
 
-    /// Gets the import mapping for a given account ID and import type by joining import_account_templates + import_templates
+    /// Gets the import mapping for a given account ID and context kind by joining import_account_templates + import_templates
     fn get_import_mapping(
         &self,
         some_account_id: &str,
-        some_import_type: &str,
+        some_context_kind: &str,
     ) -> Result<Option<ImportMapping>> {
         let mut conn = get_connection(&self.pool)?;
 
@@ -625,10 +625,11 @@ impl ActivityRepositoryTrait for ActivityRepository {
                     .on(import_templates::id.eq(import_account_templates::template_id)),
             )
             .filter(import_account_templates::account_id.eq(some_account_id))
-            .filter(import_account_templates::import_type.eq(some_import_type))
+            .filter(import_account_templates::context_kind.eq(some_context_kind))
             .select((
                 import_account_templates::account_id,
-                import_account_templates::import_type,
+                import_account_templates::context_kind,
+                import_account_templates::source_system,
                 import_templates::id,
                 import_templates::name,
                 import_templates::config,
@@ -641,6 +642,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 String,
                 String,
                 String,
+                String,
                 chrono::NaiveDateTime,
                 chrono::NaiveDateTime,
             )>(&mut conn)
@@ -648,10 +650,20 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .map_err(StorageError::from)?;
 
         Ok(result.map(
-            |(account_id, import_type, template_id, name, config, created_at, updated_at)| {
+            |(
+                account_id,
+                context_kind,
+                source_system,
+                template_id,
+                name,
+                config,
+                created_at,
+                updated_at,
+            )| {
                 ImportMapping {
                     account_id,
-                    import_type,
+                    context_kind,
+                    source_system,
                     template_id: Some(template_id),
                     name,
                     config,
@@ -668,10 +680,10 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .exec_tx(move |tx| -> Result<()> {
                 use chrono::Utc;
 
-                // Check if account already has a linked template for this import type
+                // Check if account already has a linked template for this context kind
                 let existing_link = import_account_templates::table
                     .filter(import_account_templates::account_id.eq(&mapping.account_id))
-                    .filter(import_account_templates::import_type.eq(&mapping.import_type))
+                    .filter(import_account_templates::context_kind.eq(&mapping.context_kind))
                     .first::<ImportAccountTemplateDB>(tx.conn())
                     .optional()
                     .map_err(StorageError::from)?;
@@ -680,9 +692,9 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 // Preserve the existing row id so the sync entity_id stays stable across
                 // updates. Generating a new UUID on every upsert would cause the outbox to
                 // emit a different entity_id than the row that already lives on remote devices,
-                // making their replay INSERT collide on UNIQUE(account_id, import_type).
+                // making their replay INSERT collide on UNIQUE(account_id, context_kind, source_system).
                 let existing_link_id = existing_link.as_ref().map(|l| l.id.clone());
-                let account_local_id = if mapping.import_type == import_type::HOLDINGS {
+                let account_local_id = if mapping.context_kind == import_type::HOLDINGS {
                     format!("acct_{}_holdings", mapping.account_id)
                 } else {
                     format!("acct_{}", mapping.account_id)
@@ -709,6 +721,9 @@ impl ActivityRepositoryTrait for ActivityRepository {
                         id: new_id.clone(),
                         name: mapping.name.clone(),
                         scope: "user".to_string(),
+                        kind: mapping.context_kind.clone(),
+                        source_system: String::new(),
+                        config_version: 1,
                         config: mapping.config.clone(),
                         created_at: now,
                         updated_at: now,
@@ -727,7 +742,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 let link_db = ImportAccountTemplateDB {
                     id: existing_link_id.unwrap_or_else(|| Uuid::new_v4().to_string()),
                     account_id: mapping.account_id.clone(),
-                    import_type: mapping.import_type.clone(),
+                    context_kind: mapping.context_kind.clone(),
+                    source_system: String::new(),
                     template_id,
                     created_at: now,
                     updated_at: now,
@@ -736,7 +752,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
                     .values(&link_db)
                     .on_conflict((
                         import_account_templates::account_id,
-                        import_account_templates::import_type,
+                        import_account_templates::context_kind,
+                        import_account_templates::source_system,
                     ))
                     .do_update()
                     .set(&link_db)
@@ -752,11 +769,11 @@ impl ActivityRepositoryTrait for ActivityRepository {
         &self,
         account_id: &str,
         template_id: &str,
-        import_type: &str,
+        context_kind: &str,
     ) -> Result<()> {
         let account_id = account_id.to_string();
         let template_id = template_id.to_string();
-        let import_type = import_type.to_string();
+        let context_kind = context_kind.to_string();
         self.writer
             .exec_tx(move |tx| -> Result<()> {
                 use chrono::Utc;
@@ -764,7 +781,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 // Reuse the existing row id to keep the sync entity_id stable across updates.
                 let existing_id: Option<String> = import_account_templates::table
                     .filter(import_account_templates::account_id.eq(&account_id))
-                    .filter(import_account_templates::import_type.eq(&import_type))
+                    .filter(import_account_templates::context_kind.eq(&context_kind))
                     .select(import_account_templates::id)
                     .first::<String>(tx.conn())
                     .optional()
@@ -772,7 +789,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 let link_db = ImportAccountTemplateDB {
                     id: existing_id.unwrap_or_else(|| Uuid::new_v4().to_string()),
                     account_id: account_id.clone(),
-                    import_type,
+                    context_kind,
+                    source_system: String::new(),
                     template_id,
                     created_at: now,
                     updated_at: now,
@@ -781,7 +799,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
                     .values(&link_db)
                     .on_conflict((
                         import_account_templates::account_id,
-                        import_account_templates::import_type,
+                        import_account_templates::context_kind,
+                        import_account_templates::source_system,
                     ))
                     .do_update()
                     .set(&link_db)
@@ -797,6 +816,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
         let mut conn = get_connection(&self.pool)?;
 
         let rows = import_templates::table
+            .filter(import_templates::kind.eq_any(vec!["CSV_ACTIVITY", "CSV_HOLDINGS"]))
             .order((import_templates::scope.asc(), import_templates::name.asc()))
             .load::<ImportTemplateDB>(&mut conn)
             .map_err(StorageError::from)?;
@@ -843,6 +863,134 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 .execute(tx.conn())
                 .map_err(StorageError::from)?;
                 tx.delete::<ImportTemplateDB>(&template_id);
+                Ok(())
+            })
+            .await
+    }
+
+    fn get_broker_sync_profile(
+        &self,
+        account_id: &str,
+        source_system: &str,
+    ) -> Result<Option<ImportTemplate>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        // Precedence: account-specific user -> broker-wide user -> system for source_system
+
+        // 1. Account-specific user profile: find template_id from link table
+        let account_template_id: Option<String> = import_account_templates::table
+            .filter(import_account_templates::account_id.eq(account_id))
+            .filter(import_account_templates::context_kind.eq("BROKER_ACTIVITY"))
+            .filter(import_account_templates::source_system.eq(source_system))
+            .select(import_account_templates::template_id)
+            .first::<String>(&mut conn)
+            .optional()
+            .map_err(StorageError::from)?;
+
+        if let Some(tid) = account_template_id {
+            let template = import_templates::table
+                .filter(import_templates::id.eq(&tid))
+                .filter(import_templates::scope.eq("USER"))
+                .first::<ImportTemplateDB>(&mut conn)
+                .optional()
+                .map_err(StorageError::from)?;
+            if let Some(t) = template {
+                return Ok(Some(ImportTemplate::from(t)));
+            }
+        }
+
+        // 2. Broker-wide user profile (not linked to any account)
+        let all_linked_ids: Vec<String> = import_account_templates::table
+            .filter(import_account_templates::context_kind.eq("BROKER_ACTIVITY"))
+            .filter(import_account_templates::source_system.eq(source_system))
+            .select(import_account_templates::template_id)
+            .load::<String>(&mut conn)
+            .map_err(StorageError::from)?;
+
+        let broker_wide = import_templates::table
+            .filter(import_templates::kind.eq("BROKER_ACTIVITY"))
+            .filter(import_templates::source_system.eq(source_system))
+            .filter(import_templates::scope.eq("USER"))
+            .filter(import_templates::id.ne_all(&all_linked_ids))
+            .first::<ImportTemplateDB>(&mut conn)
+            .optional()
+            .map_err(StorageError::from)?;
+
+        if let Some(t) = broker_wide {
+            return Ok(Some(ImportTemplate::from(t)));
+        }
+
+        // 3. System profile for this source_system
+        let system_profile = import_templates::table
+            .filter(import_templates::kind.eq("BROKER_ACTIVITY"))
+            .filter(import_templates::source_system.eq(source_system))
+            .filter(import_templates::scope.eq("SYSTEM"))
+            .first::<ImportTemplateDB>(&mut conn)
+            .optional()
+            .map_err(StorageError::from)?;
+
+        Ok(system_profile.map(ImportTemplate::from))
+    }
+
+    async fn save_broker_sync_profile(&self, template: &ImportTemplate) -> Result<()> {
+        let template_db: ImportTemplateDB = template.clone().into();
+        self.writer
+            .exec_tx(move |tx| -> Result<()> {
+                diesel::insert_into(import_templates::table)
+                    .values(&template_db)
+                    .on_conflict(import_templates::id)
+                    .do_update()
+                    .set(&template_db)
+                    .execute(tx.conn())
+                    .map_err(StorageError::from)?;
+                tx.update(&template_db)?;
+                Ok(())
+            })
+            .await
+    }
+
+    async fn link_broker_sync_profile(
+        &self,
+        account_id: &str,
+        template_id: &str,
+        source_system: &str,
+    ) -> Result<()> {
+        let account_id = account_id.to_string();
+        let template_id = template_id.to_string();
+        let source_system = source_system.to_string();
+        self.writer
+            .exec_tx(move |tx| -> Result<()> {
+                use chrono::Utc;
+                let now = Utc::now().naive_utc();
+                let existing_id: Option<String> = import_account_templates::table
+                    .filter(import_account_templates::account_id.eq(&account_id))
+                    .filter(import_account_templates::context_kind.eq("BROKER_ACTIVITY"))
+                    .filter(import_account_templates::source_system.eq(&source_system))
+                    .select(import_account_templates::id)
+                    .first::<String>(tx.conn())
+                    .optional()
+                    .map_err(StorageError::from)?;
+                let link_db = ImportAccountTemplateDB {
+                    id: existing_id.unwrap_or_else(|| Uuid::new_v4().to_string()),
+                    account_id,
+                    context_kind: "BROKER_ACTIVITY".to_string(),
+                    source_system,
+                    template_id,
+                    created_at: now,
+                    updated_at: now,
+                };
+                diesel::insert_into(import_account_templates::table)
+                    .values(&link_db)
+                    .on_conflict((
+                        import_account_templates::account_id,
+                        import_account_templates::context_kind,
+                        import_account_templates::source_system,
+                    ))
+                    .do_update()
+                    .set(&link_db)
+                    .execute(tx.conn())
+                    .map_err(StorageError::from)?;
+                tx.update(&link_db)?;
                 Ok(())
             })
             .await
@@ -1603,10 +1751,10 @@ mod tests {
         .expect("insert template");
     }
 
-    /// Regression: re-linking the same (account_id, import_type) must preserve the row `id`
+    /// Regression: re-linking the same (account_id, context_kind, source_system) must preserve the row `id`
     /// so that sync outbox events keep a stable entity_id across updates. Generating a new UUID
     /// on every upsert causes remote devices to receive a different entity_id and fail with a
-    /// UNIQUE(account_id, import_type) constraint error on replay.
+    /// UNIQUE(account_id, context_kind, source_system) constraint error on replay.
     #[tokio::test]
     async fn relink_preserves_row_id() {
         let (pool, writer) = setup_db();
@@ -1624,19 +1772,19 @@ mod tests {
 
         let id_after_first: String = import_account_templates::table
             .filter(import_account_templates::account_id.eq("acc-relink"))
-            .filter(import_account_templates::import_type.eq(import_type::ACTIVITY))
+            .filter(import_account_templates::context_kind.eq(import_type::ACTIVITY))
             .select(import_account_templates::id)
             .first(&mut conn)
             .expect("row after first link");
 
-        // Re-link to a different template for the same (account, import_type)
+        // Re-link to a different template for the same (account, context_kind)
         repo.link_account_template("acc-relink", "tmpl-b", import_type::ACTIVITY)
             .await
             .expect("relink");
 
         let id_after_relink: String = import_account_templates::table
             .filter(import_account_templates::account_id.eq("acc-relink"))
-            .filter(import_account_templates::import_type.eq(import_type::ACTIVITY))
+            .filter(import_account_templates::context_kind.eq(import_type::ACTIVITY))
             .select(import_account_templates::id)
             .first(&mut conn)
             .expect("row after relink");

@@ -54,19 +54,31 @@ pub trait ActivityRepositoryTrait: Send + Sync {
     fn get_import_mapping(
         &self,
         account_id: &str,
-        import_type: &str,
+        context_kind: &str,
     ) -> Result<Option<ImportMapping>>;
     async fn save_import_mapping(&self, mapping: &ImportMapping) -> Result<()>;
     async fn link_account_template(
         &self,
         account_id: &str,
         template_id: &str,
-        import_type: &str,
+        context_kind: &str,
     ) -> Result<()>;
     fn list_import_templates(&self) -> Result<Vec<ImportTemplate>>;
     fn get_import_template(&self, template_id: &str) -> Result<Option<ImportTemplate>>;
     async fn save_import_template(&self, template: &ImportTemplate) -> Result<()>;
     async fn delete_import_template(&self, template_id: &str) -> Result<()>;
+    fn get_broker_sync_profile(
+        &self,
+        account_id: &str,
+        source_system: &str,
+    ) -> Result<Option<ImportTemplate>>;
+    async fn save_broker_sync_profile(&self, template: &ImportTemplate) -> Result<()>;
+    async fn link_broker_sync_profile(
+        &self,
+        account_id: &str,
+        template_id: &str,
+        source_system: &str,
+    ) -> Result<()>;
     // Add other repository methods if necessary, e.g., calculate_average_cost, get_deposit_activities
     fn calculate_average_cost(&self, account_id: &str, asset_id: &str) -> Result<Decimal>;
     fn get_income_activities_data(&self, account_id: Option<&str>) -> Result<Vec<IncomeData>>;
@@ -147,7 +159,7 @@ pub trait ActivityServiceTrait: Send + Sync {
     fn get_import_mapping(
         &self,
         account_id: String,
-        import_type: String,
+        context_kind: String,
     ) -> Result<ImportMappingData>;
     fn list_import_templates(&self) -> Result<Vec<ImportTemplateData>>;
     fn get_import_template(&self, template_id: String) -> Result<ImportTemplateData>;
@@ -174,7 +186,7 @@ pub trait ActivityServiceTrait: Send + Sync {
         &self,
         account_id: String,
         template_id: String,
-        import_type: String,
+        context_kind: String,
     ) -> Result<()>;
     async fn save_import_mapping(
         &self,
@@ -240,4 +252,14 @@ pub trait ActivityServiceTrait: Send + Sync {
         activities: Vec<NewActivity>,
         account: &crate::accounts::Account,
     ) -> Result<PrepareActivitiesResult>;
+
+    fn get_broker_sync_profile(
+        &self,
+        account_id: String,
+        source_system: String,
+    ) -> Result<BrokerSyncProfileData>;
+    async fn save_broker_sync_profile_rules(
+        &self,
+        request: SaveBrokerSyncProfileRulesRequest,
+    ) -> Result<BrokerSyncProfileData>;
 }

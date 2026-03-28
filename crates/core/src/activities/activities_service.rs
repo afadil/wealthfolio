@@ -3465,15 +3465,17 @@ impl ActivityServiceTrait for ActivityService {
             .get_first_activity_date(account_ids)
     }
 
-    /// Gets the import mapping for a given account ID and import type
+    /// Gets the import mapping for a given account ID and context kind.
+    /// Normalizes legacy values ("ACTIVITY" → "CSV_ACTIVITY", "HOLDINGS" → "CSV_HOLDINGS").
     fn get_import_mapping(
         &self,
         account_id: String,
-        import_type: String,
+        context_kind: String,
     ) -> Result<ImportMappingData> {
+        let context_kind = normalize_context_kind_value(&context_kind).to_string();
         let mapping = self
             .activity_repository
-            .get_import_mapping(&account_id, &import_type)?;
+            .get_import_mapping(&account_id, &context_kind)?;
 
         let mut result = match mapping {
             Some(m) => m.to_mapping_data().map_err(|e| {
@@ -3482,7 +3484,7 @@ impl ActivityServiceTrait for ActivityService {
             None => ImportMappingData::default(),
         };
         result.account_id = account_id;
-        result.import_type = import_type;
+        result.context_kind = context_kind;
         Ok(result)
     }
 
@@ -3519,18 +3521,21 @@ impl ActivityServiceTrait for ActivityService {
         &self,
         account_id: String,
         template_id: String,
-        import_type: String,
+        context_kind: String,
     ) -> Result<()> {
+        let context_kind = normalize_context_kind_value(&context_kind).to_string();
         self.activity_repository
-            .link_account_template(&account_id, &template_id, &import_type)
+            .link_account_template(&account_id, &template_id, &context_kind)
             .await
     }
 
     /// Saves or updates an import mapping
     async fn save_import_mapping(
         &self,
-        mapping_data: ImportMappingData,
+        mut mapping_data: ImportMappingData,
     ) -> Result<ImportMappingData> {
+        mapping_data.context_kind =
+            normalize_context_kind_value(&mapping_data.context_kind).to_string();
         let mapping = ImportMapping::from_mapping_data(&mapping_data)?;
         self.activity_repository
             .save_import_mapping(&mapping)
@@ -3553,6 +3558,116 @@ impl ActivityServiceTrait for ActivityService {
         self.activity_repository
             .delete_import_template(&template_id)
             .await
+    }
+
+    fn get_broker_sync_profile(
+        &self,
+        account_id: String,
+        source_system: String,
+    ) -> Result<BrokerSyncProfileData> {
+        let template = self
+            .activity_repository
+            .get_broker_sync_profile(&account_id, &source_system)?;
+        match template {
+            Some(t) => t.to_broker_profile_data().map_err(|e| {
+                ActivityError::InvalidData(format!("Failed to parse broker profile data: {}", e))
+                    .into()
+            }),
+            None => Ok(BrokerSyncProfileData {
+                source_system,
+                ..BrokerSyncProfileData::default()
+            }),
+        }
+    }
+
+    async fn save_broker_sync_profile_rules(
+        &self,
+        request: SaveBrokerSyncProfileRulesRequest,
+    ) -> Result<BrokerSyncProfileData> {
+        use super::activities_model::BrokerProfileScope;
+
+        // Determine template ID based on scope
+        let template_id = if request.scope == BrokerProfileScope::Account {
+            format!(
+                "broker_{}_{}",
+                request.source_system.to_lowercase(),
+                request.account_id
+            )
+        } else {
+            format!("broker_{}", request.source_system.to_lowercase())
+        };
+
+        // Load the base profile to merge patches into.
+        // 1. If the exact target template already exists, use it (subsequent saves).
+        // 2. Otherwise, seed from the precedence chain so inherited defaults are preserved.
+        //    For BROKER scope: skip account-specific profiles to avoid leaking private overrides.
+        let existing = match self.activity_repository.get_import_template(&template_id)? {
+            Some(t) if t.kind == TemplateKind::BrokerActivity => {
+                t.to_broker_profile_data().unwrap_or_default()
+            }
+            _ => {
+                // First save — seed from effective baseline.
+                // get_broker_sync_profile respects account→broker→system precedence.
+                // For BROKER scope, use empty account_id so it skips account-specific lookup.
+                let seed_account = if request.scope == BrokerProfileScope::Account {
+                    &request.account_id
+                } else {
+                    ""
+                };
+                self.get_broker_sync_profile(
+                    seed_account.to_string(),
+                    request.source_system.clone(),
+                )?
+            }
+        };
+
+        // Merge patches into existing
+        let mut activity_mappings = existing.activity_mappings;
+        for (key, values) in request.activity_rule_patches {
+            activity_mappings.insert(key, values);
+        }
+        let mut symbol_mappings = existing.symbol_mappings;
+        for (key, value) in request.security_rule_patches {
+            symbol_mappings.insert(key, value);
+        }
+        let mut symbol_mapping_meta = existing.symbol_mapping_meta;
+        for (key, meta) in request.security_rule_meta_patches {
+            symbol_mapping_meta.insert(key, meta);
+        }
+
+        let profile_data = BrokerSyncProfileData {
+            id: template_id,
+            name: format!("{} Profile", request.source_system),
+            scope: ImportTemplateScope::User,
+            source_system: request.source_system.clone(),
+            activity_mappings,
+            symbol_mappings,
+            symbol_mapping_meta,
+        };
+
+        let template = ImportTemplate::from_broker_profile_data(&profile_data).map_err(|e| {
+            crate::errors::Error::from(ActivityError::InvalidData(format!(
+                "Failed to serialize broker profile: {}",
+                e
+            )))
+        })?;
+
+        self.activity_repository
+            .save_broker_sync_profile(&template)
+            .await?;
+
+        // Link to account if scope is Account
+        if request.scope == BrokerProfileScope::Account {
+            self.activity_repository
+                .link_broker_sync_profile(
+                    &request.account_id,
+                    &profile_data.id,
+                    &request.source_system,
+                )
+                .await?;
+        }
+
+        Ok(profile_data)
     }
 
     /// Checks for existing activities with the given idempotency keys.

@@ -84,7 +84,9 @@ pub mod test_env {
         activities::{
             Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityDetails,
             ActivityImport, ActivitySearchResponse, ActivitySearchResponseMeta,
-            ActivityServiceTrait, ActivityUpdate, ImportMappingData, NewActivity, Sort,
+            ActivityServiceTrait, ActivityUpdate, BrokerSyncProfileData, ImportAssetCandidate,
+            ImportAssetPreviewItem, ImportMappingData, ImportTemplateData, ImportTemplateScope,
+            NewActivity, SaveBrokerSyncProfileRulesRequest, Sort,
         },
         assets::{Asset, ProviderProfile},
         errors::DatabaseError,
@@ -319,7 +321,6 @@ pub mod test_env {
 
         async fn check_activities_import(
             &self,
-            _account_id: String,
             _activities: Vec<ActivityImport>,
         ) -> CoreResult<Vec<ActivityImport>> {
             unimplemented!("MockActivityService::check_activities_import")
@@ -327,7 +328,6 @@ pub mod test_env {
 
         async fn import_activities(
             &self,
-            _account_id: String,
             _activities: Vec<ActivityImport>,
         ) -> CoreResult<wealthfolio_core::activities::ImportActivitiesResult> {
             unimplemented!("MockActivityService::import_activities")
@@ -385,6 +385,72 @@ pub mod test_env {
             _activities: Vec<wealthfolio_core::activities::ActivityUpsert>,
         ) -> CoreResult<wealthfolio_core::activities::BulkUpsertResult> {
             unimplemented!("MockActivityService::upsert_activities_bulk")
+        }
+
+        fn list_import_templates(&self) -> CoreResult<Vec<ImportTemplateData>> {
+            Ok(vec![])
+        }
+
+        fn get_import_template(&self, _template_id: String) -> CoreResult<ImportTemplateData> {
+            Ok(ImportTemplateData::default())
+        }
+
+        async fn preview_import_assets(
+            &self,
+            _candidates: Vec<ImportAssetCandidate>,
+        ) -> CoreResult<Vec<ImportAssetPreviewItem>> {
+            Ok(vec![])
+        }
+
+        async fn link_account_template(
+            &self,
+            _account_id: String,
+            _template_id: String,
+            _context_kind: String,
+        ) -> CoreResult<()> {
+            Ok(())
+        }
+
+        async fn save_import_template(
+            &self,
+            template: ImportTemplateData,
+        ) -> CoreResult<ImportTemplateData> {
+            Ok(template)
+        }
+
+        async fn delete_import_template(&self, _template_id: String) -> CoreResult<()> {
+            Ok(())
+        }
+
+        fn get_broker_sync_profile(
+            &self,
+            _account_id: String,
+            _source_system: String,
+        ) -> CoreResult<BrokerSyncProfileData> {
+            Ok(BrokerSyncProfileData {
+                id: String::new(),
+                name: String::new(),
+                scope: ImportTemplateScope::User,
+                source_system: String::new(),
+                activity_mappings: std::collections::HashMap::new(),
+                symbol_mappings: std::collections::HashMap::new(),
+                symbol_mapping_meta: std::collections::HashMap::new(),
+            })
+        }
+
+        async fn save_broker_sync_profile_rules(
+            &self,
+            _request: SaveBrokerSyncProfileRulesRequest,
+        ) -> CoreResult<BrokerSyncProfileData> {
+            Ok(BrokerSyncProfileData {
+                id: String::new(),
+                name: String::new(),
+                scope: ImportTemplateScope::User,
+                source_system: String::new(),
+                activity_mappings: std::collections::HashMap::new(),
+                symbol_mappings: std::collections::HashMap::new(),
+                symbol_mapping_meta: std::collections::HashMap::new(),
+            })
         }
     }
 

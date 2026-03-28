@@ -235,9 +235,36 @@ enum PayloadColumnResolution {
     Readonly,
 }
 
+/// Column renames applied during sync replay for backward compatibility.
+/// Old devices may still send payloads with the pre-rename column names.
+fn apply_column_rename(table: &str, column: &str) -> Option<&'static str> {
+    match (table, column) {
+        ("import_account_templates", "import_type") => Some("context_kind"),
+        _ => None,
+    }
+}
+
+/// Value transformations applied during sync replay for backward compatibility.
+/// Old payloads may send pre-rename enum values (e.g., "ACTIVITY" → "CSV_ACTIVITY").
+fn apply_value_migration(table: &str, column: &str, value: serde_json::Value) -> serde_json::Value {
+    match (table, column) {
+        ("import_account_templates", "context_kind") => {
+            if let Some(s) = value.as_str() {
+                let migrated = wealthfolio_core::activities::normalize_context_kind_value(s);
+                if migrated != s {
+                    return serde_json::Value::String(migrated.to_string());
+                }
+            }
+            value
+        }
+        _ => value,
+    }
+}
+
 fn resolve_payload_column(
     raw_key: &str,
     catalog: &PayloadColumnCatalog,
+    table_name: &str,
 ) -> Option<PayloadColumnResolution> {
     if catalog.writable.contains(raw_key) {
         return Some(PayloadColumnResolution::Writable(raw_key.to_string()));
@@ -249,10 +276,22 @@ fn resolve_payload_column(
     let normalized = normalize_payload_key_to_snake_case(raw_key);
     if normalized != raw_key {
         if catalog.writable.contains(&normalized) {
-            return Some(PayloadColumnResolution::Writable(normalized));
+            return Some(PayloadColumnResolution::Writable(normalized.clone()));
         }
         if catalog.readonly.contains(&normalized) {
             return Some(PayloadColumnResolution::Readonly);
+        }
+    }
+
+    // Check for known column renames (backward compat with older sync payloads)
+    let check = if normalized != raw_key {
+        &normalized
+    } else {
+        raw_key
+    };
+    if let Some(renamed) = apply_column_rename(table_name, check) {
+        if catalog.writable.contains(renamed) {
+            return Some(PayloadColumnResolution::Writable(renamed.to_string()));
         }
     }
 
@@ -269,12 +308,13 @@ fn normalize_payload_fields(
     let mut seen_columns: HashMap<String, serde_json::Value> = HashMap::new();
 
     for (raw_key, value) in fields {
-        let resolution = resolve_payload_column(&raw_key, &catalog).ok_or_else(|| {
-            Error::Database(DatabaseError::Internal(format!(
-                "Sync payload column '{}' is not valid for table '{}'",
-                raw_key, table_name
-            )))
-        })?;
+        let resolution =
+            resolve_payload_column(&raw_key, &catalog, table_name).ok_or_else(|| {
+                Error::Database(DatabaseError::Internal(format!(
+                    "Sync payload column '{}' is not valid for table '{}'",
+                    raw_key, table_name
+                )))
+            })?;
 
         let column = match resolution {
             PayloadColumnResolution::Writable(column) => column,
@@ -291,6 +331,7 @@ fn normalize_payload_fields(
             continue;
         }
 
+        let value = apply_value_migration(table_name, &column, value);
         seen_columns.insert(column.clone(), value.clone());
         normalized_fields.push((column, value));
     }
@@ -2664,7 +2705,7 @@ mod tests {
 
         let template_id_value: String = import_account_templates::table
             .filter(import_account_templates::account_id.eq("acc-import-profile"))
-            .filter(import_account_templates::import_type.eq("ACTIVITY"))
+            .filter(import_account_templates::context_kind.eq("CSV_ACTIVITY"))
             .select(import_account_templates::template_id)
             .first(&mut conn)
             .expect("import account template row");
@@ -2796,7 +2837,7 @@ mod tests {
 
         let row_count: i64 = import_account_templates::table
             .filter(import_account_templates::account_id.eq("acc-import-update"))
-            .filter(import_account_templates::import_type.eq("ACTIVITY"))
+            .filter(import_account_templates::context_kind.eq("CSV_ACTIVITY"))
             .select(count_star())
             .first(&mut conn)
             .expect("import account template count");
@@ -2804,7 +2845,7 @@ mod tests {
 
         let (link_id, template_id): (String, String) = import_account_templates::table
             .filter(import_account_templates::account_id.eq("acc-import-update"))
-            .filter(import_account_templates::import_type.eq("ACTIVITY"))
+            .filter(import_account_templates::context_kind.eq("CSV_ACTIVITY"))
             .select((
                 import_account_templates::id,
                 import_account_templates::template_id,

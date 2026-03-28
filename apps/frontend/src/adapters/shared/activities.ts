@@ -14,6 +14,8 @@ import type {
   ImportActivitiesResult,
   ImportMappingData,
   ImportTemplateData,
+  BrokerSyncProfileData,
+  SaveBrokerSyncProfileRulesRequest,
 } from "@/lib/types";
 
 import { invoke, logger } from "./platform";
@@ -239,10 +241,13 @@ export const previewImportAssets = async ({
  */
 export const getAccountImportMapping = async (
   accountId: string,
-  importType: string = ImportType.ACTIVITY,
+  contextKind: string = ImportType.ACTIVITY,
 ): Promise<ImportMappingData> => {
   try {
-    return await invoke<ImportMappingData>("get_account_import_mapping", { accountId, importType });
+    return await invoke<ImportMappingData>("get_account_import_mapping", {
+      accountId,
+      contextKind,
+    });
   } catch (err) {
     logger.error("Error fetching mapping.");
     throw err;
@@ -255,10 +260,10 @@ export const getAccountImportMapping = async (
 export const linkAccountTemplate = async (
   accountId: string,
   templateId: string,
-  importType: string = ImportType.ACTIVITY,
+  contextKind: string = ImportType.ACTIVITY,
 ): Promise<void> => {
   try {
-    await invoke<void>("link_account_template", { accountId, templateId, importType });
+    await invoke<void>("link_account_template", { accountId, templateId, contextKind });
   } catch (err) {
     logger.error("Error linking account to template.");
     throw err;
@@ -290,6 +295,36 @@ export const checkExistingDuplicates = async (
     return await invoke<Record<string, string>>("check_existing_duplicates", { idempotencyKeys });
   } catch (err) {
     logger.error("Error checking for duplicate activities.");
+    throw err;
+  }
+};
+
+// ============================================================================
+// Broker Sync Profile Commands
+// ============================================================================
+
+export const getBrokerSyncProfile = async (
+  accountId: string,
+  sourceSystem: string,
+): Promise<BrokerSyncProfileData> => {
+  try {
+    return await invoke<BrokerSyncProfileData>("get_broker_sync_profile", {
+      accountId,
+      sourceSystem,
+    });
+  } catch (err) {
+    logger.error("Error fetching broker sync profile.");
+    throw err;
+  }
+};
+
+export const saveBrokerSyncProfileRules = async (
+  request: SaveBrokerSyncProfileRulesRequest,
+): Promise<BrokerSyncProfileData> => {
+  try {
+    return await invoke<BrokerSyncProfileData>("save_broker_sync_profile_rules", { request });
+  } catch (err) {
+    logger.error("Error saving broker sync profile rules.");
     throw err;
   }
 };

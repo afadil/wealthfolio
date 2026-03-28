@@ -205,7 +205,8 @@ impl ActivityDetailsDB {
 pub struct ImportAccountTemplateDB {
     pub id: String,
     pub account_id: String,
-    pub import_type: String,
+    pub context_kind: String,
+    pub source_system: String,
     pub template_id: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
@@ -222,6 +223,9 @@ pub struct ImportTemplateDB {
     pub id: String,
     pub name: String,
     pub scope: String,
+    pub kind: String,
+    pub source_system: String,
+    pub config_version: i32,
     pub config: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
@@ -312,17 +316,26 @@ impl From<ActivityDetailsDB> for wealthfolio_core::activities::ActivityDetails {
 
 impl From<ImportTemplateDB> for wealthfolio_core::activities::ImportTemplate {
     fn from(db: ImportTemplateDB) -> Self {
-        use wealthfolio_core::activities::ImportTemplateScope;
+        use wealthfolio_core::activities::{ImportTemplateScope, TemplateKind};
 
         let scope = match db.scope.as_str() {
             "SYSTEM" => ImportTemplateScope::System,
             _ => ImportTemplateScope::User,
         };
 
+        let kind = match db.kind.as_str() {
+            "CSV_HOLDINGS" => TemplateKind::CsvHoldings,
+            "BROKER_ACTIVITY" => TemplateKind::BrokerActivity,
+            _ => TemplateKind::CsvActivity,
+        };
+
         Self {
             id: db.id,
             name: db.name,
             scope,
+            kind,
+            source_system: db.source_system,
+            config_version: db.config_version,
             config: db.config,
             created_at: db.created_at,
             updated_at: db.updated_at,
@@ -341,6 +354,9 @@ impl From<wealthfolio_core::activities::ImportTemplate> for ImportTemplateDB {
             id: domain.id,
             name: domain.name,
             scope: scope.to_string(),
+            kind: domain.kind.as_str().to_string(),
+            source_system: domain.source_system,
+            config_version: domain.config_version,
             config: domain.config,
             created_at: domain.created_at,
             updated_at: domain.updated_at,

@@ -188,7 +188,7 @@ export function HoldingsMappingStep() {
   // Fetch saved mapping from backend
   const { data: savedMapping } = useQuery({
     queryKey: [QueryKeys.IMPORT_MAPPING, accountId],
-    queryFn: () => (accountId ? getAccountImportMapping(accountId, "HOLDINGS") : null),
+    queryFn: () => (accountId ? getAccountImportMapping(accountId, ImportType.HOLDINGS) : null),
     enabled: !!accountId,
   });
 
