@@ -16,8 +16,8 @@ use rig::{
     client::{CompletionClient, Nothing},
     completion::{CompletionModel, Message},
     message::{
-        AssistantContent, Reasoning, Text, ToolCall as RigToolCall, ToolChoice, ToolResultContent,
-        UserContent,
+        AssistantContent, Document, DocumentMediaType, DocumentSourceKind, Image, ImageMediaType,
+        Reasoning, Text, ToolCall as RigToolCall, ToolChoice, ToolResultContent, UserContent,
     },
     providers::{
         anthropic, gemini, groq,
@@ -38,11 +38,15 @@ use crate::error::AiError;
 use crate::providers::ProviderService;
 use crate::title_generator::truncate_to_title;
 use crate::title_generator::{TitleGenerator, TitleGeneratorConfig, TitleGeneratorTrait};
+use crate::tools::constants::{
+    MAX_ATTACHMENTS_COUNT, MAX_ATTACHMENT_SIZE_BYTES, MAX_HISTORY_CHARS,
+    MAX_TOTAL_ATTACHMENTS_BYTES,
+};
 use crate::tools::ToolSet;
 use crate::types::{
     AiStreamEvent, ChatMessage, ChatMessageContent, ChatMessagePart, ChatMessageRole,
-    ChatRepositoryTrait, ChatThread, ListThreadsRequest, SendMessageRequest, SimpleChatMessage,
-    ThreadPage, ToolCall, ToolResultData,
+    ChatRepositoryTrait, ChatThread, ListThreadsRequest, MessageAttachment, SendMessageRequest,
+    SimpleChatMessage, ThreadPage, ToolCall, ToolResultData,
 };
 
 fn derive_initial_thread_title(first_user_message: &str) -> Option<String> {
@@ -173,6 +177,45 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
     ) -> Result<BoxStream<'static, AiStreamEvent>, AiError> {
         let repo = self.env.chat_repository();
 
+        // Validate attachments
+        let attachments = request.attachments.clone().unwrap_or_default();
+        if !attachments.is_empty() {
+            if attachments.len() > MAX_ATTACHMENTS_COUNT {
+                return Err(AiError::InvalidInput(format!(
+                    "Too many attachments: {} (max {})",
+                    attachments.len(),
+                    MAX_ATTACHMENTS_COUNT
+                )));
+            }
+            let mut total_size: usize = 0;
+            for att in &attachments {
+                // For base64-encoded payloads (images/PDFs), estimate the
+                // decoded byte size (~75% of encoded length) so limits stay
+                // consistent with the frontend's raw file.size check.
+                let is_binary =
+                    att.content_type.starts_with("image/") || att.content_type == "application/pdf";
+                let effective_size = if is_binary {
+                    att.data.len() * 3 / 4
+                } else {
+                    att.data.len()
+                };
+                if effective_size > MAX_ATTACHMENT_SIZE_BYTES {
+                    return Err(AiError::InvalidInput(format!(
+                        "Attachment '{}' too large (max {} MB)",
+                        att.name,
+                        MAX_ATTACHMENT_SIZE_BYTES / (1024 * 1024)
+                    )));
+                }
+                total_size += effective_size;
+            }
+            if total_size > MAX_TOTAL_ATTACHMENTS_BYTES {
+                return Err(AiError::InvalidInput(format!(
+                    "Total attachment size too large (max {} MB)",
+                    MAX_TOTAL_ATTACHMENTS_BYTES / (1024 * 1024)
+                )));
+            }
+        }
+
         // Get or create thread
         let (thread, is_new_thread, initial_title) = match &request.thread_id {
             Some(id) => {
@@ -203,23 +246,34 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
             }
         }
 
-        let history_messages: Vec<SimpleChatMessage> = previous_messages
-            .iter()
-            .filter_map(|msg| {
-                let text = msg.content.get_text_content();
-                if text.is_empty() {
-                    return None;
-                }
-                match msg.role {
-                    ChatMessageRole::User => Some(SimpleChatMessage::user(&text)),
-                    ChatMessageRole::Assistant => Some(SimpleChatMessage::assistant(&text)),
-                    _ => None, // Skip system/tool messages in history
-                }
-            })
-            .collect();
+        // Build history with a reverse character-budget window:
+        // take messages from most recent backwards until the budget is exhausted.
+        let mut history_messages: Vec<SimpleChatMessage> = Vec::new();
+        let mut budget = MAX_HISTORY_CHARS;
+        for msg in previous_messages.iter().rev() {
+            let text = msg.content.get_text_content();
+            if text.is_empty() {
+                continue;
+            }
+            let simple = match msg.role {
+                ChatMessageRole::User => SimpleChatMessage::user(&text),
+                ChatMessageRole::Assistant => SimpleChatMessage::assistant(&text),
+                _ => continue,
+            };
+            if text.len() > budget {
+                break;
+            }
+            budget -= text.len();
+            history_messages.push(simple);
+        }
+        history_messages.reverse();
 
-        // Save user message immediately to repository
-        let user_message = ChatMessage::user(&thread_id, &request.content);
+        // Save user message with attachment placeholders (no binary data stored)
+        let mut persist_text = request.content.clone();
+        for att in &attachments {
+            persist_text.push_str(&format!("\n[Attached: {}]", att.name));
+        }
+        let user_message = ChatMessage::user(&thread_id, &persist_text);
         repo.create_message(user_message).await?;
 
         // Get provider settings
@@ -262,6 +316,7 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
                 tx.clone(),
                 content,
                 history_messages,
+                attachments,
                 provider_id,
                 model_id,
                 thread_id_clone.clone(),
@@ -413,6 +468,80 @@ struct TitleContext<E: AiEnvironment> {
     model_id: String,
 }
 
+/// Build a multimodal `Message::User` from text content and file attachments.
+fn build_user_prompt(user_message: &str, attachments: &[MessageAttachment]) -> Message {
+    if attachments.is_empty() {
+        return Message::User {
+            content: OneOrMany::one(UserContent::Text(Text {
+                text: user_message.to_string(),
+            })),
+        };
+    }
+
+    let mut parts: Vec<UserContent> = Vec::new();
+    let has_csv = attachments
+        .iter()
+        .any(|a| a.content_type == "text/csv" || a.content_type == "application/csv");
+    let has_image_or_pdf = attachments
+        .iter()
+        .any(|a| a.content_type.starts_with("image/") || a.content_type == "application/pdf");
+
+    // Build instruction-prefixed text
+    let mut text = String::new();
+    if has_csv {
+        text.push_str("[INSTRUCTION: A CSV file is attached. You MUST call the import_csv tool with the full CSV content in csvContent parameter. Do NOT analyze or summarize the data yourself - use the tool.]\n\n");
+    }
+    if has_image_or_pdf {
+        text.push_str("[INSTRUCTION: Image or PDF file(s) attached. Examine for financial transaction data and use record_activities to create drafts for all extracted transactions.]\n\n");
+    }
+    text.push_str(user_message);
+    parts.push(UserContent::Text(Text { text }));
+
+    // Add attachment content parts
+    for att in attachments {
+        match att.content_type.as_str() {
+            "text/csv" | "application/csv" => {
+                parts.push(UserContent::Text(Text {
+                    text: format!("[Attached CSV file: {}]\n{}", att.name, att.data),
+                }));
+            }
+            ct if ct.starts_with("image/") => {
+                let media_type = match ct {
+                    "image/png" => Some(ImageMediaType::PNG),
+                    "image/jpeg" | "image/jpg" => Some(ImageMediaType::JPEG),
+                    "image/webp" => Some(ImageMediaType::WEBP),
+                    "image/gif" => Some(ImageMediaType::GIF),
+                    _ => None,
+                };
+                parts.push(UserContent::Image(Image {
+                    data: DocumentSourceKind::Base64(att.data.clone()),
+                    media_type,
+                    detail: None,
+                    additional_params: None,
+                }));
+            }
+            "application/pdf" => {
+                parts.push(UserContent::Document(Document {
+                    data: DocumentSourceKind::Base64(att.data.clone()),
+                    media_type: Some(DocumentMediaType::PDF),
+                    additional_params: None,
+                }));
+            }
+            _ => {
+                debug!("Skipping unsupported attachment type: {}", att.content_type);
+            }
+        }
+    }
+
+    Message::User {
+        content: OneOrMany::many(parts).unwrap_or_else(|_| {
+            OneOrMany::one(UserContent::Text(Text {
+                text: user_message.to_string(),
+            }))
+        }),
+    }
+}
+
 /// Spawn a chat stream with the appropriate provider.
 #[allow(clippy::too_many_arguments)]
 async fn spawn_chat_stream<E: AiEnvironment + 'static>(
@@ -420,6 +549,7 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     tx: mpsc::Sender<AiStreamEvent>,
     user_message: String,
     history_messages: Vec<SimpleChatMessage>,
+    attachments: Vec<MessageAttachment>,
     provider_id: String,
     model_id: String,
     thread_id: String,
@@ -501,9 +631,22 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         model_id: model_id.clone(),
     };
 
-    let prompt = Message::User {
-        content: OneOrMany::one(UserContent::Text(Text { text: user_message })),
-    };
+    // Reject image/PDF attachments when the model doesn't support vision
+    if !capabilities.vision {
+        if let Some(att) = attachments
+            .iter()
+            .find(|a| a.content_type.starts_with("image/") || a.content_type == "application/pdf")
+        {
+            return Err(AiError::InvalidInput(format!(
+                "The current model does not support image/PDF attachments ({}). \
+                 Please switch to a vision-capable model.",
+                att.name
+            )));
+        }
+    }
+
+    // Build multimodal user content from text + attachments
+    let prompt = build_user_prompt(&user_message, &attachments);
 
     // Build history from previous messages
     let history: Vec<Message> = history_messages

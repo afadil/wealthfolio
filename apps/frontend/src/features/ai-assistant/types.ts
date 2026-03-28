@@ -146,6 +146,20 @@ export interface AiSendMessageRequest {
   allowedTools?: string[];
   /** Parent message ID for edit operations. When set, AI context is truncated to this message. */
   parentMessageId?: string;
+  /** File attachments (CSV, images, PDFs). */
+  attachments?: AiMessageAttachment[];
+}
+
+/**
+ * A file attachment sent with an AI chat message.
+ */
+export interface AiMessageAttachment {
+  /** Original filename. */
+  name: string;
+  /** MIME type (e.g., "text/csv", "image/png", "application/pdf"). */
+  contentType: string;
+  /** File content: plain text for CSV, base64-encoded for images/PDFs. */
+  data: string;
 }
 
 /**
