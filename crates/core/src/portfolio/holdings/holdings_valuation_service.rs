@@ -6,6 +6,7 @@ use crate::portfolio::holdings::{Holding, HoldingType, MonetaryValue};
 use crate::quotes::{LatestQuotePair, QuoteServiceTrait};
 use crate::utils::time_utils::{parse_user_timezone_or_default, user_today};
 use async_trait::async_trait;
+use chrono::NaiveDate;
 use log::{debug, warn};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
@@ -219,6 +220,43 @@ impl HoldingsValuationService {
             holding.day_change_pct = None;
             holding.prev_close_value = None;
             // FX rate and base cost basis are already set above
+            return Ok(());
+        }
+
+        // --- Handle Expired Options ---
+        // Expired options are worth $0. Set market value to zero and realize the loss.
+        let today = self.today_in_user_timezone();
+        if is_expired_option(holding.metadata.as_ref(), today) {
+            debug!(
+                "{}: Option expired. Setting market value to zero.",
+                context_msg
+            );
+            holding.price = Some(Decimal::ZERO);
+            holding.market_value = MonetaryValue::zero();
+
+            if let Some(cost_basis) = &holding.cost_basis {
+                let neg_local = -cost_basis.local;
+                let neg_base = -cost_basis.base;
+                holding.unrealized_gain = Some(MonetaryValue {
+                    local: neg_local,
+                    base: neg_base,
+                });
+                if cost_basis.base != Decimal::ZERO {
+                    holding.unrealized_gain_pct = Some(dec!(-1));
+                } else {
+                    holding.unrealized_gain_pct = Some(Decimal::ZERO);
+                }
+            } else {
+                holding.unrealized_gain = None;
+                holding.unrealized_gain_pct = None;
+            }
+            holding.day_change = None;
+            holding.day_change_pct = None;
+            holding.prev_close_value = None;
+            holding.realized_gain = None;
+            holding.realized_gain_pct = None;
+            holding.total_gain = holding.unrealized_gain.clone();
+            holding.total_gain_pct = holding.unrealized_gain_pct;
             return Ok(());
         }
 
@@ -617,4 +655,14 @@ impl HoldingsValuationService {
 
         Ok(())
     }
+}
+
+/// Returns true if the holding metadata indicates an option contract that has expired.
+fn is_expired_option(metadata: Option<&serde_json::Value>, today: NaiveDate) -> bool {
+    let spec = metadata
+        .and_then(|m| m.get("option"))
+        .and_then(|o| o.get("expiration"))
+        .and_then(|v| v.as_str())
+        .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
+    matches!(spec, Some(exp) if exp < today)
 }

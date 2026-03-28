@@ -1,4 +1,4 @@
-import { getHolding } from "@/adapters";
+import { createActivity, getAssetHoldings, getHolding } from "@/adapters";
 import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { useHapticFeedback } from "@/hooks";
@@ -8,18 +8,30 @@ import { useQuoteHistory } from "@/hooks/use-quote-history";
 import { useSyncMarketDataMutation } from "@/hooks/use-sync-market-data";
 import { useAssetTaxonomyAssignments, useTaxonomy } from "@/hooks/use-taxonomies";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { generateId } from "@/lib/id";
 import { QueryKeys } from "@/lib/query-keys";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { AssetKind, Holding, Quote } from "@/lib/types";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatedToggleGroup, Page, PageContent, PageHeader, SwipableView } from "@wealthfolio/ui";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@wealthfolio/ui/components/ui/alert-dialog";
 import { Tabs, TabsContent } from "@wealthfolio/ui/components/ui/tabs";
 import { useCallback, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import { AlternativeAssetContent, useAlternativeAssetActions } from "./alternative-asset-content";
 import { ValueHistoryDataGrid } from "./alternative-assets";
 import AssetDetailCard from "./asset-detail-card";
@@ -331,6 +343,46 @@ export const AssetProfilePage = () => {
     if (!option || (!option.right && option.strike == null && !option.expiration)) return null;
     return option;
   }, [assetProfile]);
+
+  const isExpiredOption = useMemo(() => {
+    if (!optionSpec?.expiration) return false;
+    // Compare date-only: expired once the calendar day after expiration has started
+    const today = new Date().toISOString().split("T")[0];
+    return optionSpec.expiration < today;
+  }, [optionSpec]);
+
+  const [confirmExpiryOpen, setConfirmExpiryOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const confirmExpiryMutation = useMutation({
+    mutationFn: async () => {
+      const accountHoldings = await getAssetHoldings(assetId);
+      const nonZeroHoldings = accountHoldings.filter((h) => h.quantity > 0);
+      if (nonZeroHoldings.length === 0) throw new Error("No open positions found");
+
+      for (const h of nonZeroHoldings) {
+        await createActivity({
+          idempotencyKey: generateId("option-expiry"),
+          accountId: h.accountId,
+          activityType: "ADJUSTMENT",
+          subtype: "OPTION_EXPIRY",
+          activityDate: optionSpec?.expiration ?? new Date().toISOString().split("T")[0],
+          symbol: { id: assetId },
+          quantity: String(h.quantity),
+          unitPrice: "0",
+          fee: "0",
+          currency: h.localCurrency,
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      toast.success("Option expiry recorded");
+    },
+    onError: (error) => {
+      toast.error("Failed to record option expiry", { description: String(error) });
+    },
+  });
 
   const { saveQuoteMutation, deleteQuoteMutation } = useQuoteMutations(assetId);
   const syncMarketDataMutation = useSyncMarketDataMutation(true);
@@ -918,6 +970,15 @@ export const AssetProfilePage = () => {
                             onClick: () =>
                               navigate(`/activities/manage?assetId=${encodeURIComponent(assetId)}`),
                           },
+                          ...(isExpiredOption
+                            ? [
+                                {
+                                  icon: Icons.XCircle,
+                                  label: "Confirm Expiry",
+                                  onClick: () => setConfirmExpiryOpen(true),
+                                },
+                              ]
+                            : []),
                         ],
                       },
                       {
@@ -1227,6 +1288,30 @@ export const AssetProfilePage = () => {
         onOpenChange={setRefreshConfirmOpen}
         onConfirm={handleRefreshQuotes}
       />
+
+      {/* Confirm Option Expiry Dialog */}
+      <AlertDialog open={confirmExpiryOpen} onOpenChange={setConfirmExpiryOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm option expiry</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will record the option as expired worthless, removing the position with no cash
+              effect. This action cannot be easily undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                confirmExpiryMutation.mutate();
+                setConfirmExpiryOpen(false);
+              }}
+            >
+              Confirm Expiry
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Edit Sheet (for regular assets) */}
       <AssetEditSheet
