@@ -191,10 +191,9 @@ const getColumns = (
       const parsedOption = parseOccSymbol(symbol);
       const displaySymbol = parsedOption ? parsedOption.underlying : symbol;
 
-      // Check if option is expired
-      const isExpiredOption = parsedOption
-        ? new Date(parsedOption.expiration + "T12:00:00") < new Date()
-        : false;
+      // Check if option is expired (date-only: expired once the day after expiration)
+      const today = new Date().toISOString().split("T")[0];
+      const isExpiredOption = parsedOption ? parsedOption.expiration < today : false;
 
       // Option subtitle: "Mar 29 $150 CALL"
       const optionSubtitle = parsedOption

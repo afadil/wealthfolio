@@ -163,9 +163,8 @@ export const HoldingsTableMobile = ({
             const symbol = holding.instrument?.symbol ?? holding.id;
             const isCash = symbol.startsWith("$CASH");
             const parsedOption = isCash ? null : parseOccSymbol(symbol);
-            const isExpiredOption = parsedOption
-              ? new Date(parsedOption.expiration + "T12:00:00") < new Date()
-              : false;
+            const today = new Date().toISOString().split("T")[0];
+            const isExpiredOption = parsedOption ? parsedOption.expiration < today : false;
             const avatarSymbol = isCash ? "$CASH" : parsedOption ? parsedOption.underlying : symbol;
             const displaySymbol = isCash
               ? symbol.split("-")[0]

@@ -346,7 +346,9 @@ export const AssetProfilePage = () => {
 
   const isExpiredOption = useMemo(() => {
     if (!optionSpec?.expiration) return false;
-    return new Date(optionSpec.expiration + "T12:00:00") < new Date();
+    // Compare date-only: expired once the calendar day after expiration has started
+    const today = new Date().toISOString().split("T")[0];
+    return optionSpec.expiration < today;
   }, [optionSpec]);
 
   const [confirmExpiryOpen, setConfirmExpiryOpen] = useState(false);
