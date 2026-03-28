@@ -39,7 +39,8 @@ use crate::providers::ProviderService;
 use crate::title_generator::truncate_to_title;
 use crate::title_generator::{TitleGenerator, TitleGeneratorConfig, TitleGeneratorTrait};
 use crate::tools::constants::{
-    MAX_ATTACHMENTS_COUNT, MAX_ATTACHMENT_SIZE_BYTES, MAX_TOTAL_ATTACHMENTS_BYTES,
+    MAX_ATTACHMENTS_COUNT, MAX_ATTACHMENT_SIZE_BYTES, MAX_HISTORY_CHARS,
+    MAX_TOTAL_ATTACHMENTS_BYTES,
 };
 use crate::tools::ToolSet;
 use crate::types::{
@@ -235,20 +236,27 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
             }
         }
 
-        let history_messages: Vec<SimpleChatMessage> = previous_messages
-            .iter()
-            .filter_map(|msg| {
-                let text = msg.content.get_text_content();
-                if text.is_empty() {
-                    return None;
-                }
-                match msg.role {
-                    ChatMessageRole::User => Some(SimpleChatMessage::user(&text)),
-                    ChatMessageRole::Assistant => Some(SimpleChatMessage::assistant(&text)),
-                    _ => None, // Skip system/tool messages in history
-                }
-            })
-            .collect();
+        // Build history with a reverse character-budget window:
+        // take messages from most recent backwards until the budget is exhausted.
+        let mut history_messages: Vec<SimpleChatMessage> = Vec::new();
+        let mut budget = MAX_HISTORY_CHARS;
+        for msg in previous_messages.iter().rev() {
+            let text = msg.content.get_text_content();
+            if text.is_empty() {
+                continue;
+            }
+            let simple = match msg.role {
+                ChatMessageRole::User => SimpleChatMessage::user(&text),
+                ChatMessageRole::Assistant => SimpleChatMessage::assistant(&text),
+                _ => continue,
+            };
+            if text.len() > budget {
+                break;
+            }
+            budget -= text.len();
+            history_messages.push(simple);
+        }
+        history_messages.reverse();
 
         // Save user message with attachment placeholders (no binary data stored)
         let mut persist_text = request.content.clone();

@@ -41,3 +41,7 @@ pub const MAX_TOTAL_ATTACHMENTS_BYTES: usize = 20 * 1024 * 1024;
 
 /// Maximum number of attachments per message.
 pub const MAX_ATTACHMENTS_COUNT: usize = 10;
+
+/// Maximum total characters of history sent to the LLM (~25K tokens).
+/// Messages are taken from most-recent backwards until this budget is exhausted.
+pub const MAX_HISTORY_CHARS: usize = 100_000;
