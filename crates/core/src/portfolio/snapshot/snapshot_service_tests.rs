@@ -3219,6 +3219,66 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_get_latest_holdings_snapshot_excludes_future_dated_activity() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let today = valuation_date_today();
+        let d1 = today.pred_opt().unwrap_or(today);
+        let d_future = today.succ_opt().unwrap_or(today);
+
+        let dep1 = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("CASH:USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(5000)),
+            "USD",
+        );
+
+        let dep2 = create_test_activity(
+            "dep2",
+            &acc.id,
+            Some("CASH:USD"),
+            "DEPOSIT",
+            d_future,
+            None,
+            None,
+            Some(dec!(3000)),
+            "USD",
+        );
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![dep1, dep2]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
+
+        let latest = svc.get_latest_holdings_snapshot(&acc.id).unwrap().unwrap();
+        assert!(latest.snapshot_date < d_future);
+        assert_eq!(latest.cash_balances.get("USD"), Some(&dec!(5000)));
+    }
+
+    #[tokio::test]
     async fn test_no_account_returns_empty() {
         let base = Arc::new(RwLock::new("USD".to_string()));
         let account_repo = MockAccountRepository::new(); // Empty
