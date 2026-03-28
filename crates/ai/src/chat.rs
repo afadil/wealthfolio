@@ -189,14 +189,24 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
             }
             let mut total_size: usize = 0;
             for att in &attachments {
-                if att.data.len() > MAX_ATTACHMENT_SIZE_BYTES {
+                // For base64-encoded payloads (images/PDFs), estimate the
+                // decoded byte size (~75% of encoded length) so limits stay
+                // consistent with the frontend's raw file.size check.
+                let is_binary =
+                    att.content_type.starts_with("image/") || att.content_type == "application/pdf";
+                let effective_size = if is_binary {
+                    att.data.len() * 3 / 4
+                } else {
+                    att.data.len()
+                };
+                if effective_size > MAX_ATTACHMENT_SIZE_BYTES {
                     return Err(AiError::InvalidInput(format!(
                         "Attachment '{}' too large (max {} MB)",
                         att.name,
                         MAX_ATTACHMENT_SIZE_BYTES / (1024 * 1024)
                     )));
                 }
-                total_size += att.data.len();
+                total_size += effective_size;
             }
             if total_size > MAX_TOTAL_ATTACHMENTS_BYTES {
                 return Err(AiError::InvalidInput(format!(
@@ -620,6 +630,20 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         provider_id: provider_id.clone(),
         model_id: model_id.clone(),
     };
+
+    // Reject image/PDF attachments when the model doesn't support vision
+    if !capabilities.vision {
+        if let Some(att) = attachments
+            .iter()
+            .find(|a| a.content_type.starts_with("image/") || a.content_type == "application/pdf")
+        {
+            return Err(AiError::InvalidInput(format!(
+                "The current model does not support image/PDF attachments ({}). \
+                 Please switch to a vision-capable model.",
+                att.name
+            )));
+        }
+    }
 
     // Build multimodal user content from text + attachments
     let prompt = build_user_prompt(&user_message, &attachments);
