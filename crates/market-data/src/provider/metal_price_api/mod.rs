@@ -21,6 +21,8 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::time::Duration;
 
+use tracing::warn;
+
 use crate::errors::MarketDataError;
 use crate::models::{Coverage, InstrumentKind, ProviderInstrument, Quote, QuoteContext};
 use crate::provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
@@ -91,16 +93,19 @@ impl MetalPriceApiProvider {
     }
 
     /// Convert a rate (1 base_currency = rate troy ounces) to price per troy ounce.
+    /// Division is done in Decimal space to avoid f64 precision loss.
     fn rate_to_price(rate: f64) -> Result<Decimal, MarketDataError> {
-        if rate == 0.0 {
+        let rate_decimal =
+            Decimal::try_from(rate).map_err(|_| MarketDataError::ValidationFailed {
+                message: "Failed to convert rate to decimal".to_string(),
+            })?;
+        if rate_decimal.is_zero() {
             return Err(MarketDataError::ProviderError {
                 provider: PROVIDER_ID.to_string(),
                 message: "Invalid rate (zero)".to_string(),
             });
         }
-        Decimal::try_from(1.0 / rate).map_err(|_| MarketDataError::ValidationFailed {
-            message: "Failed to convert rate to decimal".to_string(),
-        })
+        Ok(Decimal::ONE / rate_decimal)
     }
 }
 
@@ -158,20 +163,21 @@ impl MarketDataProvider for MetalPriceApiProvider {
 
         // Build the API URL
         let url = format!(
-            "https://api.metalpriceapi.com/v1/latest?api_key={}&base={}&currencies={}",
-            self.api_key, quote_currency, symbol
+            "https://api.metalpriceapi.com/v1/latest?base={}&currencies={}",
+            quote_currency, symbol
         );
 
         // Make the API request
-        let response =
-            self.client
-                .get(&url)
-                .send()
-                .await
-                .map_err(|e| MarketDataError::ProviderError {
-                    provider: PROVIDER_ID.to_string(),
-                    message: e.to_string(),
-                })?;
+        let response = self
+            .client
+            .get(&url)
+            .header("X-API-KEY", &self.api_key)
+            .send()
+            .await
+            .map_err(|e| MarketDataError::ProviderError {
+                provider: PROVIDER_ID.to_string(),
+                message: e.to_string(),
+            })?;
 
         // Parse the response
         let metal_resp: MetalPriceResponse =
@@ -185,6 +191,11 @@ impl MarketDataProvider for MetalPriceApiProvider {
 
         // Check if the API request was successful
         if !metal_resp.success {
+            warn!(
+                provider = PROVIDER_ID,
+                symbol = %symbol,
+                "Metal Price API latest request failed"
+            );
             return Err(MarketDataError::ProviderError {
                 provider: PROVIDER_ID.to_string(),
                 message: "API request failed".to_string(),
@@ -209,6 +220,11 @@ impl MarketDataProvider for MetalPriceApiProvider {
         ))
     }
 
+    /// Fetch historical quotes using the timeframe API endpoint.
+    ///
+    /// Note: The API has a maximum date range of 365 days (paid plans).
+    /// Free-tier plans are limited to 5 days. Exceeding the limit returns
+    /// HTTP 421 which is handled as a provider error.
     async fn get_historical_quotes(
         &self,
         _context: &QuoteContext,
@@ -236,20 +252,23 @@ impl MarketDataProvider for MetalPriceApiProvider {
         let end_date = end.format("%Y-%m-%d");
 
         let url = format!(
-            "https://api.metalpriceapi.com/v1/timeframe?api_key={}&base={}&currencies={}&start_date={}&end_date={}",
-            self.api_key, quote_currency, symbol, start_date, end_date
+            "https://api.metalpriceapi.com/v1/timeframe?base={}&currencies={}&start_date={}&end_date={}",
+            quote_currency, symbol, start_date, end_date
         );
 
-        let response =
-            self.client
-                .get(&url)
-                .send()
-                .await
-                .map_err(|e| MarketDataError::ProviderError {
-                    provider: PROVIDER_ID.to_string(),
-                    message: e.to_string(),
-                })?;
+        let response = self
+            .client
+            .get(&url)
+            .header("X-API-KEY", &self.api_key)
+            .send()
+            .await
+            .map_err(|e| MarketDataError::ProviderError {
+                provider: PROVIDER_ID.to_string(),
+                message: e.to_string(),
+            })?;
 
+        // Read as text first so we can include the body in error messages
+        // (the API returns error details that don't match the success schema).
         let response_text = response
             .text()
             .await
@@ -259,16 +278,26 @@ impl MarketDataProvider for MetalPriceApiProvider {
             })?;
 
         let tf_resp: MetalPriceTimeframeResponse =
-            serde_json::from_str(&response_text).map_err(|e| MarketDataError::ProviderError {
-                provider: PROVIDER_ID.to_string(),
-                message: format!(
-                    "Failed to parse timeframe response: {} (body: {})",
-                    e,
-                    &response_text[..response_text.len().min(500)]
-                ),
+            serde_json::from_str(&response_text).map_err(|e| {
+                warn!(
+                    provider = PROVIDER_ID,
+                    error = %e,
+                    body = %&response_text[..response_text.len().min(300)],
+                    "Failed to parse timeframe response"
+                );
+                MarketDataError::ProviderError {
+                    provider: PROVIDER_ID.to_string(),
+                    message: format!("Failed to parse timeframe response: {}", e),
+                }
             })?;
 
         if !tf_resp.success || tf_resp.rates.is_empty() {
+            warn!(
+                provider = PROVIDER_ID,
+                symbol = %symbol,
+                body = %&response_text[..response_text.len().min(300)],
+                "Metal Price API timeframe request failed"
+            );
             return Err(MarketDataError::ProviderError {
                 provider: PROVIDER_ID.to_string(),
                 message: format!(
@@ -470,7 +499,8 @@ mod tests {
             quote: "USD".into(),
         };
 
-        // Free tier limits timeframe to 5 days
+        // Free tier returns HTTP 421 for timeframe queries exceeding 5 days.
+        // Paid plans support up to 365 days per the API docs.
         let end = Utc::now();
         let start = end - chrono::Duration::days(4);
 
