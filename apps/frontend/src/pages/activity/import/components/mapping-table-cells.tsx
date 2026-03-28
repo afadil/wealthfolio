@@ -100,7 +100,7 @@ export function MappingHeaderCell({
         <Button
           type="button"
           variant="ghost"
-          className="text-muted-foreground h-8 py-0 pl-0 font-normal"
+          className="text-muted-foreground h-8 rounded-md py-0 pl-0 font-normal"
           onClick={() => setEditingHeader(field)}
         >
           {displayHeader || (isRequired ? "Select column" : "Ignore")}
