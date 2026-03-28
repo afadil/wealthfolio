@@ -18,11 +18,7 @@ export { StepIndicator } from "./step-indicator";
 export { ImportAlert } from "./import-alert";
 export { FileDropzone } from "./file-dropzone";
 export { CSVFileViewer } from "./csv-file-viewer";
-export {
-  ImportReviewGrid,
-  type ImportReviewGridProps,
-  type ImportReviewFilter,
-} from "./import-review-grid";
+export { ImportReviewGrid, type ImportReviewGridProps } from "./import-review-grid";
 export {
   ImportToolbar,
   ImportContextMenu,

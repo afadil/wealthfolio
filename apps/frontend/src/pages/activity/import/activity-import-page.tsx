@@ -1,5 +1,6 @@
 import { getAccounts, logger } from "@/adapters";
 import { usePlatform } from "@/hooks/use-platform";
+import { isCashSymbol, needsImportAssetResolution } from "@/lib/activity-utils";
 import { canImportCSV } from "@/lib/activity-restrictions";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account } from "@/lib/types";
@@ -7,7 +8,7 @@ import { ImportType } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { AlertFeedback, Page, PageContent, PageHeader } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
-import { Card, CardContent, CardHeader } from "@wealthfolio/ui/components/ui/card";
+import { Card, CardHeader } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { AnimatePresence, motion } from "motion/react";
 import React, { useCallback, useMemo, useState } from "react";
@@ -45,7 +46,6 @@ import { HoldingsFormat, HoldingsMappingStep } from "./steps/holdings-mapping-st
 import { HoldingsReviewStep } from "./steps/holdings-review-step";
 
 // Constants
-import { isCashSymbol, isSymbolRequired } from "@/lib/activity-utils";
 import { IMPORT_REQUIRED_FIELDS, ImportFormat } from "@/lib/constants";
 import { computeFieldMappings } from "./hooks/use-import-mapping";
 import { buildImportAssetCandidateFromDraft } from "./utils/asset-review-utils";
@@ -215,6 +215,12 @@ function useStepValidation(isHoldingsMode: boolean, accounts?: Account[]) {
                 .map((h) => headers.indexOf(h))
                 .filter((i) => i !== -1)
             : [];
+          const subtypeMapping = mapping.fieldMappings[ImportFormat.SUBTYPE];
+          const subtypeCols = subtypeMapping
+            ? (Array.isArray(subtypeMapping) ? subtypeMapping : [subtypeMapping])
+                .map((h) => headers.indexOf(h))
+                .filter((i) => i !== -1)
+            : [];
 
           if (symbolHeaderIndex !== -1) {
             const symbolsNeedingResolution = new Set<string>();
@@ -232,13 +238,26 @@ function useStepValidation(isHoldingsMode: boolean, accounts?: Account[]) {
                   break;
                 }
               }
+              let csvSubtype: string | undefined;
+              for (const idx of subtypeCols) {
+                const val = row[idx]?.trim();
+                if (val) {
+                  csvSubtype = val;
+                  break;
+                }
+              }
 
               if (csvActivityType) {
                 const mappedType = findMappedActivityType(
                   csvActivityType,
                   mapping.activityMappings || {},
                 );
-                if (mappedType && (!isSymbolRequired(mappedType) || isCashSymbol(symbol))) return;
+                if (
+                  mappedType &&
+                  (!needsImportAssetResolution(mappedType, csvSubtype) || isCashSymbol(symbol))
+                ) {
+                  return;
+                }
               }
 
               symbolsNeedingResolution.add(symbol);
@@ -538,16 +557,16 @@ function ImportWizardContent() {
       <PageContent withPadding={false}>
         <ErrorBoundary>
           <div className="px-2 pb-6 pt-2 sm:px-4 sm:pt-4 md:px-6 md:pt-6">
-            <Card className="w-full">
+            <Card className="flex max-h-[calc(100dvh-9rem)] w-full flex-col overflow-hidden">
               {/* Step indicator — hidden on result step */}
               {state.step !== "result" && (
-                <CardHeader className="border-b px-3 py-3 sm:px-6 sm:py-4">
+                <CardHeader className="shrink-0 border-b px-3 py-3 sm:px-6 sm:py-4">
                   <WizardStepIndicator steps={steps} currentStep={state.step} />
                 </CardHeader>
               )}
 
-              {/* Step content */}
-              <CardContent className="overflow-hidden p-0">
+              {/* Step content — scrollable */}
+              <div className="min-h-0 flex-1 overflow-y-auto">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={state.step}
@@ -558,23 +577,23 @@ function ImportWizardContent() {
                     className="p-3 sm:p-6"
                   >
                     <CurrentStepComponent />
-
-                    {/* Navigation buttons */}
-                    {showNavigation && (
-                      <div className="mt-6">
-                        <StepNavigation
-                          onNext={handleNext}
-                          onBack={handleBack}
-                          canGoBack={canGoBack}
-                          canGoNext={canGoNext}
-                          nextLabel={getNextLabel()}
-                          isNextLoading={isNextLoading}
-                        />
-                      </div>
-                    )}
                   </motion.div>
                 </AnimatePresence>
-              </CardContent>
+              </div>
+
+              {/* Navigation buttons — always visible */}
+              {showNavigation && (
+                <div className="shrink-0 px-3 pb-3 sm:px-6 sm:pb-6">
+                  <StepNavigation
+                    onNext={handleNext}
+                    onBack={handleBack}
+                    canGoBack={canGoBack}
+                    canGoNext={canGoNext}
+                    nextLabel={getNextLabel()}
+                    isNextLoading={isNextLoading}
+                  />
+                </div>
+              )}
             </Card>
           </div>
         </ErrorBoundary>

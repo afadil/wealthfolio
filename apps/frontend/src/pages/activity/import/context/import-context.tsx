@@ -501,7 +501,7 @@ export function ImportProvider({ children, initialAccountId }: ImportProviderPro
             (draft) =>
               ({
                 accountId: draft.accountId,
-                activityType: draft.activityType as ActivityImport["activityType"],
+                activityType: (draft.activityType || "UNKNOWN") as ActivityImport["activityType"],
                 date: draft.activityDate || "",
                 symbol: draft.symbol || "",
                 assetId: draft.assetId,
@@ -513,7 +513,7 @@ export function ImportProvider({ children, initialAccountId }: ImportProviderPro
                 quantity: draft.quantity,
                 unitPrice: draft.unitPrice,
                 amount: draft.amount,
-                currency: draft.currency || defaultCurrencyRef.current,
+                currency: draft.currency || defaultCurrencyRef.current || "",
                 fee: draft.fee,
                 isDraft: true,
                 isValid: draft.status === "valid" || draft.status === "warning",
@@ -580,9 +580,13 @@ export function ImportProvider({ children, initialAccountId }: ImportProviderPro
                   ? draft.status
                   : hasErrors
                     ? "error"
-                    : hasWarnings
-                      ? "warning"
-                      : "valid",
+                    : backendResult.duplicateOfLineNumber !== undefined ||
+                        backendResult.duplicateOfId !== undefined ||
+                        backendWarnings._duplicate?.length
+                      ? "duplicate"
+                      : hasWarnings
+                        ? "warning"
+                        : "valid",
             } as DraftActivity;
           });
         }

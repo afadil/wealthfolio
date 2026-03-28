@@ -1258,6 +1258,8 @@ pub struct ImportActivitiesSummary {
     pub assets_created: u32,
     /// Whether the import was successful (no validation errors)
     pub success: bool,
+    /// Human-readable reason for failure, if success is false
+    pub error_message: Option<String>,
 }
 
 /// Input model for upserting activities (insert or update on conflict).

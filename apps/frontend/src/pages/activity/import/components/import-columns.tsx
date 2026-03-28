@@ -8,7 +8,7 @@ import {
   SUBTYPES_BY_ACTIVITY_TYPE,
   SUBTYPE_DISPLAY_NAMES,
 } from "@/lib/constants";
-import { isSymbolRequired } from "@/lib/activity-utils";
+import { needsImportAssetResolution } from "@/lib/activity-utils";
 import { ActivityTypeBadge } from "../../components/activity-type-badge";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -262,16 +262,16 @@ export function useImportColumns<T extends ImportRowData>({
       meta: {
         cell: {
           variant: "symbol",
-          onSearch: onSymbolSearch,
-          onSelect: onSymbolSelect,
-          onCreateCustomAsset,
-          isClearable: (rowData: unknown) => {
-            const row = rowData as ImportRowData;
-            return !isSymbolRequired(row.activityType ?? "");
+            onSearch: onSymbolSearch,
+            onSelect: onSymbolSelect,
+            onCreateCustomAsset,
+            isClearable: (rowData: unknown) => {
+              const row = rowData as ImportRowData;
+              return !needsImportAssetResolution(row.activityType ?? "", row.subtype);
+            },
           },
         },
-      },
-    });
+      });
 
     // 9. Instrument Type
     columns.push({

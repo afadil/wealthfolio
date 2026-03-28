@@ -8,7 +8,9 @@ use std::sync::Arc;
 use crate::accounts::{Account, AccountServiceTrait};
 use crate::activities::activities_constants::{
     classify_import_activity, is_garbage_symbol, requires_symbol, ImportSymbolDisposition,
-    ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT, PRICE_BEARING_ACTIVITY_TYPES,
+    ACTIVITY_SUBTYPE_DIVIDEND_IN_KIND, ACTIVITY_SUBTYPE_DRIP, ACTIVITY_SUBTYPE_STAKING_REWARD,
+    ACTIVITY_TYPE_SPLIT, ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT,
+    PRICE_BEARING_ACTIVITY_TYPES,
 };
 use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
@@ -87,6 +89,35 @@ impl PreparationMode {
 }
 
 impl ActivityService {
+    fn is_asset_backed_import_subtype(subtype: Option<&str>) -> bool {
+        subtype
+            .map(str::trim)
+            .filter(|subtype| !subtype.is_empty())
+            .is_some_and(|subtype| {
+                subtype.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_DRIP)
+                    || subtype.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_DIVIDEND_IN_KIND)
+                    || subtype.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_STAKING_REWARD)
+            })
+    }
+
+    fn classify_import_symbol_disposition(
+        activity_type: &str,
+        subtype: Option<&str>,
+        symbol: &str,
+        quantity: Option<Decimal>,
+        unit_price: Option<Decimal>,
+    ) -> ImportSymbolDisposition {
+        if Self::is_asset_backed_import_subtype(subtype) {
+            ImportSymbolDisposition::ResolveAsset
+        } else {
+            classify_import_activity(activity_type, symbol, quantity, unit_price)
+        }
+    }
+
+    fn requires_asset_identity(activity_type: &str, subtype: Option<&str>) -> bool {
+        requires_symbol(activity_type) || Self::is_asset_backed_import_subtype(subtype)
+    }
+
     fn duplicate_activity_error(existing_activity_id: Option<&str>) -> crate::errors::Error {
         let message = if let Some(activity_id) = existing_activity_id {
             format!(
@@ -536,126 +567,6 @@ impl ActivityService {
             notes: None,
             metadata: None,
         })
-    }
-
-    fn validate_import_activities_for_apply(
-        &self,
-        account: &Account,
-        account_id: &str,
-        activities: Vec<ActivityImport>,
-    ) -> Vec<ActivityImport> {
-        let base_ccy = self.account_service.get_base_currency().unwrap_or_default();
-        let account_currency = resolve_currency(&[&account.currency, &base_ccy]);
-        let mut validated: Vec<ActivityImport> = Vec::with_capacity(activities.len());
-
-        for mut activity in activities {
-            activity.id = Some(Uuid::new_v4().to_string());
-            if activity.account_name.is_none() {
-                activity.account_name = Some(account.name.clone());
-            }
-            if activity.account_id.is_none() {
-                activity.account_id = Some(account_id.to_string());
-            }
-            self.hydrate_import_activity_from_asset_id(&mut activity);
-
-            let symbol = activity.symbol.trim().to_string();
-            match classify_import_activity(
-                &activity.activity_type,
-                &symbol,
-                activity.quantity,
-                activity.unit_price,
-            ) {
-                ImportSymbolDisposition::CashMovement => {
-                    activity.symbol = String::new();
-                    activity.exchange_mic = None;
-                    activity.quote_ccy = None;
-                    activity.instrument_type = None;
-                    if activity.currency.trim().is_empty() {
-                        activity.currency = account_currency.clone();
-                    }
-                }
-                ImportSymbolDisposition::NeedsReview(msg) => {
-                    Self::add_activity_error(&mut activity, "symbol", &msg);
-                }
-                ImportSymbolDisposition::ResolveAsset => {
-                    if symbol.is_empty() {
-                        let activity_type = activity.activity_type.clone();
-                        Self::add_activity_error(
-                            &mut activity,
-                            "symbol",
-                            &format!("Symbol is required for {} activities.", activity_type),
-                        );
-                    } else if is_garbage_symbol(&symbol) {
-                        Self::add_activity_error(
-                            &mut activity,
-                            "symbol",
-                            &format!("Invalid symbol '{}'. Please correct or remove it.", &symbol),
-                        );
-                    } else {
-                        activity.symbol = symbol;
-                    }
-
-                    let instrument_type =
-                        Self::parse_instrument_type(activity.instrument_type.as_deref());
-                    if instrument_type.is_none() {
-                        Self::add_activity_error(
-                            &mut activity,
-                            "instrumentType",
-                            "Instrument type is missing. Re-run import check before applying.",
-                        );
-                    }
-
-                    if let Some(normalized_quote_ccy) =
-                        Self::normalize_quote_ccy(activity.quote_ccy.as_deref())
-                    {
-                        activity.quote_ccy = Some(normalized_quote_ccy);
-                    } else {
-                        Self::add_activity_error(
-                            &mut activity,
-                            "quoteCcy",
-                            "Quote currency is missing. Re-run import check before applying.",
-                        );
-                    }
-
-                    let is_non_security = matches!(
-                        instrument_type.as_ref(),
-                        Some(InstrumentType::Crypto | InstrumentType::Fx)
-                    );
-                    let is_manual_quote = activity
-                        .quote_mode
-                        .as_deref()
-                        .map(|m| m.to_uppercase() == "MANUAL")
-                        .unwrap_or(false);
-                    let is_equity = instrument_type.as_ref() == Some(&InstrumentType::Equity);
-
-                    if is_non_security {
-                        activity.exchange_mic = None;
-                    } else if is_equity
-                        && !is_manual_quote
-                        && activity
-                            .exchange_mic
-                            .as_deref()
-                            .map(str::trim)
-                            .is_none_or(str::is_empty)
-                    {
-                        Self::add_activity_error(
-                            &mut activity,
-                            "exchangeMic",
-                            "Exchange MIC is missing. Re-run import check before applying.",
-                        );
-                    }
-                }
-            }
-
-            self.validate_currency(&mut activity, &account_currency);
-            activity.is_valid = activity
-                .errors
-                .as_ref()
-                .is_none_or(std::collections::HashMap::is_empty);
-            validated.push(activity);
-        }
-
-        validated
     }
 
     /// Resolves (symbol, currency) pairs to exchange MICs in batch.
@@ -1255,10 +1166,13 @@ impl ActivityService {
                 .get_symbol_id()
                 .filter(|id| !id.trim().is_empty())
                 .is_none()
-                && requires_symbol(&activity.activity_type) =>
+                && Self::requires_asset_identity(
+                    &activity.activity_type,
+                    activity.subtype.as_deref(),
+                ) =>
             {
                 return Err(ActivityError::InvalidData(
-                    "Symbol-required activities need either asset_id or symbol".to_string(),
+                    "Asset-backed activities need either asset_id or symbol".to_string(),
                 )
                 .into());
             }
@@ -1369,11 +1283,14 @@ impl ActivityService {
         } else if let Some(asset_id) = activity.get_symbol_id().filter(|s| !s.is_empty()) {
             // Existing asset_id provided (UUID from frontend)
             Some(asset_id.to_string())
-        } else if !requires_symbol(&activity.activity_type) {
+        } else if !Self::requires_asset_identity(
+            &activity.activity_type,
+            activity.subtype.as_deref(),
+        ) {
             None // Symbol-optional types have no asset when symbol is absent
         } else {
             return Err(ActivityError::InvalidData(
-                "Symbol-required activities need either asset_id or symbol".to_string(),
+                "Asset-backed activities need either asset_id or symbol".to_string(),
             )
             .into());
         };
@@ -1647,10 +1564,13 @@ impl ActivityService {
                 .get_symbol_id()
                 .filter(|id| !id.trim().is_empty())
                 .is_none()
-                && requires_symbol(&activity.activity_type) =>
+                && Self::requires_asset_identity(
+                    &activity.activity_type,
+                    activity.subtype.as_deref(),
+                ) =>
             {
                 return Err(ActivityError::InvalidData(
-                    "Symbol-required activities need either asset_id or symbol".to_string(),
+                    "Asset-backed activities need either asset_id or symbol".to_string(),
                 )
                 .into());
             }
@@ -1749,11 +1669,14 @@ impl ActivityService {
             }
         } else if let Some(asset_id) = activity.get_symbol_id().filter(|s| !s.is_empty()) {
             Some(asset_id.to_string())
-        } else if !requires_symbol(&activity.activity_type) {
+        } else if !Self::requires_asset_identity(
+            &activity.activity_type,
+            activity.subtype.as_deref(),
+        ) {
             None
         } else {
             return Err(ActivityError::InvalidData(
-                "Symbol-required activities need either asset_id or symbol".to_string(),
+                "Asset-backed activities need either asset_id or symbol".to_string(),
             )
             .into());
         };
@@ -1944,11 +1867,14 @@ impl ActivityService {
                     }
                 }
                 // Symbol-optional types with no symbol → no asset needed
-                if !requires_symbol(&activity.activity_type) {
+                if !Self::requires_asset_identity(
+                    &activity.activity_type,
+                    activity.subtype.as_deref(),
+                ) {
                     return Ok(None);
                 }
                 return Err(ActivityError::InvalidData(
-                    "Symbol-required activity needs symbol or asset_id".to_string(),
+                    "Asset-backed activity needs symbol or asset_id".to_string(),
                 )
                 .into());
             }
@@ -2164,7 +2090,13 @@ impl ActivityService {
                 let sym = a.symbol.trim();
                 !sym.is_empty()
                     && matches!(
-                        classify_import_activity(&a.activity_type, sym, a.quantity, a.unit_price,),
+                        Self::classify_import_symbol_disposition(
+                            &a.activity_type,
+                            a.subtype.as_deref(),
+                            sym,
+                            a.quantity,
+                            a.unit_price,
+                        ),
                         ImportSymbolDisposition::ResolveAsset
                     )
                     && a.exchange_mic.is_none()
@@ -2213,8 +2145,9 @@ impl ActivityService {
 
             let symbol = activity.symbol.trim().to_string();
 
-            match classify_import_activity(
+            match Self::classify_import_symbol_disposition(
                 &activity.activity_type,
+                activity.subtype.as_deref(),
                 &symbol,
                 activity.quantity,
                 activity.unit_price,
@@ -2546,334 +2479,37 @@ impl ActivityService {
         Ok(activities_with_status)
     }
 
-    async fn import_activities_for_account(
-        &self,
-        account_id: String,
-        activities: Vec<ActivityImport>,
-    ) -> Result<ImportActivitiesResult> {
-        let account = self.account_service.get_account(&account_id)?;
-        let total_count = activities.len() as u32;
-
-        let import_run = ImportRun::new(
-            account_id.clone(),
-            "CSV".to_string(),
-            ImportRunType::Import,
-            ImportRunMode::Initial,
-            ReviewMode::Never,
-        );
-        let import_run_id = import_run.id.clone();
-
-        if let Some(ref repo) = self.import_run_repository {
-            if let Err(e) = repo.create(import_run.clone()).await {
-                warn!("Failed to create import run record: {}", e);
+    /// Normalizes an `ActivityImport` for DB insertion. Does NOT add validation errors —
+    /// the import apply path runs a lightweight invariant check afterward.
+    ///
+    /// - CashMovement: clears symbol, exchange_mic, quote_ccy, instrument_type
+    /// - SPLIT: falls back to `account_currency` when currency is missing or invalid
+    fn normalize_for_insert(activity: &mut ActivityImport, account_currency: &str) {
+        match Self::classify_import_symbol_disposition(
+            &activity.activity_type,
+            activity.subtype.as_deref(),
+            activity.symbol.trim(),
+            activity.quantity,
+            activity.unit_price,
+        ) {
+            ImportSymbolDisposition::CashMovement => {
+                activity.symbol = String::new();
+                activity.exchange_mic = None;
+                activity.quote_ccy = None;
+                activity.instrument_type = None;
+                if activity.currency.trim().is_empty() {
+                    activity.currency = account_currency.to_string();
+                }
             }
+            _ => {}
         }
 
-        let mut validated_activities =
-            self.validate_import_activities_for_apply(&account, &account_id, activities);
-
-        let has_errors = validated_activities.iter().any(|activity| {
-            !activity.is_valid
-                || activity
-                    .errors
-                    .as_ref()
-                    .is_some_and(|errors| !errors.is_empty())
-        });
-
-        if has_errors {
-            let skipped_count = validated_activities.iter().filter(|a| !a.is_valid).count() as u32;
-
-            if let Some(ref repo) = self.import_run_repository {
-                let mut failed_run = import_run;
-                failed_run.fail("Validation errors in import data".to_string());
-                failed_run.summary = Some(ImportRunSummary {
-                    fetched: total_count,
-                    inserted: 0,
-                    updated: 0,
-                    skipped: skipped_count,
-                    warnings: 0,
-                    errors: skipped_count,
-                    removed: 0,
-                    assets_created: 0,
-                });
-                if let Err(e) = repo.update(failed_run).await {
-                    warn!("Failed to update import run with failure status: {}", e);
-                }
-            }
-
-            return Ok(ImportActivitiesResult {
-                activities: validated_activities,
-                import_run_id,
-                summary: ImportActivitiesSummary {
-                    total: total_count,
-                    imported: 0,
-                    skipped: skipped_count,
-                    duplicates: 0,
-                    assets_created: 0,
-                    success: false,
-                },
-            });
-        }
-
-        let mut import_index_map: Vec<usize> = Vec::new();
-        let new_activities: Vec<NewActivity> = validated_activities
-            .iter()
-            .enumerate()
-            .filter_map(|(idx, activity)| {
-                if activity.is_valid {
-                    import_index_map.push(idx);
-                    Some(activity.clone().into())
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        let prepare_result = self
-            .prepare_activities_for_import(new_activities, &account)
-            .await?;
-
-        if !prepare_result.errors.is_empty() {
-            for (idx, error) in prepare_result.errors.iter() {
-                if let Some(import_idx) = import_index_map.get(*idx).copied() {
-                    let activity = &mut validated_activities[import_idx];
-                    activity.is_valid = false;
-                    let mut errors = activity.errors.take().unwrap_or_default();
-                    errors
-                        .entry("symbol".to_string())
-                        .or_default()
-                        .push(error.clone());
-                    activity.errors = Some(errors);
-                }
-            }
-
-            let skipped_count = validated_activities.iter().filter(|a| !a.is_valid).count() as u32;
-
-            if let Some(ref repo) = self.import_run_repository {
-                let mut failed_run = import_run;
-                failed_run.fail("Preparation errors in import data".to_string());
-                failed_run.summary = Some(ImportRunSummary {
-                    fetched: total_count,
-                    inserted: 0,
-                    updated: 0,
-                    skipped: skipped_count,
-                    warnings: 0,
-                    errors: skipped_count,
-                    removed: 0,
-                    assets_created: prepare_result.assets_created,
-                });
-                if let Err(e) = repo.update(failed_run).await {
-                    warn!("Failed to update import run with failure status: {}", e);
-                }
-            }
-
-            return Ok(ImportActivitiesResult {
-                activities: validated_activities,
-                import_run_id,
-                summary: ImportActivitiesSummary {
-                    total: total_count,
-                    imported: 0,
-                    skipped: skipped_count,
-                    duplicates: 0,
-                    assets_created: prepare_result.assets_created,
-                    success: false,
-                },
-            });
-        }
-
-        let assets_created_count = prepare_result.assets_created;
-        let mut activities_to_insert: Vec<NewActivity> = prepare_result
-            .prepared
-            .into_iter()
-            .map(|prepared| prepared.activity)
-            .collect();
-
-        self.link_imported_transfer_pairs(&validated_activities, &mut activities_to_insert);
-
-        let mut duplicate_count: u32 = 0;
-        {
-            let mut keys: Vec<Option<String>> = Vec::with_capacity(activities_to_insert.len());
-            for activity in &mut activities_to_insert {
-                let date = DateTime::parse_from_rfc3339(&activity.activity_date)
-                    .map(|dt| dt.with_timezone(&Utc))
-                    .or_else(|_| {
-                        NaiveDate::parse_from_str(&activity.activity_date, "%Y-%m-%d").map(|d| {
-                            Utc.from_utc_datetime(&d.and_hms_opt(0, 0, 0).unwrap_or_default())
-                        })
-                    })
-                    .ok();
-
-                if let Some(date) = date {
-                    let key = compute_idempotency_key(
-                        &activity.account_id,
-                        &activity.activity_type,
-                        &date,
-                        activity.get_symbol_id(),
-                        activity.quantity,
-                        activity.unit_price,
-                        activity.amount,
-                        &activity.currency,
-                        None,
-                        activity.notes.as_deref(),
-                    );
-                    activity.idempotency_key = Some(key.clone());
-                    keys.push(Some(key));
-                } else {
-                    keys.push(None);
-                }
-            }
-
-            let mut first_index_by_key: HashMap<String, usize> = HashMap::new();
-            let mut batch_dup_sources: HashMap<usize, usize> = HashMap::new();
-            for (idx, key) in keys.iter().enumerate() {
-                if let Some(key) = key {
-                    if let Some(first_idx) = first_index_by_key.get(key).copied() {
-                        batch_dup_sources.insert(idx, first_idx);
-                    } else {
-                        first_index_by_key.insert(key.clone(), idx);
-                    }
-                }
-            }
-
-            let unique_keys: Vec<String> = first_index_by_key.keys().cloned().collect();
-            let existing = if unique_keys.is_empty() {
-                HashMap::new()
-            } else {
-                self.check_existing_duplicates(unique_keys)
-                    .unwrap_or_default()
-            };
-
-            let mut dup_indices: HashSet<usize> = batch_dup_sources.keys().copied().collect();
-            for (idx, key) in keys.iter().enumerate() {
-                if let Some(key) = key {
-                    if existing.contains_key(key) {
-                        dup_indices.insert(idx);
-                    }
-                }
-            }
-
-            if !dup_indices.is_empty() {
-                duplicate_count = dup_indices.len() as u32;
-
-                for &insert_idx in &dup_indices {
-                    if let Some(&import_idx) = import_index_map.get(insert_idx) {
-                        let key = keys.get(insert_idx).and_then(|item| item.as_ref());
-                        let existing_id = key.and_then(|item| existing.get(item)).cloned();
-                        let duplicate_line_number = if existing_id.is_none() {
-                            batch_dup_sources
-                                .get(&insert_idx)
-                                .and_then(|first_insert_idx| {
-                                    import_index_map.get(*first_insert_idx).and_then(
-                                        |first_import_idx| {
-                                            validated_activities
-                                                .get(*first_import_idx)
-                                                .and_then(|activity| activity.line_number)
-                                        },
-                                    )
-                                })
-                                .or_else(|| {
-                                    batch_dup_sources
-                                        .get(&insert_idx)
-                                        .map(|first_insert_idx| (*first_insert_idx + 1) as i32)
-                                })
-                        } else {
-                            None
-                        };
-
-                        let activity = &mut validated_activities[import_idx];
-                        if let Some(existing_id) = existing_id {
-                            Self::add_activity_warning(
-                                activity,
-                                "_duplicate",
-                                "Duplicate activity already exists",
-                            );
-                            activity.duplicate_of_id = Some(existing_id);
-                        } else if let Some(duplicate_line_number) = duplicate_line_number {
-                            Self::add_activity_warning(
-                                activity,
-                                "_duplicate",
-                                &format!(
-                                    "Duplicate of line {} in this import batch",
-                                    duplicate_line_number
-                                ),
-                            );
-                            activity.duplicate_of_line_number = Some(duplicate_line_number);
-                        } else {
-                            Self::add_activity_warning(
-                                activity,
-                                "_duplicate",
-                                "Duplicate activity appears multiple times in this import batch",
-                            );
-                        }
-                    }
-                }
-
-                let mut sorted_dups: Vec<usize> = dup_indices.into_iter().collect();
-                sorted_dups.sort_unstable_by(|a, b| b.cmp(a));
-                for idx in sorted_dups {
-                    activities_to_insert.remove(idx);
-                }
+        if activity.activity_type == ACTIVITY_TYPE_SPLIT {
+            let ccy = activity.currency.trim();
+            if ccy.len() != 3 || !ccy.chars().all(|c| c.is_ascii_alphabetic()) {
+                activity.currency = account_currency.to_string();
             }
         }
-
-        let asset_ids: Vec<String> = activities_to_insert
-            .iter()
-            .filter_map(|activity| activity.get_symbol_id().map(str::to_string))
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect();
-        let currencies: Vec<String> = activities_to_insert
-            .iter()
-            .map(|activity| activity.currency.clone())
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect();
-        let earliest_activity_at_utc = Self::earliest_new_activity_at_utc(&activities_to_insert);
-
-        let count = self
-            .activity_repository
-            .create_activities(activities_to_insert)
-            .await?;
-
-        if let Some(ref repo) = self.import_run_repository {
-            let mut completed_run = import_run;
-            completed_run.complete();
-            completed_run.summary = Some(ImportRunSummary {
-                fetched: total_count,
-                inserted: count as u32,
-                updated: 0,
-                skipped: duplicate_count,
-                warnings: duplicate_count,
-                errors: 0,
-                removed: 0,
-                assets_created: assets_created_count,
-            });
-            if let Err(e) = repo.update(completed_run.clone()).await {
-                warn!("Failed to update import run with success status: {}", e);
-            }
-        }
-
-        if count > 0 {
-            self.emit_activities_changed(
-                vec![account_id.clone()],
-                asset_ids,
-                currencies,
-                earliest_activity_at_utc,
-            );
-        }
-
-        Ok(ImportActivitiesResult {
-            activities: validated_activities,
-            import_run_id,
-            summary: ImportActivitiesSummary {
-                total: total_count,
-                imported: count as u32,
-                skipped: duplicate_count,
-                duplicates: duplicate_count,
-                assets_created: assets_created_count,
-                success: true,
-            },
-        })
     }
 }
 
@@ -3345,6 +2981,36 @@ impl ActivityServiceTrait for ActivityService {
                     };
                 }
 
+                // Equity without exchange MIC → needs manual resolution
+                let is_equity = matches!(
+                    Self::parse_instrument_type(activity.instrument_type.as_deref()),
+                    Some(InstrumentType::Equity)
+                );
+                let is_manual = activity
+                    .quote_mode
+                    .as_deref()
+                    .map(|m| m.eq_ignore_ascii_case("MANUAL"))
+                    .unwrap_or(false);
+                if is_equity && activity.exchange_mic.is_none() && !is_manual {
+                    let mut errors = std::collections::HashMap::new();
+                    errors.insert(
+                        "symbol".to_string(),
+                        vec![format!(
+                            "Could not determine the exchange for '{}'. Please search for the correct ticker.",
+                            &activity.symbol
+                        )],
+                    );
+                    return ImportAssetPreviewItem {
+                        key: candidate.key,
+                        status: ImportAssetPreviewStatus::NeedsFixing,
+                        resolution_source: "missing_exchange".to_string(),
+                        asset_id: None,
+                        draft: self.build_new_asset_draft_from_import(activity),
+                        errors: Some(errors),
+                        warnings: activity.warnings.clone(),
+                    };
+                }
+
                 ImportAssetPreviewItem {
                     key: candidate.key,
                     status: ImportAssetPreviewStatus::AutoResolvedNewAsset,
@@ -3364,82 +3030,429 @@ impl ActivityServiceTrait for ActivityService {
         &self,
         activities: Vec<ActivityImport>,
     ) -> Result<ImportActivitiesResult> {
-        let mut missing_account_results: Vec<(usize, ActivityImport)> = Vec::new();
-        let mut grouped: HashMap<String, Vec<(usize, ActivityImport)>> = HashMap::new();
+        let total = activities.len();
+
+        // ── 1. Separate valid from missing-account ───────────────────────────
+        let mut ordered: Vec<Option<ActivityImport>> = vec![None; total];
+        let mut valid: Vec<(usize, ActivityImport)> = Vec::with_capacity(total);
 
         for (idx, mut activity) in activities.into_iter().enumerate() {
-            let Some(account_id) = activity
+            let account_id = activity
                 .account_id
-                .clone()
-                .map(|value| value.trim().to_string())
-                .filter(|value| !value.is_empty())
-            else {
-                Self::add_activity_error(
-                    &mut activity,
-                    "accountId",
-                    "Account is required before importing activities.",
-                );
-                missing_account_results.push((idx, activity));
-                continue;
-            };
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string);
 
-            activity.account_id = Some(account_id.clone());
-            grouped.entry(account_id).or_default().push((idx, activity));
-        }
-
-        let total_len =
-            grouped.values().map(Vec::len).sum::<usize>() + missing_account_results.len();
-        let mut ordered: Vec<Option<ActivityImport>> = vec![None; total_len];
-        let mut summaries: Vec<ImportActivitiesSummary> = Vec::new();
-        let mut import_run_id: Option<String> = None;
-
-        for (idx, activity) in missing_account_results {
-            ordered[idx] = Some(activity);
-        }
-
-        for (account_id, entries) in grouped {
-            let indexes: Vec<usize> = entries.iter().map(|(idx, _)| *idx).collect();
-            let account_activities: Vec<ActivityImport> =
-                entries.into_iter().map(|(_, activity)| activity).collect();
-            let result = self
-                .import_activities_for_account(account_id, account_activities)
-                .await?;
-
-            if import_run_id.is_none() {
-                import_run_id = Some(result.import_run_id.clone());
-            }
-            summaries.push(result.summary.clone());
-
-            for (offset, activity) in result.activities.into_iter().enumerate() {
-                if let Some(idx) = indexes.get(offset).copied() {
+            match account_id {
+                Some(id) => {
+                    activity.account_id = Some(id);
+                    valid.push((idx, activity));
+                }
+                None => {
+                    Self::add_activity_error(
+                        &mut activity,
+                        "accountId",
+                        "Account is required before importing activities.",
+                    );
                     ordered[idx] = Some(activity);
                 }
             }
         }
 
-        let summary = summaries.into_iter().fold(
-            ImportActivitiesSummary {
-                total: ordered.iter().flatten().count() as u32,
-                imported: 0,
-                skipped: 0,
-                duplicates: 0,
-                assets_created: 0,
-                success: true,
-            },
-            |mut aggregate, item| {
-                aggregate.imported += item.imported;
-                aggregate.skipped += item.skipped;
-                aggregate.duplicates += item.duplicates;
-                aggregate.assets_created += item.assets_created;
-                aggregate.success &= item.success;
-                aggregate
-            },
+        if valid.is_empty() {
+            return Ok(ImportActivitiesResult {
+                activities: ordered.into_iter().flatten().collect(),
+                import_run_id: String::new(),
+                summary: ImportActivitiesSummary {
+                    total: total as u32,
+                    imported: 0,
+                    skipped: total as u32,
+                    duplicates: 0,
+                    assets_created: 0,
+                    success: false,
+                    error_message: Some("Account is required for all activities.".to_string()),
+                },
+            });
+        }
+
+        // ── 2. Resolve account currencies (one query per unique account) ─────
+        let base_ccy = self.account_service.get_base_currency().unwrap_or_default();
+        let unique_account_ids: HashSet<String> = valid
+            .iter()
+            .filter_map(|(_, a)| a.account_id.clone())
+            .collect();
+
+        let mut account_currencies: HashMap<String, String> =
+            HashMap::with_capacity(unique_account_ids.len());
+
+        for account_id in &unique_account_ids {
+            let account = self.account_service.get_account(account_id)?;
+            let currency = resolve_currency(&[&account.currency, &base_ccy]);
+            account_currencies.insert(account_id.clone(), currency);
+        }
+
+        // ── 3. Normalize + convert each activity ─────────────────────────────
+        let mut import_activities_indexed: Vec<(usize, ActivityImport)> =
+            Vec::with_capacity(valid.len());
+
+        for (idx, mut activity) in valid {
+            let account_id = activity.account_id.as_deref().unwrap_or("");
+            let account_currency = account_currencies
+                .get(account_id)
+                .map(String::as_str)
+                .unwrap_or(&base_ccy);
+            Self::normalize_for_insert(&mut activity, account_currency);
+            import_activities_indexed.push((idx, activity));
+        }
+
+        // ── 3.5: Lightweight pre-insert validation (no asset/FX resolution) ───
+        // Catches rows that slipped through the review step without proper resolution.
+        // date errors → "symbol" to match frontend field-keying convention.
+        let mut has_validation_errors = false;
+        for (_, activity) in import_activities_indexed.iter_mut() {
+            let has_symbol = !activity.symbol.trim().is_empty();
+            let has_asset_id = activity
+                .asset_id
+                .as_deref()
+                .map(str::trim)
+                .is_some_and(|asset_id| !asset_id.is_empty());
+            let symbol_disposition = Self::classify_import_symbol_disposition(
+                &activity.activity_type,
+                activity.subtype.as_deref(),
+                activity.symbol.trim(),
+                activity.quantity,
+                activity.unit_price,
+            );
+            let valid_date = DateTime::parse_from_rfc3339(&activity.date).is_ok()
+                || NaiveDate::parse_from_str(&activity.date, "%Y-%m-%d").is_ok();
+            if !valid_date {
+                activity.is_valid = false;
+                Self::add_activity_error(
+                    activity,
+                    "symbol",
+                    &format!("Invalid date '{}'.", activity.date),
+                );
+                has_validation_errors = true;
+                continue;
+            }
+            if let ImportSymbolDisposition::NeedsReview(message) = &symbol_disposition {
+                Self::add_activity_error(activity, "symbol", message);
+                activity.is_valid = false;
+                has_validation_errors = true;
+                continue;
+            }
+            if matches!(symbol_disposition, ImportSymbolDisposition::ResolveAsset)
+                && !has_symbol
+                && !has_asset_id
+            {
+                Self::add_activity_error(
+                    activity,
+                    "symbol",
+                    "Symbol or asset_id is required to import this activity.",
+                );
+                activity.is_valid = false;
+                has_validation_errors = true;
+                continue;
+            }
+            // Symbol-required rows with no asset_id need quote_ccy + instrument_type
+            // so the asset can be created or matched on first portfolio calculation.
+            if matches!(symbol_disposition, ImportSymbolDisposition::ResolveAsset)
+                && !has_asset_id
+                && has_symbol
+            {
+                if activity
+                    .quote_ccy
+                    .as_deref()
+                    .map(str::trim)
+                    .unwrap_or("")
+                    .is_empty()
+                {
+                    Self::add_activity_error(
+                        activity,
+                        "quoteCcy",
+                        "Price currency (quoteCcy) is required to import this activity.",
+                    );
+                    activity.is_valid = false;
+                    has_validation_errors = true;
+                }
+                if activity
+                    .instrument_type
+                    .as_deref()
+                    .map(str::trim)
+                    .unwrap_or("")
+                    .is_empty()
+                {
+                    Self::add_activity_error(
+                        activity,
+                        "instrumentType",
+                        "Instrument type is required to import this activity.",
+                    );
+                    activity.is_valid = false;
+                    has_validation_errors = true;
+                }
+            }
+        }
+
+        if has_validation_errors {
+            let skipped = import_activities_indexed
+                .iter()
+                .filter(|(_, a)| !a.is_valid)
+                .count() as u32;
+            for (idx, activity) in import_activities_indexed {
+                ordered[idx] = Some(activity);
+            }
+            return Ok(ImportActivitiesResult {
+                activities: ordered.into_iter().flatten().collect(),
+                import_run_id: String::new(),
+                summary: ImportActivitiesSummary {
+                    total: total as u32,
+                    imported: 0,
+                    skipped,
+                    duplicates: 0,
+                    assets_created: 0,
+                    success: false,
+                    error_message: Some("Validation errors found in activities.".to_string()),
+                },
+            });
+        }
+
+        // ── 4. Convert to NewActivity + link transfer pairs ──────────────────
+        // source_slice keeps the original ActivityImport values so link_imported_transfer_pairs
+        // can match by (date, currency, symbol, amount) using the pre-normalized data.
+        let source_slice: Vec<ActivityImport> = import_activities_indexed
+            .iter()
+            .map(|(_, a)| a.clone())
+            .collect();
+
+        let mut new_activities: Vec<NewActivity> = source_slice
+            .iter()
+            .cloned()
+            .map(NewActivity::from)
+            .collect();
+
+        for (new_act, src) in new_activities.iter_mut().zip(source_slice.iter()) {
+            new_act.idempotency_key = Self::build_import_idempotency_key(src, &new_act.account_id);
+        }
+
+        self.link_imported_transfer_pairs(&source_slice, &mut new_activities);
+
+        // ── 5. Partition hard duplicates before insert ───────────────────────
+        let mut first_index_by_key: HashMap<String, usize> = HashMap::new();
+        let mut batch_dup_sources: HashMap<usize, usize> = HashMap::new();
+
+        for (position, activity) in new_activities.iter().enumerate() {
+            let Some(key) = activity.idempotency_key.as_ref() else {
+                continue;
+            };
+
+            if let Some(first_idx) = first_index_by_key.get(key).copied() {
+                batch_dup_sources.insert(position, first_idx);
+            } else {
+                first_index_by_key.insert(key.clone(), position);
+            }
+        }
+
+        let existing_duplicates = if first_index_by_key.is_empty() {
+            HashMap::new()
+        } else {
+            self.check_existing_duplicates(first_index_by_key.keys().cloned().collect())?
+        };
+
+        let mut duplicate_count = 0u32;
+        let mut insertable_positions: Vec<usize> = Vec::with_capacity(new_activities.len());
+
+        for (position, activity) in new_activities.iter().enumerate() {
+            let Some(key) = activity.idempotency_key.as_ref() else {
+                insertable_positions.push(position);
+                continue;
+            };
+
+            if let Some(existing_id) = existing_duplicates.get(key) {
+                if let Some((_, import_activity)) = import_activities_indexed.get_mut(position) {
+                    Self::add_activity_warning(
+                        import_activity,
+                        "_duplicate",
+                        "Duplicate activity already exists",
+                    );
+                    import_activity.duplicate_of_id = Some(existing_id.clone());
+                }
+                duplicate_count += 1;
+                continue;
+            }
+
+            if let Some(first_idx) = batch_dup_sources.get(&position).copied() {
+                let duplicate_line_number = import_activities_indexed
+                    .get(first_idx)
+                    .and_then(|(_, activity)| activity.line_number)
+                    .unwrap_or((first_idx + 1) as i32);
+                if let Some((_, import_activity)) = import_activities_indexed.get_mut(position) {
+                    Self::add_activity_warning(
+                        import_activity,
+                        "_duplicate",
+                        &format!(
+                            "Duplicate of line {} in this import batch",
+                            duplicate_line_number
+                        ),
+                    );
+                    import_activity.duplicate_of_line_number = Some(duplicate_line_number);
+                }
+                duplicate_count += 1;
+                continue;
+            }
+
+            insertable_positions.push(position);
+        }
+
+        let mut insertable_sources: Vec<(usize, ActivityImport)> =
+            Vec::with_capacity(insertable_positions.len());
+        let mut insertable_new_activities: Vec<NewActivity> =
+            Vec::with_capacity(insertable_positions.len());
+
+        for position in insertable_positions {
+            if let Some(indexed_activity) = import_activities_indexed.get(position).cloned() {
+                insertable_sources.push(indexed_activity);
+            }
+            if let Some(new_activity) = new_activities.get(position).cloned() {
+                insertable_new_activities.push(new_activity);
+            }
+        }
+
+        // ── 6. Ensure FX pairs (one batch call) ──────────────────────────────
+        let mut fx_pairs: HashSet<(String, String)> = HashSet::new();
+        for (new_act, (_, src)) in insertable_new_activities
+            .iter()
+            .zip(insertable_sources.iter())
+        {
+            let account_id = src.account_id.as_deref().unwrap_or("");
+            let account_currency = account_currencies
+                .get(account_id)
+                .cloned()
+                .unwrap_or_else(|| base_ccy.clone());
+            let act_ccy = new_act.currency.clone();
+            if !act_ccy.is_empty() && act_ccy != account_currency {
+                fx_pairs.insert((act_ccy.clone(), account_currency.clone()));
+            }
+            if let Some(quote_ccy) = new_act.get_quote_ccy() {
+                let quote_ccy = quote_ccy.to_string();
+                if quote_ccy != account_currency && quote_ccy != act_ccy {
+                    fx_pairs.insert((quote_ccy, account_currency.clone()));
+                }
+            }
+        }
+        if !fx_pairs.is_empty() {
+            self.fx_service
+                .ensure_fx_pairs(fx_pairs.into_iter().collect())
+                .await?;
+        }
+
+        // ── 7. Create ImportRun ───────────────────────────────────────────────
+        let first_account_id = import_activities_indexed
+            .first()
+            .and_then(|(_, a)| a.account_id.as_deref())
+            .unwrap_or("")
+            .to_string();
+
+        let import_run = ImportRun::new(
+            first_account_id,
+            "csv".to_string(),
+            ImportRunType::Import,
+            ImportRunMode::Incremental,
+            ReviewMode::Never,
         );
+        let import_run_id = import_run.id.clone();
+
+        if let Some(ref repo) = self.import_run_repository {
+            if let Err(e) = repo.create(import_run.clone()).await {
+                warn!("Failed to create import run: {}", e);
+            }
+        }
+
+        // ── 8. Collect event metadata ─────────────────────────────────────────
+        let account_ids: Vec<String> = insertable_sources
+            .iter()
+            .filter_map(|(_, a)| a.account_id.clone())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+        let asset_ids: Vec<String> = insertable_new_activities
+            .iter()
+            .filter_map(|a| a.get_symbol_id().map(str::to_string))
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+        let currencies: Vec<String> = insertable_new_activities
+            .iter()
+            .map(|a| a.currency.clone())
+            .filter(|c| !c.is_empty())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+        let earliest_at = Self::earliest_new_activity_at_utc(insertable_new_activities.iter());
+
+        // ── 9. Insert all non-duplicate activities in one transaction ────────
+        let inserted_count = if insertable_new_activities.is_empty() {
+            0
+        } else {
+            match self
+                .activity_repository
+                .create_activities(insertable_new_activities)
+                .await
+            {
+                Ok(n) => n as u32,
+                Err(e) => {
+                    if let Some(ref repo) = self.import_run_repository {
+                        let mut failed_run = import_run.clone();
+                        failed_run.fail(e.to_string());
+                        if let Err(ue) = repo.update(failed_run).await {
+                            warn!("Failed to mark import run as failed: {}", ue);
+                        }
+                    }
+                    return Err(e);
+                }
+            }
+        };
+
+        // ── 10. Finalize ImportRun ────────────────────────────────────────────
+        if let Some(ref repo) = self.import_run_repository {
+            let mut completed_run = import_run;
+            completed_run.complete();
+            completed_run.summary = Some(ImportRunSummary {
+                fetched: total as u32,
+                inserted: inserted_count,
+                updated: 0,
+                skipped: duplicate_count,
+                warnings: duplicate_count,
+                errors: 0,
+                removed: 0,
+                assets_created: 0,
+            });
+            if let Err(e) = repo.update(completed_run).await {
+                warn!("Failed to update import run with success status: {}", e);
+            }
+        }
+
+        // ── 11. Emit events + build ordered result ────────────────────────────
+        if inserted_count > 0 {
+            self.emit_activities_changed(account_ids, asset_ids, currencies, earliest_at);
+        }
+
+        for (idx, activity) in import_activities_indexed {
+            ordered[idx] = Some(activity);
+        }
 
         Ok(ImportActivitiesResult {
             activities: ordered.into_iter().flatten().collect(),
-            import_run_id: import_run_id.unwrap_or_default(),
-            summary,
+            import_run_id,
+            summary: ImportActivitiesSummary {
+                total: total as u32,
+                imported: inserted_count,
+                skipped: duplicate_count,
+                duplicates: duplicate_count,
+                assets_created: 0,
+                success: true,
+                error_message: None,
+            },
         })
     }
 

@@ -459,6 +459,8 @@ export interface ImportActivitiesSummary {
   assetsCreated: number;
   /** Whether the import was successful (no validation errors) */
   success: boolean;
+  /** Human-readable reason for failure, if success is false */
+  errorMessage?: string;
 }
 
 export type ValidationResult = { status: "success" } | { status: "error"; errors: string[] };

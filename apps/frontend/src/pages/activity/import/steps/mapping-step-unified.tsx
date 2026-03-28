@@ -29,7 +29,7 @@ import { computeFieldMappings, useImportMapping } from "../hooks/use-import-mapp
 import { isFieldMapped } from "../utils/draft-utils";
 import { validateTickerSymbol, findMappedActivityType } from "../utils/validation-utils";
 
-import { isCashSymbol, isSymbolRequired } from "@/lib/activity-utils";
+import { isCashSymbol, needsImportAssetResolution } from "@/lib/activity-utils";
 import { IMPORT_REQUIRED_FIELDS, ImportFormat } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, CsvRowData, ImportTemplateData } from "@/lib/types";
@@ -133,11 +133,14 @@ export function MappingStepUnified() {
       if (!symbol) return;
 
       const csvType = getMappedValue(row, ImportFormat.ACTIVITY_TYPE)?.trim();
+      const csvSubtype = getMappedValue(row, ImportFormat.SUBTYPE)?.trim();
       const appType = csvType
         ? findMappedActivityType(csvType, localMapping.activityMappings || {})
         : null;
 
-      if (appType && (!isSymbolRequired(appType) || isCashSymbol(symbol))) return;
+      if (appType && (!needsImportAssetResolution(appType, csvSubtype) || isCashSymbol(symbol))) {
+        return;
+      }
 
       needed.add(symbol);
       if (!validateTickerSymbol(symbol)) invalid.add(symbol);
@@ -276,11 +279,14 @@ export function MappingStepUnified() {
       if (!symbol) return;
 
       const csvType = getMappedValue(row, ImportFormat.ACTIVITY_TYPE)?.trim();
+      const csvSubtype = getMappedValue(row, ImportFormat.SUBTYPE)?.trim();
       const appType = csvType
         ? findMappedActivityType(csvType, localMapping.activityMappings || {})
         : null;
 
-      if (appType && (!isSymbolRequired(appType) || isCashSymbol(symbol))) return;
+      if (appType && (!needsImportAssetResolution(appType, csvSubtype) || isCashSymbol(symbol))) {
+        return;
+      }
       if (validateTickerSymbol(symbol) || localMapping.symbolMappings?.[symbol]) return;
       unresolved.add(symbol);
     });

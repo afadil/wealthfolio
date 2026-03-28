@@ -4,7 +4,7 @@ import { ProgressIndicator } from "@wealthfolio/ui/components/ui/progress-indica
 import { FacetedFilter } from "@wealthfolio/ui";
 import { useCallback, useMemo, useState } from "react";
 import { ImportAlert } from "../components/import-alert";
-import { ImportReviewGrid, type ImportReviewFilter } from "../components/import-review-grid";
+import { ImportReviewGrid } from "../components/import-review-grid";
 import {
   bulkSetAccount,
   bulkSetCurrency,
@@ -15,72 +15,71 @@ import {
   type DraftActivity,
 } from "../context";
 import { buildImportAssetCandidateFromDraft } from "../utils/asset-review-utils";
-import { hasDuplicateWarning, validateDraft } from "../utils/draft-utils";
+import { validateDraft } from "../utils/draft-utils";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Types
+// Filter Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface FilterStats {
-  all: number;
-  errors: number;
-  warnings: number;
-  duplicates: number;
-  skipped: number;
-  valid: number;
+function matchesFacetFilters(
+  draft: DraftActivity,
+  typeFilter: Set<string>,
+  accountFilter: Set<string>,
+  symbolFilter: Set<string>,
+): boolean {
+  if (typeFilter.size > 0 && (!draft.activityType || !typeFilter.has(draft.activityType))) {
+    return false;
+  }
+  if (accountFilter.size > 0 && (!draft.accountId || !accountFilter.has(draft.accountId))) {
+    return false;
+  }
+  if (symbolFilter.size > 0 && (!draft.symbol || !symbolFilter.has(draft.symbol))) {
+    return false;
+  }
+  return true;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Filter Stats Component
-// ─────────────────────────────────────────────────────────────────────────────
+function buildDuplicateReviewRows(drafts: DraftActivity[]): DraftActivity[] {
+  const byLineNumber = new Map(drafts.map((draft) => [draft.rowIndex + 1, draft]));
+  const duplicateRows = drafts
+    .filter((draft) => draft.status === "duplicate")
+    .sort((left, right) => {
+      const leftSource = left.duplicateOfLineNumber ?? left.rowIndex + 1;
+      const rightSource = right.duplicateOfLineNumber ?? right.rowIndex + 1;
+      return leftSource - rightSource || left.rowIndex - right.rowIndex;
+    });
 
-interface FilterStatsProps {
-  stats: FilterStats;
-  currentFilter: ImportReviewFilter;
-  onFilterChange: (filter: ImportReviewFilter) => void;
+  const ordered: DraftActivity[] = [];
+  const seen = new Set<number>();
+  const pushOnce = (draft?: DraftActivity) => {
+    if (!draft || seen.has(draft.rowIndex)) return;
+    ordered.push(draft);
+    seen.add(draft.rowIndex);
+  };
+
+  for (const duplicate of duplicateRows) {
+    if (typeof duplicate.duplicateOfLineNumber === "number") {
+      pushOnce(byLineNumber.get(duplicate.duplicateOfLineNumber));
+    }
+    pushOnce(duplicate);
+  }
+
+  return ordered;
 }
 
-function FilterStatsBar({ stats, currentFilter, onFilterChange }: FilterStatsProps) {
-  // Define filter configs - only show colored variants when count > 0
-  const filters: {
-    id: ImportReviewFilter;
-    label: string;
-    count: number;
-    colorVariant: "default" | "destructive" | "secondary" | "outline";
-  }[] = [
-    { id: "all", label: "All", count: stats.all, colorVariant: "secondary" },
-    { id: "errors", label: "Errors", count: stats.errors, colorVariant: "destructive" },
-    { id: "warnings", label: "Warnings", count: stats.warnings, colorVariant: "secondary" },
-    { id: "duplicates", label: "Duplicates", count: stats.duplicates, colorVariant: "secondary" },
-    { id: "skipped", label: "Skipped", count: stats.skipped, colorVariant: "secondary" },
-  ];
+function findDuplicateContextRowIndexes(drafts: DraftActivity[]): number[] {
+  const byLineNumber = new Map(drafts.map((draft) => [draft.rowIndex + 1, draft]));
+  const contextRowIndexes = new Set<number>();
 
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      {filters.map((filter) => {
-        // Use colored variant only when count > 0, otherwise use outline
-        const variant =
-          currentFilter === filter.id
-            ? "default"
-            : filter.count > 0
-              ? filter.colorVariant
-              : "outline";
+  for (const draft of drafts) {
+    if (typeof draft.duplicateOfLineNumber !== "number") continue;
+    const sourceDraft = byLineNumber.get(draft.duplicateOfLineNumber);
+    if (sourceDraft) {
+      contextRowIndexes.add(sourceDraft.rowIndex);
+    }
+  }
 
-        return (
-          <Badge
-            key={filter.id}
-            variant={variant}
-            className={`cursor-pointer transition-all ${
-              currentFilter === filter.id ? "" : "opacity-70 hover:opacity-100"
-            }`}
-            onClick={() => onFilterChange(filter.id)}
-          >
-            {filter.label}: {filter.count}
-          </Badge>
-        );
-      })}
-    </div>
-  );
+  return [...contextRowIndexes];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -93,50 +92,23 @@ export function ReviewStep() {
   const isValidating = state.isValidating;
 
   const [selectedRows, setSelectedRows] = useState<number[]>([]);
-  const [filter, setFilter] = useState<ImportReviewFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set());
   const [typeFilter, setTypeFilter] = useState<Set<string>>(new Set());
   const [accountFilter, setAccountFilter] = useState<Set<string>>(new Set());
   const [symbolFilter, setSymbolFilter] = useState<Set<string>>(new Set());
 
-  // Calculate filter stats
-  const filterStats = useMemo<FilterStats>(() => {
-    const stats: FilterStats = {
-      all: draftActivities.length,
-      errors: 0,
-      warnings: 0,
-      duplicates: 0,
-      skipped: 0,
-      valid: 0,
-    };
-
-    for (const draft of draftActivities) {
-      switch (draft.status) {
-        case "error":
-          stats.errors++;
-          break;
-        case "warning":
-          stats.warnings++;
-          if (hasDuplicateWarning(draft)) {
-            stats.duplicates++;
-          }
-          break;
-        case "duplicate":
-          stats.warnings++;
-          stats.duplicates++;
-          break;
-        case "skipped":
-          stats.skipped++;
-          break;
-        case "valid":
-          stats.valid++;
-          if (hasDuplicateWarning(draft)) {
-            stats.duplicates++;
-          }
-          break;
-      }
+  // Calculate filter stats (counts by status)
+  const filterStats = useMemo(() => {
+    const counts = { all: 0, errors: 0, warnings: 0, duplicates: 0, skipped: 0, valid: 0 };
+    counts.all = draftActivities.length;
+    for (const d of draftActivities) {
+      if (d.status === "error") counts.errors++;
+      else if (d.status === "warning") counts.warnings++;
+      else if (d.status === "duplicate") counts.duplicates++;
+      else if (d.status === "skipped") counts.skipped++;
+      else counts.valid++;
     }
-
-    return stats;
+    return counts;
   }, [draftActivities]);
 
   // Faceted filter options — derived from draft data
@@ -151,6 +123,14 @@ export function ReviewStep() {
       if (d.symbol) symbols.set(d.symbol, (symbols.get(d.symbol) ?? 0) + 1);
     }
 
+    const statuses = [
+      { label: "Errors", value: "error", count: filterStats.errors },
+      { label: "Warnings", value: "warning", count: filterStats.warnings },
+      { label: "Duplicates", value: "duplicate", count: filterStats.duplicates },
+      { label: "Skipped", value: "skipped", count: filterStats.skipped },
+      { label: "Valid", value: "valid", count: filterStats.valid },
+    ].filter((o) => o.count > 0);
+
     return {
       types: Array.from(types, ([value, count]) => ({ label: value, value, count })).sort((a, b) =>
         a.label.localeCompare(b.label),
@@ -161,24 +141,43 @@ export function ReviewStep() {
       symbols: Array.from(symbols, ([value, count]) => ({ label: value, value, count })).sort(
         (a, b) => a.label.localeCompare(b.label),
       ),
+      statuses,
     };
-  }, [draftActivities]);
+  }, [draftActivities, filterStats]);
 
-  // Apply faceted filters on top of drafts passed to the grid
-  const facetFilteredDrafts = useMemo(() => {
-    if (typeFilter.size === 0 && accountFilter.size === 0 && symbolFilter.size === 0) {
-      return draftActivities;
+  // Apply all filters on top of drafts passed to the grid
+  const { facetFilteredDrafts, nonSelectableRowIndexes } = useMemo(() => {
+    const draftsMatchingFacetFilters = draftActivities.filter((draft) =>
+      matchesFacetFilters(draft, typeFilter, accountFilter, symbolFilter),
+    );
+
+    if (statusFilter.size === 0) {
+      return { facetFilteredDrafts: draftsMatchingFacetFilters, nonSelectableRowIndexes: [] };
     }
-    return draftActivities.filter((d) => {
-      if (typeFilter.size > 0 && (!d.activityType || !typeFilter.has(d.activityType))) return false;
-      if (accountFilter.size > 0 && (!d.accountId || !accountFilter.has(d.accountId))) return false;
-      if (symbolFilter.size > 0 && (!d.symbol || !symbolFilter.has(d.symbol))) return false;
-      return true;
-    });
-  }, [draftActivities, typeFilter, accountFilter, symbolFilter]);
+
+    if (statusFilter.size === 1 && statusFilter.has("duplicate")) {
+      const groupedDrafts = buildDuplicateReviewRows(draftsMatchingFacetFilters);
+      return {
+        facetFilteredDrafts: groupedDrafts,
+        nonSelectableRowIndexes: findDuplicateContextRowIndexes(groupedDrafts),
+      };
+    }
+
+    return {
+      facetFilteredDrafts: draftsMatchingFacetFilters.filter((draft) => statusFilter.has(draft.status)),
+      nonSelectableRowIndexes: [],
+    };
+  }, [draftActivities, typeFilter, accountFilter, symbolFilter, statusFilter]);
 
   const hasActiveFacetFilters =
-    typeFilter.size > 0 || accountFilter.size > 0 || symbolFilter.size > 0;
+    typeFilter.size > 0 || accountFilter.size > 0 || symbolFilter.size > 0 || statusFilter.size > 0;
+
+  const clearAllFilters = useCallback(() => {
+    setTypeFilter(new Set());
+    setAccountFilter(new Set());
+    setSymbolFilter(new Set());
+    setStatusFilter(new Set());
+  }, []);
 
   // Handlers
   const handleDraftUpdate = useCallback(
@@ -298,13 +297,14 @@ export function ReviewStep() {
     );
   }
 
-  const validCount = filterStats.valid + filterStats.warnings;
+  const validCount = filterStats.valid + filterStats.warnings + filterStats.duplicates;
   const hasErrors = filterStats.errors > 0;
-  const hasWarnings = filterStats.warnings > 0;
+  const hasWarnings = filterStats.warnings > 0 || filterStats.duplicates > 0;
   const hasIssues = hasErrors || hasWarnings;
   const hasSkipped = filterStats.skipped > 0;
   const importCount = validCount; // skipped are excluded
   const isStale = state.lastValidatedRevision !== state.draftRevision;
+  const warningCount = filterStats.warnings + filterStats.duplicates;
 
   return (
     <div className="flex flex-col gap-4">
@@ -336,14 +336,44 @@ export function ReviewStep() {
           title={
             hasErrors
               ? `${filterStats.errors} ${filterStats.errors === 1 ? "row needs fixing" : "rows need fixing"}`
-              : `${filterStats.warnings} ${filterStats.warnings === 1 ? "warning" : "warnings"} to review`
+              : `${warningCount} ${warningCount === 1 ? "warning" : "warnings"} to review`
           }
           description={
             hasErrors
               ? `${validCount} of ${filterStats.all} rows are valid and ready to import. Fix errors below, or skip them to continue.`
               : `All ${filterStats.all} activities are importable. Review warnings below or proceed.`
           }
-        />
+        >
+          <div className="mt-2 flex flex-wrap gap-2">
+            {filterStats.errors > 0 && (
+              <Badge
+                variant="outline"
+                className="border-destructive/50 text-destructive hover:bg-destructive/10 cursor-pointer"
+                onClick={() => setStatusFilter(new Set(["error"]))}
+              >
+                {filterStats.errors} errors
+              </Badge>
+            )}
+            {filterStats.warnings > 0 && (
+              <Badge
+                variant="outline"
+                className="cursor-pointer border-yellow-500/50 text-yellow-700 hover:bg-yellow-500/10 dark:text-yellow-400"
+                onClick={() => setStatusFilter(new Set(["warning"]))}
+              >
+                {filterStats.warnings} warnings
+              </Badge>
+            )}
+            {filterStats.duplicates > 0 && (
+              <Badge
+                variant="outline"
+                className="cursor-pointer border-blue-500/50 text-blue-700 hover:bg-blue-500/10 dark:text-blue-400"
+                onClick={() => setStatusFilter(new Set(["duplicate"]))}
+              >
+                {filterStats.duplicates} duplicates
+              </Badge>
+            )}
+          </div>
+        </ImportAlert>
       ) : hasSkipped ? (
         <ImportAlert
           variant="success"
@@ -358,15 +388,10 @@ export function ReviewStep() {
         />
       )}
 
-      {/* Stats and filter */}
+      {/* Filter bar */}
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-base font-semibold">Review Activities</h2>
-          <FilterStatsBar stats={filterStats} currentFilter={filter} onFilterChange={setFilter} />
-        </div>
-
-        {/* Faceted filters */}
         <div className="flex flex-wrap items-center gap-2">
+          <span className="text-muted-foreground mr-1 text-sm">{filterStats.all} activities</span>
           <FacetedFilter
             title="Type"
             options={facetedOptions.types}
@@ -385,28 +410,30 @@ export function ReviewStep() {
             selectedValues={accountFilter}
             onFilterChange={setAccountFilter}
           />
+          <FacetedFilter
+            title="Status"
+            options={facetedOptions.statuses}
+            selectedValues={statusFilter}
+            onFilterChange={setStatusFilter}
+          />
           {hasActiveFacetFilters && (
             <Button
               variant="ghost"
               size="sm"
               className="text-muted-foreground h-7 text-xs"
-              onClick={() => {
-                setTypeFilter(new Set());
-                setAccountFilter(new Set());
-                setSymbolFilter(new Set());
-              }}
+              onClick={clearAllFilters}
             >
               Clear filters
             </Button>
           )}
         </div>
 
-        <ImportReviewGrid
-          drafts={facetFilteredDrafts}
-          onDraftUpdate={handleDraftUpdate}
-          selectedRows={selectedRows}
-          onSelectionChange={setSelectedRows}
-          filter={filter}
+          <ImportReviewGrid
+            drafts={facetFilteredDrafts}
+            nonSelectableRowIndexes={nonSelectableRowIndexes}
+            onDraftUpdate={handleDraftUpdate}
+            selectedRows={selectedRows}
+            onSelectionChange={setSelectedRows}
           onBulkSkip={handleBulkSkip}
           onBulkUnskip={handleBulkUnskip}
           onBulkSetCurrency={handleBulkSetCurrency}

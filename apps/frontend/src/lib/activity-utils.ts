@@ -1,4 +1,5 @@
 import {
+  ACTIVITY_SUBTYPES,
   ActivityType,
   DECIMAL_PRECISION,
   INCOME_ACTIVITY_TYPES,
@@ -44,6 +45,23 @@ export const isCashSymbol = (symbol?: string): boolean => {
  */
 export const isSymbolRequired = (activityType: string): boolean => {
   return (SYMBOL_REQUIRED_TYPES as readonly string[]).includes(activityType);
+};
+
+/**
+ * Import-time asset resolution can also be required by subtype even when the
+ * base activity type is normally cash-oriented (e.g. staking rewards).
+ */
+export const needsImportAssetResolution = (
+  activityType: string,
+  subtype?: string | null,
+): boolean => {
+  const normalizedSubtype = subtype?.trim().toUpperCase();
+  return (
+    isSymbolRequired(activityType) ||
+    normalizedSubtype === ACTIVITY_SUBTYPES.DRIP ||
+    normalizedSubtype === ACTIVITY_SUBTYPES.DIVIDEND_IN_KIND ||
+    normalizedSubtype === ACTIVITY_SUBTYPES.STAKING_REWARD
+  );
 };
 
 /**

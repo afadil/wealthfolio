@@ -8,7 +8,9 @@ import {
   nextStep,
   prevStep,
   setImportResult,
+  setStep,
   type DraftActivity,
+  type DraftActivityStatus,
 } from "../context";
 import { useActivityImportMutations } from "../hooks/use-activity-import-mutations";
 import { ImportAlert } from "../components/import-alert";
@@ -108,7 +110,7 @@ function draftToActivityImport(draft: DraftActivity): ActivityImport {
     id: undefined,
     accountId: draft.accountId,
     assetId: draft.assetId,
-    currency: draft.currency,
+    currency: draft.currency ?? "",
     activityType: draft.activityType as ActivityImport["activityType"],
     date: draft.activityDate,
     symbol: draft.symbol ?? "",
@@ -183,6 +185,30 @@ export function ConfirmStep() {
     onSuccess: (_activities, result) => {
       setImportError(null);
 
+      // If the backend found validation errors, surface them in the review grid
+      // rather than showing "Import Failed". This should be rare since the
+      // frontend validates first, but guards against edge cases.
+      if (!result.summary.success) {
+        const errored = result.activities.filter(
+          (a) => !a.isValid || (a.errors && Object.keys(a.errors).length > 0),
+        );
+        if (errored.length > 0) {
+          const errorMap = new Map(errored.map((a) => [a.lineNumber, a]));
+          const updatedDrafts = state.draftActivities.map((draft) => {
+            const backendActivity = errorMap.get(draft.rowIndex + 1);
+            if (!backendActivity?.errors) return draft;
+            return {
+              ...draft,
+              errors: { ...(draft.errors ?? {}), ...backendActivity.errors },
+              status: "error" as DraftActivityStatus,
+            };
+          });
+          dispatch({ type: "SET_VALIDATED_DRAFT_ACTIVITIES", payload: updatedDrafts });
+          dispatch(setStep("review"));
+          return;
+        }
+      }
+
       const frontendSkipped = summary.skipped + summary.errors;
       dispatch(
         setImportResult({
@@ -195,6 +221,7 @@ export function ConfirmStep() {
             errors: 0,
           },
           importRunId: result.importRunId,
+          errorMessage: result.summary.errorMessage,
         }),
       );
       dispatch(nextStep());
@@ -256,9 +283,11 @@ export function ConfirmStep() {
   };
 
   const handleImport = async () => {
-    // Filter only valid/warning activities for import
+    // Send valid, warning, and duplicate activities to the backend.
+    // Duplicates are skipped server-side via idempotency keys (ON CONFLICT DO NOTHING)
+    // so the backend returns the true inserted/duplicate counts.
     const draftsToImport = state.draftActivities.filter(
-      (d) => d.status === "valid" || d.status === "warning",
+      (d) => d.status === "valid" || d.status === "warning" || d.status === "duplicate",
     );
     if (draftsToImport.length === 0) {
       setImportError("No valid activities to import");

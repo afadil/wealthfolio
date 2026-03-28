@@ -1,4 +1,4 @@
-import { isCashSymbol, isSymbolRequired } from "@/lib/activity-utils";
+import { isCashSymbol, needsImportAssetResolution } from "@/lib/activity-utils";
 import type { ImportAssetCandidate, NewAsset, SymbolSearchResult } from "@/lib/types";
 import type { DraftActivity } from "../context";
 
@@ -61,11 +61,12 @@ export function buildImportAssetCandidateKey(input: {
   quoteCcy?: string;
   exchangeMic?: string;
 }): string {
+  // quoteCcy is intentionally excluded — rows with the same symbol but missing
+  // currency (e.g. SPLIT rows) should group with rows that have a currency.
   return [
     input.symbol.trim().toUpperCase(),
     input.instrumentType?.trim().toUpperCase() ?? "",
     input.quoteMode?.trim().toUpperCase() ?? "",
-    input.quoteCcy?.trim().toUpperCase() ?? "",
     input.exchangeMic?.trim().toUpperCase() ?? "",
   ].join("::");
 }
@@ -76,7 +77,10 @@ export function buildImportAssetCandidateFromDraft(
   if (!draft.symbol || !draft.activityType) {
     return null;
   }
-  if (!isSymbolRequired(draft.activityType) || isCashSymbol(draft.symbol)) {
+  if (
+    !needsImportAssetResolution(draft.activityType, draft.subtype) ||
+    isCashSymbol(draft.symbol)
+  ) {
     return null;
   }
   if (!draft.accountId) {

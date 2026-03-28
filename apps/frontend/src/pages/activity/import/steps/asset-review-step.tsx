@@ -181,7 +181,7 @@ function AutoResolvedRow({
   const metaPills = [asset?.instrumentType, asset?.quoteCcy, exchangeDisplay].filter(Boolean);
 
   return (
-    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1.5 px-3 py-3 transition-colors hover:bg-blue-50/60 sm:grid-cols-[12rem_1fr_auto] sm:px-4 sm:py-3.5 dark:hover:bg-blue-500/[0.05]">
+    <div className="hover:bg-muted/30 grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1.5 px-3 py-3 transition-colors sm:grid-cols-[12rem_1fr_auto] sm:px-4 sm:py-3.5">
       {/* Col 1: avatar + symbol + name */}
       <div className="flex items-center gap-2.5">
         <TickerAvatar symbol={symbol} className="size-7 shrink-0" />
@@ -220,7 +220,7 @@ function AutoResolvedRow({
           {metaPills.map((pill) => (
             <span
               key={pill}
-              className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] text-blue-700 dark:border-blue-400/25 dark:bg-blue-400/10 dark:text-blue-300"
+              className="border-border bg-muted/50 text-muted-foreground rounded border px-1.5 py-0.5 text-[10px]"
             >
               {pill}
             </span>
@@ -313,7 +313,7 @@ function ReadyAssetRow({
           {metaPills.map((pill) => (
             <span
               key={pill}
-              className="border-success/30 bg-success/10 text-success rounded border px-1.5 py-0.5 text-[10px]"
+              className="border-border bg-muted/50 text-muted-foreground rounded border px-1.5 py-0.5 text-[10px]"
             >
               {pill}
             </span>
@@ -358,7 +358,7 @@ export function AssetReviewStep() {
     symbol: "",
     mode: "create",
   });
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(["existingAssets"]));
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const toggleSection = (key: string) =>
     setCollapsed((prev) => {
       const next = new Set(prev);
@@ -577,7 +577,7 @@ export function AssetReviewStep() {
               <span className="text-xs font-semibold uppercase tracking-wider text-amber-800 dark:text-amber-300">
                 Needs Fixing
               </span>
-              <p className="mt-0.5 text-[11px] text-amber-700/80 dark:text-amber-400/80">
+              <p className="text-muted-foreground mt-0.5 text-[11px]">
                 Search for the correct ticker or create a custom asset for each symbol.
               </p>
             </div>
@@ -591,7 +591,7 @@ export function AssetReviewStep() {
 
           {/* Items */}
           {!collapsed.has("needsFixing") && (
-            <div className="divide-y divide-amber-100 dark:divide-amber-500/10">
+            <div className="divide-border divide-y">
               {needsFixing.map((item) => {
                 const candidate = candidateMap.get(item.key);
                 const symbol = candidate?.draft.symbol || item.key;
@@ -653,7 +653,7 @@ export function AssetReviewStep() {
                   <span className="text-xs font-semibold uppercase tracking-wider text-blue-800 dark:text-blue-300">
                     New Assets
                   </span>
-                  <p className="mt-0.5 text-[11px] text-blue-700/80 dark:text-blue-400/80">
+                  <p className="text-muted-foreground mt-0.5 text-[11px]">
                     Auto-resolved from market data. Review and edit if anything looks off before
                     importing.
                   </p>
@@ -676,7 +676,7 @@ export function AssetReviewStep() {
 
               {/* Items */}
               {!collapsed.has("newAssets") && (
-                <div className="divide-y divide-blue-100 dark:divide-blue-400/10">
+                <div className="divide-border divide-y">
                   {sortedItems.map((item) => {
                     const candidate = candidateMap.get(item.key);
                     const symbol =
@@ -733,24 +733,29 @@ export function AssetReviewStep() {
           {/* Section header */}
           <button
             type="button"
-            className="border-success/30 bg-success/[0.06] flex w-full items-center gap-2 border-b px-4 py-2.5 text-left"
+            className="border-success/30 bg-success/[0.06] flex w-full items-start gap-2 border-b px-4 py-2.5 text-left"
             onClick={() => toggleSection("existingAssets")}
           >
-            <Icons.CheckCircle className="text-success h-3.5 w-3.5 shrink-0" />
-            <span className="text-success flex-1 text-xs font-semibold uppercase tracking-wider">
-              Existing Assets
-            </span>
+            <Icons.CheckCircle className="text-success mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <div className="flex-1">
+              <span className="text-success text-xs font-semibold uppercase tracking-wider">
+                Existing Assets
+              </span>
+              <p className="text-muted-foreground mt-0.5 text-[11px]">
+                Already in your portfolio. No action needed, but you can still remap if required.
+              </p>
+            </div>
             <span className="bg-success/20 text-success rounded-full px-2 py-0.5 text-[10px] font-bold">
               {existingItems.length}
             </span>
             <Icons.ChevronDown
-              className={`text-success/60 h-3.5 w-3.5 shrink-0 transition-transform ${collapsed.has("existingAssets") ? "" : "rotate-180"}`}
+              className={`text-success/60 mt-0.5 h-3.5 w-3.5 shrink-0 transition-transform ${collapsed.has("existingAssets") ? "" : "rotate-180"}`}
             />
           </button>
 
           {/* Items */}
           {!collapsed.has("existingAssets") && (
-            <div className="divide-success/15 divide-y">
+            <div className="divide-border divide-y">
               {existingItems.map((item) => {
                 const candidate = candidateMap.get(item.key);
                 const symbol =

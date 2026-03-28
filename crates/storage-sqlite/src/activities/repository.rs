@@ -872,9 +872,11 @@ impl ActivityRepositoryTrait for ActivityRepository {
                     .values(&activities_db_owned)
                     .execute(tx.conn())
                     .map_err(StorageError::from)?;
+
                 for activity_db in &activities_db_owned {
                     tx.insert(activity_db)?;
                 }
+
                 Ok(num_inserted)
             })
             .await
@@ -1209,16 +1211,30 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
         self.writer
             .exec_tx(move |tx| -> Result<BulkUpsertResult> {
-                // Collect all activity IDs and idempotency keys for batch lookup
+                // Collect all activity IDs, source identities, and idempotency keys for batch lookup.
                 let activity_ids: Vec<String> =
                     activity_rows.iter().map(|a| a.id.clone()).collect();
+                let source_identities: Vec<(String, String, String)> = activity_rows
+                    .iter()
+                    .filter_map(|a| {
+                        let source_system = a.source_system.as_deref()?.trim();
+                        let source_record_id = a.source_record_id.as_deref()?.trim();
+                        if source_system.is_empty() || source_record_id.is_empty() {
+                            return None;
+                        }
+                        Some((
+                            source_system.to_string(),
+                            a.account_id.clone(),
+                            source_record_id.to_string(),
+                        ))
+                    })
+                    .collect();
                 let idempotency_keys: Vec<String> = activity_rows
                     .iter()
                     .filter_map(|a| a.idempotency_key.clone())
                     .collect();
 
-                // Fetch existing activities by ID or idempotency_key in one query
-                // This allows us to check is_user_modified and handle idempotency conflicts
+                // Fetch existing activities by ID or idempotency_key in one query.
                 let existing_activities: Vec<(String, Option<String>, i32)> = activities::table
                     .filter(
                         activities::id
@@ -1233,14 +1249,61 @@ impl ActivityRepositoryTrait for ActivityRepository {
                     .load::<(String, Option<String>, i32)>(tx.conn())
                     .map_err(StorageError::from)?;
 
-                // Build lookup maps for quick access
+                let existing_source_activities: Vec<(String, String, Option<String>, Option<String>, i32)> =
+                    if source_identities.is_empty() {
+                        Vec::new()
+                    } else {
+                        let source_systems: Vec<Option<String>> = source_identities
+                            .iter()
+                            .map(|(source_system, _, _)| Some(source_system.clone()))
+                            .collect();
+                        let account_ids: Vec<String> = source_identities
+                            .iter()
+                            .map(|(_, account_id, _)| account_id.clone())
+                            .collect();
+                        let source_record_ids: Vec<Option<String>> = source_identities
+                            .iter()
+                            .map(|(_, _, source_record_id)| Some(source_record_id.clone()))
+                            .collect();
+
+                        activities::table
+                            .filter(activities::account_id.eq_any(&account_ids))
+                            .filter(activities::source_system.eq_any(&source_systems))
+                            .filter(activities::source_record_id.eq_any(&source_record_ids))
+                            .select((
+                                activities::id,
+                                activities::account_id,
+                                activities::source_system,
+                                activities::source_record_id,
+                                activities::is_user_modified,
+                            ))
+                            .load::<(String, String, Option<String>, Option<String>, i32)>(tx.conn())
+                            .map_err(StorageError::from)?
+                    };
+
+                // Build lookup maps for quick access.
                 let mut existing_by_id: HashMap<String, i32> = HashMap::new();
                 let mut existing_by_idemp: HashMap<String, (String, i32)> = HashMap::new();
+                let mut existing_by_source: HashMap<(String, String, String), (String, i32)> =
+                    HashMap::new();
 
                 for (id, idemp_key, is_modified) in existing_activities {
                     existing_by_id.insert(id.clone(), is_modified);
                     if let Some(key) = idemp_key {
                         existing_by_idemp.insert(key, (id, is_modified));
+                    }
+                }
+
+                for (id, account_id, source_system, source_record_id, is_modified) in
+                    existing_source_activities
+                {
+                    if let (Some(source_system), Some(source_record_id)) =
+                        (source_system, source_record_id)
+                    {
+                        existing_by_source.insert(
+                            (source_system, account_id, source_record_id),
+                            (id, is_modified),
+                        );
                     }
                 }
 
@@ -1251,9 +1314,31 @@ impl ActivityRepositoryTrait for ActivityRepository {
                     let activity_id = activity_db.id.clone();
                     let idempotency_key = activity_db.idempotency_key.clone();
 
-                    // Check if this activity exists and is user-modified
-                    // First check by ID
+                    let source_identity = activity_db
+                        .source_system
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|value| !value.is_empty())
+                        .zip(
+                            activity_db
+                                .source_record_id
+                                .as_deref()
+                                .map(str::trim)
+                                .filter(|value| !value.is_empty()),
+                        )
+                        .map(|(source_system, source_record_id)| {
+                            (
+                                source_system.to_string(),
+                                activity_db.account_id.clone(),
+                                source_record_id.to_string(),
+                            )
+                        });
+                    let mut will_update = false;
+
+                    // Check if this activity exists and is user-modified.
+                    // First check by ID.
                     if let Some(&is_modified) = existing_by_id.get(&activity_id) {
+                        will_update = true;
                         if is_modified != 0 {
                             log::debug!(
                                 "Skipping user-modified activity {} (type={})",
@@ -1265,10 +1350,33 @@ impl ActivityRepositoryTrait for ActivityRepository {
                         }
                     }
 
-                    // If not found by ID, check by idempotency_key
-                    // This handles cases where provider IDs changed but content is the same
-                    let is_existing = existing_by_id.contains_key(&activity_id);
-                    if !is_existing {
+                    // Match by provider identity before falling back to semantic idempotency.
+                    if !will_update {
+                        if let Some(ref source_key) = source_identity {
+                            if let Some((existing_id, is_modified)) = existing_by_source.get(source_key)
+                            {
+                                if *is_modified != 0 {
+                                    log::debug!(
+                                        "Skipping update for user-modified activity (matched by source identity: {} -> {})",
+                                        activity_id,
+                                        existing_id
+                                    );
+                                    result.skipped += 1;
+                                    continue;
+                                }
+                                log::debug!(
+                                    "Activity {} matched existing {} by source identity, updating existing",
+                                    activity_id,
+                                    existing_id
+                                );
+                                activity_db.id = existing_id.clone();
+                                will_update = true;
+                            }
+                        }
+                    }
+
+                    // If still unmatched, fall back to semantic idempotency.
+                    if !will_update {
                         if let Some(ref key) = idempotency_key {
                             if let Some((existing_id, is_modified)) = existing_by_idemp.get(key) {
                                 if *is_modified != 0 {
@@ -1287,14 +1395,10 @@ impl ActivityRepositoryTrait for ActivityRepository {
                                     existing_id
                                 );
                                 activity_db.id = existing_id.clone();
+                                will_update = true;
                             }
                         }
                     }
-
-                    // Determine if this is a create or update for counting purposes
-                    let will_update = existing_by_id.contains_key(&activity_db.id)
-                        || (idempotency_key.is_some()
-                            && existing_by_idemp.contains_key(idempotency_key.as_ref().unwrap()));
 
                     match diesel::insert_into(activities::table)
                         .values(&activity_db)
@@ -1332,6 +1436,15 @@ impl ActivityRepositoryTrait for ActivityRepository {
                                 } else {
                                     tx.insert(&activity_db)?;
                                 }
+
+                                existing_by_id.insert(activity_db.id.clone(), 0);
+                                if let Some(key) = activity_db.idempotency_key.clone() {
+                                    existing_by_idemp.insert(key, (activity_db.id.clone(), 0));
+                                }
+                                if let Some(source_key) = source_identity.clone() {
+                                    existing_by_source.insert(source_key, (activity_db.id.clone(), 0));
+                                }
+
                                 result.upserted += count;
                                 if will_update {
                                     result.updated += count;
@@ -1450,8 +1563,9 @@ impl ActivityRepositoryTrait for ActivityRepository {
 mod tests {
     use super::*;
     use crate::db::{create_pool, get_connection, init, run_migrations, write_actor::spawn_writer};
+    use rust_decimal::Decimal;
     use tempfile::tempdir;
-    use wealthfolio_core::activities::import_type;
+    use wealthfolio_core::activities::{import_type, ActivityUpsert};
 
     fn setup_db() -> (Arc<Pool<ConnectionManager<SqliteConnection>>>, WriteHandle) {
         std::env::set_var("CONNECT_API_URL", "http://test.local");
@@ -1540,5 +1654,209 @@ mod tests {
             .first(&mut conn)
             .expect("template_id after relink");
         assert_eq!(template_id_after, "tmpl-b");
+    }
+
+    #[tokio::test]
+    async fn bulk_upsert_prefers_source_identity_over_idempotency_fallback() {
+        let (pool, writer) = setup_db();
+        let repo = ActivityRepository::new(pool.clone(), writer);
+        let mut conn = get_connection(&pool).expect("conn");
+
+        insert_account(&mut conn, "acc-sync");
+
+        let first = ActivityUpsert {
+            id: "provider-id-1".to_string(),
+            account_id: "acc-sync".to_string(),
+            asset_id: None,
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(Decimal::ONE),
+            unit_price: Some(Decimal::from(100)),
+            currency: "USD".to_string(),
+            fee: Some(Decimal::ZERO),
+            amount: Some(Decimal::from(100)),
+            status: None,
+            notes: Some("first import".to_string()),
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: Some("SNAPTRADE".to_string()),
+            source_record_id: Some("txn-1".to_string()),
+            source_group_id: None,
+            idempotency_key: Some("idemp-1".to_string()),
+            import_run_id: None,
+        };
+
+        let second = ActivityUpsert {
+            id: "provider-id-2".to_string(),
+            account_id: "acc-sync".to_string(),
+            asset_id: None,
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(Decimal::ONE),
+            unit_price: Some(Decimal::from(101)),
+            currency: "USD".to_string(),
+            fee: Some(Decimal::ZERO),
+            amount: Some(Decimal::from(101)),
+            status: None,
+            notes: Some("updated import".to_string()),
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: Some("SNAPTRADE".to_string()),
+            source_record_id: Some("txn-1".to_string()),
+            source_group_id: None,
+            idempotency_key: Some("idemp-2".to_string()),
+            import_run_id: None,
+        };
+
+        let first_result = repo
+            .bulk_upsert(vec![first])
+            .await
+            .expect("first upsert succeeds");
+        assert_eq!(first_result.created, 1);
+        assert_eq!(first_result.updated, 0);
+
+        let second_result = repo
+            .bulk_upsert(vec![second])
+            .await
+            .expect("second upsert succeeds");
+        assert_eq!(second_result.created, 0);
+        assert_eq!(second_result.updated, 1);
+
+        let rows: Vec<(
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        )> = activities::table
+            .filter(activities::account_id.eq("acc-sync"))
+            .select((
+                activities::id,
+                activities::amount,
+                activities::source_system,
+                activities::source_record_id,
+                activities::idempotency_key,
+            ))
+            .load(&mut conn)
+            .expect("load synced activities");
+
+        assert_eq!(
+            rows.len(),
+            1,
+            "source identity should collapse provider-id churn"
+        );
+        assert_eq!(
+            rows[0].0, "provider-id-1",
+            "existing row id should be preserved"
+        );
+        assert_eq!(
+            rows[0].1,
+            Some("101".to_string()),
+            "latest economics should win"
+        );
+        assert_eq!(rows[0].2.as_deref(), Some("SNAPTRADE"));
+        assert_eq!(rows[0].3.as_deref(), Some("txn-1"));
+        assert_eq!(rows[0].4.as_deref(), Some("idemp-2"));
+    }
+
+    #[tokio::test]
+    async fn bulk_upsert_collapses_duplicate_source_identity_within_same_batch() {
+        let (pool, writer) = setup_db();
+        let repo = ActivityRepository::new(pool.clone(), writer);
+        let mut conn = get_connection(&pool).expect("conn");
+
+        insert_account(&mut conn, "acc-sync");
+
+        let first = ActivityUpsert {
+            id: "provider-id-1".to_string(),
+            account_id: "acc-sync".to_string(),
+            asset_id: None,
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(Decimal::ONE),
+            unit_price: Some(Decimal::from(100)),
+            currency: "USD".to_string(),
+            fee: Some(Decimal::ZERO),
+            amount: Some(Decimal::from(100)),
+            status: None,
+            notes: Some("first import".to_string()),
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: Some("SNAPTRADE".to_string()),
+            source_record_id: Some("txn-1".to_string()),
+            source_group_id: None,
+            idempotency_key: Some("idemp-1".to_string()),
+            import_run_id: None,
+        };
+
+        let second = ActivityUpsert {
+            id: "provider-id-2".to_string(),
+            account_id: "acc-sync".to_string(),
+            asset_id: None,
+            activity_type: "BUY".to_string(),
+            subtype: None,
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(Decimal::ONE),
+            unit_price: Some(Decimal::from(101)),
+            currency: "USD".to_string(),
+            fee: Some(Decimal::ZERO),
+            amount: Some(Decimal::from(101)),
+            status: None,
+            notes: Some("updated import".to_string()),
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: Some("SNAPTRADE".to_string()),
+            source_record_id: Some("txn-1".to_string()),
+            source_group_id: None,
+            idempotency_key: Some("idemp-2".to_string()),
+            import_run_id: None,
+        };
+
+        let result = repo
+            .bulk_upsert(vec![first, second])
+            .await
+            .expect("batched upsert succeeds");
+
+        assert_eq!(result.created, 1);
+        assert_eq!(result.updated, 1);
+
+        let rows: Vec<(
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        )> = activities::table
+            .filter(activities::account_id.eq("acc-sync"))
+            .select((
+                activities::id,
+                activities::amount,
+                activities::source_system,
+                activities::source_record_id,
+                activities::idempotency_key,
+            ))
+            .load(&mut conn)
+            .expect("load synced activities");
+
+        assert_eq!(
+            rows.len(),
+            1,
+            "batch should collapse to a single provider row"
+        );
+        assert_eq!(
+            rows[0].0, "provider-id-1",
+            "first inserted row id should remain authoritative"
+        );
+        assert_eq!(rows[0].1, Some("101".to_string()));
+        assert_eq!(rows[0].2.as_deref(), Some("SNAPTRADE"));
+        assert_eq!(rows[0].3.as_deref(), Some("txn-1"));
+        assert_eq!(rows[0].4.as_deref(), Some("idemp-2"));
     }
 }

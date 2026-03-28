@@ -1516,6 +1516,56 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_create_rejects_staking_reward_without_symbol_or_asset_id() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        account_service.add_account(create_test_account("acc-1", "CAD"));
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let new_activity = NewActivity {
+            id: Some("staking-reward-1".to_string()),
+            account_id: "acc-1".to_string(),
+            symbol: None,
+            activity_type: "INTEREST".to_string(),
+            subtype: Some("STAKING_REWARD".to_string()),
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(dec!(0.25)),
+            unit_price: Some(dec!(4000)),
+            currency: "CAD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(1000)),
+            status: None,
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+            needs_review: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+        };
+
+        let result = activity_service.create_activity(new_activity).await;
+        assert!(result.is_err());
+        let error = result.err().unwrap().to_string();
+        assert!(
+            error.contains("Asset-backed activities need either asset_id or symbol"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[tokio::test]
     async fn test_bulk_create_rejects_new_equity_without_requested_quote_ccy() {
         let account_service = Arc::new(MockAccountService::new());
         let asset_service = Arc::new(MockAssetService::new());
@@ -2772,6 +2822,334 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_import_rejects_drip_without_symbol() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "GBP");
+        account_service.add_account(account);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let drip = ActivityImport {
+            id: None,
+            date: "2024-01-15".to_string(),
+            symbol: String::new(),
+            activity_type: "DIVIDEND".to_string(),
+            quantity: Some(dec!(1)),
+            unit_price: Some(dec!(132)),
+            currency: "GBP".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(132)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: None,
+            exchange_mic: None,
+            quote_ccy: Some("GBP".to_string()),
+            instrument_type: Some("EQUITY".to_string()),
+            quote_mode: Some("MARKET".to_string()),
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: Some("DRIP".to_string()),
+            asset_id: None,
+            isin: None,
+        };
+
+        let result = activity_service
+            .import_activities(vec![drip])
+            .await
+            .expect("import should complete with validation feedback");
+
+        assert!(!result.summary.success);
+        assert_eq!(result.summary.imported, 0);
+        assert_eq!(result.summary.skipped, 1);
+        let errors = result.activities[0]
+            .errors
+            .as_ref()
+            .expect("expected import errors");
+        assert!(errors.contains_key("symbol"));
+    }
+
+    #[tokio::test]
+    async fn test_import_rejects_dividend_in_kind_without_symbol() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "GBP");
+        account_service.add_account(account);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let dividend_in_kind = ActivityImport {
+            id: None,
+            date: "2024-01-15".to_string(),
+            symbol: String::new(),
+            activity_type: "DIVIDEND".to_string(),
+            quantity: Some(dec!(1)),
+            unit_price: Some(dec!(132)),
+            currency: "GBP".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(132)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: None,
+            exchange_mic: None,
+            quote_ccy: Some("GBP".to_string()),
+            instrument_type: Some("EQUITY".to_string()),
+            quote_mode: Some("MARKET".to_string()),
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: Some("DIVIDEND_IN_KIND".to_string()),
+            asset_id: None,
+            isin: None,
+        };
+
+        let result = activity_service
+            .import_activities(vec![dividend_in_kind])
+            .await
+            .expect("import should complete with validation feedback");
+
+        assert!(!result.summary.success);
+        assert_eq!(result.summary.imported, 0);
+        assert_eq!(result.summary.skipped, 1);
+        let errors = result.activities[0]
+            .errors
+            .as_ref()
+            .expect("expected import errors");
+        assert!(errors.contains_key("symbol"));
+    }
+
+    #[tokio::test]
+    async fn test_import_rejects_staking_reward_without_resolution_metadata() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "CAD");
+        account_service.add_account(account);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let staking_reward = ActivityImport {
+            id: None,
+            date: "2024-01-15".to_string(),
+            symbol: "ETH".to_string(),
+            activity_type: "INTEREST".to_string(),
+            quantity: Some(dec!(0.25)),
+            unit_price: Some(dec!(4000)),
+            currency: "CAD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(1000)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: Some("Ethereum".to_string()),
+            exchange_mic: None,
+            quote_ccy: None,
+            instrument_type: None,
+            quote_mode: Some("MARKET".to_string()),
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: Some("STAKING_REWARD".to_string()),
+            asset_id: None,
+            isin: None,
+        };
+
+        let result = activity_service
+            .import_activities(vec![staking_reward])
+            .await
+            .expect("import should complete with validation feedback");
+
+        assert!(!result.summary.success);
+        assert_eq!(result.summary.imported, 0);
+        assert_eq!(result.summary.skipped, 1);
+        let errors = result.activities[0]
+            .errors
+            .as_ref()
+            .expect("expected import errors");
+        assert!(errors.contains_key("quoteCcy"));
+        assert!(errors.contains_key("instrumentType"));
+    }
+
+    #[tokio::test]
+    async fn test_check_import_accepts_cash_dividend_without_symbol() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "CAD");
+        account_service.add_account(account);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let cash_dividend = ActivityImport {
+            id: None,
+            date: "2024-01-15".to_string(),
+            symbol: String::new(),
+            activity_type: "DIVIDEND".to_string(),
+            quantity: None,
+            unit_price: None,
+            currency: "CAD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(42)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: None,
+            exchange_mic: None,
+            quote_ccy: None,
+            instrument_type: None,
+            quote_mode: None,
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+            asset_id: None,
+            isin: None,
+        };
+
+        let result = activity_service
+            .check_activities_import(vec![cash_dividend])
+            .await
+            .expect("import check should succeed");
+
+        assert_eq!(result.len(), 1);
+        assert!(result[0].is_valid);
+        assert!(result[0]
+            .errors
+            .as_ref()
+            .is_none_or(|errors| errors.is_empty()));
+        assert_eq!(result[0].symbol, "");
+        assert_eq!(result[0].asset_id, None);
+    }
+
+    #[tokio::test]
+    async fn test_import_accepts_cash_dividend_without_symbol() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "CAD");
+        account_service.add_account(account);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let cash_dividend = ActivityImport {
+            id: None,
+            date: "2024-01-15".to_string(),
+            symbol: String::new(),
+            activity_type: "DIVIDEND".to_string(),
+            quantity: None,
+            unit_price: None,
+            currency: "CAD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(42)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: None,
+            exchange_mic: None,
+            quote_ccy: None,
+            instrument_type: None,
+            quote_mode: None,
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+            asset_id: None,
+            isin: None,
+        };
+
+        let result = activity_service
+            .import_activities(vec![cash_dividend])
+            .await
+            .expect("cash dividend import should succeed");
+
+        assert!(result.summary.success);
+        assert_eq!(result.summary.imported, 1);
+        assert_eq!(result.summary.skipped, 0);
+
+        let stored = activity_repository
+            .get_activities()
+            .expect("stored activities should be readable");
+        assert_eq!(stored.len(), 1);
+        assert_eq!(stored[0].activity_type, "DIVIDEND");
+        assert_eq!(stored[0].asset_id, None);
+    }
+
+    #[tokio::test]
     async fn test_import_accepts_resolved_symbol_rows_without_rechecking() {
         let account_service = Arc::new(MockAccountService::new());
         let asset_service = Arc::new(MockAssetService::new());
@@ -3157,6 +3535,202 @@ mod tests {
         assert_eq!(
             transfer_out_stored.source_group_id, transfer_in_stored.source_group_id,
             "paired transfers should share the same source_group_id"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_import_skips_existing_hard_duplicates_before_insert() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "GBP");
+        account_service.add_account(account);
+
+        let date = DateTime::parse_from_rfc3339("2024-01-15T00:00:00Z")
+            .expect("valid date")
+            .with_timezone(&Utc);
+        let existing_key = crate::activities::compute_idempotency_key(
+            "acc-1",
+            "BUY",
+            &date,
+            Some("VWRL@XLON"),
+            Some(dec!(1)),
+            Some(dec!(100)),
+            Some(dec!(100)),
+            "GBP",
+            None,
+            None,
+        );
+        activity_repository
+            .activities
+            .lock()
+            .unwrap()
+            .push(Activity {
+                id: "existing-dup".to_string(),
+                account_id: "acc-1".to_string(),
+                asset_id: None,
+                activity_type: "BUY".to_string(),
+                activity_type_override: None,
+                source_type: None,
+                subtype: None,
+                status: ActivityStatus::Posted,
+                activity_date: date,
+                settlement_date: None,
+                quantity: Some(dec!(1)),
+                unit_price: Some(dec!(100)),
+                amount: Some(dec!(100)),
+                fee: Some(dec!(0)),
+                currency: "GBP".to_string(),
+                fx_rate: None,
+                notes: None,
+                metadata: None,
+                source_system: Some("CSV".to_string()),
+                source_record_id: None,
+                source_group_id: None,
+                idempotency_key: Some(existing_key),
+                import_run_id: None,
+                is_user_modified: false,
+                needs_review: false,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            });
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let duplicate = ActivityImport {
+            id: None,
+            date: "2024-01-15".to_string(),
+            symbol: "VWRL".to_string(),
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(1)),
+            unit_price: Some(dec!(100)),
+            currency: "GBP".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(100)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: Some("Vanguard FTSE All-World".to_string()),
+            exchange_mic: Some("XLON".to_string()),
+            quote_ccy: Some("GBP".to_string()),
+            instrument_type: Some("EQUITY".to_string()),
+            quote_mode: Some("MARKET".to_string()),
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+            asset_id: None,
+            isin: None,
+        };
+
+        let result = activity_service
+            .import_activities(vec![duplicate])
+            .await
+            .expect("import should succeed");
+
+        assert!(result.summary.success);
+        assert_eq!(result.summary.imported, 0);
+        assert_eq!(result.summary.duplicates, 1);
+        assert_eq!(result.summary.skipped, 1);
+        assert_eq!(
+            result.activities[0].duplicate_of_id.as_deref(),
+            Some("existing-dup")
+        );
+
+        let stored = activity_repository
+            .get_activities()
+            .expect("stored activities should be readable");
+        assert_eq!(stored.len(), 1, "duplicate row should not be inserted");
+    }
+
+    #[tokio::test]
+    async fn test_import_skips_within_batch_duplicates_before_insert() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "GBP");
+        account_service.add_account(account);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let import = ActivityImport {
+            id: None,
+            date: "2024-01-15".to_string(),
+            symbol: "VWRL".to_string(),
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(1)),
+            unit_price: Some(dec!(100)),
+            currency: "GBP".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(100)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: Some("Vanguard FTSE All-World".to_string()),
+            exchange_mic: Some("XLON".to_string()),
+            quote_ccy: Some("GBP".to_string()),
+            instrument_type: Some("EQUITY".to_string()),
+            quote_mode: Some("MARKET".to_string()),
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+            asset_id: None,
+            isin: None,
+        };
+
+        let result = activity_service
+            .import_activities(vec![
+                import.clone(),
+                ActivityImport {
+                    line_number: Some(2),
+                    ..import
+                },
+            ])
+            .await
+            .expect("import should succeed");
+
+        assert!(result.summary.success);
+        assert_eq!(result.summary.imported, 1);
+        assert_eq!(result.summary.duplicates, 1);
+        assert_eq!(result.summary.skipped, 1);
+        assert_eq!(result.activities[1].duplicate_of_line_number, Some(1));
+
+        let stored = activity_repository
+            .get_activities()
+            .expect("stored activities should be readable");
+        assert_eq!(
+            stored.len(),
+            1,
+            "within-batch duplicate should not be inserted"
         );
     }
 

@@ -19,8 +19,7 @@ use std::sync::Arc;
 
 use rust_decimal::Decimal;
 use wealthfolio_core::activities::{
-    import_type, into_field_mapping_values, FieldMappingValue, ImportMappingData, ParseConfig,
-    ParsedCsvResult,
+    import_type, into_field_mapping_values, ImportMappingData, ParseConfig, ParsedCsvResult,
 };
 
 use super::constants::MAX_IMPORT_ROWS;

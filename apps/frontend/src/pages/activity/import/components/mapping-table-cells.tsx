@@ -12,7 +12,7 @@ import {
   type SymbolSearchResult,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { isCashSymbol, isSymbolRequired } from "@/lib/activity-utils";
+import { isCashSymbol, needsImportAssetResolution } from "@/lib/activity-utils";
 import {
   Badge,
   SearchableSelect,
@@ -103,7 +103,7 @@ export function MappingHeaderCell({
           className="text-muted-foreground h-8 py-0 pl-0 font-normal"
           onClick={() => setEditingHeader(field)}
         >
-          {mappedHeader || (isRequired ? "Select column" : "Ignore")}
+          {displayHeader || (isRequired ? "Select column" : "Ignore")}
         </Button>
       )}
     </div>
@@ -160,7 +160,11 @@ function ActivityTypeDisplayCell({
               ...Object.values(ActivityType)
                 .filter((t) => t !== "UNKNOWN")
                 .map((type) => ({ value: type, label: type })),
-              { value: ACTIVITY_SKIP, label: "Skip / Ignore" },
+              {
+                value: ACTIVITY_SKIP,
+                label: "SKIP",
+                className: "text-muted-foreground italic line-through",
+              },
             ]}
             value=""
             onValueChange={(newType) =>
@@ -393,8 +397,9 @@ export function MappingCell({
   if (field === ImportFormat.SYMBOL) {
     // Skip symbol display when not required (pure cash types, cash symbols)
     const csvType = getMappedValue(row, ImportFormat.ACTIVITY_TYPE)?.trim();
+    const csvSubtype = getMappedValue(row, ImportFormat.SUBTYPE)?.trim();
     const appType = csvType ? findMappedActivityType(csvType, mapping.activityMappings) : null;
-    if (appType && (!isSymbolRequired(appType) || isCashSymbol(value))) {
+    if (appType && (!needsImportAssetResolution(appType, csvSubtype) || isCashSymbol(value))) {
       return <span className="text-muted-foreground text-xs">-</span>;
     }
 

@@ -168,6 +168,9 @@ export function validateDraft(draft: Partial<DraftActivity>): {
   const errors: Record<string, string[]> = {};
   const warnings: Record<string, string[]> = {};
 
+  const activityType = draft.activityType?.toUpperCase();
+  const subtype = draft.subtype?.toUpperCase();
+
   // Required field validation
   if (!draft.activityDate) {
     errors.activityDate = ["Date is required"];
@@ -177,7 +180,8 @@ export function validateDraft(draft: Partial<DraftActivity>): {
     errors.activityType = ["Activity type is required"];
   }
 
-  if (!draft.currency) {
+  // SPLIT is a ratio event — currency is not meaningful
+  if (!draft.currency && activityType !== ActivityType.SPLIT) {
     errors.currency = ["Currency is required"];
   }
 
@@ -185,12 +189,9 @@ export function validateDraft(draft: Partial<DraftActivity>): {
     errors.accountId = ["Account is required"];
   }
 
-  // Activity-type specific validation
-  const activityType = draft.activityType?.toUpperCase();
-  const subtype = draft.subtype?.toUpperCase();
-
-  // Validate subtype is allowed for this activity type
-  if (subtype && activityType) {
+  // Validate subtype is allowed for this activity type.
+  // Skip when subtype mirrors the activity type itself — brokers often export this as a no-op label.
+  if (subtype && activityType && subtype !== activityType) {
     const allowedSubtypes = SUBTYPES_BY_ACTIVITY_TYPE[activityType] || [];
     if (allowedSubtypes.length > 0 && !allowedSubtypes.includes(subtype)) {
       warnings.subtype = [`'${subtype}' is not a recognized subtype for ${activityType}`];
@@ -212,14 +213,13 @@ export function validateDraft(draft: Partial<DraftActivity>): {
 
   // DIVIDEND validation
   if (activityType === ActivityType.DIVIDEND) {
-    if (!draft.symbol) {
-      errors.symbol = ["Symbol is required for dividend activities"];
-    }
-
     if (subtype === ACTIVITY_SUBTYPES.DRIP) {
       // DRIP: cash dividend → reinvested as BUY of same ticker
       // Needs: quantity (shares received), unit price (reinvest price)
       // Amount is optional (dividend cash amount)
+      if (!draft.symbol) {
+        errors.symbol = ["Symbol is required for DRIP dividends"];
+      }
       if (!hasPositiveValue(draft.quantity)) {
         errors.quantity = ["Quantity is required for DRIP (shares received)"];
       }
@@ -229,6 +229,9 @@ export function validateDraft(draft: Partial<DraftActivity>): {
     } else if (subtype === ACTIVITY_SUBTYPES.DIVIDEND_IN_KIND) {
       // DIVIDEND_IN_KIND: dividend paid in asset (not cash)
       // Needs: symbol (received asset), quantity, unit price (FMV), amount (value)
+      if (!draft.symbol) {
+        errors.symbol = ["Symbol is required for dividend in kind activities"];
+      }
       if (!hasPositiveValue(draft.quantity)) {
         errors.quantity = ["Quantity is required for dividend in kind (shares received)"];
       }
@@ -470,6 +473,11 @@ export function createDraftActivities(
     // in the Quantity column instead of Amount.
     const resolved = resolveCashActivityFields(activityType, quantity, amount, unitPrice);
 
+    // Infer isExternal for transfers: external unless the raw CSV label says "INTERNAL"
+    const isTransfer =
+      activityType === ActivityType.TRANSFER_IN || activityType === ActivityType.TRANSFER_OUT;
+    const isExternal = isTransfer ? !rawType?.trim().toUpperCase().includes("INTERNAL") : undefined;
+
     // Create draft object
     const draft: Partial<DraftActivity> = {
       rowIndex,
@@ -501,6 +509,7 @@ export function createDraftActivities(
       fee,
       fxRate,
       subtype,
+      isExternal,
       accountId,
       comment,
       isEdited: false,
