@@ -1,4 +1,10 @@
-import { createGoal, getGoalsAllocation, updateGoal, updateGoalsAllocations } from "@/adapters";
+import {
+  createGoal,
+  getGoals,
+  getGoalsAllocation,
+  updateGoal,
+  updateGoalsAllocations,
+} from "@/adapters";
 import { useFireSettings } from "@/pages/fire-planner/hooks/use-fire-settings";
 import { usePortfolioData } from "@/pages/fire-planner/hooks/use-portfolio";
 import { timezoneToCountry } from "@/pages/fire-planner/lib/timezone";
@@ -19,8 +25,14 @@ export default function FirePlannerSettingsPage() {
   const handleSave = async (updated: FireSettings) => {
     const grossTarget = calculateFireTarget(updated);
 
+    // Prefer the stored linkedGoalId; if missing (e.g. web localStorage cleared),
+    // recover the existing FIRE goal by name to avoid creating duplicates.
     let goalId = updated.linkedGoalId ?? null;
     try {
+      if (!goalId) {
+        const existing = await getGoals();
+        goalId = existing.find((g) => g.title === "FIRE (gross)")?.id ?? null;
+      }
       if (goalId) {
         await updateGoal({
           id: goalId,

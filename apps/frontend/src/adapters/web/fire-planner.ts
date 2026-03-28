@@ -39,12 +39,14 @@ export const calculateFireProjection = async (
   return projectFireDate(settings, currentPortfolio);
 };
 
+const WEB_MAX_SIMS = 10_000;
+
 export const runFireMonteCarlo = async (
   settings: FireSettings,
   currentPortfolio: number,
-  nSims = 10_000,
+  nSims = WEB_MAX_SIMS,
 ): Promise<MonteCarloResult> => {
-  return runMonteCarlo(settings, currentPortfolio, nSims);
+  return runMonteCarlo(settings, currentPortfolio, Math.min(nSims, WEB_MAX_SIMS));
 };
 
 export const runFireScenarioAnalysis = async (
