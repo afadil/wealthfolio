@@ -871,6 +871,21 @@ pub struct SendMessageRequest {
     /// When set, AI context is truncated to this message (inclusive).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_message_id: Option<String>,
+    /// File attachments (CSV, images, PDFs).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attachments: Option<Vec<MessageAttachment>>,
+}
+
+/// A file attachment sent with a chat message.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageAttachment {
+    /// Original filename (e.g., "statement.pdf", "trades.csv").
+    pub name: String,
+    /// MIME type (e.g., "text/csv", "image/png", "application/pdf").
+    pub content_type: String,
+    /// File content: plain text for CSV, base64-encoded for images/PDFs.
+    pub data: String,
 }
 
 impl SendMessageRequest {
