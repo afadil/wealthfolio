@@ -179,29 +179,40 @@ pub fn parse_csv(content: &[u8], config: &ParseConfig) -> Result<ParsedCsvResult
     })
 }
 
-/// Decodes content bytes to UTF-8 string, handling BOM if present.
-fn decode_content(content: &[u8], errors: &mut Vec<ParseError>) -> Result<String> {
-    // Check for UTF-8 BOM (EF BB BF)
-    let content_without_bom =
-        if content.len() >= 3 && content[0] == 0xEF && content[1] == 0xBB && content[2] == 0xBF {
-            &content[3..]
-        } else {
-            content
-        };
-
-    // Try UTF-8 decoding
-    match std::str::from_utf8(content_without_bom) {
-        Ok(s) => Ok(s.to_string()),
-        Err(e) => {
-            // Try lossy conversion and report error
-            errors.push(ParseError::encoding_error(format!(
-                "Invalid UTF-8 encoding at byte {}: {}. Some characters may be replaced.",
-                e.valid_up_to(),
-                e
-            )));
-            Ok(String::from_utf8_lossy(content_without_bom).into_owned())
-        }
+/// Detects the encoding of raw bytes.
+///
+/// Priority: BOM → valid UTF-8 → statistical detection (chardetng).
+fn detect_encoding(content: &[u8]) -> &'static encoding_rs::Encoding {
+    // BOM is authoritative (handles UTF-8, UTF-16LE, UTF-16BE)
+    if let Some((encoding, _)) = encoding_rs::Encoding::for_bom(content) {
+        return encoding;
     }
+    // Fast path: valid UTF-8 (no need for statistical detection)
+    if std::str::from_utf8(content).is_ok() {
+        return encoding_rs::UTF_8;
+    }
+    // Legacy encoding detection (Shift_JIS, Windows-1252, EUC-KR, etc.)
+    let mut detector = chardetng::EncodingDetector::new();
+    detector.feed(content, true);
+    detector.guess(None, true)
+}
+
+/// Decodes content bytes to UTF-8 string, handling BOM and non-UTF-8 encodings.
+fn decode_content(content: &[u8], errors: &mut Vec<ParseError>) -> Result<String> {
+    let encoding = detect_encoding(content);
+    let (decoded, _, had_errors) = encoding.decode(content);
+
+    if had_errors {
+        errors.push(ParseError::encoding_error(format!(
+            "Some characters could not be decoded (encoding: {}).",
+            encoding.name()
+        )));
+    }
+    if encoding != encoding_rs::UTF_8 {
+        log::debug!("Detected CSV encoding: {}", encoding.name());
+    }
+
+    Ok(decoded.into_owned())
 }
 
 /// Auto-detects the delimiter by analyzing the content.

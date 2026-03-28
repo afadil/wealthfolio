@@ -938,6 +938,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "chardetng"
+version = "0.1.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14b8f0b65b7b08ae3c8187e8d77174de20cb6777864c6b832d8ad365999cf1ea"
+dependencies = [
+ "cfg-if",
+ "encoding_rs",
+ "memchr",
+]
+
+[[package]]
 name = "chrono"
 version = "0.4.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7897,12 +7908,14 @@ version = "3.1.2"
 dependencies = [
  "anyhow",
  "async-trait",
+ "chardetng",
  "chrono",
  "chrono-tz",
  "csv",
  "dashmap",
  "diesel",
  "diesel_migrations",
+ "encoding_rs",
  "futures",
  "hex",
  "log",
