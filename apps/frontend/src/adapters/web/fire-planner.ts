@@ -1,5 +1,3 @@
-// FIRE planner is a desktop-only feature in v1. These stubs ensure web builds resolve
-// the module without errors and give clear messaging at runtime.
 import type {
   FireSettings,
   FireProjection,
@@ -9,57 +7,71 @@ import type {
   SensitivityResult,
   StrategyComparisonResult,
 } from "@/pages/fire-planner/types";
+import {
+  projectFireDate,
+  runMonteCarlo,
+  runScenarioAnalysis,
+  runSequenceOfReturnsRisk,
+  runSensitivityAnalysis,
+  runStrategyComparison,
+} from "@/pages/fire-planner/lib/fire-math";
 
-const DESKTOP_ONLY = "FIRE planner requires the desktop app";
+const STORAGE_KEY = "fire_planner_settings";
 
 export const getFireSettings = async (): Promise<FireSettings | null> => {
-  throw new Error(DESKTOP_ONLY);
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as FireSettings;
+  } catch {
+    return null;
+  }
 };
 
-export const saveFireSettings = async (_settings: FireSettings): Promise<void> => {
-  throw new Error(DESKTOP_ONLY);
+export const saveFireSettings = async (settings: FireSettings): Promise<void> => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 };
 
 export const calculateFireProjection = async (
-  _settings: FireSettings,
-  _currentPortfolio: number,
+  settings: FireSettings,
+  currentPortfolio: number,
 ): Promise<FireProjection> => {
-  throw new Error(DESKTOP_ONLY);
+  return projectFireDate(settings, currentPortfolio);
 };
 
 export const runFireMonteCarlo = async (
-  _settings: FireSettings,
-  _currentPortfolio: number,
-  _nSims?: number,
+  settings: FireSettings,
+  currentPortfolio: number,
+  nSims = 10_000,
 ): Promise<MonteCarloResult> => {
-  throw new Error(DESKTOP_ONLY);
+  return runMonteCarlo(settings, currentPortfolio, nSims);
 };
 
 export const runFireScenarioAnalysis = async (
-  _settings: FireSettings,
-  _currentPortfolio: number,
+  settings: FireSettings,
+  currentPortfolio: number,
 ): Promise<ScenarioResult[]> => {
-  throw new Error(DESKTOP_ONLY);
+  return runScenarioAnalysis(settings, currentPortfolio);
 };
 
 export const runFireSorr = async (
-  _settings: FireSettings,
-  _portfolioAtFire: number,
+  settings: FireSettings,
+  portfolioAtFire: number,
 ): Promise<SorrScenario[]> => {
-  throw new Error(DESKTOP_ONLY);
+  return runSequenceOfReturnsRisk(settings, portfolioAtFire);
 };
 
 export const runFireSensitivity = async (
-  _settings: FireSettings,
-  _currentPortfolio: number,
+  settings: FireSettings,
+  currentPortfolio: number,
 ): Promise<SensitivityResult> => {
-  throw new Error(DESKTOP_ONLY);
+  return runSensitivityAnalysis(settings, currentPortfolio);
 };
 
 export const runFireStrategyComparison = async (
-  _settings: FireSettings,
-  _currentPortfolio: number,
-  _nSims?: number,
+  settings: FireSettings,
+  currentPortfolio: number,
+  nSims = 5_000,
 ): Promise<StrategyComparisonResult> => {
-  throw new Error(DESKTOP_ONLY);
+  return runStrategyComparison(settings, currentPortfolio, nSims);
 };
