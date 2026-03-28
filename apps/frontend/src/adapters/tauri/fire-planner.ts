@@ -5,25 +5,11 @@ import type {
   MonteCarloResult,
   ScenarioResult,
   SorrScenario,
+  SensitivityResult,
+  StrategyComparisonResult,
 } from "@/pages/fire-planner/types";
 
-export interface SensitivityResult {
-  contribution: {
-    contributionRows: number[];
-    returnColumns: number[];
-    fireAges: (number | null)[][];
-  };
-  swr: {
-    swrRows: number[];
-    returnColumns: number[];
-    fireAges: (number | null)[][];
-  };
-}
-
-export interface StrategyComparisonResult {
-  constantDollar: MonteCarloResult;
-  constantPercentage: MonteCarloResult;
-}
+export type { SensitivityResult, StrategyComparisonResult };
 
 export const getFireSettings = async (): Promise<FireSettings | null> => {
   return invoke<FireSettings | null>("get_fire_settings");

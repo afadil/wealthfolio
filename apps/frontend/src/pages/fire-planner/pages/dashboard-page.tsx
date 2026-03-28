@@ -16,6 +16,7 @@ import {
   calculateNetFireTarget,
   calculateCoastFireAmount,
   projectFireDate,
+  resolveDcPayouts,
 } from "../lib/fire-math";
 
 interface Props {
@@ -40,6 +41,7 @@ function pct(value: number) {
 
 function singleStreamIncome(
   s: IncomeStream,
+  baseMonthly: number,
   age: number,
   yearsFromStart: number,
   inflationRate: number,
@@ -51,7 +53,7 @@ function singleStreamIncome(
       : s.adjustForInflation
         ? inflationRate
         : 0;
-  return s.monthlyAmount * 12 * Math.pow(1 + rate, yearsFromStart);
+  return baseMonthly * 12 * Math.pow(1 + rate, yearsFromStart);
 }
 
 export default function DashboardPage({ settings, portfolioData, isLoading }: Props) {
@@ -67,17 +69,30 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
 
   const fireAgeForBudget = projection.fireAge ?? settings.targetFireAge;
 
+  // Resolve DC stream payouts so the budget uses derived amounts (not the raw monthlyAmount field)
+  const dcPayouts = useMemo(
+    () =>
+      resolveDcPayouts(
+        settings.additionalIncomeStreams,
+        settings.currentAge,
+        settings.targetFireAge,
+        settings.safeWithdrawalRate,
+      ),
+    [settings],
+  );
+  const resolvedMonthly = (s: IncomeStream) => dcPayouts.get(s.id) ?? s.monthlyAmount;
+
   // Streams active from day-1 of FIRE (payout age <= FIRE age)
   const activeStreams = settings.additionalIncomeStreams.filter(
-    (s) => s.startAge <= fireAgeForBudget && s.monthlyAmount > 0,
+    (s) => s.startAge <= fireAgeForBudget && resolvedMonthly(s) > 0,
   );
   // Streams that kick in later
   const deferredStreams = settings.additionalIncomeStreams
-    .filter((s) => s.startAge > fireAgeForBudget && s.monthlyAmount > 0)
+    .filter((s) => s.startAge > fireAgeForBudget && resolvedMonthly(s) > 0)
     .sort((a, b) => a.startAge - b.startAge);
 
   const healthcareMonthly = settings.healthcareMonthlyAtFire ?? 0;
-  const totalActiveIncome = activeStreams.reduce((sum, s) => sum + s.monthlyAmount, 0);
+  const totalActiveIncome = activeStreams.reduce((sum, s) => sum + resolvedMonthly(s), 0);
   const totalBudget = settings.monthlyExpensesAtFire + healthcareMonthly;
   const portfolioWithdrawalAtFire = Math.max(0, totalBudget - totalActiveIncome);
 
@@ -320,13 +335,14 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
             {/* Visual bar */}
             <div className="mb-3 flex h-5 w-full overflow-hidden rounded-full">
               {activeStreams.map((s, i) => {
-                const pctVal = totalBudget > 0 ? (s.monthlyAmount / totalBudget) * 100 : 0;
+                const monthly = resolvedMonthly(s);
+                const pctVal = totalBudget > 0 ? (monthly / totalBudget) * 100 : 0;
                 const colors = ["#3b82f6", "#22c55e", "#f97316", "#a855f7", "#ec4899"];
                 return (
                   <div
                     key={s.id}
                     style={{ width: `${pctVal}%`, background: colors[i % colors.length] }}
-                    title={`${s.label}: ${fmt(s.monthlyAmount, currency)}/mo`}
+                    title={`${s.label}: ${fmt(monthly, currency)}/mo`}
                   />
                 );
               })}
@@ -360,7 +376,8 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
                 </div>
               )}
               {activeStreams.map((s, i) => {
-                const pctVal = totalBudget > 0 ? (s.monthlyAmount / totalBudget) * 100 : 0;
+                const monthly = resolvedMonthly(s);
+                const pctVal = totalBudget > 0 ? (monthly / totalBudget) * 100 : 0;
                 const colors = ["#3b82f6", "#22c55e", "#f97316", "#a855f7", "#ec4899"];
                 return (
                   <div key={s.id} className="flex items-center justify-between text-xs">
@@ -372,7 +389,7 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
                       {s.label || "Income stream"}
                     </span>
                     <span className="text-muted-foreground">
-                      {fmt(s.monthlyAmount, currency)}/mo{" "}
+                      {fmt(monthly, currency)}/mo{" "}
                       <span className="text-foreground ml-1 font-medium">{pctVal.toFixed(0)}%</span>
                     </span>
                   </div>
@@ -406,14 +423,14 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
                   totalActiveIncome +
                   deferredStreams
                     .filter((d) => d.startAge <= s.startAge)
-                    .reduce((sum, d) => sum + d.monthlyAmount, 0);
+                    .reduce((sum, d) => sum + resolvedMonthly(d), 0);
                 const newPortfolioWithdrawal = Math.max(0, totalBudget - cumulativeIncome);
                 const extraBudget = Math.max(0, cumulativeIncome - totalBudget);
 
                 return (
                   <div key={s.id} className="bg-muted/40 rounded p-2 text-xs">
                     <p className="font-medium">
-                      From age {s.startAge}: +{fmt(s.monthlyAmount, currency)}/mo ({s.label})
+                      From age {s.startAge}: +{fmt(resolvedMonthly(s), currency)}/mo ({s.label})
                     </p>
                     {extraBudget > 0 ? (
                       <p className="text-muted-foreground mt-0.5">
@@ -453,6 +470,13 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
         <Card>
           <CardHeader>
             <CardTitle className="text-sm">Year-by-Year Snapshot</CardTitle>
+            {hasPensionFunds && (
+              <p className="text-muted-foreground mt-1 text-xs">
+                Pension fund balances grow with contributions until FIRE, then on investment return
+                only. Accumulation-fund payouts are derived from the projected balance at payout
+                age.
+              </p>
+            )}
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -509,6 +533,7 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
                       {settings.additionalIncomeStreams.map((s) => {
                         const income = singleStreamIncome(
                           s,
+                          resolvedMonthly(s),
                           snap.age,
                           snap.age - settings.currentAge,
                           settings.inflationRate,

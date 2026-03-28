@@ -33,15 +33,10 @@ export default function FirePlannerSettingsPage() {
         goalId = goal.id;
       }
 
-      // Collect all account IDs that contribute to the FIRE goal:
-      // - main investment accounts selected in the planner
-      // - accounts linked to income streams with accumulation funds (pension, TFR…)
-      const linkedStreamAccountIds = updated.additionalIncomeStreams
-        .map((s) => s.linkedAccountId)
-        .filter((id): id is string => !!id);
-      const allFireAccountIds = [
-        ...new Set([...(updated.includedAccountIds ?? []), ...linkedStreamAccountIds]),
-      ];
+      // Only the main investment accounts selected in the planner contribute to the goal.
+      // Income-stream linked accounts are separate financial instruments — including them
+      // would give the goal a wider scope than the projection itself uses.
+      const allFireAccountIds = [...new Set(updated.includedAccountIds ?? [])];
 
       if (allFireAccountIds.length > 0 && goalId) {
         const allAllocations = await getGoalsAllocation();
@@ -102,6 +97,7 @@ export default function FirePlannerSettingsPage() {
             holdings={portfolioData.holdings}
             activities={portfolioData.activities}
             accounts={portfolioData.accounts}
+            activeAccounts={portfolioData.activeAccounts}
           />
         </TabsContent>
         <TabsContent value="guide" className="mt-6">

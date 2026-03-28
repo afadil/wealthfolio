@@ -6,8 +6,9 @@ import type {
   MonteCarloResult,
   ScenarioResult,
   SorrScenario,
+  SensitivityResult,
+  StrategyComparisonResult,
 } from "@/pages/fire-planner/types";
-import type { SensitivityResult, StrategyComparisonResult } from "@/adapters/fire-planner";
 
 const DESKTOP_ONLY = "FIRE planner requires the desktop app";
 

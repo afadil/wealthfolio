@@ -25,12 +25,13 @@ import { useState, useMemo, useEffect } from "react";
 import type { FireSettings, MonteCarloResult } from "../types";
 import {
   calculateNetFireTarget,
+  resolveDcPayouts,
   runScenarioAnalysis,
   runSequenceOfReturnsRisk,
   runSensitivityAnalysis,
   projectFireDate,
 } from "../lib/fire-math";
-import { runFireMonteCarlo, runFireStrategyComparison } from "@/adapters/fire-planner";
+import { runFireMonteCarlo, runFireStrategyComparison } from "@/adapters";
 
 interface Props {
   settings: FireSettings;
@@ -462,15 +463,22 @@ function IncomeProjectionSection({
 
   const horizonYears = Math.max(1, settings.planningHorizonAge - settings.currentAge);
   const fireAge = actualFireAge;
+  const dcPayouts = resolveDcPayouts(
+    settings.additionalIncomeStreams,
+    settings.currentAge,
+    settings.targetFireAge,
+    settings.safeWithdrawalRate,
+  );
 
   function realStreamValue(s: (typeof streams)[number], i: number): number {
+    const baseMonthly = dcPayouts.get(s.id) ?? s.monthlyAmount;
     const rate =
       s.annualGrowthRate !== undefined
         ? s.annualGrowthRate
         : s.adjustForInflation
           ? settings.inflationRate
           : 0;
-    const nominal = s.monthlyAmount * 12 * Math.pow(1 + rate, i);
+    const nominal = baseMonthly * 12 * Math.pow(1 + rate, i);
     return nominal / Math.pow(1 + settings.inflationRate, i);
   }
 
@@ -775,8 +783,8 @@ function SensitivitySection({
 
 function SorrSection({ settings, totalValue }: { settings: FireSettings; totalValue: number }) {
   const proj = useMemo(() => projectFireDate(settings, totalValue), [settings, totalValue]);
-  const fireReached = proj.portfolioAtFire > 0;
-  const portfolioAtFire = fireReached ? proj.portfolioAtFire : totalValue;
+  const fireReached = proj.fundedAtRetirement;
+  const portfolioAtFire = proj.portfolioAtFire > 0 ? proj.portfolioAtFire : totalValue;
 
   const scenarios = useMemo(
     () => runSequenceOfReturnsRisk(settings, portfolioAtFire),
@@ -800,9 +808,15 @@ function SorrSection({ settings, totalValue }: { settings: FireSettings; totalVa
   }, [scenarios, settings.targetFireAge]);
 
   const annualExpenses = settings.monthlyExpensesAtFire * 12;
+  const dcPayouts = resolveDcPayouts(
+    settings.additionalIncomeStreams,
+    settings.currentAge,
+    settings.targetFireAge,
+    settings.safeWithdrawalRate,
+  );
   const annualIncomeAtFire = settings.additionalIncomeStreams
     .filter((s) => settings.targetFireAge >= s.startAge)
-    .reduce((sum, s) => sum + s.monthlyAmount * 12, 0);
+    .reduce((sum, s) => sum + (dcPayouts.get(s.id) ?? s.monthlyAmount) * 12, 0);
   const incomeRatio = annualExpenses > 0 ? annualIncomeAtFire / annualExpenses : 0;
 
   return (

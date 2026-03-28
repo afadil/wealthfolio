@@ -26,11 +26,50 @@ fn sample_inflation<R: Rng>(rng: &mut R, mean: f64) -> f64 {
     Normal::new(mean, 0.01).unwrap().sample(rng)
 }
 
+/// For DC streams, precompute the monthly payout from the accumulated balance at start_age.
+/// Uses a deterministic FV formula (pension accumulation is not stochastic).
+/// DB streams (stream_type = None / DefinedBenefit) are not present in the returned map.
+fn resolve_dc_payouts(
+    streams: &[IncomeStream],
+    current_age: u32,
+    target_fire_age: u32,
+    swr: f64,
+) -> HashMap<String, f64> {
+    streams
+        .iter()
+        .filter(|s| s.stream_type == Some(StreamType::DefinedContribution))
+        .map(|s| {
+            let total_years =
+                (s.start_age as i32 - current_age as i32).max(0) as u32;
+            let contrib_years =
+                (s.start_age.min(target_fire_age) as i32 - current_age as i32).max(0) as u32;
+            let growth_only_years = total_years - contrib_years;
+            let r = s.accumulation_return.unwrap_or(0.04);
+            let initial = s.current_value.unwrap_or(0.0);
+            let monthly_contrib = s.monthly_contribution.unwrap_or(0.0);
+            // Initial balance grows for entire period
+            let fv_lump = initial * (1.0 + r).powi(total_years as i32);
+            // Contributions only until FIRE (or startAge if earlier), then grow without contributions
+            let fv_annuity_at_stop = if r > 1e-9 {
+                monthly_contrib * 12.0 * ((1.0 + r).powi(contrib_years as i32) - 1.0) / r
+            } else {
+                monthly_contrib * 12.0 * contrib_years as f64
+            };
+            let fv_annuity = fv_annuity_at_stop * (1.0 + r).powi(growth_only_years as i32);
+            let monthly_payout = (fv_lump + fv_annuity) * swr / 12.0;
+            (s.id.clone(), monthly_payout)
+        })
+        .collect()
+}
+
 /// Compute total annual income from all active streams at a given age.
+/// `resolved_payouts`: DC stream payouts precomputed by `resolve_dc_payouts` (use `monthly_amount`
+///   for DB streams or any stream not present in the map).
 /// `cumulative_inflation`: if Some, inflation-indexed streams use this stochastic factor
 /// instead of the deterministic `(1+rate)^years` formula. Pass Some only from Monte Carlo.
 fn additional_income_at_age(
     streams: &[IncomeStream],
+    resolved_payouts: &HashMap<String, f64>,
     age: u32,
     years_from_now: u32,
     inflation_rate: f64,
@@ -40,7 +79,8 @@ fn additional_income_at_age(
         .iter()
         .filter(|s| age >= s.start_age)
         .map(|s| {
-            let annual = s.monthly_amount * 12.0;
+            let base_monthly = resolved_payouts.get(&s.id).copied().unwrap_or(s.monthly_amount);
+            let annual = base_monthly * 12.0;
             if let Some(r) = s.annual_growth_rate {
                 // Custom growth rate: always deterministic
                 annual * (1.0 + r).powi(years_from_now as i32)
@@ -151,11 +191,13 @@ pub fn calculate_fire_target(settings: &FireSettings) -> f64 {
 }
 
 pub fn calculate_net_fire_target(settings: &FireSettings) -> f64 {
+    let resolved =
+        resolve_dc_payouts(&settings.additional_income_streams, settings.current_age, settings.target_fire_age, settings.safe_withdrawal_rate);
     let income_at_fire_age: f64 = settings
         .additional_income_streams
         .iter()
         .filter(|s| s.start_age <= settings.target_fire_age)
-        .map(|s| s.monthly_amount)
+        .map(|s| resolved.get(&s.id).copied().unwrap_or(s.monthly_amount))
         .sum();
     let total_monthly =
         settings.monthly_expenses_at_fire + settings.healthcare_monthly_at_fire.unwrap_or(0.0);
@@ -208,6 +250,12 @@ fn step_pension_funds(
 // ─── Deterministic Projection ──────────────────────────────────────────────────
 
 pub fn project_fire_date(settings: &FireSettings, current_portfolio: f64) -> FireProjection {
+    let resolved_payouts = resolve_dc_payouts(
+        &settings.additional_income_streams,
+        settings.current_age,
+        settings.target_fire_age,
+        settings.safe_withdrawal_rate,
+    );
     let real_fire_target = calculate_net_fire_target(settings);
     let coast_amount = calculate_coast_fire_amount(settings);
     let start_year = chrono::Local::now().year() as u32;
@@ -266,6 +314,7 @@ pub fn project_fire_date(settings: &FireSettings, current_portfolio: f64) -> Fir
             let annual_expenses = annual_living + annual_healthcare;
             let annual_income = additional_income_at_age(
                 &settings.additional_income_streams,
+                &resolved_payouts,
                 age,
                 i,
                 settings.inflation_rate,
@@ -362,6 +411,8 @@ pub fn run_monte_carlo(
         .healthcare_inflation_rate
         .unwrap_or(settings.inflation_rate);
     let glide_path = settings.glide_path.clone();
+    // Pension accumulation is deterministic — resolve DC payouts once, share across all sims.
+    let resolved_payouts = resolve_dc_payouts(&settings.additional_income_streams, current_age, target_fire_age, swr);
 
     // paths[sim] = (year_values, survived, fi_age)
     // fi_age: age when portfolio first reached the FIRE target (None if never reached)
@@ -410,6 +461,7 @@ pub fn run_monte_carlo(
                     // stochastic path as expenses (fixes systematic inflation asymmetry).
                     let annual_income = additional_income_at_age(
                         &streams,
+                        &resolved_payouts,
                         age,
                         i,
                         inflation_rate,
@@ -545,6 +597,12 @@ pub fn run_sequence_of_returns_risk(
     settings: &FireSettings,
     portfolio_at_fire: f64,
 ) -> Vec<SorrScenario> {
+    let resolved_payouts = resolve_dc_payouts(
+        &settings.additional_income_streams,
+        settings.current_age,
+        settings.target_fire_age,
+        settings.safe_withdrawal_rate,
+    );
     let r = settings.expected_annual_return;
     let years =
         (settings.planning_horizon_age as i32 - settings.target_fire_age as i32).max(10) as usize;
@@ -597,6 +655,7 @@ pub fn run_sequence_of_returns_risk(
                 let annual_expenses = annual_living + annual_healthcare;
                 let annual_income = additional_income_at_age(
                     &settings.additional_income_streams,
+                    &resolved_payouts,
                     age,
                     years_from_now,
                     settings.inflation_rate,
@@ -784,6 +843,7 @@ mod tests {
             current_value: None,
             monthly_contribution: None,
             accumulation_return: None,
+            stream_type: None,
         });
         // net monthly = 3000 - 1200 = 1800; target = 1800 * 12 / 0.04 = 540_000
         assert_eq!(calculate_net_fire_target(&s), 540_000.0);
@@ -805,6 +865,7 @@ mod tests {
             current_value: None,
             monthly_contribution: None,
             accumulation_return: None,
+            stream_type: None,
         });
         assert_eq!(calculate_net_fire_target(&s), 900_000.0);
     }

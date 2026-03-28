@@ -40,9 +40,17 @@ export interface FireSettings {
   glidePath?: GlidepathSettings;
 }
 
+/**
+ * "db" (defined-benefit, default): user enters `monthlyAmount` manually.
+ * "dc" (defined-contribution): payout is derived as `balanceAtStartAge * swr / 12`.
+ *  Absence of this field is treated as "db" for backward compatibility.
+ */
+export type StreamType = "db" | "dc";
+
 export interface IncomeStream {
   id: string;
   label: string;
+  /** For DB streams: the manual monthly payout. For DC streams, ignored — payout is derived. */
   monthlyAmount: number;
   startAge: number;
   startAgeIsAuto?: boolean;
@@ -52,6 +60,8 @@ export interface IncomeStream {
   currentValue?: number;
   monthlyContribution?: number;
   accumulationReturn?: number;
+  /** Undefined = defined-benefit (backward-compatible default). */
+  streamType?: StreamType;
 }
 
 export interface FireProjection {
@@ -127,6 +137,16 @@ export interface SorrScenario {
   portfolioPath: number[];
   finalValue: number;
   survived: boolean;
+}
+
+export interface SensitivityResult {
+  contribution: SensitivityMatrix;
+  swr: SensitivitySWRMatrix;
+}
+
+export interface StrategyComparisonResult {
+  constantDollar: MonteCarloResult;
+  constantPercentage: MonteCarloResult;
 }
 
 export interface SensitivityMatrix {

@@ -1,4 +1,5 @@
 import type { Account, ActivityDetails, Holding } from "@/lib/types";
+import { generateId } from "@/lib/id";
 import { getLatestValuations } from "@/adapters";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import {
@@ -23,10 +24,8 @@ interface Props {
   holdings: Holding[];
   activities: ActivityDetails[];
   accounts: Account[];
-}
-
-function generateId() {
-  return crypto.randomUUID();
+  /** Accounts already filtered to the FIRE scope — used for auto-config expected return. */
+  activeAccounts: Account[];
 }
 
 function SliderField({
@@ -108,6 +107,7 @@ export default function SettingsPage({
   holdings,
   activities,
   accounts,
+  activeAccounts,
 }: Props) {
   const [draft, setDraft] = useState<FireSettings>(settings);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -123,7 +123,7 @@ export default function SettingsPage({
     setAutoConfigLoading(true);
     setAutoConfigResult(null);
     try {
-      const result = await runAutoConfig(activities, holdings, accounts);
+      const result = await runAutoConfig(activities, holdings, activeAccounts);
       setAutoConfigResult(result);
     } catch (e) {
       toast({
@@ -679,10 +679,29 @@ export default function SettingsPage({
             </p>
           )}
           {draft.additionalIncomeStreams.map((stream) => {
+            const isDc = stream.streamType === "dc";
             const hasPension =
+              isDc ||
               (stream.currentValue ?? 0) > 0 ||
               (stream.monthlyContribution ?? 0) > 0 ||
               (stream.accumulationReturn ?? 0) > 0;
+
+            // Computed payout preview for DC streams (two-phase: contributions until FIRE, growth-only after)
+            const totalYears = Math.max(0, stream.startAge - draft.currentAge);
+            const contribYears = Math.max(
+              0,
+              Math.min(stream.startAge, draft.targetFireAge) - draft.currentAge,
+            );
+            const growthOnlyYears = totalYears - contribYears;
+            const r = stream.accumulationReturn ?? 0.04;
+            const fvLump = (stream.currentValue ?? 0) * Math.pow(1 + r, totalYears);
+            const fvAnnuityAtStop =
+              r > 1e-9
+                ? ((stream.monthlyContribution ?? 0) * 12 * (Math.pow(1 + r, contribYears) - 1)) / r
+                : (stream.monthlyContribution ?? 0) * 12 * contribYears;
+            const fvAnnuity = fvAnnuityAtStop * Math.pow(1 + r, growthOnlyYears);
+            const estimatedMonthlyPayout = ((fvLump + fvAnnuity) * draft.safeWithdrawalRate) / 12;
+
             return (
               <div key={stream.id} className="rounded border p-3">
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
@@ -696,19 +715,33 @@ export default function SettingsPage({
                       className="mt-1 h-8 text-sm"
                     />
                   </div>
-                  {/* Monthly amount */}
-                  <div>
-                    <Label className="text-xs">Monthly amount ({draft.currency})</Label>
-                    <Input
-                      type="number"
-                      value={stream.monthlyAmount}
-                      min={0}
-                      onChange={(e) =>
-                        updateStream(stream.id, { monthlyAmount: parseFloat(e.target.value) || 0 })
-                      }
-                      className="mt-1 h-8 text-sm"
-                    />
-                  </div>
+                  {/* Monthly amount (DB only) / computed payout preview (DC) */}
+                  {isDc ? (
+                    <div>
+                      <Label className="text-xs">Est. monthly payout ({draft.currency})</Label>
+                      <p className="mt-1 flex h-8 items-center text-sm font-medium">
+                        {Math.round(estimatedMonthlyPayout).toLocaleString()}
+                        <span className="text-muted-foreground ml-1 text-xs">
+                          (derived from balance)
+                        </span>
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <Label className="text-xs">Monthly amount ({draft.currency})</Label>
+                      <Input
+                        type="number"
+                        value={stream.monthlyAmount}
+                        min={0}
+                        onChange={(e) =>
+                          updateStream(stream.id, {
+                            monthlyAmount: parseFloat(e.target.value) || 0,
+                          })
+                        }
+                        className="mt-1 h-8 text-sm"
+                      />
+                    </div>
+                  )}
                   {/* Payout start age */}
                   <div>
                     <div className="flex items-center justify-between gap-2">
@@ -787,6 +820,7 @@ export default function SettingsPage({
                     onCheckedChange={(v) => {
                       if (v) {
                         updateStream(stream.id, {
+                          streamType: "dc",
                           currentValue: 0,
                           monthlyContribution: 0,
                           accumulationReturn: 0.04,
@@ -794,6 +828,7 @@ export default function SettingsPage({
                         });
                       } else {
                         updateStream(stream.id, {
+                          streamType: undefined,
                           currentValue: undefined,
                           monthlyContribution: undefined,
                           accumulationReturn: undefined,
@@ -802,7 +837,7 @@ export default function SettingsPage({
                     }}
                   />
                   <Label className="text-muted-foreground cursor-pointer text-xs">
-                    Has accumulation fund (pension fund, TFR…)
+                    Accumulation fund — payout derived from balance (pension fund, TFR…)
                   </Label>
                 </div>
 
@@ -894,13 +929,9 @@ export default function SettingsPage({
                       </div>
                     </div>
                     <p className="text-muted-foreground col-span-full text-xs">
-                      Phase 1 (now → FIRE): fund grows with contributions + investment return. Phase
-                      2 (FIRE → payout age): contributions stop, fund keeps growing. Phase 3 (payout
-                      age+): pays out as monthly income.{" "}
-                      <span className="text-amber-600 dark:text-amber-400">
-                        The fund balance is informational — the payout amount above is your manual
-                        estimate and is not derived from the accumulated balance.
-                      </span>
+                      Phase 1 (now → FIRE): fund grows with contributions + return. Phase 2 (FIRE →
+                      payout age): contributions stop, fund keeps growing. Phase 3 (payout age+):
+                      balance converted to income using the same SWR as the main portfolio.
                     </p>
                   </div>
                 )}

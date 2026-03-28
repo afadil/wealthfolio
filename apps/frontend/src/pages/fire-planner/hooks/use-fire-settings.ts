@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
-import { getFireSettings, saveFireSettings } from "@/adapters/fire-planner";
+import { getFireSettings, saveFireSettings } from "@/adapters";
 import { getSettings } from "@/adapters";
 import type { FireSettings } from "../types";
 import { DEFAULT_SETTINGS } from "../lib/storage";

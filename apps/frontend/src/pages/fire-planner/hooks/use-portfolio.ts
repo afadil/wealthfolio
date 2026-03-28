@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { getAccounts, getLatestValuations, getHoldings, getActivities } from "@/adapters";
+import { getAccounts, getLatestValuations, getHoldings, searchActivities } from "@/adapters";
+import type { Holding } from "@/lib/types";
 import type { FireSettings } from "../types";
 
 const INVESTMENT_TYPES = new Set(["SECURITIES", "CRYPTOCURRENCY"]);
@@ -12,12 +13,12 @@ export function usePortfolioData(settings?: Pick<FireSettings, "includedAccountI
   });
 
   const accounts = accountsQuery.data ?? [];
-  const activeAccounts = accounts.filter((a) => a.isActive && !a.isArchived);
+  const allActiveAccounts = accounts.filter((a) => a.isActive && !a.isArchived);
 
   const activeAccountIds = (
     settings?.includedAccountIds && settings.includedAccountIds.length > 0
-      ? activeAccounts.filter((a) => settings.includedAccountIds!.includes(a.id))
-      : activeAccounts.filter((a) => INVESTMENT_TYPES.has(a.accountType))
+      ? allActiveAccounts.filter((a) => settings.includedAccountIds!.includes(a.id))
+      : allActiveAccounts.filter((a) => INVESTMENT_TYPES.has(a.accountType))
   ).map((a) => a.id);
 
   const valuationsQuery = useQuery({
@@ -28,14 +29,47 @@ export function usePortfolioData(settings?: Pick<FireSettings, "includedAccountI
   });
 
   const holdingsQuery = useQuery({
-    queryKey: ["fire-planner-holdings"],
-    queryFn: () => getHoldings("TOTAL"),
+    queryKey: ["fire-planner-holdings", activeAccountIds],
+    queryFn: async (): Promise<Holding[]> => {
+      if (activeAccountIds.length === 0) return [];
+      const perAccount = await Promise.all(activeAccountIds.map((id) => getHoldings(id)));
+      // Aggregate by symbol so drift analysis sees combined weights across all FIRE accounts.
+      const bySymbol = new Map<string, Holding>();
+      for (const holdings of perAccount) {
+        for (const h of holdings) {
+          const key = h.instrument?.symbol ?? h.id;
+          const existing = bySymbol.get(key);
+          if (existing) {
+            existing.marketValue = {
+              local: existing.marketValue.local + h.marketValue.local,
+              base: existing.marketValue.base + h.marketValue.base,
+            };
+            existing.quantity = existing.quantity + h.quantity;
+          } else {
+            bySymbol.set(key, { ...h });
+          }
+        }
+      }
+      return Array.from(bySymbol.values());
+    },
+    enabled: activeAccountIds.length > 0,
     staleTime: 5 * 60 * 1000,
   });
 
   const activitiesQuery = useQuery({
-    queryKey: ["fire-planner-activities"],
-    queryFn: () => getActivities(),
+    queryKey: ["fire-planner-activities", activeAccountIds],
+    queryFn: async () => {
+      if (activeAccountIds.length === 0) return [];
+      const result = await searchActivities(
+        0,
+        Number.MAX_SAFE_INTEGER,
+        { accountIds: activeAccountIds },
+        "",
+        { id: "date", desc: true },
+      );
+      return result.data;
+    },
+    enabled: activeAccountIds.length > 0,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -44,10 +78,13 @@ export function usePortfolioData(settings?: Pick<FireSettings, "includedAccountI
     0,
   );
 
+  const activeAccounts = accounts.filter((a) => activeAccountIds.includes(a.id));
+
   return {
     holdings: holdingsQuery.data ?? [],
     activities: activitiesQuery.data ?? [],
     accounts,
+    activeAccounts,
     totalValue,
     isLoading:
       accountsQuery.isLoading ||

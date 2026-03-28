@@ -9,6 +9,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@wealthfolio/ui";
+import { isWeb } from "@/adapters";
 import { useFireSettings } from "./hooks/use-fire-settings";
 import { usePortfolioData } from "./hooks/use-portfolio";
 import DashboardPage from "./pages/dashboard-page";
@@ -22,6 +23,28 @@ export default function FirePlannerPage() {
   const { settings, isLoading: settingsLoading } = useFireSettings();
   const portfolioData = usePortfolioData(settings);
   const navigate = useNavigate();
+
+  if (isWeb) {
+    return (
+      <Page>
+        <PageHeader heading="FIRE Planner" text="Financial Independence · Retire Early" />
+        <PageContent>
+          <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
+            <div className="bg-muted flex h-14 w-14 items-center justify-center rounded-full text-2xl">
+              🖥️
+            </div>
+            <div className="space-y-1">
+              <p className="font-semibold">Desktop app required</p>
+              <p className="text-muted-foreground max-w-sm text-sm">
+                The FIRE Planner is only available in the Wealthfolio desktop app. Download it to
+                access projections, Monte Carlo simulations, and your full retirement plan.
+              </p>
+            </div>
+          </div>
+        </PageContent>
+      </Page>
+    );
+  }
 
   if (settingsLoading) {
     return (

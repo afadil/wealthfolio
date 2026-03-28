@@ -35,8 +35,41 @@ function sampleReturn(mean: number, std: number): number {
  * `cumulativeInflation`: if provided, inflation-indexed streams use this stochastic factor
  * instead of the deterministic formula. Pass only from Monte Carlo paths.
  */
+/**
+ * For DC streams, precompute the monthly payout derived from the accumulated balance at startAge.
+ * DB streams (streamType undefined/"db") are absent from the returned map.
+ */
+export function resolveDcPayouts(
+  streams: FireSettings["additionalIncomeStreams"],
+  currentAge: number,
+  targetFireAge: number,
+  swr: number,
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const s of streams) {
+    if (s.streamType !== "dc") continue;
+    const totalYears = Math.max(0, s.startAge - currentAge);
+    const contribYears = Math.max(0, Math.min(s.startAge, targetFireAge) - currentAge);
+    const growthOnlyYears = totalYears - contribYears;
+    const r = s.accumulationReturn ?? 0.04;
+    const initial = s.currentValue ?? 0;
+    const monthly = s.monthlyContribution ?? 0;
+    // Initial balance grows for entire period
+    const fvLump = initial * Math.pow(1 + r, totalYears);
+    // Contributions only until FIRE (or startAge if earlier), then grow without contributions
+    const fvAnnuityAtStop =
+      r > 1e-9
+        ? (monthly * 12 * (Math.pow(1 + r, contribYears) - 1)) / r
+        : monthly * 12 * contribYears;
+    const fvAnnuity = fvAnnuityAtStop * Math.pow(1 + r, growthOnlyYears);
+    map.set(s.id, ((fvLump + fvAnnuity) * swr) / 12);
+  }
+  return map;
+}
+
 function additionalIncomeAtAge(
   streams: FireSettings["additionalIncomeStreams"],
+  resolvedPayouts: Map<string, number>,
   age: number,
   yearsFromNow: number,
   inflationRate: number,
@@ -45,7 +78,8 @@ function additionalIncomeAtAge(
   return streams
     .filter((s) => age >= s.startAge)
     .reduce((sum, s) => {
-      const annual = s.monthlyAmount * 12;
+      const baseMonthly = resolvedPayouts.get(s.id) ?? s.monthlyAmount;
+      const annual = baseMonthly * 12;
       if (s.annualGrowthRate !== undefined) {
         // Custom growth rate: always deterministic
         return sum + annual * Math.pow(1 + s.annualGrowthRate, yearsFromNow);
@@ -114,9 +148,15 @@ export function calculateFireTarget(settings: FireSettings): number {
 // Deferred streams (e.g. INPS at 67 when FIRE at 55) are NOT subtracted here;
 // the portfolio needs to bridge that gap on its own.
 export function calculateNetFireTarget(settings: FireSettings): number {
+  const resolved = resolveDcPayouts(
+    settings.additionalIncomeStreams,
+    settings.currentAge,
+    settings.targetFireAge,
+    settings.safeWithdrawalRate,
+  );
   const incomeAtFireAge = settings.additionalIncomeStreams
     .filter((s) => s.startAge <= settings.targetFireAge)
-    .reduce((sum, s) => sum + s.monthlyAmount, 0);
+    .reduce((sum, s) => sum + (resolved.get(s.id) ?? s.monthlyAmount), 0);
   const totalMonthly = settings.monthlyExpensesAtFire + (settings.healthcareMonthlyAtFire ?? 0);
   const netMonthly = Math.max(0, totalMonthly - incomeAtFireAge);
   return (netMonthly * 12) / settings.safeWithdrawalRate;
@@ -170,6 +210,12 @@ function stepPensionFunds(
 }
 
 export function projectFireDate(settings: FireSettings, currentPortfolio: number): FireProjection {
+  const resolvedPayouts = resolveDcPayouts(
+    settings.additionalIncomeStreams,
+    settings.currentAge,
+    settings.targetFireAge,
+    settings.safeWithdrawalRate,
+  );
   // Real (today's €) target for display; each loop year inflates it to nominal for the trigger
   const realFireTarget = calculateNetFireTarget(settings);
   const coastAmount = calculateCoastFireAmount(settings);
@@ -223,6 +269,7 @@ export function projectFireDate(settings: FireSettings, currentPortfolio: number
       const annualExpenses = annualLiving + annualHealthcare;
       const annualIncome = additionalIncomeAtAge(
         settings.additionalIncomeStreams,
+        resolvedPayouts,
         age,
         i,
         settings.inflationRate,
@@ -286,6 +333,13 @@ export function runMonteCarlo(
   currentPortfolio: number,
   nSims = 1000,
 ): MonteCarloResult {
+  // Pension accumulation is deterministic — resolve DC payouts once, reuse across all sims.
+  const resolvedPayouts = resolveDcPayouts(
+    settings.additionalIncomeStreams,
+    settings.currentAge,
+    settings.targetFireAge,
+    settings.safeWithdrawalRate,
+  );
   const realFireTarget = calculateNetFireTarget(settings); // real (today's €); inflated per year for trigger
   const horizonYears = Math.max(1, settings.planningHorizonAge - settings.currentAge);
   const contribGrowth = settings.salaryGrowthRate ?? settings.contributionGrowthRate;
@@ -332,6 +386,7 @@ export function runMonteCarlo(
         // path as expenses (fixes systematic inflation asymmetry in MC).
         const annualIncome = additionalIncomeAtAge(
           settings.additionalIncomeStreams,
+          resolvedPayouts,
           age,
           i,
           settings.inflationRate,
@@ -435,6 +490,12 @@ export function runSequenceOfReturnsRisk(
   settings: FireSettings,
   portfolioAtFire: number,
 ): SorrScenario[] {
+  const resolvedPayouts = resolveDcPayouts(
+    settings.additionalIncomeStreams,
+    settings.currentAge,
+    settings.targetFireAge,
+    settings.safeWithdrawalRate,
+  );
   const r = settings.expectedAnnualReturn;
   const years = Math.max(10, settings.planningHorizonAge - settings.targetFireAge);
   // yearsToFire offsets the inflation/income-growth index so it is always
@@ -484,6 +545,7 @@ export function runSequenceOfReturnsRisk(
       const annualExpenses = annualLiving + annualHealthcare;
       const annualIncome = additionalIncomeAtAge(
         settings.additionalIncomeStreams,
+        resolvedPayouts,
         age,
         yearsFromNow,
         settings.inflationRate,

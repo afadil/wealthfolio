@@ -15,11 +15,23 @@ impl Default for WithdrawalStrategy {
     }
 }
 
+/// Whether the stream's payout amount is entered manually or derived from an accumulated balance.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum StreamType {
+    /// Defined-benefit: user enters `monthly_amount` directly (default, backward-compat).
+    #[serde(rename = "db")]
+    DefinedBenefit,
+    /// Defined-contribution: payout is derived as `balance_at_start_age × swr / 12`.
+    #[serde(rename = "dc")]
+    DefinedContribution,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IncomeStream {
     pub id: String,
     pub label: String,
+    /// For DB streams: the manual monthly payout. For DC streams, ignored — payout is derived.
     pub monthly_amount: f64,
     pub start_age: u32,
     pub start_age_is_auto: Option<bool>,
@@ -29,6 +41,9 @@ pub struct IncomeStream {
     pub current_value: Option<f64>,
     pub monthly_contribution: Option<f64>,
     pub accumulation_return: Option<f64>,
+    /// None = DefinedBenefit (backward-compatible default).
+    #[serde(default)]
+    pub stream_type: Option<StreamType>,
 }
 
 /// Gradual shift from equities to bonds during the withdrawal phase to reduce SORR.

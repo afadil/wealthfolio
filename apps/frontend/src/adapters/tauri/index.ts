@@ -199,3 +199,15 @@ export {
   syncGenerateDeviceId,
   syncHmacSha256,
 } from "./crypto";
+
+// FIRE Planner (desktop-only feature)
+export {
+  getFireSettings,
+  saveFireSettings,
+  calculateFireProjection,
+  runFireMonteCarlo,
+  runFireScenarioAnalysis,
+  runFireSorr,
+  runFireSensitivity,
+  runFireStrategyComparison,
+} from "./fire-planner";
