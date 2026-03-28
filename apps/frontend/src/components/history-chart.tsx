@@ -113,6 +113,7 @@ export function HistoryChart({
 }: HistoryChartProps) {
   const { isBalanceHidden } = useBalancePrivacy();
   const [isChartHovered, setIsChartHovered] = useState(false);
+  const [hoveredMarker, setHoveredMarker] = useState(false);
   const isMobile = useIsMobileViewport();
   const id = useId();
   const fillGradientId = `historyFill-${id}`;
@@ -174,6 +175,12 @@ export function HistoryChart({
       .filter((item): item is { date: string; index: number; value: number } => item !== null);
   }, [showMarkers, snapshotDates, dateToIndexMap, data]);
 
+  // Set for efficient marker date lookup (used by chart onClick)
+  const markerDateSet = useMemo(
+    () => new Set(markerDataPoints.map((p) => p.date)),
+    [markerDataPoints],
+  );
+
   if (isLoading && data.length === 0) {
     return null;
   }
@@ -186,6 +193,9 @@ export function HistoryChart({
       <AreaChart
         data={data}
         stackOffset="sign"
+        style={{
+          cursor: showMarkers && isChartHovered && hoveredMarker ? "pointer" : undefined,
+        }}
         margin={{
           top: 0,
           right: 0,
@@ -193,7 +203,24 @@ export function HistoryChart({
           bottom: 0,
         }}
         onMouseEnter={() => setIsChartHovered(true)}
-        onMouseLeave={() => setIsChartHovered(false)}
+        onMouseLeave={() => {
+          setIsChartHovered(false);
+          setHoveredMarker(false);
+        }}
+        onMouseMove={(chartState) => {
+          if (!showMarkers || chartState?.activeLabel == null) {
+            setHoveredMarker(false);
+            return;
+          }
+          setHoveredMarker(markerDateSet.has(String(chartState.activeLabel)));
+        }}
+        onClick={(chartState) => {
+          if (!showMarkers || chartState?.activeLabel == null) return;
+          const clickedDate = String(chartState.activeLabel);
+          if (markerDateSet.has(clickedDate)) {
+            onMarkerClick?.(clickedDate);
+          }
+        }}
       >
         <defs>
           <linearGradient id={fillGradientId} x1="0" y1="0" x2="0" y2="1">
@@ -281,27 +308,18 @@ export function HistoryChart({
               key={`marker-${point.date}`}
               x={point.date}
               y={point.value}
-              zIndex={1300}
               shape={(props: { cx?: number; cy?: number }) => {
                 const cx = props.cx ?? 0;
                 const cy = props.cy ?? 0;
                 const size = 8;
-                const hitAreaSize = 16;
                 return (
-                  <g
-                    style={{ cursor: "pointer", pointerEvents: "all" }}
-                    onClick={() => onMarkerClick?.(point.date)}
-                  >
-                    {/* Invisible larger hit area for easier clicking */}
-                    <circle cx={cx} cy={cy} r={hitAreaSize} fill="transparent" />
-                    {/* Diamond shape */}
-                    <polygon
-                      points={`${cx},${cy - size} ${cx + size},${cy} ${cx},${cy + size} ${cx - size},${cy}`}
-                      fill={point.value >= 0 ? "var(--success)" : "var(--destructive)"}
-                      stroke="hsl(var(--background))"
-                      strokeWidth={2}
-                    />
-                  </g>
+                  <polygon
+                    points={`${cx},${cy - size} ${cx + size},${cy} ${cx},${cy + size} ${cx - size},${cy}`}
+                    fill={point.value >= 0 ? "var(--success)" : "var(--destructive)"}
+                    stroke="hsl(var(--background))"
+                    strokeWidth={2}
+                    style={{ pointerEvents: "none" }}
+                  />
                 );
               }}
             />
