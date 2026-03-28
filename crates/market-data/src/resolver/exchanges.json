@@ -137,6 +137,15 @@
       "yahoo": { "suffix": ".XD", "codes": ["DXE"] }
     },
     {
+      "mic": "XAQE",
+      "name": "Aquis",
+      "long_name": "Aquis Exchange",
+      "currency": "GBP",
+      "timezone": "Europe/London",
+      "close": [16, 30],
+      "yahoo": { "suffix": ".AQ", "codes": ["AQS"] }
+    },
+    {
       "mic": "XLON_IL",
       "name": null,
       "yahoo": { "suffix": ".IL", "currency": "GBp" }
