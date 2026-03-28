@@ -88,7 +88,7 @@ VALUES (
     'system_wealthsimple',
     'Wealthsimple',
     'SYSTEM',
-    '{"fieldMappings":{"date":"transaction_date","activityType":["activity_sub_type","activity_type"],"subtype":"activity_type","symbol":"symbol","quantity":"quantity","unitPrice":"unit_price","fee":"commission","amount":"net_cash_amount","currency":"currency","account":"account_id","comment":"name"},"activityMappings":{"BUY":["BUY","DRIP","Trade","OptionExercise"],"SELL":["SELL"],"DIVIDEND":["Dividend","ReturnOfCapital","NonCashDistribution"],"INTEREST":["Interest"],"DEPOSIT":["EFT","E_TRFIN","TRANSFER","TRANSFER_TF","MoneyMovement","WDA_IN","CONTRIBUTION"],"WITHDRAWAL":["E_TRFOUT","OBP_OUT","WDA_OUT"],"TRANSFER_IN":["FxExchange"],"SPLIT":["CorporateAction","SUBDIVISION"],"TAX":["NonResidentTax"],"FEE":["Fee"],"CREDIT":["Refund","AdministrativePayment","MANAGEMENT_FEE_REFUND","GIVEAWAY"],"TRANSFER_OUT":["InternalSecurityTransfer"],"ADJUSTMENT":["Correction","WRITE_OFF","ANOMALY"]},"symbolMappings":{},"accountMappings":{},"symbolMappingMeta":{},"parseConfig":{"delimiter":",","dateFormat":"ISO8601","decimalSeparator":".","thousandsSeparator":"auto","hasHeaderRow":true,"skipTopRows":0,"skipBottomRows":1}}',
+    '{"fieldMappings":{"date":"transaction_date","activityType":["activity_sub_type","activity_type"],"subtype":"activity_type","symbol":"symbol","quantity":"quantity","unitPrice":"unit_price","fee":"commission","amount":"net_cash_amount","currency":"currency","account":"account_id","comment":"name","instrumentType":"account_type"},"activityMappings":{"BUY":["BUY","DRIP","Trade","OptionExercise"],"SELL":["SELL"],"DIVIDEND":["Dividend","ReturnOfCapital","NonCashDistribution"],"INTEREST":["Interest"],"DEPOSIT":["EFT","E_TRFIN","TRANSFER","TRANSFER_TF","MoneyMovement","WDA_IN","CONTRIBUTION"],"WITHDRAWAL":["E_TRFOUT","OBP_OUT","WDA_OUT","SPEND"],"TRANSFER_IN":["FxExchange"],"SPLIT":["CorporateAction","SUBDIVISION"],"TAX":["NonResidentTax"],"FEE":["Fee"],"CREDIT":["Refund","AdministrativePayment","MANAGEMENT_FEE_REFUND","GIVEAWAY","CASHBACK","BonusPayment"],"TRANSFER_OUT":["InternalSecurityTransfer"],"ADJUSTMENT":["Correction","WRITE_OFF","ANOMALY"]},"symbolMappings":{},"accountMappings":{},"symbolMappingMeta":{},"parseConfig":{"delimiter":",","dateFormat":"ISO8601","decimalSeparator":".","thousandsSeparator":"auto","hasHeaderRow":true,"skipTopRows":0,"skipBottomRows":1}}',
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP
 );
@@ -140,3 +140,8 @@ DELETE FROM sync_table_state WHERE table_name = 'activity_import_profiles';
 INSERT OR IGNORE INTO sync_table_state (table_name, enabled) VALUES
     ('import_templates', 1),
     ('import_account_templates', 1);
+
+
+CREATE INDEX IF NOT EXISTS ix_activities_source_identity
+ON activities(source_system, account_id, source_record_id)
+WHERE source_system IS NOT NULL AND source_record_id IS NOT NULL;

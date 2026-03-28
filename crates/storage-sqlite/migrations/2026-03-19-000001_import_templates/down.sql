@@ -22,3 +22,5 @@ WHERE iat.import_type = 'ACTIVITY';
 
 DROP TABLE import_account_templates;
 DROP TABLE IF EXISTS import_templates;
+
+DROP INDEX IF EXISTS ix_activities_source_identity;
