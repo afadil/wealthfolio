@@ -154,7 +154,7 @@ pub enum ImportSymbolDisposition {
 ///
 /// Decision tree:
 /// 1. DIVIDEND with symbol → ResolveAsset; DIVIDEND without symbol → CashMovement (portfolio-level income)
-/// 1b. ADJUSTMENT with symbol → ResolveAsset; ADJUSTMENT without symbol → CashMovement (cash correction)
+///    1b. ADJUSTMENT with symbol → ResolveAsset; ADJUSTMENT without symbol → CashMovement (cash correction)
 /// 2. Symbol-required type (BUY/SELL/SPLIT) → always ResolveAsset
 /// 3. Empty / cash-placeholder / garbage symbol → CashMovement
 /// 4. Never-asset type (DEPOSIT/WITHDRAWAL/FEE/TAX/CREDIT) → CashMovement (clear junk)

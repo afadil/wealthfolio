@@ -2312,6 +2312,12 @@ impl ActivityService {
                 if let Ok(asset) = self.asset_service.get_asset_by_id(id) {
                     activity.symbol_name = asset.name;
                     asset_currency = Some(asset.quote_ccy.clone());
+                    if activity.quote_mode.is_none() {
+                        activity.quote_mode = Some(match asset.quote_mode {
+                            QuoteMode::Manual => "MANUAL".to_string(),
+                            QuoteMode::Market => "MARKET".to_string(),
+                        });
+                    }
                 } else {
                     activity.symbol_name = Some(normalized_symbol.clone());
                 }
@@ -2485,23 +2491,21 @@ impl ActivityService {
     /// - CashMovement: clears symbol, exchange_mic, quote_ccy, instrument_type
     /// - SPLIT: falls back to `account_currency` when currency is missing or invalid
     fn normalize_for_insert(activity: &mut ActivityImport, account_currency: &str) {
-        match Self::classify_import_symbol_disposition(
+        if Self::classify_import_symbol_disposition(
             &activity.activity_type,
             activity.subtype.as_deref(),
             activity.symbol.trim(),
             activity.quantity,
             activity.unit_price,
-        ) {
-            ImportSymbolDisposition::CashMovement => {
-                activity.symbol = String::new();
-                activity.exchange_mic = None;
-                activity.quote_ccy = None;
-                activity.instrument_type = None;
-                if activity.currency.trim().is_empty() {
-                    activity.currency = account_currency.to_string();
-                }
+        ) == ImportSymbolDisposition::CashMovement
+        {
+            activity.symbol = String::new();
+            activity.exchange_mic = None;
+            activity.quote_ccy = None;
+            activity.instrument_type = None;
+            if activity.currency.trim().is_empty() {
+                activity.currency = account_currency.to_string();
             }
-            _ => {}
         }
 
         if activity.activity_type == ACTIVITY_TYPE_SPLIT {

@@ -169,7 +169,7 @@ export const importActivitySchema = z
     /** Optional resolved instrument type hint (e.g., EQUITY, CRYPTO). */
     instrumentType: z.string().optional(),
     /** Optional quote mode hint (e.g., MANUAL, MARKET). */
-    quoteMode: z.string().optional(),
+    quoteMode: quoteModeSchema.optional(),
     /** ISIN identifier from the CSV (e.g. GB0007188757). Used for unambiguous exchange resolution. */
     isin: z.string().optional(),
     errors: z.record(z.string(), z.array(z.string())).optional(),

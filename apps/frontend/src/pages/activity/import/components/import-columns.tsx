@@ -262,16 +262,16 @@ export function useImportColumns<T extends ImportRowData>({
       meta: {
         cell: {
           variant: "symbol",
-            onSearch: onSymbolSearch,
-            onSelect: onSymbolSelect,
-            onCreateCustomAsset,
-            isClearable: (rowData: unknown) => {
-              const row = rowData as ImportRowData;
-              return !needsImportAssetResolution(row.activityType ?? "", row.subtype);
-            },
+          onSearch: onSymbolSearch,
+          onSelect: onSymbolSelect,
+          onCreateCustomAsset,
+          isClearable: (rowData: unknown) => {
+            const row = rowData as ImportRowData;
+            return !needsImportAssetResolution(row.activityType ?? "", row.subtype);
           },
         },
-      });
+      },
+    });
 
     // 9. Instrument Type
     columns.push({

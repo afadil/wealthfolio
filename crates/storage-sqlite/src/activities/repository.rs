@@ -1874,6 +1874,7 @@ mod tests {
         assert_eq!(second_result.created, 0);
         assert_eq!(second_result.updated, 1);
 
+        #[allow(clippy::type_complexity)]
         let rows: Vec<(
             String,
             Option<String>,
@@ -1975,6 +1976,7 @@ mod tests {
         assert_eq!(result.created, 1);
         assert_eq!(result.updated, 1);
 
+        #[allow(clippy::type_complexity)]
         let rows: Vec<(
             String,
             Option<String>,

@@ -2615,10 +2615,11 @@ mod tests {
             subtype: None,
             quote_mode: Some("MANUAL".to_string()),
             asset_id: None,
+            isin: None,
         };
 
         let result = activity_service
-            .check_activities_import("acc-1".to_string(), vec![import])
+            .check_activities_import(vec![import])
             .await
             .expect("import check should succeed");
 
@@ -2691,10 +2692,11 @@ mod tests {
             subtype: None,
             quote_mode: None,
             asset_id: None,
+            isin: None,
         };
 
         let result = activity_service
-            .check_activities_import("acc-1".to_string(), vec![import])
+            .check_activities_import(vec![import])
             .await
             .expect("import check should succeed");
 

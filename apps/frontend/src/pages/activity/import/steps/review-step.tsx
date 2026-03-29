@@ -164,7 +164,9 @@ export function ReviewStep() {
     }
 
     return {
-      facetFilteredDrafts: draftsMatchingFacetFilters.filter((draft) => statusFilter.has(draft.status)),
+      facetFilteredDrafts: draftsMatchingFacetFilters.filter((draft) =>
+        statusFilter.has(draft.status),
+      ),
       nonSelectableRowIndexes: [],
     };
   }, [draftActivities, typeFilter, accountFilter, symbolFilter, statusFilter]);
@@ -428,12 +430,12 @@ export function ReviewStep() {
           )}
         </div>
 
-          <ImportReviewGrid
-            drafts={facetFilteredDrafts}
-            nonSelectableRowIndexes={nonSelectableRowIndexes}
-            onDraftUpdate={handleDraftUpdate}
-            selectedRows={selectedRows}
-            onSelectionChange={setSelectedRows}
+        <ImportReviewGrid
+          drafts={facetFilteredDrafts}
+          nonSelectableRowIndexes={nonSelectableRowIndexes}
+          onDraftUpdate={handleDraftUpdate}
+          selectedRows={selectedRows}
+          onSelectionChange={setSelectedRows}
           onBulkSkip={handleBulkSkip}
           onBulkUnskip={handleBulkUnskip}
           onBulkSetCurrency={handleBulkSetCurrency}

@@ -310,7 +310,7 @@ export interface ImportTemplateData {
       symbolName?: string;
       quoteCcy?: string;
       instrumentType?: string;
-      quoteMode?: string;
+      quoteMode?: QuoteMode;
     }
   >;
   parseConfig?: ParseConfig;
