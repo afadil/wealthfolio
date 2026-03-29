@@ -162,6 +162,7 @@ export const incomeActivitySchema = baseActivitySchema.extend({
   activityType: z.enum([ActivityType.DIVIDEND, ActivityType.INTEREST]),
   assetId: z.string().min(1, { message: "Please select a security" }).optional(),
   quantity: z.coerce.number().default(0),
+  unitPrice: z.coerce.number().positive().optional(),
   amount: z.coerce
     .number({
       required_error: "Please enter a valid amount.",
