@@ -742,12 +742,20 @@ export interface IncomeByAsset {
   income: number;
 }
 
+export interface IncomeByAccount {
+  accountId: string;
+  accountName: string;
+  byMonth: Record<string, number>;
+  total: number;
+}
+
 export interface IncomeSummary {
   period: string;
   byMonth: Record<string, number>;
   byType: Record<string, number>;
   byAsset: Record<string, IncomeByAsset>;
   byCurrency: Record<string, number>;
+  byAccount: Record<string, IncomeByAccount>;
   totalIncome: number;
   currency: string;
   monthlyAverage: number;

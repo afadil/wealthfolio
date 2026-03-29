@@ -1133,6 +1133,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
              COALESCE(ast.display_code, 'CASH') as symbol,
              COALESCE(ast.name, 'Cash') as symbol_name,
              a.currency,
+             a.account_id,
+             acc.name as account_name,
              CASE
                  WHEN a.subtype IN ('STAKING_REWARD', 'DRIP', 'DIVIDEND_IN_KIND')
                       AND (a.amount IS NULL OR CAST(a.amount AS REAL) = 0)
@@ -1174,6 +1176,10 @@ impl ActivityRepositoryTrait for ActivityRepository {
             #[diesel(sql_type = diesel::sql_types::Text)]
             pub currency: String,
             #[diesel(sql_type = diesel::sql_types::Text)]
+            pub account_id: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            pub account_name: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
             pub amount: String,
         }
 
@@ -1202,6 +1208,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
                     symbol_name: raw.symbol_name,
                     currency: raw.currency,
                     amount,
+                    account_id: raw.account_id,
+                    account_name: raw.account_name,
                 })
             })
             .collect::<Result<Vec<IncomeData>>>()?; // Collect into Result
