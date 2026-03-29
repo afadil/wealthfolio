@@ -1,7 +1,7 @@
 import { ScrollArea } from "@wealthfolio/ui/components/ui/scroll-area";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
 import { AnimatedToggleGroup } from "@wealthfolio/ui/components/ui/animated-toggle-group";
-import { QuoteMode, type ActivityType } from "@/lib/constants";
+import { ACTIVITY_SUBTYPES, QuoteMode, type ActivityType } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
 import {
   AdvancedOptionsSection,
@@ -88,6 +88,9 @@ export function MobileDetailsStep({ accounts, activityType, isEditing }: MobileD
   const isSecuritiesTransfer = isTransfer && transferMode === "securities";
   const isCashTransfer = isTransfer && transferMode === "cash";
   const [toAccountSheetOpen, setToAccountSheetOpen] = useState(false);
+
+  const subtype = watch("subtype");
+  const isDrip = activityType === "DIVIDEND" && subtype === ACTIVITY_SUBTYPES.DRIP;
 
   const isFeeActivity = activityType === "FEE";
   const isTaxActivity = activityType === "TAX";
@@ -553,7 +556,56 @@ export function MobileDetailsStep({ accounts, activityType, isEditing }: MobileD
             assetCurrency={assetCurrency}
             accountCurrency={accountCurrency}
             baseCurrency={baseCurrency}
+            defaultOpen={isDrip}
           />
+
+          {/* DRIP: Price & Quantity of reinvested shares */}
+          {isDrip && (
+            <div className="grid grid-cols-1 gap-4">
+              <FormField
+                control={control}
+                name="unitPrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base font-medium">Price</FormLabel>
+                    <FormControl>
+                      <MoneyInput
+                        ref={field.ref}
+                        name={field.name}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="0.00"
+                        maxDecimalPlaces={4}
+                        className="h-12 text-base sm:text-sm"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={control}
+                name="quantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base font-medium">Quantity</FormLabel>
+                    <FormControl>
+                      <QuantityInput
+                        ref={field.ref}
+                        name={field.name}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="0.00"
+                        maxDecimalPlaces={8}
+                        className="h-12 text-base sm:text-sm"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          )}
 
           {/* Comment */}
           <FormField

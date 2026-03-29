@@ -306,6 +306,8 @@ export const ACTIVITY_FORM_CONFIG: Record<
       ...getBaseDefaults(activity, accounts),
       symbol: activity?.assetSymbol ?? activity?.assetId ?? "",
       amount: absNum(activity?.amount),
+      unitPrice: absNum(activity?.unitPrice),
+      quantity: absNum(activity?.quantity),
       // Advanced options
       currency: activity?.currency,
       fxRate: activity?.fxRate ?? undefined,
@@ -319,6 +321,8 @@ export const ACTIVITY_FORM_CONFIG: Record<
         activityDate: d.activityDate,
         assetId: d.symbol,
         amount: d.amount,
+        unitPrice: d.unitPrice,
+        quantity: d.quantity,
         comment: d.comment,
         subtype: d.subtype ?? undefined,
         currency: d.currency,

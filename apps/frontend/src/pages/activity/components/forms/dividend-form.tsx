@@ -1,5 +1,5 @@
 import { useSettings } from "@/hooks/use-settings";
-import { ActivityType } from "@/lib/constants";
+import { ACTIVITY_SUBTYPES, ActivityType } from "@/lib/constants";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
@@ -14,6 +14,7 @@ import {
   createValidatedSubmit,
   DatePicker,
   NotesInput,
+  QuantityInput,
   SymbolSearch,
   type AccountSelectOption,
 } from "./fields";
@@ -40,6 +41,19 @@ export const dividendFormSchema = z.object({
     .positive({ message: "FX Rate must be positive." })
     .optional(),
   subtype: z.string().optional().nullable(),
+  // DRIP fields (price & quantity of reinvested shares)
+  unitPrice: z.coerce
+    .number({
+      invalid_type_error: "Price must be a number.",
+    })
+    .positive({ message: "Price must be greater than 0." })
+    .optional(),
+  quantity: z.coerce
+    .number({
+      invalid_type_error: "Quantity must be a number.",
+    })
+    .positive({ message: "Quantity must be greater than 0." })
+    .optional(),
   symbolQuoteCcy: z.string().nullable().optional(),
   symbolInstrumentType: z.string().nullable().optional(),
 });
@@ -98,6 +112,8 @@ export function DividendForm({
   const { watch } = form;
   const accountId = watch("accountId");
   const currency = watch("currency");
+  const subtype = watch("subtype");
+  const isDrip = subtype === ACTIVITY_SUBTYPES.DRIP;
 
   // Get account currency from selected account
   const selectedAccount = useMemo(
@@ -146,7 +162,21 @@ export function DividendForm({
               assetCurrency={assetCurrency}
               accountCurrency={accountCurrency}
               baseCurrency={baseCurrency}
+              defaultOpen={isDrip}
             />
+
+            {/* DRIP: Price & Quantity of reinvested shares */}
+            {isDrip && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <AmountInput
+                  name="unitPrice"
+                  label="Price"
+                  maxDecimalPlaces={4}
+                  currency={currency}
+                />
+                <QuantityInput name="quantity" label="Quantity" />
+              </div>
+            )}
 
             {/* Notes */}
             <NotesInput name="comment" label="Notes" placeholder="Add an optional note..." />
