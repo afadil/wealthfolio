@@ -1,0 +1,2 @@
+-- No-op: deleted quotes cannot be restored. They will be recreated
+-- from activities if the code regression is reintroduced.

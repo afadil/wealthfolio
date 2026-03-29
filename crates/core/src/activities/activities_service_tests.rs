@@ -2510,6 +2510,7 @@ mod tests {
             fx_rate: None,
             subtype: None,
             quote_mode: Some("MANUAL".to_string()),
+            asset_id: None,
         };
 
         let result = activity_service
@@ -2585,6 +2586,7 @@ mod tests {
             fx_rate: None,
             subtype: None,
             quote_mode: None,
+            asset_id: None,
         };
 
         let result = activity_service

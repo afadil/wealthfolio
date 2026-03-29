@@ -1,8 +1,9 @@
--- Remove bogus BROKER quotes that were created from DIVIDEND, INTEREST,
--- FEE, TAX, and CREDIT activities. These activity types store payment
--- amounts in unit_price, not asset market prices.
--- Preserves quotes where a price-bearing activity (BUY, SELL, TRANSFER_IN)
--- also exists on the same asset+day.
+-- Corrective pass for the 2026-03-18 migration which lacked a guard
+-- against same-day price-bearing activities. This re-checks BROKER
+-- quotes with a NOT EXISTS clause so that legitimate fallback quotes
+-- created by BUY/SELL/TRANSFER_IN on the same asset+day are preserved.
+-- For fresh installs the prior migration already includes this guard;
+-- this is a harmless no-op in that case.
 DELETE FROM quotes
 WHERE source = 'BROKER'
   AND id IN (
