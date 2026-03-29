@@ -508,7 +508,7 @@ export function ImportProvider({ children, initialAccountId }: ImportProviderPro
                 exchangeMic: draft.exchangeMic,
                 quoteCcy: draft.quoteCcy,
                 instrumentType: draft.instrumentType,
-                quoteMode: draft.quoteMode,
+                quoteMode: draft.quoteMode as ActivityImport["quoteMode"],
                 isin: draft.isin,
                 quantity: draft.quantity,
                 unitPrice: draft.unitPrice,

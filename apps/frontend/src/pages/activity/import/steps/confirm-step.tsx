@@ -124,7 +124,7 @@ function draftToActivityImport(draft: DraftActivity): ActivityImport {
     exchangeMic: draft.exchangeMic,
     quoteCcy: draft.quoteCcy,
     instrumentType: draft.instrumentType,
-    quoteMode: draft.quoteMode,
+    quoteMode: draft.quoteMode as ActivityImport["quoteMode"],
     errors: draft.errors,
     isValid: draft.status === "valid" || draft.status === "warning",
     lineNumber: draft.rowIndex + 1,
