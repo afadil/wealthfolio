@@ -112,19 +112,17 @@ impl ContributionLimitService {
             let should_count = match activity.activity_type.as_str() {
                 "DEPOSIT" => true,
                 "TRANSFER_IN" => {
-                    // Must be external AND not an internal transfer within this limit
-                    if !Self::is_external(activity) {
-                        false
-                    } else if let Some(group_id) = &activity.source_group_id {
-                        // Check if linked TRANSFER_OUT is also in this limit's accounts
-                        // If so, it's an internal transfer - don't count
+                    if let Some(group_id) = &activity.source_group_id {
+                        // Linked transfer pair: count only if the source account
+                        // is outside this limit (new money entering the limit).
                         !transfer_out_accounts
                             .get(group_id.as_str())
                             .map(|out_account| limit_accounts.contains(out_account))
                             .unwrap_or(false)
                     } else {
-                        // External with no link - count it
-                        true
+                        // Unlinked transfer: count only if explicitly marked external
+                        // (e.g. from outside the portfolio entirely).
+                        Self::is_external(activity)
                     }
                 }
                 "CREDIT" => Self::is_external(activity),
@@ -1248,6 +1246,84 @@ mod tests {
             result.by_account.get("tfsa_invest").unwrap().amount,
             dec!(2000)
         );
+    }
+
+    #[test]
+    fn test_internal_transfer_from_outside_limit_counts_without_external_flag() {
+        // Reproduces GitHub issue #775:
+        // Internal transfer (no is_external metadata) from a Cash account
+        // outside the limit into a Registered account inside the limit.
+        // This should count because the source is outside the limit's scope.
+        let activities = vec![
+            // TRANSFER_OUT from Cash account (not in the limit)
+            ContributionActivity {
+                account_id: "cash_account".to_string(),
+                activity_type: "TRANSFER_OUT".to_string(),
+                activity_instant: default_instant(),
+                amount: Some(dec!(1000)),
+                currency: "CAD".to_string(),
+                metadata: None, // No external flag — it's an internal transfer
+                source_group_id: Some("pair1".to_string()),
+            },
+            // TRANSFER_IN to Registered account (in the limit)
+            ContributionActivity {
+                account_id: "registered".to_string(),
+                activity_type: "TRANSFER_IN".to_string(),
+                activity_instant: default_instant(),
+                amount: Some(dec!(1000)),
+                currency: "CAD".to_string(),
+                metadata: None, // No external flag
+                source_group_id: Some("pair1".to_string()),
+            },
+        ];
+        let service = make_service(activities);
+        let (start, end) = dates();
+
+        // Only the registered account is in the limit
+        let result = service
+            .calculate_contributions_by_period(&["registered".to_string()], start, end, "CAD")
+            .unwrap();
+
+        // Should count — source account is outside this limit
+        assert_eq!(result.total, dec!(1000));
+    }
+
+    #[test]
+    fn test_internal_transfer_within_limit_not_counted_without_external_flag() {
+        // Internal transfer between two accounts both in the limit — should NOT count.
+        let activities = vec![
+            ContributionActivity {
+                account_id: "acc1".to_string(),
+                activity_type: "TRANSFER_OUT".to_string(),
+                activity_instant: default_instant(),
+                amount: Some(dec!(500)),
+                currency: "USD".to_string(),
+                metadata: None,
+                source_group_id: Some("pair1".to_string()),
+            },
+            ContributionActivity {
+                account_id: "acc2".to_string(),
+                activity_type: "TRANSFER_IN".to_string(),
+                activity_instant: default_instant(),
+                amount: Some(dec!(500)),
+                currency: "USD".to_string(),
+                metadata: None,
+                source_group_id: Some("pair1".to_string()),
+            },
+        ];
+        let service = make_service(activities);
+        let (start, end) = dates();
+
+        let result = service
+            .calculate_contributions_by_period(
+                &["acc1".to_string(), "acc2".to_string()],
+                start,
+                end,
+                "USD",
+            )
+            .unwrap();
+
+        assert_eq!(result.total, Decimal::ZERO);
     }
 
     #[test]
