@@ -18,6 +18,7 @@ mod tests {
     use chrono::{DateTime, NaiveDate, Utc};
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
+    use serde_json::json;
     use std::collections::{HashMap, HashSet};
     use std::sync::{Arc, Mutex};
 
@@ -936,6 +937,20 @@ mod tests {
             kind: AssetKind::Investment,
             ..Default::default()
         }
+    }
+
+    fn create_test_asset_with_instrument_and_isin(
+        id: &str,
+        symbol: &str,
+        exchange_mic: Option<&str>,
+        instrument_type: Option<InstrumentType>,
+        currency: &str,
+        isin: &str,
+    ) -> Asset {
+        let mut asset =
+            create_test_asset_with_instrument(id, symbol, exchange_mic, instrument_type, currency);
+        asset.metadata = Some(json!({ "identifiers": { "isin": isin } }));
+        asset
     }
 
     /// Test: When creating an activity where the activity currency matches the account currency,
@@ -2365,6 +2380,188 @@ mod tests {
         assert_eq!(checked.exchange_mic.as_deref(), Some("XLON"));
         assert_eq!(checked.instrument_type.as_deref(), Some("EQUITY"));
         assert_eq!(checked.quote_ccy.as_deref(), Some("GBp"));
+    }
+
+    #[tokio::test]
+    async fn test_check_import_keeps_same_symbol_rows_distinct_by_isin() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        asset_service.add_asset(create_test_asset_with_instrument_and_isin(
+            "shop-nyse",
+            "SHOP",
+            Some("XNYS"),
+            Some(InstrumentType::Equity),
+            "USD",
+            "CA82509L1076",
+        ));
+        asset_service.add_asset(create_test_asset_with_instrument_and_isin(
+            "shop-nasdaq",
+            "SHOP",
+            Some("XNAS"),
+            Some(InstrumentType::Equity),
+            "USD",
+            "CA82509L1077",
+        ));
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let imports = vec![
+            ActivityImport {
+                id: None,
+                date: "2024-01-15".to_string(),
+                symbol: "SHOP".to_string(),
+                activity_type: "BUY".to_string(),
+                quantity: Some(dec!(1)),
+                unit_price: Some(dec!(100)),
+                currency: "USD".to_string(),
+                fee: Some(dec!(0)),
+                amount: Some(dec!(100)),
+                comment: None,
+                account_id: Some("acc-1".to_string()),
+                account_name: None,
+                symbol_name: None,
+                exchange_mic: None,
+                quote_ccy: None,
+                instrument_type: None,
+                quote_mode: None,
+                errors: None,
+                warnings: None,
+                duplicate_of_id: None,
+                duplicate_of_line_number: None,
+                is_draft: false,
+                is_valid: true,
+                line_number: Some(1),
+                fx_rate: None,
+                subtype: None,
+                asset_id: None,
+                isin: Some("ca82509l1076".to_string()),
+            },
+            ActivityImport {
+                id: None,
+                date: "2024-01-15".to_string(),
+                symbol: "SHOP".to_string(),
+                activity_type: "BUY".to_string(),
+                quantity: Some(dec!(1)),
+                unit_price: Some(dec!(100)),
+                currency: "USD".to_string(),
+                fee: Some(dec!(0)),
+                amount: Some(dec!(100)),
+                comment: None,
+                account_id: Some("acc-1".to_string()),
+                account_name: None,
+                symbol_name: None,
+                exchange_mic: None,
+                quote_ccy: None,
+                instrument_type: None,
+                quote_mode: None,
+                errors: None,
+                warnings: None,
+                duplicate_of_id: None,
+                duplicate_of_line_number: None,
+                is_draft: false,
+                is_valid: true,
+                line_number: Some(2),
+                fx_rate: None,
+                subtype: None,
+                asset_id: None,
+                isin: Some("CA82509L1077".to_string()),
+            },
+        ];
+
+        let result = activity_service
+            .check_activities_import(imports)
+            .await
+            .expect("import check should succeed");
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].asset_id.as_deref(), Some("shop-nyse"));
+        assert_eq!(result[0].exchange_mic.as_deref(), Some("XNYS"));
+        assert_eq!(result[1].asset_id.as_deref(), Some("shop-nasdaq"));
+        assert_eq!(result[1].exchange_mic.as_deref(), Some("XNAS"));
+    }
+
+    #[tokio::test]
+    async fn test_preview_import_assets_keeps_same_symbol_candidates_distinct_by_isin() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        asset_service.add_asset(create_test_asset_with_instrument_and_isin(
+            "shop-nyse",
+            "SHOP",
+            Some("XNYS"),
+            Some(InstrumentType::Equity),
+            "USD",
+            "CA82509L1076",
+        ));
+        asset_service.add_asset(create_test_asset_with_instrument_and_isin(
+            "shop-nasdaq",
+            "SHOP",
+            Some("XNAS"),
+            Some(InstrumentType::Equity),
+            "USD",
+            "CA82509L1077",
+        ));
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let preview = activity_service
+            .preview_import_assets(vec![
+                ImportAssetCandidate {
+                    key: "shop-1".to_string(),
+                    account_id: "acc-1".to_string(),
+                    symbol: "SHOP".to_string(),
+                    currency: Some("USD".to_string()),
+                    instrument_type: None,
+                    quote_ccy: None,
+                    quote_mode: None,
+                    exchange_mic: None,
+                    isin: Some("ca82509l1076".to_string()),
+                },
+                ImportAssetCandidate {
+                    key: "shop-2".to_string(),
+                    account_id: "acc-1".to_string(),
+                    symbol: "SHOP".to_string(),
+                    currency: Some("USD".to_string()),
+                    instrument_type: None,
+                    quote_ccy: None,
+                    quote_mode: None,
+                    exchange_mic: None,
+                    isin: Some("CA82509L1077".to_string()),
+                },
+            ])
+            .await
+            .expect("preview should succeed");
+
+        assert_eq!(preview.len(), 2);
+        assert_eq!(preview[0].status, ImportAssetPreviewStatus::ExistingAsset);
+        assert_eq!(preview[0].asset_id.as_deref(), Some("shop-nyse"));
+        assert_eq!(preview[1].status, ImportAssetPreviewStatus::ExistingAsset);
+        assert_eq!(preview[1].asset_id.as_deref(), Some("shop-nasdaq"));
     }
 
     #[tokio::test]

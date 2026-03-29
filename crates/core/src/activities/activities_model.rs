@@ -829,6 +829,8 @@ pub struct ImportAssetCandidate {
     pub quote_mode: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exchange_mic: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub isin: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

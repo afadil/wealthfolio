@@ -39,6 +39,29 @@ describe("import asset rules", () => {
     expect(candidate?.symbol).toBe("SOL");
   });
 
+  it("keeps otherwise identical candidates distinct when their ISIN differs", () => {
+    const first = buildImportAssetCandidateFromDraft(
+      createDraft({
+        symbol: "SHOP",
+        instrumentType: "EQUITY",
+        quoteCcy: "CAD",
+        isin: "ca82509l1076",
+      }),
+    );
+    const second = buildImportAssetCandidateFromDraft(
+      createDraft({
+        symbol: "SHOP",
+        instrumentType: "EQUITY",
+        quoteCcy: "CAD",
+        isin: "CA82509L1077",
+      }),
+    );
+
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    expect(first?.key).not.toBe(second?.key);
+  });
+
   it("requires a symbol for DRIP dividends", () => {
     const validation = validateDraft(
       createDraft({

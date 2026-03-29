@@ -60,14 +60,19 @@ export function buildImportAssetCandidateKey(input: {
   quoteMode?: string;
   quoteCcy?: string;
   exchangeMic?: string;
+  isin?: string;
 }): string {
-  // quoteCcy is intentionally excluded — rows with the same symbol but missing
-  // currency (e.g. SPLIT rows) should group with rows that have a currency.
+  // quoteCcy is included so that the same symbol with different currencies
+  // (e.g. SHOP on NASDAQ/USD vs TSX/CAD) resolves independently.
+  // ISIN is included so same-ticker rows from different instruments do not
+  // collapse before preview/validation can disambiguate them.
   return [
     input.symbol.trim().toUpperCase(),
     input.instrumentType?.trim().toUpperCase() ?? "",
     input.quoteMode?.trim().toUpperCase() ?? "",
     input.exchangeMic?.trim().toUpperCase() ?? "",
+    input.quoteCcy?.trim().toUpperCase() ?? "",
+    input.isin?.trim().toUpperCase() ?? "",
   ].join("::");
 }
 
@@ -97,6 +102,7 @@ export function buildImportAssetCandidateFromDraft(
         quoteMode: draft.quoteMode,
         quoteCcy: draft.quoteCcy || draft.currency,
         exchangeMic: draft.exchangeMic,
+        isin: draft.isin,
       }),
     accountId: draft.accountId,
     symbol: draft.symbol,
@@ -105,6 +111,7 @@ export function buildImportAssetCandidateFromDraft(
     quoteCcy: draft.quoteCcy,
     quoteMode: draft.quoteMode,
     exchangeMic: draft.exchangeMic,
+    isin: draft.isin,
   };
 }
 

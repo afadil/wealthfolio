@@ -193,6 +193,7 @@ export function ReviewStep() {
           "quoteCcy",
           "instrumentType",
           "quoteMode",
+          "isin",
           "accountId",
           "activityType",
         ].some((field) => field in updates);

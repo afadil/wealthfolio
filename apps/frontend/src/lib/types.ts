@@ -909,6 +909,7 @@ export interface ImportAssetCandidate {
   quoteCcy?: string;
   quoteMode?: string;
   exchangeMic?: string;
+  isin?: string;
 }
 
 export type ImportAssetPreviewStatus =

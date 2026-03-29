@@ -118,13 +118,13 @@ pub async fn save_activities(
 #[tauri::command]
 pub async fn get_account_import_mapping(
     account_id: String,
-    import_type: String,
+    context_kind: String,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ImportMappingData, String> {
     debug!("Getting import mapping for account: {}", account_id);
     Ok(state
         .activity_service()
-        .get_import_mapping(account_id, import_type)?)
+        .get_import_mapping(account_id, context_kind)?)
 }
 
 #[tauri::command]
@@ -144,13 +144,13 @@ pub async fn save_account_import_mapping(
 pub async fn link_account_template(
     account_id: String,
     template_id: String,
-    import_type: String,
+    context_kind: String,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<(), String> {
     debug!("Linking account {} to template {}", account_id, template_id);
     state
         .activity_service()
-        .link_account_template(account_id, template_id, import_type)
+        .link_account_template(account_id, template_id, context_kind)
         .await
         .map_err(|e| e.to_string())
 }

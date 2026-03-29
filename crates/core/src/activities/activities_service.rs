@@ -34,6 +34,8 @@ use log::warn;
 
 /// Cache key: (symbol, exchange_mic, instrument_type) → provider quote currency
 type QuoteCcyCache = HashMap<(String, Option<String>, Option<String>), Option<String>>;
+/// Cache key: (symbol, activity currency, ISIN) → symbol resolution result
+type SymbolResolutionKey = (String, String, Option<String>);
 use uuid::Uuid;
 use wealthfolio_market_data::{
     exchanges_for_currency, mic_to_currency, yahoo_exchange_suffixes, yahoo_suffix_to_mic,
@@ -52,6 +54,32 @@ fn yahoo_suffix_for_mic(mic: &str) -> Option<&'static str> {
             .unwrap_or(false)
         {
             return Some(suffix);
+        }
+    }
+    None
+}
+
+fn normalize_isin_key(isin: Option<&str>) -> Option<String> {
+    isin.map(str::trim)
+        .filter(|isin| !isin.is_empty())
+        .map(|isin| isin.to_uppercase())
+}
+
+fn find_unique_existing_symbol_match(
+    symbol: &str,
+    existing_map: &HashMap<String, Option<String>>,
+    existing_symbol_counts: &HashMap<String, usize>,
+) -> Option<ResolvedSymbolInfo> {
+    for candidate in symbol_resolution_candidates(symbol) {
+        let normalized = candidate.to_lowercase();
+        if existing_symbol_counts.get(&normalized).copied() != Some(1) {
+            continue;
+        }
+        if let Some(exchange_mic) = existing_map.get(&normalized) {
+            return Some(ResolvedSymbolInfo {
+                exchange_mic: exchange_mic.clone(),
+                name: None,
+            });
         }
     }
     None
@@ -569,18 +597,17 @@ impl ActivityService {
         })
     }
 
-    /// Resolves (symbol, currency) pairs to exchange MICs in batch.
+    /// Resolves (symbol, currency, optional ISIN) keys to exchange MICs in batch.
     /// Uses the activity-level currency to rank exchange results correctly.
     /// First checks existing assets in the database, then falls back to quote service.
-    /// Returns a `ResolvedSymbolInfo` for each symbol-currency pair.
+    /// Returns a `ResolvedSymbolInfo` for each resolution key.
     async fn resolve_symbols_batch(
         &self,
-        symbol_currency_pairs: HashSet<(String, String)>,
-        isin_map: &HashMap<String, String>,
-    ) -> HashMap<(String, String), ResolvedSymbolInfo> {
-        let mut cache: HashMap<(String, String), ResolvedSymbolInfo> = HashMap::new();
+        resolution_keys: HashSet<SymbolResolutionKey>,
+    ) -> HashMap<SymbolResolutionKey, ResolvedSymbolInfo> {
+        let mut cache: HashMap<SymbolResolutionKey, ResolvedSymbolInfo> = HashMap::new();
 
-        if symbol_currency_pairs.is_empty() {
+        if resolution_keys.is_empty() {
             return cache;
         }
 
@@ -593,6 +620,13 @@ impl ActivityService {
                 Some((symbol.to_lowercase(), a.instrument_exchange_mic.clone()))
             })
             .collect();
+        let existing_symbol_counts: HashMap<String, usize> = existing_assets
+            .iter()
+            .filter_map(|a| a.display_code.as_ref().or(a.instrument_symbol.as_ref()))
+            .fold(HashMap::new(), |mut counts, symbol| {
+                *counts.entry(symbol.to_lowercase()).or_insert(0) += 1;
+                counts
+            });
 
         // Build ISIN → exchange_mic from existing asset metadata
         let existing_isin_map: HashMap<String, Option<String>> = existing_assets
@@ -608,17 +642,31 @@ impl ActivityService {
             })
             .collect();
 
-        // 2. Check each symbol against existing assets first
-        let mut missing: Vec<(String, String)> = Vec::new();
+        // 2. Check each key against existing assets first
+        let mut missing: Vec<SymbolResolutionKey> = Vec::new();
 
-        for (symbol, currency) in &symbol_currency_pairs {
+        for (symbol, currency, isin) in &resolution_keys {
+            let resolution_key = (symbol.clone(), currency.clone(), isin.clone());
             if symbol.trim().is_empty() {
-                cache.insert(
-                    (symbol.clone(), currency.clone()),
-                    ResolvedSymbolInfo::default(),
-                );
+                cache.insert(resolution_key, ResolvedSymbolInfo::default());
                 continue;
             }
+
+            if let Some(isin) = isin {
+                if let Some(exchange_mic) = existing_isin_map.get(isin) {
+                    cache.insert(
+                        resolution_key,
+                        ResolvedSymbolInfo {
+                            exchange_mic: exchange_mic.clone(),
+                            name: None,
+                        },
+                    );
+                } else {
+                    missing.push((symbol.clone(), currency.clone(), Some(isin.clone())));
+                }
+                continue;
+            }
+
             let mut existing_match = None;
             for candidate in symbol_resolution_candidates(symbol) {
                 if let Some(exchange_mic) = existing_map.get(&candidate.to_lowercase()) {
@@ -630,14 +678,14 @@ impl ActivityService {
             if let Some(exchange_mic) = existing_match {
                 // For existing DB assets, name comes from get_asset_by_id — not needed here
                 cache.insert(
-                    (symbol.clone(), currency.clone()),
+                    resolution_key,
                     ResolvedSymbolInfo {
                         exchange_mic,
                         name: None,
                     },
                 );
             } else {
-                missing.push((symbol.clone(), currency.clone()));
+                missing.push((symbol.clone(), currency.clone(), None));
             }
         }
 
@@ -649,60 +697,82 @@ impl ActivityService {
             SYMBOL_RESOLVE_CONCURRENCY
         );
 
-        let resolved: Vec<((String, String), ResolvedSymbolInfo)> = futures::stream::iter(missing)
-            .map(|(symbol, currency)| {
-                let isin_map = &isin_map;
-                let existing_isin_map = &existing_isin_map;
-                async move {
-                    let info = if let Some(isin) = isin_map.get(&symbol) {
-                        debug!(
-                            "resolve_symbols_batch: resolving symbol={} via ISIN={}",
-                            symbol, isin
-                        );
-                        // ① existing asset by ISIN (zero network)
-                        if let Some(exchange_mic) = existing_isin_map.get(&isin.to_uppercase()) {
-                            ResolvedSymbolInfo {
-                                exchange_mic: exchange_mic.clone(),
-                                name: None,
-                            }
-                        } else {
-                            // ② provider search by ISIN
-                            match self
-                                .quote_service
-                                .search_symbol_with_currency(isin, None)
-                                .await
-                            {
-                                Err(e) => {
-                                    warn!(
-                                        "resolve_symbols_batch: ISIN search failed isin={} err={}",
-                                        isin, e
-                                    );
-                                    self.resolve_symbol_exchange_mic(&symbol, &currency).await
+        let resolved: Vec<(SymbolResolutionKey, ResolvedSymbolInfo)> =
+            futures::stream::iter(missing)
+                .map(|(symbol, currency, isin)| {
+                    let existing_isin_map = &existing_isin_map;
+                    let existing_map = &existing_map;
+                    let existing_symbol_counts = &existing_symbol_counts;
+                    async move {
+                        let info = if let Some(isin) = isin.as_deref() {
+                            debug!(
+                                "resolve_symbols_batch: resolving symbol={} via ISIN={}",
+                                symbol, isin
+                            );
+                            // ① existing asset by ISIN (zero network)
+                            if let Some(exchange_mic) = existing_isin_map.get(isin) {
+                                ResolvedSymbolInfo {
+                                    exchange_mic: exchange_mic.clone(),
+                                    name: None,
                                 }
-                                Ok(results) => {
-                                    if let Some(r) =
-                                        results.into_iter().find(|r| r.exchange_mic.is_some())
-                                    {
-                                        ResolvedSymbolInfo {
-                                            exchange_mic: r.exchange_mic,
-                                            name: Some(r.long_name).filter(|n| !n.is_empty()),
+                            } else {
+                                // ② provider search by ISIN
+                                match self
+                                    .quote_service
+                                    .search_symbol_with_currency(isin, None)
+                                    .await
+                                {
+                                    Err(e) => {
+                                        warn!(
+                                            "resolve_symbols_batch: ISIN search failed isin={} err={}",
+                                            isin, e
+                                        );
+                                        if let Some(existing_match) =
+                                            find_unique_existing_symbol_match(
+                                                &symbol,
+                                                existing_map,
+                                                existing_symbol_counts,
+                                            )
+                                        {
+                                            existing_match
+                                        } else {
+                                            self.resolve_symbol_exchange_mic(&symbol, &currency)
+                                                .await
                                         }
-                                    } else {
-                                        self.resolve_symbol_exchange_mic(&symbol, &currency).await
+                                    }
+                                    Ok(results) => {
+                                        if let Some(r) =
+                                            results.into_iter().find(|r| r.exchange_mic.is_some())
+                                        {
+                                            ResolvedSymbolInfo {
+                                                exchange_mic: r.exchange_mic,
+                                                name: Some(r.long_name).filter(|n| !n.is_empty()),
+                                            }
+                                        } else if let Some(existing_match) =
+                                            find_unique_existing_symbol_match(
+                                                &symbol,
+                                                existing_map,
+                                                existing_symbol_counts,
+                                            )
+                                        {
+                                            existing_match
+                                        } else {
+                                            self.resolve_symbol_exchange_mic(&symbol, &currency)
+                                                .await
+                                        }
                                     }
                                 }
                             }
-                        }
-                    } else {
-                        // ③ ticker fallback
-                        self.resolve_symbol_exchange_mic(&symbol, &currency).await
-                    };
-                    ((symbol, currency), info)
-                }
-            })
-            .buffer_unordered(SYMBOL_RESOLVE_CONCURRENCY)
-            .collect()
-            .await;
+                        } else {
+                            // ③ ticker fallback
+                            self.resolve_symbol_exchange_mic(&symbol, &currency).await
+                        };
+                        ((symbol, currency, isin), info)
+                    }
+                })
+                .buffer_unordered(SYMBOL_RESOLVE_CONCURRENCY)
+                .collect()
+                .await;
 
         for (key, info) in resolved {
             cache.insert(key, info);
@@ -723,10 +793,14 @@ impl ActivityService {
             .into_iter()
             .map(|s| (s, currency.to_string()))
             .collect();
-        self.resolve_symbols_batch(pairs, &HashMap::new())
+        let resolution_keys: HashSet<SymbolResolutionKey> = pairs
+            .into_iter()
+            .map(|(symbol, currency)| (symbol, currency, None))
+            .collect();
+        self.resolve_symbols_batch(resolution_keys)
             .await
             .into_iter()
-            .map(|((sym, _), info)| (sym, info.exchange_mic))
+            .map(|((sym, _, _), info)| (sym, info.exchange_mic))
             .collect()
     }
 
@@ -2084,7 +2158,7 @@ impl ActivityService {
         let base_ccy = self.account_service.get_base_currency().unwrap_or_default();
         let account_currency = resolve_currency(&[&account.currency, &base_ccy]);
 
-        let symbol_currency_pairs: HashSet<(String, String)> = activities
+        let symbol_resolution_keys: HashSet<SymbolResolutionKey> = activities
             .iter()
             .filter(|a| {
                 let sym = a.symbol.trim();
@@ -2108,25 +2182,15 @@ impl ActivityService {
                 } else {
                     a.currency.clone()
                 };
-                (a.symbol.clone(), ccy)
+                (a.symbol.clone(), ccy, normalize_isin_key(a.isin.as_deref()))
             })
             .collect();
-
-        let isin_map: HashMap<String, String> = activities
-            .iter()
-            .filter_map(|a| {
-                let isin = a.isin.as_deref().filter(|i| !i.is_empty())?;
-                Some((a.symbol.clone(), isin.to_string()))
-            })
-            .collect();
-        let symbol_batch = self
-            .resolve_symbols_batch(symbol_currency_pairs, &isin_map)
-            .await;
-        let symbol_mic_cache: HashMap<(String, String), Option<String>> = symbol_batch
+        let symbol_batch = self.resolve_symbols_batch(symbol_resolution_keys).await;
+        let symbol_mic_cache: HashMap<SymbolResolutionKey, Option<String>> = symbol_batch
             .iter()
             .map(|(k, info)| (k.clone(), info.exchange_mic.clone()))
             .collect();
-        let symbol_name_cache: HashMap<(String, String), Option<String>> = symbol_batch
+        let symbol_name_cache: HashMap<SymbolResolutionKey, Option<String>> = symbol_batch
             .into_iter()
             .map(|(k, info)| (k, info.name))
             .collect();
@@ -2210,12 +2274,15 @@ impl ActivityService {
             } else {
                 activity.currency.clone()
             };
-            let exchange_mic = activity.exchange_mic.clone().or_else(|| {
-                symbol_mic_cache
-                    .get(&(activity.symbol.clone(), resolve_ccy.clone()))
-                    .cloned()
-                    .flatten()
-            });
+            let resolution_key = (
+                activity.symbol.clone(),
+                resolve_ccy.clone(),
+                normalize_isin_key(activity.isin.as_deref()),
+            );
+            let exchange_mic = activity
+                .exchange_mic
+                .clone()
+                .or_else(|| symbol_mic_cache.get(&resolution_key).cloned().flatten());
 
             let (base_symbol, suffix_mic) = parse_symbol_with_exchange_suffix(&symbol);
             let resolved_mic = exchange_mic.or_else(|| suffix_mic.map(|s| s.to_string()));
@@ -2324,7 +2391,7 @@ impl ActivityService {
             } else {
                 // Use provider-supplied name when available; fall back to symbol
                 let provider_name = symbol_name_cache
-                    .get(&(symbol.clone(), resolve_ccy))
+                    .get(&resolution_key)
                     .and_then(|n| n.clone())
                     .filter(|n| {
                         !n.is_empty() && n.to_uppercase() != normalized_symbol.to_uppercase()
@@ -2915,7 +2982,7 @@ impl ActivityServiceTrait for ActivityService {
                 fx_rate: None,
                 subtype: None,
                 asset_id: None,
-                isin: None,
+                isin: candidate.isin.clone(),
             })
             .collect();
 

@@ -65,6 +65,7 @@ interface NeedsFixingRowProps {
   symbolName?: string;
   count: number;
   onSearch: (item: ImportAssetPreviewItem, result?: SymbolSearchResult) => void;
+  onMarkCustom: () => void;
   onCreateAsset: () => void;
 }
 
@@ -77,6 +78,7 @@ function NeedsFixingRow({
   symbolName,
   count,
   onSearch,
+  onMarkCustom,
   onCreateAsset,
 }: NeedsFixingRowProps) {
   const meaningfulErrors = Object.values(item.errors ?? {})
@@ -102,30 +104,39 @@ function NeedsFixingRow({
         <Icons.ArrowRight className="ml-auto h-3.5 w-3.5 shrink-0 text-amber-400 dark:text-amber-500/70" />
       </div>
 
-      {/* Col 2: search input */}
-      <TickerSearchInput
-        defaultValue={symbol}
-        placeholder="Search by ticker, name or ISIN…"
-        onSelectResult={(_sym, result) => onSearch(item, result)}
-        className="h-8 w-full py-1 text-xs"
-      />
+      {/* Col 2: search input with icon */}
+      <div className="relative [&_[role=combobox]]:h-9 [&_[role=combobox]]:min-h-0 [&_[role=combobox]]:py-1">
+        <Icons.Search className="pointer-events-none absolute left-2.5 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 text-amber-400 dark:text-amber-500/70" />
+        <TickerSearchInput
+          defaultValue={symbol}
+          placeholder="Search by ticker, name or ISIN…"
+          onSelectResult={(_sym, result) => onSearch(item, result)}
+          className="w-full pl-8 text-xs"
+        />
+      </div>
 
-      {/* Col 3: "or" separator + Create manually */}
-      <div className="flex items-center gap-2 sm:gap-3">
-        <div className="flex flex-col items-center gap-0.5">
-          <div className="h-3 w-px bg-amber-300 dark:bg-amber-500/30" />
-          <span className="text-[10px] font-medium leading-none text-amber-400 dark:text-amber-500/70">
-            or
-          </span>
-          <div className="h-3 w-px bg-amber-300 dark:bg-amber-500/30" />
-        </div>
-        <button
+      {/* Col 3: actions */}
+      <div className="flex shrink-0 items-center gap-2">
+        <Button
           type="button"
-          onClick={onCreateAsset}
-          className="text-muted-foreground whitespace-nowrap text-[11px] transition-colors hover:text-amber-700 dark:hover:text-amber-400"
+          size="sm"
+          variant="ghost"
+          onClick={onMarkCustom}
+          className="text-muted-foreground h-7 gap-1 px-2 text-[11px] hover:text-amber-700 dark:hover:text-amber-400"
         >
-          Create<span className="hidden sm:inline"> manually</span>
-        </button>
+          <Icons.Tag className="h-3 w-3 shrink-0" />
+          <span className="hidden sm:inline">Mark Custom</span>
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={onCreateAsset}
+          className="h-7 gap-1 border-amber-300 px-2.5 text-[11px] text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/10"
+        >
+          <Icons.Plus className="h-3 w-3 shrink-0" />
+          <span className="hidden sm:inline">Create manually</span>
+        </Button>
       </div>
 
       {/* Errors span all 3 columns */}
@@ -208,6 +219,12 @@ function AutoResolvedRow({
         />
       ) : (
         <div className="flex min-w-0 flex-wrap items-center gap-1">
+          {item.resolutionSource === "mark_custom" && (
+            <span className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-300">
+              <Icons.Tag className="h-3 w-3 shrink-0" />
+              Custom
+            </span>
+          )}
           {isSuspicious && (
             <span
               className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-300"
@@ -225,7 +242,7 @@ function AutoResolvedRow({
               {pill}
             </span>
           ))}
-          {metaPills.length === 0 && (
+          {metaPills.length === 0 && item.resolutionSource !== "mark_custom" && (
             <span className="text-muted-foreground text-[11px] italic">No metadata resolved</span>
           )}
         </div>
@@ -449,6 +466,91 @@ export function AssetReviewStep() {
     [candidateMap, dispatch, draftActivities, state.parseConfig.defaultCurrency, updatePreviewItem],
   );
 
+  const handleMarkCustom = useCallback(
+    (item: ImportAssetPreviewItem) => {
+      const candidate = candidateMap.get(item.key);
+      const symbol = candidate?.draft.symbol || item.key;
+      const fallbackCurrency = candidate?.draft.currency || state.parseConfig.defaultCurrency;
+      const assetDraft = buildNewAssetFromSearchResult(
+        {
+          symbol,
+          shortName: symbol,
+          longName: symbol,
+          exchange: "MANUAL",
+          index: "MANUAL",
+          quoteType: "EQUITY",
+          score: 0,
+          typeDisplay: "Custom Asset",
+          dataSource: "MANUAL",
+        },
+        fallbackCurrency,
+      );
+      const nextDrafts = applyAssetResolution(draftActivities, item.key, assetDraft, {
+        importAssetKey: item.key,
+      });
+      dispatch({ type: "SET_DRAFT_ACTIVITIES", payload: nextDrafts });
+      dispatch({
+        type: "SET_PENDING_IMPORT_ASSET",
+        payload: { key: item.key, draft: assetDraft, source: "auto" },
+      });
+      updatePreviewItem(item.key, {
+        status: "AUTO_RESOLVED_NEW_ASSET",
+        resolutionSource: "mark_custom",
+        assetId: undefined,
+        draft: assetDraft,
+        errors: undefined,
+      });
+    },
+    [candidateMap, dispatch, draftActivities, state.parseConfig.defaultCurrency, updatePreviewItem],
+  );
+
+  const handleMarkAllCustom = useCallback(() => {
+    let nextDrafts = draftActivities;
+    const updatedItems = assetPreviewItems.map((item) => {
+      if (item.status !== "NEEDS_FIXING") return item;
+      const candidate = candidateMap.get(item.key);
+      const symbol = candidate?.draft.symbol || item.key;
+      const fallbackCurrency = candidate?.draft.currency || state.parseConfig.defaultCurrency;
+      const assetDraft = buildNewAssetFromSearchResult(
+        {
+          symbol,
+          shortName: symbol,
+          longName: symbol,
+          exchange: "MANUAL",
+          index: "MANUAL",
+          quoteType: "EQUITY",
+          score: 0,
+          typeDisplay: "Custom Asset",
+          dataSource: "MANUAL",
+        },
+        fallbackCurrency,
+      );
+      nextDrafts = applyAssetResolution(nextDrafts, item.key, assetDraft, {
+        importAssetKey: item.key,
+      });
+      dispatch({
+        type: "SET_PENDING_IMPORT_ASSET",
+        payload: { key: item.key, draft: assetDraft, source: "auto" },
+      });
+      return {
+        ...item,
+        status: "AUTO_RESOLVED_NEW_ASSET" as const,
+        resolutionSource: "mark_custom",
+        assetId: undefined,
+        draft: assetDraft,
+        errors: undefined,
+      };
+    });
+    dispatch({ type: "SET_DRAFT_ACTIVITIES", payload: nextDrafts });
+    dispatch({ type: "SET_ASSET_PREVIEW_ITEMS", payload: updatedItems });
+  }, [
+    assetPreviewItems,
+    candidateMap,
+    dispatch,
+    draftActivities,
+    state.parseConfig.defaultCurrency,
+  ]);
+
   const handleManualCreate = useCallback(
     async (payload: NewAsset) => {
       const created = await createAsset(payload);
@@ -567,27 +669,45 @@ export function AssetReviewStep() {
       {needsFixing.length > 0 && (
         <div className="overflow-hidden rounded-lg border border-amber-200 bg-amber-50/40 dark:border-amber-500/20 dark:bg-amber-500/[0.04]">
           {/* Section header */}
-          <button
-            type="button"
-            className="flex w-full items-start gap-2 border-b border-amber-200 bg-amber-50/60 px-4 py-2.5 text-left dark:border-amber-500/20 dark:bg-amber-500/[0.06]"
-            onClick={() => toggleSection("needsFixing")}
-          >
-            <Icons.AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
-            <div className="flex-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-amber-800 dark:text-amber-300">
-                Needs Fixing
+          <div className="flex items-center gap-3 border-b border-amber-200 bg-amber-50/60 px-4 py-2.5 dark:border-amber-500/20 dark:bg-amber-500/[0.06]">
+            {/* Left: icon + text — clicking collapses */}
+            <button
+              type="button"
+              className="flex flex-1 items-start gap-2 text-left"
+              onClick={() => toggleSection("needsFixing")}
+            >
+              <Icons.AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+              <div className="flex-1">
+                <span className="text-xs font-semibold uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                  Needs Fixing
+                </span>
+                <p className="text-muted-foreground mt-0.5 text-[11px]">
+                  Search for the correct ticker or create a custom asset for each symbol.
+                </p>
+              </div>
+            </button>
+            {/* Right: Mark All Custom + count + chevron */}
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleMarkAllCustom}
+                className="h-7 gap-1 border-amber-300 px-2.5 text-[11px] text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/10"
+              >
+                <Icons.Tag className="h-3 w-3 shrink-0" />
+                Mark All Custom
+              </Button>
+              <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-900 dark:bg-amber-500/20 dark:text-amber-200">
+                {needsFixing.length}
               </span>
-              <p className="text-muted-foreground mt-0.5 text-[11px]">
-                Search for the correct ticker or create a custom asset for each symbol.
-              </p>
+              <button type="button" onClick={() => toggleSection("needsFixing")}>
+                <Icons.ChevronDown
+                  className={`h-3.5 w-3.5 text-amber-500 transition-transform dark:text-amber-400/70 ${collapsed.has("needsFixing") ? "" : "rotate-180"}`}
+                />
+              </button>
             </div>
-            <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-900 dark:bg-amber-500/20 dark:text-amber-200">
-              {needsFixing.length}
-            </span>
-            <Icons.ChevronDown
-              className={`mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500 transition-transform dark:text-amber-400/70 ${collapsed.has("needsFixing") ? "" : "rotate-180"}`}
-            />
-          </button>
+          </div>
 
           {/* Items */}
           {!collapsed.has("needsFixing") && (
@@ -605,6 +725,7 @@ export function AssetReviewStep() {
                     symbolName={symbolName}
                     count={count}
                     onSearch={handleSearchSelection}
+                    onMarkCustom={() => handleMarkCustom(item)}
                     onCreateAsset={() =>
                       setAssetDialog({
                         open: true,

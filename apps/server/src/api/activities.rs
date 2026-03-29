@@ -190,11 +190,7 @@ async fn preview_import_assets(
 struct MappingQuery {
     #[serde(rename = "accountId")]
     account_id: String,
-    #[serde(
-        rename = "contextKind",
-        alias = "importType",
-        default = "default_activity_context_kind"
-    )]
+    #[serde(rename = "contextKind", default = "default_activity_context_kind")]
     context_kind: String,
 }
 
@@ -276,11 +272,7 @@ struct LinkAccountTemplateBody {
     account_id: String,
     #[serde(rename = "templateId")]
     template_id: String,
-    #[serde(
-        rename = "contextKind",
-        alias = "importType",
-        default = "default_activity_context_kind"
-    )]
+    #[serde(rename = "contextKind", default = "default_activity_context_kind")]
     context_kind: String,
 }
 

@@ -16,7 +16,7 @@ use crate::broker_ingest::{
     ImportRunRepositoryTrait, ImportRunStatus, ImportRunSummary, ImportRunType, ReviewMode,
 };
 use crate::platform::Platform;
-use chrono::{DateTime, Months, Utc};
+use chrono::{DateTime, Months, NaiveDate, Utc};
 use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 use std::collections::{HashMap, HashSet};
@@ -647,8 +647,9 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
         let mut asset_specs: Vec<AssetSpec> = Vec::new();
         // Keyed by (symbol, currency) → index into asset_specs
         let mut spec_key_to_idx: HashMap<String, usize> = HashMap::new();
-        // Position data: (spec_key, quantity, price, avg_cost)
-        let mut position_data: Vec<(String, Decimal, Decimal, Decimal, String)> = Vec::new();
+        // Position data: (spec_key, quantity, price, avg_cost, currency)
+        let mut position_data: Vec<(String, Decimal, Decimal, Option<Decimal>, String)> =
+            Vec::new();
 
         for pos in &positions {
             let symbol_info = pos.symbol.as_ref().and_then(|s| s.symbol.as_ref());
@@ -743,9 +744,10 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             let price = Decimal::from_f64(pos.price.unwrap_or(0.0))
                 .unwrap_or(Decimal::ZERO)
                 .round_dp(HOLDINGS_DECIMAL_PRECISION);
-            let avg_cost = Decimal::from_f64(pos.average_purchase_price.unwrap_or(0.0))
-                .unwrap_or(price)
-                .round_dp(HOLDINGS_DECIMAL_PRECISION);
+            let avg_cost = pos
+                .average_purchase_price
+                .and_then(Decimal::from_f64)
+                .map(|value| value.round_dp(HOLDINGS_DECIMAL_PRECISION));
 
             position_data.push((spec_key, quantity, price, avg_cost, currency));
         }
@@ -831,9 +833,10 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             let price = Decimal::from_f64(opt_pos.price.unwrap_or(0.0))
                 .unwrap_or(Decimal::ZERO)
                 .round_dp(HOLDINGS_DECIMAL_PRECISION);
-            let avg_cost = Decimal::from_f64(opt_pos.average_purchase_price.unwrap_or(0.0))
-                .unwrap_or(price)
-                .round_dp(HOLDINGS_DECIMAL_PRECISION);
+            let avg_cost = opt_pos
+                .average_purchase_price
+                .and_then(Decimal::from_f64)
+                .map(|value| value.round_dp(HOLDINGS_DECIMAL_PRECISION));
 
             position_data.push((spec_key, quantity, price, avg_cost, currency));
         }
@@ -933,11 +936,16 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             }
         }
 
+        let tomorrow = today + chrono::Days::new(1);
+        let latest = self
+            .snapshot_repository
+            .get_latest_snapshot_before_date(&account_id, tomorrow)?;
+
         // 4. Build positions_map using resolved asset IDs
         let mut positions_map: HashMap<String, Position> = HashMap::new();
         let mut total_cost_basis = Decimal::ZERO;
 
-        for (spec_key, quantity, _price, avg_cost, currency) in &position_data {
+        for (spec_key, quantity, _price, broker_avg_cost, currency) in &position_data {
             let asset_id = match spec_key_to_asset_id.get(spec_key) {
                 Some(id) => id.clone(),
                 None => {
@@ -953,7 +961,15 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 .and_then(|spec| spec.option_multiplier())
                 .unwrap_or(Decimal::ONE);
 
-            let position_cost_basis = (*quantity * *avg_cost).round_dp(HOLDINGS_DECIMAL_PRECISION);
+            let avg_cost = Self::resolve_position_average_cost(
+                broker_avg_cost.as_ref().copied(),
+                latest
+                    .as_ref()
+                    .and_then(|snapshot| snapshot.positions.get(&asset_id)),
+                *quantity,
+                currency,
+            );
+            let position_cost_basis = (*quantity * avg_cost).round_dp(HOLDINGS_DECIMAL_PRECISION);
             total_cost_basis += position_cost_basis;
 
             let position = Position {
@@ -961,7 +977,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 account_id: account_id.clone(),
                 asset_id: asset_id.clone(),
                 quantity: *quantity,
-                average_cost: *avg_cost,
+                average_cost: avg_cost,
                 total_cost_basis: position_cost_basis,
                 currency: currency.clone(),
                 inception_date: now,
@@ -1000,11 +1016,15 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
         let positions_count = positions_map.len();
 
         // Check if content is unchanged from latest snapshot (skip if identical)
-        let tomorrow = today + chrono::Days::new(1);
-        let latest = self
-            .snapshot_repository
-            .get_latest_snapshot_before_date(&account_id, tomorrow)?;
         let diff = Self::compute_holdings_diff(latest.as_ref(), &positions_map);
+
+        if Self::should_preserve_manual_snapshot_for_date(latest.as_ref(), today) {
+            info!(
+                "Skipping broker snapshot save for account {} on {} because a manual snapshot already exists for that date",
+                account_id, today
+            );
+            return Ok((diff, assets_created, new_asset_ids));
+        }
 
         if let Some(existing) = latest {
             if existing.is_content_equal(&snapshot) {
@@ -1054,6 +1074,39 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
 }
 
 impl BrokerSyncService {
+    fn should_preserve_manual_snapshot_for_date(
+        latest_snapshot: Option<&AccountStateSnapshot>,
+        snapshot_date: NaiveDate,
+    ) -> bool {
+        matches!(
+            latest_snapshot,
+            Some(snapshot)
+                if snapshot.snapshot_date == snapshot_date
+                    && snapshot.source == SnapshotSource::ManualEntry
+        )
+    }
+
+    fn resolve_position_average_cost(
+        broker_average_cost: Option<Decimal>,
+        latest_position: Option<&Position>,
+        quantity: Decimal,
+        currency: &str,
+    ) -> Decimal {
+        if let Some(avg_cost) = broker_average_cost {
+            return avg_cost.round_dp(HOLDINGS_DECIMAL_PRECISION);
+        }
+
+        if let Some(previous) = latest_position {
+            let same_quantity = previous.quantity.round_dp(HOLDINGS_DECIMAL_PRECISION)
+                == quantity.round_dp(HOLDINGS_DECIMAL_PRECISION);
+            if same_quantity && previous.currency == currency {
+                return previous.average_cost.round_dp(HOLDINGS_DECIMAL_PRECISION);
+            }
+        }
+
+        Decimal::ZERO
+    }
+
     fn compute_holdings_diff(
         latest_snapshot: Option<&AccountStateSnapshot>,
         current_positions: &HashMap<String, Position>,
@@ -1376,9 +1429,9 @@ mod tests {
     use std::collections::{HashMap, VecDeque};
     use std::str::FromStr;
 
-    use chrono::Utc;
+    use chrono::{NaiveDate, Utc};
     use rust_decimal::Decimal;
-    use wealthfolio_core::portfolio::snapshot::{AccountStateSnapshot, Position};
+    use wealthfolio_core::portfolio::snapshot::{AccountStateSnapshot, Position, SnapshotSource};
 
     use super::BrokerSyncService;
 
@@ -1414,6 +1467,23 @@ mod tests {
 
     fn snapshot_with_positions(positions: Vec<Position>) -> AccountStateSnapshot {
         AccountStateSnapshot {
+            positions: positions
+                .into_iter()
+                .map(|p| (p.asset_id.clone(), p))
+                .collect::<HashMap<_, _>>(),
+            ..Default::default()
+        }
+    }
+
+    fn snapshot_with_metadata(
+        snapshot_date: &str,
+        source: SnapshotSource,
+        positions: Vec<Position>,
+    ) -> AccountStateSnapshot {
+        AccountStateSnapshot {
+            snapshot_date: NaiveDate::parse_from_str(snapshot_date, "%Y-%m-%d")
+                .expect("valid snapshot date"),
+            source,
             positions: positions
                 .into_iter()
                 .map(|p| (p.asset_id.clone(), p))
@@ -1533,5 +1603,94 @@ mod tests {
         assert_eq!(diff.updated_positions, 1);
         assert_eq!(diff.removed_positions, 0);
         assert_eq!(diff.unchanged_positions, 0);
+    }
+
+    #[test]
+    fn should_preserve_manual_snapshot_for_same_day_only() {
+        let manual_today = snapshot_with_metadata(
+            "2026-03-29",
+            SnapshotSource::ManualEntry,
+            vec![position("acc-1", "aapl", "10", "100", "1000", "USD")],
+        );
+        let broker_today = snapshot_with_metadata(
+            "2026-03-29",
+            SnapshotSource::BrokerImported,
+            vec![position("acc-1", "aapl", "10", "100", "1000", "USD")],
+        );
+        let manual_yesterday = snapshot_with_metadata(
+            "2026-03-28",
+            SnapshotSource::ManualEntry,
+            vec![position("acc-1", "aapl", "10", "100", "1000", "USD")],
+        );
+        let today = NaiveDate::from_ymd_opt(2026, 3, 29).unwrap();
+
+        assert!(BrokerSyncService::should_preserve_manual_snapshot_for_date(
+            Some(&manual_today),
+            today,
+        ));
+        assert!(
+            !BrokerSyncService::should_preserve_manual_snapshot_for_date(
+                Some(&broker_today),
+                today,
+            )
+        );
+        assert!(
+            !BrokerSyncService::should_preserve_manual_snapshot_for_date(
+                Some(&manual_yesterday),
+                today,
+            )
+        );
+    }
+
+    #[test]
+    fn resolve_position_average_cost_prefers_broker_value() {
+        let latest = position("acc-1", "aapl", "10", "100", "1000", "USD");
+
+        let resolved = BrokerSyncService::resolve_position_average_cost(
+            Some(decimal("125.50")),
+            Some(&latest),
+            decimal("10"),
+            "USD",
+        );
+
+        assert_eq!(resolved, decimal("125.50"));
+    }
+
+    #[test]
+    fn resolve_position_average_cost_reuses_latest_when_quantity_is_unchanged() {
+        let latest = position("acc-1", "aapl", "10", "100.25", "1002.5", "USD");
+
+        let resolved = BrokerSyncService::resolve_position_average_cost(
+            None,
+            Some(&latest),
+            decimal("10.0000000000004"),
+            "USD",
+        );
+
+        assert_eq!(resolved, decimal("100.25"));
+    }
+
+    #[test]
+    fn resolve_position_average_cost_does_not_reuse_latest_when_quantity_or_currency_changes() {
+        let latest = position("acc-1", "aapl", "10", "100.25", "1002.5", "USD");
+
+        let quantity_changed = BrokerSyncService::resolve_position_average_cost(
+            None,
+            Some(&latest),
+            decimal("11"),
+            "USD",
+        );
+        let currency_changed = BrokerSyncService::resolve_position_average_cost(
+            None,
+            Some(&latest),
+            decimal("10"),
+            "CAD",
+        );
+        let missing =
+            BrokerSyncService::resolve_position_average_cost(None, None, decimal("10"), "USD");
+
+        assert_eq!(quantity_changed, Decimal::ZERO);
+        assert_eq!(currency_changed, Decimal::ZERO);
+        assert_eq!(missing, Decimal::ZERO);
     }
 }

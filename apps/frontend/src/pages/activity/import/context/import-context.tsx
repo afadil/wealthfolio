@@ -249,6 +249,7 @@ function importReducer(state: ImportState, action: ImportAction): ImportState {
       "quoteCcy",
       "instrumentType",
       "quoteMode",
+      "isin",
       "accountId",
       "assetCandidateKey",
       "importAssetKey",
@@ -480,6 +481,20 @@ export function ImportProvider({ children, initialAccountId }: ImportProviderPro
   });
 
   const validationRunRef = useRef(0);
+  const previewRunRef = useRef(0);
+
+  // Invalidate in-flight async work when navigating backward so stale
+  // responses cannot repopulate state the user already left behind.
+  const prevStepRef = useRef(state.step);
+  if (state.step !== prevStepRef.current) {
+    const steps: ImportStep[] = ["upload", "mapping", "assets", "review", "confirm", "result"];
+    if (steps.indexOf(state.step) < steps.indexOf(prevStepRef.current)) {
+      ++validationRunRef.current;
+      ++previewRunRef.current;
+    }
+    prevStepRef.current = state.step;
+  }
+
   // "Latest ref" pattern — keeps validateDrafts stable while reading current values
   const accountIdRef = useRef(state.accountId);
   accountIdRef.current = state.accountId;
@@ -616,6 +631,7 @@ export function ImportProvider({ children, initialAccountId }: ImportProviderPro
 
   const previewAssets = useCallback(
     async (drafts: DraftActivity[]) => {
+      const run = ++previewRunRef.current;
       const candidates = drafts
         .map(buildImportAssetCandidateFromDraft)
         .filter((c): c is NonNullable<typeof c> => c !== null)
@@ -627,6 +643,7 @@ export function ImportProvider({ children, initialAccountId }: ImportProviderPro
       dispatch({ type: "SET_ASSET_PREVIEW_ERROR", payload: null });
       try {
         const preview = await previewImportAssets({ candidates });
+        if (run !== previewRunRef.current) return;
         dispatch({ type: "SET_ASSET_PREVIEW_ITEMS", payload: preview });
         dispatch({ type: "CLEAR_PENDING_IMPORT_ASSETS" });
 
@@ -654,12 +671,15 @@ export function ImportProvider({ children, initialAccountId }: ImportProviderPro
         }
         dispatch({ type: "SET_DRAFT_ACTIVITIES", payload: nextDrafts });
       } catch (error) {
+        if (run !== previewRunRef.current) return;
         dispatch({
           type: "SET_ASSET_PREVIEW_ERROR",
           payload: error instanceof Error ? error.message : "Failed to preview import assets.",
         });
       } finally {
-        dispatch({ type: "SET_IS_PREVIEWING_ASSETS", payload: false });
+        if (run === previewRunRef.current) {
+          dispatch({ type: "SET_IS_PREVIEWING_ASSETS", payload: false });
+        }
       }
     },
     [dispatch],

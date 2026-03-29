@@ -500,6 +500,7 @@ export function createDraftActivities(
               quoteMode: mappedQuoteMode,
               quoteCcy: mappedQuoteCcy || currency,
               exchangeMic: mappedExchangeMic,
+              isin: rawIsin?.trim() || undefined,
             })
           : undefined,
       quantity: resolved.quantity,
