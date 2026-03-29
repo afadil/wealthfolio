@@ -1005,6 +1005,8 @@ pub struct IncomeData {
     pub symbol_name: String,
     pub currency: String,
     pub amount: Decimal,
+    pub account_id: String,
+    pub account_name: String,
 }
 
 /// Result of importing activities, includes import run metadata

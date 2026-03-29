@@ -396,6 +396,7 @@ export default function IncomePage() {
             selectedPeriod={selectedPeriod}
             currency={currency}
             isBalanceHidden={isBalanceHidden}
+            byAccount={periodSummary.byAccount}
           />
           <Card className="flex flex-col">
             <CardHeader>

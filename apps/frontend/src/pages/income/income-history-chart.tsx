@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
-import { formatAmount } from "@wealthfolio/ui";
+import type { IncomeByAccount } from "@/lib/types";
+import { AnimatedToggleGroup, formatAmount } from "@wealthfolio/ui";
 import {
   Card,
   CardContent,
@@ -17,8 +18,8 @@ import {
 import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholder";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { format, parseISO } from "date-fns";
-import React from "react";
-import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
+import React, { useMemo, useState } from "react";
+import { Bar, BarChart, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
 
 interface IncomeHistoryChartProps {
   monthlyIncomeData: [string, number][];
@@ -26,7 +27,13 @@ interface IncomeHistoryChartProps {
   selectedPeriod: "TOTAL" | "YTD" | "LAST_YEAR";
   currency: string;
   isBalanceHidden: boolean;
+  byAccount?: Record<string, IncomeByAccount>;
 }
+
+const viewModes = [
+  { value: "combined" as const, label: "Combined" },
+  { value: "byAccount" as const, label: "By Account" },
+];
 
 export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
   monthlyIncomeData,
@@ -34,8 +41,10 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
   selectedPeriod,
   currency,
   isBalanceHidden,
+  byAccount,
 }) => {
   const [isMobile, setIsMobile] = React.useState(false);
+  const [viewMode, setViewMode] = useState<"combined" | "byAccount">("combined");
 
   React.useEffect(() => {
     const checkMobile = () => {
@@ -62,6 +71,36 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
     return dataPoint;
   });
 
+  const accounts = useMemo(
+    () => (byAccount ? Object.values(byAccount).sort((a, b) => b.total - a.total) : []),
+    [byAccount],
+  );
+
+  const showToggle = accounts.length > 1;
+  const effectiveViewMode = showToggle ? viewMode : "combined";
+
+  const byAccountChartData = useMemo(() => {
+    if (!byAccount || accounts.length === 0) return [];
+    return monthlyIncomeData.map(([month]) => {
+      const point: Record<string, string | number> = { month };
+      for (const acc of accounts) {
+        point[acc.accountId] = acc.byMonth[month] ?? 0;
+      }
+      return point;
+    });
+  }, [monthlyIncomeData, byAccount, accounts]);
+
+  const accountChartConfig = useMemo(
+    () =>
+      Object.fromEntries(
+        accounts.map((acc, i) => [
+          acc.accountId,
+          { label: acc.accountName, color: `var(--chart-${(i % 9) + 1})` },
+        ]),
+      ),
+    [accounts],
+  );
+
   const periodDescription =
     selectedPeriod === "TOTAL"
       ? "All Time"
@@ -69,11 +108,67 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
         ? "Year to Date"
         : "Last Year";
 
+  const xAxisProps = {
+    dataKey: "month" as const,
+    tickLine: false,
+    tickMargin: 8,
+    axisLine: false,
+    tick: { fontSize: isMobile ? 11 : 12 },
+    tickFormatter: (value: string) => {
+      const date = parseISO(`${value}-01`);
+      return isMobile ? format(date, "MMM") : format(date, "MMM yy");
+    },
+  };
+
+  const yAxisProps = {
+    tickLine: false,
+    axisLine: false,
+    tick: { fontSize: isMobile ? 10 : 12 },
+    width: isMobile ? 45 : 60,
+    tickFormatter: (value: number) => {
+      if (value >= 1000) {
+        return `${(value / 1000).toFixed(0)}k`;
+      }
+      return value.toString();
+    },
+  };
+
+  const tooltipLabelFormatter = (label: unknown) => {
+    if (typeof label !== "string") return "";
+    return format(parseISO(`${label}-01`), isMobile ? "MMM yyyy" : "MMMM yyyy");
+  };
+
   return (
     <Card className="md:col-span-2">
       <CardHeader className="pb-4 md:pb-6">
-        <CardTitle className="text-sm font-medium">Income History</CardTitle>
-        <CardDescription className="text-xs md:text-sm">{periodDescription}</CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-sm font-medium">Income History</CardTitle>
+            <CardDescription className="text-xs md:text-sm">{periodDescription}</CardDescription>
+          </div>
+          {showToggle && (
+            <>
+              <div className="hidden sm:block">
+                <AnimatedToggleGroup
+                  variant="secondary"
+                  size="sm"
+                  items={viewModes}
+                  value={viewMode}
+                  onValueChange={setViewMode}
+                />
+              </div>
+              <div className="block sm:hidden">
+                <AnimatedToggleGroup
+                  variant="secondary"
+                  size="xs"
+                  items={viewModes}
+                  value={viewMode}
+                  onValueChange={setViewMode}
+                />
+              </div>
+            </>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="px-4 pt-0 md:px-6">
         {chartData.length === 0 ? (
@@ -83,6 +178,75 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
             title="No income history available"
             description="There is no income history for the selected period. Try selecting a different time range or check back later."
           />
+        ) : effectiveViewMode === "byAccount" ? (
+          <ChartContainer
+            config={accountChartConfig}
+            className={cn("h-[280px] w-full md:h-[380px]")}
+          >
+            <BarChart
+              data={byAccountChartData}
+              margin={{
+                left: isMobile ? -16 : 0,
+                right: isMobile ? 4 : 8,
+                top: 12,
+                bottom: 4,
+              }}
+            >
+              <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
+              <XAxis {...xAxisProps} />
+              <YAxis {...yAxisProps} />
+              <ChartTooltip
+                content={
+                  <ChartTooltipContent
+                    className="min-w-[150px] md:min-w-[180px]"
+                    formatter={(value, name, entry) => {
+                      const formattedValue = isBalanceHidden
+                        ? "••••"
+                        : formatAmount(Number(value), currency);
+                      const label = accountChartConfig[name as string]?.label ?? String(name);
+                      return (
+                        <>
+                          <div
+                            className="border-border bg-(--color-bg) h-2.5 w-2.5 shrink-0 rounded-[2px]"
+                            style={
+                              {
+                                "--color-bg": entry.color,
+                                "--color-border": entry.color,
+                              } as React.CSSProperties
+                            }
+                          />
+                          <div className="flex flex-1 items-center justify-between gap-2">
+                            <span className="text-muted-foreground text-xs md:text-sm">
+                              {label}
+                            </span>
+                            <span className="text-foreground font-mono text-xs font-medium tabular-nums md:text-sm">
+                              {formattedValue}
+                            </span>
+                          </div>
+                        </>
+                      );
+                    }}
+                    labelFormatter={tooltipLabelFormatter}
+                  />
+                }
+              />
+              {!isMobile && <ChartLegend content={<ChartLegendContent />} />}
+              {accounts.map((acc, i) => (
+                <Bar
+                  key={acc.accountId}
+                  dataKey={acc.accountId}
+                  stackId="income"
+                  fill={`var(--chart-${(i % 9) + 1})`}
+                  barSize={isMobile ? 16 : 25}
+                  radius={
+                    i === accounts.length - 1
+                      ? [isMobile ? 4 : 8, isMobile ? 4 : 8, 0, 0]
+                      : [0, 0, 0, 0]
+                  }
+                />
+              ))}
+            </BarChart>
+          </ChartContainer>
         ) : (
           <ChartContainer
             config={{
@@ -111,30 +275,8 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
               }}
             >
               <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
-              <XAxis
-                dataKey="month"
-                tickLine={false}
-                tickMargin={8}
-                axisLine={false}
-                tick={{ fontSize: isMobile ? 11 : 12 }}
-                tickFormatter={(value) => {
-                  const date = parseISO(`${value}-01`);
-                  return isMobile ? format(date, "MMM") : format(date, "MMM yy");
-                }}
-              />
-              <YAxis
-                yAxisId="left"
-                tickLine={false}
-                axisLine={false}
-                tick={{ fontSize: isMobile ? 10 : 12 }}
-                width={isMobile ? 45 : 60}
-                tickFormatter={(value: number) => {
-                  if (value >= 1000) {
-                    return `${(value / 1000).toFixed(0)}k`;
-                  }
-                  return value.toString();
-                }}
-              />
+              <XAxis {...xAxisProps} />
+              <YAxis yAxisId="left" {...yAxisProps} />
               {!isMobile && (
                 <YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} />
               )}
@@ -176,10 +318,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                         </>
                       );
                     }}
-                    labelFormatter={(label) => {
-                      if (typeof label !== "string") return "";
-                      return format(parseISO(`${label}-01`), isMobile ? "MMM yyyy" : "MMMM yyyy");
-                    }}
+                    labelFormatter={tooltipLabelFormatter}
                   />
                 }
               />

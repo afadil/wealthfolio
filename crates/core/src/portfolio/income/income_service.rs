@@ -168,7 +168,9 @@ impl IncomeServiceTrait for IncomeService {
                 symbol: activity.symbol.clone(),
                 symbol_name: activity.symbol_name.clone(),
                 currency: activity.currency.clone(),
-                amount: activity.amount, // Keep original amount in activity_copy if needed elsewhere
+                amount: activity.amount,
+                account_id: activity.account_id.clone(),
+                account_name: activity.account_name.clone(),
             };
 
             total_summary.add_income(&activity_copy, converted_amount);
@@ -232,6 +234,12 @@ impl IncomeServiceTrait for IncomeService {
                 }
                 for val in summary.by_currency.values_mut() {
                     *val = val.round_dp(DISPLAY_DECIMAL_PRECISION);
+                }
+                for entry in summary.by_account.values_mut() {
+                    entry.total = entry.total.round_dp(DISPLAY_DECIMAL_PRECISION);
+                    for val in entry.by_month.values_mut() {
+                        *val = val.round_dp(DISPLAY_DECIMAL_PRECISION);
+                    }
                 }
                 summary
             })
