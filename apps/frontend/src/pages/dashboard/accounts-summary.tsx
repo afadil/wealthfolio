@@ -111,6 +111,8 @@ const AccountSummaryComponent = React.memo(
     const gainDisplayCurrency = currency;
     const gainPercentToDisplay = item.totalGainLossPercent;
     const hasAnyGainData = gainAmountToDisplay != null || gainPercentToDisplay != null;
+    // Distinguish "zero gain with data" from "no data at all" so standalone
+    // cards hide the redundant 0/0% line while nested rows still show it.
     const isZeroGain =
       (gainAmountToDisplay ?? 0) === 0 && (gainPercentToDisplay ?? 0) === 0 && hasAnyGainData;
 
@@ -121,8 +123,10 @@ const AccountSummaryComponent = React.memo(
       gainPercentToDisplay === null &&
       gainAmountToDisplay !== null &&
       gainAmountToDisplay !== 0;
-    const shouldRenderNestedPlaceholder = isNested && (!hasAnyGainData || hasBadData);
     const shouldRenderGainMetrics = gainPercentToDisplay !== null && (isNested || !isZeroGain);
+    // Nested rows always show a secondary line for visual consistency —
+    // fall back to a "-" placeholder when gain metrics aren't available.
+    const shouldRenderNestedPlaceholder = isNested && !shouldRenderGainMetrics;
 
     let secondaryMetricContent: React.ReactNode = null;
 
