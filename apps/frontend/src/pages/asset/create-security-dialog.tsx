@@ -41,6 +41,7 @@ const INSTRUMENT_TYPE_OPTIONS = [
   { value: "CRYPTO", label: "Cryptocurrency" },
   { value: "BOND", label: "Bond" },
   { value: "OPTION", label: "Option" },
+  { value: "FX", label: "Foreign Exchange" },
   { value: "METAL", label: "Precious Metal" },
 ] as const;
 
@@ -94,6 +95,10 @@ interface CreateSecurityDialogProps {
   onOpenChange: (open: boolean) => void;
   onSubmit: (payload: NewAsset) => void;
   isPending?: boolean;
+  initialAsset?: Partial<NewAsset>;
+  title?: string;
+  description?: string;
+  submitLabel?: string;
 }
 
 export function CreateSecurityDialog({
@@ -101,6 +106,10 @@ export function CreateSecurityDialog({
   onOpenChange,
   onSubmit,
   isPending = false,
+  initialAsset,
+  title = "Add Security",
+  description = "Search for a security to auto-fill details, or enter them manually.",
+  submitLabel = "Create Security",
 }: CreateSecurityDialogProps) {
   const { settings } = useSettingsContext();
   const defaultCurrency = settings?.baseCurrency || "USD";
@@ -121,33 +130,30 @@ export function CreateSecurityDialog({
     [exchanges],
   );
 
+  const defaultValues = useMemo<CreateSecurityFormValues>(
+    () => ({
+      symbol: (initialAsset?.instrumentSymbol || initialAsset?.displayCode || "").toUpperCase(),
+      name: initialAsset?.name || initialAsset?.displayCode || initialAsset?.instrumentSymbol || "",
+      instrumentType: initialAsset?.instrumentType || "EQUITY",
+      quoteCcy: initialAsset?.quoteCcy || defaultCurrency,
+      quoteMode: initialAsset?.quoteMode === "MARKET" ? "MARKET" : "MANUAL",
+      instrumentExchangeMic: normalizeMic(initialAsset?.instrumentExchangeMic),
+      notes: initialAsset?.notes || "",
+    }),
+    [defaultCurrency, initialAsset],
+  );
+
   const form = useForm<CreateSecurityFormValues>({
     resolver: zodResolver(createSecuritySchema),
-    defaultValues: {
-      symbol: "",
-      name: "",
-      instrumentType: "EQUITY",
-      quoteCcy: defaultCurrency,
-      quoteMode: "MANUAL",
-      instrumentExchangeMic: "",
-      notes: "",
-    },
+    defaultValues,
   });
 
   useEffect(() => {
     if (open) {
       setSelectedResult(undefined);
-      form.reset({
-        symbol: "",
-        name: "",
-        instrumentType: "EQUITY",
-        quoteCcy: defaultCurrency,
-        quoteMode: "MANUAL",
-        instrumentExchangeMic: "",
-        notes: "",
-      });
+      form.reset(defaultValues);
     }
-  }, [open, defaultCurrency, form]);
+  }, [defaultValues, form, open]);
 
   const handleTickerSelect = useCallback(
     (_symbol: string, result?: SymbolSearchResult) => {
@@ -182,8 +188,15 @@ export function CreateSecurityDialog({
   );
 
   const handleSubmit = (values: CreateSecurityFormValues) => {
+    const kind =
+      values.instrumentType === "METAL"
+        ? "PRECIOUS_METAL"
+        : values.instrumentType === "FX"
+          ? "FX"
+          : "INVESTMENT";
+
     const payload: NewAsset = {
-      kind: "INVESTMENT",
+      kind,
       name: values.name,
       displayCode: values.symbol,
       isActive: true,
@@ -211,10 +224,8 @@ export function CreateSecurityDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add Security</DialogTitle>
-          <DialogDescription>
-            Search for a security to auto-fill details, or enter them manually.
-          </DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -225,7 +236,7 @@ export function CreateSecurityDialog({
                 <label className="text-sm font-medium">Search</label>
                 <TickerSearchInput
                   onSelectResult={handleTickerSelect}
-                  placeholder="Search by name or symbol..."
+                  placeholder="Search by ticker, name or ISIN…"
                   defaultCurrency={defaultCurrency}
                   autoFocusSearch
                   hideCustomCreate
@@ -406,7 +417,7 @@ export function CreateSecurityDialog({
                     <Icons.Spinner className="h-4 w-4 animate-spin" /> Creating...
                   </span>
                 ) : (
-                  "Create Security"
+                  submitLabel
                 )}
               </Button>
             </DialogFooter>

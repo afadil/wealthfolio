@@ -1,4 +1,5 @@
 // Activity Commands
+import { ImportType } from "@/lib/types";
 import type {
   Activity,
   ActivityBulkMutationRequest,
@@ -8,8 +9,13 @@ import type {
   ActivitySearchResponse,
   ActivityUpdate,
   ActivityImport,
+  ImportAssetCandidate,
+  ImportAssetPreviewItem,
   ImportActivitiesResult,
   ImportMappingData,
+  ImportTemplateData,
+  BrokerSyncProfileData,
+  SaveBrokerSyncProfileRulesRequest,
 } from "@/lib/types";
 
 import { invoke, logger } from "./platform";
@@ -142,7 +148,6 @@ export const deleteActivity = async (activityId: string): Promise<Activity> => {
  * Import activities into the system.
  * Expects activities that already passed backend check/preview resolution.
  * Apply is persistence-only and rejects missing resolved symbol fields.
- * Extracts accountId from the first activity for the backend call.
  * Returns ImportActivitiesResult with activities, import_run_id, and summary.
  */
 export const importActivities = async ({
@@ -151,10 +156,7 @@ export const importActivities = async ({
   activities: ActivityImport[];
 }): Promise<ImportActivitiesResult> => {
   try {
-    return await invoke<ImportActivitiesResult>("import_activities", {
-      accountId: activities[0].accountId,
-      activities,
-    });
+    return await invoke<ImportActivitiesResult>("import_activities", { activities });
   } catch (err) {
     logger.error(`Error importing activities: ${err}`);
     throw err;
@@ -165,23 +167,71 @@ export const importActivities = async ({
  * Check activities before import (read-only validation/preview).
  * This performs read-only validation without creating assets or FX pairs.
  * Asset creation happens during the actual import when user confirms.
- * @param accountId - The account ID to import activities into
  * @param activities - The activities to validate
  */
 export const checkActivitiesImport = async ({
-  accountId,
   activities,
 }: {
-  accountId: string;
   activities: ActivityImport[];
 }): Promise<ActivityImport[]> => {
   try {
-    return await invoke<ActivityImport[]>("check_activities_import", {
-      accountId,
-      activities,
-    });
+    return await invoke<ActivityImport[]>("check_activities_import", { activities });
   } catch (err) {
     logger.error(`Error checking activities import: ${err}`);
+    throw err;
+  }
+};
+
+export const listImportTemplates = async (): Promise<ImportTemplateData[]> => {
+  try {
+    return await invoke<ImportTemplateData[]>("list_import_templates");
+  } catch (err) {
+    logger.error("Error listing import templates.");
+    throw err;
+  }
+};
+
+export const getImportTemplate = async (id: string): Promise<ImportTemplateData> => {
+  try {
+    return await invoke<ImportTemplateData>("get_import_template", { id });
+  } catch (err) {
+    logger.error("Error fetching import template.");
+    throw err;
+  }
+};
+
+export const saveImportTemplate = async (
+  template: ImportTemplateData,
+): Promise<ImportTemplateData> => {
+  try {
+    return await invoke<ImportTemplateData>("save_import_template", { template });
+  } catch (err) {
+    logger.error("Error saving import template.");
+    throw err;
+  }
+};
+
+export const deleteImportTemplate = async (id: string): Promise<void> => {
+  try {
+    await invoke<void>("delete_import_template", { id });
+  } catch (err) {
+    logger.error("Error deleting import template.");
+    throw err;
+  }
+};
+
+/**
+ * Preview which assets would be created or matched for a set of import candidates.
+ */
+export const previewImportAssets = async ({
+  candidates,
+}: {
+  candidates: ImportAssetCandidate[];
+}): Promise<ImportAssetPreviewItem[]> => {
+  try {
+    return await invoke<ImportAssetPreviewItem[]>("preview_import_assets", { candidates });
+  } catch (err) {
+    logger.error(`Error previewing import assets: ${err}`);
     throw err;
   }
 };
@@ -189,11 +239,33 @@ export const checkActivitiesImport = async ({
 /**
  * Get the import mapping configuration for an account.
  */
-export const getAccountImportMapping = async (accountId: string): Promise<ImportMappingData> => {
+export const getAccountImportMapping = async (
+  accountId: string,
+  contextKind: string = ImportType.ACTIVITY,
+): Promise<ImportMappingData> => {
   try {
-    return await invoke<ImportMappingData>("get_account_import_mapping", { accountId });
+    return await invoke<ImportMappingData>("get_account_import_mapping", {
+      accountId,
+      contextKind,
+    });
   } catch (err) {
     logger.error("Error fetching mapping.");
+    throw err;
+  }
+};
+
+/**
+ * Link an account to an existing import template.
+ */
+export const linkAccountTemplate = async (
+  accountId: string,
+  templateId: string,
+  contextKind: string = ImportType.ACTIVITY,
+): Promise<void> => {
+  try {
+    await invoke<void>("link_account_template", { accountId, templateId, contextKind });
+  } catch (err) {
+    logger.error("Error linking account to template.");
     throw err;
   }
 };
@@ -223,6 +295,36 @@ export const checkExistingDuplicates = async (
     return await invoke<Record<string, string>>("check_existing_duplicates", { idempotencyKeys });
   } catch (err) {
     logger.error("Error checking for duplicate activities.");
+    throw err;
+  }
+};
+
+// ============================================================================
+// Broker Sync Profile Commands
+// ============================================================================
+
+export const getBrokerSyncProfile = async (
+  accountId: string,
+  sourceSystem: string,
+): Promise<BrokerSyncProfileData> => {
+  try {
+    return await invoke<BrokerSyncProfileData>("get_broker_sync_profile", {
+      accountId,
+      sourceSystem,
+    });
+  } catch (err) {
+    logger.error("Error fetching broker sync profile.");
+    throw err;
+  }
+};
+
+export const saveBrokerSyncProfileRules = async (
+  request: SaveBrokerSyncProfileRulesRequest,
+): Promise<BrokerSyncProfileData> => {
+  try {
+    return await invoke<BrokerSyncProfileData>("save_broker_sync_profile_rules", { request });
+  } catch (err) {
+    logger.error("Error saving broker sync profile rules.");
     throw err;
   }
 };

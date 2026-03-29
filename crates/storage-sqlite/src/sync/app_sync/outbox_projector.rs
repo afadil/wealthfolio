@@ -21,7 +21,7 @@ impl ProjectedChange {
     pub(crate) fn for_model<T: SyncOutboxModel>(model: &T, op: SyncOperation) -> Result<Self> {
         Ok(Self {
             entity: T::ENTITY,
-            entity_id: model.sync_entity_id().to_string(),
+            entity_id: model.sync_entity_id_owned(),
             op,
             payload: serde_json::to_value(model)?,
         })

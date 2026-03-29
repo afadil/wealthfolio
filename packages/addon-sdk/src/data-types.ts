@@ -393,7 +393,7 @@ export interface ImportActivitiesResult {
 
 export interface ImportMappingData {
   accountId: string;
-  fieldMappings: Record<string, string>;
+  fieldMappings: Record<string, string | string[]>;
   activityMappings: Record<string, string[]>;
   symbolMappings: Record<string, string>;
   accountMappings: Record<string, string>;

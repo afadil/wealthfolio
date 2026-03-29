@@ -182,7 +182,7 @@ impl WriteProjection {
 
     pub fn capture_model_delete<T: SyncOutboxModel>(&mut self, model: &T) {
         if model.should_sync_outbox(SyncOperation::Delete) {
-            self.capture_delete::<T>(model.sync_entity_id().to_string());
+            self.capture_delete::<T>(model.sync_entity_id_owned());
         }
     }
 

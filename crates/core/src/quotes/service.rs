@@ -2311,12 +2311,71 @@ mod tests {
             unimplemented!("unused in this test")
         }
 
-        fn get_import_mapping(&self, _account_id: &str) -> Result<Option<ImportMapping>> {
+        fn get_import_mapping(
+            &self,
+            _account_id: &str,
+            _context_kind: &str,
+        ) -> Result<Option<ImportMapping>> {
             unimplemented!("unused in this test")
         }
 
         async fn save_import_mapping(&self, _mapping: &ImportMapping) -> Result<()> {
             unimplemented!("unused in this test")
+        }
+
+        async fn link_account_template(
+            &self,
+            _account_id: &str,
+            _template_id: &str,
+            _context_kind: &str,
+        ) -> Result<()> {
+            unimplemented!("unused in this test")
+        }
+
+        fn list_import_templates(&self) -> Result<Vec<crate::activities::ImportTemplate>> {
+            Ok(Vec::new())
+        }
+
+        fn get_import_template(
+            &self,
+            _template_id: &str,
+        ) -> Result<Option<crate::activities::ImportTemplate>> {
+            Ok(None)
+        }
+
+        async fn save_import_template(
+            &self,
+            _template: &crate::activities::ImportTemplate,
+        ) -> Result<()> {
+            unimplemented!("unused in this test")
+        }
+
+        async fn delete_import_template(&self, _template_id: &str) -> Result<()> {
+            unimplemented!("unused in this test")
+        }
+
+        fn get_broker_sync_profile(
+            &self,
+            _account_id: &str,
+            _source_system: &str,
+        ) -> Result<Option<crate::activities::ImportTemplate>> {
+            Ok(None)
+        }
+
+        async fn save_broker_sync_profile(
+            &self,
+            _template: &crate::activities::ImportTemplate,
+        ) -> Result<()> {
+            Ok(())
+        }
+
+        async fn link_broker_sync_profile(
+            &self,
+            _account_id: &str,
+            _template_id: &str,
+            _source_system: &str,
+        ) -> Result<()> {
+            Ok(())
         }
 
         fn calculate_average_cost(

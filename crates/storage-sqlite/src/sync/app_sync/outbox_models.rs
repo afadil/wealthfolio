@@ -1,7 +1,7 @@
 //! Centralized sync-entity mappings for projected outbox models.
 
 use crate::accounts::AccountDB;
-use crate::activities::{ActivityDB, ImportMappingDB};
+use crate::activities::{ActivityDB, ImportAccountTemplateDB, ImportTemplateDB};
 use crate::ai_chat::{AiMessageDB, AiThreadDB, AiThreadTagDB};
 use crate::assets::AssetDB;
 use crate::goals::{GoalDB, GoalsAllocationDB};
@@ -77,15 +77,25 @@ impl SyncOutboxModel for ActivityDB {
     }
 }
 
-impl SyncOutboxModel for ImportMappingDB {
+impl SyncOutboxModel for ImportAccountTemplateDB {
     const ENTITY: SyncEntity = SyncEntity::ActivityImportProfile;
 
     fn sync_entity_id(&self) -> &str {
-        &self.account_id
+        &self.id
+    }
+}
+
+impl SyncOutboxModel for ImportTemplateDB {
+    const ENTITY: SyncEntity = SyncEntity::ImportTemplate;
+
+    fn sync_entity_id(&self) -> &str {
+        &self.id
     }
 
-    fn delete_payload(entity_id: &str) -> serde_json::Value {
-        serde_json::json!({ "accountId": entity_id })
+    fn should_sync_outbox(&self, _op: SyncOperation) -> bool {
+        // System templates are seeded by migrations — identical on every device.
+        // Only user-created templates need to travel over sync.
+        !self.scope.eq_ignore_ascii_case("SYSTEM")
     }
 }
 

@@ -1,550 +1,85 @@
-import { checkActivitiesImport, logger, saveAccountImportMapping } from "@/adapters";
-import {
-  ACTIVITY_SUBTYPES,
-  ActivityType,
-  ImportFormat,
-  SUBTYPES_BY_ACTIVITY_TYPE,
-} from "@/lib/constants";
-import type { ActivityImport, QuoteMode, SymbolSearchResult } from "@/lib/types";
-import { tryParseDate } from "@/lib/utils";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 import { ProgressIndicator } from "@wealthfolio/ui/components/ui/progress-indicator";
-import { isValid, parse, parseISO } from "date-fns";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FacetedFilter } from "@wealthfolio/ui";
+import { useCallback, useMemo, useState } from "react";
 import { ImportAlert } from "../components/import-alert";
-import { ImportReviewGrid, type ImportReviewFilter } from "../components/import-review-grid";
-import {
-  SymbolResolutionPanel,
-  type UnresolvedSymbol,
-} from "../components/symbol-resolution-panel";
+import { ImportReviewGrid } from "../components/import-review-grid";
 import {
   bulkSetAccount,
   bulkSetCurrency,
   bulkSkipDrafts,
   bulkUnskipDrafts,
-  setDraftActivities,
-  setMapping,
   updateDraft,
   useImportContext,
   type DraftActivity,
-  type DraftActivityStatus,
 } from "../context";
-import { findMappedActivityType } from "../utils/activity-type-mapping";
-import { getDateFnsPattern } from "../utils/date-format-options";
-import { normalizeInstrumentType, splitInstrumentPrefixedSymbol } from "../utils/instrument-type";
-import {
-  parseNumericValue,
-  toNumber,
-  hasPositiveValue,
-  hasNonZeroValue,
-  resolveCashActivityFields,
-} from "../utils/review-draft-utils";
+import { buildImportAssetCandidateFromDraft } from "../utils/asset-review-utils";
+import { validateDraft } from "../utils/draft-utils";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Types
+// Filter Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface FilterStats {
-  all: number;
-  errors: number;
-  warnings: number;
-  duplicates: number;
-  skipped: number;
-  valid: number;
+function matchesFacetFilters(
+  draft: DraftActivity,
+  typeFilter: Set<string>,
+  accountFilter: Set<string>,
+  symbolFilter: Set<string>,
+): boolean {
+  if (typeFilter.size > 0 && (!draft.activityType || !typeFilter.has(draft.activityType))) {
+    return false;
+  }
+  if (accountFilter.size > 0 && (!draft.accountId || !accountFilter.has(draft.accountId))) {
+    return false;
+  }
+  if (symbolFilter.size > 0 && (!draft.symbol || !symbolFilter.has(draft.symbol))) {
+    return false;
+  }
+  return true;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper Functions
-// ─────────────────────────────────────────────────────────────────────────────
+function buildDuplicateReviewRows(drafts: DraftActivity[]): DraftActivity[] {
+  const byLineNumber = new Map(drafts.map((draft) => [draft.rowIndex + 1, draft]));
+  const duplicateRows = drafts
+    .filter((draft) => draft.status === "duplicate")
+    .sort((left, right) => {
+      const leftSource = left.duplicateOfLineNumber ?? left.rowIndex + 1;
+      const rightSource = right.duplicateOfLineNumber ?? right.rowIndex + 1;
+      return leftSource - rightSource || left.rowIndex - right.rowIndex;
+    });
 
-function mergeIssueMaps(
-  current: Record<string, string[]>,
-  incoming: Record<string, string[]>,
-): Record<string, string[]> {
-  const merged: Record<string, string[]> = { ...current };
-  for (const [key, messages] of Object.entries(incoming)) {
-    const existing = merged[key] ?? [];
-    const next = [...existing];
-    for (const message of messages) {
-      if (!next.includes(message)) {
-        next.push(message);
-      }
-    }
-    merged[key] = next;
-  }
-  return merged;
-}
-
-function hasDuplicateWarning(draft: DraftActivity): boolean {
-  const hasDuplicateLineNumber = typeof draft.duplicateOfLineNumber === "number";
-  return Boolean(
-    draft.duplicateOfId || hasDuplicateLineNumber || draft.warnings?._duplicate?.length,
-  );
-}
-
-/**
- * Parse a date value using the configured format (priority) then auto-detection fallback.
- * Returns a full ISO datetime string preserving any time component from the source.
- */
-function parseDateValue(value: string | undefined, dateFormat: string): string {
-  if (!value || value.trim() === "") return "";
-
-  const trimmed = value.trim();
-
-  // 1. If user specified a format, try it first
-  const pattern = getDateFnsPattern(dateFormat);
-  if (pattern) {
-    try {
-      const parsed = parse(trimmed, pattern, new Date());
-      if (isValid(parsed)) return parsed.toISOString();
-    } catch {
-      // fall through to auto-detection
-    }
-  }
-
-  // 2. For ISO8601 preset, try parseISO directly
-  if (dateFormat === "ISO8601") {
-    try {
-      const parsed = parseISO(trimmed);
-      if (isValid(parsed)) return parsed.toISOString();
-    } catch {
-      // fall through
-    }
-  }
-
-  // 3. Auto-detection fallback (handles 80+ formats)
-  const autoDetected = tryParseDate(trimmed);
-  if (autoDetected) return autoDetected.toISOString();
-
-  // 4. Return as-is if nothing works (will surface as validation error)
-  return trimmed;
-}
-
-/**
- * Map a CSV activity type value to a Wealthfolio activity type.
- * Uses findMappedActivityType which checks explicit mappings + smart defaults.
- */
-function mapActivityType(
-  csvValue: string | undefined,
-  activityMappings: Record<string, string[]>,
-): string | undefined {
-  if (!csvValue) return undefined;
-  return findMappedActivityType(csvValue, activityMappings) ?? csvValue.trim();
-}
-
-/**
- * Map a CSV symbol to a resolved symbol, optionally with exchange MIC and name metadata
- */
-function mapSymbol(
-  csvSymbol: string | undefined,
-  symbolMappings: Record<string, string>,
-  symbolMappingMeta?: Record<
-    string,
-    {
-      exchangeMic?: string;
-      symbolName?: string;
-      quoteCcy?: string;
-      instrumentType?: string;
-      quoteMode?: QuoteMode;
-    }
-  >,
-): {
-  symbol: string | undefined;
-  exchangeMic?: string;
-  symbolName?: string;
-  quoteCcy?: string;
-  instrumentType?: string;
-  quoteMode?: QuoteMode;
-} {
-  if (!csvSymbol) return { symbol: undefined };
-
-  const trimmed = csvSymbol.trim();
-  const symbol = symbolMappings[trimmed] || trimmed;
-  const meta = symbolMappingMeta?.[trimmed];
-  return {
-    symbol,
-    exchangeMic: meta?.exchangeMic,
-    symbolName: meta?.symbolName,
-    quoteCcy: meta?.quoteCcy,
-    instrumentType: meta?.instrumentType,
-    quoteMode: meta?.quoteMode,
-  };
-}
-
-/**
- * Validate a draft activity and return errors/warnings
- */
-function validateDraft(draft: Partial<DraftActivity>): {
-  status: DraftActivityStatus;
-  errors: Record<string, string[]>;
-  warnings: Record<string, string[]>;
-} {
-  const errors: Record<string, string[]> = {};
-  const warnings: Record<string, string[]> = {};
-
-  // Required field validation
-  if (!draft.activityDate) {
-    errors.activityDate = ["Date is required"];
-  }
-
-  if (!draft.activityType) {
-    errors.activityType = ["Activity type is required"];
-  }
-
-  if (!draft.currency) {
-    errors.currency = ["Currency is required"];
-  }
-
-  if (!draft.accountId) {
-    errors.accountId = ["Account is required"];
-  }
-
-  // Activity-type specific validation
-  const activityType = draft.activityType?.toUpperCase();
-  const subtype = draft.subtype?.toUpperCase();
-
-  // Validate subtype is allowed for this activity type
-  if (subtype && activityType) {
-    const allowedSubtypes = SUBTYPES_BY_ACTIVITY_TYPE[activityType] || [];
-    if (allowedSubtypes.length > 0 && !allowedSubtypes.includes(subtype)) {
-      warnings.subtype = [`'${subtype}' is not a recognized subtype for ${activityType}`];
-    }
-  }
-
-  // Trade activities (BUY/SELL)
-  if (activityType === ActivityType.BUY || activityType === ActivityType.SELL) {
-    if (!draft.symbol) {
-      errors.symbol = ["Symbol is required for trade activities"];
-    }
-    if (!hasPositiveValue(draft.quantity)) {
-      errors.quantity = ["Quantity must be greater than 0"];
-    }
-    if (!hasPositiveValue(draft.unitPrice)) {
-      errors.unitPrice = ["Unit price must be greater than 0"];
-    }
-  }
-
-  // DIVIDEND validation
-  if (activityType === ActivityType.DIVIDEND) {
-    if (!draft.symbol) {
-      errors.symbol = ["Symbol is required for dividend activities"];
-    }
-
-    if (subtype === ACTIVITY_SUBTYPES.DRIP) {
-      // DRIP: cash dividend → reinvested as BUY of same ticker
-      // Needs: quantity (shares received), unit price (reinvest price)
-      // Amount is optional (dividend cash amount)
-      if (!hasPositiveValue(draft.quantity)) {
-        errors.quantity = ["Quantity is required for DRIP (shares received)"];
-      }
-      if (!hasPositiveValue(draft.unitPrice)) {
-        errors.unitPrice = ["Unit price is required for DRIP (reinvestment price)"];
-      }
-    } else if (subtype === ACTIVITY_SUBTYPES.DIVIDEND_IN_KIND) {
-      // DIVIDEND_IN_KIND: dividend paid in asset (not cash)
-      // Needs: symbol (received asset), quantity, unit price (FMV), amount (value)
-      if (!hasPositiveValue(draft.quantity)) {
-        errors.quantity = ["Quantity is required for dividend in kind (shares received)"];
-      }
-      if (!hasPositiveValue(draft.unitPrice)) {
-        errors.unitPrice = ["Unit price is required for dividend in kind (FMV at receipt)"];
-      }
-      if (!hasNonZeroValue(draft.amount)) {
-        errors.amount = ["Amount is required for dividend in kind (value of shares)"];
-      }
-    } else {
-      // Regular cash dividend - amount is required
-      if (!hasNonZeroValue(draft.amount)) {
-        errors.amount = ["Amount is required for dividend activities"];
-      }
-    }
-  }
-
-  // INTEREST validation
-  if (activityType === ActivityType.INTEREST) {
-    // STAKING_REWARD - needs quantity (tokens received) and may have unit price
-    if (subtype === ACTIVITY_SUBTYPES.STAKING_REWARD) {
-      if (!draft.symbol) {
-        errors.symbol = ["Symbol is required for staking rewards"];
-      }
-      if (!hasPositiveValue(draft.quantity)) {
-        errors.quantity = ["Quantity is required for staking rewards (tokens received)"];
-      }
-      // Amount is optional for staking - can be calculated from quantity * price
-      if (!hasNonZeroValue(draft.amount) && !hasPositiveValue(draft.unitPrice)) {
-        warnings.amount = ["Either amount or unit price is recommended for staking rewards"];
-      }
-    } else {
-      // Regular interest - amount is required
-      if (!hasNonZeroValue(draft.amount)) {
-        errors.amount = ["Amount is required for interest activities"];
-      }
-    }
-  }
-
-  // DEPOSIT/WITHDRAWAL - amount is required
-  if (activityType === ActivityType.DEPOSIT || activityType === ActivityType.WITHDRAWAL) {
-    if (!hasNonZeroValue(draft.amount)) {
-      errors.amount = ["Amount is required for deposit/withdrawal activities"];
-    }
-  }
-
-  // FEE validation - either fee or amount required
-  if (activityType === ActivityType.FEE) {
-    const hasFee = hasPositiveValue(draft.fee);
-    const hasAmount = hasPositiveValue(draft.amount);
-    if (!hasFee && !hasAmount) {
-      errors.fee = ["Either fee or amount is required for fee activities"];
-    }
-  }
-
-  // TAX validation - amount is required
-  if (activityType === ActivityType.TAX) {
-    const hasFee = hasPositiveValue(draft.fee);
-    const hasAmount = hasPositiveValue(draft.amount);
-    if (!hasFee && !hasAmount) {
-      errors.amount = ["Amount or fee is required for tax activities"];
-    }
-  }
-
-  // TRANSFER_IN/TRANSFER_OUT - amount or quantity required
-  if (activityType === ActivityType.TRANSFER_IN || activityType === ActivityType.TRANSFER_OUT) {
-    const hasAmount = hasPositiveValue(draft.amount);
-    const hasQuantity = hasPositiveValue(draft.quantity);
-    if (!hasAmount && !hasQuantity) {
-      errors.amount = ["Amount or quantity is required for transfer activities"];
-    }
-  }
-
-  // SPLIT validation
-  if (activityType === ActivityType.SPLIT) {
-    if (!draft.symbol) {
-      errors.symbol = ["Symbol is required for split activities"];
-    }
-    if (toNumber(draft.amount) === undefined) {
-      errors.amount = ["Amount (split ratio) is required for split activities"];
-    }
-  }
-
-  // CREDIT validation
-  if (activityType === ActivityType.CREDIT) {
-    if (!hasNonZeroValue(draft.amount)) {
-      errors.amount = ["Amount is required for credit activities"];
-    }
-  }
-
-  // Determine status
-  const hasErrors = Object.keys(errors).length > 0;
-  const hasWarnings = Object.keys(warnings).length > 0;
-
-  let status: DraftActivityStatus = "valid";
-  if (hasErrors) {
-    status = "error";
-  } else if (hasWarnings) {
-    status = "warning";
-  }
-
-  return { status, errors, warnings };
-}
-
-/**
- * Create DraftActivity objects from parsed CSV data and mapping
- */
-function createDraftActivities(
-  parsedRows: string[][],
-  headers: string[],
-  mapping: {
-    fieldMappings: Record<string, string>;
-    activityMappings: Record<string, string[]>;
-    symbolMappings: Record<string, string>;
-    accountMappings: Record<string, string>;
-    symbolMappingMeta?: Record<
-      string,
-      {
-        exchangeMic?: string;
-        symbolName?: string;
-        quoteCcy?: string;
-        instrumentType?: string;
-        quoteMode?: QuoteMode;
-      }
-    >;
-  },
-  parseConfig: {
-    dateFormat: string;
-    decimalSeparator: string;
-    thousandsSeparator: string;
-    defaultCurrency: string;
-  },
-  defaultAccountId: string,
-): DraftActivity[] {
-  const { fieldMappings, activityMappings, symbolMappings, accountMappings, symbolMappingMeta } =
-    mapping;
-  const { dateFormat, decimalSeparator, thousandsSeparator, defaultCurrency } = parseConfig;
-
-  // Create header index lookup
-  const headerIndex: Record<string, number> = {};
-  headers.forEach((header, idx) => {
-    headerIndex[header] = idx;
-  });
-
-  // Get column indices for each mapped field
-  const getColumnValue = (row: string[], field: ImportFormat): string | undefined => {
-    const csvHeader = fieldMappings[field];
-    if (!csvHeader) return undefined;
-    const idx = headerIndex[csvHeader];
-    if (idx === undefined) return undefined;
-    return row[idx];
+  const ordered: DraftActivity[] = [];
+  const seen = new Set<number>();
+  const pushOnce = (draft?: DraftActivity) => {
+    if (!draft || seen.has(draft.rowIndex)) return;
+    ordered.push(draft);
+    seen.add(draft.rowIndex);
   };
 
-  return parsedRows.map((row, rowIndex): DraftActivity => {
-    // Extract raw values from CSV
-    const rawDate = getColumnValue(row, ImportFormat.DATE);
-    const rawType = getColumnValue(row, ImportFormat.ACTIVITY_TYPE);
-    const rawSymbol = getColumnValue(row, ImportFormat.SYMBOL);
-    const rawQuantity = getColumnValue(row, ImportFormat.QUANTITY);
-    const rawUnitPrice = getColumnValue(row, ImportFormat.UNIT_PRICE);
-    const rawAmount = getColumnValue(row, ImportFormat.AMOUNT);
-    const rawCurrency = getColumnValue(row, ImportFormat.CURRENCY);
-    const rawFee = getColumnValue(row, ImportFormat.FEE);
-    const rawComment = getColumnValue(row, ImportFormat.COMMENT);
-    const rawAccount = getColumnValue(row, ImportFormat.ACCOUNT);
-    const rawFxRate = getColumnValue(row, ImportFormat.FX_RATE);
-    const rawSubtype = getColumnValue(row, ImportFormat.SUBTYPE);
-    const rawInstrumentType = getColumnValue(row, ImportFormat.INSTRUMENT_TYPE);
-
-    // Parse and normalize values
-    const activityDate = parseDateValue(rawDate, dateFormat);
-    const activityType = mapActivityType(rawType, activityMappings);
-    const {
-      symbol: mappedSymbol,
-      exchangeMic: mappedExchangeMic,
-      symbolName: mappedSymbolName,
-      quoteCcy: mappedQuoteCcy,
-      instrumentType: mappedInstrumentType,
-      quoteMode: mappedQuoteMode,
-    } = mapSymbol(rawSymbol, symbolMappings, symbolMappingMeta);
-
-    // Parse typed symbol prefixes (e.g., "bond:US037833DU14")
-    const { symbol: prefixParsedSymbol, instrumentType: prefixInstrumentType } =
-      splitInstrumentPrefixedSymbol(mappedSymbol);
-    const symbol = prefixParsedSymbol;
-
-    // Normalize instrument type: explicit CSV column > prefix > symbol mapping meta
-    const normalizedCsvInstrumentType = normalizeInstrumentType(rawInstrumentType);
-    const resolvedInstrumentType =
-      normalizedCsvInstrumentType || prefixInstrumentType || mappedInstrumentType;
-    const quantity = parseNumericValue(rawQuantity, decimalSeparator, thousandsSeparator);
-    const unitPrice = parseNumericValue(rawUnitPrice, decimalSeparator, thousandsSeparator);
-    const amount = parseNumericValue(rawAmount, decimalSeparator, thousandsSeparator);
-    const currency = rawCurrency?.trim() || defaultCurrency;
-    const fee = parseNumericValue(rawFee, decimalSeparator, thousandsSeparator);
-    const comment = rawComment?.trim();
-    const fxRate = parseNumericValue(rawFxRate, decimalSeparator, thousandsSeparator);
-    const subtype = rawSubtype?.trim().toUpperCase() || undefined;
-
-    // Resolve account ID: use CSV account mapping, or fall back to default
-    let accountId = defaultAccountId;
-    if (rawAccount?.trim()) {
-      const mappedAccount = accountMappings[rawAccount.trim()];
-      if (mappedAccount) {
-        accountId = mappedAccount;
-      } else if (rawAccount.trim()) {
-        // Use raw account value if no mapping exists (might be an account ID already)
-        accountId = rawAccount.trim();
-      }
+  for (const duplicate of duplicateRows) {
+    if (typeof duplicate.duplicateOfLineNumber === "number") {
+      pushOnce(byLineNumber.get(duplicate.duplicateOfLineNumber));
     }
+    pushOnce(duplicate);
+  }
 
-    // For cash-like activities, some brokers (e.g. Schwab) put the dollar value
-    // in the Quantity column instead of Amount.
-    const resolved = resolveCashActivityFields(activityType, quantity, amount, unitPrice);
-
-    // Create draft object
-    const draft: Partial<DraftActivity> = {
-      rowIndex,
-      rawRow: row,
-      activityDate,
-      activityType,
-      symbol,
-      exchangeMic: mappedExchangeMic,
-      symbolName: mappedSymbolName,
-      quoteCcy: mappedQuoteCcy,
-      instrumentType: resolvedInstrumentType,
-      quoteMode: mappedQuoteMode,
-      quantity: resolved.quantity,
-      unitPrice,
-      amount: resolved.amount,
-      currency,
-      fee,
-      fxRate,
-      subtype,
-      accountId,
-      comment,
-      isEdited: false,
-    };
-
-    // Validate and get status
-    const validation = validateDraft(draft);
-
-    return {
-      ...draft,
-      status: validation.status,
-      errors: validation.errors,
-      warnings: validation.warnings,
-    } as DraftActivity;
-  });
+  return ordered;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Filter Stats Component
-// ─────────────────────────────────────────────────────────────────────────────
+function findDuplicateContextRowIndexes(drafts: DraftActivity[]): number[] {
+  const byLineNumber = new Map(drafts.map((draft) => [draft.rowIndex + 1, draft]));
+  const contextRowIndexes = new Set<number>();
 
-interface FilterStatsProps {
-  stats: FilterStats;
-  currentFilter: ImportReviewFilter;
-  onFilterChange: (filter: ImportReviewFilter) => void;
-}
+  for (const draft of drafts) {
+    if (typeof draft.duplicateOfLineNumber !== "number") continue;
+    const sourceDraft = byLineNumber.get(draft.duplicateOfLineNumber);
+    if (sourceDraft) {
+      contextRowIndexes.add(sourceDraft.rowIndex);
+    }
+  }
 
-function FilterStatsBar({ stats, currentFilter, onFilterChange }: FilterStatsProps) {
-  // Define filter configs - only show colored variants when count > 0
-  const filters: {
-    id: ImportReviewFilter;
-    label: string;
-    count: number;
-    colorVariant: "default" | "destructive" | "secondary" | "outline";
-  }[] = [
-    { id: "all", label: "All", count: stats.all, colorVariant: "secondary" },
-    { id: "errors", label: "Errors", count: stats.errors, colorVariant: "destructive" },
-    { id: "warnings", label: "Warnings", count: stats.warnings, colorVariant: "secondary" },
-    { id: "duplicates", label: "Duplicates", count: stats.duplicates, colorVariant: "secondary" },
-    { id: "skipped", label: "Skipped", count: stats.skipped, colorVariant: "secondary" },
-  ];
-
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      {filters.map((filter) => {
-        // Use colored variant only when count > 0, otherwise use outline
-        const variant =
-          currentFilter === filter.id
-            ? "default"
-            : filter.count > 0
-              ? filter.colorVariant
-              : "outline";
-
-        return (
-          <Badge
-            key={filter.id}
-            variant={variant}
-            className={`cursor-pointer transition-all ${
-              currentFilter === filter.id ? "" : "opacity-70 hover:opacity-100"
-            }`}
-            onClick={() => onFilterChange(filter.id)}
-          >
-            {filter.label}: {filter.count}
-          </Badge>
-        );
-      })}
-    </div>
-  );
+  return [...contextRowIndexes];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -552,213 +87,99 @@ function FilterStatsBar({ stats, currentFilter, onFilterChange }: FilterStatsPro
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function ReviewStep() {
-  const { state, dispatch } = useImportContext();
-  const { parsedRows, headers, mapping, parseConfig, accountId, draftActivities } = state;
+  const { state, dispatch, validateDrafts } = useImportContext();
+  const { parsedRows, mapping, draftActivities } = state;
+  const isValidating = state.isValidating;
 
   const [selectedRows, setSelectedRows] = useState<number[]>([]);
-  const [filter, setFilter] = useState<ImportReviewFilter>("all");
-  const [isValidating, setIsValidating] = useState(false);
-  const validationRunRef = useRef(0);
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set());
+  const [typeFilter, setTypeFilter] = useState<Set<string>>(new Set());
+  const [accountFilter, setAccountFilter] = useState<Set<string>>(new Set());
+  const [symbolFilter, setSymbolFilter] = useState<Set<string>>(new Set());
 
-  const validateDraftsWithBackend = useCallback(
-    async (drafts: DraftActivity[]) => {
-      const validationRun = ++validationRunRef.current;
-      setIsValidating(true);
-      try {
-        if (!accountId) {
-          logger.warn("No account selected - skipping backend validation");
-          if (validationRun === validationRunRef.current) {
-            dispatch(setDraftActivities(drafts));
-          }
-          return;
-        }
-
-        const activitiesToValidate = drafts
-          .filter((d) => d.status !== "skipped" && d.activityType)
-          .map(
-            (draft) =>
-              ({
-                accountId: draft.accountId || accountId,
-                activityType: draft.activityType as ActivityImport["activityType"],
-                date: draft.activityDate || "",
-                symbol: draft.symbol || "",
-                symbolName: draft.symbolName,
-                exchangeMic: draft.exchangeMic,
-                quoteCcy: draft.quoteCcy,
-                instrumentType: draft.instrumentType,
-                quoteMode: draft.quoteMode,
-                quantity: draft.quantity,
-                unitPrice: draft.unitPrice,
-                amount: draft.amount,
-                currency: draft.currency || parseConfig.defaultCurrency,
-                fee: draft.fee,
-                isDraft: true,
-                isValid: draft.status === "valid" || draft.status === "warning",
-                lineNumber: draft.rowIndex + 1,
-                comment: draft.comment,
-                fxRate: draft.fxRate,
-                subtype: draft.subtype,
-              }) satisfies Partial<ActivityImport>,
-          ) as ActivityImport[];
-
-        let updatedDrafts = drafts;
-        if (activitiesToValidate.length > 0) {
-          const validated = await checkActivitiesImport({
-            accountId,
-            activities: activitiesToValidate,
-          });
-          if (validationRun !== validationRunRef.current) {
-            return;
-          }
-
-          updatedDrafts = drafts.map((draft) => {
-            const backendResult = validated.find((v) => v.lineNumber === draft.rowIndex + 1);
-            if (!backendResult) {
-              return {
-                ...draft,
-                accountId: draft.accountId || accountId,
-                duplicateOfId: undefined,
-                duplicateOfLineNumber: undefined,
-              };
-            }
-
-            const backendErrors: Record<string, string[]> = {};
-            if (backendResult.errors) {
-              for (const [key, value] of Object.entries(backendResult.errors)) {
-                backendErrors[key] = Array.isArray(value) ? value : [String(value)];
-              }
-            }
-            const backendWarnings: Record<string, string[]> = {};
-            if (backendResult.warnings) {
-              for (const [key, value] of Object.entries(backendResult.warnings)) {
-                backendWarnings[key] = Array.isArray(value) ? value : [String(value)];
-              }
-            }
-            if (!backendResult.isValid && Object.keys(backendErrors).length === 0) {
-              backendErrors.general = ["Validation failed"];
-            }
-
-            const mergedErrors = mergeIssueMaps(draft.errors || {}, backendErrors);
-            const retainedWarnings = { ...(draft.warnings || {}) };
-            delete retainedWarnings._duplicate;
-            const mergedWarnings = mergeIssueMaps(retainedWarnings, backendWarnings);
-            const hasErrors = Object.keys(mergedErrors).length > 0;
-            const hasWarnings = Object.keys(mergedWarnings).length > 0;
-
-            return {
-              ...draft,
-              accountId: draft.accountId || accountId,
-              errors: mergedErrors,
-              warnings: mergedWarnings,
-              duplicateOfId: backendResult.duplicateOfId,
-              duplicateOfLineNumber: backendResult.duplicateOfLineNumber,
-              symbolName: backendResult.symbolName,
-              exchangeMic: backendResult.exchangeMic,
-              quoteCcy: backendResult.quoteCcy,
-              instrumentType: backendResult.instrumentType,
-              quoteMode: backendResult.quoteMode,
-              status:
-                draft.status === "skipped"
-                  ? draft.status
-                  : hasErrors
-                    ? "error"
-                    : hasWarnings
-                      ? "warning"
-                      : "valid",
-            } as DraftActivity;
-          });
-        }
-        if (validationRun === validationRunRef.current) {
-          dispatch(setDraftActivities(updatedDrafts));
-        }
-      } catch (error) {
-        logger.error(`Backend validation failed: ${error}`);
-        if (validationRun === validationRunRef.current) {
-          dispatch(setDraftActivities(drafts));
-        }
-      } finally {
-        if (validationRun === validationRunRef.current) {
-          setIsValidating(false);
-        }
-      }
-    },
-    [accountId, dispatch, parseConfig.defaultCurrency],
-  );
-
-  // Create draft activities and validate with backend when entering this step
-  useEffect(() => {
-    if (draftActivities.length === 0 && parsedRows.length > 0 && mapping) {
-      const drafts = createDraftActivities(
-        parsedRows,
-        headers,
-        {
-          fieldMappings: mapping.fieldMappings,
-          activityMappings: mapping.activityMappings,
-          symbolMappings: mapping.symbolMappings,
-          accountMappings: mapping.accountMappings || {},
-          symbolMappingMeta: mapping.symbolMappingMeta || {},
-        },
-        {
-          dateFormat: parseConfig.dateFormat,
-          decimalSeparator: parseConfig.decimalSeparator,
-          thousandsSeparator: parseConfig.thousandsSeparator,
-          defaultCurrency: parseConfig.defaultCurrency,
-        },
-        accountId,
-      );
-
-      void validateDraftsWithBackend(drafts);
+  // Calculate filter stats (counts by status)
+  const filterStats = useMemo(() => {
+    const counts = { all: 0, errors: 0, warnings: 0, duplicates: 0, skipped: 0, valid: 0 };
+    counts.all = draftActivities.length;
+    for (const d of draftActivities) {
+      if (d.status === "error") counts.errors++;
+      else if (d.status === "warning") counts.warnings++;
+      else if (d.status === "duplicate") counts.duplicates++;
+      else if (d.status === "skipped") counts.skipped++;
+      else counts.valid++;
     }
-  }, [
-    parsedRows,
-    headers,
-    mapping,
-    parseConfig,
-    accountId,
-    draftActivities.length,
-    validateDraftsWithBackend,
-  ]);
-
-  // Calculate filter stats
-  const filterStats = useMemo<FilterStats>(() => {
-    const stats: FilterStats = {
-      all: draftActivities.length,
-      errors: 0,
-      warnings: 0,
-      duplicates: 0,
-      skipped: 0,
-      valid: 0,
-    };
-
-    for (const draft of draftActivities) {
-      switch (draft.status) {
-        case "error":
-          stats.errors++;
-          break;
-        case "warning":
-          stats.warnings++;
-          if (hasDuplicateWarning(draft)) {
-            stats.duplicates++;
-          }
-          break;
-        case "duplicate":
-          stats.warnings++;
-          stats.duplicates++;
-          break;
-        case "skipped":
-          stats.skipped++;
-          break;
-        case "valid":
-          stats.valid++;
-          if (hasDuplicateWarning(draft)) {
-            stats.duplicates++;
-          }
-          break;
-      }
-    }
-
-    return stats;
+    return counts;
   }, [draftActivities]);
+
+  // Faceted filter options — derived from draft data
+  const facetedOptions = useMemo(() => {
+    const types = new Map<string, number>();
+    const accounts = new Map<string, number>();
+    const symbols = new Map<string, number>();
+
+    for (const d of draftActivities) {
+      if (d.activityType) types.set(d.activityType, (types.get(d.activityType) ?? 0) + 1);
+      if (d.accountId) accounts.set(d.accountId, (accounts.get(d.accountId) ?? 0) + 1);
+      if (d.symbol) symbols.set(d.symbol, (symbols.get(d.symbol) ?? 0) + 1);
+    }
+
+    const statuses = [
+      { label: "Errors", value: "error", count: filterStats.errors },
+      { label: "Warnings", value: "warning", count: filterStats.warnings },
+      { label: "Duplicates", value: "duplicate", count: filterStats.duplicates },
+      { label: "Skipped", value: "skipped", count: filterStats.skipped },
+      { label: "Valid", value: "valid", count: filterStats.valid },
+    ].filter((o) => o.count > 0);
+
+    return {
+      types: Array.from(types, ([value, count]) => ({ label: value, value, count })).sort((a, b) =>
+        a.label.localeCompare(b.label),
+      ),
+      accounts: Array.from(accounts, ([value, count]) => ({ label: value, value, count })).sort(
+        (a, b) => a.label.localeCompare(b.label),
+      ),
+      symbols: Array.from(symbols, ([value, count]) => ({ label: value, value, count })).sort(
+        (a, b) => a.label.localeCompare(b.label),
+      ),
+      statuses,
+    };
+  }, [draftActivities, filterStats]);
+
+  // Apply all filters on top of drafts passed to the grid
+  const { facetFilteredDrafts, nonSelectableRowIndexes } = useMemo(() => {
+    const draftsMatchingFacetFilters = draftActivities.filter((draft) =>
+      matchesFacetFilters(draft, typeFilter, accountFilter, symbolFilter),
+    );
+
+    if (statusFilter.size === 0) {
+      return { facetFilteredDrafts: draftsMatchingFacetFilters, nonSelectableRowIndexes: [] };
+    }
+
+    if (statusFilter.size === 1 && statusFilter.has("duplicate")) {
+      const groupedDrafts = buildDuplicateReviewRows(draftsMatchingFacetFilters);
+      return {
+        facetFilteredDrafts: groupedDrafts,
+        nonSelectableRowIndexes: findDuplicateContextRowIndexes(groupedDrafts),
+      };
+    }
+
+    return {
+      facetFilteredDrafts: draftsMatchingFacetFilters.filter((draft) =>
+        statusFilter.has(draft.status),
+      ),
+      nonSelectableRowIndexes: [],
+    };
+  }, [draftActivities, typeFilter, accountFilter, symbolFilter, statusFilter]);
+
+  const hasActiveFacetFilters =
+    typeFilter.size > 0 || accountFilter.size > 0 || symbolFilter.size > 0 || statusFilter.size > 0;
+
+  const clearAllFilters = useCallback(() => {
+    setTypeFilter(new Set());
+    setAccountFilter(new Set());
+    setSymbolFilter(new Set());
+    setStatusFilter(new Set());
+  }, []);
 
   // Handlers
   const handleDraftUpdate = useCallback(
@@ -766,7 +187,21 @@ export function ReviewStep() {
       // Find the current draft and merge with updates
       const currentDraft = draftActivities.find((d) => d.rowIndex === rowIndex);
       if (currentDraft) {
-        const mergedDraft = { ...currentDraft, ...updates };
+        const changesAssetIdentity = [
+          "symbol",
+          "exchangeMic",
+          "quoteCcy",
+          "instrumentType",
+          "quoteMode",
+          "isin",
+          "accountId",
+          "activityType",
+        ].some((field) => field in updates);
+        const mergedDraft = {
+          ...currentDraft,
+          ...updates,
+        } as DraftActivity;
+        const nextCandidate = buildImportAssetCandidateFromDraft(mergedDraft);
         // Re-validate the merged draft
         const validation = validateDraft(mergedDraft);
         // Don't override status if it was explicitly skipped.
@@ -774,6 +209,13 @@ export function ReviewStep() {
         dispatch(
           updateDraft(rowIndex, {
             ...updates,
+            ...(changesAssetIdentity
+              ? {
+                  assetId: undefined,
+                  importAssetKey: undefined,
+                  assetCandidateKey: nextCandidate?.key,
+                }
+              : {}),
             ...(shouldRevalidateStatus
               ? {
                   status: validation.status,
@@ -794,7 +236,7 @@ export function ReviewStep() {
 
   const handleBulkSkip = useCallback(
     (rowIndexes: number[]) => {
-      dispatch(bulkSkipDrafts(rowIndexes, "Skipped by user"));
+      dispatch(bulkSkipDrafts(rowIndexes, "Skipped"));
       setSelectedRows([]);
     },
     [dispatch],
@@ -821,96 +263,6 @@ export function ReviewStep() {
     },
     [dispatch],
   );
-
-  const handleSymbolResolution = useCallback(
-    (mappings: Record<string, SymbolSearchResult>) => {
-      // 1. Update all affected drafts in-memory, then run backend validation+dedupe again.
-      const nextDrafts = draftActivities.map((draft) => {
-        const result = draft.symbol ? mappings[draft.symbol] : undefined;
-        if (!result || !draft.errors.symbol) {
-          return draft;
-        }
-
-        const symbolUpdates: Partial<DraftActivity> = {
-          symbol: result.symbol,
-          exchangeMic: result.exchangeMic,
-          symbolName: result.longName,
-          quoteCcy: result.currency,
-          instrumentType: result.quoteType,
-          quoteMode: result.dataSource === "MANUAL" ? "MANUAL" : undefined,
-        };
-        const { symbol: _removed, ...otherErrors } = draft.errors;
-        const merged = { ...draft, ...symbolUpdates };
-        const validation = validateDraft(merged);
-        const finalErrors = { ...otherErrors, ...validation.errors };
-        const hasErrors = Object.keys(finalErrors).length > 0;
-        const hasWarnings = Object.keys(validation.warnings).length > 0;
-
-        return {
-          ...merged,
-          errors: finalErrors,
-          warnings: validation.warnings,
-          duplicateOfId: undefined,
-          duplicateOfLineNumber: undefined,
-          status:
-            draft.status === "skipped"
-              ? draft.status
-              : hasErrors
-                ? "error"
-                : hasWarnings
-                  ? "warning"
-                  : "valid",
-        } as DraftActivity;
-      });
-      dispatch(setDraftActivities(nextDrafts));
-      void validateDraftsWithBackend(nextDrafts);
-
-      // 2. Save resolved symbols to mapping profile for future imports
-      if (mapping) {
-        const newSymbolMappings = { ...mapping.symbolMappings };
-        const newSymbolMappingMeta = { ...(mapping.symbolMappingMeta || {}) };
-
-        for (const [csvSymbol, result] of Object.entries(mappings)) {
-          newSymbolMappings[csvSymbol] = result.symbol;
-          newSymbolMappingMeta[csvSymbol] = {
-            exchangeMic: result.exchangeMic,
-            symbolName: result.longName,
-            quoteCcy: result.currency,
-            instrumentType: result.quoteType,
-            quoteMode: result.dataSource === "MANUAL" ? "MANUAL" : undefined,
-          };
-        }
-
-        const updatedMapping = {
-          ...mapping,
-          symbolMappings: newSymbolMappings,
-          symbolMappingMeta: newSymbolMappingMeta,
-        };
-
-        dispatch(setMapping(updatedMapping));
-
-        // Persist to backend
-        if (accountId) {
-          saveAccountImportMapping({ ...updatedMapping, accountId }).catch((err) =>
-            logger.error(`Failed to save symbol mappings: ${err}`),
-          );
-        }
-      }
-    },
-    [draftActivities, dispatch, mapping, accountId, validateDraftsWithBackend],
-  );
-
-  const unresolvedSymbols = useMemo<UnresolvedSymbol[]>(() => {
-    const symbolMap = new Map<string, number>();
-    for (const draft of draftActivities) {
-      if (draft.errors.symbol && draft.symbol) {
-        symbolMap.set(draft.symbol, (symbolMap.get(draft.symbol) || 0) + 1);
-      }
-    }
-    return Array.from(symbolMap.entries())
-      .map(([csvSymbol, count]) => ({ csvSymbol, affectedCount: count }))
-      .sort((a, b) => (b.affectedCount ?? 0) - (a.affectedCount ?? 0));
-  }, [draftActivities]);
 
   // --- All hooks above this line ---
 
@@ -948,19 +300,88 @@ export function ReviewStep() {
     );
   }
 
-  const validCount = filterStats.valid + filterStats.warnings;
+  const validCount = filterStats.valid + filterStats.warnings + filterStats.duplicates;
   const hasErrors = filterStats.errors > 0;
-  const hasWarnings = filterStats.warnings > 0;
+  const hasWarnings = filterStats.warnings > 0 || filterStats.duplicates > 0;
   const hasIssues = hasErrors || hasWarnings;
+  const hasSkipped = filterStats.skipped > 0;
+  const importCount = validCount; // skipped are excluded
+  const isStale = state.lastValidatedRevision !== state.draftRevision;
+  const warningCount = filterStats.warnings + filterStats.duplicates;
 
   return (
     <div className="flex flex-col gap-4">
       {/* Summary alert */}
-      {hasIssues ? (
+      {state.validationError ? (
+        <ImportAlert
+          variant="destructive"
+          title="Backend validation failed"
+          description={state.validationError}
+        />
+      ) : isStale ? (
+        <ImportAlert
+          variant="warning"
+          title="Review validation is out of date"
+          description="You changed one or more activities after the last backend validation. Revalidate before continuing to import."
+        >
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-2"
+            onClick={() => void validateDrafts(draftActivities)}
+          >
+            Revalidate
+          </Button>
+        </ImportAlert>
+      ) : hasIssues ? (
         <ImportAlert
           variant={hasErrors ? "destructive" : "warning"}
-          title={`${validCount} of ${filterStats.all} activities ready to import`}
-          description={`${filterStats.errors} errors, ${filterStats.warnings} warnings. Review and fix issues below, or skip problematic rows.`}
+          title={
+            hasErrors
+              ? `${filterStats.errors} ${filterStats.errors === 1 ? "row needs fixing" : "rows need fixing"}`
+              : `${warningCount} ${warningCount === 1 ? "warning" : "warnings"} to review`
+          }
+          description={
+            hasErrors
+              ? `${validCount} of ${filterStats.all} rows are valid and ready to import. Fix errors below, or skip them to continue.`
+              : `All ${filterStats.all} activities are importable. Review warnings below or proceed.`
+          }
+        >
+          <div className="mt-2 flex flex-wrap gap-2">
+            {filterStats.errors > 0 && (
+              <Badge
+                variant="outline"
+                className="border-destructive/50 text-destructive hover:bg-destructive/10 cursor-pointer"
+                onClick={() => setStatusFilter(new Set(["error"]))}
+              >
+                {filterStats.errors} errors
+              </Badge>
+            )}
+            {filterStats.warnings > 0 && (
+              <Badge
+                variant="outline"
+                className="cursor-pointer border-yellow-500/50 text-yellow-700 hover:bg-yellow-500/10 dark:text-yellow-400"
+                onClick={() => setStatusFilter(new Set(["warning"]))}
+              >
+                {filterStats.warnings} warnings
+              </Badge>
+            )}
+            {filterStats.duplicates > 0 && (
+              <Badge
+                variant="outline"
+                className="cursor-pointer border-blue-500/50 text-blue-700 hover:bg-blue-500/10 dark:text-blue-400"
+                onClick={() => setStatusFilter(new Set(["duplicate"]))}
+              >
+                {filterStats.duplicates} duplicates
+              </Badge>
+            )}
+          </div>
+        </ImportAlert>
+      ) : hasSkipped ? (
+        <ImportAlert
+          variant="success"
+          title={`${importCount} of ${filterStats.all} activities will be imported`}
+          description={`${filterStats.skipped} ${filterStats.skipped === 1 ? "activity is" : "activities are"} excluded. Your data is ready for import.`}
         />
       ) : (
         <ImportAlert
@@ -970,24 +391,52 @@ export function ReviewStep() {
         />
       )}
 
-      {/* Symbol resolution for unrecognized symbols */}
-      <SymbolResolutionPanel
-        unresolvedSymbols={unresolvedSymbols}
-        onApplyMappings={handleSymbolResolution}
-      />
-
-      {/* Stats and filter */}
+      {/* Filter bar */}
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-base font-semibold">Review Activities</h2>
-          <FilterStatsBar stats={filterStats} currentFilter={filter} onFilterChange={setFilter} />
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-muted-foreground mr-1 text-sm">{filterStats.all} activities</span>
+          <FacetedFilter
+            title="Type"
+            options={facetedOptions.types}
+            selectedValues={typeFilter}
+            onFilterChange={setTypeFilter}
+          />
+          <FacetedFilter
+            title="Symbol"
+            options={facetedOptions.symbols}
+            selectedValues={symbolFilter}
+            onFilterChange={setSymbolFilter}
+          />
+          <FacetedFilter
+            title="Account"
+            options={facetedOptions.accounts}
+            selectedValues={accountFilter}
+            onFilterChange={setAccountFilter}
+          />
+          <FacetedFilter
+            title="Status"
+            options={facetedOptions.statuses}
+            selectedValues={statusFilter}
+            onFilterChange={setStatusFilter}
+          />
+          {hasActiveFacetFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground h-7 text-xs"
+              onClick={clearAllFilters}
+            >
+              Clear filters
+            </Button>
+          )}
         </div>
+
         <ImportReviewGrid
-          drafts={draftActivities}
+          drafts={facetFilteredDrafts}
+          nonSelectableRowIndexes={nonSelectableRowIndexes}
           onDraftUpdate={handleDraftUpdate}
           selectedRows={selectedRows}
           onSelectionChange={setSelectedRows}
-          filter={filter}
           onBulkSkip={handleBulkSkip}
           onBulkUnskip={handleBulkUnskip}
           onBulkSetCurrency={handleBulkSetCurrency}

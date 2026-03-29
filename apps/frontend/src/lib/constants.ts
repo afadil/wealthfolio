@@ -126,14 +126,15 @@ export const pricingModeSchema = quoteModeSchema;
 
 export const ImportFormat = {
   DATE: "date",
+  ACCOUNT: "account",
   ACTIVITY_TYPE: "activityType",
   SYMBOL: "symbol",
+  ISIN: "isin",
   QUANTITY: "quantity",
   UNIT_PRICE: "unitPrice",
   AMOUNT: "amount",
   CURRENCY: "currency",
   FEE: "fee",
-  ACCOUNT: "account",
   COMMENT: "comment",
   FX_RATE: "fxRate",
   SUBTYPE: "subtype",
@@ -144,14 +145,15 @@ export type ImportFormat = (typeof ImportFormat)[keyof typeof ImportFormat];
 
 export const importFormatSchema = z.enum([
   ImportFormat.DATE,
+  ImportFormat.ACCOUNT,
   ImportFormat.ACTIVITY_TYPE,
   ImportFormat.SYMBOL,
+  ImportFormat.ISIN,
   ImportFormat.QUANTITY,
   ImportFormat.UNIT_PRICE,
   ImportFormat.AMOUNT,
   ImportFormat.CURRENCY,
   ImportFormat.FEE,
-  ImportFormat.ACCOUNT,
   ImportFormat.COMMENT,
   ImportFormat.FX_RATE,
   ImportFormat.SUBTYPE,

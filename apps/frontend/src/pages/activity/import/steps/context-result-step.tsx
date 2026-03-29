@@ -127,7 +127,7 @@ export function ContextResultStep() {
     );
   }
 
-  const { success, stats, importRunId, errorMessage } = importResult;
+  const { success, stats, errorMessage } = importResult;
 
   if (!success) {
     return (
@@ -213,17 +213,6 @@ export function ContextResultStep() {
 
         <StatItem label="Total" value={stats.total} />
       </motion.div>
-
-      {/* Import reference */}
-      {importRunId && (
-        <motion.div
-          className="text-muted-foreground mb-10 flex items-center gap-2 text-xs"
-          variants={itemVariants}
-        >
-          <Icons.Hash className="h-3 w-3" />
-          <span className="font-mono">{importRunId.slice(0, 8)}</span>
-        </motion.div>
-      )}
 
       {/* Action buttons */}
       <motion.div className="flex gap-3" variants={itemVariants}>

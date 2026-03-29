@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 interface Option {
   value: string;
   label: string;
+  className?: string;
 }
 
 interface SearchableSelectProps {
@@ -62,6 +63,7 @@ export function SearchableSelect({
                   onValueChange(option.value);
                   setOpen(false);
                 }}
+                className={option.className}
               >
                 {option.label}
                 <Icons.Check className={cn("ml-auto h-4 w-4", value === option.value ? "opacity-100" : "opacity-0")} />

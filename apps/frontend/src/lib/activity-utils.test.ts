@@ -4,6 +4,7 @@ import {
   isCashTransfer,
   isIncomeActivity,
   isAssetBackedIncomeActivity,
+  needsImportAssetResolution,
   calculateActivityValue,
   formatSplitRatio,
 } from "./activity-utils";
@@ -65,6 +66,21 @@ describe("Activity Utilities", () => {
     it("should return false for non-income types", () => {
       expect(isAssetBackedIncomeActivity(ActivityType.BUY, "AAPL", "AAPL")).toBe(false);
       expect(isAssetBackedIncomeActivity(ActivityType.DEPOSIT, "SOL", "SOL")).toBe(false);
+    });
+  });
+
+  describe("needsImportAssetResolution", () => {
+    it("treats staking rewards as asset-backed imports", () => {
+      expect(needsImportAssetResolution(ActivityType.INTEREST, "STAKING_REWARD")).toBe(true);
+    });
+
+    it("treats DRIP and dividend-in-kind as asset-backed imports", () => {
+      expect(needsImportAssetResolution(ActivityType.DIVIDEND, "DRIP")).toBe(true);
+      expect(needsImportAssetResolution(ActivityType.DIVIDEND, "DIVIDEND_IN_KIND")).toBe(true);
+    });
+
+    it("does not force cash-only interest imports through asset resolution", () => {
+      expect(needsImportAssetResolution(ActivityType.INTEREST)).toBe(false);
     });
   });
 

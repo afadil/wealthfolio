@@ -938,6 +938,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "chardetng"
+version = "0.1.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14b8f0b65b7b08ae3c8187e8d77174de20cb6777864c6b832d8ad365999cf1ea"
+dependencies = [
+ "cfg-if",
+ "encoding_rs",
+ "memchr",
+]
+
+[[package]]
 name = "chrono"
 version = "0.4.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7802,7 +7813,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-ai"
-version = "3.1.2"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7826,7 +7837,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-app"
-version = "3.1.2"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7875,7 +7886,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-connect"
-version = "3.1.2"
+version = "3.2.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -7893,16 +7904,18 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-core"
-version = "3.1.2"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "chardetng",
  "chrono",
  "chrono-tz",
  "csv",
  "dashmap",
  "diesel",
  "diesel_migrations",
+ "encoding_rs",
  "futures",
  "hex",
  "log",
@@ -7931,7 +7944,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-device-sync"
-version = "3.1.2"
+version = "3.2.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -7955,7 +7968,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-market-data"
-version = "3.1.2"
+version = "3.2.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7977,7 +7990,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-server"
-version = "3.1.2"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "argon2",
@@ -8024,7 +8037,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-storage-sqlite"
-version = "3.1.2"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "async-trait",

@@ -8,7 +8,7 @@ import {
   SUBTYPES_BY_ACTIVITY_TYPE,
   SUBTYPE_DISPLAY_NAMES,
 } from "@/lib/constants";
-import { isSymbolRequired } from "@/lib/activity-utils";
+import { needsImportAssetResolution } from "@/lib/activity-utils";
 import { ActivityTypeBadge } from "../../components/activity-type-badge";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -267,7 +267,7 @@ export function useImportColumns<T extends ImportRowData>({
           onCreateCustomAsset,
           isClearable: (rowData: unknown) => {
             const row = rowData as ImportRowData;
-            return !isSymbolRequired(row.activityType ?? "");
+            return !needsImportAssetResolution(row.activityType ?? "", row.subtype);
           },
         },
       },

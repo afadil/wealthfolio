@@ -35,7 +35,11 @@ pub fn default_adapter_descriptors() -> Vec<EntityAdapterDescriptor> {
         },
         EntityAdapterDescriptor {
             entity: SyncEntity::ActivityImportProfile,
-            table_name: "activity_import_profiles",
+            table_name: "import_account_templates",
+        },
+        EntityAdapterDescriptor {
+            entity: SyncEntity::ImportTemplate,
+            table_name: "import_templates",
         },
         EntityAdapterDescriptor {
             entity: SyncEntity::Goal,

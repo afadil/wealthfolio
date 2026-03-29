@@ -275,9 +275,15 @@ pub fn run() {
             commands::activity::save_activities,
             commands::activity::delete_activity,
             commands::activity::check_activities_import,
+            commands::activity::preview_import_assets,
             commands::activity::import_activities,
             commands::activity::get_account_import_mapping,
             commands::activity::save_account_import_mapping,
+            commands::activity::link_account_template,
+            commands::activity::list_import_templates,
+            commands::activity::get_import_template,
+            commands::activity::save_import_template,
+            commands::activity::delete_import_template,
             commands::activity::check_existing_duplicates,
             commands::activity::parse_csv,
             // Settings commands
@@ -452,6 +458,10 @@ pub fn run() {
             commands::brokers_sync::get_import_runs,
             #[cfg(feature = "connect-sync")]
             commands::brokers_sync::get_data_import_runs,
+            #[cfg(feature = "connect-sync")]
+            commands::brokers_sync::get_broker_sync_profile,
+            #[cfg(feature = "connect-sync")]
+            commands::brokers_sync::save_broker_sync_profile_rules,
             // Device sync commands
             #[cfg(feature = "device-sync")]
             commands::device_sync::enroll_device,

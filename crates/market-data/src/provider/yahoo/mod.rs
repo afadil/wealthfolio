@@ -873,9 +873,9 @@ impl MarketDataProvider for YahooProvider {
 
     fn rate_limit(&self) -> RateLimit {
         RateLimit {
-            requests_per_minute: 1000,
-            max_concurrency: 5,
-            min_delay: Duration::from_millis(50),
+            requests_per_minute: 2000,
+            max_concurrency: 10,
+            min_delay: Duration::from_millis(25),
         }
     }
 

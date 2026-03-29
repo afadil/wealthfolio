@@ -1,50 +1,56 @@
-import React, { useMemo, useState, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { Card, CardContent, CardHeader } from "@wealthfolio/ui/components/ui/card";
-import { Button } from "@wealthfolio/ui/components/ui/button";
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { AlertFeedback, Page, PageContent, PageHeader } from "@wealthfolio/ui";
-import { AnimatePresence, motion } from "motion/react";
-import { logger, getAccounts } from "@/adapters";
+import { getAccounts, logger } from "@/adapters";
 import { usePlatform } from "@/hooks/use-platform";
-import { useQuery } from "@tanstack/react-query";
+import { isCashSymbol, needsImportAssetResolution } from "@/lib/activity-utils";
+import { canImportCSV } from "@/lib/activity-restrictions";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account } from "@/lib/types";
-import { canImportCSV } from "@/lib/activity-restrictions";
+import { ImportType } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { AlertFeedback, Page, PageContent, PageHeader } from "@wealthfolio/ui";
+import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Card, CardHeader } from "@wealthfolio/ui/components/ui/card";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { AnimatePresence, motion } from "motion/react";
+import React, { useCallback, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 // Context
 import {
   ImportProvider,
-  useImportContext,
   nextStep,
   prevStep,
+  setDraftActivities,
   setMapping,
+  useImportContext,
   type ImportStep,
 } from "./context";
+import { createDraftActivities } from "./utils/draft-utils";
 
 // Components
-import { WizardStepIndicator, type WizardStep } from "./components/wizard-step-indicator";
-import { StepNavigation } from "./components/step-navigation";
 import { CancelConfirmationDialog } from "./components/cancel-confirmation-dialog";
+import { StepNavigation } from "./components/step-navigation";
+import { WizardStepIndicator, type WizardStep } from "./components/wizard-step-indicator";
 import { ImportHelpPopover } from "./import-help";
 
 // Steps
-import { UploadStep } from "./steps/upload-step";
-import { MappingStepUnified } from "./steps/mapping-step-unified";
-import { ReviewStep } from "./steps/review-step";
+import { AssetReviewStep } from "./steps/asset-review-step";
 import { ConfirmStep } from "./steps/confirm-step";
 import { ContextResultStep } from "./steps/context-result-step";
+import { MappingStepUnified } from "./steps/mapping-step-unified";
+import { ReviewStep } from "./steps/review-step";
+import { UploadStep } from "./steps/upload-step";
 
 // Holdings Import Steps
-import { HoldingsMappingStep, HoldingsFormat } from "./steps/holdings-mapping-step";
-import { HoldingsReviewStep } from "./steps/holdings-review-step";
 import { HoldingsConfirmStep } from "./steps/holdings-confirm-step";
+import { HoldingsFormat, HoldingsMappingStep } from "./steps/holdings-mapping-step";
+import { HoldingsReviewStep } from "./steps/holdings-review-step";
 
 // Constants
 import { IMPORT_REQUIRED_FIELDS, ImportFormat } from "@/lib/constants";
-import { isCashSymbol, isSymbolRequired } from "@/lib/activity-utils";
-import { validateTickerSymbol, findMappedActivityType } from "./utils/validation-utils";
 import { computeFieldMappings } from "./hooks/use-import-mapping";
+import { buildImportAssetCandidateFromDraft } from "./utils/asset-review-utils";
+import { isFieldMapped, primaryHeader } from "./utils/draft-utils";
+import { findMappedActivityType, validateTickerSymbol } from "./utils/validation-utils";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Step Configuration
@@ -53,13 +59,15 @@ import { computeFieldMappings } from "./hooks/use-import-mapping";
 const STEPS: WizardStep[] = [
   { id: "upload", label: "Upload" },
   { id: "mapping", label: "Mapping" },
-  { id: "review", label: "Review" },
+  { id: "assets", label: "Review Assets" },
+  { id: "review", label: "Review Activities" },
   { id: "confirm", label: "Import" },
 ];
 
 const STEP_COMPONENTS: Record<ImportStep, React.ComponentType> = {
   upload: UploadStep,
   mapping: MappingStepUnified,
+  assets: AssetReviewStep,
   review: ReviewStep,
   confirm: ConfirmStep,
   result: ContextResultStep,
@@ -69,6 +77,7 @@ const STEP_COMPONENTS: Record<ImportStep, React.ComponentType> = {
 const HOLDINGS_STEP_COMPONENTS: Record<ImportStep, React.ComponentType> = {
   upload: UploadStep, // Same upload step
   mapping: HoldingsMappingStep,
+  assets: HoldingsReviewStep,
   review: HoldingsReviewStep,
   confirm: HoldingsConfirmStep,
   result: ContextResultStep, // Same result step
@@ -91,7 +100,7 @@ const HOLDINGS_REQUIRED_FIELDS: HoldingsFormat[] = [
 /**
  * Check if a step can proceed to the next step (for activity import)
  */
-function useStepValidation(isHoldingsMode: boolean) {
+function useStepValidation(isHoldingsMode: boolean, accounts?: Account[]) {
   const { state } = useImportContext();
 
   return useMemo(() => {
@@ -106,14 +115,13 @@ function useStepValidation(isHoldingsMode: boolean) {
         if (isHoldingsMode) {
           // Holdings mode: check if required holdings fields are mapped
           if (!mapping) return false;
-          const requiredFieldsMapped = HOLDINGS_REQUIRED_FIELDS.every(
-            (field) =>
-              mapping.fieldMappings[field] && headers.includes(mapping.fieldMappings[field]),
+          const requiredFieldsMapped = HOLDINGS_REQUIRED_FIELDS.every((field) =>
+            isFieldMapped(mapping.fieldMappings[field], headers),
           );
           if (!requiredFieldsMapped) return false;
 
           // Check if all non-$CASH symbols are valid or resolved
-          const symbolCol = mapping.fieldMappings[HoldingsFormat.SYMBOL];
+          const symbolCol = primaryHeader(mapping.fieldMappings[HoldingsFormat.SYMBOL]);
           if (symbolCol) {
             const symIndex = headers.indexOf(symbolCol);
             if (symIndex !== -1) {
@@ -135,20 +143,56 @@ function useStepValidation(isHoldingsMode: boolean) {
 
         // Activity mode: existing validation logic
         if (!mapping) return false;
+        if (!state.accountId && !mapping.fieldMappings[ImportFormat.ACCOUNT]) {
+          return false;
+        }
+
+        if (mapping.fieldMappings[ImportFormat.ACCOUNT]) {
+          const accountCol = primaryHeader(mapping.fieldMappings[ImportFormat.ACCOUNT]);
+          const accountHeaderIndex = accountCol ? headers.indexOf(accountCol) : -1;
+          if (accountHeaderIndex === -1) {
+            return false;
+          }
+
+          const validAccountIds = new Set((accounts ?? []).map((account) => account.id));
+          for (const row of parsedRows) {
+            const rawAccount = row[accountHeaderIndex]?.trim();
+            if (!rawAccount) {
+              if (!state.accountId && !mapping.accountMappings?.[""]) {
+                return false;
+              }
+              continue;
+            }
+            if (!validAccountIds.has(rawAccount) && !mapping.accountMappings?.[rawAccount]) {
+              return false;
+            }
+          }
+        }
+
         const requiredFieldsMapped = IMPORT_REQUIRED_FIELDS.every(
           (field) => mapping.fieldMappings[field],
         );
         if (!requiredFieldsMapped) return false;
 
         // Check if all activity types have mappings
-        const activityTypeColumn = mapping.fieldMappings[ImportFormat.ACTIVITY_TYPE];
-        if (activityTypeColumn) {
-          const headerIndex = headers.indexOf(activityTypeColumn);
-          if (headerIndex !== -1) {
+        const activityTypeMapping = mapping.fieldMappings[ImportFormat.ACTIVITY_TYPE];
+        if (activityTypeMapping) {
+          // Build column indices for fallback resolution
+          const atHeaders = Array.isArray(activityTypeMapping)
+            ? activityTypeMapping
+            : [activityTypeMapping];
+          const atIndices = atHeaders.map((h) => headers.indexOf(h)).filter((i) => i !== -1);
+
+          if (atIndices.length > 0) {
             const uniqueValues = new Set<string>();
             parsedRows.forEach((row) => {
-              const value = row[headerIndex]?.trim();
-              if (value) uniqueValues.add(value);
+              for (const idx of atIndices) {
+                const value = row[idx]?.trim();
+                if (value) {
+                  uniqueValues.add(value);
+                  break;
+                }
+              }
             });
 
             for (const value of uniqueValues) {
@@ -160,11 +204,23 @@ function useStepValidation(isHoldingsMode: boolean) {
         }
 
         // Check if all symbols are resolved (only for non-cash activities)
-        const symbolColumn = mapping.fieldMappings[ImportFormat.SYMBOL];
-        const activityTypeCol = mapping.fieldMappings[ImportFormat.ACTIVITY_TYPE];
+        const symbolColumn = primaryHeader(mapping.fieldMappings[ImportFormat.SYMBOL]);
         if (symbolColumn) {
           const symbolHeaderIndex = headers.indexOf(symbolColumn);
-          const activityHeaderIndex = activityTypeCol ? headers.indexOf(activityTypeCol) : -1;
+
+          // Activity type indices for per-row type resolution
+          const atMapping = mapping.fieldMappings[ImportFormat.ACTIVITY_TYPE];
+          const atCols = atMapping
+            ? (Array.isArray(atMapping) ? atMapping : [atMapping])
+                .map((h) => headers.indexOf(h))
+                .filter((i) => i !== -1)
+            : [];
+          const subtypeMapping = mapping.fieldMappings[ImportFormat.SUBTYPE];
+          const subtypeCols = subtypeMapping
+            ? (Array.isArray(subtypeMapping) ? subtypeMapping : [subtypeMapping])
+                .map((h) => headers.indexOf(h))
+                .filter((i) => i !== -1)
+            : [];
 
           if (symbolHeaderIndex !== -1) {
             const symbolsNeedingResolution = new Set<string>();
@@ -173,15 +229,34 @@ function useStepValidation(isHoldingsMode: boolean) {
               const symbol = row[symbolHeaderIndex]?.trim();
               if (!symbol) return;
 
-              // Skip symbols that don't need mapping
-              if (activityHeaderIndex !== -1) {
-                const csvActivityType = row[activityHeaderIndex]?.trim();
-                if (csvActivityType) {
-                  const mappedType = findMappedActivityType(
-                    csvActivityType,
-                    mapping.activityMappings || {},
-                  );
-                  if (mappedType && (!isSymbolRequired(mappedType) || isCashSymbol(symbol))) return;
+              // Resolve activity type with fallback
+              let csvActivityType: string | undefined;
+              for (const idx of atCols) {
+                const val = row[idx]?.trim();
+                if (val) {
+                  csvActivityType = val;
+                  break;
+                }
+              }
+              let csvSubtype: string | undefined;
+              for (const idx of subtypeCols) {
+                const val = row[idx]?.trim();
+                if (val) {
+                  csvSubtype = val;
+                  break;
+                }
+              }
+
+              if (csvActivityType) {
+                const mappedType = findMappedActivityType(
+                  csvActivityType,
+                  mapping.activityMappings || {},
+                );
+                if (
+                  mappedType &&
+                  (!needsImportAssetResolution(mappedType, csvSubtype) || isCashSymbol(symbol))
+                ) {
+                  return;
                 }
               }
 
@@ -199,13 +274,29 @@ function useStepValidation(isHoldingsMode: boolean) {
         return true;
       }
 
+      case "assets": {
+        const assetCandidateCount = new Set(
+          draftActivities
+            .map((draft) => buildImportAssetCandidateFromDraft(draft)?.key)
+            .filter((key): key is string => Boolean(key)),
+        ).size;
+
+        return (
+          draftActivities.length > 0 &&
+          !state.isPreviewingAssets &&
+          !state.assetPreviewError &&
+          (assetCandidateCount === 0 ||
+            (state.assetPreviewItems.length > 0 &&
+              state.assetPreviewItems.every((item) => item.status !== "NEEDS_FIXING")))
+        );
+      }
+
       case "review":
         if (isHoldingsMode) {
           // Holdings mode: can proceed if we have parsed rows and backend check passed
           return parsedRows.length > 0 && state.holdingsCheckPassed;
         }
-        // Activity mode: can proceed if there are activities to review
-        return draftActivities.length > 0;
+        return draftActivities.length > 0 && !state.isValidating && !state.validationError;
 
       case "confirm":
         // This step handles its own navigation via the import button
@@ -218,7 +309,7 @@ function useStepValidation(isHoldingsMode: boolean) {
       default:
         return false;
     }
-  }, [state, isHoldingsMode]);
+  }, [accounts, state, isHoldingsMode]);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -226,11 +317,12 @@ function useStepValidation(isHoldingsMode: boolean) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ImportWizardContent() {
-  const { state, dispatch } = useImportContext();
+  const { state, dispatch, validateDrafts, previewAssets } = useImportContext();
   const navigate = useNavigate();
   const { isMobile } = usePlatform();
 
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [isNextLoading, setIsNextLoading] = useState(false);
 
   // Fetch accounts to determine tracking mode based on selected account
   const { data: accounts } = useQuery<Account[], Error>({
@@ -250,7 +342,7 @@ function ImportWizardContent() {
 
   const isCsvImportAllowed = canImportCSV(selectedAccount);
 
-  const canProceed = useStepValidation(isHoldingsMode);
+  const canProceed = useStepValidation(isHoldingsMode, accounts);
 
   // Select the appropriate steps and components based on mode
   const steps = isHoldingsMode ? HOLDINGS_STEPS : STEPS;
@@ -274,30 +366,111 @@ function ImportWizardContent() {
 
   // Handlers
   const handleNext = useCallback(() => {
-    if (!canGoNext) return;
+    void (async () => {
+      if (!canGoNext) return;
 
-    // At the upload→mapping transition, compute field mappings synchronously
-    // so the mapping step mounts with fieldMappings already populated.
-    if (state.step === "upload" && state.headers.length > 0 && !isHoldingsMode) {
-      const mergedFieldMappings = computeFieldMappings(state.headers, state.mapping?.fieldMappings);
-      dispatch(
-        setMapping({
-          ...(state.mapping ?? {
-            accountId: state.accountId || "",
-            name: "",
-            fieldMappings: {},
-            activityMappings: {},
-            symbolMappings: {},
-            accountMappings: {},
-            symbolMappingMeta: {},
+      if (state.step === "upload" && state.headers.length > 0 && !isHoldingsMode) {
+        const mergedFieldMappings = computeFieldMappings(
+          state.headers,
+          state.mapping?.fieldMappings,
+        );
+        const existingAccountMappings = state.mapping?.accountMappings ?? {};
+        // When no account column is mapped, pre-fill accountMappings[""] with the selected
+        // account so every row resolves without requiring manual per-row assignment.
+        const accountMappings =
+          !mergedFieldMappings[ImportFormat.ACCOUNT] &&
+          state.accountId &&
+          !existingAccountMappings[""]
+            ? { ...existingAccountMappings, "": state.accountId }
+            : existingAccountMappings;
+        dispatch(
+          setMapping({
+            ...(state.mapping ?? {
+              accountId: state.accountId || "",
+              importType: ImportType.ACTIVITY,
+              name: "",
+              fieldMappings: {},
+              activityMappings: {},
+              symbolMappings: {},
+              accountMappings: {},
+              symbolMappingMeta: {},
+            }),
+            fieldMappings: mergedFieldMappings,
+            accountMappings,
           }),
-          fieldMappings: mergedFieldMappings,
-        }),
-      );
-    }
+        );
+      }
 
-    dispatch(nextStep());
-  }, [dispatch, canGoNext, state.step, state.headers, state.mapping, state.accountId]);
+      if (
+        state.step === "mapping" &&
+        !isHoldingsMode &&
+        state.mapping &&
+        state.parsedRows.length > 0
+      ) {
+        const drafts = createDraftActivities(
+          state.parsedRows,
+          state.headers,
+          {
+            fieldMappings: state.mapping.fieldMappings,
+            activityMappings: state.mapping.activityMappings,
+            symbolMappings: state.mapping.symbolMappings,
+            accountMappings: state.mapping.accountMappings || {},
+            symbolMappingMeta: state.mapping.symbolMappingMeta || {},
+          },
+          {
+            dateFormat: state.parseConfig.dateFormat,
+            decimalSeparator: state.parseConfig.decimalSeparator,
+            thousandsSeparator: state.parseConfig.thousandsSeparator,
+            defaultCurrency: state.parseConfig.defaultCurrency,
+          },
+          state.accountId,
+        );
+        dispatch(setDraftActivities(drafts));
+        dispatch({ type: "SET_ASSET_PREVIEW_ITEMS", payload: [] });
+        dispatch({ type: "CLEAR_PENDING_IMPORT_ASSETS" });
+        dispatch(nextStep());
+        void previewAssets(drafts); // fire-and-forget: assets step shows spinner
+        return;
+      }
+
+      if (state.step === "assets" && !isHoldingsMode) {
+        setIsNextLoading(true);
+        try {
+          const result = await validateDrafts(state.draftActivities);
+          if (!result.ok) return; // network/race error only — activity errors are shown in review step
+          dispatch(nextStep());
+        } finally {
+          setIsNextLoading(false);
+        }
+        return;
+      }
+
+      if (state.step === "review" && !isHoldingsMode) {
+        setIsNextLoading(true);
+        try {
+          const result = await validateDrafts(state.draftActivities);
+          if (!result.ok || result.hasErrors) return;
+        } finally {
+          setIsNextLoading(false);
+        }
+      }
+
+      dispatch(nextStep());
+    })();
+  }, [
+    dispatch,
+    canGoNext,
+    state.step,
+    state.headers,
+    state.mapping,
+    state.accountId,
+    state.parsedRows,
+    state.parseConfig,
+    state.draftActivities,
+    isHoldingsMode,
+    validateDrafts,
+    previewAssets,
+  ]);
 
   const handleBack = useCallback(() => {
     if (canGoBack) {
@@ -325,13 +498,17 @@ function ImportWizardContent() {
       case "upload":
         return "Configure Mapping";
       case "mapping":
-        return isHoldingsMode ? "Review Holdings" : "Review Activities";
+        return isHoldingsMode ? "Review Holdings" : "Review Assets";
+      case "assets":
+        return "Review Activities";
       case "review":
-        return "Continue to Import";
+        return state.lastValidatedRevision === state.draftRevision
+          ? "Continue to Import"
+          : "Revalidate & Continue";
       default:
         return "Continue";
     }
-  }, [state.step, isHoldingsMode]);
+  }, [state.step, isHoldingsMode, state.lastValidatedRevision, state.draftRevision]);
 
   // Page title
   const pageTitle = isHoldingsMode ? "Import Holdings" : "Import Activities";
@@ -363,7 +540,12 @@ function ImportWizardContent() {
           <div className="flex items-center gap-2">
             <ImportHelpPopover defaultTab={isHoldingsMode ? "holdings" : "activities"} />
             {!isMobile && (
-              <Button variant="ghost" size="sm" onClick={handleCancelClick}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCancelClick}
+                className="hidden sm:flex"
+              >
                 <Icons.X className="mr-2 h-4 w-4" />
                 Cancel
               </Button>
@@ -375,16 +557,16 @@ function ImportWizardContent() {
       <PageContent withPadding={false}>
         <ErrorBoundary>
           <div className="px-2 pb-6 pt-2 sm:px-4 sm:pt-4 md:px-6 md:pt-6">
-            <Card className="w-full">
+            <Card className="flex max-h-[calc(100dvh-9rem)] w-full flex-col overflow-hidden">
               {/* Step indicator — hidden on result step */}
               {state.step !== "result" && (
-                <CardHeader className="border-b px-3 py-3 sm:px-6 sm:py-4">
+                <CardHeader className="shrink-0 border-b px-3 py-3 sm:px-6 sm:py-4">
                   <WizardStepIndicator steps={steps} currentStep={state.step} />
                 </CardHeader>
               )}
 
-              {/* Step content */}
-              <CardContent className="overflow-hidden p-0">
+              {/* Step content — scrollable */}
+              <div className="min-h-0 flex-1 overflow-y-auto">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={state.step}
@@ -395,22 +577,23 @@ function ImportWizardContent() {
                     className="p-3 sm:p-6"
                   >
                     <CurrentStepComponent />
-
-                    {/* Navigation buttons */}
-                    {showNavigation && (
-                      <div className="mt-6">
-                        <StepNavigation
-                          onNext={handleNext}
-                          onBack={handleBack}
-                          canGoBack={canGoBack}
-                          canGoNext={canGoNext}
-                          nextLabel={getNextLabel()}
-                        />
-                      </div>
-                    )}
                   </motion.div>
                 </AnimatePresence>
-              </CardContent>
+              </div>
+
+              {/* Navigation buttons — always visible */}
+              {showNavigation && (
+                <div className="shrink-0 px-3 pb-3 sm:px-6 sm:pb-6">
+                  <StepNavigation
+                    onNext={handleNext}
+                    onBack={handleBack}
+                    canGoBack={canGoBack}
+                    canGoNext={canGoNext}
+                    nextLabel={getNextLabel()}
+                    isNextLoading={isNextLoading}
+                  />
+                </div>
+              )}
             </Card>
           </div>
         </ErrorBoundary>

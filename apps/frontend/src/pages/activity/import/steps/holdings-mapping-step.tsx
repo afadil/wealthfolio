@@ -20,6 +20,7 @@ import { ImportAlert } from "../components/import-alert";
 import { validateTickerSymbol } from "../utils/validation-utils";
 import TickerSearchInput from "@/components/ticker-search";
 import type { ImportMappingData, SymbolSearchResult } from "@/lib/types";
+import { ImportType } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Holdings Format Fields
@@ -187,13 +188,13 @@ export function HoldingsMappingStep() {
   // Fetch saved mapping from backend
   const { data: savedMapping } = useQuery({
     queryKey: [QueryKeys.IMPORT_MAPPING, accountId],
-    queryFn: () => (accountId ? getAccountImportMapping(accountId) : null),
+    queryFn: () => (accountId ? getAccountImportMapping(accountId, ImportType.HOLDINGS) : null),
     enabled: !!accountId,
   });
 
   // Local state for the field mappings being edited
   const [localFieldMappings, setLocalFieldMappings] = useState<Record<string, string>>(() => {
-    return mapping?.fieldMappings || {};
+    return (mapping?.fieldMappings || {}) as Record<string, string>;
   });
 
   // Auto-initialize: merge saved mapping from backend, then auto-detect from headers
@@ -207,7 +208,8 @@ export function HoldingsMappingStep() {
 
     // 1. Apply saved field mappings (only valid HoldingsFormat keys with headers in this CSV)
     if (savedMapping?.fieldMappings) {
-      for (const [field, header] of Object.entries(savedMapping.fieldMappings)) {
+      for (const [field, value] of Object.entries(savedMapping.fieldMappings)) {
+        const header = Array.isArray(value) ? value[0] : value;
         if (validHoldingsFields.has(field) && header && headers.includes(header)) {
           merged[field] = header;
         }
@@ -230,6 +232,7 @@ export function HoldingsMappingStep() {
     if (savedMapping?.symbolMappings || savedMapping?.symbolMappingMeta) {
       const currentMapping = mapping || {
         accountId,
+        importType: ImportType.HOLDINGS,
         name: "holdings-import",
         fieldMappings: {},
         activityMappings: {},
@@ -385,6 +388,7 @@ export function HoldingsMappingStep() {
     (csvSymbol: string, resolvedSymbol: string, result?: SymbolSearchResult) => {
       const currentMapping = mappingRef.current || {
         accountId: accountIdRef.current,
+        importType: ImportType.HOLDINGS,
         name: "holdings-import",
         fieldMappings: localFieldMappings,
         activityMappings: {},
@@ -423,6 +427,7 @@ export function HoldingsMappingStep() {
     const updatedMapping: ImportMappingData = {
       ...(mappingRef.current || {
         accountId: accountIdRef.current,
+        importType: ImportType.HOLDINGS,
         name: "holdings-import",
         fieldMappings: {},
         activityMappings: {},

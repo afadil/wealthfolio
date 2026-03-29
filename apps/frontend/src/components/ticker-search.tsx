@@ -365,14 +365,23 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       [handleSelectResult],
     );
 
+    // Auto-search on mount when a defaultValue is pre-filled
+    useEffect(() => {
+      if (defaultValue && defaultValue.length > 1) {
+        setDebouncedQuery(defaultValue);
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     // Use debounced query for API call
     const { data, isLoading, isError } = useQuery<SymbolSearchResult[], Error>({
       queryKey: ["ticker-search", debouncedQuery],
       queryFn: () => searchTicker(debouncedQuery),
       enabled:
         debouncedQuery?.length > 1 &&
-        selected !== debouncedQuery &&
-        defaultValue !== debouncedQuery,
+        // Only block re-search after an actual confirmed selection (name is populated),
+        // not when the input is just pre-filled from defaultValue (name is empty).
+        !(selected === debouncedQuery && !!selectedTicker?.name),
       staleTime: 60000, // Cache results for 1 minute
       gcTime: 300000, // Keep in cache for 5 minutes (formerly cacheTime)
     });

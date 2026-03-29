@@ -1,4 +1,5 @@
 import { importActivitySchema, importMappingSchema, parseConfigSchema } from "@/lib/schemas";
+export { ImportType } from "@/lib/schemas";
 import * as z from "zod";
 import {
   AccountType,
@@ -291,6 +292,69 @@ export interface ActivityBulkMutationResult {
 export type ActivityImport = z.infer<typeof importActivitySchema>;
 export type ImportMappingData = z.infer<typeof importMappingSchema>;
 export type ParseConfig = z.infer<typeof parseConfigSchema>;
+export type ImportTemplateScope = "SYSTEM" | "USER";
+
+export interface ImportTemplateData {
+  id: string;
+  name: string;
+  scope: ImportTemplateScope;
+  kind: TemplateKind;
+  fieldMappings: Record<string, string | string[]>;
+  activityMappings: Record<string, string[]>;
+  symbolMappings: Record<string, string>;
+  accountMappings: Record<string, string>;
+  symbolMappingMeta: Record<
+    string,
+    {
+      exchangeMic?: string;
+      symbolName?: string;
+      quoteCcy?: string;
+      instrumentType?: string;
+      quoteMode?: QuoteMode;
+    }
+  >;
+  parseConfig?: ParseConfig;
+}
+
+export type TemplateKind = "CSV_ACTIVITY" | "CSV_HOLDINGS" | "BROKER_ACTIVITY";
+export type TemplateContextKind = TemplateKind;
+
+export type BrokerProfileScope = "ACCOUNT" | "BROKER";
+
+export interface BrokerSyncProfileData {
+  id: string;
+  name: string;
+  scope: ImportTemplateScope;
+  sourceSystem: string;
+  activityMappings: Record<string, string[]>;
+  symbolMappings: Record<string, string>;
+  symbolMappingMeta: Record<
+    string,
+    {
+      exchangeMic?: string;
+      symbolName?: string;
+      quoteCcy?: string;
+      instrumentType?: string;
+    }
+  >;
+}
+
+export interface SaveBrokerSyncProfileRulesRequest {
+  accountId: string;
+  sourceSystem: string;
+  scope: BrokerProfileScope;
+  activityRulePatches: Record<string, string[]>;
+  securityRulePatches: Record<string, string>;
+  securityRuleMetaPatches: Record<
+    string,
+    {
+      exchangeMic?: string;
+      symbolName?: string;
+      quoteCcy?: string;
+      instrumentType?: string;
+    }
+  >;
+}
 
 // Define a generic type for the parsed row data
 export type CsvRowData = Record<string, string> & { lineNumber: string };
@@ -436,6 +500,8 @@ export interface ImportActivitiesSummary {
   assetsCreated: number;
   /** Whether the import was successful (no validation errors) */
   success: boolean;
+  /** Human-readable reason for failure, if success is false */
+  errorMessage?: string;
 }
 
 export type ValidationResult = { status: "success" } | { status: "error"; errors: string[] };
@@ -832,6 +898,33 @@ export interface NewAsset {
   instrumentSymbol?: string;
   instrumentExchangeMic?: string;
   notes?: string;
+}
+
+export interface ImportAssetCandidate {
+  key: string;
+  accountId: string;
+  symbol: string;
+  currency?: string;
+  instrumentType?: string;
+  quoteCcy?: string;
+  quoteMode?: string;
+  exchangeMic?: string;
+  isin?: string;
+}
+
+export type ImportAssetPreviewStatus =
+  | "EXISTING_ASSET"
+  | "AUTO_RESOLVED_NEW_ASSET"
+  | "NEEDS_FIXING";
+
+export interface ImportAssetPreviewItem {
+  key: string;
+  status: ImportAssetPreviewStatus;
+  resolutionSource: string;
+  assetId?: string;
+  draft?: NewAsset;
+  errors?: Record<string, string[]>;
+  warnings?: Record<string, string[]>;
 }
 
 export interface UpdateAssetProfile {

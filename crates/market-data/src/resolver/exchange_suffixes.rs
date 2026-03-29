@@ -260,6 +260,11 @@ mod tests {
             yahoo_exchange_to_mic(" cxe "),
             Some(Cow::Owned("CXE".to_string()))
         );
+        // Cboe Europe EUR (DXE) — used by SXLPM.XD and similar instruments
+        assert_eq!(
+            yahoo_exchange_to_mic("DXE"),
+            Some(Cow::Owned("DXE".to_string()))
+        );
         assert_eq!(
             yahoo_exchange_to_mic("xice"),
             Some(Cow::Owned("XICE".to_string()))
@@ -282,6 +287,9 @@ mod tests {
         assert_eq!(strip_yahoo_suffix("BRK.B"), "BRK.B");
         assert_eq!(strip_yahoo_suffix("RDS.A"), "RDS.A");
 
+        // Cboe Europe EUR suffix
+        assert_eq!(strip_yahoo_suffix("SXLPM.XD"), "SXLPM");
+
         // Special suffixes
         assert_eq!(strip_yahoo_suffix("EURUSD=X"), "EURUSD");
         assert_eq!(strip_yahoo_suffix("eurusd=x"), "eurusd");
@@ -300,6 +308,7 @@ mod tests {
         assert_eq!(yahoo_suffix_to_mic("L"), Some("XLON"));
         assert_eq!(yahoo_suffix_to_mic("XC"), Some("CXE"));
         assert_eq!(yahoo_suffix_to_mic("xc"), Some("CXE"));
+        assert_eq!(yahoo_suffix_to_mic("XD"), Some("DXE")); // Cboe Europe EUR
         assert_eq!(yahoo_suffix_to_mic("DE"), Some("XETR"));
         assert_eq!(yahoo_suffix_to_mic("PA"), Some("XPAR"));
         assert_eq!(yahoo_suffix_to_mic("AE"), None); // Ambiguous between XDFM and XADS

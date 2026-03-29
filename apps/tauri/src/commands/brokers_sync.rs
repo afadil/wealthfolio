@@ -324,5 +324,45 @@ pub async fn get_data_import_runs(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Broker Sync Profile Commands
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Get broker sync profile (rules learned from sync)
+#[tauri::command]
+pub async fn get_broker_sync_profile(
+    account_id: String,
+    source_system: String,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<wealthfolio_core::activities::BrokerSyncProfileData, String> {
+    log::debug!(
+        "Getting broker sync profile for account: {}, source: {}",
+        account_id,
+        source_system
+    );
+    state
+        .activity_service()
+        .get_broker_sync_profile(account_id, source_system)
+        .map_err(|e| e.to_string())
+}
+
+/// Save broker sync profile rules (learned corrections)
+#[tauri::command]
+pub async fn save_broker_sync_profile_rules(
+    request: wealthfolio_core::activities::SaveBrokerSyncProfileRulesRequest,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<wealthfolio_core::activities::BrokerSyncProfileData, String> {
+    log::debug!(
+        "Saving broker sync profile rules for account: {}, source: {}",
+        request.account_id,
+        request.source_system
+    );
+    state
+        .activity_service()
+        .save_broker_sync_profile_rules(request)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Foreground Sync Command
 // ─────────────────────────────────────────────────────────────────────────────

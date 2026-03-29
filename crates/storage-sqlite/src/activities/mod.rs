@@ -3,5 +3,7 @@
 mod model;
 mod repository;
 
-pub use model::{ActivityDB, ActivityDetailsDB, ImportMappingDB, IncomeDataDB};
+pub use model::{
+    ActivityDB, ActivityDetailsDB, ImportAccountTemplateDB, ImportTemplateDB, IncomeDataDB,
+};
 pub use repository::ActivityRepository;

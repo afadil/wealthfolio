@@ -92,8 +92,26 @@ export function ProgressIndicator({
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.3, delay: 0.1 }}
           >
-            {message} {formatTime(elapsedTime)}
+            {message}
           </motion.h3>
+          {description && (
+            <motion.p
+              className="text-muted-foreground text-sm"
+              initial={{ y: 10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.3, delay: 0.2 }}
+            >
+              {description}
+            </motion.p>
+          )}
+          <motion.p
+            className="text-muted-foreground text-sm tabular-nums"
+            initial={{ y: 10, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.3, delay: 0.3 }}
+          >
+            {formatTime(elapsedTime)}
+          </motion.p>
         </div>
 
         <div className="mt-6">

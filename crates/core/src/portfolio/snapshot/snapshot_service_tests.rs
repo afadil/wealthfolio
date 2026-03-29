@@ -408,11 +408,59 @@ mod tests {
         fn get_import_mapping(
             &self,
             _account_id: &str,
+            _context_kind: &str,
         ) -> AppResult<Option<ActivityImportMapping>> {
             unimplemented!()
         }
         async fn save_import_mapping(&self, _mapping: &ActivityImportMapping) -> AppResult<()> {
             unimplemented!()
+        }
+        async fn link_account_template(
+            &self,
+            _account_id: &str,
+            _template_id: &str,
+            _context_kind: &str,
+        ) -> AppResult<()> {
+            unimplemented!()
+        }
+        fn list_import_templates(&self) -> AppResult<Vec<crate::activities::ImportTemplate>> {
+            Ok(Vec::new())
+        }
+        fn get_import_template(
+            &self,
+            _template_id: &str,
+        ) -> AppResult<Option<crate::activities::ImportTemplate>> {
+            Ok(None)
+        }
+        async fn save_import_template(
+            &self,
+            _template: &crate::activities::ImportTemplate,
+        ) -> AppResult<()> {
+            unimplemented!()
+        }
+        async fn delete_import_template(&self, _template_id: &str) -> AppResult<()> {
+            unimplemented!()
+        }
+        fn get_broker_sync_profile(
+            &self,
+            _account_id: &str,
+            _source_system: &str,
+        ) -> AppResult<Option<crate::activities::ImportTemplate>> {
+            Ok(None)
+        }
+        async fn save_broker_sync_profile(
+            &self,
+            _template: &crate::activities::ImportTemplate,
+        ) -> AppResult<()> {
+            Ok(())
+        }
+        async fn link_broker_sync_profile(
+            &self,
+            _account_id: &str,
+            _template_id: &str,
+            _source_system: &str,
+        ) -> AppResult<()> {
+            Ok(())
         }
         fn calculate_average_cost(&self, _account_id: &str, _asset_id: &str) -> AppResult<Decimal> {
             unimplemented!()
@@ -560,10 +608,61 @@ mod tests {
         ) -> AppResult<Option<DateTime<Utc>>> {
             Ok(None)
         }
-        fn get_import_mapping(&self, _id: &str) -> AppResult<Option<ActivityImportMapping>> {
+        fn get_import_mapping(
+            &self,
+            _id: &str,
+            _context_kind: &str,
+        ) -> AppResult<Option<ActivityImportMapping>> {
             Ok(None)
         }
         async fn save_import_mapping(&self, _m: &ActivityImportMapping) -> AppResult<()> {
+            Ok(())
+        }
+        async fn link_account_template(
+            &self,
+            _account_id: &str,
+            _template_id: &str,
+            _context_kind: &str,
+        ) -> AppResult<()> {
+            Ok(())
+        }
+        fn list_import_templates(&self) -> AppResult<Vec<crate::activities::ImportTemplate>> {
+            Ok(Vec::new())
+        }
+        fn get_import_template(
+            &self,
+            _template_id: &str,
+        ) -> AppResult<Option<crate::activities::ImportTemplate>> {
+            Ok(None)
+        }
+        async fn save_import_template(
+            &self,
+            _template: &crate::activities::ImportTemplate,
+        ) -> AppResult<()> {
+            Ok(())
+        }
+        async fn delete_import_template(&self, _template_id: &str) -> AppResult<()> {
+            Ok(())
+        }
+        fn get_broker_sync_profile(
+            &self,
+            _account_id: &str,
+            _source_system: &str,
+        ) -> AppResult<Option<crate::activities::ImportTemplate>> {
+            Ok(None)
+        }
+        async fn save_broker_sync_profile(
+            &self,
+            _template: &crate::activities::ImportTemplate,
+        ) -> AppResult<()> {
+            Ok(())
+        }
+        async fn link_broker_sync_profile(
+            &self,
+            _account_id: &str,
+            _template_id: &str,
+            _source_system: &str,
+        ) -> AppResult<()> {
             Ok(())
         }
         fn calculate_average_cost(&self, _acc: &str, _asset: &str) -> AppResult<Decimal> {

@@ -38,10 +38,21 @@ export const parseConfigSchema = z.object({
   defaultCurrency: z.string().optional(),
 });
 
+export const ImportType = {
+  ACTIVITY: "CSV_ACTIVITY",
+  HOLDINGS: "CSV_HOLDINGS",
+} as const;
+export type ImportType = (typeof ImportType)[keyof typeof ImportType];
+
 export const importMappingSchema = z.object({
   accountId: z.string(),
+  importType: z.enum([ImportType.ACTIVITY, ImportType.HOLDINGS]).default(ImportType.ACTIVITY),
+  templateId: z.string().optional(),
   name: z.string().optional().default(""),
-  fieldMappings: z.record(z.string(), z.string()).optional().default({}),
+  fieldMappings: z
+    .record(z.string(), z.union([z.string(), z.array(z.string())]))
+    .optional()
+    .default({}),
   activityMappings: z.record(z.string(), z.array(z.string())).optional().default({}),
   symbolMappings: z.record(z.string(), z.string()).optional().default({}),
   accountMappings: z.record(z.string(), z.string()).optional().default({}),
@@ -159,10 +170,13 @@ export const importActivitySchema = z
     instrumentType: z.string().optional(),
     /** Optional quote mode hint (e.g., MANUAL, MARKET). */
     quoteMode: quoteModeSchema.optional(),
+    /** ISIN identifier from the CSV (e.g. GB0007188757). Used for unambiguous exchange resolution. */
+    isin: z.string().optional(),
     errors: z.record(z.string(), z.array(z.string())).optional(),
     warnings: z.record(z.string(), z.array(z.string())).optional(),
     duplicateOfId: z.string().optional(),
     duplicateOfLineNumber: z.number().optional(),
+    assetId: z.string().optional(),
     isValid: z.boolean().default(false),
     lineNumber: z.number().optional(),
     isDraft: z.boolean(),

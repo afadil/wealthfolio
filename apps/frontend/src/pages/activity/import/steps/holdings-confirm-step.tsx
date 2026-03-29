@@ -12,6 +12,7 @@ import { useImportContext } from "../context";
 import { setImportResult, nextStep } from "../context/import-actions";
 import { parseHoldingsSnapshots } from "./holdings-review-step";
 import type { ImportHoldingsCsvResult } from "@/lib/types";
+import { ImportType } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Holdings Confirm Step Component
@@ -24,7 +25,7 @@ export function HoldingsConfirmStep() {
 
   // Parse snapshots from CSV data
   const snapshots = useMemo(() => {
-    const fieldMappings = mapping?.fieldMappings || {};
+    const fieldMappings = (mapping?.fieldMappings || {}) as Record<string, string>;
     return parseHoldingsSnapshots(
       headers,
       parsedRows,
@@ -59,6 +60,7 @@ export function HoldingsConfirmStep() {
           await saveAccountImportMapping({
             ...mapping,
             accountId,
+            importType: ImportType.HOLDINGS,
             parseConfig: parseConfig,
           });
         } catch (error) {

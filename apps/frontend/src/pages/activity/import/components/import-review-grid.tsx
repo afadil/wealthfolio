@@ -18,7 +18,7 @@ import {
   SUBTYPES_BY_ACTIVITY_TYPE,
   SUBTYPE_DISPLAY_NAMES,
 } from "@/lib/constants";
-import { isSymbolRequired } from "@/lib/activity-utils";
+import { needsImportAssetResolution } from "@/lib/activity-utils";
 import { ActivityTypeBadge } from "../../components/activity-type-badge";
 import type { DraftActivity, DraftActivityStatus } from "../context";
 import { ImportToolbar, ImportContextMenu } from "./import-toolbar";
@@ -31,14 +31,12 @@ import { useSettingsContext } from "@/lib/settings-provider";
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type ImportReviewFilter = "all" | "errors" | "warnings" | "duplicates" | "skipped";
-
 export interface ImportReviewGridProps {
   drafts: DraftActivity[];
+  nonSelectableRowIndexes?: number[];
   onDraftUpdate: (rowIndex: number, updates: Partial<DraftActivity>) => void;
   selectedRows: number[];
   onSelectionChange: (selectedRows: number[]) => void;
-  filter?: ImportReviewFilter;
   // Bulk action handlers
   onBulkSkip?: (rowIndexes: number[]) => void;
   onBulkUnskip?: (rowIndexes: number[]) => void;
@@ -107,7 +105,7 @@ function getStatusTitle(
   if (warnings) {
     const warningDetails = Object.entries(warnings)
       .flatMap(([field, msgs]) =>
-        msgs.map((msg) => `${field === "_duplicate" ? "duplicate" : field}: ${msg}`),
+        msgs.map((msg) => (field.startsWith("_") ? msg : `${field}: ${msg}`)),
       )
       .join("\n");
     if (warningDetails) {
@@ -124,14 +122,6 @@ const STATUS_DOT_COLOR: Record<DraftActivityStatus, string> = {
   duplicate: "bg-blue-500",
   skipped: "bg-gray-400",
 };
-
-function hasDuplicateWarning(draft: DraftActivity): boolean {
-  const hasDuplicateLineNumber = typeof draft.duplicateOfLineNumber === "number";
-  return (
-    draft.status === "duplicate" ||
-    Boolean(draft.duplicateOfId || hasDuplicateLineNumber || draft.warnings?._duplicate?.length)
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Column Definitions
@@ -189,6 +179,7 @@ function useImportReviewColumns({
         id: "select",
         header: ({ table }) => (
           <Checkbox
+            disabled={!table.getRowModel().rows.some((row) => row.getCanSelect())}
             checked={
               table.getIsAllRowsSelected() || (table.getIsSomeRowsSelected() && "indeterminate")
             }
@@ -198,6 +189,7 @@ function useImportReviewColumns({
         ),
         cell: ({ row }) => (
           <Checkbox
+            disabled={!row.getCanSelect()}
             checked={row.getIsSelected()}
             onCheckedChange={(checked) => row.toggleSelected(Boolean(checked))}
             aria-label="Select row"
@@ -360,7 +352,7 @@ function useImportReviewColumns({
             onCreateCustomAsset,
             isClearable: (rowData: unknown) => {
               const row = rowData as DraftActivity;
-              return !isSymbolRequired(row.activityType ?? "");
+              return !needsImportAssetResolution(row.activityType ?? "", row.subtype);
             },
           },
         },
@@ -462,38 +454,15 @@ function useImportReviewColumns({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Filter Logic
-// ─────────────────────────────────────────────────────────────────────────────
-
-function filterDrafts(drafts: DraftActivity[], filter: ImportReviewFilter): DraftActivity[] {
-  if (filter === "all") return drafts;
-
-  return drafts.filter((draft) => {
-    switch (filter) {
-      case "errors":
-        return draft.status === "error";
-      case "warnings":
-        return draft.status === "warning" || draft.status === "duplicate";
-      case "duplicates":
-        return hasDuplicateWarning(draft);
-      case "skipped":
-        return draft.status === "skipped";
-      default:
-        return true;
-    }
-  });
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function ImportReviewGrid({
   drafts,
+  nonSelectableRowIndexes = [],
   onDraftUpdate,
   selectedRows,
   onSelectionChange,
-  filter = "all",
   onBulkSkip,
   onBulkUnskip,
   onBulkSetCurrency,
@@ -501,6 +470,10 @@ export function ImportReviewGrid({
 }: ImportReviewGridProps) {
   const { settings } = useSettingsContext();
   const fallbackCurrency = settings?.baseCurrency ?? "USD";
+  const nonSelectableRowIndexSet = useMemo(
+    () => new Set(nonSelectableRowIndexes),
+    [nonSelectableRowIndexes],
+  );
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -586,17 +559,7 @@ export function ImportReviewGrid({
 
   // Symbol search handler
   const handleSymbolSearch = useCallback(async (query: string): Promise<SymbolSearchResult[]> => {
-    const results = await searchTicker(query);
-    return results.map((result) => ({
-      symbol: result.symbol,
-      shortName: result.shortName,
-      longName: result.longName,
-      exchange: result.exchange,
-      exchangeMic: result.exchangeMic,
-      currency: result.currency,
-      score: result.score,
-      dataSource: result.dataSource,
-    }));
+    return searchTicker(query);
   }, []);
 
   // Symbol selection handler - update draft with symbol and currency from search result
@@ -614,6 +577,13 @@ export function ImportReviewGrid({
       onDraftUpdate(rowIndex, {
         symbol: result.symbol,
         currency,
+        exchangeMic: result.exchangeMic,
+        quoteCcy: result.currency ?? draft.quoteCcy,
+        instrumentType: result.quoteType,
+        quoteMode: result.dataSource === "MANUAL" ? "MANUAL" : undefined,
+        symbolName: result.longName || result.shortName || draft.symbolName,
+        assetId: undefined,
+        importAssetKey: undefined,
       });
     },
     [drafts, fallbackCurrency, onDraftUpdate],
@@ -639,15 +609,19 @@ export function ImportReviewGrid({
       onDraftUpdate(rowIndex, {
         symbol: result.symbol,
         currency,
+        exchangeMic: result.exchangeMic,
+        quoteCcy: result.currency ?? draft.quoteCcy,
+        instrumentType: result.quoteType,
+        quoteMode: result.dataSource === "MANUAL" ? "MANUAL" : undefined,
+        symbolName: result.longName || result.shortName || draft.symbolName,
+        assetId: undefined,
+        importAssetKey: undefined,
       });
 
       setCustomAssetDialog({ open: false, rowIndex: -1, symbol: "" });
     },
     [customAssetDialog, drafts, fallbackCurrency, onDraftUpdate],
   );
-
-  // Filter drafts based on current filter
-  const filteredDrafts = useMemo(() => filterDrafts(drafts, filter), [drafts, filter]);
 
   // Column definitions
   const columns = useImportReviewColumns({
@@ -675,7 +649,7 @@ export function ImportReviewGrid({
       // Find which rows changed and dispatch updates
       for (let i = 0; i < nextData.length; i++) {
         const nextRow = nextData[i];
-        const prevRow = filteredDrafts[i];
+        const prevRow = drafts[i];
 
         if (nextRow !== prevRow) {
           // Something changed in this row
@@ -709,7 +683,7 @@ export function ImportReviewGrid({
         }
       }
     },
-    [filteredDrafts, onDraftUpdate],
+    [drafts, onDraftUpdate],
   );
 
   // Cell state callback for error/warning highlighting with messages
@@ -718,7 +692,7 @@ export function ImportReviewGrid({
       rowIndex: number,
       columnId: string,
     ): { type: "error" | "warning"; messages: string[] } | null => {
-      const draft = filteredDrafts[rowIndex];
+      const draft = drafts[rowIndex];
       if (!draft) return null;
 
       // Skip non-data columns
@@ -738,15 +712,15 @@ export function ImportReviewGrid({
 
       return null;
     },
-    [filteredDrafts],
+    [drafts],
   );
 
   // Initialize data grid
   const dataGrid = useDataGrid<DraftActivity>({
-    data: filteredDrafts,
+    data: drafts,
     columns,
     getRowId: (row) => String(row.rowIndex),
-    enableRowSelection: true,
+    enableRowSelection: (row) => !nonSelectableRowIndexSet.has(row.original.rowIndex),
     enableMultiRowSelection: true,
     enableSorting: false,
     enableColumnFilters: false,
@@ -770,6 +744,15 @@ export function ImportReviewGrid({
   // Sync selection changes to parent
   const tableSelectedRows = dataGrid.table.getSelectedRowModel().rows;
   const prevSelectedRef = useRef<number[]>([]);
+
+  useEffect(() => {
+    const selectableRows = selectedRows.filter(
+      (rowIndex) => !nonSelectableRowIndexSet.has(rowIndex),
+    );
+    if (selectableRows.length !== selectedRows.length) {
+      onSelectionChange(selectableRows);
+    }
+  }, [selectedRows, onSelectionChange, nonSelectableRowIndexSet]);
 
   useEffect(() => {
     if (isSyncingRef.current) return;

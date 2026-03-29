@@ -6,8 +6,9 @@ use log::debug;
 use tauri::State;
 use wealthfolio_core::activities::{
     Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
-    ActivitySearchResponse, ActivityUpdate, ImportActivitiesResult, ImportMappingData, NewActivity,
-    ParseConfig, ParsedCsvResult, Sort,
+    ActivitySearchResponse, ActivityUpdate, ImportActivitiesResult, ImportAssetCandidate,
+    ImportAssetPreviewItem, ImportMappingData, ImportTemplateData, NewActivity, ParseConfig,
+    ParsedCsvResult, Sort,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -117,10 +118,13 @@ pub async fn save_activities(
 #[tauri::command]
 pub async fn get_account_import_mapping(
     account_id: String,
+    context_kind: String,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ImportMappingData, String> {
     debug!("Getting import mapping for account: {}", account_id);
-    Ok(state.activity_service().get_import_mapping(account_id)?)
+    Ok(state
+        .activity_service()
+        .get_import_mapping(account_id, context_kind)?)
 }
 
 #[tauri::command]
@@ -137,30 +141,94 @@ pub async fn save_account_import_mapping(
 }
 
 #[tauri::command]
-pub async fn check_activities_import(
+pub async fn link_account_template(
     account_id: String,
+    template_id: String,
+    context_kind: String,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<(), String> {
+    debug!("Linking account {} to template {}", account_id, template_id);
+    state
+        .activity_service()
+        .link_account_template(account_id, template_id, context_kind)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_import_templates(
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<ImportTemplateData>, String> {
+    Ok(state.activity_service().list_import_templates()?)
+}
+
+#[tauri::command]
+pub async fn get_import_template(
+    id: String,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<ImportTemplateData, String> {
+    Ok(state.activity_service().get_import_template(id)?)
+}
+
+#[tauri::command]
+pub async fn save_import_template(
+    template: ImportTemplateData,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<ImportTemplateData, String> {
+    state
+        .activity_service()
+        .save_import_template(template)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_import_template(
+    id: String,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<(), String> {
+    state
+        .activity_service()
+        .delete_import_template(id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn check_activities_import(
     activities: Vec<ActivityImport>,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Vec<ActivityImport>, String> {
-    debug!("Checking activities import for account: {}", account_id);
+    debug!("Checking activities import for {} rows", activities.len());
     let result = state
         .activity_service()
-        .check_activities_import(account_id, activities)
+        .check_activities_import(activities)
+        .await?;
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn preview_import_assets(
+    candidates: Vec<ImportAssetCandidate>,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<ImportAssetPreviewItem>, String> {
+    let result = state
+        .activity_service()
+        .preview_import_assets(candidates)
         .await?;
     Ok(result)
 }
 
 #[tauri::command]
 pub async fn import_activities(
-    account_id: String,
     activities: Vec<ActivityImport>,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ImportActivitiesResult, String> {
-    debug!("Importing activities for account: {}", account_id);
+    debug!("Importing {} activities", activities.len());
     // Domain events handle recalculation and asset enrichment automatically
     state
         .activity_service()
-        .import_activities(account_id, activities)
+        .import_activities(activities)
         .await
         .map_err(|e| e.to_string())
 }

@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "3.1.2",
+  "version": "3.2.0",
   "type": "module",
   "scripts": {
     "dev": "cross-env BUILD_TARGET=web vite",

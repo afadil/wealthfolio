@@ -5,7 +5,7 @@ import {
   normalizeNumericValue,
   parseAndAbsoluteValue,
 } from "./validation-utils";
-import { ImportFormat, ActivityType } from "@/lib/types";
+import { ImportFormat, ActivityType, ImportType } from "@/lib/types";
 
 describe("validation-utils", () => {
   describe("normalizeNumericValue", () => {
@@ -85,6 +85,7 @@ describe("validation-utils", () => {
   describe("validateActivityImport with negative values", () => {
     const testMapping = {
       accountId: "test-account",
+      importType: ImportType.ACTIVITY,
       name: "Test Mapping",
       fieldMappings: {
         [ImportFormat.DATE]: "date",
@@ -439,6 +440,7 @@ describe("validation-utils", () => {
   describe("validateActivityImport with instrument types", () => {
     const baseMapping = {
       accountId: "test-account",
+      importType: ImportType.ACTIVITY,
       name: "Test Mapping",
       fieldMappings: {
         [ImportFormat.DATE]: "date",

@@ -29,6 +29,7 @@ export const ACTIVITY_TYPE_SMART_DEFAULTS: Record<string, ActivityType> = {
   // WITHDRAWAL
   WITHDRAWAL: ActivityType.WITHDRAWAL,
   WITHDRAW: ActivityType.WITHDRAWAL,
+  SPEND: ActivityType.WITHDRAWAL,
 
   // FEE
   FEE: ActivityType.FEE,
@@ -54,6 +55,7 @@ export const ACTIVITY_TYPE_SMART_DEFAULTS: Record<string, ActivityType> = {
   // CREDIT
   CREDIT: ActivityType.CREDIT,
   BONUS: ActivityType.CREDIT,
+  CASHBACK: ActivityType.CREDIT,
   REFUND: ActivityType.CREDIT,
   REBATE: ActivityType.CREDIT,
 

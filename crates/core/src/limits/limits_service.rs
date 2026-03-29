@@ -360,11 +360,62 @@ mod tests {
         fn get_first_activity_date(&self, _: Option<&[String]>) -> Result<Option<DateTime<Utc>>> {
             unimplemented!()
         }
-        fn get_import_mapping(&self, _: &str) -> Result<Option<ImportMapping>> {
+        fn get_import_mapping(
+            &self,
+            _: &str,
+            _context_kind: &str,
+        ) -> Result<Option<ImportMapping>> {
             unimplemented!()
         }
         async fn save_import_mapping(&self, _: &ImportMapping) -> Result<()> {
             unimplemented!()
+        }
+        async fn link_account_template(
+            &self,
+            _account_id: &str,
+            _template_id: &str,
+            _context_kind: &str,
+        ) -> Result<()> {
+            unimplemented!()
+        }
+        fn list_import_templates(&self) -> Result<Vec<crate::activities::ImportTemplate>> {
+            Ok(Vec::new())
+        }
+        fn get_import_template(
+            &self,
+            _template_id: &str,
+        ) -> Result<Option<crate::activities::ImportTemplate>> {
+            Ok(None)
+        }
+        async fn save_import_template(
+            &self,
+            _template: &crate::activities::ImportTemplate,
+        ) -> Result<()> {
+            unimplemented!()
+        }
+        async fn delete_import_template(&self, _template_id: &str) -> Result<()> {
+            unimplemented!()
+        }
+        fn get_broker_sync_profile(
+            &self,
+            _account_id: &str,
+            _source_system: &str,
+        ) -> Result<Option<crate::activities::ImportTemplate>> {
+            Ok(None)
+        }
+        async fn save_broker_sync_profile(
+            &self,
+            _template: &crate::activities::ImportTemplate,
+        ) -> Result<()> {
+            Ok(())
+        }
+        async fn link_broker_sync_profile(
+            &self,
+            _account_id: &str,
+            _template_id: &str,
+            _source_system: &str,
+        ) -> Result<()> {
+            Ok(())
         }
         fn calculate_average_cost(&self, _: &str, _: &str) -> Result<Decimal> {
             unimplemented!()

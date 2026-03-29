@@ -89,6 +89,11 @@ export const DataGridRow = React.memo(DataGridRowImpl, (prev, next) => {
     return false;
   }
 
+  // Re-render if visible column count changed (e.g., actions column added/removed)
+  if (prev.row.getVisibleCells().length !== next.row.getVisibleCells().length) {
+    return false;
+  }
+
   // Re-render if column visibility changed
   if (prev.columnVisibility !== next.columnVisibility) {
     return false;

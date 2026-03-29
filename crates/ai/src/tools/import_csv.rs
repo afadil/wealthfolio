@@ -18,7 +18,9 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use rust_decimal::Decimal;
-use wealthfolio_core::activities::{ImportMappingData, ParseConfig, ParsedCsvResult};
+use wealthfolio_core::activities::{
+    import_type, into_field_mapping_values, ImportMappingData, ParseConfig, ParsedCsvResult,
+};
 
 use super::constants::MAX_IMPORT_ROWS;
 use super::record_activity::AccountOption;
@@ -661,10 +663,15 @@ impl<E: AiEnvironment> ImportCsvTool<E> {
 
         // Helper to get column index for a field
         let get_index = |field: &str| -> Option<usize> {
-            mapping
-                .field_mappings
-                .get(field)
-                .and_then(|header_name| header_index.get(&header_name.to_lowercase()).copied())
+            mapping.field_mappings.get(field).and_then(|val| {
+                let header = match val {
+                    wealthfolio_core::activities::FieldMappingValue::Single(s) => s.clone(),
+                    wealthfolio_core::activities::FieldMappingValue::Fallback(v) => {
+                        v.first()?.clone()
+                    }
+                };
+                header_index.get(&header.to_lowercase()).copied()
+            })
         };
 
         // Get column indices for each field
@@ -1041,7 +1048,9 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
             // LLM provided mappings (flattened structure)
             ImportMappingData {
                 account_id: args.account_id.clone().unwrap_or_default(),
-                field_mappings: args.field_mappings.clone().unwrap_or_default(),
+                field_mappings: into_field_mapping_values(
+                    args.field_mappings.clone().unwrap_or_default(),
+                ),
                 activity_mappings: args.activity_mappings.clone().unwrap_or_default(),
                 symbol_mappings: args.symbol_mappings.clone().unwrap_or_default(),
                 account_mappings: args.account_mappings.clone().unwrap_or_default(),
@@ -1052,7 +1061,7 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
             match self
                 .env
                 .activity_service()
-                .get_import_mapping(account_id.clone())
+                .get_import_mapping(account_id.clone(), import_type::ACTIVITY.to_string())
             {
                 Ok(saved) => {
                     used_saved_profile = true;
@@ -1063,7 +1072,9 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
                     // No saved profile, use auto-detection
                     ImportMappingData {
                         account_id: account_id.clone(),
-                        field_mappings: auto_detect_field_mappings(&headers),
+                        field_mappings: into_field_mapping_values(auto_detect_field_mappings(
+                            &headers,
+                        )),
                         ..Default::default()
                     }
                 }
@@ -1072,7 +1083,7 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
             // No account, use auto-detection
             ImportMappingData {
                 account_id: String::new(),
-                field_mappings: auto_detect_field_mappings(&headers),
+                field_mappings: into_field_mapping_values(auto_detect_field_mappings(&headers)),
                 ..Default::default()
             }
         };

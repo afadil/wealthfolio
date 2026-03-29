@@ -71,6 +71,7 @@ pub const PRICE_BEARING_ACTIVITY_TYPES: [&str; 3] = [
 
 /// Activity types that always require a symbol/asset.
 /// Everything else: symbol is optional (cash-only or dual-use like TRANSFER_IN).
+/// Note: DIVIDEND and ADJUSTMENT are handled separately in classify_import_activity (symbol optional during import).
 pub const SYMBOL_REQUIRED_TYPES: [&str; 5] = [
     ACTIVITY_TYPE_BUY,
     ACTIVITY_TYPE_SELL,
@@ -152,12 +153,14 @@ pub enum ImportSymbolDisposition {
 /// Classifies an activity instance during import to decide how its symbol should be handled.
 ///
 /// Decision tree:
-/// 1. Symbol-required type (BUY/SELL/SPLIT/DIVIDEND/ADJUSTMENT) → always ResolveAsset
-/// 2. Empty / cash-placeholder / garbage symbol → CashMovement
-/// 3. Never-asset type (DEPOSIT/WITHDRAWAL/FEE/TAX/CREDIT) → CashMovement (clear junk)
-/// 4. Transfer type (TRANSFER_IN/OUT) with real symbol + qty or price → ResolveAsset
-/// 5. Transfer type with real symbol but no qty AND no price → NeedsReview
-/// 6. Everything else (INTEREST, UNKNOWN, …) with real symbol → ResolveAsset
+/// 1. DIVIDEND with symbol → ResolveAsset; DIVIDEND without symbol → CashMovement (portfolio-level income)
+///    1b. ADJUSTMENT with symbol → ResolveAsset; ADJUSTMENT without symbol → CashMovement (cash correction)
+/// 2. Symbol-required type (BUY/SELL/SPLIT) → always ResolveAsset
+/// 3. Empty / cash-placeholder / garbage symbol → CashMovement
+/// 4. Never-asset type (DEPOSIT/WITHDRAWAL/FEE/TAX/CREDIT) → CashMovement (clear junk)
+/// 5. Transfer type (TRANSFER_IN/OUT) with real symbol + qty or price → ResolveAsset
+/// 6. Transfer type with real symbol but no qty AND no price → NeedsReview
+/// 7. Everything else (INTEREST, UNKNOWN, …) with real symbol → ResolveAsset
 pub fn classify_import_activity(
     activity_type: &str,
     symbol: &str,
@@ -166,7 +169,23 @@ pub fn classify_import_activity(
 ) -> ImportSymbolDisposition {
     let sym = symbol.trim();
 
-    // 1. Symbol-required types always need resolution (errors caught downstream)
+    // 1. DIVIDEND: optional symbol — resolve asset if provided, cash income if not
+    if activity_type == ACTIVITY_TYPE_DIVIDEND {
+        if sym.is_empty() || is_cash_symbol(sym) || is_garbage_symbol(sym) {
+            return ImportSymbolDisposition::CashMovement;
+        }
+        return ImportSymbolDisposition::ResolveAsset;
+    }
+
+    // 1b. ADJUSTMENT: optional symbol — resolve asset if provided, cash correction if not
+    if activity_type == ACTIVITY_TYPE_ADJUSTMENT {
+        if sym.is_empty() || is_cash_symbol(sym) || is_garbage_symbol(sym) {
+            return ImportSymbolDisposition::CashMovement;
+        }
+        return ImportSymbolDisposition::ResolveAsset;
+    }
+
+    // 2. Symbol-required types always need resolution (errors caught downstream)
     if requires_symbol(activity_type) {
         return ImportSymbolDisposition::ResolveAsset;
     }
@@ -379,21 +398,25 @@ mod tests {
     }
 
     #[test]
-    fn test_classify_dividend_always_resolve() {
+    fn test_classify_dividend_optional_symbol() {
         assert!(is_resolve(&classify("DIVIDEND", "AAPL", None, None)));
-        assert!(is_resolve(&classify("DIVIDEND", "", None, None)));
-        assert!(is_resolve(&classify("DIVIDEND", "$CASH-CAD", None, None)));
+        // No symbol → cash income (portfolio-level dividend)
+        assert!(is_cash(&classify("DIVIDEND", "", None, None)));
+        assert!(is_cash(&classify("DIVIDEND", "$CASH-CAD", None, None)));
     }
 
     #[test]
-    fn test_classify_adjustment_always_resolve() {
+    fn test_classify_adjustment_optional_symbol() {
         assert!(is_resolve(&classify(
             "ADJUSTMENT",
             "AAPL",
             Some(dec!(1)),
             None
         )));
-        assert!(is_resolve(&classify("ADJUSTMENT", "", None, None)));
+        // No symbol → cash correction
+        assert!(is_cash(&classify("ADJUSTMENT", "", None, None)));
+        assert!(is_cash(&classify("ADJUSTMENT", "$CASH-CAD", None, None)));
+        assert!(is_cash(&classify("ADJUSTMENT", "----", None, None)));
     }
 
     // -- Never-asset types: always CashMovement (even with real-looking symbols)
