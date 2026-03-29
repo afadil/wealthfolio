@@ -724,9 +724,9 @@ impl ActivityService {
                                 {
                                     Err(e) => {
                                         warn!(
-                                            "resolve_symbols_batch: ISIN search failed isin={} err={}",
-                                            isin, e
-                                        );
+                                    "resolve_symbols_batch: ISIN search failed isin={} err={}",
+                                    isin, e
+                                );
                                         if let Some(existing_match) =
                                             find_unique_existing_symbol_match(
                                                 &symbol,
