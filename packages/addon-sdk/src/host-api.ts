@@ -184,19 +184,19 @@ export interface ActivitiesAPI {
   import(activities: ActivityImport[]): Promise<ImportActivitiesResult>;
 
   /**
-   * Check activities before import
-   * @param accountId Account identifier
+   * Check activities before import (read-only validation/preview)
    * @param activities Array of activities to check
    * @returns Promise resolving to validated activities
    */
-  checkImport(accountId: string, activities: ActivityImport[]): Promise<ActivityImport[]>;
+  checkImport(activities: ActivityImport[]): Promise<ActivityImport[]>;
 
   /**
    * Get import mapping configuration for an account
    * @param accountId Account identifier
+   * @param contextKind Optional context kind (defaults to 'ACTIVITY')
    * @returns Promise resolving to import mapping data
    */
-  getImportMapping(accountId: string): Promise<ImportMappingData>;
+  getImportMapping(accountId: string, contextKind?: string): Promise<ImportMappingData>;
 
   /**
    * Save import mapping configuration
