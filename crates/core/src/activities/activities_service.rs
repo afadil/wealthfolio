@@ -7,7 +7,7 @@ use std::sync::Arc;
 use crate::accounts::{Account, AccountServiceTrait};
 use crate::activities::activities_constants::{
     classify_import_activity, is_garbage_symbol, requires_symbol, ImportSymbolDisposition,
-    ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT,
+    ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT, PRICE_BEARING_ACTIVITY_TYPES,
 };
 use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
@@ -626,6 +626,10 @@ impl ActivityService {
     /// Creates a quote from activity data to serve as a price fallback.
     /// Uses `DataSource::Manual` for MANUAL-mode assets (provider sync won't overwrite),
     /// and `DataSource::Broker` for MARKET-mode assets (coexists with provider quotes).
+    ///
+    /// Only called for activity types where `unit_price` represents the asset's
+    /// market price (BUY, SELL, TRANSFER_IN). Income activities (DIVIDEND,
+    /// INTEREST) store payment amounts in `unit_price`, not asset prices.
     async fn create_quote_from_activity(
         &self,
         asset_id: &str,
@@ -1160,26 +1164,28 @@ impl ActivityService {
                 }
             }
 
-            // Create a quote from the activity price as a fallback.
-            // Use the requested mode (if switching) rather than the pre-update asset mode.
-            if let Some(unit_price) = activity.unit_price {
-                let effective_manual = quote_mode
-                    .as_deref()
-                    .map(|m| m.eq_ignore_ascii_case("manual"))
-                    .unwrap_or(asset.quote_mode == QuoteMode::Manual);
-                let source = if effective_manual {
-                    DataSource::Manual
-                } else {
-                    DataSource::Broker
-                };
-                self.create_quote_from_activity(
-                    asset_id,
-                    unit_price,
-                    &currency,
-                    &activity.activity_date,
-                    source,
-                )
-                .await?;
+            // Create a quote from the activity price as a fallback, but only
+            // for activity types where unit_price is a real asset price.
+            if PRICE_BEARING_ACTIVITY_TYPES.contains(&activity.activity_type.as_str()) {
+                if let Some(unit_price) = activity.unit_price {
+                    let effective_manual = quote_mode
+                        .as_deref()
+                        .map(|m| m.eq_ignore_ascii_case("manual"))
+                        .unwrap_or(asset.quote_mode == QuoteMode::Manual);
+                    let source = if effective_manual {
+                        DataSource::Manual
+                    } else {
+                        DataSource::Broker
+                    };
+                    self.create_quote_from_activity(
+                        asset_id,
+                        unit_price,
+                        &currency,
+                        &activity.activity_date,
+                        source,
+                    )
+                    .await?;
+                }
             }
 
             if activity.currency.is_empty() {
@@ -1538,26 +1544,28 @@ impl ActivityService {
                 }
             }
 
-            // Create a quote from the activity price as a fallback.
-            // Use the requested mode (if switching) rather than the pre-update asset mode.
-            if let Some(Some(unit_price)) = activity.unit_price {
-                let effective_manual = quote_mode
-                    .as_deref()
-                    .map(|m| m.eq_ignore_ascii_case("manual"))
-                    .unwrap_or(asset.quote_mode == QuoteMode::Manual);
-                let source = if effective_manual {
-                    DataSource::Manual
-                } else {
-                    DataSource::Broker
-                };
-                self.create_quote_from_activity(
-                    asset_id,
-                    unit_price,
-                    &currency,
-                    &activity.activity_date,
-                    source,
-                )
-                .await?;
+            // Create a quote from the activity price as a fallback, but only
+            // for activity types where unit_price is a real asset price.
+            if PRICE_BEARING_ACTIVITY_TYPES.contains(&activity.activity_type.as_str()) {
+                if let Some(Some(unit_price)) = activity.unit_price {
+                    let effective_manual = quote_mode
+                        .as_deref()
+                        .map(|m| m.eq_ignore_ascii_case("manual"))
+                        .unwrap_or(asset.quote_mode == QuoteMode::Manual);
+                    let source = if effective_manual {
+                        DataSource::Manual
+                    } else {
+                        DataSource::Broker
+                    };
+                    self.create_quote_from_activity(
+                        asset_id,
+                        unit_price,
+                        &currency,
+                        &activity.activity_date,
+                        source,
+                    )
+                    .await?;
+                }
             }
 
             if activity.currency.is_empty() {
@@ -3267,27 +3275,30 @@ impl ActivityService {
                 }
             }
 
-            // 6. Create a quote from the activity price as a fallback
-            if let Some(ref asset_id) = resolved_asset_id {
-                if let Some(unit_price) = activity.unit_price {
-                    let source = ensure_result
-                        .assets
-                        .get(asset_id)
-                        .filter(|a| a.quote_mode == QuoteMode::Manual)
-                        .map_or(DataSource::Broker, |_| DataSource::Manual);
-                    let currency = if !activity.currency.is_empty() {
-                        &activity.currency
-                    } else {
-                        &account_currency
-                    };
-                    self.create_quote_from_activity(
-                        asset_id,
-                        unit_price,
-                        currency,
-                        &activity.activity_date,
-                        source,
-                    )
-                    .await?;
+            // 6. Create a quote from the activity price as a fallback, but only
+            // for activity types where unit_price is a real asset price.
+            if PRICE_BEARING_ACTIVITY_TYPES.contains(&activity.activity_type.as_str()) {
+                if let Some(ref asset_id) = resolved_asset_id {
+                    if let Some(unit_price) = activity.unit_price {
+                        let source = ensure_result
+                            .assets
+                            .get(asset_id)
+                            .filter(|a| a.quote_mode == QuoteMode::Manual)
+                            .map_or(DataSource::Broker, |_| DataSource::Manual);
+                        let currency = if !activity.currency.is_empty() {
+                            &activity.currency
+                        } else {
+                            &account_currency
+                        };
+                        self.create_quote_from_activity(
+                            asset_id,
+                            unit_price,
+                            currency,
+                            &activity.activity_date,
+                            source,
+                        )
+                        .await?;
+                    }
                 }
             }
 

@@ -60,6 +60,15 @@ pub const TRADING_ACTIVITY_TYPES: [&str; 3] =
 /// Income activity types
 pub const INCOME_ACTIVITY_TYPES: [&str; 2] = [ACTIVITY_TYPE_DIVIDEND, ACTIVITY_TYPE_INTEREST];
 
+/// Activity types where `unit_price` represents the asset's per-unit market
+/// price and can be used as a fallback quote. Income activities (DIVIDEND,
+/// INTEREST) store payment amounts, not asset prices.
+pub const PRICE_BEARING_ACTIVITY_TYPES: [&str; 3] = [
+    ACTIVITY_TYPE_BUY,
+    ACTIVITY_TYPE_SELL,
+    ACTIVITY_TYPE_TRANSFER_IN,
+];
+
 /// Activity types that always require a symbol/asset.
 /// Everything else: symbol is optional (cash-only or dual-use like TRANSFER_IN).
 pub const SYMBOL_REQUIRED_TYPES: [&str; 5] = [
