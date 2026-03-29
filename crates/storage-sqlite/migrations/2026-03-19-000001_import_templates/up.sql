@@ -122,3 +122,21 @@ INSERT OR IGNORE INTO sync_table_state (table_name, enabled) VALUES
 CREATE INDEX IF NOT EXISTS ix_activities_source_identity
 ON activities(source_system, account_id, source_record_id)
 WHERE source_system IS NOT NULL AND source_record_id IS NOT NULL;
+
+--
+DELETE FROM quotes
+WHERE source = 'BROKER'
+  AND id IN (
+    SELECT q.id
+    FROM quotes q
+    JOIN activities a ON a.asset_id = q.asset_id
+      AND substr(a.activity_date, 1, 10) = q.day
+    WHERE q.source = 'BROKER'
+      AND a.activity_type IN ('DIVIDEND', 'INTEREST', 'FEE', 'TAX', 'CREDIT')
+      AND NOT EXISTS (
+        SELECT 1 FROM activities a2
+        WHERE a2.asset_id = q.asset_id
+          AND substr(a2.activity_date, 1, 10) = q.day
+          AND a2.activity_type IN ('BUY', 'SELL', 'TRANSFER_IN')
+      )
+  );
