@@ -284,7 +284,7 @@ mod tests {
             adjclose: dec!(100),
             volume: dec!(0),
             currency: "CAD".to_string(),
-            data_source: DataSource::Manual,
+            data_source: "MANUAL".to_string(),
             created_at: Utc::now(),
             notes: None,
         };

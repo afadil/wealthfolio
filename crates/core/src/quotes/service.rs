@@ -17,6 +17,7 @@ use tokio::sync::RwLock;
 use crate::utils::time_utils;
 
 use super::client::{MarketDataClient, ProviderConfig};
+use super::constants::DATA_SOURCE_MANUAL;
 use super::import::{ImportValidationStatus, QuoteConverter, QuoteImport, QuoteValidator};
 use super::model::{DataSource, LatestQuotePair, Quote, ResolvedQuote, SymbolSearchResult};
 use super::store::{ProviderSettingsStore, QuoteStore};
@@ -584,7 +585,7 @@ where
         Ok(Quote {
             id,
             created_at: Utc::now(),
-            data_source: DataSource::Manual,
+            data_source: "MANUAL".to_string(),
             timestamp,
             asset_id: import.symbol.clone(),
             open: import.open_or_close(),
@@ -900,7 +901,7 @@ where
 
         // When source is MANUAL, regenerate the ID so provider sync can't overwrite it.
         // If the old ID was provider-based (e.g. *_YAHOO), delete it first.
-        if quote.data_source == DataSource::Manual {
+        if quote.data_source == DATA_SOURCE_MANUAL {
             let day = Day::new(quote.timestamp.date_naive());
             let asset_id = AssetId::new(&quote.asset_id);
             let manual_id = quote_id(&asset_id, day, &QuoteSource::Manual);
@@ -2632,7 +2633,7 @@ mod tests {
         let mut quote = Quote {
             id: "q_1".to_string(),
             created_at: Utc::now(),
-            data_source: DataSource::Yahoo,
+            data_source: "YAHOO".to_string(),
             timestamp: Utc::now(),
             asset_id: asset.id.clone(),
             open: dec!(465),

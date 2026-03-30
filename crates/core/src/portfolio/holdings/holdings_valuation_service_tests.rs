@@ -437,7 +437,7 @@ mod tests {
             adjclose: close,
             volume: dec!(1000),
             currency: currency.to_string(),
-            data_source: DataSource::Yahoo,
+            data_source: "YAHOO".to_string(),
             created_at: Utc::now(),
             notes: None,
         }

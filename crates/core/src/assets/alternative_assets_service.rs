@@ -259,7 +259,7 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
                 adjclose: purchase_price,
                 volume: Decimal::ZERO,
                 currency: request.currency.clone(),
-                data_source: DataSource::Manual,
+                data_source: "MANUAL".to_string(),
                 created_at: Utc::now(),
                 notes: None,
             };
@@ -283,7 +283,7 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
             adjclose: request.current_value,
             volume: Decimal::ZERO,
             currency: request.currency.clone(),
-            data_source: DataSource::Manual,
+            data_source: "MANUAL".to_string(),
             created_at: Utc::now(),
             notes: None,
         };
@@ -333,7 +333,7 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
             adjclose: request.value,
             volume: Decimal::ZERO,
             currency,
-            data_source: DataSource::Manual,
+            data_source: "MANUAL".to_string(),
             created_at: Utc::now(),
             notes: request.notes.clone(),
         };
@@ -539,7 +539,7 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
                     adjclose: purchase_price,
                     volume: Decimal::ZERO,
                     currency: asset.quote_ccy.clone(),
-                    data_source: DataSource::Manual,
+                    data_source: "MANUAL".to_string(),
                     created_at: Utc::now(),
                     notes: None,
                 };

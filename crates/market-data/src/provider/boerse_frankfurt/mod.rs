@@ -595,7 +595,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
-            bond_metadata: None,
+            bond_metadata: None, custom_provider_code: None,
         }
     }
 
@@ -607,7 +607,7 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
-            bond_metadata: None,
+            bond_metadata: None, custom_provider_code: None,
         }
     }
 

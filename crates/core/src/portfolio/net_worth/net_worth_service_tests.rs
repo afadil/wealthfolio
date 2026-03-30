@@ -914,7 +914,7 @@ fn create_test_quote(symbol: &str, price: Decimal, date: NaiveDate, currency: &s
         adjclose: price,
         volume: dec!(0),
         currency: currency.to_string(),
-        data_source: DataSource::Manual,
+        data_source: "MANUAL".to_string(),
         created_at: Utc::now(),
         notes: None,
     }

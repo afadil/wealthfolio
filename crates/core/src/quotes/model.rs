@@ -98,6 +98,7 @@ impl From<&str> for DataSource {
             DATA_SOURCE_BOERSE_FRANKFURT => DataSource::BoerseFrankfurt,
             DATA_SOURCE_BROKER => DataSource::Broker,
             DATA_SOURCE_CUSTOM_SCRAPER => DataSource::CustomScraper,
+            other if other.starts_with("CUSTOM_SCRAPER:") => DataSource::CustomScraper,
             _ => DataSource::Manual,
         }
     }
@@ -138,7 +139,7 @@ pub struct Quote {
     pub adjclose: Decimal,
     pub volume: Decimal,
     pub currency: String,
-    pub data_source: DataSource,
+    pub data_source: String,
     pub created_at: DateTime<Utc>,
     pub notes: Option<String>,
 }

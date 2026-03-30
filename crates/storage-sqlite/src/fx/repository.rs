@@ -139,7 +139,7 @@ impl FxRepository {
                     from_currency,
                     to_currency,
                     rate,
-                    source: DataSource::from(quote_db.source.as_str()),
+                    source: quote_db.source.clone(),
                     timestamp,
                 });
             } else {
@@ -158,7 +158,7 @@ impl FxRepository {
                     from_currency,
                     to_currency,
                     rate: Decimal::ZERO,
-                    source: DataSource::from(preferred_provider.as_deref().unwrap_or("MANUAL")),
+                    source: preferred_provider.clone().unwrap_or_else(|| "MANUAL".to_string()),
                     timestamp,
                 });
             }
@@ -191,7 +191,7 @@ impl FxRepository {
                     from_currency: asset_db.instrument_symbol.unwrap_or_default(),
                     to_currency: asset_db.quote_ccy,
                     rate,
-                    source: DataSource::from(quote_db.source.as_str()),
+                    source: quote_db.source.clone(),
                     timestamp,
                 }
             })
@@ -223,7 +223,7 @@ impl FxRepository {
                 from_currency: asset_db.instrument_symbol.unwrap_or_default(),
                 to_currency: asset_db.quote_ccy,
                 rate,
-                source: DataSource::from(quote_db.source.as_str()),
+                source: quote_db.source.clone(),
                 timestamp,
             }
         }))
@@ -252,7 +252,7 @@ impl FxRepository {
                 from_currency: asset_db.instrument_symbol.unwrap_or_default(),
                 to_currency: asset_db.quote_ccy,
                 rate,
-                source: DataSource::from(quote_db.source.as_str()),
+                source: quote_db.source.clone(),
                 timestamp,
             }
         }))

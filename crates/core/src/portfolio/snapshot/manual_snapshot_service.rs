@@ -13,6 +13,7 @@ use crate::fx::FxServiceTrait;
 use crate::portfolio::snapshot::{
     AccountStateSnapshot, Position, SnapshotServiceTrait, SnapshotSource,
 };
+use crate::quotes::model::{DATA_SOURCE_BROKER, DATA_SOURCE_MANUAL};
 use crate::quotes::{DataSource, Quote, QuoteServiceTrait};
 
 #[derive(Debug, Clone)]
@@ -140,9 +141,9 @@ impl ManualSnapshotService {
             if !holding.average_cost.is_zero() {
                 let is_manual = asset.quote_mode == QuoteMode::Manual || quote_mode.is_some();
                 let source = if is_manual {
-                    DataSource::Manual
+                    DATA_SOURCE_MANUAL.to_string()
                 } else {
-                    DataSource::Broker
+                    DATA_SOURCE_BROKER.to_string()
                 };
                 self.create_quote_from_snapshot(
                     &asset.id,
@@ -255,19 +256,16 @@ impl ManualSnapshotService {
         price: Decimal,
         currency: &str,
         date: NaiveDate,
-        data_source: DataSource,
+        data_source: String,
     ) {
         let timestamp = Utc.from_utc_datetime(&date.and_hms_opt(12, 0, 0).unwrap());
 
-        let quote_id = match data_source {
-            DataSource::Manual => {
-                let date_part = timestamp.format("%Y%m%d").to_string();
-                format!("{}_{}", date_part, asset_id.to_uppercase())
-            }
-            _ => {
-                let date_str = timestamp.format("%Y-%m-%d").to_string();
-                format!("{}_{}_{}", asset_id, date_str, data_source.as_str())
-            }
+        let quote_id = if data_source == DATA_SOURCE_MANUAL {
+            let date_part = timestamp.format("%Y%m%d").to_string();
+            format!("{}_{}", date_part, asset_id.to_uppercase())
+        } else {
+            let date_str = timestamp.format("%Y-%m-%d").to_string();
+            format!("{}_{}_{}", asset_id, date_str, data_source)
         };
 
         let quote = Quote {

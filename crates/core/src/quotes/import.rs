@@ -602,7 +602,7 @@ impl QuoteImportService {
             adjclose: validation.close,
             volume: validation.volume.unwrap_or(Decimal::ZERO),
             currency: validation.currency.0,
-            data_source: DataSource::Manual,
+            data_source: "MANUAL".to_string(),
             created_at: Utc::now(),
             notes: None,
         }
@@ -929,7 +929,7 @@ mod tests {
             adjclose: Decimal::new(150, 0),
             volume: Decimal::new(1000000, 0),
             currency: "USD".to_string(),
-            data_source: DataSource::Manual,
+            data_source: "MANUAL".to_string(),
             created_at: Utc::now(),
             notes: None,
         };
@@ -958,7 +958,7 @@ mod tests {
             adjclose: Decimal::new(150, 0),
             volume: Decimal::ZERO,
             currency: "USD".to_string(),
-            data_source: DataSource::Manual,
+            data_source: "MANUAL".to_string(),
             created_at: Utc::now(),
             notes: None,
         };

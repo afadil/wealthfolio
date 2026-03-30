@@ -461,7 +461,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                         adjclose: *price,
                         volume: Decimal::ZERO,
                         currency: currency.clone(),
-                        data_source: DataSource::Broker,
+                        data_source: "BROKER".to_string(),
                         created_at: now,
                         notes: None,
                     },
@@ -912,7 +912,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                     adjclose: *price,
                     volume: Decimal::ZERO,
                     currency: currency.clone(),
-                    data_source: DataSource::Broker,
+                    data_source: "BROKER".to_string(),
                     created_at: now,
                     notes: None,
                 });

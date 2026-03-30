@@ -407,21 +407,6 @@ impl MarketDataClient {
 
     /// Convert a market-data Quote to a core Quote.
     fn convert_quote(market_quote: MarketQuote, asset_id: &str) -> Quote {
-        let data_source = match market_quote.source.as_str() {
-            DATA_SOURCE_YAHOO => DataSource::Yahoo,
-            DATA_SOURCE_ALPHA_VANTAGE => DataSource::AlphaVantage,
-            DATA_SOURCE_MARKET_DATA_APP => DataSource::MarketDataApp,
-            DATA_SOURCE_METAL_PRICE_API => DataSource::MetalPriceApi,
-            DATA_SOURCE_FINNHUB => DataSource::Finnhub,
-            DATA_SOURCE_US_TREASURY_CALC => DataSource::UsTreasuryCalc,
-            DATA_SOURCE_BOERSE_FRANKFURT => DataSource::BoerseFrankfurt,
-            DATA_SOURCE_CUSTOM_SCRAPER => DataSource::CustomScraper,
-            DATA_SOURCE_MANUAL => DataSource::Manual,
-            _ => DataSource::Yahoo, // Default fallback
-        };
-
-        // Generate deterministic quote ID: {asset_id}_{YYYY-MM-DD}_{source}
-        // This format matches types::quote_id() for consistency
         let id = format!(
             "{}_{}_{}",
             asset_id,
@@ -432,7 +417,7 @@ impl MarketDataClient {
         Quote {
             id,
             created_at: Utc::now(),
-            data_source,
+            data_source: market_quote.source,
             timestamp: market_quote.timestamp,
             asset_id: asset_id.to_string(),
             open: market_quote.open.unwrap_or(market_quote.close),
@@ -761,7 +746,7 @@ mod tests {
         assert_eq!(core_quote.adjclose, dec!(102)); // Defaults to close
         assert_eq!(core_quote.volume, dec!(1000000));
         assert_eq!(core_quote.currency, "USD");
-        assert!(matches!(core_quote.data_source, DataSource::Yahoo));
+        assert_eq!(core_quote.data_source, "YAHOO");
     }
 
     #[test]
@@ -784,7 +769,7 @@ mod tests {
         assert_eq!(core_quote.low, dec!(150.50));
         assert_eq!(core_quote.close, dec!(150.50));
         assert_eq!(core_quote.volume, dec!(0));
-        assert!(matches!(core_quote.data_source, DataSource::AlphaVantage));
+        assert_eq!(core_quote.data_source, "ALPHA_VANTAGE");
     }
 
     #[test]
@@ -792,16 +777,16 @@ mod tests {
         let timestamp = Utc::now();
 
         let test_cases = [
-            ("YAHOO", DataSource::Yahoo),
-            ("ALPHA_VANTAGE", DataSource::AlphaVantage),
-            ("MARKETDATA_APP", DataSource::MarketDataApp),
-            ("METAL_PRICE_API", DataSource::MetalPriceApi),
-            ("FINNHUB", DataSource::Finnhub),
-            ("MANUAL", DataSource::Manual),
-            ("UNKNOWN_SOURCE", DataSource::Yahoo), // Fallback
+            "YAHOO",
+            "ALPHA_VANTAGE",
+            "MARKETDATA_APP",
+            "METAL_PRICE_API",
+            "FINNHUB",
+            "MANUAL",
+            "CUSTOM_SCRAPER:coingecko", // Custom provider with code
         ];
 
-        for (source_str, expected_source) in test_cases {
+        for source_str in test_cases {
             let market_quote = MarketQuote::new(
                 timestamp,
                 dec!(100),
@@ -810,12 +795,10 @@ mod tests {
             );
 
             let core_quote = MarketDataClient::convert_quote(market_quote, "TEST");
-            assert!(
-                std::mem::discriminant(&core_quote.data_source)
-                    == std::mem::discriminant(&expected_source),
-                "Source '{}' should map to {:?}",
-                source_str,
-                expected_source
+            assert_eq!(
+                core_quote.data_source, source_str,
+                "Source string '{}' should be preserved verbatim",
+                source_str
             );
         }
     }

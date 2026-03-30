@@ -210,7 +210,7 @@ mod tests {
             from_currency: from.to_string(),
             to_currency: to.to_string(),
             rate: Decimal::from_f64_retain(rate).unwrap(),
-            source: DataSource::Manual,
+            source: "MANUAL".to_string(),
             timestamp: date_time,
         }
     }
