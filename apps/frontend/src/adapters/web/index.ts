@@ -364,6 +364,18 @@ export {
   updateAddon,
 } from "./addons";
 
+// FIRE Planner (desktop-only — stubs throw at runtime)
+export {
+  getFireSettings,
+  saveFireSettings,
+  calculateFireProjection,
+  runFireMonteCarlo,
+  runFireScenarioAnalysis,
+  runFireSorr,
+  runFireSensitivity,
+  runFireStrategyComparison,
+} from "./fire-planner";
+
 // Crypto Commands (web stubs - not available in web mode)
 export {
   syncComputeSas,

@@ -7,7 +7,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@wealthfolio/addon-sdk": ["../../packages/addon-sdk/src"],
+"@wealthfolio/addon-sdk": ["../../packages/addon-sdk/src"],
       "@wealthfolio/ui": ["../../packages/ui/src"],
       "@wealthfolio/ui/*": ["../../packages/ui/src/*"],
       "#platform": ["./src/adapters/tauri/core"]

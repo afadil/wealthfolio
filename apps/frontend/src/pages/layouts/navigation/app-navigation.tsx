@@ -47,6 +47,13 @@ const staticNavigation: NavigationProps = {
       label: "View Activities",
     },
     {
+      icon: <Icons.Target className="size-6" />,
+      title: "FIRE Planner",
+      href: "/fire-planner",
+      keywords: ["fire", "retire", "retirement", "financial independence", "planner"],
+      label: "FIRE Planner",
+    },
+    {
       icon: <Icons.Sparkles className="size-6" />,
       title: "Assistant",
       href: "/assistant",
