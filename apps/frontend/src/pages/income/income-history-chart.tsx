@@ -21,6 +21,19 @@ import { format, parseISO } from "date-fns";
 import React, { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
 
+function getNiceTicks(maxValue: number, count = 5): number[] {
+  if (maxValue <= 0) return [0];
+  const rawStep = maxValue / (count - 1);
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const residual = rawStep / magnitude;
+  let niceStep: number;
+  if (residual <= 1) niceStep = magnitude;
+  else if (residual <= 2) niceStep = 2 * magnitude;
+  else if (residual <= 5) niceStep = 5 * magnitude;
+  else niceStep = 10 * magnitude;
+  return Array.from({ length: count }, (_, i) => i * niceStep);
+}
+
 interface IncomeHistoryChartProps {
   monthlyIncomeData: [string, number][];
   previousMonthlyIncomeData: [string, number][];
@@ -120,14 +133,33 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
     },
   };
 
+  const dataMax = (() => {
+    if (effectiveViewMode === "byAccount" && byAccountChartData.length > 0) {
+      return Math.max(
+        ...byAccountChartData.map((row) =>
+          accounts.reduce((sum, acc) => sum + (Number(row[acc.accountId]) || 0), 0),
+        ),
+      );
+    }
+    return chartData.length > 0
+      ? Math.max(...chartData.map((d) => Math.max(d.income, d.previousIncome)))
+      : 0;
+  })();
+  const yTicks = getNiceTicks(dataMax);
+  const tickStep = yTicks.length > 1 ? yTicks[1] : 0;
+
   const yAxisProps = {
     tickLine: false,
     axisLine: false,
     tick: { fontSize: isMobile ? 10 : 12 },
     width: isMobile ? 45 : 60,
+    ticks: yTicks,
+    domain: [0, yTicks[yTicks.length - 1] || 0] as [number, number],
     tickFormatter: (value: number) => {
-      if (value >= 1000) {
-        return `${(value / 1000).toFixed(0)}k`;
+      if (value === 0) return "0";
+      if (tickStep >= 1000) {
+        const k = value / 1000;
+        return `${Number.isInteger(k) ? k : k.toFixed(1)}k`;
       }
       return value.toString();
     },
@@ -184,6 +216,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
             className={cn("h-[280px] w-full md:h-[380px]")}
           >
             <BarChart
+              key={selectedPeriod}
               data={byAccountChartData}
               margin={{
                 left: isMobile ? -16 : 0,
@@ -237,12 +270,9 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                   dataKey={acc.accountId}
                   stackId="income"
                   fill={`var(--chart-${(i % 9) + 1})`}
+                  stroke={`var(--chart-${(i % 9) + 1})`}
                   barSize={isMobile ? 16 : 25}
-                  radius={
-                    i === accounts.length - 1
-                      ? [isMobile ? 4 : 8, isMobile ? 4 : 8, 0, 0]
-                      : [0, 0, 0, 0]
-                  }
+                  radius={i === accounts.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
                 />
               ))}
             </BarChart>
