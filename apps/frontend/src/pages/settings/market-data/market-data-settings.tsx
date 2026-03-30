@@ -805,8 +805,22 @@ export default function MarketDataSettingsPage() {
 
       <Tabs defaultValue="builtin" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="builtin">Built-in Providers</TabsTrigger>
-          <TabsTrigger value="custom">Custom Providers</TabsTrigger>
+          <TabsTrigger value="builtin">
+            Built-in Providers
+            {builtinProviders.filter((p) => p.enabled).length > 0 && (
+              <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-[10px] font-normal">
+                {builtinProviders.filter((p) => p.enabled).length}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="custom">
+            Custom Providers
+            {customProviders.filter((p) => p.enabled).length > 0 && (
+              <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-[10px] font-normal">
+                {customProviders.filter((p) => p.enabled).length}
+              </Badge>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="builtin" className="mt-4">
@@ -859,7 +873,7 @@ export default function MarketDataSettingsPage() {
                     let msg = lastIdx >= 0 ? err.slice(lastIdx + "CUSTOM_SCRAPER: ".length) : err;
                     // Extract [provider-id] prefix and resolve to provider name
                     let providerLabel = "";
-                    const bracketMatch = msg.match(/^\[([^\]]+)\]\s*/);
+                    const bracketMatch = /^\[([^\]]+)\]\s*/.exec(msg);
                     if (bracketMatch) {
                       const code = bracketMatch[1];
                       const cp = customProviders.find((p) => p.id === code);
