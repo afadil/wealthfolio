@@ -33,26 +33,44 @@ function ActivitiesHelpContent() {
         <div>
           <p className="font-semibold">Steps:</p>
           <ol className="mt-2 list-inside list-decimal space-y-1 text-sm">
-            <li>Ensure your CSV has headers with the required fields</li>
-            <li>Select account and upload your CSV file</li>
             <li>
-              Map CSV columns to required fields:
-              <span className="text-muted-foreground ml-2 text-xs">
-                date, symbol, quantity, activityType, unitPrice, currency, fee, amount, fxRate,
-                subtype
-              </span>
+              <strong>Upload</strong> — Select a built-in or custom format template, or upload your
+              CSV directly
             </li>
-            <li>Map activity types and symbols if needed</li>
-            <li>Preview, verify, and import your activities</li>
+            <li>
+              <strong>Mapping</strong> — Map CSV columns to fields, map activity types and symbols
+              to recognized values
+            </li>
+            <li>
+              <strong>Review Assets</strong> — Review and resolve asset matches for imported symbols
+            </li>
+            <li>
+              <strong>Review Activities</strong> — Validate, edit, skip, or fix activities inline
+              before importing
+            </li>
+            <li>
+              <strong>Import</strong> — Confirm and import your activities
+            </li>
           </ol>
+        </div>
+
+        <div>
+          <p className="text-sm font-semibold">Required fields:</p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            date, activityType, symbol, quantity, unitPrice, amount
+          </p>
+          <p className="mt-2 text-sm font-semibold">Optional fields:</p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            account, currency, fee, comment, fxRate, subtype, instrumentType, isin
+          </p>
         </div>
 
         <div className="space-y-3">
           <div className="border-blue-500 bg-blue-50 p-3 dark:bg-blue-900/50">
             <p className="text-sm">
               <strong className="text-blue-700 dark:text-blue-300">💡 Tip:</strong> Column names and
-              activity types don&apos;t need to match exactly - you can map them during import.
-              Mappings are saved for future imports.
+              activity types don&apos;t need to match exactly — you can map them during import.
+              Mappings can be saved as custom templates for future imports.
             </p>
           </div>
 
@@ -94,15 +112,15 @@ function ActivitiesHelpContent() {
           <pre className="bg-muted mt-2 select-all overflow-x-auto p-3 text-xs leading-relaxed">
             <span className="text-muted-foreground"># Standard format:</span>
             <br />
-            date,symbol,quantity,activityType,unitPrice,currency,fee,amount,fxRate,subtype
+            date,symbol,instrumentType,quantity,activityType,unitPrice,currency,fee,amount,fxRate,subtype
             <br />
-            2024-01-01,MSFT,1,DIVIDEND,57.5,USD,0,57.5,,DRIP
+            2024-01-15,MSFT,EQUITY,10,BUY,380.50,USD,4.95,,,
             <br />
-            2023-12-15,MSFT,30,BUY,368.60,USD,0,,,
+            2024-02-01,MSFT,EQUITY,1,DIVIDEND,0.75,USD,0,0.75,,QUALIFIED
             <br />
-            2023-08-11,,1,DEPOSIT,1,USD,0,600.03,,
+            2024-02-15,,,1,DEPOSIT,1,USD,0,1000.00,,
             <br />
-            2024-02-01,AAPL,10,BUY,185.50,CAD,5,,1.35,
+            2024-06-01,TD.TO,EQUITY,10,BUY,85.00,CAD,9.99,,1.36,
             <br />
             <br />
             <span className="text-muted-foreground"># With currency symbols (auto-parsed):</span>

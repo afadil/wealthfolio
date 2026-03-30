@@ -231,7 +231,7 @@ function useImportReviewColumns({
           ) : null;
           return (
             <div className="flex items-center gap-1.5">
-              <span className="text-muted-foreground w-5 text-xs">{rowIndex + 1}</span>
+              <span className="text-muted-foreground shrink-0 text-xs">{rowIndex + 1}</span>
               {dot && title ? (
                 <TooltipProvider delayDuration={200}>
                   <Tooltip>
@@ -686,13 +686,18 @@ export function ImportReviewGrid({
     [drafts, onDraftUpdate],
   );
 
+  // Keep a synchronously-updated ref so getCellState always reads the latest
+  // drafts even when the DataGrid's internal propsRef lags by one layout-effect.
+  const draftsRef = useRef(drafts);
+  draftsRef.current = drafts;
+
   // Cell state callback for error/warning highlighting with messages
   const getCellState = useCallback(
     (
       rowIndex: number,
       columnId: string,
     ): { type: "error" | "warning"; messages: string[] } | null => {
-      const draft = drafts[rowIndex];
+      const draft = draftsRef.current[rowIndex];
       if (!draft) return null;
 
       // Skip non-data columns
@@ -712,7 +717,7 @@ export function ImportReviewGrid({
 
       return null;
     },
-    [drafts],
+    [],
   );
 
   // Initialize data grid
