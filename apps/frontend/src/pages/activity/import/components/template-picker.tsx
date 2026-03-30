@@ -88,31 +88,6 @@ export function TemplatePicker({
               No matching formats.
             </div>
           </CommandEmpty>
-          {systemTemplates.length > 0 && (
-            <CommandGroup heading="Built-in">
-              {systemTemplates.map((t) => (
-                <CommandItem
-                  key={t.id}
-                  value={t.name}
-                  onSelect={() => {
-                    onSelect(t.id);
-                    setOpen(false);
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  <Icons.Building className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
-                  <span className="flex-1">{t.name}</span>
-                  <Icons.Check
-                    className={cn(
-                      "h-4 w-4 shrink-0",
-                      selectedTemplateId === t.id ? "opacity-100" : "opacity-0",
-                    )}
-                  />
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          )}
-          {systemTemplates.length > 0 && userTemplates.length > 0 && <CommandSeparator />}
           {userTemplates.length > 0 && (
             <CommandGroup heading="Custom">
               {userTemplates.map((t) => (
@@ -126,6 +101,31 @@ export function TemplatePicker({
                   className="flex items-center gap-2"
                 >
                   <Icons.User className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
+                  <span className="flex-1">{t.name}</span>
+                  <Icons.Check
+                    className={cn(
+                      "h-4 w-4 shrink-0",
+                      selectedTemplateId === t.id ? "opacity-100" : "opacity-0",
+                    )}
+                  />
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+          {userTemplates.length > 0 && systemTemplates.length > 0 && <CommandSeparator />}
+          {systemTemplates.length > 0 && (
+            <CommandGroup heading="Built-in">
+              {systemTemplates.map((t) => (
+                <CommandItem
+                  key={t.id}
+                  value={t.name}
+                  onSelect={() => {
+                    onSelect(t.id);
+                    setOpen(false);
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Icons.Building className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
                   <span className="flex-1">{t.name}</span>
                   <Icons.Check
                     className={cn(
