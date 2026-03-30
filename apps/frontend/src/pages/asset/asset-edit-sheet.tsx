@@ -276,30 +276,35 @@ export function AssetEditSheet({
   const { data: marketDataProviders = [] } = useMarketDataProviders();
   const { data: customProviders = [] } = useCustomProviders();
 
+  // Built-in providers only (exclude CUSTOM_SCRAPER dispatcher and custom provider rows)
+  const builtinProviders = useMemo(
+    () =>
+      marketDataProviders.filter((p) => p.id !== "CUSTOM_SCRAPER" && p.providerType !== "custom"),
+    [marketDataProviders],
+  );
+
   const providerOptions: ResponsiveSelectOption[] = useMemo(() => {
     const options: ResponsiveSelectOption[] = [
       { value: "__auto__", label: "Auto (default)" },
-      ...marketDataProviders
-        .filter((p) => p.id !== "CUSTOM_SCRAPER")
-        .map((p) => ({ value: p.id, label: p.name })),
+      ...builtinProviders.map((p) => ({ value: p.id, label: p.name })),
     ];
     for (const cp of customProviders) {
       options.push({ value: `CUSTOM:${cp.id}`, label: cp.name });
     }
     return options;
-  }, [marketDataProviders, customProviders]);
+  }, [builtinProviders, customProviders]);
 
   // Provider options for symbol mapping (without Auto, includes custom providers)
   const mappingProviderOptions: ResponsiveSelectOption[] = useMemo(() => {
-    const options: ResponsiveSelectOption[] = PROVIDERS.map((p) => ({
-      value: p.value,
-      label: p.label,
+    const options: ResponsiveSelectOption[] = builtinProviders.map((p) => ({
+      value: p.id,
+      label: p.name,
     }));
     for (const cp of customProviders) {
       options.push({ value: `CUSTOM:${cp.id}`, label: cp.name });
     }
     return options;
-  }, [customProviders]);
+  }, [builtinProviders, customProviders]);
 
   const { data: exchanges = [] } = useQuery({
     queryKey: ["exchanges"],
@@ -792,13 +797,11 @@ export function AssetEditSheet({
                                   <SelectItem value="__auto__">Auto (default)</SelectItem>
                                   <SelectGroup>
                                     <SelectLabel>Built-in</SelectLabel>
-                                    {marketDataProviders
-                                      .filter((p) => p.id !== "CUSTOM_SCRAPER")
-                                      .map((p) => (
-                                        <SelectItem key={p.id} value={p.id}>
-                                          {p.name}
-                                        </SelectItem>
-                                      ))}
+                                    {builtinProviders.map((p) => (
+                                      <SelectItem key={p.id} value={p.id}>
+                                        {p.name}
+                                      </SelectItem>
+                                    ))}
                                   </SelectGroup>
                                   <SelectGroup>
                                     <SelectLabel>Custom</SelectLabel>
@@ -912,7 +915,7 @@ export function AssetEditSheet({
                                               <Input
                                                 placeholder="e.g., SHOP.TO"
                                                 {...symbolField}
-                                                className="h-9 uppercase"
+                                                className="h-9"
                                               />
                                             </FormControl>
                                           </FormItem>
