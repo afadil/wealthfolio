@@ -42,7 +42,7 @@ const INSTRUMENT_TYPE_OPTIONS = [
   { value: "BOND", label: "Bond" },
   { value: "OPTION", label: "Option" },
   { value: "FX", label: "Foreign Exchange" },
-  { value: "METAL", label: "Precious Metal" },
+  { value: "METAL", label: "Metal (Commodity)" },
 ] as const;
 
 const QUOTE_MODE_OPTIONS = [
@@ -188,12 +188,7 @@ export function CreateSecurityDialog({
   );
 
   const handleSubmit = (values: CreateSecurityFormValues) => {
-    const kind =
-      values.instrumentType === "METAL"
-        ? "PRECIOUS_METAL"
-        : values.instrumentType === "FX"
-          ? "FX"
-          : "INVESTMENT";
+    const kind = values.instrumentType === "FX" ? "FX" : "INVESTMENT";
 
     const payload: NewAsset = {
       kind,

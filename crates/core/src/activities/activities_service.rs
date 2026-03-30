@@ -216,7 +216,7 @@ impl ActivityService {
     fn kind_from_instrument_type(instrument_type: &InstrumentType) -> AssetKind {
         match instrument_type {
             InstrumentType::Fx => AssetKind::Fx,
-            InstrumentType::Metal => AssetKind::PreciousMetal,
+            InstrumentType::Metal => AssetKind::Investment,
             _ => AssetKind::Investment,
         }
     }
@@ -978,7 +978,7 @@ impl ActivityService {
                 "OPTION" | "OPT" => return (AssetKind::Investment, Some(InstrumentType::Option)),
                 "BOND" => return (AssetKind::Investment, Some(InstrumentType::Bond)),
                 "COMMODITY" | "CMDTY" | "METAL" => {
-                    return (AssetKind::PreciousMetal, Some(InstrumentType::Metal))
+                    return (AssetKind::Investment, Some(InstrumentType::Metal))
                 }
                 "PROPERTY" | "PROP" => return (AssetKind::Property, None),
                 "VEHICLE" | "VEH" => return (AssetKind::Vehicle, None),
