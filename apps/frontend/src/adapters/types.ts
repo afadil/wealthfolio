@@ -92,6 +92,7 @@ export interface MarketDataProviderSetting {
   enabled: boolean;
   logoFilename: string | null;
   capabilities: ProviderCapabilities | null;
+  providerType?: string;
   requiresApiKey: boolean;
   hasApiKey: boolean;
   assetCount: number;

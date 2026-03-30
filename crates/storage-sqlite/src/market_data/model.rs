@@ -89,6 +89,8 @@ pub struct MarketDataProviderSettingDB {
     pub last_synced_at: Option<String>,
     pub last_sync_status: Option<String>,
     pub last_sync_error: Option<String>,
+    pub provider_type: String,
+    pub config: Option<String>,
 }
 
 /// Database model for updating market data provider settings
@@ -227,6 +229,7 @@ impl From<MarketDataProviderSettingDB> for MarketDataProviderSetting {
             last_sync_status: db.last_sync_status,
             last_sync_error: db.last_sync_error,
             capabilities,
+            provider_type: Some(db.provider_type),
         }
     }
 }
@@ -244,6 +247,10 @@ impl From<MarketDataProviderSetting> for MarketDataProviderSettingDB {
             last_synced_at: domain.last_synced_at,
             last_sync_status: domain.last_sync_status,
             last_sync_error: domain.last_sync_error,
+            provider_type: domain
+                .provider_type
+                .unwrap_or_else(|| "builtin".to_string()),
+            config: None,
         }
     }
 }

@@ -54,7 +54,7 @@
 //!     overrides: None,
 //!     currency_hint: Some("CAD".into()),
 //!     preferred_provider: None,
-//!     bond_metadata: None,
+//!     bond_metadata: None, custom_provider_code: None,
 //! };
 //!
 //! let resolved = chain.resolve(&"YAHOO".into(), &context)?;
@@ -70,7 +70,7 @@
 //!     overrides: None,
 //!     currency_hint: None,
 //!     preferred_provider: None,
-//!     bond_metadata: None,
+//!     bond_metadata: None, custom_provider_code: None,
 //! };
 //!
 //! let resolved = chain.resolve(&"YAHOO".into(), &fx_context)?;

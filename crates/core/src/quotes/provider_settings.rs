@@ -31,6 +31,8 @@ pub struct MarketDataProviderSetting {
     pub last_sync_error: Option<String>,
     /// Provider capabilities (populated from provider implementation)
     pub capabilities: Option<ProviderCapabilities>,
+    /// 'builtin' or 'custom'
+    pub provider_type: Option<String>,
 }
 
 /// Provider capabilities - what a provider supports.
@@ -88,6 +90,11 @@ impl ProviderCapabilities {
                     "Search".to_string(),
                     "Profiles".to_string(),
                 ],
+            }),
+            "CUSTOM_SCRAPER" => Some(Self {
+                instruments: "Any".to_string(),
+                coverage: "User-defined".to_string(),
+                features: vec!["Real-time".to_string(), "Historical".to_string()],
             }),
             _ => None,
         }

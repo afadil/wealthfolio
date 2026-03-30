@@ -27,6 +27,7 @@ mod alternative_assets;
 mod assets;
 #[cfg(any(feature = "connect-sync", feature = "device-sync"))]
 pub mod connect;
+mod custom_providers;
 #[cfg(feature = "device-sync")]
 mod device_sync;
 #[cfg(feature = "device-sync")]
@@ -104,7 +105,8 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
         .merge(alternative_assets::router())
         .merge(ai_providers::router())
         .merge(ai_chat::router())
-        .merge(health::router());
+        .merge(health::router())
+        .merge(custom_providers::router());
 
     #[cfg(feature = "device-sync")]
     {

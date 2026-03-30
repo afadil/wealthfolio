@@ -21,6 +21,7 @@ pub const DATA_SOURCE_FINNHUB: &str = "FINNHUB";
 pub const DATA_SOURCE_US_TREASURY_CALC: &str = "US_TREASURY_CALC";
 pub const DATA_SOURCE_BOERSE_FRANKFURT: &str = "BOERSE_FRANKFURT";
 pub const DATA_SOURCE_BROKER: &str = "BROKER";
+pub const DATA_SOURCE_CUSTOM_SCRAPER: &str = "CUSTOM_SCRAPER";
 
 // =============================================================================
 // Data Source
@@ -54,6 +55,8 @@ pub enum DataSource {
     BoerseFrankfurt,
     /// Broker-provided price from position sync
     Broker,
+    /// Custom scraper — user-defined JSON/HTML provider
+    CustomScraper,
     /// Manual entry by user
     #[default]
     Manual,
@@ -71,6 +74,7 @@ impl DataSource {
             DataSource::UsTreasuryCalc => DATA_SOURCE_US_TREASURY_CALC,
             DataSource::BoerseFrankfurt => DATA_SOURCE_BOERSE_FRANKFURT,
             DataSource::Broker => DATA_SOURCE_BROKER,
+            DataSource::CustomScraper => DATA_SOURCE_CUSTOM_SCRAPER,
             DataSource::Manual => DATA_SOURCE_MANUAL,
         }
     }
@@ -93,6 +97,7 @@ impl From<&str> for DataSource {
             DATA_SOURCE_US_TREASURY_CALC => DataSource::UsTreasuryCalc,
             DATA_SOURCE_BOERSE_FRANKFURT => DataSource::BoerseFrankfurt,
             DATA_SOURCE_BROKER => DataSource::Broker,
+            DATA_SOURCE_CUSTOM_SCRAPER => DataSource::CustomScraper,
             _ => DataSource::Manual,
         }
     }

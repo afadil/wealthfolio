@@ -114,6 +114,15 @@ impl MarketDataClient {
         secret_store: Arc<dyn SecretStore>,
         enabled_providers: Vec<ProviderConfig>,
     ) -> Result<Self> {
+        Self::new_with_extra(secret_store, enabled_providers, vec![]).await
+    }
+
+    /// Create a new market data client with extra pre-built providers (e.g., CustomScraperProvider).
+    pub async fn new_with_extra(
+        secret_store: Arc<dyn SecretStore>,
+        enabled_providers: Vec<ProviderConfig>,
+        extra_providers: Vec<Arc<dyn wealthfolio_market_data::MarketDataProvider>>,
+    ) -> Result<Self> {
         use std::collections::HashMap;
 
         let mut providers: Vec<Arc<dyn wealthfolio_market_data::MarketDataProvider>> = Vec::new();
@@ -145,6 +154,12 @@ impl MarketDataClient {
         // This ensures bond ISIN/FIGI lookup works without users needing to enable it in settings.
         if !providers.iter().any(|p| p.id() == DATA_SOURCE_OPENFIGI) {
             providers.push(Arc::new(OpenFigiProvider::new()));
+        }
+
+        // Append extra providers (e.g., CustomScraperProvider)
+        for ep in extra_providers {
+            info!("Registered extra provider: {}", ep.id());
+            providers.push(ep);
         }
 
         if providers.is_empty() {
@@ -372,12 +387,21 @@ impl MarketDataClient {
             _ => None,
         };
 
+        // Extract custom_provider_code from provider_config if present
+        let custom_provider_code = asset
+            .provider_config
+            .as_ref()
+            .and_then(|c| c.get("custom_provider_code"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
         Ok(QuoteContext {
             instrument,
             overrides,
             currency_hint,
             preferred_provider,
             bond_metadata,
+            custom_provider_code,
         })
     }
 
@@ -391,6 +415,7 @@ impl MarketDataClient {
             DATA_SOURCE_FINNHUB => DataSource::Finnhub,
             DATA_SOURCE_US_TREASURY_CALC => DataSource::UsTreasuryCalc,
             DATA_SOURCE_BOERSE_FRANKFURT => DataSource::BoerseFrankfurt,
+            DATA_SOURCE_CUSTOM_SCRAPER => DataSource::CustomScraper,
             DATA_SOURCE_MANUAL => DataSource::Manual,
             _ => DataSource::Yahoo, // Default fallback
         };

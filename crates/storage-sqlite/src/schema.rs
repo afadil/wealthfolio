@@ -207,19 +207,19 @@ diesel::table! {
 }
 
 diesel::table! {
-    health_issue_dismissals (issue_id) {
-        issue_id -> Text,
-        dismissed_at -> Text,
-        data_hash -> Text,
-    }
-}
-
-diesel::table! {
     goals_allocation (id) {
         id -> Text,
         percent_allocation -> Integer,
         goal_id -> Text,
         account_id -> Text,
+    }
+}
+
+diesel::table! {
+    health_issue_dismissals (issue_id) {
+        issue_id -> Text,
+        dismissed_at -> Text,
+        data_hash -> Text,
     }
 }
 
@@ -275,6 +275,8 @@ diesel::table! {
         last_synced_at -> Nullable<Text>,
         last_sync_status -> Nullable<Text>,
         last_sync_error -> Nullable<Text>,
+        provider_type -> Text,
+        config -> Nullable<Text>,
     }
 }
 
@@ -302,6 +304,25 @@ diesel::table! {
         profile_enriched_at -> Nullable<Text>,
         created_at -> Text,
         updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    quotes (id) {
+        id -> Text,
+        asset_id -> Text,
+        day -> Text,
+        source -> Text,
+        open -> Nullable<Text>,
+        high -> Nullable<Text>,
+        low -> Nullable<Text>,
+        close -> Text,
+        adjclose -> Nullable<Text>,
+        volume -> Nullable<Text>,
+        currency -> Text,
+        notes -> Nullable<Text>,
+        created_at -> Text,
+        timestamp -> Text,
     }
 }
 
@@ -383,25 +404,6 @@ diesel::table! {
         enabled -> Integer,
         last_snapshot_restore_at -> Nullable<Text>,
         last_incremental_apply_at -> Nullable<Text>,
-    }
-}
-
-diesel::table! {
-    quotes (id) {
-        id -> Text,
-        asset_id -> Text,
-        day -> Text,
-        source -> Text,
-        open -> Nullable<Text>,
-        high -> Nullable<Text>,
-        low -> Nullable<Text>,
-        close -> Text,
-        adjclose -> Nullable<Text>,
-        volume -> Nullable<Text>,
-        currency -> Text,
-        notes -> Nullable<Text>,
-        created_at -> Text,
-        timestamp -> Text,
     }
 }
 

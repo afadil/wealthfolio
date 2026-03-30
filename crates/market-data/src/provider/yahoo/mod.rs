@@ -1224,7 +1224,7 @@ mod tests {
             overrides: None,
             currency_hint: Some(Cow::Borrowed("USD")),
             preferred_provider: None,
-            bond_metadata: None,
+            bond_metadata: None, custom_provider_code: None,
         }
     }
 
@@ -1242,7 +1242,7 @@ mod tests {
             overrides: None,
             currency_hint: currency_hint.map(Cow::Borrowed),
             preferred_provider: None,
-            bond_metadata: None,
+            bond_metadata: None, custom_provider_code: None,
         }
     }
 
@@ -1337,7 +1337,7 @@ mod tests {
             currency_hint: Some(Cow::Borrowed("GBP")),
             overrides: None,
             preferred_provider: None,
-            bond_metadata: None,
+            bond_metadata: None, custom_provider_code: None,
         };
         assert_eq!(provider.get_currency(&context), "GBp");
     }

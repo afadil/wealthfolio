@@ -5,7 +5,8 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { useEffect, useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
+import { useMemo, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { SettingsHeader } from "../settings-header";
@@ -15,7 +16,9 @@ import {
   useRecalculatePortfolioMutation,
   useUpdatePortfolioMutation,
 } from "@/hooks/use-calculate-portfolio";
+import { useCustomProviders, useDeleteCustomProvider } from "@/hooks/use-custom-providers";
 import { QueryKeys } from "@/lib/query-keys";
+import type { CustomProviderWithSources } from "@/lib/types/custom-provider";
 import { cn } from "@/lib/utils";
 import { ActionConfirm } from "@wealthfolio/ui";
 import {
@@ -32,6 +35,7 @@ import {
   useSetApiKey,
   useUpdateMarketDataProviderSettings,
 } from "./use-market-data-settings";
+import { CustomProviderForm } from "./custom-provider-form";
 
 interface ProviderSettingsProps {
   provider: MarketDataProviderSetting;
@@ -459,14 +463,139 @@ function ProviderSettings({
   );
 }
 
+function CustomProviderCard({
+  provider,
+  onEdit,
+  onDelete,
+  onToggleEnabled,
+  isDeleting = false,
+  isLast = false,
+}: {
+  provider: CustomProviderWithSources;
+  onEdit: () => void;
+  onDelete: () => void;
+  onToggleEnabled: (enabled: boolean) => void;
+  isDeleting?: boolean;
+  isLast?: boolean;
+}) {
+  const latestSource = provider.sources.find((s) => s.kind === "latest");
+  const historicalSource = provider.sources.find((s) => s.kind === "historical");
+
+  return (
+    <div className={cn("hover:bg-accent/30 transition-colors", !isLast && "border-b")}>
+      <div className="flex items-center gap-4 px-4 py-3">
+        <div className="bg-muted flex h-9 w-9 shrink-0 items-center justify-center rounded-lg">
+          <Icons.Globe className="text-muted-foreground h-5 w-5" />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-medium">{provider.name}</span>
+            {!provider.enabled && (
+              <Badge variant="outline" className="h-5 px-1.5 text-[10px] font-normal">
+                Disabled
+              </Badge>
+            )}
+          </div>
+          {provider.description && (
+            <p className="text-muted-foreground mt-0.5 text-xs">{provider.description}</p>
+          )}
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            {latestSource && (
+              <span className="text-muted-foreground inline-flex items-center gap-1 text-[11px]">
+                <Icons.Activity2 className="h-3 w-3" />
+                {latestSource.format.toUpperCase()}
+              </span>
+            )}
+            {historicalSource && (
+              <span className="text-muted-foreground inline-flex items-center gap-1 text-[11px]">
+                <Icons.Clock className="h-3 w-3" />
+                Historical
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <Switch
+            id={`${provider.id}-enabled`}
+            checked={provider.enabled}
+            onCheckedChange={onToggleEnabled}
+            className="data-[state=checked]:bg-success"
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-foreground h-8 w-8"
+            onClick={onEdit}
+          >
+            <Icons.Pencil className="h-4 w-4" />
+          </Button>
+          <ActionConfirm
+            handleConfirm={onDelete}
+            isPending={isDeleting}
+            confirmTitle="Delete Custom Provider?"
+            confirmMessage={`This will permanently delete "${provider.name}" and remove it from all assets using it.`}
+            confirmButtonText="Delete"
+            cancelButtonText="Cancel"
+            confirmButtonVariant="destructive"
+            button={
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-destructive h-8 w-8"
+              >
+                <Icons.Trash className="h-4 w-4" />
+              </Button>
+            }
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function MarketDataSettingsPage() {
   const { data: providers, isLoading, error } = useMarketDataProviderSettings();
   const { mutate: updateSettings } = useUpdateMarketDataProviderSettings();
   const { mutate: updatePortfolio, isPending: isUpdating } = useUpdatePortfolioMutation();
   const { mutate: recalculatePortfolio, isPending: isRecalculating } =
     useRecalculatePortfolioMutation();
+  const { data: customProviders = [] } = useCustomProviders();
+  const { mutate: deleteCustomProvider, isPending: isDeletingCustom } = useDeleteCustomProvider();
 
   const [priorityInputs, setPriorityInputs] = useState<Record<string, number>>({});
+  const [customFormOpen, setCustomFormOpen] = useState(false);
+  const [editingProvider, setEditingProvider] = useState<CustomProviderWithSources | undefined>();
+
+  // Split providers into built-in and custom using the providerType field
+  const { builtinProviders, customSettingsProviders, customScraperErrors } = useMemo(() => {
+    if (!providers)
+      return { builtinProviders: [], customSettingsProviders: [], customScraperErrors: undefined };
+    const builtin: MarketDataProviderSetting[] = [];
+    const custom: MarketDataProviderSetting[] = [];
+    let scraperInfo: MarketDataProviderSetting | undefined;
+    for (const p of providers) {
+      if (p.id === "CUSTOM_SCRAPER") {
+        scraperInfo = p;
+      } else if (p.providerType === "custom") {
+        custom.push(p);
+      } else {
+        builtin.push(p);
+      }
+    }
+    const sortFn = (a: MarketDataProviderSetting, b: MarketDataProviderSetting) => {
+      if (a.enabled === b.enabled) return a.priority - b.priority;
+      return a.enabled ? -1 : 1;
+    };
+    builtin.sort(sortFn);
+    custom.sort(sortFn);
+    return {
+      builtinProviders: builtin,
+      customSettingsProviders: custom,
+      customScraperErrors: scraperInfo,
+    };
+  }, [providers]);
 
   useEffect(() => {
     if (providers) {
@@ -673,21 +802,19 @@ export default function MarketDataSettingsPage() {
         </div>
       </SettingsHeader>
       <Separator />
-      <div>
-        {providers?.length === 0 ? (
-          <p>No market data providers configured. This might be an initialization issue.</p>
-        ) : (
-          <div className="overflow-hidden rounded-lg border">
-            {providers
-              ?.slice()
-              .sort((a, b) => {
-                // Enabled providers first, then by priority ascending
-                if (a.enabled === b.enabled) {
-                  return a.priority - b.priority;
-                }
-                return a.enabled ? -1 : 1;
-              })
-              .map((provider, index, arr) => (
+
+      <Tabs defaultValue="builtin" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="builtin">Built-in Providers</TabsTrigger>
+          <TabsTrigger value="custom">Custom Providers</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="builtin" className="mt-4">
+          {builtinProviders.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No built-in providers configured.</p>
+          ) : (
+            <div className="overflow-hidden rounded-lg border">
+              {builtinProviders.map((provider, index, arr) => (
                 <ProviderSettings
                   key={provider.id}
                   provider={provider}
@@ -698,9 +825,96 @@ export default function MarketDataSettingsPage() {
                   isLast={index === arr.length - 1}
                 />
               ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="custom" className="mt-4">
+          <div className="mb-3 flex items-center justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setEditingProvider(undefined);
+                setCustomFormOpen(true);
+              }}
+            >
+              <Icons.Plus className="mr-1 h-3 w-3" />
+              Add Provider
+            </Button>
           </div>
-        )}
-      </div>
+          {customScraperErrors && customScraperErrors.errorCount > 0 && (
+            <div className="border-destructive/20 bg-destructive/5 mb-3 rounded-lg border p-3">
+              <div className="flex items-start gap-2">
+                <Icons.XCircle className="text-destructive mt-0.5 h-4 w-4 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-destructive text-sm font-medium">
+                    {customScraperErrors.errorCount} asset
+                    {customScraperErrors.errorCount > 1 ? "s" : ""} failed to sync
+                  </p>
+                  {customScraperErrors.uniqueErrors?.map((err, i) => {
+                    // Strip boilerplate prefix, keep just the actionable message
+                    // Error format: "...CUSTOM_SCRAPER: [provider-id] actual message"
+                    const lastIdx = err.lastIndexOf("CUSTOM_SCRAPER: ");
+                    let msg = lastIdx >= 0 ? err.slice(lastIdx + "CUSTOM_SCRAPER: ".length) : err;
+                    // Extract [provider-id] prefix and resolve to provider name
+                    let providerLabel = "";
+                    const bracketMatch = msg.match(/^\[([^\]]+)\]\s*/);
+                    if (bracketMatch) {
+                      const code = bracketMatch[1];
+                      const cp = customProviders.find((p) => p.id === code);
+                      providerLabel = cp?.name ?? code;
+                      msg = msg.slice(bracketMatch[0].length);
+                    }
+                    return (
+                      <p key={i} className="text-destructive/80 mt-1 break-all text-xs">
+                        {providerLabel && (
+                          <span className="text-destructive font-medium">{providerLabel}: </span>
+                        )}
+                        {msg}
+                      </p>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+          {customProviders.length === 0 && customSettingsProviders.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-6 text-center">
+              <Icons.Globe className="text-muted-foreground/50 mx-auto h-8 w-8" />
+              <p className="text-muted-foreground mt-2 text-sm">No custom providers configured</p>
+              <p className="text-muted-foreground text-xs">
+                Add a custom data source to scrape prices from any website or API.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-lg border">
+              {customProviders.map((cp, index) => (
+                <CustomProviderCard
+                  key={cp.id}
+                  provider={cp}
+                  onEdit={() => {
+                    setEditingProvider(cp);
+                    setCustomFormOpen(true);
+                  }}
+                  onDelete={() => deleteCustomProvider(cp.id)}
+                  onToggleEnabled={(enabled) =>
+                    updateSettings({ providerId: cp.id, priority: cp.priority, enabled })
+                  }
+                  isDeleting={isDeletingCustom}
+                  isLast={index === customProviders.length - 1}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      <CustomProviderForm
+        open={customFormOpen}
+        onOpenChange={setCustomFormOpen}
+        provider={editingProvider}
+      />
     </div>
   );
 }

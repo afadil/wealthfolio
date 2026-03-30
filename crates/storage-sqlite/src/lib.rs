@@ -34,6 +34,7 @@ pub mod accounts;
 pub mod activities;
 pub mod ai_chat;
 pub mod assets;
+pub mod custom_provider;
 pub mod fx;
 pub mod goals;
 pub mod health;

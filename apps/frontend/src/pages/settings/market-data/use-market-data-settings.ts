@@ -24,13 +24,15 @@ export function useUpdateMarketDataProviderSettings() {
     onMutate: async (variables) => {
       // Cancel any outgoing refetches to avoid overwriting our optimistic update
       await queryClient.cancelQueries({ queryKey: [QueryKeys.MARKET_DATA_PROVIDER_SETTINGS] });
+      await queryClient.cancelQueries({ queryKey: [QueryKeys.CUSTOM_PROVIDERS] });
 
-      // Snapshot the previous value
+      // Snapshot the previous values
       const previousProviders = queryClient.getQueryData<MarketDataProviderSetting[]>([
         QueryKeys.MARKET_DATA_PROVIDER_SETTINGS,
       ]);
+      const previousCustom = queryClient.getQueryData([QueryKeys.CUSTOM_PROVIDERS]);
 
-      // Optimistically update the cache
+      // Optimistically update the provider settings cache
       queryClient.setQueryData<MarketDataProviderSetting[]>(
         [QueryKeys.MARKET_DATA_PROVIDER_SETTINGS],
         (old) => {
@@ -43,8 +45,18 @@ export function useUpdateMarketDataProviderSettings() {
         },
       );
 
-      // Return a context object with the snapshotted value
-      return { previousProviders };
+      // Optimistically update the custom providers cache
+      queryClient.setQueryData<{ id: string; enabled: boolean }[]>(
+        [QueryKeys.CUSTOM_PROVIDERS],
+        (old) => {
+          if (!old) return old;
+          return old.map((cp) =>
+            cp.id === variables.providerId ? { ...cp, enabled: variables.enabled } : cp,
+          );
+        },
+      );
+
+      return { previousProviders, previousCustom };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.MARKET_DATA_PROVIDER_SETTINGS] });
@@ -57,6 +69,9 @@ export function useUpdateMarketDataProviderSettings() {
           context.previousProviders,
         );
       }
+      if (context?.previousCustom) {
+        queryClient.setQueryData([QueryKeys.CUSTOM_PROVIDERS], context.previousCustom);
+      }
       toast({
         title: `Failed to update settings for provider ${variables.providerId}`,
         description: error.message,
@@ -66,6 +81,7 @@ export function useUpdateMarketDataProviderSettings() {
     onSettled: () => {
       // Always refetch after error or success to ensure we have the latest data
       queryClient.invalidateQueries({ queryKey: [QueryKeys.MARKET_DATA_PROVIDER_SETTINGS] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.CUSTOM_PROVIDERS] });
     },
   });
 }
