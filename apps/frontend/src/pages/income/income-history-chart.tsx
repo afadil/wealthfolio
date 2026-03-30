@@ -141,9 +141,10 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
         ),
       );
     }
-    return chartData.length > 0
-      ? Math.max(...chartData.map((d) => Math.max(d.income, d.previousIncome)))
-      : 0;
+    if (chartData.length === 0) return 0;
+    return Math.max(
+      ...chartData.map((d) => Math.max(d.income, d.previousIncome, isMobile ? d.cumulative : 0)),
+    );
   })();
   const yTicks = getNiceTicks(dataMax);
   const tickStep = yTicks.length > 1 ? yTicks[1] : 0;
