@@ -144,7 +144,8 @@ mod tests {
             overrides: Some(overrides),
             currency_hint: Some("CAD".into()),
             preferred_provider: None,
-            bond_metadata: None, custom_provider_code: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let resolved = chain.resolve(&"YAHOO".into(), &context).unwrap();
@@ -172,7 +173,8 @@ mod tests {
             overrides: None,
             currency_hint: Some("CAD".into()),
             preferred_provider: None,
-            bond_metadata: None, custom_provider_code: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let resolved = chain.resolve(&"YAHOO".into(), &context).unwrap();
@@ -208,7 +210,8 @@ mod tests {
             overrides: Some(overrides),
             currency_hint: Some("CAD".into()),
             preferred_provider: None,
-            bond_metadata: None, custom_provider_code: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         };
 
         // Resolve for ALPHA_VANTAGE (no override) - should use rules
@@ -235,7 +238,8 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
-            bond_metadata: None, custom_provider_code: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let resolved = chain.resolve(&"YAHOO".into(), &context).unwrap();
@@ -260,7 +264,8 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
-            bond_metadata: None, custom_provider_code: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let result = chain.resolve(&"UNKNOWN_PROVIDER".into(), &context);
@@ -286,7 +291,8 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
-            bond_metadata: None, custom_provider_code: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let currency = chain.get_currency(&"YAHOO".into(), &context);
@@ -305,7 +311,8 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
-            bond_metadata: None, custom_provider_code: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let currency = chain.get_currency(&"YAHOO".into(), &context);
