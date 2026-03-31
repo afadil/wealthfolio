@@ -6,4 +6,4 @@ ALTER TABLE market_data_providers ADD COLUMN config TEXT;
 
 -- Seed the runtime dispatch provider
 INSERT OR IGNORE INTO market_data_providers (id, name, description, url, priority, enabled, provider_type)
-VALUES ('CUSTOM_SCRAPER', 'Custom Scraper', 'Runtime dispatch provider for user-defined custom sources', NULL, 50, 1, 'builtin');
+VALUES ('CUSTOM_SCRAPER', 'Custom Provider', 'Runtime dispatch provider for user-defined custom sources', NULL, 50, 1, 'builtin');
