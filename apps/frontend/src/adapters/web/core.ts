@@ -83,6 +83,12 @@ export const COMMANDS: CommandMap = {
   get_market_data_providers: { method: "GET", path: "/providers" },
   get_market_data_providers_settings: { method: "GET", path: "/providers/settings" },
   update_market_data_provider_settings: { method: "PUT", path: "/providers/settings" },
+  // Custom providers
+  get_custom_providers: { method: "GET", path: "/custom-providers" },
+  create_custom_provider: { method: "POST", path: "/custom-providers" },
+  update_custom_provider: { method: "PUT", path: "/custom-providers" },
+  delete_custom_provider: { method: "DELETE", path: "/custom-providers" },
+  test_custom_provider_source: { method: "POST", path: "/custom-providers/test-source" },
   // Contribution limits
   get_contribution_limits: { method: "GET", path: "/limits" },
   create_contribution_limit: { method: "POST", path: "/limits" },
@@ -618,6 +624,30 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     }
     case "update_market_data_provider_settings": {
       body = JSON.stringify(payload);
+      break;
+    }
+    case "create_custom_provider": {
+      const { payload: cp } = payload as { payload: Record<string, unknown> };
+      body = JSON.stringify(cp);
+      break;
+    }
+    case "update_custom_provider": {
+      const { providerId, payload: cp } = payload as {
+        providerId: string;
+        payload: Record<string, unknown>;
+      };
+      url += `/${encodeURIComponent(providerId)}`;
+      body = JSON.stringify(cp);
+      break;
+    }
+    case "delete_custom_provider": {
+      const { providerId } = payload as { providerId: string };
+      url += `/${encodeURIComponent(providerId)}`;
+      break;
+    }
+    case "test_custom_provider_source": {
+      const { payload: tp } = payload as { payload: Record<string, unknown> };
+      body = JSON.stringify(tp);
       break;
     }
     case "create_contribution_limit": {

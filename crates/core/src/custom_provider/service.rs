@@ -131,8 +131,21 @@ impl CustomProviderService {
             .ok_or_else(|| crate::Error::Unexpected("Updated provider not found".into()))
     }
 
-    /// Delete a custom provider. Fails if assets reference it.
+    /// Delete a custom provider. Fails if it is not a user-created provider or assets reference it.
     pub async fn delete(&self, provider_id: &str) -> Result<()> {
+        // Only allow deleting providers that actually belong to the user
+        let exists = self
+            .repo
+            .get_all()?
+            .into_iter()
+            .any(|p| p.id == provider_id);
+        if !exists {
+            return Err(ValidationError::InvalidInput(format!(
+                "Provider '{}' not found or is not a custom provider.",
+                provider_id
+            ))
+            .into());
+        }
         let asset_count = self.repo.get_asset_count_for_provider(provider_id)?;
         if asset_count > 0 {
             return Err(ValidationError::InvalidInput(format!(
