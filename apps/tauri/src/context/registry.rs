@@ -178,4 +178,10 @@ impl ServiceContext {
     pub fn health_service(&self) -> Arc<health::HealthService> {
         Arc::clone(&self.health_service)
     }
+
+    pub fn custom_provider_service(
+        &self,
+    ) -> Arc<wealthfolio_core::custom_provider::CustomProviderService> {
+        Arc::clone(&self.custom_provider_service)
+    }
 }
