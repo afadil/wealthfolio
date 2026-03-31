@@ -2582,6 +2582,14 @@ impl ActivityService {
             }
         }
     }
+
+    fn append_duplicate_comment(activity: &mut ActivityImport, duplicate_number: u32) {
+        let suffix = format!("\n\n-- Possible duplicate {}", duplicate_number);
+        match activity.comment.as_mut() {
+            Some(comment) => comment.push_str(&suffix),
+            None => activity.comment = Some(suffix),
+        }
+    }
 }
 
 #[async_trait::async_trait]
@@ -3100,6 +3108,7 @@ impl ActivityServiceTrait for ActivityService {
     async fn import_activities(
         &self,
         activities: Vec<ActivityImport>,
+        skip_deduplication: bool,
     ) -> Result<ImportActivitiesResult> {
         let total = activities.len();
 
@@ -3332,8 +3341,47 @@ impl ActivityServiceTrait for ActivityService {
 
         let mut duplicate_count = 0u32;
         let mut insertable_positions: Vec<usize> = Vec::with_capacity(new_activities.len());
+        let mut used_keys: HashSet<String> = existing_duplicates.keys().cloned().collect();
+        let mut skipped_dedup_duplicate_number_by_key: HashMap<String, u32> = HashMap::new();
 
-        for (position, activity) in new_activities.iter().enumerate() {
+        for position in 0..new_activities.len() {
+            if skip_deduplication {
+                if let Some(current_key) = new_activities[position].idempotency_key.clone() {
+                    if used_keys.contains(&current_key) {
+                        let dup_num = *skipped_dedup_duplicate_number_by_key
+                            .entry(current_key)
+                            .and_modify(|c| *c += 1)
+                            .or_insert(1);
+
+                        // Key is already in used_keys, so the loop body runs at least once.
+                        while new_activities[position]
+                            .idempotency_key
+                            .as_ref()
+                            .is_some_and(|k| used_keys.contains(k))
+                        {
+                            if let Some((_, imp)) = import_activities_indexed.get_mut(position) {
+                                Self::append_duplicate_comment(imp, dup_num);
+                                new_activities[position].notes = imp.comment.clone();
+                                new_activities[position].idempotency_key =
+                                    Self::build_import_idempotency_key(
+                                        imp,
+                                        &new_activities[position].account_id,
+                                    );
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if let Some(key) = new_activities[position].idempotency_key.clone() {
+                    used_keys.insert(key);
+                }
+                insertable_positions.push(position);
+                continue;
+            }
+
+            let activity = &new_activities[position];
             let Some(key) = activity.idempotency_key.as_ref() else {
                 insertable_positions.push(position);
                 continue;

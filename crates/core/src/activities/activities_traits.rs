@@ -181,6 +181,7 @@ pub trait ActivityServiceTrait: Send + Sync {
     async fn import_activities(
         &self,
         activities: Vec<ActivityImport>,
+        skip_deduplication: bool,
     ) -> Result<ImportActivitiesResult>;
     async fn link_account_template(
         &self,

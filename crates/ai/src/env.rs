@@ -329,6 +329,7 @@ pub mod test_env {
         async fn import_activities(
             &self,
             _activities: Vec<ActivityImport>,
+            _skip_deduplication: bool,
         ) -> CoreResult<wealthfolio_core::activities::ImportActivitiesResult> {
             unimplemented!("MockActivityService::import_activities")
         }

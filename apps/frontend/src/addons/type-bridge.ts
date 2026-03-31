@@ -3,7 +3,7 @@
  * These utilities help convert between the main app's internal types and the SDK's public types
  */
 
-import type { EventCallback, UnlistenFn } from "@/adapters";
+import type { EventCallback, HoldingInput, UnlistenFn } from "@/adapters";
 import type {
   Account,
   AccountValuation,
@@ -38,7 +38,6 @@ import type {
   SimplePerformanceMetrics,
   UpdateAssetProfile,
 } from "@/lib/types";
-import type { HoldingInput } from "@/adapters";
 import type { HostAPI as SDKHostAPI } from "@wealthfolio/addon-sdk";
 
 /**
@@ -151,7 +150,10 @@ export interface InternalHostAPI {
   listenMarketSyncComplete<T>(handler: EventCallback<T>): Promise<UnlistenFn>;
 
   // Activity import
-  importActivities(params: { activities: ActivityImport[] }): Promise<ImportActivitiesResult>;
+  importActivities(params: {
+    activities: ActivityImport[];
+    skipDeduplication?: boolean;
+  }): Promise<ImportActivitiesResult>;
   checkActivitiesImport(params: { activities: ActivityImport[] }): Promise<ActivityImport[]>;
   getAccountImportMapping(accountId: string, contextKind?: string): Promise<ImportMappingData>;
   saveAccountImportMapping(mapping: ImportMappingData): Promise<ImportMappingData>;
@@ -237,7 +239,8 @@ export function createSDKHostAPIBridge(
         Array.isArray(input)
           ? internalAPI.saveActivities({ updates: input })
           : internalAPI.saveActivities(input),
-      import: (activities: ActivityImport[]) => internalAPI.importActivities({ activities }),
+      import: (activities: ActivityImport[], skipDeduplication?: boolean) =>
+        internalAPI.importActivities({ activities, skipDeduplication }),
       checkImport: (activities: ActivityImport[]) =>
         internalAPI.checkActivitiesImport({ activities }),
       getImportMapping: internalAPI.getAccountImportMapping,

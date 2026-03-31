@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { Button } from "@wealthfolio/ui/components/ui/button";
+import { Checkbox } from "@wealthfolio/ui/components/ui/checkbox";
 import { Icons, type Icon } from "@wealthfolio/ui/components/ui/icons";
+import { Label } from "@wealthfolio/ui/components/ui/label";
 import { ProgressIndicator } from "@wealthfolio/ui/components/ui/progress-indicator";
 import {
   useImportContext,
@@ -180,6 +182,7 @@ export function ConfirmStep() {
   const { state, dispatch } = useImportContext();
   const [importError, setImportError] = useState<string | null>(null);
   const [isPreparingAssets, setIsPreparingAssets] = useState(false);
+  const [skipDeduplication, setSkipDeduplication] = useState(false);
 
   const { confirmImportMutation } = useActivityImportMutations({
     onSuccess: (_activities, result) => {
@@ -339,7 +342,7 @@ export function ConfirmStep() {
         }),
       );
 
-      confirmImportMutation.mutate({ activities: activitiesToImport });
+      confirmImportMutation.mutate({ activities: activitiesToImport, skipDeduplication });
     } catch (error) {
       persistCreatedAssets(createdAssetIdsByKey);
       setImportError(
@@ -482,6 +485,24 @@ export function ConfirmStep() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Skip deduplication option */}
+      <div className="bg-muted/20 rounded-lg border p-4">
+        <div className="flex items-start gap-3">
+          <Checkbox
+            id="skip-deduplication"
+            checked={skipDeduplication}
+            onCheckedChange={(checked) => setSkipDeduplication(Boolean(checked))}
+          />
+          <Label htmlFor="skip-deduplication" className="text-sm font-medium">
+            Allow duplicates
+            <span className="text-muted-foreground ml-1 text-xs font-normal">
+              - skip deduplication for this import and insert activities even if they match existing
+              records.
+            </span>
+          </Label>
+        </div>
       </div>
 
       {/* Progress indicator dialog */}

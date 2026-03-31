@@ -3023,7 +3023,7 @@ mod tests {
         };
 
         let result = activity_service
-            .import_activities(vec![unresolved])
+            .import_activities(vec![unresolved], false)
             .await
             .expect("import should complete with validation feedback");
 
@@ -3092,7 +3092,7 @@ mod tests {
         };
 
         let result = activity_service
-            .import_activities(vec![drip])
+            .import_activities(vec![drip], false)
             .await
             .expect("import should complete with validation feedback");
 
@@ -3157,7 +3157,7 @@ mod tests {
         };
 
         let result = activity_service
-            .import_activities(vec![dividend_in_kind])
+            .import_activities(vec![dividend_in_kind], false)
             .await
             .expect("import should complete with validation feedback");
 
@@ -3222,7 +3222,7 @@ mod tests {
         };
 
         let result = activity_service
-            .import_activities(vec![staking_reward])
+            .import_activities(vec![staking_reward], false)
             .await
             .expect("import should complete with validation feedback");
 
@@ -3353,7 +3353,7 @@ mod tests {
         };
 
         let result = activity_service
-            .import_activities(vec![cash_dividend])
+            .import_activities(vec![cash_dividend], false)
             .await
             .expect("cash dividend import should succeed");
 
@@ -3427,7 +3427,7 @@ mod tests {
         };
 
         let result = activity_service
-            .import_activities(vec![resolved])
+            .import_activities(vec![resolved], false)
             .await
             .expect("import should succeed");
 
@@ -3496,7 +3496,7 @@ mod tests {
         };
 
         let result = activity_service
-            .import_activities(vec![manual_row])
+            .import_activities(vec![manual_row], false)
             .await
             .expect("manual quote import should succeed");
 
@@ -3565,7 +3565,7 @@ mod tests {
         };
 
         let result = activity_service
-            .import_activities(vec![invalid_date_row])
+            .import_activities(vec![invalid_date_row], false)
             .await
             .expect("import should return validation feedback");
 
@@ -3632,7 +3632,7 @@ mod tests {
         };
 
         let result = activity_service
-            .import_activities(vec![cash_row])
+            .import_activities(vec![cash_row], false)
             .await
             .expect("cash import should succeed");
 
@@ -3727,7 +3727,7 @@ mod tests {
         };
 
         let result = activity_service
-            .import_activities(vec![transfer_out, transfer_in])
+            .import_activities(vec![transfer_out, transfer_in], false)
             .await
             .expect("transfer import should succeed");
 
@@ -3858,7 +3858,7 @@ mod tests {
         };
 
         let result = activity_service
-            .import_activities(vec![duplicate])
+            .import_activities(vec![duplicate], false)
             .await
             .expect("import should succeed");
 
@@ -3866,6 +3866,7 @@ mod tests {
         assert_eq!(result.summary.imported, 0);
         assert_eq!(result.summary.duplicates, 1);
         assert_eq!(result.summary.skipped, 1);
+        assert_eq!(result.summary.error_message, None);
         assert_eq!(
             result.activities[0].duplicate_of_id.as_deref(),
             Some("existing-dup")
@@ -3934,7 +3935,7 @@ mod tests {
                     line_number: Some(2),
                     ..import
                 },
-            ])
+            ], false)
             .await
             .expect("import should succeed");
 
@@ -3942,6 +3943,7 @@ mod tests {
         assert_eq!(result.summary.imported, 1);
         assert_eq!(result.summary.duplicates, 1);
         assert_eq!(result.summary.skipped, 1);
+        assert_eq!(result.summary.error_message, None);
         assert_eq!(result.activities[1].duplicate_of_line_number, Some(1));
 
         let stored = activity_repository
@@ -4363,7 +4365,7 @@ mod tests {
         };
 
         let result = activity_service
-            .import_activities(vec![resolved])
+            .import_activities(vec![resolved], false)
             .await
             .expect("import should succeed for bond");
 
@@ -4427,7 +4429,7 @@ mod tests {
             };
 
             let result = activity_service
-                .import_activities(vec![resolved])
+                .import_activities(vec![resolved], false)
                 .await
                 .unwrap_or_else(|_| panic!("import should succeed for alias '{}'", alias));
 
@@ -4645,7 +4647,7 @@ mod tests {
         };
 
         let result = activity_service
-            .import_activities(vec![resolved])
+            .import_activities(vec![resolved], false)
             .await
             .expect("import should succeed for option");
 
@@ -4804,5 +4806,287 @@ mod tests {
             Some("aapl-opt-uuid".to_string()),
             "OCC symbol should match existing option asset"
         );
+    }
+
+    // ==========================================================================
+    // Skip Deduplication Tests
+    // ==========================================================================
+
+    /// Test: When skip_deduplication is false (default), duplicates are detected and skipped
+    #[tokio::test]
+    async fn test_import_with_deduplication_enabled() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        let asset = create_test_asset_with_instrument(
+            "AAPL",
+            "AAPL",
+            Some("XNAS"),
+            Some(InstrumentType::Equity),
+            "USD",
+        );
+        asset_service.add_asset(asset);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        // First import
+        let import1 = ActivityImport {
+            id: None,
+            date: "2024-01-15".to_string(),
+            symbol: "AAPL".to_string(),
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(10)),
+            unit_price: Some(dec!(150)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(1500)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: None,
+            exchange_mic: Some("XNAS".to_string()),
+            quote_ccy: Some("USD".to_string()),
+            instrument_type: Some("EQUITY".to_string()),
+            quote_mode: Some("MARKET".to_string()),
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+            asset_id: None,
+            isin: None,
+        };
+
+        let result1 = activity_service
+            .import_activities(vec![import1.clone()], false)
+            .await;
+        assert!(result1.is_ok());
+        let result1 = result1.unwrap();
+        assert_eq!(result1.summary.imported, 1);
+        assert_eq!(result1.summary.duplicates, 0);
+
+        // Second import with the same activity - should be detected as duplicate
+        let import2 = import1.clone();
+        let result2 = activity_service
+            .import_activities(vec![import2], false)
+            .await;
+        assert!(result2.is_ok());
+        let result2 = result2.unwrap();
+        assert_eq!(
+            result2.summary.imported, 0,
+            "Duplicate should not be imported"
+        );
+        assert_eq!(result2.summary.duplicates, 1, "Should detect 1 duplicate");
+        assert_eq!(result2.summary.skipped, 1, "Duplicate should be skipped");
+    }
+
+    #[tokio::test]
+    async fn test_import_with_deduplication_disabled() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        let asset = create_test_asset_with_instrument(
+            "AAPL",
+            "AAPL",
+            Some("XNAS"),
+            Some(InstrumentType::Equity),
+            "USD",
+        );
+        asset_service.add_asset(asset);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        // First import
+        let import1 = ActivityImport {
+            id: None,
+            date: "2024-01-15".to_string(),
+            symbol: "AAPL".to_string(),
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(10)),
+            unit_price: Some(dec!(150)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(1500)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: None,
+            exchange_mic: Some("XNAS".to_string()),
+            quote_ccy: Some("USD".to_string()),
+            instrument_type: Some("EQUITY".to_string()),
+            quote_mode: Some("MARKET".to_string()),
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+            asset_id: None,
+            isin: None,
+        };
+
+        let result1 = activity_service
+            .import_activities(vec![import1.clone()], true)
+            .await;
+        assert!(result1.is_ok());
+        let result1 = result1.unwrap();
+        assert_eq!(result1.summary.imported, 1);
+        assert_eq!(result1.summary.duplicates, 0);
+
+        // Second import with the same activity - should be imported again
+        let import2 = import1.clone();
+        let result2 = activity_service
+            .import_activities(vec![import2], true)
+            .await;
+        assert!(result2.is_ok());
+        let result2 = result2.unwrap();
+        assert_eq!(
+            result2.summary.imported, 1,
+            "Duplicate should be imported when skip_deduplication=true"
+        );
+        assert_eq!(
+            result2.summary.duplicates, 0,
+            "Should not detect duplicates when skip_deduplication=true"
+        );
+        assert_eq!(result2.summary.skipped, 0, "Nothing should be skipped");
+        assert_eq!(
+            result2.activities[0].comment.as_deref(),
+            Some("\n\n-- Possible duplicate 1"),
+            "Duplicate description should be appended when deduplication is skipped"
+        );
+        assert_eq!(result2.summary.error_message, None);
+    }
+
+    #[tokio::test]
+    async fn test_import_with_skip_deduplication_allows_within_batch_duplicates() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "USD");
+        account_service.add_account(account);
+
+        let asset = create_test_asset_with_instrument(
+            "AAPL",
+            "AAPL",
+            Some("XNAS"),
+            Some(InstrumentType::Equity),
+            "USD",
+        );
+        asset_service.add_asset(asset);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        // Create two identical activities in the same batch
+        let import1 = ActivityImport {
+            id: None,
+            date: "2024-01-15".to_string(),
+            symbol: "AAPL".to_string(),
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(10)),
+            unit_price: Some(dec!(150)),
+            currency: "USD".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(1500)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: None,
+            exchange_mic: Some("XNAS".to_string()),
+            quote_ccy: Some("USD".to_string()),
+            instrument_type: Some("EQUITY".to_string()),
+            quote_mode: Some("MARKET".to_string()),
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+            asset_id: None,
+            isin: None,
+        };
+
+        let import2 = ActivityImport {
+            line_number: Some(2),
+            ..import1.clone()
+        };
+
+        // With deduplication enabled, only one should be imported
+        let result_with_dedup = activity_service
+            .import_activities(
+                vec![import1.clone(), import2.clone()],
+                false,
+            )
+            .await;
+        assert!(result_with_dedup.is_ok());
+        let result_with_dedup = result_with_dedup.unwrap();
+        assert_eq!(
+            result_with_dedup.summary.imported, 1,
+            "Only one activity should be imported with dedup enabled"
+        );
+        assert_eq!(result_with_dedup.summary.duplicates, 1);
+
+        // With deduplication disabled, both should be imported
+        let result_skip_dedup = activity_service
+            .import_activities(vec![import1, import2], true)
+            .await;
+        assert!(result_skip_dedup.is_ok());
+        let result_skip_dedup = result_skip_dedup.unwrap();
+        assert_eq!(
+            result_skip_dedup.summary.imported, 2,
+            "Both activities should be imported when deduplication is disabled"
+        );
+        assert_eq!(
+            result_skip_dedup.summary.duplicates, 0,
+            "No duplicates should be detected"
+        );
+        assert_eq!(
+            result_skip_dedup.activities[1].comment.as_deref(),
+            Some("\n\n-- Possible duplicate 2"),
+            "Within-batch duplicate should get appended description"
+        );
+        assert_eq!(result_skip_dedup.summary.error_message, None);
     }
 }

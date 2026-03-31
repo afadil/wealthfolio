@@ -222,13 +222,14 @@ pub async fn preview_import_assets(
 #[tauri::command]
 pub async fn import_activities(
     activities: Vec<ActivityImport>,
+    skip_deduplication: bool,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<ImportActivitiesResult, String> {
     debug!("Importing {} activities", activities.len());
     // Domain events handle recalculation and asset enrichment automatically
     state
         .activity_service()
-        .import_activities(activities)
+        .import_activities(activities, skip_deduplication)
         .await
         .map_err(|e| e.to_string())
 }

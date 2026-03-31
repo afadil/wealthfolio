@@ -156,6 +156,8 @@ async fn check_activities_import(
 #[derive(serde::Deserialize)]
 struct ImportBody {
     activities: Vec<ActivityImport>,
+    #[serde(rename = "skipDeduplication", default)]
+    skip_deduplication: bool,
 }
 
 async fn import_activities(
@@ -164,7 +166,7 @@ async fn import_activities(
 ) -> ApiResult<Json<ImportActivitiesResult>> {
     let result = state
         .activity_service
-        .import_activities(body.activities)
+        .import_activities(body.activities, body.skip_deduplication)
         .await?;
     // Domain events handle asset enrichment and portfolio recalculation
     Ok(Json(result))

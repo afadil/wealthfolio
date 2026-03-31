@@ -152,11 +152,16 @@ export const deleteActivity = async (activityId: string): Promise<Activity> => {
  */
 export const importActivities = async ({
   activities,
+  skipDeduplication = false,
 }: {
   activities: ActivityImport[];
+  skipDeduplication?: boolean;
 }): Promise<ImportActivitiesResult> => {
   try {
-    return await invoke<ImportActivitiesResult>("import_activities", { activities });
+    return await invoke<ImportActivitiesResult>("import_activities", {
+      activities,
+      skipDeduplication,
+    });
   } catch (err) {
     logger.error(`Error importing activities: ${err}`);
     throw err;
