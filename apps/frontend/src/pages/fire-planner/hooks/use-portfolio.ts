@@ -5,7 +5,9 @@ import type { FireSettings } from "../types";
 
 const INVESTMENT_TYPES = new Set(["SECURITIES", "CRYPTOCURRENCY"]);
 
-export function usePortfolioData(settings?: Pick<FireSettings, "includedAccountIds">) {
+export function usePortfolioData(
+  settingsOrAccountIds?: Pick<FireSettings, "includedAccountIds"> | string[],
+) {
   const accountsQuery = useQuery({
     queryKey: ["fire-planner-accounts"],
     queryFn: () => getAccounts(),
@@ -15,9 +17,14 @@ export function usePortfolioData(settings?: Pick<FireSettings, "includedAccountI
   const accounts = accountsQuery.data ?? [];
   const allActiveAccounts = accounts.filter((a) => a.isActive && !a.isArchived);
 
+  // Accept either explicit account IDs array or settings object
+  const explicitIds = Array.isArray(settingsOrAccountIds)
+    ? settingsOrAccountIds
+    : settingsOrAccountIds?.includedAccountIds;
+
   const activeAccountIds = (
-    settings?.includedAccountIds && settings.includedAccountIds.length > 0
-      ? allActiveAccounts.filter((a) => settings.includedAccountIds!.includes(a.id))
+    explicitIds && explicitIds.length > 0
+      ? allActiveAccounts.filter((a) => explicitIds.includes(a.id))
       : allActiveAccounts.filter((a) => INVESTMENT_TYPES.has(a.accountType))
   ).map((a) => a.id);
 
