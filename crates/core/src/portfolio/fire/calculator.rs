@@ -28,21 +28,21 @@ fn sample_inflation<R: Rng>(rng: &mut R, mean: f64) -> f64 {
 
 /// For DC streams, precompute the monthly payout from the accumulated balance at start_age.
 /// Uses a deterministic FV formula (pension accumulation is not stochastic).
+/// `retirement_age`: the candidate age at which contributions stop (actual FI age, not necessarily target).
 /// DB streams (stream_type = None / DefinedBenefit) are not present in the returned map.
 fn resolve_dc_payouts(
     streams: &[IncomeStream],
     current_age: u32,
-    target_fire_age: u32,
+    retirement_age: u32,
     swr: f64,
 ) -> HashMap<String, f64> {
     streams
         .iter()
         .filter(|s| s.stream_type == Some(StreamType::DefinedContribution))
         .map(|s| {
-            let total_years =
-                (s.start_age as i32 - current_age as i32).max(0) as u32;
+            let total_years = (s.start_age as i32 - current_age as i32).max(0) as u32;
             let contrib_years =
-                (s.start_age.min(target_fire_age) as i32 - current_age as i32).max(0) as u32;
+                (s.start_age.min(retirement_age) as i32 - current_age as i32).max(0) as u32;
             let growth_only_years = total_years - contrib_years;
             let r = s.accumulation_return.unwrap_or(0.04);
             let initial = s.current_value.unwrap_or(0.0);
@@ -79,7 +79,10 @@ fn additional_income_at_age(
         .iter()
         .filter(|s| age >= s.start_age)
         .map(|s| {
-            let base_monthly = resolved_payouts.get(&s.id).copied().unwrap_or(s.monthly_amount);
+            let base_monthly = resolved_payouts
+                .get(&s.id)
+                .copied()
+                .unwrap_or(s.monthly_amount);
             let annual = base_monthly * 12.0;
             if let Some(r) = s.annual_growth_rate {
                 // Custom growth rate: always deterministic
@@ -113,7 +116,12 @@ fn healthcare_cost_at_year(settings: &FireSettings, i: u32) -> f64 {
 /// `i` = years from current age; `in_fire` = withdrawal phase.
 /// During accumulation the base equity parameters are returned unchanged.
 /// During withdrawal the parameters are blended with the bond allocation from the glide path.
-fn blended_return_params(settings: &FireSettings, i: u32, in_fire: bool) -> (f64, f64) {
+fn blended_return_params(
+    settings: &FireSettings,
+    i: u32,
+    in_fire: bool,
+    retirement_start_age: u32,
+) -> (f64, f64) {
     let gp = match settings.glide_path.as_ref() {
         Some(gp) if gp.enabled => gp,
         _ => {
@@ -129,10 +137,9 @@ fn blended_return_params(settings: &FireSettings, i: u32, in_fire: bool) -> (f64
             settings.expected_return_std_dev,
         );
     }
-    let years_to_fire =
-        (settings.target_fire_age as i32 - settings.current_age as i32).max(0) as f64;
+    let years_to_fire = (retirement_start_age as i32 - settings.current_age as i32).max(0) as f64;
     let years_in_retirement =
-        (settings.planning_horizon_age as i32 - settings.target_fire_age as i32).max(1) as f64;
+        (settings.planning_horizon_age as i32 - retirement_start_age as i32).max(1) as f64;
     let years_from_fire = (i as f64 - years_to_fire).max(0.0);
     let t = (years_from_fire / years_in_retirement).clamp(0.0, 1.0);
     let bond_pct = (gp.bond_allocation_at_fire
@@ -149,7 +156,7 @@ fn blended_return_params_mc(
     base_mean: f64,
     base_std: f64,
     current_age: u32,
-    target_fire_age: u32,
+    retirement_start_age: u32,
     planning_horizon_age: u32,
     gp: Option<&GlidepathSettings>,
     i: u32,
@@ -162,9 +169,9 @@ fn blended_return_params_mc(
     if !in_fire {
         return (base_mean, base_std);
     }
-    let years_to_fire = (target_fire_age as i32 - current_age as i32).max(0) as f64;
+    let years_to_fire = (retirement_start_age as i32 - current_age as i32).max(0) as f64;
     let years_in_retirement =
-        (planning_horizon_age as i32 - target_fire_age as i32).max(1) as f64;
+        (planning_horizon_age as i32 - retirement_start_age as i32).max(1) as f64;
     let years_from_fire = (i as f64 - years_to_fire).max(0.0);
     let t = (years_from_fire / years_in_retirement).clamp(0.0, 1.0);
     let bond_pct = (gp.bond_allocation_at_fire
@@ -190,13 +197,19 @@ pub fn calculate_fire_target(settings: &FireSettings) -> f64 {
     (total_monthly * 12.0) / settings.safe_withdrawal_rate
 }
 
-pub fn calculate_net_fire_target(settings: &FireSettings) -> f64 {
-    let resolved =
-        resolve_dc_payouts(&settings.additional_income_streams, settings.current_age, settings.target_fire_age, settings.safe_withdrawal_rate);
+/// Net FIRE target at a given candidate retirement age.
+/// Only income streams available by `retirement_age` reduce the target.
+pub fn calculate_net_fire_target(settings: &FireSettings, retirement_age: u32) -> f64 {
+    let resolved = resolve_dc_payouts(
+        &settings.additional_income_streams,
+        settings.current_age,
+        retirement_age,
+        settings.safe_withdrawal_rate,
+    );
     let income_at_fire_age: f64 = settings
         .additional_income_streams
         .iter()
-        .filter(|s| s.start_age <= settings.target_fire_age)
+        .filter(|s| s.start_age <= retirement_age)
         .map(|s| resolved.get(&s.id).copied().unwrap_or(s.monthly_amount))
         .sum();
     let total_monthly =
@@ -206,7 +219,7 @@ pub fn calculate_net_fire_target(settings: &FireSettings) -> f64 {
 }
 
 pub fn calculate_coast_fire_amount(settings: &FireSettings) -> f64 {
-    let fire_target = calculate_net_fire_target(settings);
+    let fire_target = calculate_net_fire_target(settings, settings.target_fire_age);
     let years_to_grow = settings.target_fire_age as i32 - settings.current_age as i32;
     if years_to_grow <= 0 {
         return fire_target;
@@ -229,7 +242,9 @@ fn step_pension_funds(
         if !has_accumulation {
             continue;
         }
-        let current = *balances.get(&s.id).unwrap_or(&s.current_value.unwrap_or(0.0));
+        let current = *balances
+            .get(&s.id)
+            .unwrap_or(&s.current_value.unwrap_or(0.0));
         if age < s.start_age {
             let r = s.accumulation_return.unwrap_or(0.04);
             let contributions = if in_fire {
@@ -250,13 +265,6 @@ fn step_pension_funds(
 // ─── Deterministic Projection ──────────────────────────────────────────────────
 
 pub fn project_fire_date(settings: &FireSettings, current_portfolio: f64) -> FireProjection {
-    let resolved_payouts = resolve_dc_payouts(
-        &settings.additional_income_streams,
-        settings.current_age,
-        settings.target_fire_age,
-        settings.safe_withdrawal_rate,
-    );
-    let real_fire_target = calculate_net_fire_target(settings);
     let coast_amount = calculate_coast_fire_amount(settings);
     let start_year = chrono::Local::now().year() as u32;
     let horizon_years =
@@ -271,6 +279,8 @@ pub fn project_fire_date(settings: &FireSettings, current_portfolio: f64) -> Fir
     let mut portfolio_at_fire = 0.0;
     let mut funded_at_retirement = false;
     let mut in_fire = false;
+    let mut actual_retirement_age = settings.target_fire_age;
+    let mut resolved_payouts: Option<HashMap<String, f64>> = None;
     let mut year_by_year = Vec::new();
 
     let mut pension_balances: HashMap<String, f64> = settings
@@ -288,13 +298,22 @@ pub fn project_fire_date(settings: &FireSettings, current_portfolio: f64) -> Fir
 
         // Trigger retirement when FI target reached OR forced by target_fire_age.
         // fire_age is only set when FI is actually reached (portfolio >= target).
-        let nominal_fire_target =
-            real_fire_target * (1.0 + settings.inflation_rate).powi(i as i32);
+        // Net target is computed per-year: only income available at THIS age reduces it.
+        let real_fire_target = calculate_net_fire_target(settings, age);
+        let nominal_fire_target = real_fire_target * (1.0 + settings.inflation_rate).powi(i as i32);
         if !in_fire {
             let fi_reached = portfolio >= nominal_fire_target;
             let age_forced = age >= settings.target_fire_age;
             if fi_reached || age_forced {
                 in_fire = true;
+                actual_retirement_age = age;
+                // Resolve DC payouts once at the actual retirement age
+                resolved_payouts = Some(resolve_dc_payouts(
+                    &settings.additional_income_streams,
+                    settings.current_age,
+                    age,
+                    settings.safe_withdrawal_rate,
+                ));
                 if fi_reached {
                     fire_age = Some(age);
                     fire_year = Some(year);
@@ -305,16 +324,18 @@ pub fn project_fire_date(settings: &FireSettings, current_portfolio: f64) -> Fir
         }
 
         // Year-specific return accounting for glide path
-        let (r, _) = blended_return_params(settings, i, in_fire);
+        let (r, _) = blended_return_params(settings, i, in_fire, actual_retirement_age);
 
         if in_fire {
-            let annual_living =
-                settings.monthly_expenses_at_fire * 12.0 * (1.0 + settings.inflation_rate).powi(i as i32);
+            let payouts = resolved_payouts.as_ref().unwrap();
+            let annual_living = settings.monthly_expenses_at_fire
+                * 12.0
+                * (1.0 + settings.inflation_rate).powi(i as i32);
             let annual_healthcare = healthcare_cost_at_year(settings, i);
             let annual_expenses = annual_living + annual_healthcare;
             let annual_income = additional_income_at_age(
                 &settings.additional_income_streams,
-                &resolved_payouts,
+                payouts,
                 age,
                 i,
                 settings.inflation_rate,
@@ -384,7 +405,6 @@ pub fn run_monte_carlo(
     current_portfolio: f64,
     n_sims: u32,
 ) -> MonteCarloResult {
-    let real_fire_target = calculate_net_fire_target(settings);
     let horizon_years =
         (settings.planning_horizon_age as i32 - settings.current_age as i32).max(1) as u32;
     let contrib_growth = settings
@@ -411,8 +431,23 @@ pub fn run_monte_carlo(
         .healthcare_inflation_rate
         .unwrap_or(settings.inflation_rate);
     let glide_path = settings.glide_path.clone();
-    // Pension accumulation is deterministic — resolve DC payouts once, share across all sims.
-    let resolved_payouts = resolve_dc_payouts(&settings.additional_income_streams, current_age, target_fire_age, swr);
+
+    // Precompute per-age net targets and DC payouts for all possible retirement ages.
+    // These are deterministic and shared across all simulations.
+    let age_range = horizon_years as usize + 1;
+    let per_age_targets: Vec<f64> = (0..age_range)
+        .map(|i| calculate_net_fire_target(settings, current_age + i as u32))
+        .collect();
+    let per_age_payouts: Vec<HashMap<String, f64>> = (0..age_range)
+        .map(|i| {
+            resolve_dc_payouts(
+                &settings.additional_income_streams,
+                current_age,
+                current_age + i as u32,
+                swr,
+            )
+        })
+        .collect();
 
     // paths[sim] = (year_values, survived, fi_age)
     // fi_age: age when portfolio first reached the FIRE target (None if never reached)
@@ -426,19 +461,23 @@ pub fn run_monte_carlo(
             let mut portfolio_at_retirement_start = current_portfolio;
             let mut path = Vec::with_capacity(horizon_years as usize + 1);
             let mut cumulative_inflation = 1.0_f64;
+            let mut sim_resolved_payouts: Option<&HashMap<String, f64>> = None;
+            let mut sim_retirement_age = target_fire_age;
 
             for i in 0..=horizon_years {
                 let age = current_age + i;
                 path.push(portfolio.max(0.0));
 
-                let nominal_fire_target =
-                    real_fire_target * (1.0 + inflation_rate).powi(i as i32);
+                let real_fire_target = per_age_targets[i as usize];
+                let nominal_fire_target = real_fire_target * (1.0 + inflation_rate).powi(i as i32);
                 if !in_fire {
                     let fi_reached = portfolio >= nominal_fire_target;
                     let age_forced = age >= target_fire_age;
                     if fi_reached || age_forced {
                         in_fire = true;
+                        sim_retirement_age = age;
                         portfolio_at_retirement_start = portfolio;
+                        sim_resolved_payouts = Some(&per_age_payouts[i as usize]);
                         if fi_reached {
                             sim_fi_age = Some(age);
                         }
@@ -447,21 +486,28 @@ pub fn run_monte_carlo(
 
                 // Glide-path-blended return distribution for this year
                 let (eff_mean, eff_std) = blended_return_params_mc(
-                    mean, std_dev, current_age, target_fire_age, planning_horizon_age,
-                    glide_path.as_ref(), i, in_fire,
+                    mean,
+                    std_dev,
+                    current_age,
+                    sim_retirement_age,
+                    planning_horizon_age,
+                    glide_path.as_ref(),
+                    i,
+                    in_fire,
                 );
                 let annual_return = sample_return(&mut rng, eff_mean, eff_std);
 
                 if in_fire {
+                    let payouts = sim_resolved_payouts.unwrap();
                     let annual_living = monthly_expenses * 12.0 * cumulative_inflation;
-                    let annual_healthcare = healthcare_monthly * 12.0
-                        * (1.0 + healthcare_rate).powi(i as i32);
+                    let annual_healthcare =
+                        healthcare_monthly * 12.0 * (1.0 + healthcare_rate).powi(i as i32);
                     let annual_expenses = annual_living + annual_healthcare;
                     // Pass cumulative_inflation so inflation-indexed income tracks the same
                     // stochastic path as expenses (fixes systematic inflation asymmetry).
                     let annual_income = additional_income_at_age(
                         &streams,
-                        &resolved_payouts,
+                        payouts,
                         age,
                         i,
                         inflation_rate,
@@ -496,10 +542,7 @@ pub fn run_monte_carlo(
     let year_count = horizon_years as usize + 1;
     let survived_count = sim_results.iter().filter(|(_, s, _)| *s).count();
     // Only collect ages where FI target was genuinely reached (fi_age is Some)
-    let mut fire_ages: Vec<u32> = sim_results
-        .iter()
-        .filter_map(|(_, _, fa)| *fa)
-        .collect();
+    let mut fire_ages: Vec<u32> = sim_results.iter().filter_map(|(_, _, fa)| *fa).collect();
     fire_ages.sort_unstable();
 
     let mut p10 = Vec::with_capacity(year_count);
@@ -596,18 +639,18 @@ pub fn run_scenario_analysis(
 pub fn run_sequence_of_returns_risk(
     settings: &FireSettings,
     portfolio_at_fire: f64,
+    retirement_start_age: u32,
 ) -> Vec<SorrScenario> {
     let resolved_payouts = resolve_dc_payouts(
         &settings.additional_income_streams,
         settings.current_age,
-        settings.target_fire_age,
+        retirement_start_age,
         settings.safe_withdrawal_rate,
     );
     let r = settings.expected_annual_return;
     let years =
-        (settings.planning_horizon_age as i32 - settings.target_fire_age as i32).max(10) as usize;
-    let years_to_fire =
-        (settings.target_fire_age as i32 - settings.current_age as i32).max(0) as u32;
+        (settings.planning_horizon_age as i32 - retirement_start_age as i32).max(10) as usize;
+    let years_to_fire = (retirement_start_age as i32 - settings.current_age as i32).max(0) as u32;
     let use_constant_pct = matches!(
         settings.withdrawal_strategy,
         WithdrawalStrategy::ConstantPercentage
@@ -646,7 +689,7 @@ pub fn run_sequence_of_returns_risk(
 
             for i in 0..years {
                 path.push(portfolio.max(0.0));
-                let age = settings.target_fire_age + i as u32;
+                let age = retirement_start_age + i as u32;
                 let years_from_now = years_to_fire + i as u32;
                 let annual_living = settings.monthly_expenses_at_fire
                     * 12.0
@@ -669,7 +712,8 @@ pub fn run_sequence_of_returns_risk(
                 // Use scenario returns[i] but blend with glide path for the base-return component.
                 // For non-base scenarios the shock return overrides the actual return for that year;
                 // in subsequent years the scenario return already embeds the recovery premium.
-                let (glide_mean, _) = blended_return_params(settings, years_from_now, true);
+                let (glide_mean, _) =
+                    blended_return_params(settings, years_from_now, true, retirement_start_age);
                 let effective_return = if (returns[i] - r).abs() < 1e-9 {
                     // "normal" year: use glide-path-adjusted mean
                     glide_mean
@@ -824,7 +868,7 @@ mod tests {
     #[test]
     fn net_fire_target_no_streams() {
         let s = base_settings();
-        assert_eq!(calculate_net_fire_target(&s), 900_000.0);
+        assert_eq!(calculate_net_fire_target(&s, s.target_fire_age), 900_000.0);
     }
 
     #[test]
@@ -846,7 +890,7 @@ mod tests {
             stream_type: None,
         });
         // net monthly = 3000 - 1200 = 1800; target = 1800 * 12 / 0.04 = 540_000
-        assert_eq!(calculate_net_fire_target(&s), 540_000.0);
+        assert_eq!(calculate_net_fire_target(&s, s.target_fire_age), 540_000.0);
     }
 
     #[test]
@@ -867,7 +911,7 @@ mod tests {
             accumulation_return: None,
             stream_type: None,
         });
-        assert_eq!(calculate_net_fire_target(&s), 900_000.0);
+        assert_eq!(calculate_net_fire_target(&s, s.target_fire_age), 900_000.0);
     }
 
     #[test]
@@ -893,16 +937,13 @@ mod tests {
         assert!(result.success_rate >= 0.0 && result.success_rate <= 1.0);
         assert_eq!(result.n_simulations, 500);
         assert_eq!(result.age_axis.first(), Some(&s.current_age));
-        assert_eq!(
-            result.age_axis.last(),
-            Some(&s.planning_horizon_age)
-        );
+        assert_eq!(result.age_axis.last(), Some(&s.planning_horizon_age));
     }
 
     #[test]
     fn sorr_produces_five_scenarios() {
         let s = base_settings();
-        let scenarios = run_sequence_of_returns_risk(&s, 900_000.0);
+        let scenarios = run_sequence_of_returns_risk(&s, 900_000.0, s.target_fire_age);
         assert_eq!(scenarios.len(), 5);
         // Base scenario should survive with a healthy portfolio
         assert!(scenarios[0].survived);
@@ -916,5 +957,123 @@ mod tests {
         assert_eq!(result.contribution.return_columns.len(), 6);
         assert_eq!(result.contribution.fire_ages.len(), 5);
         assert_eq!(result.swr.swr_rows.len(), 5);
+    }
+
+    #[test]
+    fn net_target_higher_when_retiring_before_pension_starts() {
+        let mut s = base_settings();
+        // Pension starts at 60, target FIRE at 55
+        s.target_fire_age = 55;
+        s.additional_income_streams.push(IncomeStream {
+            id: "pension".into(),
+            label: "Pension".into(),
+            monthly_amount: 1_200.0,
+            start_age: 60,
+            start_age_is_auto: None,
+            adjust_for_inflation: false,
+            annual_growth_rate: None,
+            linked_account_id: None,
+            current_value: None,
+            monthly_contribution: None,
+            accumulation_return: None,
+            stream_type: None,
+        });
+        // At age 50: pension not available → full target
+        let target_at_50 = calculate_net_fire_target(&s, 50);
+        // At age 60: pension available → reduced target
+        let target_at_60 = calculate_net_fire_target(&s, 60);
+        assert!(
+            target_at_50 > target_at_60,
+            "target at 50 ({}) should be larger than at 60 ({}) because pension is not yet available",
+            target_at_50, target_at_60,
+        );
+        // At 50, no income streams → full gross target
+        assert_eq!(target_at_50, 900_000.0);
+        // At 60, €1200/mo pension → net monthly = 3000 - 1200 = 1800 → 540_000
+        assert_eq!(target_at_60, 540_000.0);
+    }
+
+    #[test]
+    fn dc_payout_varies_with_retirement_age() {
+        let mut s = base_settings();
+        // DC fund: €10k initial, €200/mo contribution, 4% return, starts paying at 65
+        s.additional_income_streams.push(IncomeStream {
+            id: "dc".into(),
+            label: "DC Fund".into(),
+            monthly_amount: 0.0, // ignored for DC
+            start_age: 65,
+            start_age_is_auto: None,
+            adjust_for_inflation: false,
+            annual_growth_rate: None,
+            linked_account_id: None,
+            current_value: Some(10_000.0),
+            monthly_contribution: Some(200.0),
+            accumulation_return: Some(0.04),
+            stream_type: Some(StreamType::DefinedContribution),
+        });
+        // Retiring at 50: contributions stop at 50, 15 years of growth-only until 65
+        let payouts_at_50 = resolve_dc_payouts(&s.additional_income_streams, 35, 50, 0.04);
+        // Retiring at 55: contributions until 55, 10 years of growth-only until 65
+        let payouts_at_55 = resolve_dc_payouts(&s.additional_income_streams, 35, 55, 0.04);
+        let payout_50 = payouts_at_50.get("dc").unwrap();
+        let payout_55 = payouts_at_55.get("dc").unwrap();
+        // Longer contribution period → higher payout
+        assert!(
+            payout_55 > payout_50,
+            "DC payout with retirement at 55 ({:.0}) should exceed retirement at 50 ({:.0})",
+            payout_55,
+            payout_50,
+        );
+    }
+
+    #[test]
+    fn early_fi_projection_does_not_subtract_deferred_income() {
+        let mut s = base_settings();
+        s.target_fire_age = 60;
+        // Give a huge portfolio so FI is immediate
+        s.monthly_contribution = 0.0;
+        // Pension at 60 — should NOT help an earlier FI check
+        s.additional_income_streams.push(IncomeStream {
+            id: "pension".into(),
+            label: "Late Pension".into(),
+            monthly_amount: 2_000.0,
+            start_age: 60,
+            start_age_is_auto: None,
+            adjust_for_inflation: false,
+            annual_growth_rate: None,
+            linked_account_id: None,
+            current_value: None,
+            monthly_contribution: None,
+            accumulation_return: None,
+            stream_type: None,
+        });
+        // At target age 60, net target = (3000-2000)*12/0.04 = 300_000
+        let target_at_60 = calculate_net_fire_target(&s, 60);
+        assert_eq!(target_at_60, 300_000.0);
+        // At age 35 (current), net target = 3000*12/0.04 = 900_000 (no pension yet)
+        let target_at_35 = calculate_net_fire_target(&s, 35);
+        assert_eq!(target_at_35, 900_000.0);
+        // With 500k portfolio: should NOT reach FI at 35 (needs 900k), but would at 60 (needs 300k)
+        let proj = project_fire_date(&s, 500_000.0);
+        assert!(proj.fire_age.is_some(), "should eventually reach FIRE");
+        assert!(
+            proj.fire_age.unwrap() > 35,
+            "should not report FI at age 35 with only 500k vs 900k target",
+        );
+    }
+
+    #[test]
+    fn sorr_uses_retirement_start_age() {
+        let s = base_settings();
+        // SORR at age 50 (early retirement) vs 55 (target age)
+        let sorr_50 = run_sequence_of_returns_risk(&s, 900_000.0, 50);
+        let sorr_55 = run_sequence_of_returns_risk(&s, 900_000.0, 55);
+        // Earlier retirement → longer withdrawal period → more data points
+        assert!(
+            sorr_50[0].portfolio_path.len() > sorr_55[0].portfolio_path.len(),
+            "SORR at 50 should have longer path ({}) than at 55 ({})",
+            sorr_50[0].portfolio_path.len(),
+            sorr_55[0].portfolio_path.len(),
+        );
     }
 }
