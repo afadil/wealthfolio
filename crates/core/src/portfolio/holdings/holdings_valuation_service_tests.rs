@@ -10,7 +10,7 @@ mod tests {
     use crate::portfolio::holdings::holdings_valuation_service::{
         HoldingsValuationService, HoldingsValuationServiceTrait,
     };
-    use crate::quotes::{DataSource, MarketDataError};
+    use crate::quotes::MarketDataError;
     use crate::quotes::{
         LatestQuotePair, LatestQuoteSnapshot, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait,
         QuoteSyncState, SymbolSearchResult, SymbolSyncPlan, SyncResult,

@@ -1422,10 +1422,8 @@ where
                     .flatten()
                     .map(|k| !k.is_empty())
                     .unwrap_or(false)
-            } else if requires_key {
-                false
             } else {
-                true
+                !requires_key
             };
 
             // Get sync stats for this provider

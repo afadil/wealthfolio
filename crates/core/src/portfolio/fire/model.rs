@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub enum WithdrawalStrategy {
+    #[default]
     #[serde(rename = "constant-dollar")]
     #[default]
     ConstantDollar,

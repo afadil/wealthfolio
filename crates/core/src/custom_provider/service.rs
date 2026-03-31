@@ -551,7 +551,7 @@ fn detect_html_elements(body: &str, locale: Option<&str>) -> Vec<DetectedHtmlEle
         let mut direct_text = String::new();
         for child in element_ref.children() {
             if let Node::Text(t) = child.value() {
-                direct_text.push_str(&t);
+                direct_text.push_str(t);
             }
         }
         let trimmed = direct_text.trim();
@@ -661,7 +661,7 @@ fn find_context_label(el: scraper::ElementRef) -> String {
             let trimmed = text.trim();
             if !trimmed.is_empty()
                 && trimmed.len() < 40
-                && !trimmed.chars().next().map_or(false, |c| c.is_ascii_digit())
+                && !trimmed.chars().next().is_some_and(|c| c.is_ascii_digit())
             {
                 return trimmed.to_string();
             }
@@ -672,7 +672,7 @@ fn find_context_label(el: scraper::ElementRef) -> String {
             let t = t.trim();
             if !t.is_empty()
                 && t.len() < 40
-                && !t.chars().next().map_or(false, |c| c.is_ascii_digit())
+                && !t.chars().next().is_some_and(|c| c.is_ascii_digit())
             {
                 return t.to_string();
             }
@@ -685,7 +685,7 @@ fn find_context_label(el: scraper::ElementRef) -> String {
         || el
             .parent()
             .and_then(scraper::ElementRef::wrap)
-            .map_or(false, |p| p.value().name() == "td");
+            .is_some_and(|p| p.value().name() == "td");
     if in_td {
         // Walk up to find the <tr>
         let mut node = el.parent();
@@ -722,7 +722,7 @@ fn find_context_label(el: scraper::ElementRef) -> String {
                 let trimmed = text.trim();
                 if !trimmed.is_empty()
                     && trimmed.len() < 40
-                    && !trimmed.chars().next().map_or(false, |c| c.is_ascii_digit())
+                    && !trimmed.chars().next().is_some_and(|c| c.is_ascii_digit())
                 {
                     return trimmed.to_string();
                 }
@@ -769,8 +769,7 @@ fn truncate_str(s: &str, max_bytes: usize) -> String {
     // Walk backward from max_bytes to find a char boundary
     let end = s[..=max_bytes.min(s.len() - 1)]
         .char_indices()
-        .rev()
-        .next()
+        .next_back()
         .map_or(0, |(i, _)| i);
     format!("{}...", &s[..end])
 }
@@ -834,11 +833,11 @@ pub fn parse_number_string(s: &str, locale: Option<&str>) -> Option<f64> {
         _ => {
             // Auto-detect European format: comma followed by 1-8 digits at end
             // (e.g. "1.234,56" or "0,12345678" for crypto/FX)
-            let has_european_comma = stripped.rfind(',').map_or(false, |pos| {
+            let has_european_comma = stripped.rfind(',').is_some_and(|pos| {
                 let after = stripped.len() - pos - 1;
                 (1..=8).contains(&after) && stripped[pos + 1..].chars().all(|c| c.is_ascii_digit())
             });
-            let has_trailing_dot = stripped.rfind('.').map_or(false, |pos| {
+            let has_trailing_dot = stripped.rfind('.').is_some_and(|pos| {
                 let after = stripped.len() - pos - 1;
                 (1..=8).contains(&after) && stripped[pos + 1..].chars().all(|c| c.is_ascii_digit())
             });
@@ -1043,7 +1042,7 @@ pub fn parse_csv_records(body: &str) -> Option<Vec<Vec<String>>> {
     // Try comma first
     let records = try_csv_parse(body, b',');
     if let Some(ref rows) = records {
-        if rows.first().map_or(false, |r| r.len() > 1) {
+        if rows.first().is_some_and(|r| r.len() > 1) {
             return records;
         }
     }

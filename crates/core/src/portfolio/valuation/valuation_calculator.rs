@@ -229,7 +229,7 @@ fn get_rate_from_map(
 mod tests {
     use super::*;
     use crate::portfolio::snapshot::{Position, SnapshotSource};
-    use crate::quotes::{DataSource, Quote};
+    use crate::quotes::Quote;
     use rust_decimal_macros::dec;
     use std::collections::VecDeque;
 

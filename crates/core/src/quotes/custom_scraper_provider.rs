@@ -622,10 +622,9 @@ impl CustomScraperProvider {
     ) -> String {
         let override_key = format!("CUSTOM:{}", source.provider_id);
         if let Some(overrides) = &context.overrides {
-            if let Some(instrument) = overrides.get(&override_key) {
-                if let ProviderInstrument::EquitySymbol { symbol } = instrument {
-                    return symbol.to_string();
-                }
+            if let Some(ProviderInstrument::EquitySymbol { symbol }) = overrides.get(&override_key)
+            {
+                return symbol.to_string();
             }
         }
         default_symbol.to_string()
@@ -995,9 +994,9 @@ fn extract_json_rows(
         })
         .unwrap_or_default();
 
-    let high_path = source.high_path.as_deref().map(|p| expand_path(p));
-    let low_path = source.low_path.as_deref().map(|p| expand_path(p));
-    let volume_path = source.volume_path.as_deref().map(|p| expand_path(p));
+    let high_path = source.high_path.as_deref().map(expand_path);
+    let low_path = source.low_path.as_deref().map(expand_path);
+    let volume_path = source.volume_path.as_deref().map(expand_path);
     let highs = extract_json_f64_array(&json, high_path.as_deref(), locale);
     let lows = extract_json_f64_array(&json, low_path.as_deref(), locale);
     let volumes = extract_json_f64_array(&json, volume_path.as_deref(), locale);

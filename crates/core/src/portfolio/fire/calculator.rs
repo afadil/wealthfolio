@@ -154,11 +154,17 @@ fn blended_return_params_mc(
     current_age: u32,
     target_fire_age: u32,
     planning_horizon_age: u32,
-    gp: Option<&GlidepathSettings>,
-    i: u32,
-    in_fire: bool,
-) -> (f64, f64) {
-    let gp = match gp {
+    gp: Option<&'a GlidepathSettings>,
+}
+
+/// MC-closure–safe version of `blended_return_params` that works with owned primitives.
+fn blended_return_params_mc(params: &BlendedReturnParams<'_>, i: u32, in_fire: bool) -> (f64, f64) {
+    let base_mean = params.base_mean;
+    let base_std = params.base_std;
+    let current_age = params.current_age;
+    let target_fire_age = params.target_fire_age;
+    let planning_horizon_age = params.planning_horizon_age;
+    let gp = match params.gp {
         Some(gp) if gp.enabled => gp,
         _ => return (base_mean, base_std),
     };
@@ -458,16 +464,15 @@ pub fn run_monte_carlo(
                 }
 
                 // Glide-path-blended return distribution for this year
-                let (eff_mean, eff_std) = blended_return_params_mc(
-                    mean,
-                    std_dev,
+                let bp = BlendedReturnParams {
+                    base_mean: mean,
+                    base_std: std_dev,
                     current_age,
                     target_fire_age,
                     planning_horizon_age,
-                    glide_path.as_ref(),
-                    i,
-                    in_fire,
-                );
+                    gp: glide_path.as_ref(),
+                };
+                let (eff_mean, eff_std) = blended_return_params_mc(&bp, i, in_fire);
                 let annual_return = sample_return(&mut rng, eff_mean, eff_std);
 
                 if in_fire {
