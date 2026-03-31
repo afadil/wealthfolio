@@ -47,11 +47,11 @@ const staticNavigation: NavigationProps = {
       label: "View Activities",
     },
     {
-      icon: <Icons.Target className="size-6" />,
-      title: "FIRE Planner",
-      href: "/fire-planner",
-      keywords: ["fire", "retire", "retirement", "financial independence", "planner"],
-      label: "FIRE Planner",
+      icon: <Icons.Goals className="size-6" />,
+      title: "Goals",
+      href: "/goals",
+      keywords: ["goals", "fire", "retire", "retirement", "savings", "planner"],
+      label: "Goals",
     },
     {
       icon: <Icons.Sparkles className="size-6" />,
@@ -92,9 +92,11 @@ export function useNavigation() {
     };
   }, []);
 
-  // Combine static navigation items with addons grouped separately
+  // Combine static navigation items with addons grouped separately.
+  // Hide desktop-only features (FIRE Planner) in web mode.
+  const primary = staticNavigation.primary;
   const navigation: NavigationProps = {
-    primary: staticNavigation.primary,
+    primary,
     secondary: staticNavigation.secondary,
     addons: dynamicItems,
   };
