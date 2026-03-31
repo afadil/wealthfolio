@@ -1,10 +1,7 @@
 //! Goals tool - fetch investment goals using rig-core Tool trait.
 
 use rig::{completion::ToolDefinition, tool::Tool};
-use rust_decimal::prelude::ToPrimitive;
-use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use super::constants::MAX_GOALS;
@@ -98,67 +95,25 @@ impl<E: AiEnvironment + 'static> Tool for GetGoalsTool<E> {
             .get_goals()
             .map_err(|e| AiError::ToolExecutionFailed(e.to_string()))?;
 
-        // Fetch allocations for progress
-        let allocations = self
-            .env
-            .goal_service()
-            .load_goals_allocations()
-            .unwrap_or_default();
-
-        // Fetch latest valuations for progress calculation
-        let account_ids: Vec<String> = allocations.iter().map(|a| a.account_id.clone()).collect();
-
-        let valuations = self
-            .env
-            .valuation_service()
-            .get_latest_valuations(&account_ids)
-            .unwrap_or_default();
-
-        // Build valuation lookup: account_id -> total_value in base currency (Decimal)
-        let valuation_map: HashMap<String, Decimal> = valuations
-            .iter()
-            .map(|v| {
-                let value_in_base = v.total_value * v.fx_rate_to_base;
-                (v.account_id.clone(), value_in_base)
-            })
-            .collect();
-
         let original_count = goals.len();
 
-        // Convert to DTOs with progress
+        // Convert to DTOs using cached summary fields
         let goals_dto: Vec<GoalDto> = goals
             .into_iter()
             .take(MAX_GOALS)
             .map(|g| {
-                // Calculate current amount using percent_allocation per account
-                let current_amount_dec: Decimal = allocations
-                    .iter()
-                    .filter(|a| a.goal_id == g.id)
-                    .map(|a| {
-                        let account_value = valuation_map
-                            .get(&a.account_id)
-                            .copied()
-                            .unwrap_or(Decimal::ZERO);
-                        account_value * Decimal::from(a.percent_allocation) / Decimal::from(100)
-                    })
-                    .sum();
-
-                let current_amount = current_amount_dec.to_f64().unwrap_or(0.0);
-
-                let progress_percent = if g.target_amount > 0.0 {
-                    current_amount / g.target_amount * 100.0
-                } else {
-                    0.0
-                };
+                let target = g.target_amount_cached.or(g.target_amount).unwrap_or(0.0);
+                let current_amount = g.current_value_cached.unwrap_or(0.0);
+                let progress_percent = g.progress_cached.unwrap_or(0.0) * 100.0;
 
                 GoalDto {
                     id: g.id,
                     title: g.title,
                     description: g.description,
-                    target_amount: g.target_amount,
+                    target_amount: target,
                     current_amount,
                     progress_percent,
-                    deadline: None, // Goal model doesn't have deadline field
+                    deadline: g.target_date,
                     is_achieved: g.is_achieved,
                 }
             })
