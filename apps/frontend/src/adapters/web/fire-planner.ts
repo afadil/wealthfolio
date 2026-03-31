@@ -59,8 +59,9 @@ export const runFireScenarioAnalysis = async (
 export const runFireSorr = async (
   settings: FireSettings,
   portfolioAtFire: number,
+  retirementStartAge: number,
 ): Promise<SorrScenario[]> => {
-  return runSequenceOfReturnsRisk(settings, portfolioAtFire);
+  return runSequenceOfReturnsRisk(settings, portfolioAtFire, retirementStartAge);
 };
 
 export const runFireSensitivity = async (

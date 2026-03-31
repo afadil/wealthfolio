@@ -48,8 +48,9 @@ export const runFireScenarioAnalysis = async (
 export const runFireSorr = async (
   settings: FireSettings,
   portfolioAtFire: number,
+  retirementStartAge: number,
 ): Promise<SorrScenario[]> => {
-  return invoke<SorrScenario[]>("run_fire_sorr", { settings, portfolioAtFire });
+  return invoke<SorrScenario[]>("run_fire_sorr", { settings, portfolioAtFire, retirementStartAge });
 };
 
 export const runFireSensitivity = async (
