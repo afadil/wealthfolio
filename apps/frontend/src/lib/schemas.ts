@@ -97,6 +97,14 @@ export const newAccountSchema = z.object({
 
 export const newGoalSchema = z.object({
   id: z.string().uuid().optional(),
+  goalType: z.enum([
+    "retirement",
+    "education",
+    "wedding",
+    "home",
+    "emergency_fund",
+    "custom_save_up",
+  ]),
   title: z.string(),
   description: z.string().optional(),
   targetAmount: z.coerce
@@ -105,7 +113,11 @@ export const newGoalSchema = z.object({
       invalid_type_error: "Target amount must be a positive number.",
     })
     .min(0, { message: "Target amount must be a positive number." }),
-  isAchieved: z.boolean().optional(),
+  isAchieved: z.boolean(),
+  coverImageKey: z.string().optional(),
+  currency: z.string().optional(),
+  startDate: z.string().optional(),
+  targetDate: z.string().optional(),
 });
 
 const parseNumberLike = (value: unknown): number | undefined => {

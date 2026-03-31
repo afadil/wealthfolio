@@ -427,17 +427,19 @@ export interface GoalsAPI {
   update(goal: Goal): Promise<Goal>;
 
   /**
-   * Update goal allocations
-   * @param allocations Array of goal allocations
-   * @returns Promise that resolves when update is complete
+   * Get funding rules for a goal
+   * @param goalId Goal ID
+   * @returns Promise resolving to array of funding rules
    */
-  updateAllocations(allocations: GoalAllocation[]): Promise<void>;
+  getFunding(goalId: string): Promise<GoalAllocation[]>;
 
   /**
-   * Get goal allocations
-   * @returns Promise resolving to array of goal allocations
+   * Save funding rules for a goal
+   * @param goalId Goal ID
+   * @param rules Array of funding rule inputs
+   * @returns Promise resolving to saved rules
    */
-  getAllocations(): Promise<GoalAllocation[]>;
+  saveFunding(goalId: string, rules: GoalAllocation[]): Promise<GoalAllocation[]>;
 }
 
 /**
