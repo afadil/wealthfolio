@@ -67,7 +67,10 @@ function MonteCarloSection({
   } | null>(null);
   const [comparing, setComparing] = useState(false);
   const [compareError, setCompareError] = useState<string | null>(null);
-  const fireTarget = useMemo(() => calculateNetFireTarget(settings), [settings]);
+  const fireTarget = useMemo(
+    () => calculateNetFireTarget(settings, settings.targetFireAge),
+    [settings],
+  );
   const strategy = settings.withdrawalStrategy ?? "constant-dollar";
 
   // Invalidate stale results whenever settings change
@@ -785,10 +788,11 @@ function SorrSection({ settings, totalValue }: { settings: FireSettings; totalVa
   const proj = useMemo(() => projectFireDate(settings, totalValue), [settings, totalValue]);
   const fireReached = proj.fundedAtRetirement;
   const portfolioAtFire = proj.portfolioAtFire > 0 ? proj.portfolioAtFire : totalValue;
+  const retirementStartAge = proj.fireAge ?? settings.targetFireAge;
 
   const scenarios = useMemo(
-    () => runSequenceOfReturnsRisk(settings, portfolioAtFire),
-    [settings, portfolioAtFire],
+    () => runSequenceOfReturnsRisk(settings, portfolioAtFire, retirementStartAge),
+    [settings, portfolioAtFire, retirementStartAge],
   );
 
   const COLORS = ["#3b82f6", "#ef4444", "#f97316", "#a855f7", "#64748b"];
@@ -798,24 +802,24 @@ function SorrSection({ settings, totalValue }: { settings: FireSettings; totalVa
     return Array.from({ length: maxLen }, (_, i) => {
       const entry: Record<string, number | string> = {
         year: i,
-        age: settings.targetFireAge + i,
+        age: retirementStartAge + i,
       };
       scenarios.forEach((s) => {
         entry[s.label] = s.portfolioPath[i] ?? 0;
       });
       return entry;
     });
-  }, [scenarios, settings.targetFireAge]);
+  }, [scenarios, retirementStartAge]);
 
   const annualExpenses = settings.monthlyExpensesAtFire * 12;
   const dcPayouts = resolveDcPayouts(
     settings.additionalIncomeStreams,
     settings.currentAge,
-    settings.targetFireAge,
+    retirementStartAge,
     settings.safeWithdrawalRate,
   );
   const annualIncomeAtFire = settings.additionalIncomeStreams
-    .filter((s) => settings.targetFireAge >= s.startAge)
+    .filter((s) => retirementStartAge >= s.startAge)
     .reduce((sum, s) => sum + (dcPayouts.get(s.id) ?? s.monthlyAmount) * 12, 0);
   const incomeRatio = annualExpenses > 0 ? annualIncomeAtFire / annualExpenses : 0;
 
