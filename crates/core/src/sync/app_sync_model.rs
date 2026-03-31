@@ -4,13 +4,14 @@ use serde::{Deserialize, Serialize};
 
 /// Canonical list of local tables that participate in app-side device sync.
 /// Order matters: parent tables before children (FK dependencies).
-pub const APP_SYNC_TABLES: [&str; 16] = [
+pub const APP_SYNC_TABLES: [&str; 17] = [
     // Base tables (no FK deps)
     "platforms",
     "assets",
     // Depends on: assets
     "quotes",
     "goals",
+    "goal_plans",
     "ai_threads",
     "contribution_limits",
     // Depends on: platforms
@@ -47,6 +48,7 @@ pub enum SyncEntity {
     ActivityImportProfile,
     ImportTemplate,
     Goal,
+    GoalPlan,
     GoalsAllocation,
     AiThread,
     AiMessage,

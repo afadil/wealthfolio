@@ -4,7 +4,7 @@ use crate::accounts::AccountDB;
 use crate::activities::{ActivityDB, ImportAccountTemplateDB, ImportTemplateDB};
 use crate::ai_chat::{AiMessageDB, AiThreadDB, AiThreadTagDB};
 use crate::assets::AssetDB;
-use crate::goals::{GoalDB, GoalsAllocationDB};
+use crate::goals::{GoalDB, GoalPlanDB, GoalsAllocationDB};
 use crate::limits::ContributionLimitDB;
 use crate::market_data::QuoteDB;
 use crate::portfolio::snapshot::AccountStateSnapshotDB;
@@ -104,6 +104,14 @@ impl SyncOutboxModel for GoalDB {
 
     fn sync_entity_id(&self) -> &str {
         &self.id
+    }
+}
+
+impl SyncOutboxModel for GoalPlanDB {
+    const ENTITY: SyncEntity = SyncEntity::GoalPlan;
+
+    fn sync_entity_id(&self) -> &str {
+        &self.goal_id
     }
 }
 

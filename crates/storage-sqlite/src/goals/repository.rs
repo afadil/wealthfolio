@@ -1,12 +1,13 @@
-use wealthfolio_core::goals::{Goal, GoalRepositoryTrait, GoalsAllocation, NewGoal};
+use wealthfolio_core::goals::{
+    Goal, GoalCachedUpdate, GoalFundingRule, GoalFundingRuleInput, GoalPlan, GoalRepositoryTrait,
+    NewGoal, SaveGoalPlan,
+};
 use wealthfolio_core::Result;
 
-use super::model::{GoalDB, GoalsAllocationDB, NewGoalDB};
+use super::model::{GoalDB, GoalPlanDB, GoalsAllocationDB, NewGoalDB};
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
-use crate::schema::goals;
-use crate::schema::goals::dsl::*;
-use crate::schema::goals_allocation;
+use crate::schema::{goal_plans, goals, goals_allocation};
 use async_trait::async_trait;
 use diesel::prelude::*;
 use diesel::r2d2::{self, Pool};
@@ -27,34 +28,26 @@ impl GoalRepository {
     ) -> Self {
         GoalRepository { pool, writer }
     }
-
-    pub fn load_goals_impl(&self) -> Result<Vec<Goal>> {
-        let mut conn = get_connection(&self.pool)?;
-        let goals_db = goals
-            .load::<GoalDB>(&mut conn)
-            .map_err(StorageError::from)?;
-        Ok(goals_db.into_iter().map(Goal::from).collect())
-    }
-
-    pub fn load_allocations_for_non_achieved_goals_impl(&self) -> Result<Vec<GoalsAllocation>> {
-        let mut conn = get_connection(&self.pool)?;
-        let allocations_db = goals_allocation::table
-            .inner_join(goals::table.on(goals::id.eq(goals_allocation::goal_id)))
-            .filter(goals::is_achieved.eq(false))
-            .select(GoalsAllocationDB::as_select())
-            .load::<GoalsAllocationDB>(&mut conn)
-            .map_err(StorageError::from)?;
-        Ok(allocations_db
-            .into_iter()
-            .map(GoalsAllocation::from)
-            .collect())
-    }
 }
 
 #[async_trait]
 impl GoalRepositoryTrait for GoalRepository {
     fn load_goals(&self) -> Result<Vec<Goal>> {
-        self.load_goals_impl()
+        let mut conn = get_connection(&self.pool)?;
+        let goals_db = goals::table
+            .order(goals::priority.desc())
+            .load::<GoalDB>(&mut conn)
+            .map_err(StorageError::from)?;
+        Ok(goals_db.into_iter().map(Goal::from).collect())
+    }
+
+    fn load_goal(&self, goal_id: &str) -> Result<Goal> {
+        let mut conn = get_connection(&self.pool)?;
+        let goal_db = goals::table
+            .find(goal_id)
+            .first::<GoalDB>(&mut conn)
+            .map_err(StorageError::from)?;
+        Ok(Goal::from(goal_db))
     }
 
     async fn insert_new_goal(&self, new_goal: NewGoal) -> Result<Goal> {
@@ -78,22 +71,38 @@ impl GoalRepositoryTrait for GoalRepository {
 
     async fn update_goal(&self, goal_update: Goal) -> Result<Goal> {
         let goal_id_owned = goal_update.id.clone();
-        let goal_db: GoalDB = GoalDB {
+        let goal_db = GoalDB {
             id: goal_update.id,
+            goal_type: goal_update.goal_type,
             title: goal_update.title,
             description: goal_update.description,
-            target_amount: goal_update.target_amount,
+            target_amount: goal_update.target_amount.unwrap_or(0.0),
             is_achieved: goal_update.is_achieved,
+            status_lifecycle: goal_update.status_lifecycle,
+            status_health: goal_update.status_health,
+            is_archived: goal_update.is_archived,
+            priority: goal_update.priority,
+            cover_image_key: goal_update.cover_image_key,
+            currency: goal_update.currency,
+            start_date: goal_update.start_date,
+            target_date: goal_update.target_date,
+            current_value_cached: goal_update.current_value_cached,
+            progress_cached: goal_update.progress_cached,
+            projected_completion_date: goal_update.projected_completion_date,
+            projected_value_at_target_date: goal_update.projected_value_at_target_date,
+            created_at: goal_update.created_at,
+            updated_at: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+            target_amount_cached: goal_update.target_amount_cached,
         };
 
         self.writer
             .exec_tx(move |tx| -> Result<Goal> {
-                diesel::update(goals.find(goal_id_owned.clone()))
+                diesel::update(goals::table.find(goal_id_owned.clone()))
                     .set(&goal_db)
                     .execute(tx.conn())
                     .map_err(StorageError::from)?;
-                let result_db = goals
-                    .filter(id.eq(goal_id_owned))
+                let result_db = goals::table
+                    .find(goal_id_owned)
                     .first::<GoalDB>(tx.conn())
                     .map_err(StorageError::from)?;
                 let payload_db = result_db.clone();
@@ -108,7 +117,7 @@ impl GoalRepositoryTrait for GoalRepository {
         let goal_id_for_event = goal_id_to_delete.clone();
         self.writer
             .exec_tx(move |tx| -> Result<usize> {
-                let affected = diesel::delete(goals.find(goal_id_to_delete))
+                let affected = diesel::delete(goals::table.find(goal_id_to_delete))
                     .execute(tx.conn())
                     .map_err(StorageError::from)?;
 
@@ -121,26 +130,202 @@ impl GoalRepositoryTrait for GoalRepository {
             .await
     }
 
-    fn load_allocations_for_non_achieved_goals(&self) -> Result<Vec<GoalsAllocation>> {
-        self.load_allocations_for_non_achieved_goals_impl()
+    // --- Funding rules ---
+
+    fn load_funding_rules(&self, goal_id: &str) -> Result<Vec<GoalFundingRule>> {
+        let mut conn = get_connection(&self.pool)?;
+        let rules = goals_allocation::table
+            .filter(goals_allocation::goal_id.eq(goal_id))
+            .select(GoalsAllocationDB::as_select())
+            .load::<GoalsAllocationDB>(&mut conn)
+            .map_err(StorageError::from)?;
+        Ok(rules.into_iter().map(GoalFundingRule::from).collect())
     }
 
-    async fn upsert_goal_allocations(&self, allocations: Vec<GoalsAllocation>) -> Result<usize> {
+    fn load_all_active_funding_rules(&self) -> Result<Vec<GoalFundingRule>> {
+        let mut conn = get_connection(&self.pool)?;
+        let rules = goals_allocation::table
+            .inner_join(goals::table.on(goals::id.eq(goals_allocation::goal_id)))
+            .filter(goals::is_archived.eq(false))
+            .filter(
+                goals::status_lifecycle
+                    .eq("active")
+                    .or(goals::status_lifecycle.eq("achieved"))
+                    .or(goals::status_lifecycle.eq("paused")),
+            )
+            .select(GoalsAllocationDB::as_select())
+            .load::<GoalsAllocationDB>(&mut conn)
+            .map_err(StorageError::from)?;
+        Ok(rules.into_iter().map(GoalFundingRule::from).collect())
+    }
+
+    async fn save_goal_funding(
+        &self,
+        goal_id: &str,
+        rules: Vec<GoalFundingRuleInput>,
+    ) -> Result<Vec<GoalFundingRule>> {
+        let goal_id_owned = goal_id.to_string();
         self.writer
-            .exec_tx(move |tx| -> Result<usize> {
-                let mut affected_rows = 0;
-                for allocation in allocations {
-                    let allocation_db: GoalsAllocationDB = allocation.into();
-                    affected_rows += diesel::insert_into(goals_allocation::table)
-                        .values(&allocation_db)
-                        .on_conflict(goals_allocation::id)
-                        .do_update()
-                        .set(&allocation_db)
+            .exec_tx(move |tx| -> Result<Vec<GoalFundingRule>> {
+                let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+                // Load existing rules to track deletes for sync
+                let existing = goals_allocation::table
+                    .filter(goals_allocation::goal_id.eq(&goal_id_owned))
+                    .select(GoalsAllocationDB::as_select())
+                    .load::<GoalsAllocationDB>(tx.conn())
+                    .map_err(StorageError::from)?;
+
+                // Delete all existing rules for this goal
+                diesel::delete(
+                    goals_allocation::table.filter(goals_allocation::goal_id.eq(&goal_id_owned)),
+                )
+                .execute(tx.conn())
+                .map_err(StorageError::from)?;
+
+                // Track deletes in sync outbox
+                for old in &existing {
+                    tx.delete::<GoalsAllocationDB>(old.id.clone());
+                }
+
+                // Insert new rules
+                let mut result = Vec::new();
+                for rule in rules {
+                    let db = GoalsAllocationDB {
+                        id: Uuid::new_v4().to_string(),
+                        percent_allocation: rule.reservation_percent.unwrap_or(0.0) as i32,
+                        goal_id: goal_id_owned.clone(),
+                        account_id: rule.account_id,
+                        funding_role: rule.funding_role,
+                        reservation_percent: rule.reservation_percent,
+                        created_at: now.clone(),
+                        updated_at: now.clone(),
+                    };
+                    diesel::insert_into(goals_allocation::table)
+                        .values(&db)
                         .execute(tx.conn())
                         .map_err(StorageError::from)?;
-                    tx.update(&allocation_db)?;
+                    tx.insert(&db)?;
+                    result.push(GoalFundingRule::from(db));
                 }
-                Ok(affected_rows)
+
+                Ok(result)
+            })
+            .await
+    }
+
+    // --- Plans ---
+
+    fn load_goal_plan(&self, goal_id: &str) -> Result<Option<GoalPlan>> {
+        let mut conn = get_connection(&self.pool)?;
+        let result = goal_plans::table
+            .find(goal_id)
+            .first::<GoalPlanDB>(&mut conn)
+            .optional()
+            .map_err(StorageError::from)?;
+        Ok(result.map(GoalPlan::from))
+    }
+
+    async fn save_goal_plan(&self, plan: SaveGoalPlan) -> Result<GoalPlan> {
+        let goal_id = plan.goal_id.clone();
+        self.writer
+            .exec_tx(move |tx| -> Result<GoalPlan> {
+                let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+                let existing = goal_plans::table
+                    .find(&plan.goal_id)
+                    .first::<GoalPlanDB>(tx.conn())
+                    .optional()
+                    .map_err(StorageError::from)?;
+
+                let new_version = existing.as_ref().map_or(1, |e| e.version + 1);
+                let created = existing
+                    .as_ref()
+                    .map_or_else(|| now.clone(), |e| e.created_at.clone());
+
+                let plan_db = GoalPlanDB {
+                    goal_id: plan.goal_id,
+                    plan_kind: plan.plan_kind,
+                    planner_mode: plan.planner_mode,
+                    settings_json: plan.settings_json,
+                    summary_json: plan.summary_json.unwrap_or_else(|| "{}".to_string()),
+                    version: new_version,
+                    created_at: created,
+                    updated_at: now,
+                };
+
+                diesel::insert_into(goal_plans::table)
+                    .values(&plan_db)
+                    .on_conflict(goal_plans::goal_id)
+                    .do_update()
+                    .set(&plan_db)
+                    .execute(tx.conn())
+                    .map_err(StorageError::from)?;
+
+                let result_db = goal_plans::table
+                    .find(&goal_id)
+                    .first::<GoalPlanDB>(tx.conn())
+                    .map_err(StorageError::from)?;
+
+                let payload_db = result_db.clone();
+                let goal_plan = GoalPlan::from(result_db);
+                if existing.is_some() {
+                    tx.update(&payload_db)?;
+                } else {
+                    tx.insert(&payload_db)?;
+                }
+                Ok(goal_plan)
+            })
+            .await
+    }
+
+    async fn delete_goal_plan(&self, goal_id: &str) -> Result<usize> {
+        let goal_id_owned = goal_id.to_string();
+        let goal_id_for_event = goal_id_owned.clone();
+        self.writer
+            .exec_tx(move |tx| -> Result<usize> {
+                let affected = diesel::delete(goal_plans::table.find(&goal_id_owned))
+                    .execute(tx.conn())
+                    .map_err(StorageError::from)?;
+                if affected > 0 {
+                    tx.delete::<GoalPlanDB>(goal_id_for_event);
+                }
+                Ok(affected)
+            })
+            .await
+    }
+
+    // --- Cached summary ---
+
+    async fn update_goal_cached_fields(
+        &self,
+        goal_id: &str,
+        update: GoalCachedUpdate,
+    ) -> Result<()> {
+        let goal_id_owned = goal_id.to_string();
+        self.writer
+            .exec_tx(move |tx| -> Result<()> {
+                let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+                diesel::update(goals::table.find(&goal_id_owned))
+                    .set((
+                        goals::target_amount_cached.eq(update.target_amount_cached),
+                        goals::current_value_cached.eq(update.current_value_cached),
+                        goals::progress_cached.eq(update.progress_cached),
+                        goals::projected_completion_date.eq(update.projected_completion_date),
+                        goals::projected_value_at_target_date
+                            .eq(update.projected_value_at_target_date),
+                        goals::status_health.eq(update.status_health),
+                        goals::updated_at.eq(now),
+                    ))
+                    .execute(tx.conn())
+                    .map_err(StorageError::from)?;
+                // Re-read for sync outbox
+                let updated_db = goals::table
+                    .find(&goal_id_owned)
+                    .first::<GoalDB>(tx.conn())
+                    .map_err(StorageError::from)?;
+                tx.update(&updated_db)?;
+                Ok(())
             })
             .await
     }

@@ -47,6 +47,7 @@ fn sync_entity_name(entity: &SyncEntity) -> &'static str {
         SyncEntity::ActivityImportProfile => "activity_import_profile",
         SyncEntity::ImportTemplate => "import_template",
         SyncEntity::Goal => "goal",
+        SyncEntity::GoalPlan => "goal_plan",
         SyncEntity::GoalsAllocation => "goals_allocation",
         SyncEntity::AiThread => "ai_thread",
         SyncEntity::AiMessage => "ai_message",
