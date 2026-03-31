@@ -14,7 +14,7 @@ import {
 } from "@wealthfolio/ui";
 import { useState, useEffect } from "react";
 import type { FireSettings, IncomeStream } from "../types";
-import { DEFAULT_SETTINGS } from "../lib/storage";
+import { DEFAULT_SETTINGS } from "../types";
 import { runAutoConfig, applyAutoConfig, type AutoConfigResult } from "../lib/auto-config";
 
 interface Props {
@@ -236,8 +236,10 @@ export default function SettingsPage({
   }
 
   async function handleSave() {
+    // Strip includedAccountIds — account selection is managed via funding rules
+    const { includedAccountIds: _, ...rest } = draft;
     const resolved: FireSettings = {
-      ...draft,
+      ...rest,
       additionalIncomeStreams: draft.additionalIncomeStreams.map((s) =>
         s.startAgeIsAuto ? { ...s, startAge: draft.targetFireAge } : s,
       ),
@@ -604,64 +606,7 @@ export default function SettingsPage({
         )}
       </Card>
 
-      {/* Portfolio Accounts */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Portfolio Accounts</CardTitle>
-          <p className="text-muted-foreground mt-1 text-xs">
-            Choose which accounts count toward your FIRE portfolio. Cash / bank accounts are
-            excluded by default.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {accounts.filter((a) => a.isActive && !a.isArchived).length === 0 ? (
-            <p className="text-muted-foreground text-xs">
-              No active accounts found in Wealthfolio.
-            </p>
-          ) : (
-            accounts
-              .filter((a) => a.isActive && !a.isArchived)
-              .map((a) => {
-                const isInvestment =
-                  a.accountType === "SECURITIES" || a.accountType === "CRYPTOCURRENCY";
-                const included =
-                  draft.includedAccountIds != null
-                    ? draft.includedAccountIds.includes(a.id)
-                    : isInvestment;
-                return (
-                  <div key={a.id} className="flex items-center gap-3 text-sm">
-                    <input
-                      type="checkbox"
-                      id={`acc-${a.id}`}
-                      checked={included}
-                      onChange={(e) => {
-                        const currentSet =
-                          draft.includedAccountIds ??
-                          accounts
-                            .filter(
-                              (x) =>
-                                x.isActive &&
-                                !x.isArchived &&
-                                (x.accountType === "SECURITIES" ||
-                                  x.accountType === "CRYPTOCURRENCY"),
-                            )
-                            .map((x) => x.id);
-                        const next = e.target.checked
-                          ? [...currentSet, a.id]
-                          : currentSet.filter((id) => id !== a.id);
-                        update("includedAccountIds", next.length > 0 ? next : []);
-                      }}
-                    />
-                    <label htmlFor={`acc-${a.id}`} className="flex-1 cursor-pointer">
-                      {a.name}
-                    </label>
-                    <span className="text-muted-foreground text-xs">{a.accountType}</span>
-                  </div>
-                );
-              })
-          )}
-        </CardContent>
-      </Card>
+      {/* Portfolio Accounts — managed via the Funding tab on the goal detail page */}
 
       {/* Additional Income Streams */}
       <Card>
