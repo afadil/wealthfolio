@@ -46,6 +46,10 @@ pub fn default_adapter_descriptors() -> Vec<EntityAdapterDescriptor> {
             table_name: "goals",
         },
         EntityAdapterDescriptor {
+            entity: SyncEntity::GoalPlan,
+            table_name: "goal_plans",
+        },
+        EntityAdapterDescriptor {
             entity: SyncEntity::GoalsAllocation,
             table_name: "goals_allocation",
         },

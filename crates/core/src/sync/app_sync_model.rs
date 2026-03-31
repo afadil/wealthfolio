@@ -13,6 +13,7 @@ pub const APP_SYNC_TABLES: [&str; 19] = [
     // Depends on: assets
     "quotes",
     "goals",
+    "goal_plans",
     "ai_threads",
     "contribution_limits",
     // Depends on: platforms
@@ -53,6 +54,7 @@ pub enum SyncEntity {
     ActivityImportProfile,
     ImportTemplate,
     Goal,
+    GoalPlan,
     GoalsAllocation,
     AiThread,
     AiMessage,
