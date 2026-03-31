@@ -784,6 +784,7 @@ export interface AccountValuation {
   costBasis: number;
   netContribution: number;
   calculatedAt: string;
+  alternativeMarketValue: number;
 }
 
 export interface AccountSummaryView {

@@ -1,0 +1,2 @@
+-- SQLite doesn't support DROP COLUMN before 3.35.0; recreating table is out of scope.
+-- This column is safe to leave in place if the migration is logically reverted.

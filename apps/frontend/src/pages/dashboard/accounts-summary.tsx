@@ -335,7 +335,9 @@ export const AccountsSummary = React.memo(
 
         const perf = performanceQueries[i]?.data;
         const fxRate = valuation.fxRateToBase ?? 1;
-        const totalValueAccountCurrency = valuation.totalValue;
+        // Exclude alternative assets (property, vehicle, etc.) from Investments tab
+        const altValue = valuation.alternativeMarketValue ?? 0;
+        const totalValueAccountCurrency = valuation.totalValue - altValue;
         const totalValueBaseCurrency = totalValueAccountCurrency * fxRate;
 
         const gainLossAccountCurrency = perf?.periodGain ?? null;

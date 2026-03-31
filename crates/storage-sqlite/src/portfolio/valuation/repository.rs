@@ -165,7 +165,7 @@ impl ValuationRepositoryTrait for ValuationRepository {
                 SELECT \
                     id, account_id, valuation_date, account_currency, base_currency, \
                     fx_rate_to_base, cash_balance, investment_market_value, total_value, \
-                    cost_basis, net_contribution, calculated_at, \
+                    cost_basis, net_contribution, calculated_at, alternative_market_value, \
                     ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY valuation_date DESC) as rn \
                 FROM {} \
                 WHERE account_id IN ({}) \
@@ -173,7 +173,7 @@ impl ValuationRepositoryTrait for ValuationRepository {
             SELECT \
                 id, account_id, valuation_date, account_currency, base_currency, \
                 fx_rate_to_base, cash_balance, investment_market_value, total_value, \
-                cost_basis, net_contribution, calculated_at \
+                cost_basis, net_contribution, calculated_at, alternative_market_value \
             FROM RankedValuations \
             WHERE rn = 1",
             "daily_account_valuation", // Use direct table name string

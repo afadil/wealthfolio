@@ -207,6 +207,7 @@ diesel::table! {
         cost_basis -> Text,
         net_contribution -> Text,
         calculated_at -> Text,
+        alternative_market_value -> Text,
     }
 }
 
