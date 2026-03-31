@@ -29,13 +29,7 @@ import {
   updateContributionLimit,
 } from "@/adapters";
 import { openCsvFileDialog, openFileSaveDialog } from "@/adapters";
-import {
-  createGoal,
-  getGoals,
-  getGoalsAllocation,
-  updateGoal,
-  updateGoalsAllocations,
-} from "@/adapters";
+import { createGoal, getGoals, getGoalFunding, saveGoalFunding, updateGoal } from "@/adapters";
 import {
   listenFileDrop as listenImportFileDrop,
   listenFileDropCancelled as listenImportFileDropCancelled,
@@ -243,8 +237,8 @@ export function createAddonContext(addonId: string): AddonContext {
           getGoals,
           createGoal,
           updateGoal,
-          updateGoalsAllocations,
-          getGoalsAllocation,
+          getGoalFunding,
+          saveGoalFunding,
 
           // Market data
           searchTicker,
