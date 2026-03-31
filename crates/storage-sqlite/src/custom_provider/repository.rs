@@ -64,8 +64,6 @@ fn parse_sources(config_json: Option<&str>, provider_id: &str) -> Vec<CustomProv
             invert: s.invert,
             locale: s.locale,
             headers: s.headers,
-            created_at: String::new(),
-            updated_at: String::new(),
             high_path: s.high_path,
             low_path: s.low_path,
             volume_path: s.volume_path,
@@ -176,15 +174,19 @@ impl CustomProviderRepository for CustomProviderSqliteRepository {
         let provider = provider.clone();
         self.writer
             .exec_tx(move |tx| {
-                diesel::update(market_data_providers::table.find(&provider.id))
-                    .set((
-                        market_data_providers::name.eq(&provider.name),
-                        market_data_providers::description.eq(&provider.description),
-                        market_data_providers::priority.eq(provider.priority),
-                        market_data_providers::enabled.eq(provider.enabled),
-                    ))
-                    .execute(tx.conn())
-                    .map_err(StorageError::QueryFailed)?;
+                diesel::update(
+                    market_data_providers::table
+                        .find(&provider.id)
+                        .filter(market_data_providers::provider_type.eq("custom")),
+                )
+                .set((
+                    market_data_providers::name.eq(&provider.name),
+                    market_data_providers::description.eq(&provider.description),
+                    market_data_providers::priority.eq(provider.priority),
+                    market_data_providers::enabled.eq(provider.enabled),
+                ))
+                .execute(tx.conn())
+                .map_err(StorageError::QueryFailed)?;
                 Ok(())
             })
             .await
@@ -200,10 +202,14 @@ impl CustomProviderRepository for CustomProviderSqliteRepository {
 
         self.writer
             .exec_tx(move |tx| {
-                diesel::update(market_data_providers::table.find(&provider_id))
-                    .set(market_data_providers::config.eq(&config_json))
-                    .execute(tx.conn())
-                    .map_err(StorageError::QueryFailed)?;
+                diesel::update(
+                    market_data_providers::table
+                        .find(&provider_id)
+                        .filter(market_data_providers::provider_type.eq("custom")),
+                )
+                .set(market_data_providers::config.eq(&config_json))
+                .execute(tx.conn())
+                .map_err(StorageError::QueryFailed)?;
                 Ok(())
             })
             .await
@@ -233,11 +239,13 @@ impl CustomProviderRepository for CustomProviderSqliteRepository {
         }
 
         // Check both custom_provider_code and symbol-mapping overrides (CUSTOM:<code>)
-        let override_pattern = format!("%\"CUSTOM:{}\":%", provider_code);
+        // Escape LIKE metacharacters in provider_code to prevent false matches
+        let escaped_code = provider_code.replace('%', "\\%").replace('_', "\\_");
+        let override_pattern = format!("%\"CUSTOM:{}\":%", escaped_code);
         let row: CountRow = diesel::sql_query(
             "SELECT COUNT(*) as cnt FROM assets WHERE \
              json_extract(provider_config, '$.custom_provider_code') = ?1 \
-             OR provider_config LIKE ?2",
+             OR provider_config LIKE ?2 ESCAPE '\\'",
         )
         .bind::<Text, _>(provider_code)
         .bind::<Text, _>(&override_pattern)

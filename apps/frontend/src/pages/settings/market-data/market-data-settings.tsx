@@ -469,6 +469,7 @@ function CustomProviderCard({
   onDelete,
   onToggleEnabled,
   isDeleting = false,
+  isToggling = false,
   isLast = false,
 }: {
   provider: CustomProviderWithSources;
@@ -476,6 +477,7 @@ function CustomProviderCard({
   onDelete: () => void;
   onToggleEnabled: (enabled: boolean) => void;
   isDeleting?: boolean;
+  isToggling?: boolean;
   isLast?: boolean;
 }) {
   const latestSource = provider.sources.find((s) => s.kind === "latest");
@@ -521,6 +523,7 @@ function CustomProviderCard({
             id={`${provider.id}-enabled`}
             checked={provider.enabled}
             onCheckedChange={onToggleEnabled}
+            disabled={isToggling}
             className="data-[state=checked]:bg-success"
           />
           <Button
@@ -562,11 +565,13 @@ export default function MarketDataSettingsPage() {
   const { mutate: recalculatePortfolio, isPending: isRecalculating } =
     useRecalculatePortfolioMutation();
   const { data: customProviders = [] } = useCustomProviders();
-  const { mutate: deleteCustomProvider, isPending: isDeletingCustom } = useDeleteCustomProvider();
+  const { mutate: deleteCustomProvider } = useDeleteCustomProvider();
 
   const [priorityInputs, setPriorityInputs] = useState<Record<string, number>>({});
   const [customFormOpen, setCustomFormOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<CustomProviderWithSources | undefined>();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   // Split providers into built-in and custom using the providerType field
   const { builtinProviders, customSettingsProviders, customScraperErrors } = useMemo(() => {
@@ -911,11 +916,21 @@ export default function MarketDataSettingsPage() {
                     setEditingProvider(cp);
                     setCustomFormOpen(true);
                   }}
-                  onDelete={() => deleteCustomProvider(cp.id)}
-                  onToggleEnabled={(enabled) =>
-                    updateSettings({ providerId: cp.id, priority: cp.priority, enabled })
-                  }
-                  isDeleting={isDeletingCustom}
+                  onDelete={() => {
+                    setDeletingId(cp.id);
+                    deleteCustomProvider(cp.id, {
+                      onSettled: () => setDeletingId(null),
+                    });
+                  }}
+                  onToggleEnabled={(enabled) => {
+                    setTogglingId(cp.id);
+                    updateSettings(
+                      { providerId: cp.id, priority: cp.priority, enabled },
+                      { onSettled: () => setTogglingId(null) },
+                    );
+                  }}
+                  isDeleting={deletingId === cp.id}
+                  isToggling={togglingId === cp.id}
                   isLast={index === customProviders.length - 1}
                 />
               ))}

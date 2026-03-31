@@ -21,7 +21,8 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use super::model::{DataSource, Quote};
+use super::constants::DATA_SOURCE_MANUAL;
+use super::model::Quote;
 use super::store::QuoteStore;
 use super::types::{quote_id, AssetId, Currency, Day, QuoteSource};
 use crate::errors::{Result, ValidationError};
@@ -602,7 +603,7 @@ impl QuoteImportService {
             adjclose: validation.close,
             volume: validation.volume.unwrap_or(Decimal::ZERO),
             currency: validation.currency.0,
-            data_source: "MANUAL".to_string(),
+            data_source: DATA_SOURCE_MANUAL.to_string(),
             created_at: Utc::now(),
             notes: None,
         }

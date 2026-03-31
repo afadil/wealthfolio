@@ -1,4 +1,81 @@
 use serde::{Deserialize, Serialize};
+use std::net::IpAddr;
+
+/// Valid source kinds.
+pub const VALID_SOURCE_KINDS: &[&str] = &["latest", "historical"];
+/// Valid source formats.
+pub const VALID_SOURCE_FORMATS: &[&str] = &["json", "html", "html_table", "csv"];
+
+/// Cached regex for `{DATE:...}` template expansion.
+pub static DATE_TEMPLATE_RE: std::sync::LazyLock<regex::Regex> =
+    std::sync::LazyLock::new(|| regex::Regex::new(r"\{DATE:([^}]+)\}").unwrap());
+
+/// Maximum HTTP response body size (10 MB).
+pub const MAX_RESPONSE_BYTES: usize = 10 * 1024 * 1024;
+
+/// Validate that a URL is safe to fetch (no SSRF).
+///
+/// Rejects non-HTTP(S) schemes and URLs targeting private/loopback addresses.
+pub fn validate_url(raw: &str) -> Result<(), anyhow::Error> {
+    let parsed =
+        url::Url::parse(raw).map_err(|e| anyhow::anyhow!("Invalid URL '{}': {}", raw, e))?;
+
+    match parsed.scheme() {
+        "http" | "https" => {}
+        other => {
+            return Err(anyhow::anyhow!(
+                "Unsupported URL scheme '{}' (only http/https allowed)",
+                other
+            ))
+        }
+    }
+
+    match parsed.host() {
+        Some(url::Host::Domain(domain)) => {
+            if domain == "localhost" {
+                return Err(anyhow::anyhow!("URLs targeting localhost are not allowed"));
+            }
+        }
+        Some(url::Host::Ipv4(ip)) => {
+            let ip_addr = IpAddr::V4(ip);
+            if ip.is_loopback()
+                || ip.is_private()
+                || ip.is_link_local()
+                || ip.is_broadcast()
+                || ip.is_unspecified()
+            {
+                return Err(anyhow::anyhow!(
+                    "URLs targeting private/reserved IP address {} are not allowed",
+                    ip_addr
+                ));
+            }
+        }
+        Some(url::Host::Ipv6(ip)) => {
+            let ip_addr = IpAddr::V6(ip);
+            if ip.is_loopback() || ip.is_unspecified() {
+                return Err(anyhow::anyhow!(
+                    "URLs targeting private/reserved IP address {} are not allowed",
+                    ip_addr
+                ));
+            }
+        }
+        None => return Err(anyhow::anyhow!("URL '{}' has no host", raw)),
+    }
+
+    Ok(())
+}
+
+/// Extract a numeric value from HTML using a CSS selector.
+///
+/// Shared between `custom_provider::service` (test_source) and
+/// `quotes::custom_scraper_provider` (runtime quote fetching).
+pub fn extract_html_value(body: &str, selector: &str, locale: Option<&str>) -> Option<f64> {
+    let document = scraper::Html::parse_document(body);
+    let sel = scraper::Selector::parse(selector).ok()?;
+    let element = document.select(&sel).next()?;
+    let text: String = element.text().collect::<String>();
+    crate::custom_provider::service::parse_number_string(text.trim(), locale)
+}
 
 /// A custom provider source definition (latest or historical).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,8 +98,6 @@ pub struct CustomProviderSource {
     pub locale: Option<String>,
     /// JSON object string of extra HTTP headers
     pub headers: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
     pub high_path: Option<String>,
     pub low_path: Option<String>,
     pub volume_path: Option<String>,

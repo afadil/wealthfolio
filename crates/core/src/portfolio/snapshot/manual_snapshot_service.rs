@@ -13,8 +13,8 @@ use crate::fx::FxServiceTrait;
 use crate::portfolio::snapshot::{
     AccountStateSnapshot, Position, SnapshotServiceTrait, SnapshotSource,
 };
-use crate::quotes::model::{DATA_SOURCE_BROKER, DATA_SOURCE_MANUAL};
-use crate::quotes::{DataSource, Quote, QuoteServiceTrait};
+use crate::quotes::constants::{DATA_SOURCE_BROKER, DATA_SOURCE_MANUAL};
+use crate::quotes::{Quote, QuoteServiceTrait};
 
 #[derive(Debug, Clone)]
 pub struct ManualHoldingInput {
@@ -112,7 +112,7 @@ impl ManualSnapshotService {
             };
 
             let quote_mode = match holding.data_source.as_deref() {
-                Some("MANUAL") => Some("MANUAL".to_string()),
+                Some(DATA_SOURCE_MANUAL) => Some(DATA_SOURCE_MANUAL.to_string()),
                 _ => None,
             };
 

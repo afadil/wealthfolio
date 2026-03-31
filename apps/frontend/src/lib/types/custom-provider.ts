@@ -12,8 +12,6 @@ export interface CustomProviderSource {
   invert?: boolean;
   locale?: string;
   headers?: string;
-  createdAt: string;
-  updatedAt: string;
   highPath?: string;
   lowPath?: string;
   volumePath?: string;

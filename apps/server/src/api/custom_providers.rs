@@ -14,15 +14,12 @@ use crate::main_lib::AppState;
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/api/v1/custom-providers", get(get_custom_providers))
-        .route("/api/v1/custom-providers", post(create_custom_provider))
-        .route("/api/v1/custom-providers/{id}", put(update_custom_provider))
+        .route("/custom-providers", get(get_custom_providers))
+        .route("/custom-providers", post(create_custom_provider))
+        .route("/custom-providers/{id}", put(update_custom_provider))
+        .route("/custom-providers/{id}", delete(delete_custom_provider))
         .route(
-            "/api/v1/custom-providers/{id}",
-            delete(delete_custom_provider),
-        )
-        .route(
-            "/api/v1/custom-providers/test-source",
+            "/custom-providers/test-source",
             post(test_custom_provider_source),
         )
 }

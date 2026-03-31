@@ -28,8 +28,8 @@ use crate::assets::{
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::fx::currency::{get_normalization_rule, normalize_amount, resolve_currency};
 use crate::fx::FxServiceTrait;
-use crate::quotes::model::{DATA_SOURCE_BROKER, DATA_SOURCE_MANUAL};
-use crate::quotes::{DataSource, Quote, QuoteServiceTrait};
+use crate::quotes::constants::{DATA_SOURCE_BROKER, DATA_SOURCE_MANUAL};
+use crate::quotes::{Quote, QuoteServiceTrait};
 use crate::Result;
 use log::warn;
 

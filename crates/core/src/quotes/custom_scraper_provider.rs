@@ -8,6 +8,9 @@ use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 use log::debug;
 use rust_decimal::Decimal;
 
+use crate::custom_provider::model::{
+    extract_html_value, validate_url, DATE_TEMPLATE_RE, MAX_RESPONSE_BYTES,
+};
 use crate::custom_provider::service::{
     detect_html_locale, parse_csv_records, parse_number_string, resolve_csv_column,
 };
@@ -102,8 +105,7 @@ impl CustomScraperProvider {
 
         // {DATE:format} — current date with custom format
         if expanded.contains("{DATE:") {
-            let re = regex::Regex::new(r"\{DATE:([^}]+)\}").unwrap();
-            expanded = re
+            expanded = DATE_TEMPLATE_RE
                 .replace_all(&expanded, |caps: &regex::Captures| {
                     Utc::now().format(&caps[1]).to_string()
                 })
@@ -114,7 +116,10 @@ impl CustomScraperProvider {
     }
 
     /// Build HTTP headers from source config, resolving secrets.
-    fn build_headers(&self, source: &CustomProviderSource) -> reqwest::header::HeaderMap {
+    fn build_headers(
+        &self,
+        source: &CustomProviderSource,
+    ) -> Result<reqwest::header::HeaderMap, MarketDataError> {
         let mut headers = reqwest::header::HeaderMap::new();
         if let Some(headers_json) = &source.headers {
             if let Ok(map) =
@@ -122,7 +127,7 @@ impl CustomScraperProvider {
             {
                 for (k, v) in map {
                     if let Some(val_str) = v.as_str() {
-                        let resolved = self.resolve_secret(val_str);
+                        let resolved = self.resolve_secret(val_str)?;
                         if let (Ok(name), Ok(value)) = (
                             reqwest::header::HeaderName::from_bytes(k.as_bytes()),
                             reqwest::header::HeaderValue::from_str(&resolved),
@@ -133,7 +138,7 @@ impl CustomScraperProvider {
                 }
             }
         }
-        headers
+        Ok(headers)
     }
 
     /// Fetch body from URL with simple 1-retry on 5xx/network errors.
@@ -165,7 +170,32 @@ impl CustomScraperProvider {
             });
         }
 
-        response.text().await.map_err(MarketDataError::Network)
+        if let Some(len) = response.content_length() {
+            if len > MAX_RESPONSE_BYTES as u64 {
+                return Err(MarketDataError::ProviderError {
+                    provider: DATA_SOURCE_CUSTOM_SCRAPER.to_string(),
+                    message: format!(
+                        "Response body too large ({} bytes, max {})",
+                        len, MAX_RESPONSE_BYTES
+                    ),
+                });
+            }
+        }
+        let body_bytes = response.bytes().await.map_err(MarketDataError::Network)?;
+        if body_bytes.len() > MAX_RESPONSE_BYTES {
+            return Err(MarketDataError::ProviderError {
+                provider: DATA_SOURCE_CUSTOM_SCRAPER.to_string(),
+                message: format!(
+                    "Response body too large ({} bytes, max {})",
+                    body_bytes.len(),
+                    MAX_RESPONSE_BYTES
+                ),
+            });
+        }
+        String::from_utf8(body_bytes.to_vec()).map_err(|e| MarketDataError::ProviderError {
+            provider: DATA_SOURCE_CUSTOM_SCRAPER.to_string(),
+            message: format!("Response body is not valid UTF-8: {}", e),
+        })
     }
 
     /// Load and execute a source config, returning a single quote.
@@ -213,7 +243,14 @@ impl CustomScraperProvider {
         }
 
         let url = self.expand_url(&source.url, symbol, context, from, to);
-        let headers = self.build_headers(source);
+
+        // SSRF check
+        validate_url(&url).map_err(|e| MarketDataError::ProviderError {
+            provider: DATA_SOURCE_CUSTOM_SCRAPER.to_string(),
+            message: e.to_string(),
+        })?;
+
+        let headers = self.build_headers(source)?;
 
         debug!("CustomScraper: fetching {} for symbol '{}'", url, symbol);
 
@@ -326,16 +363,18 @@ impl CustomScraperProvider {
     }
 
     /// Resolve __SECRET__ placeholders in header values.
-    fn resolve_secret(&self, val: &str) -> String {
-        if val.starts_with("__SECRET__") {
-            let key = val.trim_start_matches("__SECRET__");
+    fn resolve_secret(&self, val: &str) -> Result<String, MarketDataError> {
+        if let Some(key) = val.strip_prefix("__SECRET__") {
             self.secret_store
                 .get_secret(key)
                 .ok()
                 .flatten()
-                .unwrap_or_else(|| val.to_string())
+                .ok_or_else(|| MarketDataError::ProviderError {
+                    provider: DATA_SOURCE_CUSTOM_SCRAPER.to_string(),
+                    message: format!("Secret '{}' not found", key),
+                })
         } else {
-            val.to_string()
+            Ok(val.to_string())
         }
     }
 }
@@ -410,7 +449,15 @@ impl MarketDataProvider for CustomScraperProvider {
             }
         }
 
-        let (pid, e) = last_err.unwrap();
+        let (pid, e) = last_err.unwrap_or_else(|| {
+            (
+                "unknown".to_string(),
+                MarketDataError::ProviderError {
+                    provider: DATA_SOURCE_CUSTOM_SCRAPER.to_string(),
+                    message: "No providers found".to_string(),
+                },
+            )
+        });
         Err(MarketDataError::ProviderError {
             provider: DATA_SOURCE_CUSTOM_SCRAPER.to_string(),
             message: format!("[{}] {}", pid, extract_inner_message(&e)),
@@ -497,7 +544,15 @@ impl MarketDataProvider for CustomScraperProvider {
             }
         }
 
-        let (pid, e) = last_err.unwrap();
+        let (pid, e) = last_err.unwrap_or_else(|| {
+            (
+                "unknown".to_string(),
+                MarketDataError::ProviderError {
+                    provider: DATA_SOURCE_CUSTOM_SCRAPER.to_string(),
+                    message: "No providers found".to_string(),
+                },
+            )
+        });
         Err(MarketDataError::ProviderError {
             provider: DATA_SOURCE_CUSTOM_SCRAPER.to_string(),
             message: format!("[{}] {}", pid, extract_inner_message(&e)),
@@ -1029,12 +1084,5 @@ fn extract_json_string(body: &str, path: &str) -> Option<String> {
     }
 }
 
-fn extract_html_value(body: &str, selector: &str, locale: Option<&str>) -> Option<f64> {
-    let document = scraper::Html::parse_document(body);
-    let sel = scraper::Selector::parse(selector).ok()?;
-    let element = document.select(&sel).next()?;
-    let text: String = element.text().collect::<String>();
-    parse_number_string(text.trim(), locale)
-}
-
+// extract_html_value imported from crate::custom_provider::model
 // parse_number_string imported from crate::custom_provider::service

@@ -105,8 +105,9 @@ export const DataSource = {
 
 export type DataSource = (typeof DataSource)[keyof typeof DataSource];
 
-// Zod schema for data source validation
-export const dataSourceSchema = z.enum([DataSource.YAHOO, DataSource.MANUAL]);
+// Zod schema for data source validation — accepts any string since the backend
+// can return many provider IDs (BROKER, ALPHA_VANTAGE, CUSTOM_SCRAPER:xyz, etc.)
+export const dataSourceSchema = z.string();
 
 // QuoteMode: How an asset's price is determined (used on Asset/Activity objects)
 export const QuoteMode = {

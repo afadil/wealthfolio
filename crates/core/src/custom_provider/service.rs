@@ -59,6 +59,10 @@ impl CustomProviderService {
             );
         }
 
+        for src in &payload.sources {
+            validate_source_kind_format(&src.kind, &src.format)?;
+        }
+
         let provider = crate::quotes::provider_settings::MarketDataProviderSetting {
             id: code.clone(),
             name: payload.name.clone(),
@@ -120,6 +124,9 @@ impl CustomProviderService {
         self.repo.update_provider(&provider).await?;
 
         if let Some(sources) = &payload.sources {
+            for src in sources {
+                validate_source_kind_format(&src.kind, &src.format)?;
+            }
             self.repo.update_sources(provider_id, sources).await?;
         }
 
@@ -168,13 +175,14 @@ impl CustomProviderService {
         url = url.replace("{FROM}", &today);
         url = url.replace("{TO}", &today);
         if url.contains("{DATE:") {
-            let re = regex::Regex::new(r"\{DATE:([^}]+)\}").unwrap();
-            url = re
+            url = DATE_TEMPLATE_RE
                 .replace_all(&url, |caps: &regex::Captures| {
                     chrono::Utc::now().format(&caps[1]).to_string()
                 })
                 .to_string();
         }
+
+        validate_url(&url).map_err(|e| crate::Error::Unexpected(e.to_string()))?;
 
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(15))
@@ -191,13 +199,14 @@ impl CustomProviderService {
             {
                 for (k, v) in map {
                     if let Some(val_str) = v.as_str() {
-                        let resolved = if val_str.starts_with("__SECRET__") {
-                            let key = val_str.trim_start_matches("__SECRET__");
+                        let resolved = if let Some(key) = val_str.strip_prefix("__SECRET__") {
                             self.secret_store
                                 .get_secret(key)
                                 .ok()
                                 .flatten()
-                                .unwrap_or_else(|| val_str.to_string())
+                                .ok_or_else(|| {
+                                    crate::Error::Unexpected(format!("Secret '{}' not found", key))
+                                })?
                         } else {
                             val_str.to_string()
                         };
@@ -229,7 +238,23 @@ impl CustomProviderService {
         };
 
         let status = response.status();
-        let body = response.text().await.unwrap_or_default();
+        if let Some(len) = response.content_length() {
+            if len > MAX_RESPONSE_BYTES as u64 {
+                return Err(crate::Error::Unexpected(format!(
+                    "Response body too large ({} bytes, max {})",
+                    len, MAX_RESPONSE_BYTES
+                )));
+            }
+        }
+        let body_bytes = response.bytes().await.unwrap_or_default();
+        if body_bytes.len() > MAX_RESPONSE_BYTES {
+            return Err(crate::Error::Unexpected(format!(
+                "Response body too large ({} bytes, max {})",
+                body_bytes.len(),
+                MAX_RESPONSE_BYTES
+            )));
+        }
+        let body = String::from_utf8_lossy(&body_bytes).to_string();
 
         if !status.is_success() {
             return Ok(TestSourceResult {
@@ -438,6 +463,27 @@ impl CustomProviderService {
     }
 }
 
+/// Validate that a source's `kind` and `format` are recognized values.
+fn validate_source_kind_format(kind: &str, format: &str) -> crate::errors::Result<()> {
+    if !VALID_SOURCE_KINDS.contains(&kind) {
+        return Err(ValidationError::InvalidInput(format!(
+            "Invalid source kind '{}'. Must be one of: {}",
+            kind,
+            VALID_SOURCE_KINDS.join(", ")
+        ))
+        .into());
+    }
+    if !VALID_SOURCE_FORMATS.contains(&format) {
+        return Err(ValidationError::InvalidInput(format!(
+            "Invalid source format '{}'. Must be one of: {}",
+            format,
+            VALID_SOURCE_FORMATS.join(", ")
+        ))
+        .into());
+    }
+    Ok(())
+}
+
 /// Extract a numeric value from JSON using a JSONPath expression.
 fn extract_json_value(body: &str, path: &str) -> Option<f64> {
     use jsonpath_rust::JsonPathQuery;
@@ -470,14 +516,7 @@ fn extract_json_string(body: &str, path: &str) -> Option<String> {
     }
 }
 
-/// Extract a numeric value from HTML using a CSS selector.
-fn extract_html_value(body: &str, selector: &str, locale: Option<&str>) -> Option<f64> {
-    let document = scraper::Html::parse_document(body);
-    let sel = scraper::Selector::parse(selector).ok()?;
-    let element = document.select(&sel).next()?;
-    let text: String = element.text().collect::<String>();
-    parse_number_string(text.trim(), locale)
-}
+// extract_html_value is shared via super::model::extract_html_value
 
 /// Detect all numeric elements in an HTML page, returning structured data with
 /// CSS selectors, values, labels, and HTML context snippets.
@@ -754,7 +793,13 @@ fn css_escape_ident(s: &str) -> String {
 }
 
 /// Parse a number string, handling locale-specific formatting.
+///
 /// Strips currency symbols, whitespace, and normalizes decimal separators.
+///
+/// **Ambiguity note:** When no `locale` is set, the string `"1,234"` is treated as having
+/// a thousands separator (English convention), producing `1234.0`. Users who need European
+/// formatting (where comma is the decimal separator) should configure a locale on the
+/// provider source (e.g. `"de"`, `"fr"`, `"es"`, `"it"`).
 pub fn parse_number_string(s: &str, locale: Option<&str>) -> Option<f64> {
     let cleaned = s.trim();
     if cleaned.is_empty() {
@@ -787,14 +832,15 @@ pub fn parse_number_string(s: &str, locale: Option<&str>) -> Option<f64> {
             stripped.replace('.', "").replace(',', ".")
         }
         _ => {
-            // Auto-detect European format: comma followed by 1-2 digits at end (e.g. "1.234,56")
+            // Auto-detect European format: comma followed by 1-8 digits at end
+            // (e.g. "1.234,56" or "0,12345678" for crypto/FX)
             let has_european_comma = stripped.rfind(',').map_or(false, |pos| {
                 let after = stripped.len() - pos - 1;
-                (1..=2).contains(&after) && stripped[pos + 1..].chars().all(|c| c.is_ascii_digit())
+                (1..=8).contains(&after) && stripped[pos + 1..].chars().all(|c| c.is_ascii_digit())
             });
             let has_trailing_dot = stripped.rfind('.').map_or(false, |pos| {
                 let after = stripped.len() - pos - 1;
-                (1..=2).contains(&after) && stripped[pos + 1..].chars().all(|c| c.is_ascii_digit())
+                (1..=8).contains(&after) && stripped[pos + 1..].chars().all(|c| c.is_ascii_digit())
             });
 
             if has_european_comma && !has_trailing_dot {

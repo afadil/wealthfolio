@@ -16,7 +16,7 @@ mod tests {
     use crate::errors::{DatabaseError, Result};
     use crate::quotes::service::{append_historical_seed_quotes, fill_missing_quotes};
     use crate::quotes::{
-        model::{DataSource, LatestQuotePair, Quote},
+        model::{LatestQuotePair, Quote},
         store::QuoteStore,
         types::{AssetId, Day, QuoteSource},
     };
@@ -108,10 +108,7 @@ mod tests {
         async fn delete_provider_quotes_for_asset(&self, asset_id: &AssetId) -> Result<usize> {
             let mut quotes = self.quotes.lock().unwrap();
             let original_len = quotes.len();
-            quotes.retain(|q| {
-                q.asset_id != asset_id.as_str()
-                    || q.data_source == "MANUAL"
-            });
+            quotes.retain(|q| q.asset_id != asset_id.as_str() || q.data_source == "MANUAL");
             Ok(original_len - quotes.len())
         }
 

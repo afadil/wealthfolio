@@ -1,7 +1,8 @@
 use wealthfolio_core::assets::{AssetKind, NewAsset};
 use wealthfolio_core::errors::{DatabaseError, ValidationError};
 use wealthfolio_core::fx::{ExchangeRate, FxRepositoryTrait};
-use wealthfolio_core::quotes::{DataSource, Quote};
+use wealthfolio_core::quotes::constants::DATA_SOURCE_MANUAL;
+use wealthfolio_core::quotes::Quote;
 use wealthfolio_core::{Error, Result};
 
 use crate::assets::{AssetDB, InsertableAssetDB};
@@ -158,7 +159,9 @@ impl FxRepository {
                     from_currency,
                     to_currency,
                     rate: Decimal::ZERO,
-                    source: preferred_provider.clone().unwrap_or_else(|| "MANUAL".to_string()),
+                    source: preferred_provider
+                        .clone()
+                        .unwrap_or_else(|| DATA_SOURCE_MANUAL.to_string()),
                     timestamp,
                 });
             }

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 use wealthfolio_core::quotes::{
-    DataSource, MarketDataProviderSetting, ProviderCapabilities, Quote, QuoteSyncState,
+    MarketDataProviderSetting, ProviderCapabilities, Quote, QuoteSyncState,
 };
 
 /// Database model for quotes

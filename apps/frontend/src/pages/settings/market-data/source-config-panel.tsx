@@ -378,7 +378,7 @@ export function SourceConfigPanel({
     };
   }, []);
 
-  const format = form.watch(`${prefix}.format`)!;
+  const format = form.watch(`${prefix}.format`) ?? "json";
   const pricePath = form.watch(`${prefix}.pricePath`);
   const urlValue = form.watch(`${prefix}.url`) ?? "";
 
@@ -430,15 +430,22 @@ export function SourceConfigPanel({
 
   const applyTemplate = useCallback(
     (t: ProviderTemplate) => {
+      // Reset all source fields to defaults before applying template values
       form.setValue(`${prefix}.format`, t.format);
       form.setValue(`${prefix}.url`, t.url);
       form.setValue(`${prefix}.pricePath`, t.pricePath);
-      if (t.datePath) form.setValue(`${prefix}.datePath`, t.datePath);
-      if (t.highPath) form.setValue(`${prefix}.highPath`, t.highPath);
-      if (t.lowPath) form.setValue(`${prefix}.lowPath`, t.lowPath);
-      if (t.volumePath) form.setValue(`${prefix}.volumePath`, t.volumePath);
+      form.setValue(`${prefix}.datePath`, t.datePath ?? "");
+      form.setValue(`${prefix}.dateFormat`, "");
+      form.setValue(`${prefix}.highPath`, t.highPath ?? "");
+      form.setValue(`${prefix}.lowPath`, t.lowPath ?? "");
+      form.setValue(`${prefix}.volumePath`, t.volumePath ?? "");
+      form.setValue(`${prefix}.headers`, t.headers ?? "");
+      form.setValue(`${prefix}.currencyPath`, "");
+      form.setValue(`${prefix}.locale`, "");
+      form.setValue(`${prefix}.factor`, undefined);
+      form.setValue(`${prefix}.invert`, false);
+      form.setValue(`${prefix}.dateTimezone`, "");
       if (t.headers) {
-        form.setValue(`${prefix}.headers`, t.headers);
         setAdvancedOpen(true);
       }
       setTestSymbol(t.testSymbol);
@@ -780,7 +787,7 @@ export function SourceConfigPanel({
       </div>
 
       {/* ── Fetch error ── */}
-      {fetchError && !hasFetched && (
+      {fetchError && !isFetching && (
         <div className="border-destructive/20 bg-destructive/5 rounded-xl border p-4">
           <div className="flex items-start gap-2">
             <Icons.XCircle className="text-destructive mt-0.5 h-4 w-4 shrink-0" />

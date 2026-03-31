@@ -5,7 +5,7 @@ use super::fx_traits::{FxRepositoryTrait, FxServiceTrait};
 use crate::errors::Result;
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::fx::currency::{denormalization_multiplier, normalize_currency_code};
-use crate::quotes::model::DATA_SOURCE_MANUAL;
+use crate::quotes::constants::{DATA_SOURCE_MANUAL, DATA_SOURCE_YAHOO};
 use async_trait::async_trait;
 use chrono::{NaiveDate, Utc};
 use rust_decimal::Decimal;
@@ -378,7 +378,7 @@ impl FxServiceTrait for FxService {
         if existing_rate.is_none() {
             let asset_id = self
                 .repository
-                .create_fx_asset(normalized_from, normalized_to, "YAHOO")
+                .create_fx_asset(normalized_from, normalized_to, DATA_SOURCE_YAHOO)
                 .await?;
 
             self.event_sink
@@ -413,7 +413,7 @@ impl FxServiceTrait for FxService {
         if existing_rate.is_none() {
             let asset_id = self
                 .repository
-                .create_fx_asset(normalized_from, normalized_to, "MANUAL")
+                .create_fx_asset(normalized_from, normalized_to, DATA_SOURCE_MANUAL)
                 .await?;
 
             self.event_sink

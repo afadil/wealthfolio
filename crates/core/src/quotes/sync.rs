@@ -33,7 +33,7 @@ use tokio::sync::RwLock;
 use super::client::MarketDataClient;
 use super::constants::*;
 use super::errors::MarketDataError;
-use super::model::{DataSource, Quote};
+use super::model::Quote;
 use super::store::QuoteStore;
 use super::sync_state::{
     calculate_sync_window, determine_sync_category, QuoteSyncState, SymbolSyncPlan, SyncCategory,
@@ -520,7 +520,7 @@ where
             adjclose: par,
             volume: Decimal::ZERO,
             currency: asset.quote_ccy.clone(),
-            data_source: "MANUAL".to_string(),
+            data_source: DATA_SOURCE_MANUAL.to_string(),
             created_at: Utc::now(),
             notes: Some("Par value at maturity (auto-generated)".to_string()),
         };

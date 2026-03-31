@@ -19,7 +19,7 @@ use crate::utils::time_utils;
 use super::client::{MarketDataClient, ProviderConfig};
 use super::constants::DATA_SOURCE_MANUAL;
 use super::import::{ImportValidationStatus, QuoteConverter, QuoteImport, QuoteValidator};
-use super::model::{DataSource, LatestQuotePair, Quote, ResolvedQuote, SymbolSearchResult};
+use super::model::{LatestQuotePair, Quote, ResolvedQuote, SymbolSearchResult};
 use super::store::{ProviderSettingsStore, QuoteStore};
 use super::sync::{QuoteSyncService, QuoteSyncServiceTrait, SyncResult};
 use super::sync_state::{QuoteSyncState, SymbolSyncPlan, SyncMode, SyncStateStore};
@@ -585,7 +585,7 @@ where
         Ok(Quote {
             id,
             created_at: Utc::now(),
-            data_source: "MANUAL".to_string(),
+            data_source: DATA_SOURCE_MANUAL.to_string(),
             timestamp,
             asset_id: import.symbol.clone(),
             open: import.open_or_close(),
@@ -638,7 +638,7 @@ where
             currency_source: None,
             data_source: asset
                 .preferred_provider()
-                .or_else(|| Some("MANUAL".to_string())),
+                .or_else(|| Some(DATA_SOURCE_MANUAL.to_string())),
             is_existing: true,
             existing_asset_id: Some(asset.id.clone()),
             index: String::new(),
@@ -1968,7 +1968,6 @@ mod tests {
     use crate::assets::QuoteMode;
     use crate::assets::{AssetRepositoryTrait, NewAsset, UpdateAssetProfile};
     use crate::limits::ContributionActivity;
-    use crate::quotes::model::DataSource;
     use crate::quotes::store::ProviderSettingsStore;
     use crate::quotes::types::{AssetId, Day, QuoteSource};
     use crate::quotes::{

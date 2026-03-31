@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -47,7 +47,21 @@ const sourceSchema = z.object({
   factor: z.coerce.number().optional(),
   invert: z.boolean().optional(),
   locale: z.string().optional(),
-  headers: z.string().optional(),
+  headers: z
+    .string()
+    .optional()
+    .refine(
+      (val) => {
+        if (!val || val.trim() === "") return true;
+        try {
+          JSON.parse(val);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { message: "Headers must be valid JSON" },
+    ),
   highPath: z.string().optional(),
   lowPath: z.string().optional(),
   volumePath: z.string().optional(),
@@ -102,14 +116,22 @@ interface CustomProviderFormProps {
  * remounts (= full reset) whenever the dialog opens or the provider changes.
  */
 export function CustomProviderForm({ open, onOpenChange, provider }: CustomProviderFormProps) {
+  const savingRef = useRef(false);
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && savingRef.current) return;
+        onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent className="flex h-[90vh] max-h-[800px] w-[95vw] max-w-5xl flex-col overflow-hidden sm:h-[85vh]">
         {open && (
           <CustomProviderFormContent
             key={provider?.id ?? "__new__"}
             provider={provider}
             onOpenChange={onOpenChange}
+            savingRef={savingRef}
           />
         )}
       </DialogContent>
@@ -120,14 +142,17 @@ export function CustomProviderForm({ open, onOpenChange, provider }: CustomProvi
 function CustomProviderFormContent({
   provider,
   onOpenChange,
+  savingRef,
 }: {
   provider?: CustomProviderWithSources;
   onOpenChange: (open: boolean) => void;
+  savingRef: React.MutableRefObject<boolean>;
 }) {
   const isEditing = !!provider;
   const { mutate: createProvider, isPending: isCreating } = useCreateCustomProvider();
   const { mutate: updateProvider, isPending: isUpdating } = useUpdateCustomProvider();
   const isSaving = isCreating || isUpdating;
+  savingRef.current = isSaving;
 
   const latestSource = provider?.sources.find((s) => s.kind === "latest");
   const historicalSource = provider?.sources.find((s) => s.kind === "historical");

@@ -1,4 +1,4 @@
-use crate::quotes::{DataSource, Quote};
+use crate::quotes::Quote;
 use crate::utils::decimal_serde;
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;

@@ -32,7 +32,7 @@ use log::{debug, info, warn};
 use crate::assets::{Asset, ProviderProfile};
 use crate::errors::Result;
 use crate::quotes::constants::*;
-use crate::quotes::model::{DataSource, SymbolSearchResult};
+use crate::quotes::model::SymbolSearchResult;
 use crate::quotes::Quote;
 use crate::secrets::SecretStore;
 
