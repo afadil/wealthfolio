@@ -297,9 +297,7 @@ fn handle_portfolio_calculation(
 
         // --- Step 3: Calculate Valuation History ---
         let mut accounts_for_valuation = initially_targeted_active_accounts;
-        if !accounts_for_valuation.contains(&PORTFOLIO_TOTAL_ACCOUNT_ID.to_string()) {
-            accounts_for_valuation.push(PORTFOLIO_TOTAL_ACCOUNT_ID.to_string());
-        }
+        accounts_for_valuation.retain(|id| id != PORTFOLIO_TOTAL_ACCOUNT_ID);
 
         if !accounts_for_valuation.is_empty() {
             let history_futures = accounts_for_valuation.iter().map(|account_id| {
@@ -331,6 +329,14 @@ fn handle_portfolio_calculation(
                     history_errors.join("; ")
                 );
             }
+        }
+
+        // Aggregate per-account valuations into portfolio-level rows.
+        if let Err(e) = valuation_service
+            .calculate_valuation_history(PORTFOLIO_TOTAL_ACCOUNT_ID, valuation_mode)
+            .await
+        {
+            error!("Portfolio valuation aggregation failed: {}", e);
         }
 
         if let Err(e) = app_handle.emit(PORTFOLIO_UPDATE_COMPLETE, ()) {

@@ -9,13 +9,16 @@ use diesel::sqlite::SqliteConnection;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::model::DailyAccountValuationDB;
+use super::model::{DailyAccountValuationDB, DailyPortfolioValuationDB};
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
 use crate::schema::daily_account_valuation;
 use crate::schema::daily_account_valuation::dsl::*;
+use crate::schema::daily_portfolio_valuation;
 use wealthfolio_core::errors::Result;
-use wealthfolio_core::portfolio::valuation::{DailyAccountValuation, ValuationRepositoryTrait};
+use wealthfolio_core::portfolio::valuation::{
+    DailyAccountValuation, DailyPortfolioValuation, ValuationRepositoryTrait,
+};
 
 pub struct ValuationRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
@@ -269,5 +272,133 @@ impl ValuationRepositoryTrait for ValuationRepository {
             .collect();
 
         Ok(history_records)
+    }
+
+    // ─── Portfolio-level methods ────────────────────────────────────────
+
+    async fn save_portfolio_valuations(&self, records: &[DailyPortfolioValuation]) -> Result<()> {
+        if records.is_empty() {
+            return Ok(());
+        }
+        let records_to_save: Vec<DailyPortfolioValuationDB> = records
+            .iter()
+            .cloned()
+            .map(DailyPortfolioValuationDB::from)
+            .collect();
+
+        self.writer
+            .exec(move |conn| {
+                for chunk in records_to_save.chunks(1000) {
+                    diesel::replace_into(daily_portfolio_valuation::table)
+                        .values(chunk)
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
+                }
+                Ok(())
+            })
+            .await
+    }
+
+    fn get_portfolio_history(
+        &self,
+        start_date_opt: Option<NaiveDate>,
+        end_date_opt: Option<NaiveDate>,
+    ) -> Result<Vec<DailyPortfolioValuation>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let mut query = daily_portfolio_valuation::table
+            .order(daily_portfolio_valuation::valuation_date.asc())
+            .into_boxed();
+
+        if let Some(sd) = start_date_opt {
+            query = query.filter(daily_portfolio_valuation::valuation_date.ge(sd));
+        }
+        if let Some(ed) = end_date_opt {
+            query = query.filter(daily_portfolio_valuation::valuation_date.le(ed));
+        }
+
+        let rows = query
+            .load::<DailyPortfolioValuationDB>(&mut conn)
+            .map_err(StorageError::from)?;
+
+        Ok(rows
+            .into_iter()
+            .map(DailyPortfolioValuation::from)
+            .collect())
+    }
+
+    fn load_latest_portfolio_valuation_date(&self) -> Result<Option<NaiveDate>> {
+        use diesel::OptionalExtension;
+        let mut conn = get_connection(&self.pool)?;
+
+        let result: Option<Option<NaiveDate>> = daily_portfolio_valuation::table
+            .select(diesel::dsl::max(daily_portfolio_valuation::valuation_date))
+            .first::<Option<NaiveDate>>(&mut conn)
+            .optional()
+            .map_err(StorageError::from)?;
+
+        Ok(result.flatten())
+    }
+
+    fn get_latest_portfolio_valuation(&self) -> Result<Option<DailyPortfolioValuation>> {
+        use diesel::OptionalExtension;
+        let mut conn = get_connection(&self.pool)?;
+
+        let row: Option<DailyPortfolioValuationDB> = daily_portfolio_valuation::table
+            .order(daily_portfolio_valuation::valuation_date.desc())
+            .first::<DailyPortfolioValuationDB>(&mut conn)
+            .optional()
+            .map_err(StorageError::from)?;
+
+        Ok(row.map(DailyPortfolioValuation::from))
+    }
+
+    fn get_all_account_valuations(
+        &self,
+        start_date_opt: Option<NaiveDate>,
+        end_date_opt: Option<NaiveDate>,
+    ) -> Result<Vec<DailyAccountValuation>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let mut query = daily_account_valuation::table
+            .filter(account_id.ne("TOTAL"))
+            .order(valuation_date.asc())
+            .into_boxed();
+
+        if let Some(sd) = start_date_opt {
+            query = query.filter(valuation_date.ge(sd));
+        }
+        if let Some(ed) = end_date_opt {
+            query = query.filter(valuation_date.le(ed));
+        }
+
+        let rows = query
+            .load::<DailyAccountValuationDB>(&mut conn)
+            .map_err(StorageError::from)?;
+
+        Ok(rows.into_iter().map(DailyAccountValuation::from).collect())
+    }
+
+    async fn delete_portfolio_valuations(&self, since_date: Option<NaiveDate>) -> Result<()> {
+        self.writer
+            .exec(move |conn| {
+                match since_date {
+                    None => {
+                        diesel::delete(daily_portfolio_valuation::table)
+                            .execute(conn)
+                            .map_err(StorageError::from)?;
+                    }
+                    Some(date) => {
+                        diesel::delete(
+                            daily_portfolio_valuation::table
+                                .filter(daily_portfolio_valuation::valuation_date.ge(date)),
+                        )
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
+                    }
+                }
+                Ok(())
+            })
+            .await
     }
 }

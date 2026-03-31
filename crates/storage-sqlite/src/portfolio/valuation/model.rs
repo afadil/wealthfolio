@@ -1,4 +1,4 @@
-//! Database model for daily account valuations.
+//! Database models for daily account and portfolio valuations.
 
 use chrono::{DateTime, NaiveDate, Utc};
 use diesel::prelude::*;
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 use wealthfolio_core::constants::DECIMAL_PRECISION;
-use wealthfolio_core::portfolio::valuation::DailyAccountValuation;
+use wealthfolio_core::portfolio::valuation::{DailyAccountValuation, DailyPortfolioValuation};
 
 /// Database model for daily account valuations
 #[derive(
@@ -80,6 +80,81 @@ impl From<DailyAccountValuationDB> for DailyAccountValuation {
                 .unwrap_or_else(|_| Utc::now()),
             alternative_market_value: Decimal::from_str(&value.alternative_market_value)
                 .unwrap_or_default(),
+        }
+    }
+}
+
+/// Database model for daily portfolio-level valuations.
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Queryable, QueryableByName, Insertable,
+)]
+#[serde(rename_all = "camelCase")]
+#[diesel(table_name = crate::schema::daily_portfolio_valuation)]
+pub struct DailyPortfolioValuationDB {
+    pub id: String,
+    pub valuation_date: NaiveDate,
+    pub base_currency: String,
+    pub cash_balance: String,
+    pub investment_market_value: String,
+    pub alternative_market_value: String,
+    pub total_assets: String,
+    pub total_liabilities: String,
+    pub net_worth: String,
+    pub cost_basis: String,
+    pub net_contribution: String,
+    pub calculated_at: String,
+}
+
+impl From<DailyPortfolioValuation> for DailyPortfolioValuationDB {
+    fn from(value: DailyPortfolioValuation) -> Self {
+        DailyPortfolioValuationDB {
+            id: value.id,
+            valuation_date: value.valuation_date,
+            base_currency: value.base_currency,
+            cash_balance: value.cash_balance.round_dp(DECIMAL_PRECISION).to_string(),
+            investment_market_value: value
+                .investment_market_value
+                .round_dp(DECIMAL_PRECISION)
+                .to_string(),
+            alternative_market_value: value
+                .alternative_market_value
+                .round_dp(DECIMAL_PRECISION)
+                .to_string(),
+            total_assets: value.total_assets.round_dp(DECIMAL_PRECISION).to_string(),
+            total_liabilities: value
+                .total_liabilities
+                .round_dp(DECIMAL_PRECISION)
+                .to_string(),
+            net_worth: value.net_worth.round_dp(DECIMAL_PRECISION).to_string(),
+            cost_basis: value.cost_basis.round_dp(DECIMAL_PRECISION).to_string(),
+            net_contribution: value
+                .net_contribution
+                .round_dp(DECIMAL_PRECISION)
+                .to_string(),
+            calculated_at: value.calculated_at.to_rfc3339(),
+        }
+    }
+}
+
+impl From<DailyPortfolioValuationDB> for DailyPortfolioValuation {
+    fn from(value: DailyPortfolioValuationDB) -> Self {
+        DailyPortfolioValuation {
+            id: value.id,
+            valuation_date: value.valuation_date,
+            base_currency: value.base_currency,
+            cash_balance: Decimal::from_str(&value.cash_balance).unwrap_or_default(),
+            investment_market_value: Decimal::from_str(&value.investment_market_value)
+                .unwrap_or_default(),
+            alternative_market_value: Decimal::from_str(&value.alternative_market_value)
+                .unwrap_or_default(),
+            total_assets: Decimal::from_str(&value.total_assets).unwrap_or_default(),
+            total_liabilities: Decimal::from_str(&value.total_liabilities).unwrap_or_default(),
+            net_worth: Decimal::from_str(&value.net_worth).unwrap_or_default(),
+            cost_basis: Decimal::from_str(&value.cost_basis).unwrap_or_default(),
+            net_contribution: Decimal::from_str(&value.net_contribution).unwrap_or_default(),
+            calculated_at: DateTime::parse_from_rfc3339(&value.calculated_at)
+                .map(|dt| dt.with_timezone(&Utc))
+                .unwrap_or_else(|_| Utc::now()),
         }
     }
 }
