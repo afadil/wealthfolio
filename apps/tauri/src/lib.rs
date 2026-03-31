@@ -310,8 +310,14 @@ pub fn run() {
             commands::goal::update_goal,
             commands::goal::delete_goal,
             commands::goal::get_goals,
-            commands::goal::update_goal_allocations,
-            commands::goal::load_goals_allocations,
+            commands::goal::get_goal,
+            commands::goal::get_goal_funding,
+            commands::goal::save_goal_funding,
+            commands::goal::get_goal_plan,
+            commands::goal::save_goal_plan,
+            commands::goal::delete_goal_plan,
+            commands::goal::refresh_all_goal_summaries,
+            commands::goal::refresh_goal_summary,
             // Portfolio commands
             commands::portfolio::get_holdings,
             commands::portfolio::get_holding,
@@ -598,9 +604,7 @@ pub fn run() {
             commands::health::execute_health_fix,
             commands::health::get_health_config,
             commands::health::update_health_config,
-            // FIRE planner commands
-            commands::fire::get_fire_settings,
-            commands::fire::save_fire_settings,
+            // FIRE calculation commands (used by retirement goal detail)
             commands::fire::calculate_fire_projection,
             commands::fire::run_fire_monte_carlo,
             commands::fire::run_fire_scenario_analysis,
