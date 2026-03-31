@@ -90,7 +90,10 @@ pub mod test_env {
         },
         assets::{Asset, ProviderProfile},
         errors::DatabaseError,
-        goals::{Goal, GoalServiceTrait, GoalsAllocation, NewGoal},
+        goals::{
+            AccountValuationMap, Goal, GoalFundingRule, GoalFundingRuleInput, GoalPlan,
+            GoalServiceTrait, NewGoal, SaveGoalPlan,
+        },
         holdings::{Holding, HoldingsServiceTrait},
         portfolio::allocation::{AllocationHoldings, AllocationServiceTrait, PortfolioAllocations},
         portfolio::income::{IncomeServiceTrait, IncomeSummary},
@@ -540,7 +543,6 @@ pub mod test_env {
     #[derive(Default)]
     pub struct MockGoalService {
         pub goals: Vec<Goal>,
-        pub allocations: Vec<GoalsAllocation>,
     }
 
     #[async_trait]
@@ -549,8 +551,8 @@ pub mod test_env {
             Ok(self.goals.clone())
         }
 
-        fn load_goals_allocations(&self) -> CoreResult<Vec<GoalsAllocation>> {
-            Ok(self.allocations.clone())
+        fn get_goal(&self, _goal_id: &str) -> CoreResult<Goal> {
+            unimplemented!("MockGoalService::get_goal")
         }
 
         async fn create_goal(&self, _goal: NewGoal) -> CoreResult<Goal> {
@@ -565,11 +567,36 @@ pub mod test_env {
             unimplemented!("MockGoalService::delete_goal")
         }
 
-        async fn upsert_goal_allocations(
+        fn get_goal_funding(&self, _goal_id: &str) -> CoreResult<Vec<GoalFundingRule>> {
+            Ok(Vec::new())
+        }
+
+        async fn save_goal_funding(
             &self,
-            _allocations: Vec<GoalsAllocation>,
-        ) -> CoreResult<usize> {
-            unimplemented!("MockGoalService::upsert_goal_allocations")
+            _goal_id: &str,
+            _rules: Vec<GoalFundingRuleInput>,
+        ) -> CoreResult<Vec<GoalFundingRule>> {
+            unimplemented!("MockGoalService::save_goal_funding")
+        }
+
+        fn get_goal_plan(&self, _goal_id: &str) -> CoreResult<Option<GoalPlan>> {
+            Ok(None)
+        }
+
+        async fn save_goal_plan(&self, _plan: SaveGoalPlan) -> CoreResult<GoalPlan> {
+            unimplemented!("MockGoalService::save_goal_plan")
+        }
+
+        async fn delete_goal_plan(&self, _goal_id: &str) -> CoreResult<usize> {
+            unimplemented!("MockGoalService::delete_goal_plan")
+        }
+
+        async fn refresh_goal_summary(
+            &self,
+            _goal_id: &str,
+            _valuations: &AccountValuationMap,
+        ) -> CoreResult<Goal> {
+            unimplemented!("MockGoalService::refresh_goal_summary")
         }
     }
 

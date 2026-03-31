@@ -1,18 +1,12 @@
-use std::sync::Arc;
-
-use crate::context::ServiceContext;
 use log::debug;
-use tauri::State;
-use wealthfolio_core::portfolio::fire::{
-    FireProjection, FireSettings, MonteCarloResult, ScenarioResult, SensitivityResult,
-    SorrScenario, StrategyComparisonResult,
-};
 use wealthfolio_core::portfolio::fire::{
     project_fire_date, run_monte_carlo, run_scenario_analysis, run_sensitivity_analysis,
     run_sequence_of_returns_risk, run_strategy_comparison,
 };
-
-const FIRE_SETTINGS_KEY: &str = "fire_planner_settings";
+use wealthfolio_core::portfolio::fire::{
+    FireProjection, FireSettings, MonteCarloResult, ScenarioResult, SensitivityResult,
+    SorrScenario, StrategyComparisonResult,
+};
 
 fn validate_fire_settings(s: &FireSettings) -> Result<(), String> {
     if s.safe_withdrawal_rate <= 0.0 {
@@ -27,40 +21,30 @@ fn validate_fire_settings(s: &FireSettings) -> Result<(), String> {
     if s.monthly_expenses_at_fire < 0.0 || s.monthly_contribution < 0.0 {
         return Err("Monetary amounts must be non-negative".into());
     }
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn get_fire_settings(
-    state: State<'_, Arc<ServiceContext>>,
-) -> Result<Option<FireSettings>, String> {
-    debug!("Fetching FIRE planner settings...");
-    match state
-        .settings_service()
-        .get_setting_value(FIRE_SETTINGS_KEY)
-        .map_err(|e| format!("Failed to load FIRE settings: {}", e))?
-    {
-        Some(json) => serde_json::from_str::<FireSettings>(&json)
-            .map(Some)
-            .map_err(|e| format!("Failed to deserialize FIRE settings: {}", e)),
-        None => Ok(None),
+    // Prevent double-counting: a DC stream's linked account must not also be in the FIRE portfolio.
+    // When included_account_ids is None, all investment accounts are implicitly included,
+    // so any linked DC account would overlap. The frontend performs the authoritative check
+    // with full account data; this is a safety net.
+    for stream in &s.additional_income_streams {
+        if let Some(ref linked) = stream.linked_account_id {
+            match &s.included_account_ids {
+                Some(included) if included.contains(linked) => {
+                    return Err(format!(
+                        "Account '{}' is used as both a FIRE portfolio account and a linked pension fund. Remove it from one to avoid double-counting.",
+                        linked
+                    ));
+                }
+                None => {
+                    return Err(format!(
+                        "Account '{}' is linked to a pension fund, but no explicit FIRE account selection is set. Select specific accounts to avoid double-counting the linked pension fund.",
+                        linked
+                    ));
+                }
+                _ => {}
+            }
+        }
     }
-}
-
-#[tauri::command]
-pub async fn save_fire_settings(
-    settings: FireSettings,
-    state: State<'_, Arc<ServiceContext>>,
-) -> Result<(), String> {
-    debug!("Saving FIRE planner settings...");
-    validate_fire_settings(&settings)?;
-    let json = serde_json::to_string(&settings)
-        .map_err(|e| format!("Failed to serialize FIRE settings: {}", e))?;
-    state
-        .settings_service()
-        .set_setting_value(FIRE_SETTINGS_KEY, &json)
-        .await
-        .map_err(|e| format!("Failed to save FIRE settings: {}", e))
+    Ok(())
 }
 
 const MAX_SIMS: u32 = 500_000;
@@ -101,10 +85,15 @@ pub async fn run_fire_scenario_analysis(
 pub async fn run_fire_sorr(
     settings: FireSettings,
     portfolio_at_fire: f64,
+    retirement_start_age: u32,
 ) -> Result<Vec<SorrScenario>, String> {
     debug!("Running FIRE sequence-of-returns risk analysis...");
     validate_fire_settings(&settings)?;
-    Ok(run_sequence_of_returns_risk(&settings, portfolio_at_fire))
+    Ok(run_sequence_of_returns_risk(
+        &settings,
+        portfolio_at_fire,
+        retirement_start_age,
+    ))
 }
 
 #[tauri::command]
