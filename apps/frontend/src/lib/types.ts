@@ -711,28 +711,97 @@ export interface SettingsContextType {
   setAccountsGrouped: (value: boolean) => void;
 }
 
+export type GoalType =
+  | "retirement"
+  | "education"
+  | "wedding"
+  | "home"
+  | "emergency_fund"
+  | "custom_save_up";
+export type GoalLifecycle = "draft" | "active" | "achieved" | "archived" | "paused";
+export type GoalHealth = "on_track" | "at_risk" | "off_track" | "not_applicable";
+export type PlanKind = "retirement" | "save_up";
+export type PlannerMode = "fire" | "traditional";
+
 export interface Goal {
   id: string;
+  goalType: GoalType;
   title: string;
   description?: string;
-  targetAmount: number;
-  isAchieved?: boolean;
-  allocations?: GoalAllocation[];
+  targetAmount?: number;
+  isAchieved: boolean;
+  statusLifecycle: GoalLifecycle;
+  statusHealth: GoalHealth;
+  isArchived: boolean;
+  priority: number;
+  coverImageKey?: string;
+  currency?: string;
+  startDate?: string;
+  targetDate?: string;
+  currentValueCached?: number;
+  progressCached?: number;
+  projectedCompletionDate?: string;
+  projectedValueAtTargetDate?: number;
+  createdAt: string;
+  updatedAt: string;
+  targetAmountCached?: number;
 }
 
-export interface GoalAllocation {
+export interface NewGoal {
+  id?: string;
+  goalType: GoalType;
+  title: string;
+  description?: string;
+  targetAmount?: number;
+  isAchieved: boolean;
+  statusLifecycle?: GoalLifecycle;
+  statusHealth?: GoalHealth;
+  isArchived?: boolean;
+  priority?: number;
+  coverImageKey?: string;
+  currency?: string;
+  startDate?: string;
+  targetDate?: string;
+}
+
+export type FundingRole = "explicit_reservation" | "residual_eligible";
+
+export interface GoalFundingRule {
   id: string;
   goalId: string;
   accountId: string;
-  percentAllocation: number;
+  fundingRole: FundingRole;
+  reservationPercent?: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface GoalProgress {
-  name: string;
-  targetValue: number;
-  currentValue: number;
-  progress: number;
-  currency: string;
+export interface GoalFundingRuleInput {
+  accountId: string;
+  fundingRole: FundingRole;
+  reservationPercent?: number;
+}
+
+/** @deprecated Use GoalFundingRule */
+export type GoalAllocation = GoalFundingRule;
+
+export interface GoalPlan {
+  goalId: string;
+  planKind: PlanKind;
+  plannerMode?: PlannerMode;
+  settingsJson: string;
+  summaryJson: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaveGoalPlan {
+  goalId: string;
+  planKind: PlanKind;
+  plannerMode?: PlannerMode;
+  settingsJson: string;
+  summaryJson?: string;
 }
 
 export interface IncomeByAsset {

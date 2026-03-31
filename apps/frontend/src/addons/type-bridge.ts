@@ -21,7 +21,7 @@ import type {
   DepositsCalculation,
   ExchangeRate,
   Goal,
-  GoalAllocation,
+  GoalFundingRule,
   Holding,
   HoldingsSnapshotInput,
   ImportActivitiesResult,
@@ -69,8 +69,8 @@ export interface InternalHostAPI {
   getGoals(): Promise<Goal[]>;
   createGoal(goal: unknown): Promise<Goal>;
   updateGoal(goal: Goal): Promise<Goal>;
-  updateGoalsAllocations(allocations: GoalAllocation[]): Promise<void>;
-  getGoalsAllocation(): Promise<GoalAllocation[]>;
+  getGoalFunding(goalId: string): Promise<GoalFundingRule[]>;
+  saveGoalFunding(goalId: string, rules: GoalFundingRule[]): Promise<GoalFundingRule[]>;
 
   // Market data
   searchTicker(query: string): Promise<SymbolSearchResult[]>;
@@ -276,11 +276,11 @@ export function createSDKHostAPIBridge(
       calculateDeposits: internalAPI.calculateDepositsForLimit,
     },
     goals: {
-      getAll: internalAPI.getGoals,
-      create: internalAPI.createGoal,
-      update: internalAPI.updateGoal,
-      updateAllocations: internalAPI.updateGoalsAllocations,
-      getAllocations: internalAPI.getGoalsAllocation,
+      getAll: internalAPI.getGoals as never,
+      create: internalAPI.createGoal as never,
+      update: internalAPI.updateGoal as never,
+      getFunding: internalAPI.getGoalFunding as never,
+      saveFunding: internalAPI.saveGoalFunding as never,
     },
     settings: {
       get: internalAPI.getSettings,
