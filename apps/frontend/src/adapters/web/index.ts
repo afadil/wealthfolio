@@ -99,10 +99,16 @@ export { parseCsv } from "./activities";
 export {
   createGoal,
   deleteGoal,
+  deleteGoalPlan,
+  getGoal,
+  getGoalFunding,
+  getGoalPlan,
   getGoals,
-  getGoalsAllocation,
+  refreshAllGoalSummaries,
+  refreshGoalSummary,
+  saveGoalFunding,
+  saveGoalPlan,
   updateGoal,
-  updateGoalsAllocations,
 } from "../shared/goals";
 
 // Secrets Commands

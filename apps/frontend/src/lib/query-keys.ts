@@ -19,7 +19,12 @@ export const QueryKeys = {
 
   // Goals related keys
   GOALS: "goals",
-  GOALS_ALLOCATIONS: "goals_allocations",
+  GOAL: "goal",
+  goal: (id: string) => [QueryKeys.GOAL, id],
+  GOAL_PLAN: "goalPlan",
+  goalPlan: (id: string) => [QueryKeys.GOAL_PLAN, id],
+  GOAL_FUNDING: "goalFunding",
+  goalFunding: (id: string) => [QueryKeys.GOAL_FUNDING, id],
 
   // Settings related keys
   SETTINGS: "settings",
