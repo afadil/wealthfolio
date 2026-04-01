@@ -147,7 +147,7 @@ impl CustomProviderRepository for CustomProviderSqliteRepository {
             name,
             description,
             enabled: true,
-            priority: 50,
+            priority: payload.priority.unwrap_or(50),
             config: Some(config_json),
             created_at: now.clone(),
             updated_at: now,

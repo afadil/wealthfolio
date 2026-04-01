@@ -598,9 +598,8 @@ impl CustomScraperProvider {
     ) -> String {
         let override_key = format!("CUSTOM:{}", source.provider_id);
         if let Some(overrides) = &context.overrides {
-            if let Some(ProviderInstrument::EquitySymbol { symbol }) = overrides.get(&override_key)
-            {
-                return symbol.to_string();
+            if let Some(instrument) = overrides.get(&override_key) {
+                return instrument.to_symbol_string();
             }
         }
         default_symbol.to_string()

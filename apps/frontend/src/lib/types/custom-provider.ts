@@ -32,6 +32,7 @@ export interface NewCustomProvider {
   code: string;
   name: string;
   description?: string;
+  priority?: number;
   sources: NewCustomProviderSource[];
 }
 

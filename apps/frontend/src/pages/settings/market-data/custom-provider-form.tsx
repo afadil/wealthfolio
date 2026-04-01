@@ -288,6 +288,7 @@ function CustomProviderFormContent({
             code: values.code,
             name: values.name,
             description: values.description || undefined,
+            priority: values.priority,
             sources,
           },
           { onSuccess: () => onOpenChange(false) },

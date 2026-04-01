@@ -57,11 +57,20 @@ pub fn expand_template(template: &str, ctx: &TemplateContext<'_>) -> String {
 fn is_private_or_reserved(addr: IpAddr) -> bool {
     match addr {
         IpAddr::V4(ip) => {
+            let octets = ip.octets();
+            let is_shared = octets[0] == 100 && (octets[1] & 0xC0) == 64; // 100.64.0.0/10 (CGNAT)
+            let is_benchmarking = octets[0] == 198 && (octets[1] & 0xFE) == 18; // 198.18.0.0/15
+            let is_multicast = octets[0] >= 224 && octets[0] <= 239; // 224.0.0.0/4
+            let is_reserved = octets[0] >= 240; // 240.0.0.0/4
             ip.is_loopback()
                 || ip.is_private()
                 || ip.is_link_local()
                 || ip.is_broadcast()
                 || ip.is_unspecified()
+                || is_shared
+                || is_benchmarking
+                || is_multicast
+                || is_reserved
         }
         IpAddr::V6(ip) => {
             let segs = ip.segments();
@@ -221,6 +230,7 @@ pub struct NewCustomProvider {
     pub code: String,
     pub name: String,
     pub description: Option<String>,
+    pub priority: Option<i32>,
     pub sources: Vec<NewCustomProviderSource>,
 }
 

@@ -68,6 +68,7 @@ impl CustomProviderService {
             code,
             name: payload.name,
             description: payload.description,
+            priority: payload.priority,
             sources: payload.sources,
         };
 
