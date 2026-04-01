@@ -39,8 +39,7 @@ fn resolve_dc_payouts(
         .iter()
         .filter(|s| s.stream_type == Some(StreamType::DefinedContribution))
         .map(|s| {
-            let total_years =
-                (s.start_age as i32 - current_age as i32).max(0) as u32;
+            let total_years = (s.start_age as i32 - current_age as i32).max(0) as u32;
             let contrib_years =
                 (s.start_age.min(target_fire_age) as i32 - current_age as i32).max(0) as u32;
             let growth_only_years = total_years - contrib_years;
@@ -79,7 +78,10 @@ fn additional_income_at_age(
         .iter()
         .filter(|s| age >= s.start_age)
         .map(|s| {
-            let base_monthly = resolved_payouts.get(&s.id).copied().unwrap_or(s.monthly_amount);
+            let base_monthly = resolved_payouts
+                .get(&s.id)
+                .copied()
+                .unwrap_or(s.monthly_amount);
             let annual = base_monthly * 12.0;
             if let Some(r) = s.annual_growth_rate {
                 // Custom growth rate: always deterministic
@@ -163,8 +165,7 @@ fn blended_return_params_mc(
         return (base_mean, base_std);
     }
     let years_to_fire = (target_fire_age as i32 - current_age as i32).max(0) as f64;
-    let years_in_retirement =
-        (planning_horizon_age as i32 - target_fire_age as i32).max(1) as f64;
+    let years_in_retirement = (planning_horizon_age as i32 - target_fire_age as i32).max(1) as f64;
     let years_from_fire = (i as f64 - years_to_fire).max(0.0);
     let t = (years_from_fire / years_in_retirement).clamp(0.0, 1.0);
     let bond_pct = (gp.bond_allocation_at_fire
@@ -191,8 +192,12 @@ pub fn calculate_fire_target(settings: &FireSettings) -> f64 {
 }
 
 pub fn calculate_net_fire_target(settings: &FireSettings) -> f64 {
-    let resolved =
-        resolve_dc_payouts(&settings.additional_income_streams, settings.current_age, settings.target_fire_age, settings.safe_withdrawal_rate);
+    let resolved = resolve_dc_payouts(
+        &settings.additional_income_streams,
+        settings.current_age,
+        settings.target_fire_age,
+        settings.safe_withdrawal_rate,
+    );
     let income_at_fire_age: f64 = settings
         .additional_income_streams
         .iter()
@@ -229,7 +234,9 @@ fn step_pension_funds(
         if !has_accumulation {
             continue;
         }
-        let current = *balances.get(&s.id).unwrap_or(&s.current_value.unwrap_or(0.0));
+        let current = *balances
+            .get(&s.id)
+            .unwrap_or(&s.current_value.unwrap_or(0.0));
         if age < s.start_age {
             let r = s.accumulation_return.unwrap_or(0.04);
             let contributions = if in_fire {
@@ -288,8 +295,7 @@ pub fn project_fire_date(settings: &FireSettings, current_portfolio: f64) -> Fir
 
         // Trigger retirement when FI target reached OR forced by target_fire_age.
         // fire_age is only set when FI is actually reached (portfolio >= target).
-        let nominal_fire_target =
-            real_fire_target * (1.0 + settings.inflation_rate).powi(i as i32);
+        let nominal_fire_target = real_fire_target * (1.0 + settings.inflation_rate).powi(i as i32);
         if !in_fire {
             let fi_reached = portfolio >= nominal_fire_target;
             let age_forced = age >= settings.target_fire_age;
@@ -308,8 +314,9 @@ pub fn project_fire_date(settings: &FireSettings, current_portfolio: f64) -> Fir
         let (r, _) = blended_return_params(settings, i, in_fire);
 
         if in_fire {
-            let annual_living =
-                settings.monthly_expenses_at_fire * 12.0 * (1.0 + settings.inflation_rate).powi(i as i32);
+            let annual_living = settings.monthly_expenses_at_fire
+                * 12.0
+                * (1.0 + settings.inflation_rate).powi(i as i32);
             let annual_healthcare = healthcare_cost_at_year(settings, i);
             let annual_expenses = annual_living + annual_healthcare;
             let annual_income = additional_income_at_age(
@@ -412,7 +419,12 @@ pub fn run_monte_carlo(
         .unwrap_or(settings.inflation_rate);
     let glide_path = settings.glide_path.clone();
     // Pension accumulation is deterministic — resolve DC payouts once, share across all sims.
-    let resolved_payouts = resolve_dc_payouts(&settings.additional_income_streams, current_age, target_fire_age, swr);
+    let resolved_payouts = resolve_dc_payouts(
+        &settings.additional_income_streams,
+        current_age,
+        target_fire_age,
+        swr,
+    );
 
     // paths[sim] = (year_values, survived, fi_age)
     // fi_age: age when portfolio first reached the FIRE target (None if never reached)
@@ -431,8 +443,7 @@ pub fn run_monte_carlo(
                 let age = current_age + i;
                 path.push(portfolio.max(0.0));
 
-                let nominal_fire_target =
-                    real_fire_target * (1.0 + inflation_rate).powi(i as i32);
+                let nominal_fire_target = real_fire_target * (1.0 + inflation_rate).powi(i as i32);
                 if !in_fire {
                     let fi_reached = portfolio >= nominal_fire_target;
                     let age_forced = age >= target_fire_age;
@@ -447,15 +458,21 @@ pub fn run_monte_carlo(
 
                 // Glide-path-blended return distribution for this year
                 let (eff_mean, eff_std) = blended_return_params_mc(
-                    mean, std_dev, current_age, target_fire_age, planning_horizon_age,
-                    glide_path.as_ref(), i, in_fire,
+                    mean,
+                    std_dev,
+                    current_age,
+                    target_fire_age,
+                    planning_horizon_age,
+                    glide_path.as_ref(),
+                    i,
+                    in_fire,
                 );
                 let annual_return = sample_return(&mut rng, eff_mean, eff_std);
 
                 if in_fire {
                     let annual_living = monthly_expenses * 12.0 * cumulative_inflation;
-                    let annual_healthcare = healthcare_monthly * 12.0
-                        * (1.0 + healthcare_rate).powi(i as i32);
+                    let annual_healthcare =
+                        healthcare_monthly * 12.0 * (1.0 + healthcare_rate).powi(i as i32);
                     let annual_expenses = annual_living + annual_healthcare;
                     // Pass cumulative_inflation so inflation-indexed income tracks the same
                     // stochastic path as expenses (fixes systematic inflation asymmetry).
@@ -496,10 +513,7 @@ pub fn run_monte_carlo(
     let year_count = horizon_years as usize + 1;
     let survived_count = sim_results.iter().filter(|(_, s, _)| *s).count();
     // Only collect ages where FI target was genuinely reached (fi_age is Some)
-    let mut fire_ages: Vec<u32> = sim_results
-        .iter()
-        .filter_map(|(_, _, fa)| *fa)
-        .collect();
+    let mut fire_ages: Vec<u32> = sim_results.iter().filter_map(|(_, _, fa)| *fa).collect();
     fire_ages.sort_unstable();
 
     let mut p10 = Vec::with_capacity(year_count);
@@ -893,10 +907,7 @@ mod tests {
         assert!(result.success_rate >= 0.0 && result.success_rate <= 1.0);
         assert_eq!(result.n_simulations, 500);
         assert_eq!(result.age_axis.first(), Some(&s.current_age));
-        assert_eq!(
-            result.age_axis.last(),
-            Some(&s.planning_horizon_age)
-        );
+        assert_eq!(result.age_axis.last(), Some(&s.planning_horizon_age));
     }
 
     #[test]

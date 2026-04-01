@@ -3929,13 +3929,16 @@ mod tests {
         };
 
         let result = activity_service
-            .import_activities(vec![
-                import.clone(),
-                ActivityImport {
-                    line_number: Some(2),
-                    ..import
-                },
-            ], false)
+            .import_activities(
+                vec![
+                    import.clone(),
+                    ActivityImport {
+                        line_number: Some(2),
+                        ..import
+                    },
+                ],
+                false,
+            )
             .await
             .expect("import should succeed");
 
@@ -5055,10 +5058,7 @@ mod tests {
 
         // With deduplication enabled, only one should be imported
         let result_with_dedup = activity_service
-            .import_activities(
-                vec![import1.clone(), import2.clone()],
-                false,
-            )
+            .import_activities(vec![import1.clone(), import2.clone()], false)
             .await;
         assert!(result_with_dedup.is_ok());
         let result_with_dedup = result_with_dedup.unwrap();

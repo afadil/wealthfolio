@@ -4,12 +4,12 @@ use crate::context::ServiceContext;
 use log::debug;
 use tauri::State;
 use wealthfolio_core::portfolio::fire::{
-    FireProjection, FireSettings, MonteCarloResult, ScenarioResult, SensitivityResult,
-    SorrScenario, StrategyComparisonResult,
-};
-use wealthfolio_core::portfolio::fire::{
     project_fire_date, run_monte_carlo, run_scenario_analysis, run_sensitivity_analysis,
     run_sequence_of_returns_risk, run_strategy_comparison,
+};
+use wealthfolio_core::portfolio::fire::{
+    FireProjection, FireSettings, MonteCarloResult, ScenarioResult, SensitivityResult,
+    SorrScenario, StrategyComparisonResult,
 };
 
 const FIRE_SETTINGS_KEY: &str = "fire_planner_settings";
