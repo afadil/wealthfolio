@@ -40,6 +40,7 @@ export interface ImportReviewGridProps {
   // Bulk action handlers
   onBulkSkip?: (rowIndexes: number[]) => void;
   onBulkUnskip?: (rowIndexes: number[]) => void;
+  onBulkForceImport?: (rowIndexes: number[]) => void;
   onBulkSetCurrency?: (rowIndexes: number[], currency: string) => void;
   onBulkSetAccount?: (rowIndexes: number[], accountId: string) => void;
 }
@@ -216,16 +217,20 @@ function useImportReviewColumns({
             errors,
             warnings,
             rowIndex,
+            forceImport,
           } = row.original;
-          const title = getStatusTitle(
-            status,
-            skipReason,
-            duplicateOfId,
-            duplicateOfLineNumber,
-            errors,
-            warnings,
-          );
-          const dotColor = STATUS_DOT_COLOR[status];
+          const isForcedDuplicate = status === "duplicate" && forceImport;
+          const title = isForcedDuplicate
+            ? "Will be imported – overrides duplicate detection"
+            : getStatusTitle(
+                status,
+                skipReason,
+                duplicateOfId,
+                duplicateOfLineNumber,
+                errors,
+                warnings,
+              );
+          const dotColor = isForcedDuplicate ? "bg-amber-500" : STATUS_DOT_COLOR[status];
           const dot = dotColor ? (
             <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${dotColor}`} />
           ) : null;
@@ -465,6 +470,7 @@ export function ImportReviewGrid({
   onSelectionChange,
   onBulkSkip,
   onBulkUnskip,
+  onBulkForceImport,
   onBulkSetCurrency,
   onBulkSetAccount,
 }: ImportReviewGridProps) {
@@ -535,6 +541,10 @@ export function ImportReviewGrid({
   const handleUnskip = useCallback(() => {
     onBulkUnskip?.(selectedRows);
   }, [onBulkUnskip, selectedRows]);
+
+  const handleForceImport = useCallback(() => {
+    onBulkForceImport?.(selectedRows);
+  }, [onBulkForceImport, selectedRows]);
 
   const handleSetCurrency = useCallback(
     (currency: string) => {
@@ -811,6 +821,7 @@ export function ImportReviewGrid({
         selectedCount={selectedRows.length}
         onSkip={handleSkip}
         onUnskip={handleUnskip}
+        onForceImport={onBulkForceImport ? handleForceImport : undefined}
         onSetCurrency={handleSetCurrency}
         onSetAccount={handleSetAccount}
         onClearSelection={handleClearSelection}
@@ -829,6 +840,7 @@ export function ImportReviewGrid({
         selectedCount={selectedRows.length}
         onSkip={handleSkip}
         onUnskip={handleUnskip}
+        onForceImport={onBulkForceImport ? handleForceImport : undefined}
         onSetCurrency={handleSetCurrency}
         onSetAccount={handleSetAccount}
       />

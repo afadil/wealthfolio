@@ -168,7 +168,21 @@ export function bulkUnskipDrafts(rowIndexes: number[]): ImportAction {
     type: "BULK_SKIP_DRAFTS",
     payload: {
       rowIndexes,
-      updates: { status: "valid", skipReason: undefined },
+      updates: { status: "valid", skipReason: undefined, forceImport: false },
+    },
+  };
+}
+
+/**
+ * Mark duplicate activities as "import anyway", bypassing dedup on the backend.
+ * Only meaningful for rows with status "duplicate".
+ */
+export function bulkForceImportDrafts(rowIndexes: number[]): ImportAction {
+  return {
+    type: "BULK_SKIP_DRAFTS",
+    payload: {
+      rowIndexes,
+      updates: { forceImport: true },
     },
   };
 }

@@ -1,18 +1,13 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub enum WithdrawalStrategy {
     #[serde(rename = "constant-dollar")]
+    #[default]
     ConstantDollar,
     #[serde(rename = "constant-percentage")]
     ConstantPercentage,
-}
-
-impl Default for WithdrawalStrategy {
-    fn default() -> Self {
-        Self::ConstantDollar
-    }
 }
 
 /// Whether the stream's payout amount is entered manually or derived from an accumulated balance.
