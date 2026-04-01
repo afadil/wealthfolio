@@ -22,6 +22,7 @@ export interface ImportToolbarProps {
   selectedCount: number;
   onSkip: () => void;
   onUnskip: () => void;
+  onForceImport?: () => void;
   onSetCurrency: (currency: string) => void;
   onSetAccount: (accountId: string) => void;
   onClearSelection: () => void;
@@ -38,6 +39,7 @@ export function ImportToolbar({
   selectedCount,
   onSkip,
   onUnskip,
+  onForceImport,
   onSetCurrency,
   onSetAccount,
   onClearSelection,
@@ -101,6 +103,20 @@ export function ImportToolbar({
           <Icons.PlusCircle className="mr-1.5 h-3.5 w-3.5" />
           Unskip
         </Button>
+
+        {/* Import anyway button — only shown when the handler is provided (duplicate filter active) */}
+        {onForceImport && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onForceImport}
+            title="Import selected rows even if they match existing activities"
+            className="h-8 border-amber-500/50 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400"
+          >
+            <Icons.ShieldAlert className="mr-1.5 h-3.5 w-3.5" />
+            Import anyway
+          </Button>
+        )}
 
         <div className="bg-border mx-1 h-5 w-px" />
 
@@ -239,6 +255,7 @@ export interface ImportContextMenuProps {
   selectedCount: number;
   onSkip: () => void;
   onUnskip: () => void;
+  onForceImport?: () => void;
   onSetCurrency: (currency: string) => void;
   onSetAccount: (accountId: string) => void;
 }
@@ -250,6 +267,7 @@ export function ImportContextMenu({
   selectedCount,
   onSkip,
   onUnskip,
+  onForceImport,
   onSetCurrency,
   onSetAccount,
 }: ImportContextMenuProps) {
@@ -289,6 +307,12 @@ export function ImportContextMenu({
           <Icons.PlusCircle className="mr-2 h-4 w-4" />
           Unskip Selected
         </DropdownMenuItem>
+        {onForceImport && (
+          <DropdownMenuItem onSelect={onForceImport} className="text-amber-700 dark:text-amber-400">
+            <Icons.ShieldAlert className="mr-2 h-4 w-4" />
+            Import Anyway
+          </DropdownMenuItem>
+        )}
 
         <DropdownMenuSeparator />
 

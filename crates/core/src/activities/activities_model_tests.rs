@@ -685,6 +685,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let converted = NewActivity::from(import);

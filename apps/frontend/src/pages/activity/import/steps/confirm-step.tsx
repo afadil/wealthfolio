@@ -27,6 +27,7 @@ interface ImportSummary {
   toImport: number;
   skipped: number;
   duplicates: number;
+  forcedDuplicates: number;
   errors: number;
   warnings: number;
   byType: Record<string, number>;
@@ -50,6 +51,7 @@ function computeSummary(draftActivities: DraftActivity[]): ImportSummary {
     toImport: 0,
     skipped: 0,
     duplicates: 0,
+    forcedDuplicates: 0,
     errors: 0,
     warnings: 0,
     byType: {},
@@ -84,8 +86,12 @@ function computeSummary(draftActivities: DraftActivity[]): ImportSummary {
       }
       case "duplicate": {
         summary.toImport++;
-        summary.warnings++;
         summary.duplicates++;
+        if (draft.forceImport) {
+          summary.forcedDuplicates++;
+        } else {
+          summary.warnings++;
+        }
         const duplicateType = draft.activityType ?? "UNKNOWN";
         summary.byType[duplicateType] = (summary.byType[duplicateType] ?? 0) + 1;
         break;
@@ -130,6 +136,7 @@ function draftToActivityImport(draft: DraftActivity): ActivityImport {
     lineNumber: draft.rowIndex + 1,
     isDraft: false,
     comment: draft.comment,
+    forceImport: draft.forceImport ?? false,
   };
 }
 
@@ -284,8 +291,9 @@ export function ConfirmStep() {
 
   const handleImport = async () => {
     // Send valid, warning, and duplicate activities to the backend.
-    // Duplicates are skipped server-side via idempotency keys (ON CONFLICT DO NOTHING)
-    // so the backend returns the true inserted/duplicate counts.
+    // Duplicate-status rows with forceImport=true will have their idempotency key
+    // cleared server-side so they bypass the DB unique constraint and are inserted.
+    // Non-forced duplicates are dropped by the backend dedup logic.
     const draftsToImport = state.draftActivities.filter(
       (d) => d.status === "valid" || d.status === "warning" || d.status === "duplicate",
     );
@@ -382,6 +390,12 @@ export function ConfirmStep() {
           variant="warning"
           title={`${summary.toImport} activities ready to import`}
           description={`${summary.warnings} activities have warnings but will still be imported.`}
+        />
+      ) : summary.forcedDuplicates > 0 ? (
+        <ImportAlert
+          variant="warning"
+          title={`${summary.toImport} activities ready to import`}
+          description={`Includes ${summary.forcedDuplicates} duplicate${summary.forcedDuplicates === 1 ? "" : "s"} marked "import anyway".`}
         />
       ) : (
         <div>

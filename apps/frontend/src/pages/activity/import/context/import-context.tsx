@@ -82,6 +82,8 @@ export interface DraftActivity {
   skipReason?: string;
   duplicateOfId?: string;
   duplicateOfLineNumber?: number;
+  /** User explicitly requested to import this row despite it matching an existing activity. */
+  forceImport?: boolean;
   isEdited: boolean;
 }
 

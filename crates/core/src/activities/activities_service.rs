@@ -2983,6 +2983,7 @@ impl ActivityServiceTrait for ActivityService {
                 subtype: None,
                 asset_id: None,
                 isin: candidate.isin.clone(),
+                force_import: false,
             })
             .collect();
 
@@ -3333,7 +3334,18 @@ impl ActivityServiceTrait for ActivityService {
         let mut duplicate_count = 0u32;
         let mut insertable_positions: Vec<usize> = Vec::with_capacity(new_activities.len());
 
-        for (position, activity) in new_activities.iter().enumerate() {
+        for (position, activity) in new_activities.iter_mut().enumerate() {
+            // User explicitly chose to import this row despite it being a duplicate.
+            // Clear the idempotency key so the DB unique constraint is not violated.
+            if import_activities_indexed
+                .get(position)
+                .is_some_and(|(_, imp)| imp.force_import)
+            {
+                activity.idempotency_key = None;
+                insertable_positions.push(position);
+                continue;
+            }
+
             let Some(key) = activity.idempotency_key.as_ref() else {
                 insertable_positions.push(position);
                 continue;
