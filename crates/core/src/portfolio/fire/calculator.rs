@@ -146,9 +146,8 @@ fn blended_return_params(settings: &FireSettings, i: u32, in_fire: bool) -> (f64
     (mean, std)
 }
 
-/// MC-closure–safe version of `blended_return_params` that works with owned primitives.
-#[allow(clippy::too_many_arguments)]
-fn blended_return_params_mc(
+/// Parameters for the MC-closure–safe blended return calculation.
+struct BlendedReturnParams<'a> {
     base_mean: f64,
     base_std: f64,
     current_age: u32,

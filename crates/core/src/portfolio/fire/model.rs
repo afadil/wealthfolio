@@ -5,7 +5,6 @@ use std::collections::HashMap;
 pub enum WithdrawalStrategy {
     #[default]
     #[serde(rename = "constant-dollar")]
-    #[default]
     ConstantDollar,
     #[serde(rename = "constant-percentage")]
     ConstantPercentage,
