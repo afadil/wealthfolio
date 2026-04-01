@@ -198,6 +198,7 @@ const HoldingRow = memo(
                     value={tickerField.value}
                     placeholder="Search ticker..."
                     className="focus:border-input focus:bg-background bg-muted/40 border-border/40 h-9 truncate rounded-md border text-sm focus:border"
+                    data-testid={`bulk-holding-ticker-${index}`}
                   />
                 )}
               />
@@ -228,6 +229,7 @@ const HoldingRow = memo(
                 placeholder="Shares"
                 className="focus:border-input focus:bg-background bg-muted/40 border-border/40 h-9 rounded-md border text-sm focus:border"
                 onKeyDown={handleSharesKeyDown}
+                data-testid={`bulk-holding-shares-${index}`}
               />
             )}
           />
@@ -244,6 +246,7 @@ const HoldingRow = memo(
                 placeholder="Avg. cost"
                 className="focus:border-input focus:bg-background bg-muted/40 border-border/40 h-9 rounded-md border text-sm focus:border"
                 onKeyDown={handleCostKeyDown}
+                data-testid={`bulk-holding-cost-${index}`}
               />
             )}
           />
@@ -437,6 +440,7 @@ export const BulkHoldingsForm = ({ onAccountChange, defaultAccount }: BulkHoldin
               size="sm"
               onClick={addRow}
               className="border-muted-foreground/25 text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground h-10 w-full border border-dashed"
+              data-testid="bulk-holdings-add-row"
             >
               <Icons.PlusCircle className="mr-2 h-4 w-4" />
               Add Another Holding

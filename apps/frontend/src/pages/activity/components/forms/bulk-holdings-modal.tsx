@@ -275,7 +275,11 @@ export const BulkHoldingsModal = ({
                 <Button type="button" variant="outline" onClick={onClose}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isSubmitDisabled}>
+                <Button
+                  type="submit"
+                  disabled={isSubmitDisabled}
+                  data-testid="bulk-holdings-confirm"
+                >
                   {saveActivitiesMutation.isPending ? "Saving..." : "Confirm"}
                 </Button>
               </DialogFooter>
