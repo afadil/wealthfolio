@@ -168,7 +168,7 @@ export function bulkUnskipDrafts(rowIndexes: number[]): ImportAction {
     type: "BULK_SKIP_DRAFTS",
     payload: {
       rowIndexes,
-      updates: { status: "valid", skipReason: undefined },
+      updates: { status: "valid", skipReason: undefined, forceImport: false },
     },
   };
 }
