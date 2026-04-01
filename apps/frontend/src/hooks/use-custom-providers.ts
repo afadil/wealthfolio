@@ -79,5 +79,12 @@ export function useDeleteCustomProvider() {
 export function useTestCustomProviderSource() {
   return useMutation({
     mutationFn: (payload: TestSourceRequest) => testCustomProviderSource(payload),
+    onError: (error: Error) => {
+      toast({
+        title: "Source test failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 }

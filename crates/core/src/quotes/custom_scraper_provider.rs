@@ -43,7 +43,7 @@ impl CustomScraperProvider {
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)",
             )
             .build()
-            .unwrap_or_default();
+            .expect("failed to build reqwest HTTP client");
         Self {
             repo,
             secret_store,
@@ -701,7 +701,13 @@ fn rows_to_quotes(
             let ts = row
                 .date
                 .and_then(|d| parse_date_to_utc(d, source.date_timezone.as_deref()))
-                .unwrap_or_else(Utc::now);
+                .unwrap_or_else(|| {
+                    debug!(
+                        "CustomScraper [{}]: date missing or failed to convert to UTC, defaulting to now",
+                        source.provider_id
+                    );
+                    Utc::now()
+                });
 
             let src = format!("{}:{}", DATA_SOURCE_CUSTOM_SCRAPER, source.provider_id);
             let mut quote = MarketQuote::new(ts, to_decimal(close), currency.to_string(), src);
@@ -771,7 +777,7 @@ fn parse_date(s: &str, explicit_format: Option<&str>) -> Option<NaiveDate> {
 /// to avoid concatenating multiple responsive variants (e.g., full and abbreviated dates).
 fn extract_first_text_content(el: scraper::ElementRef) -> String {
     // If the cell has child elements, use the first one's text
-    let child_sel = scraper::Selector::parse("*").unwrap();
+    let child_sel = scraper::Selector::parse("*").expect("valid CSS selector '*'");
     if let Some(first_child) = el.select(&child_sel).next() {
         let text = first_child.text().collect::<String>();
         let trimmed = text.trim();
@@ -795,8 +801,8 @@ fn extract_table_rows(
         Ok(s) => s,
         Err(_) => return Vec::new(),
     };
-    let tr_sel = scraper::Selector::parse("tr").unwrap();
-    let td_sel = scraper::Selector::parse("td").unwrap();
+    let tr_sel = scraper::Selector::parse("tr").expect("valid CSS selector 'tr'");
+    let td_sel = scraper::Selector::parse("td").expect("valid CSS selector 'td'");
 
     let (table_idx, close_col) = match parse_table_col_path(&source.price_path) {
         Some(v) => v,
@@ -973,9 +979,11 @@ fn extract_json_rows(
             .replace("{CURRENCY}", currency)
     };
 
+    const MAX_JSON_ROWS: usize = 10_000;
+
     let price_path = expand_path(&source.price_path);
-    let prices = match json.clone().path(&price_path) {
-        Ok(serde_json::Value::Array(arr)) => arr,
+    let prices: Vec<serde_json::Value> = match json.clone().path(&price_path) {
+        Ok(serde_json::Value::Array(arr)) => arr.into_iter().take(MAX_JSON_ROWS).collect(),
         Ok(val) => vec![val],
         Err(_) => return Vec::new(),
     };

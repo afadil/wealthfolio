@@ -6,6 +6,10 @@ use super::model::{CustomProviderSource, CustomProviderWithSources, NewCustomPro
 use crate::quotes::provider_settings::MarketDataProviderSetting;
 
 /// Repository trait for custom provider persistence.
+///
+/// Read methods are synchronous because Diesel is synchronous and reads use a
+/// shared connection pool (no serialisation needed). Write methods are async
+/// because they go through a serialised write handle (`WriteHandle::exec_tx`).
 #[async_trait]
 pub trait CustomProviderRepository: Send + Sync {
     /// Get all custom providers with their sources.

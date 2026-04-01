@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::sync::Arc;
 
 use log::info;
@@ -177,6 +178,10 @@ impl CustomProviderService {
         url = url.replace("{TODAY}", &today);
         url = url.replace("{FROM}", &today);
         url = url.replace("{TO}", &today);
+        // {ISIN} defaults to symbol (useful when testing bond/ISIN-based templates)
+        url = url.replace("{ISIN}", &payload.symbol);
+        // {MIC} defaults to empty (no exchange context in test mode)
+        url = url.replace("{MIC}", "");
         if url.contains("{DATE:") {
             url = DATE_TEMPLATE_RE
                 .replace_all(&url, |caps: &regex::Captures| {
@@ -818,9 +823,12 @@ fn css_escape_ident(s: &str) -> String {
                 result.push('\\');
             }
             result.push(c);
-        } else {
+        } else if c.is_ascii() {
             result.push('\\');
             result.push(c);
+        } else {
+            // Non-ASCII: use CSS hex escape (e.g. \1f600 )
+            write!(result, "\\{:x} ", c as u32).ok();
         }
     }
     result

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -39,7 +39,12 @@ import { SourceConfigPanel } from "./source-config-panel";
 
 const sourceSchema = z.object({
   format: z.enum(["json", "html", "html_table", "csv"]),
-  url: z.string().min(1, "URL is required"),
+  url: z
+    .string()
+    .min(1, "URL is required")
+    .refine((val) => /^https?:\/\//i.test(val), {
+      message: "URL must start with http:// or https://",
+    }),
   pricePath: z.string().min(1, "Price path is required"),
   datePath: z.string().optional(),
   dateFormat: z.string().optional(),
@@ -116,12 +121,12 @@ interface CustomProviderFormProps {
  * remounts (= full reset) whenever the dialog opens or the provider changes.
  */
 export function CustomProviderForm({ open, onOpenChange, provider }: CustomProviderFormProps) {
-  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
   return (
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen && savingRef.current) return;
+        if (!nextOpen && saving) return;
         onOpenChange(nextOpen);
       }}
     >
@@ -131,7 +136,7 @@ export function CustomProviderForm({ open, onOpenChange, provider }: CustomProvi
             key={provider?.id ?? "__new__"}
             provider={provider}
             onOpenChange={onOpenChange}
-            savingRef={savingRef}
+            onSavingChange={setSaving}
           />
         )}
       </DialogContent>
@@ -142,17 +147,17 @@ export function CustomProviderForm({ open, onOpenChange, provider }: CustomProvi
 function CustomProviderFormContent({
   provider,
   onOpenChange,
-  savingRef,
+  onSavingChange,
 }: {
   provider?: CustomProviderWithSources;
   onOpenChange: (open: boolean) => void;
-  savingRef: React.MutableRefObject<boolean>;
+  onSavingChange: (saving: boolean) => void;
 }) {
   const isEditing = !!provider;
   const { mutate: createProvider, isPending: isCreating } = useCreateCustomProvider();
   const { mutate: updateProvider, isPending: isUpdating } = useUpdateCustomProvider();
   const isSaving = isCreating || isUpdating;
-  savingRef.current = isSaving;
+  onSavingChange(isSaving);
 
   const latestSource = provider?.sources.find((s) => s.kind === "latest");
   const historicalSource = provider?.sources.find((s) => s.kind === "historical");

@@ -494,7 +494,9 @@ export function SourceConfigPanel({
             setRawResponse(result.rawResponse);
             const trimmed = result.rawResponse.trimStart();
             const detected = trimmed.startsWith("{") || trimmed.startsWith("[") ? "json" : "html";
-            if (!isHistorical && format !== "csv") {
+            // Only auto-switch format on the initial connect (when price path is still
+            // at the dummy placeholder), so we don't overwrite a user's explicit choice.
+            if (!isHistorical && format !== "csv" && !pricePath) {
               form.setValue(`${prefix}.format`, detected);
             }
           } else if (result.detectedElements && result.detectedElements.length > 0) {

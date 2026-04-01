@@ -77,7 +77,10 @@ fn sources_to_config_json(sources: &[NewCustomProviderSource]) -> String {
     let config = ProviderConfig {
         sources: sources.to_vec(),
     };
-    serde_json::to_string(&config).unwrap_or_else(|_| r#"{"sources":[]}"#.to_string())
+    serde_json::to_string(&config).unwrap_or_else(|e| {
+        warn!("Failed to serialize provider config: {}", e);
+        r#"{"sources":[]}"#.to_string()
+    })
 }
 
 #[async_trait]
