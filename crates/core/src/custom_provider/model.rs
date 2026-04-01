@@ -52,7 +52,16 @@ pub fn validate_url(raw: &str) -> Result<(), anyhow::Error> {
         }
         Some(url::Host::Ipv6(ip)) => {
             let ip_addr = IpAddr::V6(ip);
-            if ip.is_loopback() || ip.is_unspecified() {
+            let segs = ip.segments();
+            let is_unique_local = (segs[0] & 0xfe00) == 0xfc00; // fc00::/7
+            let is_link_local = (segs[0] & 0xffc0) == 0xfe80; // fe80::/10
+            let is_multicast = (segs[0] & 0xff00) == 0xff00; // ff00::/8
+            if ip.is_loopback()
+                || ip.is_unspecified()
+                || is_unique_local
+                || is_link_local
+                || is_multicast
+            {
                 return Err(anyhow::anyhow!(
                     "URLs targeting private/reserved IP address {} are not allowed",
                     ip_addr
@@ -179,6 +188,8 @@ pub struct TestSourceRequest {
     pub headers: Option<String>,
     /// Symbol to substitute in template variables
     pub symbol: String,
+    /// Currency for {currency}/{CURRENCY} placeholders (defaults to "usd")
+    pub currency: Option<String>,
     pub high_path: Option<String>,
     pub low_path: Option<String>,
     pub volume_path: Option<String>,

@@ -74,6 +74,7 @@ export interface TestSourceRequest {
   locale?: string;
   headers?: string;
   symbol: string;
+  currency?: string;
   highPath?: string;
   lowPath?: string;
   volumePath?: string;

@@ -219,9 +219,13 @@ impl CustomProviderRepository for CustomProviderSqliteRepository {
         let provider_id = provider_id.to_string();
         self.writer
             .exec_tx(move |tx| {
-                diesel::delete(market_data_providers::table.find(&provider_id))
-                    .execute(tx.conn())
-                    .map_err(StorageError::QueryFailed)?;
+                diesel::delete(
+                    market_data_providers::table
+                        .find(&provider_id)
+                        .filter(market_data_providers::provider_type.eq("custom")),
+                )
+                .execute(tx.conn())
+                .map_err(StorageError::QueryFailed)?;
                 Ok(())
             })
             .await

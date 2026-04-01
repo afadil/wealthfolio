@@ -170,7 +170,10 @@ impl CustomProviderService {
     /// Test a source configuration by fetching and extracting a price.
     pub async fn test_source(&self, payload: TestSourceRequest) -> Result<TestSourceResult> {
         let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+        let currency = payload.currency.as_deref().unwrap_or("usd");
         let mut url = payload.url.replace("{SYMBOL}", &payload.symbol);
+        url = url.replace("{currency}", currency);
+        url = url.replace("{CURRENCY}", &currency.to_uppercase());
         url = url.replace("{TODAY}", &today);
         url = url.replace("{FROM}", &today);
         url = url.replace("{TO}", &today);
@@ -240,19 +243,51 @@ impl CustomProviderService {
         let status = response.status();
         if let Some(len) = response.content_length() {
             if len > MAX_RESPONSE_BYTES as u64 {
-                return Err(crate::Error::Unexpected(format!(
-                    "Response body too large ({} bytes, max {})",
-                    len, MAX_RESPONSE_BYTES
-                )));
+                return Ok(TestSourceResult {
+                    success: false,
+                    price: None,
+                    currency: None,
+                    date: None,
+                    error: Some(format!(
+                        "Response body too large ({} bytes, max {})",
+                        len, MAX_RESPONSE_BYTES
+                    )),
+                    raw_response: None,
+                    detected_elements: None,
+                    detected_tables: None,
+                });
             }
         }
-        let body_bytes = response.bytes().await.unwrap_or_default();
+        let body_bytes = match response.bytes().await {
+            Ok(b) => b,
+            Err(e) => {
+                return Ok(TestSourceResult {
+                    success: false,
+                    price: None,
+                    currency: None,
+                    date: None,
+                    error: Some(format!("Failed to read response body: {}", e)),
+                    raw_response: None,
+                    detected_elements: None,
+                    detected_tables: None,
+                });
+            }
+        };
         if body_bytes.len() > MAX_RESPONSE_BYTES {
-            return Err(crate::Error::Unexpected(format!(
-                "Response body too large ({} bytes, max {})",
-                body_bytes.len(),
-                MAX_RESPONSE_BYTES
-            )));
+            return Ok(TestSourceResult {
+                success: false,
+                price: None,
+                currency: None,
+                date: None,
+                error: Some(format!(
+                    "Response body too large ({} bytes, max {})",
+                    body_bytes.len(),
+                    MAX_RESPONSE_BYTES
+                )),
+                raw_response: None,
+                detected_elements: None,
+                detected_tables: None,
+            });
         }
         let body = String::from_utf8_lossy(&body_bytes).to_string();
 
