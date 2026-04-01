@@ -1,7 +1,6 @@
 pub mod account;
 pub mod activity;
 pub mod addon;
-pub mod fire;
 pub mod ai_chat;
 pub mod ai_providers;
 pub mod alternative_assets;
@@ -13,6 +12,7 @@ pub mod device_enroll_service;
 #[cfg(feature = "device-sync")]
 pub mod device_sync;
 pub mod error;
+pub mod fire;
 pub mod goal;
 pub mod health;
 pub mod limits;
