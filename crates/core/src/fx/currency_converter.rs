@@ -194,7 +194,6 @@ impl CurrencyConverter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::quotes::DataSource;
     use chrono::{NaiveDate, TimeZone, Utc};
 
     fn make_rate(from: &str, to: &str, rate: f64, y: i32, m: u32, d: u32) -> ExchangeRate {
@@ -210,7 +209,7 @@ mod tests {
             from_currency: from.to_string(),
             to_currency: to.to_string(),
             rate: Decimal::from_f64_retain(rate).unwrap(),
-            source: DataSource::Manual,
+            source: "MANUAL".to_string(),
             timestamp: date_time,
         }
     }

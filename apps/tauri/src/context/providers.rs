@@ -110,21 +110,38 @@ pub async fn initialize_context(
 
     let secret_store = shared_secret_store();
 
+    // Custom provider repository
+    let custom_provider_repository = Arc::new(
+        wealthfolio_storage_sqlite::custom_provider::CustomProviderSqliteRepository::new(
+            pool.clone(),
+            writer.clone(),
+        ),
+    );
+
     // Quote sync state repository for optimized quote syncing
     let quote_sync_state_repository =
         Arc::new(QuoteSyncStateRepository::new(pool.clone(), writer.clone()));
 
     // QuoteService provides all quote operations via QuoteServiceTrait
     let quote_service: Arc<dyn QuoteServiceTrait> = Arc::new(
-        QuoteService::new(
+        QuoteService::new_with_custom_provider(
             market_data_repo.clone(),            // QuoteStore
             quote_sync_state_repository.clone(), // SyncStateStore
             market_data_repo.clone(),            // ProviderSettingsStore
             asset_repository.clone(),            // AssetRepositoryTrait
             activity_repository.clone(),         // ActivityRepositoryTrait
             secret_store.clone(),
+            Some(custom_provider_repository.clone()),
         )
         .await?,
+    );
+
+    // Custom provider service
+    let custom_provider_service = Arc::new(
+        wealthfolio_core::custom_provider::CustomProviderService::new(
+            custom_provider_repository.clone(),
+            secret_store.clone(),
+        ),
     );
 
     // Create taxonomy service before asset service (needed for auto-classification)
@@ -350,6 +367,7 @@ pub async fn initialize_context(
             device_enroll_service,
             device_sync_runtime,
             health_service,
+            custom_provider_service,
         },
         event_receiver,
     })

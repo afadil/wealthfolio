@@ -34,7 +34,8 @@ use wealthfolio_core::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink
 use wealthfolio_core::portfolio::snapshot::{
     AccountStateSnapshot, Position, SnapshotRepositoryTrait, SnapshotServiceTrait, SnapshotSource,
 };
-use wealthfolio_core::quotes::model::{DataSource, Quote};
+use wealthfolio_core::quotes::constants::DATA_SOURCE_BROKER;
+use wealthfolio_core::quotes::model::Quote;
 use wealthfolio_core::quotes::store::QuoteStore;
 use wealthfolio_core::utils::time_utils::valuation_date_today;
 
@@ -447,7 +448,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
 
             for (asset_id, price, activity_datetime, currency) in &quote_data {
                 let date_str = activity_datetime.format("%Y-%m-%d").to_string();
-                let quote_id = format!("{}_{}_{}", asset_id, date_str, DataSource::Broker.as_str());
+                let quote_id = format!("{}_{}_{}", asset_id, date_str, DATA_SOURCE_BROKER);
                 quotes_map.insert(
                     quote_id.clone(),
                     Quote {
@@ -461,7 +462,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                         adjclose: *price,
                         volume: Decimal::ZERO,
                         currency: currency.clone(),
-                        data_source: DataSource::Broker,
+                        data_source: DATA_SOURCE_BROKER.to_string(),
                         created_at: now,
                         notes: None,
                     },
@@ -897,12 +898,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 };
 
                 quotes.push(Quote {
-                    id: format!(
-                        "{}_{}_{}",
-                        asset_id,
-                        today_date,
-                        DataSource::Broker.as_str()
-                    ),
+                    id: format!("{}_{}_{}", asset_id, today_date, DATA_SOURCE_BROKER),
                     asset_id: asset_id.clone(),
                     timestamp: now,
                     open: *price,
@@ -912,7 +908,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                     adjclose: *price,
                     volume: Decimal::ZERO,
                     currency: currency.clone(),
-                    data_source: DataSource::Broker,
+                    data_source: DATA_SOURCE_BROKER.to_string(),
                     created_at: now,
                     notes: None,
                 });

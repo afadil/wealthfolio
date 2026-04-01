@@ -136,12 +136,12 @@ export const BulkHoldingsModal = ({
         activityDate: activityDate.toISOString(),
         symbol: {
           symbol: (holding.assetId || holding.ticker || "").toUpperCase().trim(),
-          exchangeMic: holding.exchangeMic,
+          exchangeMic: holding.exchangeMic || undefined,
           name: holding.name?.trim() || undefined,
           kind: holding.assetKind?.trim() || undefined,
           quoteMode: holding.quoteMode ?? QuoteMode.MARKET,
-          quoteCcy: holding.symbolQuoteCcy,
-          instrumentType: holding.symbolInstrumentType,
+          quoteCcy: holding.symbolQuoteCcy || undefined,
+          instrumentType: holding.symbolInstrumentType || undefined,
         },
         quantity: Number(holding.sharesOwned),
         unitPrice: Number(holding.averageCost),
@@ -228,10 +228,7 @@ export const BulkHoldingsModal = ({
   }, []);
 
   const isSubmitDisabled =
-    saveActivitiesMutation.isPending ||
-    !hasValidHoldings ||
-    !form.watch("accountId") ||
-    !form.formState.isValid;
+    saveActivitiesMutation.isPending || !hasValidHoldings || !form.watch("accountId");
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
@@ -278,7 +275,11 @@ export const BulkHoldingsModal = ({
                 <Button type="button" variant="outline" onClick={onClose}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isSubmitDisabled}>
+                <Button
+                  type="submit"
+                  disabled={isSubmitDisabled}
+                  data-testid="bulk-holdings-confirm"
+                >
                   {saveActivitiesMutation.isPending ? "Saving..." : "Confirm"}
                 </Button>
               </DialogFooter>

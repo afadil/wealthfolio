@@ -4,10 +4,12 @@ use serde::{Deserialize, Serialize};
 
 /// Canonical list of local tables that participate in app-side device sync.
 /// Order matters: parent tables before children (FK dependencies).
-pub const APP_SYNC_TABLES: [&str; 16] = [
+pub const APP_SYNC_TABLES: [&str; 17] = [
     // Base tables (no FK deps)
     "platforms",
     "assets",
+    // No FK deps
+    "market_data_custom_providers",
     // Depends on: assets
     "quotes",
     "goals",
@@ -54,6 +56,7 @@ pub enum SyncEntity {
     ContributionLimit,
     Platform,
     Snapshot,
+    CustomProvider,
 }
 
 /// Supported sync operations.
@@ -271,6 +274,7 @@ mod tests {
             SyncEntity::ContributionLimit,
             SyncEntity::Platform,
             SyncEntity::Snapshot,
+            SyncEntity::CustomProvider,
         ]
         .iter()
         .map(|entity| serde_json::to_string(entity).expect("serialize sync entity"))
@@ -291,6 +295,7 @@ mod tests {
             "\"contribution_limit\"",
             "\"platform\"",
             "\"snapshot\"",
+            "\"custom_provider\"",
         ];
 
         assert_eq!(actual, expected);

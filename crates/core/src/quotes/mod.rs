@@ -38,10 +38,12 @@
 
 pub mod client;
 pub mod constants;
+pub mod custom_scraper_provider;
 pub mod errors;
 pub mod import;
 pub mod model;
 pub mod provider_settings;
+pub mod scheduler;
 pub mod service;
 pub mod store;
 pub mod sync;
@@ -52,7 +54,7 @@ pub mod types;
 mod service_tests;
 
 // Re-export commonly used types for convenience
-pub use model::{DataSource, LatestQuotePair, Quote, ResolvedQuote, SymbolSearchResult};
+pub use model::{LatestQuotePair, Quote, ResolvedQuote, SymbolSearchResult};
 pub use store::{ProviderSettingsStore, QuoteStore};
 
 // Re-export strong types

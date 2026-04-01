@@ -28,7 +28,8 @@ use crate::assets::{
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::fx::currency::{get_normalization_rule, normalize_amount, resolve_currency};
 use crate::fx::FxServiceTrait;
-use crate::quotes::{DataSource, Quote, QuoteServiceTrait};
+use crate::quotes::constants::{DATA_SOURCE_BROKER, DATA_SOURCE_MANUAL};
+use crate::quotes::{Quote, QuoteServiceTrait};
 use crate::Result;
 use log::warn;
 
@@ -882,7 +883,7 @@ impl ActivityService {
         unit_price: Decimal,
         currency: &str,
         activity_date: &str,
-        data_source: DataSource,
+        data_source: String,
     ) -> Result<()> {
         // Parse activity date
         let timestamp = if let Ok(dt) = DateTime::parse_from_rfc3339(activity_date) {
@@ -897,15 +898,12 @@ impl ActivityService {
             return Ok(());
         };
 
-        let quote_id = match data_source {
-            DataSource::Manual => {
-                let date_part = timestamp.format("%Y%m%d").to_string();
-                format!("{}_{}", date_part, asset_id.to_uppercase())
-            }
-            _ => {
-                let date_str = timestamp.format("%Y-%m-%d").to_string();
-                format!("{}_{}_{}", asset_id, date_str, data_source.as_str())
-            }
+        let quote_id = if data_source == DATA_SOURCE_MANUAL {
+            let date_part = timestamp.format("%Y%m%d").to_string();
+            format!("{}_{}", date_part, asset_id.to_uppercase())
+        } else {
+            let date_str = timestamp.format("%Y-%m-%d").to_string();
+            format!("{}_{}_{}", asset_id, date_str, data_source)
         };
 
         let quote = Quote {
@@ -1420,15 +1418,7 @@ impl ActivityService {
             // for activity types where unit_price is a real asset price.
             if PRICE_BEARING_ACTIVITY_TYPES.contains(&activity.activity_type.as_str()) {
                 if let Some(unit_price) = activity.unit_price {
-                    let effective_manual = quote_mode
-                        .as_deref()
-                        .map(|m| m.eq_ignore_ascii_case("manual"))
-                        .unwrap_or(asset.quote_mode == QuoteMode::Manual);
-                    let source = if effective_manual {
-                        DataSource::Manual
-                    } else {
-                        DataSource::Broker
-                    };
+                    let source = DATA_SOURCE_MANUAL.to_string();
                     self.create_quote_from_activity(
                         asset_id,
                         unit_price,
@@ -1806,15 +1796,7 @@ impl ActivityService {
             // for activity types where unit_price is a real asset price.
             if PRICE_BEARING_ACTIVITY_TYPES.contains(&activity.activity_type.as_str()) {
                 if let Some(Some(unit_price)) = activity.unit_price {
-                    let effective_manual = quote_mode
-                        .as_deref()
-                        .map(|m| m.eq_ignore_ascii_case("manual"))
-                        .unwrap_or(asset.quote_mode == QuoteMode::Manual);
-                    let source = if effective_manual {
-                        DataSource::Manual
-                    } else {
-                        DataSource::Broker
-                    };
+                    let source = DATA_SOURCE_MANUAL.to_string();
                     self.create_quote_from_activity(
                         asset_id,
                         unit_price,
@@ -4078,7 +4060,9 @@ impl ActivityService {
                             .assets
                             .get(asset_id)
                             .filter(|a| a.quote_mode == QuoteMode::Manual)
-                            .map_or(DataSource::Broker, |_| DataSource::Manual);
+                            .map_or(DATA_SOURCE_BROKER.to_string(), |_| {
+                                DATA_SOURCE_MANUAL.to_string()
+                            });
                         let currency = if !activity.currency.is_empty() {
                             &activity.currency
                         } else {

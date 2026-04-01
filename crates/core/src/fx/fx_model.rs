@@ -1,4 +1,4 @@
-use crate::quotes::{DataSource, Quote};
+use crate::quotes::Quote;
 use crate::utils::decimal_serde;
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
@@ -12,7 +12,7 @@ pub struct ExchangeRate {
     pub to_currency: String,
     #[serde(serialize_with = "decimal_serde::serialize")]
     pub rate: Decimal,
-    pub source: DataSource,
+    pub source: String,
     pub timestamp: DateTime<Utc>,
 }
 
@@ -22,7 +22,7 @@ impl ExchangeRate {
     pub fn to_quote(&self) -> Quote {
         let day = self.timestamp.format("%Y-%m-%d").to_string();
         Quote {
-            id: format!("{}_{}_{}", self.id, day, self.source.as_str()),
+            id: format!("{}_{}_{}", self.id, day, self.source),
             asset_id: self.id.clone(),
             timestamp: self.timestamp,
             open: self.rate,
@@ -83,5 +83,5 @@ pub struct NewExchangeRate {
     pub to_currency: String,
     #[serde(serialize_with = "decimal_serde::serialize")]
     pub rate: Decimal,
-    pub source: DataSource,
+    pub source: String,
 }

@@ -77,12 +77,14 @@ fn connect_auth_url() -> Option<String> {
         .map(|v| v.trim().trim_end_matches('/').to_string())
         .filter(|v| !v.is_empty())
         .or_else(|| option_env!("CONNECT_AUTH_URL").map(|v| v.trim_end_matches('/').to_string()))
+        .or_else(|| Some("https://auth.wealthfolio.app".to_string()))
 }
 
 fn connect_auth_api_key() -> Option<String> {
     std::env::var("CONNECT_AUTH_PUBLISHABLE_KEY")
         .ok()
         .or_else(|| option_env!("CONNECT_AUTH_PUBLISHABLE_KEY").map(String::from))
+        .or_else(|| Some("sb_publishable_ZSZbXNtWtnh9i2nqJ2UL4A_NV8ZVutd".to_string()))
 }
 
 fn token_lifecycle_config() -> Option<TokenLifecycleConfig> {

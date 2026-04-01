@@ -36,6 +36,9 @@ pub struct QuoteContext {
 
     /// Bond metadata for yield-curve-based pricing (coupon, maturity, face value)
     pub bond_metadata: Option<BondQuoteMetadata>,
+
+    /// Custom provider code (e.g., "coingecko") — used by CUSTOM_SCRAPER to find source config
+    pub custom_provider_code: Option<String>,
 }
 
 /// Market data quote

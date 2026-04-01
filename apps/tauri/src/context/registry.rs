@@ -55,6 +55,7 @@ pub struct ServiceContext {
     pub device_enroll_service: Arc<DeviceEnrollService>,
     pub device_sync_runtime: Arc<DeviceSyncRuntimeState>,
     pub health_service: Arc<health::HealthService>,
+    pub custom_provider_service: Arc<wealthfolio_core::custom_provider::CustomProviderService>,
 }
 
 impl ServiceContext {

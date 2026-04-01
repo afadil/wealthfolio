@@ -175,6 +175,15 @@ export {
   updateQuoteMode,
 } from "../shared/market-data";
 
+// Custom Provider Commands
+export {
+  getCustomProviders,
+  createCustomProvider,
+  updateCustomProvider,
+  deleteCustomProvider,
+  testCustomProviderSource,
+} from "../shared/custom-provider";
+
 // Contribution Limits Commands
 export {
   calculateDepositsForLimit,

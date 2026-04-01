@@ -10,7 +10,7 @@ mod tests {
     use crate::portfolio::holdings::holdings_valuation_service::{
         HoldingsValuationService, HoldingsValuationServiceTrait,
     };
-    use crate::quotes::{DataSource, MarketDataError};
+    use crate::quotes::MarketDataError;
     use crate::quotes::{
         LatestQuotePair, LatestQuoteSnapshot, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait,
         QuoteSyncState, SymbolSearchResult, SymbolSyncPlan, SyncResult,
@@ -437,7 +437,7 @@ mod tests {
             adjclose: close,
             volume: dec!(1000),
             currency: currency.to_string(),
-            data_source: DataSource::Yahoo,
+            data_source: "YAHOO".to_string(),
             created_at: Utc::now(),
             notes: None,
         }

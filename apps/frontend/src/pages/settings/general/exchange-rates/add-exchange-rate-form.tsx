@@ -38,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@wealthfolio/ui/components/ui/select";
+import { useCustomProviders } from "@/hooks/use-custom-providers";
 import { useMarketDataProviders } from "@/hooks/use-market-data-providers";
 import { ExchangeRate } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -78,6 +79,7 @@ interface AddExchangeRateFormProps {
 
 export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormProps) {
   const { data: providers } = useMarketDataProviders();
+  const { data: customProviders = [] } = useCustomProviders();
   const form = useForm<ExchangeRateFormData>({
     resolver: zodResolver(exchangeRateSchema),
     defaultValues: {
@@ -229,11 +231,20 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
                   </FormControl>
                   <SelectContent>
                     <SelectItem value="MANUAL">Manual</SelectItem>
-                    {providers?.map((provider) => (
-                      <SelectItem key={provider.id} value={provider.id}>
-                        {provider.name}
-                      </SelectItem>
-                    ))}
+                    {providers
+                      ?.filter((p) => p.id !== "CUSTOM_SCRAPER" && p.providerType !== "custom")
+                      .map((provider) => (
+                        <SelectItem key={provider.id} value={provider.id}>
+                          {provider.name}
+                        </SelectItem>
+                      ))}
+                    {customProviders
+                      .filter((cp) => cp.enabled)
+                      .map((cp) => (
+                        <SelectItem key={cp.id} value={`CUSTOM_SCRAPER:${cp.id}`}>
+                          {cp.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
                 <FormDescription>

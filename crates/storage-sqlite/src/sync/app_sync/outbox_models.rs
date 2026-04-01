@@ -4,6 +4,7 @@ use crate::accounts::AccountDB;
 use crate::activities::{ActivityDB, ImportAccountTemplateDB, ImportTemplateDB};
 use crate::ai_chat::{AiMessageDB, AiThreadDB, AiThreadTagDB};
 use crate::assets::AssetDB;
+use crate::custom_provider::CustomProviderDB;
 use crate::goals::{GoalDB, GoalsAllocationDB};
 use crate::limits::ContributionLimitDB;
 use crate::market_data::QuoteDB;
@@ -183,5 +184,13 @@ impl SyncOutboxModel for AccountStateSnapshotDB {
             _ => SnapshotSource::Calculated,
         };
         should_sync_outbox_for_snapshot_source(source) && Uuid::parse_str(&self.id).is_ok()
+    }
+}
+
+impl SyncOutboxModel for CustomProviderDB {
+    const ENTITY: SyncEntity = SyncEntity::CustomProvider;
+
+    fn sync_entity_id(&self) -> &str {
+        &self.id
     }
 }

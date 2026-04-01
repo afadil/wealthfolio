@@ -73,5 +73,9 @@ pub fn default_adapter_descriptors() -> Vec<EntityAdapterDescriptor> {
             entity: SyncEntity::Snapshot,
             table_name: "holdings_snapshots",
         },
+        EntityAdapterDescriptor {
+            entity: SyncEntity::CustomProvider,
+            table_name: "market_data_custom_providers",
+        },
     ]
 }

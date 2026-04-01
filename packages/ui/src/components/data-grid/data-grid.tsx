@@ -193,6 +193,7 @@ export function DataGrid<TData>({
                 dir={dir}
                 readOnly={readOnly}
                 stretchColumns={stretchColumns}
+                columnCount={columns.length}
               />
             );
           })}

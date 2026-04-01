@@ -423,6 +423,7 @@ mod tests {
             currency_hint: None,
             preferred_provider: None,
             bond_metadata: None,
+            custom_provider_code: None,
         };
         let instrument = ProviderInstrument::MetalSymbol {
             symbol: "XAU".into(),
@@ -461,6 +462,7 @@ mod tests {
             currency_hint: None,
             preferred_provider: None,
             bond_metadata: None,
+            custom_provider_code: None,
         };
         let instrument = ProviderInstrument::MetalSymbol {
             symbol: "XAU".into(),
@@ -493,6 +495,7 @@ mod tests {
             currency_hint: None,
             preferred_provider: None,
             bond_metadata: None,
+            custom_provider_code: None,
         };
         let instrument = ProviderInstrument::MetalSymbol {
             symbol: "XAU".into(),
@@ -547,6 +550,7 @@ mod tests {
             currency_hint: None,
             preferred_provider: None,
             bond_metadata: None,
+            custom_provider_code: None,
         };
         let instrument = ProviderInstrument::MetalSymbol {
             symbol: "FAKE".into(),

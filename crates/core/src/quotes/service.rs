@@ -17,8 +17,9 @@ use tokio::sync::RwLock;
 use crate::utils::time_utils;
 
 use super::client::{MarketDataClient, ProviderConfig};
+use super::constants::DATA_SOURCE_MANUAL;
 use super::import::{ImportValidationStatus, QuoteConverter, QuoteImport, QuoteValidator};
-use super::model::{DataSource, LatestQuotePair, Quote, ResolvedQuote, SymbolSearchResult};
+use super::model::{LatestQuotePair, Quote, ResolvedQuote, SymbolSearchResult};
 use super::store::{ProviderSettingsStore, QuoteStore};
 use super::sync::{QuoteSyncService, QuoteSyncServiceTrait, SyncResult};
 use super::sync_state::{QuoteSyncState, SymbolSyncPlan, SyncMode, SyncStateStore};
@@ -58,6 +59,8 @@ pub struct ProviderInfo {
     pub last_sync_error: Option<String>,
     /// All unique error messages for this provider
     pub unique_errors: Vec<String>,
+    /// Provider type: "builtin" or "custom"
+    pub provider_type: Option<String>,
 }
 
 fn resolve_effective_quote_currency(asset_quote_ccy: &str, quote_ccy: &str) -> Option<String> {
@@ -419,6 +422,8 @@ where
     client: Arc<RwLock<MarketDataClient>>,
     /// Secret store for API keys.
     secret_store: Arc<dyn SecretStore>,
+    /// Optional custom provider repository for CUSTOM_SCRAPER provider.
+    custom_provider_repo: Option<Arc<dyn crate::custom_provider::CustomProviderRepository>>,
     /// Sync service.
     #[allow(clippy::type_complexity)]
     sync_service: Arc<RwLock<Option<Arc<QuoteSyncService<Q, S, A, R>>>>>,
@@ -441,7 +446,28 @@ where
         activity_repo: Arc<R>,
         secret_store: Arc<dyn SecretStore>,
     ) -> Result<Self> {
-        // Get enabled providers with their priorities
+        Self::new_with_custom_provider(
+            quote_store,
+            sync_state_store,
+            provider_settings_store,
+            asset_repo,
+            activity_repo,
+            secret_store,
+            None,
+        )
+        .await
+    }
+
+    /// Create a new quote service with optional custom provider repository.
+    pub async fn new_with_custom_provider(
+        quote_store: Arc<Q>,
+        sync_state_store: Arc<S>,
+        provider_settings_store: Arc<PS>,
+        asset_repo: Arc<A>,
+        activity_repo: Arc<R>,
+        secret_store: Arc<dyn SecretStore>,
+        custom_provider_repo: Option<Arc<dyn crate::custom_provider::CustomProviderRepository>>,
+    ) -> Result<Self> {
         let providers = provider_settings_store.get_all_providers()?;
         let enabled: Vec<ProviderConfig> = providers
             .iter()
@@ -452,11 +478,20 @@ where
             })
             .collect();
 
-        // Create market data client with provider priorities
-        let client = MarketDataClient::new(secret_store.clone(), enabled.clone()).await?;
+        // Build extra providers (CustomScraperProvider if repo is available and enabled)
+        let custom_scraper_enabled = providers
+            .iter()
+            .any(|p| p.id == super::constants::DATA_SOURCE_CUSTOM_SCRAPER && p.enabled);
+        let extra = if custom_scraper_enabled {
+            Self::build_extra_providers(&custom_provider_repo, &secret_store)
+        } else {
+            Vec::new()
+        };
+
+        let client =
+            MarketDataClient::new_with_extra(secret_store.clone(), enabled.clone(), extra).await?;
         let client_arc = Arc::new(RwLock::new(client));
 
-        // Create sync service with the client
         let sync_service = QuoteSyncService::new(
             client_arc.clone(),
             quote_store.clone(),
@@ -473,8 +508,26 @@ where
             activity_repo,
             client: client_arc,
             secret_store,
+            custom_provider_repo,
             sync_service: Arc::new(RwLock::new(Some(Arc::new(sync_service)))),
         })
+    }
+
+    /// Build extra providers from optional custom provider repo.
+    fn build_extra_providers(
+        custom_provider_repo: &Option<Arc<dyn crate::custom_provider::CustomProviderRepository>>,
+        secret_store: &Arc<dyn SecretStore>,
+    ) -> Vec<Arc<dyn wealthfolio_market_data::MarketDataProvider>> {
+        let mut extra: Vec<Arc<dyn wealthfolio_market_data::MarketDataProvider>> = Vec::new();
+        if let Some(repo) = custom_provider_repo {
+            extra.push(Arc::new(
+                super::custom_scraper_provider::CustomScraperProvider::new(
+                    repo.clone(),
+                    secret_store.clone(),
+                ),
+            ));
+        }
+        extra
     }
 
     /// Refresh the market data client (e.g., after provider settings change).
@@ -489,7 +542,17 @@ where
             })
             .collect();
 
-        let new_client = MarketDataClient::new(self.secret_store.clone(), enabled.clone()).await?;
+        let custom_scraper_enabled = providers
+            .iter()
+            .any(|p| p.id == super::constants::DATA_SOURCE_CUSTOM_SCRAPER && p.enabled);
+        let extra = if custom_scraper_enabled {
+            Self::build_extra_providers(&self.custom_provider_repo, &self.secret_store)
+        } else {
+            Vec::new()
+        };
+        let new_client =
+            MarketDataClient::new_with_extra(self.secret_store.clone(), enabled.clone(), extra)
+                .await?;
         *self.client.write().await = new_client;
 
         // Refresh sync service with updated client
@@ -522,7 +585,7 @@ where
         Ok(Quote {
             id,
             created_at: Utc::now(),
-            data_source: DataSource::Manual,
+            data_source: DATA_SOURCE_MANUAL.to_string(),
             timestamp,
             asset_id: import.symbol.clone(),
             open: import.open_or_close(),
@@ -575,7 +638,7 @@ where
             currency_source: None,
             data_source: asset
                 .preferred_provider()
-                .or_else(|| Some("MANUAL".to_string())),
+                .or_else(|| Some(DATA_SOURCE_MANUAL.to_string())),
             is_existing: true,
             existing_asset_id: Some(asset.id.clone()),
             index: String::new(),
@@ -838,7 +901,7 @@ where
 
         // When source is MANUAL, regenerate the ID so provider sync can't overwrite it.
         // If the old ID was provider-based (e.g. *_YAHOO), delete it first.
-        if quote.data_source == DataSource::Manual {
+        if quote.data_source == DATA_SOURCE_MANUAL {
             let day = Day::new(quote.timestamp.date_naive());
             let asset_id = AssetId::new(&quote.asset_id);
             let manual_id = quote_id(&asset_id, day, &QuoteSource::Manual);
@@ -1351,8 +1414,8 @@ where
                     | DATA_SOURCE_METAL_PRICE_API
                     | DATA_SOURCE_FINNHUB
             );
-            // Check if API key is set (this may trigger keychain prompt on macOS)
-            let has_key = if requires_key {
+            // Check if API key is set (skip for disabled providers to avoid keychain prompts)
+            let has_key = if requires_key && setting.enabled {
                 self.secret_store
                     .get_secret(&setting.id)
                     .ok()
@@ -1360,7 +1423,7 @@ where
                     .map(|k| !k.is_empty())
                     .unwrap_or(false)
             } else {
-                true
+                !requires_key
             };
 
             // Get sync stats for this provider
@@ -1393,6 +1456,7 @@ where
                 last_synced_at,
                 last_sync_error,
                 unique_errors,
+                provider_type: setting.provider_type.clone(),
             });
         }
 
@@ -1902,7 +1966,6 @@ mod tests {
     use crate::assets::QuoteMode;
     use crate::assets::{AssetRepositoryTrait, NewAsset, UpdateAssetProfile};
     use crate::limits::ContributionActivity;
-    use crate::quotes::model::DataSource;
     use crate::quotes::store::ProviderSettingsStore;
     use crate::quotes::types::{AssetId, Day, QuoteSource};
     use crate::quotes::{
@@ -2463,6 +2526,7 @@ mod tests {
                     last_sync_status: None,
                     last_sync_error: None,
                     capabilities: None,
+                    provider_type: None,
                 },
                 MarketDataProviderSetting {
                     id: "FINNHUB".to_string(),
@@ -2476,6 +2540,7 @@ mod tests {
                     last_sync_status: None,
                     last_sync_error: None,
                     capabilities: None,
+                    provider_type: None,
                 },
             ],
         });
@@ -2565,7 +2630,7 @@ mod tests {
         let mut quote = Quote {
             id: "q_1".to_string(),
             created_at: Utc::now(),
-            data_source: DataSource::Yahoo,
+            data_source: "YAHOO".to_string(),
             timestamp: Utc::now(),
             asset_id: asset.id.clone(),
             open: dec!(465),

@@ -33,7 +33,7 @@ use tokio::sync::RwLock;
 use super::client::MarketDataClient;
 use super::constants::*;
 use super::errors::MarketDataError;
-use super::model::{DataSource, Quote};
+use super::model::Quote;
 use super::store::QuoteStore;
 use super::sync_state::{
     calculate_sync_window, determine_sync_category, QuoteSyncState, SymbolSyncPlan, SyncCategory,
@@ -520,7 +520,7 @@ where
             adjclose: par,
             volume: Decimal::ZERO,
             currency: asset.quote_ccy.clone(),
-            data_source: DataSource::Manual,
+            data_source: DATA_SOURCE_MANUAL.to_string(),
             created_at: Utc::now(),
             notes: Some("Par value at maturity (auto-generated)".to_string()),
         };
@@ -865,7 +865,7 @@ where
 
                             // Persist the actual provider used so future planning reads correct quote bounds.
                             if let Some(actual_source) =
-                                quotes.first().map(|q| q.data_source.as_str().to_string())
+                                quotes.first().map(|q| q.data_source.clone())
                             {
                                 match self.sync_state_store.get_by_asset_id(&asset.id) {
                                     Ok(Some(mut state)) if state.data_source != actual_source => {

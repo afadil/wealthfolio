@@ -70,6 +70,7 @@ function getSearchResultKey(result: SymbolSearchResult) {
     result.symbol,
     result.exchangeMic ?? result.exchange,
     result.currency,
+    result.longName ?? result.shortName,
     result.index,
   ].filter(Boolean);
   return parts.join("|");
@@ -550,6 +551,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
             className="w-(--radix-popover-trigger-width) h-auto min-w-[280px] p-0"
             onOpenAutoFocus={handleOpenAutoFocus}
             onCloseAutoFocus={handleCloseAutoFocus}
+            onWheel={(e) => e.stopPropagation()}
           >
             <Command shouldFilter={false} className="border-none">
               <CommandInput

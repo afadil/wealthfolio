@@ -32,6 +32,7 @@ interface DataGridRowProps<TData> extends React.ComponentProps<"div"> {
   dir: Direction;
   readOnly: boolean;
   stretchColumns: boolean;
+  columnCount: number;
 }
 
 export const DataGridRow = React.memo(DataGridRowImpl, (prev, next) => {
@@ -45,6 +46,11 @@ export const DataGridRow = React.memo(DataGridRowImpl, (prev, next) => {
 
   // Re-render if row data (original) reference changed
   if (prev.row.original !== next.row.original) {
+    return false;
+  }
+
+  // Re-render if the number of columns changed (columns added/removed)
+  if (prev.columnCount !== next.columnCount) {
     return false;
   }
 
@@ -145,6 +151,7 @@ function DataGridRowImpl<TData>({
   dir,
   readOnly,
   stretchColumns,
+  columnCount: _columnCount,
   className,
   style,
   ref,
@@ -172,8 +179,8 @@ function DataGridRowImpl<TData>({
 
   // Memoize visible cells to avoid recreating cell array on every render
   // Though TanStack returns new Cell wrappers, memoizing the array helps React's reconciliation
-  // biome-ignore lint/correctness/useExhaustiveDependencies: columnVisibility and columnPinning are used for calculating the visible cells
-  const visibleCells = React.useMemo(() => row.getVisibleCells(), [row, columnVisibility, columnPinning]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: columnVisibility, columnPinning, and _columnCount are used for calculating the visible cells
+  const visibleCells = React.useMemo(() => row.getVisibleCells(), [row, columnVisibility, columnPinning, _columnCount]);
 
   return (
     <div

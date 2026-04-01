@@ -3,8 +3,8 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub enum WithdrawalStrategy {
-    #[serde(rename = "constant-dollar")]
     #[default]
+    #[serde(rename = "constant-dollar")]
     ConstantDollar,
     #[serde(rename = "constant-percentage")]
     ConstantPercentage,

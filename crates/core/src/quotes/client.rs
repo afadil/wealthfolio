@@ -32,7 +32,7 @@ use log::{debug, info, warn};
 use crate::assets::{Asset, ProviderProfile};
 use crate::errors::Result;
 use crate::quotes::constants::*;
-use crate::quotes::model::{DataSource, SymbolSearchResult};
+use crate::quotes::model::SymbolSearchResult;
 use crate::quotes::Quote;
 use crate::secrets::SecretStore;
 
@@ -114,6 +114,15 @@ impl MarketDataClient {
         secret_store: Arc<dyn SecretStore>,
         enabled_providers: Vec<ProviderConfig>,
     ) -> Result<Self> {
+        Self::new_with_extra(secret_store, enabled_providers, vec![]).await
+    }
+
+    /// Create a new market data client with extra pre-built providers (e.g., CustomScraperProvider).
+    pub async fn new_with_extra(
+        secret_store: Arc<dyn SecretStore>,
+        enabled_providers: Vec<ProviderConfig>,
+        extra_providers: Vec<Arc<dyn wealthfolio_market_data::MarketDataProvider>>,
+    ) -> Result<Self> {
         use std::collections::HashMap;
 
         let mut providers: Vec<Arc<dyn wealthfolio_market_data::MarketDataProvider>> = Vec::new();
@@ -141,10 +150,10 @@ impl MarketDataClient {
             }
         }
 
-        // Always register OpenFIGI — it's free, keyless, and only handles bond search/profile.
-        // This ensures bond ISIN/FIGI lookup works without users needing to enable it in settings.
-        if !providers.iter().any(|p| p.id() == DATA_SOURCE_OPENFIGI) {
-            providers.push(Arc::new(OpenFigiProvider::new()));
+        // Append extra providers (e.g., CustomScraperProvider)
+        for ep in extra_providers {
+            info!("Registered extra provider: {}", ep.id());
+            providers.push(ep);
         }
 
         if providers.is_empty() {
@@ -372,31 +381,26 @@ impl MarketDataClient {
             _ => None,
         };
 
+        // Extract custom_provider_code from provider_config if present
+        let custom_provider_code = asset
+            .provider_config
+            .as_ref()
+            .and_then(|c| c.get("custom_provider_code"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
         Ok(QuoteContext {
             instrument,
             overrides,
             currency_hint,
             preferred_provider,
             bond_metadata,
+            custom_provider_code,
         })
     }
 
     /// Convert a market-data Quote to a core Quote.
     fn convert_quote(market_quote: MarketQuote, asset_id: &str) -> Quote {
-        let data_source = match market_quote.source.as_str() {
-            DATA_SOURCE_YAHOO => DataSource::Yahoo,
-            DATA_SOURCE_ALPHA_VANTAGE => DataSource::AlphaVantage,
-            DATA_SOURCE_MARKET_DATA_APP => DataSource::MarketDataApp,
-            DATA_SOURCE_METAL_PRICE_API => DataSource::MetalPriceApi,
-            DATA_SOURCE_FINNHUB => DataSource::Finnhub,
-            DATA_SOURCE_US_TREASURY_CALC => DataSource::UsTreasuryCalc,
-            DATA_SOURCE_BOERSE_FRANKFURT => DataSource::BoerseFrankfurt,
-            DATA_SOURCE_MANUAL => DataSource::Manual,
-            _ => DataSource::Yahoo, // Default fallback
-        };
-
-        // Generate deterministic quote ID: {asset_id}_{YYYY-MM-DD}_{source}
-        // This format matches types::quote_id() for consistency
         let id = format!(
             "{}_{}_{}",
             asset_id,
@@ -407,7 +411,7 @@ impl MarketDataClient {
         Quote {
             id,
             created_at: Utc::now(),
-            data_source,
+            data_source: market_quote.source,
             timestamp: market_quote.timestamp,
             asset_id: asset_id.to_string(),
             open: market_quote.open.unwrap_or(market_quote.close),
@@ -736,7 +740,7 @@ mod tests {
         assert_eq!(core_quote.adjclose, dec!(102)); // Defaults to close
         assert_eq!(core_quote.volume, dec!(1000000));
         assert_eq!(core_quote.currency, "USD");
-        assert!(matches!(core_quote.data_source, DataSource::Yahoo));
+        assert_eq!(core_quote.data_source, "YAHOO");
     }
 
     #[test]
@@ -759,7 +763,7 @@ mod tests {
         assert_eq!(core_quote.low, dec!(150.50));
         assert_eq!(core_quote.close, dec!(150.50));
         assert_eq!(core_quote.volume, dec!(0));
-        assert!(matches!(core_quote.data_source, DataSource::AlphaVantage));
+        assert_eq!(core_quote.data_source, "ALPHA_VANTAGE");
     }
 
     #[test]
@@ -767,16 +771,16 @@ mod tests {
         let timestamp = Utc::now();
 
         let test_cases = [
-            ("YAHOO", DataSource::Yahoo),
-            ("ALPHA_VANTAGE", DataSource::AlphaVantage),
-            ("MARKETDATA_APP", DataSource::MarketDataApp),
-            ("METAL_PRICE_API", DataSource::MetalPriceApi),
-            ("FINNHUB", DataSource::Finnhub),
-            ("MANUAL", DataSource::Manual),
-            ("UNKNOWN_SOURCE", DataSource::Yahoo), // Fallback
+            "YAHOO",
+            "ALPHA_VANTAGE",
+            "MARKETDATA_APP",
+            "METAL_PRICE_API",
+            "FINNHUB",
+            "MANUAL",
+            "CUSTOM_SCRAPER:coingecko", // Custom provider with code
         ];
 
-        for (source_str, expected_source) in test_cases {
+        for source_str in test_cases {
             let market_quote = MarketQuote::new(
                 timestamp,
                 dec!(100),
@@ -785,12 +789,10 @@ mod tests {
             );
 
             let core_quote = MarketDataClient::convert_quote(market_quote, "TEST");
-            assert!(
-                std::mem::discriminant(&core_quote.data_source)
-                    == std::mem::discriminant(&expected_source),
-                "Source '{}' should map to {:?}",
-                source_str,
-                expected_source
+            assert_eq!(
+                core_quote.data_source, source_str,
+                "Source string '{}' should be preserved verbatim",
+                source_str
             );
         }
     }

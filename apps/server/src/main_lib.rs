@@ -102,6 +102,7 @@ pub struct AppState {
     pub device_sync_runtime: Arc<DeviceSyncRuntimeState>,
     pub health_service: Arc<dyn HealthServiceTrait + Send + Sync>,
     pub token_lifecycle: Arc<TokenLifecycleState>,
+    pub custom_provider_service: Arc<wealthfolio_core::custom_provider::CustomProviderService>,
 }
 
 pub fn init_tracing() {
@@ -190,16 +191,29 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         asset_repository.clone(),
         quote_sync_state_repository.clone(),
     ));
+    let custom_provider_repository = Arc::new(
+        wealthfolio_storage_sqlite::custom_provider::CustomProviderSqliteRepository::new(
+            pool.clone(),
+            writer.clone(),
+        ),
+    );
     let quote_service: Arc<dyn QuoteServiceTrait + Send + Sync> = Arc::new(
-        QuoteService::new(
+        QuoteService::new_with_custom_provider(
             market_data_repository.clone(),      // QuoteStore
             quote_sync_state_repository.clone(), // SyncStateStore
             market_data_repository.clone(),      // ProviderSettingsStore
             asset_repository.clone(),            // AssetRepositoryTrait
             activity_repository.clone(),         // ActivityRepositoryTrait
             secret_store.clone(),
+            Some(custom_provider_repository.clone()),
         )
         .await?,
+    );
+    let custom_provider_service = Arc::new(
+        wealthfolio_core::custom_provider::CustomProviderService::new(
+            custom_provider_repository.clone(),
+            secret_store.clone(),
+        ),
     );
 
     // Create taxonomy service for auto-classification
@@ -471,5 +485,6 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         device_sync_runtime,
         health_service,
         token_lifecycle,
+        custom_provider_service,
     }))
 }

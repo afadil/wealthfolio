@@ -2290,7 +2290,7 @@ function useDataGrid<TData>({
       colSizes[`--col-${header.column.id}-size`] = header.column.getSize();
     }
     return colSizes;
-  }, [table.getState().columnSizingInfo, table.getState().columnSizing]);
+  }, [table.getState().columnSizingInfo, table.getState().columnSizing, columns]);
 
   const rowVirtualizer = useVirtualizer({
     count: table.getRowModel().rows.length,

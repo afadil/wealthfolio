@@ -444,6 +444,7 @@ export interface MarketDataProviderInfo {
   name: string;
   logoFilename: string;
   lastSyncedDate: string | null; // ISO date string
+  providerType?: string;
 }
 
 export interface MarketData {

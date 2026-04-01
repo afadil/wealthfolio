@@ -622,6 +622,11 @@ impl NewAsset {
                     }
                 }
             }))
+        } else if let Some(custom_code) = provider.strip_prefix("CUSTOM_SCRAPER:") {
+            Some(serde_json::json!({
+                "preferred_provider": "CUSTOM_SCRAPER",
+                "custom_provider_code": custom_code
+            }))
         } else {
             Some(serde_json::json!({ "preferred_provider": provider }))
         };

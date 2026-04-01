@@ -31,7 +31,7 @@ use super::traits::{ResolvedInstrument, Resolver, SymbolResolver};
 ///     overrides: None,
 ///     currency_hint: Some("CAD".into()),
 ///     preferred_provider: None,
-///     bond_metadata: None,
+///     bond_metadata: None, custom_provider_code: None,
 /// };
 ///
 /// let resolved = chain.resolve(&"YAHOO".into(), &context)?;
@@ -145,6 +145,7 @@ mod tests {
             currency_hint: Some("CAD".into()),
             preferred_provider: None,
             bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let resolved = chain.resolve(&"YAHOO".into(), &context).unwrap();
@@ -173,6 +174,7 @@ mod tests {
             currency_hint: Some("CAD".into()),
             preferred_provider: None,
             bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let resolved = chain.resolve(&"YAHOO".into(), &context).unwrap();
@@ -209,6 +211,7 @@ mod tests {
             currency_hint: Some("CAD".into()),
             preferred_provider: None,
             bond_metadata: None,
+            custom_provider_code: None,
         };
 
         // Resolve for ALPHA_VANTAGE (no override) - should use rules
@@ -236,6 +239,7 @@ mod tests {
             currency_hint: None,
             preferred_provider: None,
             bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let resolved = chain.resolve(&"YAHOO".into(), &context).unwrap();
@@ -261,6 +265,7 @@ mod tests {
             currency_hint: None,
             preferred_provider: None,
             bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let result = chain.resolve(&"UNKNOWN_PROVIDER".into(), &context);
@@ -287,6 +292,7 @@ mod tests {
             currency_hint: None,
             preferred_provider: None,
             bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let currency = chain.get_currency(&"YAHOO".into(), &context);
@@ -306,6 +312,7 @@ mod tests {
             currency_hint: None,
             preferred_provider: None,
             bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let currency = chain.get_currency(&"YAHOO".into(), &context);

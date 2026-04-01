@@ -209,6 +209,24 @@ impl Resolver for RulesResolver {
         provider: &ProviderId,
         context: &QuoteContext,
     ) -> Option<Result<ResolvedInstrument, MarketDataError>> {
+        // CUSTOM_SCRAPER: extract symbol from any instrument variant
+        if provider.as_ref() == "CUSTOM_SCRAPER" {
+            let symbol = match &context.instrument {
+                InstrumentId::Equity { ticker, .. } => ticker.clone(),
+                InstrumentId::Crypto { base, .. } => base.clone(),
+                InstrumentId::Fx { base, quote } => {
+                    Arc::from(format!("{}{}", base, quote).as_str())
+                }
+                InstrumentId::Metal { code, .. } => code.clone(),
+                InstrumentId::Bond { isin } => isin.clone(),
+                InstrumentId::Option { occ_symbol } => occ_symbol.clone(),
+            };
+            return Some(Ok(ResolvedInstrument {
+                instrument: ProviderInstrument::EquitySymbol { symbol },
+                source: ResolutionSource::Rules,
+            }));
+        }
+
         let instrument = match &context.instrument {
             InstrumentId::Equity { ticker, mic } => self.resolve_equity(ticker, mic, provider)?,
 
@@ -244,6 +262,7 @@ mod tests {
             currency_hint: None,
             preferred_provider: None,
             bond_metadata: None,
+            custom_provider_code: None,
         }
     }
 
@@ -257,6 +276,7 @@ mod tests {
             currency_hint: None,
             preferred_provider: None,
             bond_metadata: None,
+            custom_provider_code: None,
         }
     }
 
@@ -270,6 +290,7 @@ mod tests {
             currency_hint: None,
             preferred_provider: None,
             bond_metadata: None,
+            custom_provider_code: None,
         }
     }
 
@@ -283,6 +304,7 @@ mod tests {
             currency_hint: None,
             preferred_provider: None,
             bond_metadata: None,
+            custom_provider_code: None,
         }
     }
 

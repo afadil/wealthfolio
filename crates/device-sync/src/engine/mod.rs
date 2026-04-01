@@ -54,6 +54,7 @@ fn sync_entity_name(entity: &SyncEntity) -> &'static str {
         SyncEntity::ContributionLimit => "contribution_limit",
         SyncEntity::Platform => "platform",
         SyncEntity::Snapshot => "snapshot",
+        SyncEntity::CustomProvider => "custom_provider",
     }
 }
 

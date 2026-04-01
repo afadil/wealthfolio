@@ -16,7 +16,7 @@ mod tests {
     use crate::errors::{DatabaseError, Result};
     use crate::quotes::service::{append_historical_seed_quotes, fill_missing_quotes};
     use crate::quotes::{
-        model::{DataSource, LatestQuotePair, Quote},
+        model::{LatestQuotePair, Quote},
         store::QuoteStore,
         types::{AssetId, Day, QuoteSource},
     };
@@ -108,10 +108,7 @@ mod tests {
         async fn delete_provider_quotes_for_asset(&self, asset_id: &AssetId) -> Result<usize> {
             let mut quotes = self.quotes.lock().unwrap();
             let original_len = quotes.len();
-            quotes.retain(|q| {
-                q.asset_id != asset_id.as_str()
-                    || q.data_source == crate::quotes::model::DataSource::Manual
-            });
+            quotes.retain(|q| q.asset_id != asset_id.as_str() || q.data_source == "MANUAL");
             Ok(original_len - quotes.len())
         }
 
@@ -302,7 +299,7 @@ mod tests {
         Quote {
             id: format!("{}_{}", symbol, date),
             created_at: Utc::now(),
-            data_source: DataSource::Yahoo,
+            data_source: "YAHOO".to_string(),
             timestamp: Utc.from_utc_datetime(&date.and_hms_opt(16, 0, 0).unwrap()),
             asset_id: symbol.to_string(),
             open: close,
@@ -424,7 +421,7 @@ mod tests {
         let stale_quote_date = start - Duration::days(45);
 
         let stale_manual_quote = Quote {
-            data_source: DataSource::Manual,
+            data_source: "MANUAL".to_string(),
             ..create_quote(symbol, stale_quote_date, dec!(123.45))
         };
         store.add_quote(stale_manual_quote);
@@ -449,7 +446,7 @@ mod tests {
         for (quote, expected_day) in filled_quotes.iter().zip(expected_days.iter()) {
             assert_eq!(quote.asset_id, symbol);
             assert_eq!(quote.close, dec!(123.45));
-            assert_eq!(quote.data_source, DataSource::Manual);
+            assert_eq!(quote.data_source, "MANUAL");
             assert_eq!(quote.timestamp.date_naive(), *expected_day);
         }
     }

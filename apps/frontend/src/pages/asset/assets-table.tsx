@@ -272,7 +272,7 @@ export function AssetsTable({
                     onClick={() => onRefetchQuotes(asset)}
                     disabled={isRefetchingQuotes}
                   >
-                    Refetch quotes
+                    Refetch price history
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
