@@ -420,6 +420,7 @@ where
             let provider = existing_states
                 .get(&asset.id)
                 .map(|s| s.data_source.clone())
+                .filter(|s| !s.is_empty())
                 .or_else(|| asset.preferred_provider())
                 .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string());
             assets_by_provider
@@ -1352,6 +1353,7 @@ where
             let provider = existing_states
                 .get(&asset.id)
                 .map(|s| s.data_source.clone())
+                .filter(|s| !s.is_empty())
                 .or_else(|| asset.preferred_provider())
                 .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string());
             assets_by_provider
@@ -1372,6 +1374,7 @@ where
             let data_source = state
                 .as_ref()
                 .map(|s| s.data_source.clone())
+                .filter(|s| !s.is_empty())
                 .or_else(|| asset.preferred_provider())
                 .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string());
             let effective_today =
