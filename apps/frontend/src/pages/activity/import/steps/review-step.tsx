@@ -6,6 +6,7 @@ import { useCallback, useMemo, useState } from "react";
 import { ImportAlert } from "../components/import-alert";
 import { ImportReviewGrid } from "../components/import-review-grid";
 import {
+  bulkForceImportDrafts,
   bulkSetAccount,
   bulkSetCurrency,
   bulkSkipDrafts,
@@ -264,6 +265,20 @@ export function ReviewStep() {
     [dispatch],
   );
 
+  const handleBulkForceImport = useCallback(
+    (rowIndexes: number[]) => {
+      // Only apply to duplicate rows — force_import is a no-op for others
+      const duplicateIndexes = rowIndexes.filter(
+        (idx) => draftActivities.find((d) => d.rowIndex === idx)?.status === "duplicate",
+      );
+      if (duplicateIndexes.length > 0) {
+        dispatch(bulkForceImportDrafts(duplicateIndexes));
+      }
+      setSelectedRows([]);
+    },
+    [dispatch, draftActivities],
+  );
+
   // --- All hooks above this line ---
 
   // Show loading state while drafts are being created or validated
@@ -439,6 +454,11 @@ export function ReviewStep() {
           onSelectionChange={setSelectedRows}
           onBulkSkip={handleBulkSkip}
           onBulkUnskip={handleBulkUnskip}
+          onBulkForceImport={
+            statusFilter.size === 1 && statusFilter.has("duplicate")
+              ? handleBulkForceImport
+              : undefined
+          }
           onBulkSetCurrency={handleBulkSetCurrency}
           onBulkSetAccount={handleBulkSetAccount}
         />

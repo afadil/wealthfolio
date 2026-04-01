@@ -664,6 +664,11 @@ pub struct ActivityImport {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub isin: Option<String>,
+    /// When true, bypasses duplicate detection for this row and inserts it regardless of whether
+    /// a matching activity already exists. The idempotency key is cleared before insert so the
+    /// DB unique constraint is not violated. Set by the user in the review step.
+    #[serde(default)]
+    pub force_import: bool,
 }
 
 /// Model for sorting activities

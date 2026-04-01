@@ -174,6 +174,20 @@ export function bulkUnskipDrafts(rowIndexes: number[]): ImportAction {
 }
 
 /**
+ * Mark duplicate activities as "import anyway", bypassing dedup on the backend.
+ * Only meaningful for rows with status "duplicate".
+ */
+export function bulkForceImportDrafts(rowIndexes: number[]): ImportAction {
+  return {
+    type: "BULK_SKIP_DRAFTS",
+    payload: {
+      rowIndexes,
+      updates: { forceImport: true },
+    },
+  };
+}
+
+/**
  * Set currency for multiple draft activities.
  */
 export function bulkSetCurrency(rowIndexes: number[], currency: string): ImportAction {

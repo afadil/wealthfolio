@@ -2368,6 +2368,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -2448,6 +2449,7 @@ mod tests {
                 subtype: None,
                 asset_id: None,
                 isin: Some("ca82509l1076".to_string()),
+                force_import: false,
             },
             ActivityImport {
                 id: None,
@@ -2478,6 +2480,7 @@ mod tests {
                 subtype: None,
                 asset_id: None,
                 isin: Some("CA82509L1077".to_string()),
+                force_import: false,
             },
         ];
 
@@ -2612,6 +2615,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -2681,6 +2685,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -2744,6 +2749,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -2813,6 +2819,7 @@ mod tests {
             quote_mode: Some("MANUAL".to_string()),
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -2890,6 +2897,7 @@ mod tests {
             quote_mode: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -2957,6 +2965,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -3020,6 +3029,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -3089,6 +3099,7 @@ mod tests {
             subtype: Some("DRIP".to_string()),
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -3154,6 +3165,7 @@ mod tests {
             subtype: Some("DIVIDEND_IN_KIND".to_string()),
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -3219,6 +3231,7 @@ mod tests {
             subtype: Some("STAKING_REWARD".to_string()),
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -3285,6 +3298,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -3350,6 +3364,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -3424,6 +3439,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -3493,6 +3509,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -3562,6 +3579,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -3629,6 +3647,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -3693,6 +3712,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let transfer_in = ActivityImport {
@@ -3724,6 +3744,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -3855,6 +3876,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -3925,6 +3947,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -3951,6 +3974,224 @@ mod tests {
             stored.len(),
             1,
             "within-batch duplicate should not be inserted"
+        );
+    }
+
+    // ==========================================================================
+    // force_import Tests
+    // ==========================================================================
+
+    /// Test: force_import=true bypasses DB duplicate detection and inserts the row.
+    /// The idempotency key is nulled out so the DB unique constraint is not violated.
+    #[tokio::test]
+    async fn test_import_force_import_bypasses_existing_duplicate() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "GBP");
+        account_service.add_account(account);
+
+        let date = DateTime::parse_from_rfc3339("2024-01-15T00:00:00Z")
+            .expect("valid date")
+            .with_timezone(&Utc);
+        let existing_key = crate::activities::compute_idempotency_key(
+            "acc-1",
+            "BUY",
+            &date,
+            Some("VWRL@XLON"),
+            Some(dec!(1)),
+            Some(dec!(100)),
+            Some(dec!(100)),
+            "GBP",
+            None,
+            None,
+        );
+        activity_repository
+            .activities
+            .lock()
+            .unwrap()
+            .push(Activity {
+                id: "existing-dup".to_string(),
+                account_id: "acc-1".to_string(),
+                asset_id: None,
+                activity_type: "BUY".to_string(),
+                activity_type_override: None,
+                source_type: None,
+                subtype: None,
+                status: ActivityStatus::Posted,
+                activity_date: date,
+                settlement_date: None,
+                quantity: Some(dec!(1)),
+                unit_price: Some(dec!(100)),
+                amount: Some(dec!(100)),
+                fee: Some(dec!(0)),
+                currency: "GBP".to_string(),
+                fx_rate: None,
+                notes: None,
+                metadata: None,
+                source_system: Some("CSV".to_string()),
+                source_record_id: None,
+                source_group_id: None,
+                idempotency_key: Some(existing_key),
+                import_run_id: None,
+                is_user_modified: false,
+                needs_review: false,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            });
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let forced = ActivityImport {
+            id: None,
+            date: "2024-01-15".to_string(),
+            symbol: "VWRL".to_string(),
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(1)),
+            unit_price: Some(dec!(100)),
+            currency: "GBP".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(100)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: Some("Vanguard FTSE All-World".to_string()),
+            exchange_mic: Some("XLON".to_string()),
+            quote_ccy: Some("GBP".to_string()),
+            instrument_type: Some("EQUITY".to_string()),
+            quote_mode: Some("MARKET".to_string()),
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+            asset_id: None,
+            isin: None,
+            force_import: true,
+        };
+
+        let result = activity_service
+            .import_activities(vec![forced])
+            .await
+            .expect("import should succeed");
+
+        assert!(result.summary.success);
+        assert_eq!(result.summary.imported, 1, "force_import row should be inserted");
+        assert_eq!(result.summary.duplicates, 0, "force_import row should not count as duplicate");
+
+        let stored = activity_repository
+            .get_activities()
+            .expect("stored activities should be readable");
+        assert_eq!(stored.len(), 2, "both existing and force-imported rows should exist");
+
+        // The force-imported row should have a NULL idempotency key
+        let new_row = stored.iter().find(|a| a.id != "existing-dup").expect("new row");
+        assert!(
+            new_row.idempotency_key.is_none(),
+            "force-imported row should have NULL idempotency key"
+        );
+    }
+
+    /// Test: force_import=true bypasses within-batch duplicate detection.
+    /// Both identical rows are inserted, each with a NULL idempotency key.
+    #[tokio::test]
+    async fn test_import_force_import_bypasses_within_batch_duplicate() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "GBP");
+        account_service.add_account(account);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let base = ActivityImport {
+            id: None,
+            date: "2024-01-15".to_string(),
+            symbol: "VWRL".to_string(),
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(1)),
+            unit_price: Some(dec!(100)),
+            currency: "GBP".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(100)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: Some("Vanguard FTSE All-World".to_string()),
+            exchange_mic: Some("XLON".to_string()),
+            quote_ccy: Some("GBP".to_string()),
+            instrument_type: Some("EQUITY".to_string()),
+            quote_mode: Some("MARKET".to_string()),
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+            asset_id: None,
+            isin: None,
+            force_import: false,
+        };
+
+        // First row: normal import. Second row: identical but force_import=true.
+        let result = activity_service
+            .import_activities(vec![
+                base.clone(),
+                ActivityImport {
+                    line_number: Some(2),
+                    force_import: true,
+                    ..base
+                },
+            ])
+            .await
+            .expect("import should succeed");
+
+        assert!(result.summary.success);
+        assert_eq!(result.summary.imported, 2, "both rows should be inserted");
+        assert_eq!(result.summary.duplicates, 0, "force_import row should not count as duplicate");
+
+        let stored = activity_repository
+            .get_activities()
+            .expect("stored activities should be readable");
+        assert_eq!(stored.len(), 2, "both rows should exist in the store");
+
+        // The force-imported row should have NULL key, the first row should have a key
+        let keys: Vec<Option<&str>> = stored
+            .iter()
+            .map(|a| a.idempotency_key.as_deref())
+            .collect();
+        assert!(
+            keys.iter().any(|k| k.is_some()),
+            "first row should have an idempotency key"
+        );
+        assert!(
+            keys.iter().any(|k| k.is_none()),
+            "force-imported row should have NULL idempotency key"
         );
     }
 
@@ -4296,6 +4537,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -4360,6 +4602,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -4424,6 +4667,7 @@ mod tests {
                 subtype: None,
                 asset_id: None,
                 isin: None,
+                force_import: false,
             };
 
             let result = activity_service
@@ -4500,6 +4744,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -4577,6 +4822,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -4642,6 +4888,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
@@ -4716,6 +4963,7 @@ mod tests {
             subtype: None,
             asset_id: None,
             isin: None,
+            force_import: false,
         };
 
         let result = activity_service
