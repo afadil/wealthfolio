@@ -194,6 +194,7 @@ impl CustomProviderService {
 
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(15))
+            .redirect(reqwest::redirect::Policy::none())
             .user_agent(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)",
             )

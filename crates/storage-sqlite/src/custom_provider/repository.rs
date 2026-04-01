@@ -91,6 +91,7 @@ impl CustomProviderRepository for CustomProviderSqliteRepository {
         let providers: Vec<(String, String, String, bool, i32, Option<String>)> =
             market_data_providers::table
                 .filter(market_data_providers::provider_type.eq("custom"))
+                .order(market_data_providers::priority.asc())
                 .select((
                     market_data_providers::id,
                     market_data_providers::name,
