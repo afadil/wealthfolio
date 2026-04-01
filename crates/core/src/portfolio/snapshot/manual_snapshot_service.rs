@@ -6,14 +6,14 @@ use log::debug;
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
-use crate::assets::{AssetKind, AssetMetadata, AssetServiceTrait, QuoteMode};
+use crate::assets::{AssetKind, AssetMetadata, AssetServiceTrait};
 use crate::errors::Result;
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::fx::FxServiceTrait;
 use crate::portfolio::snapshot::{
     AccountStateSnapshot, Position, SnapshotServiceTrait, SnapshotSource,
 };
-use crate::quotes::constants::{DATA_SOURCE_BROKER, DATA_SOURCE_MANUAL};
+use crate::quotes::constants::DATA_SOURCE_MANUAL;
 use crate::quotes::{Quote, QuoteServiceTrait};
 
 #[derive(Debug, Clone)]
@@ -139,12 +139,7 @@ impl ManualSnapshotService {
 
             // Create a quote from the snapshot price as a fallback
             if !holding.average_cost.is_zero() {
-                let is_manual = asset.quote_mode == QuoteMode::Manual || quote_mode.is_some();
-                let source = if is_manual {
-                    DATA_SOURCE_MANUAL.to_string()
-                } else {
-                    DATA_SOURCE_BROKER.to_string()
-                };
+                let source = DATA_SOURCE_MANUAL.to_string();
                 self.create_quote_from_snapshot(
                     &asset.id,
                     holding.average_cost,

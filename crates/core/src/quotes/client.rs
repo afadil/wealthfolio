@@ -150,12 +150,6 @@ impl MarketDataClient {
             }
         }
 
-        // Always register OpenFIGI — it's free, keyless, and only handles bond search/profile.
-        // This ensures bond ISIN/FIGI lookup works without users needing to enable it in settings.
-        if !providers.iter().any(|p| p.id() == DATA_SOURCE_OPENFIGI) {
-            providers.push(Arc::new(OpenFigiProvider::new()));
-        }
-
         // Append extra providers (e.g., CustomScraperProvider)
         for ep in extra_providers {
             info!("Registered extra provider: {}", ep.id());

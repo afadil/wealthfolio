@@ -1418,15 +1418,7 @@ impl ActivityService {
             // for activity types where unit_price is a real asset price.
             if PRICE_BEARING_ACTIVITY_TYPES.contains(&activity.activity_type.as_str()) {
                 if let Some(unit_price) = activity.unit_price {
-                    let effective_manual = quote_mode
-                        .as_deref()
-                        .map(|m| m.eq_ignore_ascii_case("manual"))
-                        .unwrap_or(asset.quote_mode == QuoteMode::Manual);
-                    let source = if effective_manual {
-                        DATA_SOURCE_MANUAL.to_string()
-                    } else {
-                        DATA_SOURCE_BROKER.to_string()
-                    };
+                    let source = DATA_SOURCE_MANUAL.to_string();
                     self.create_quote_from_activity(
                         asset_id,
                         unit_price,
@@ -1804,15 +1796,7 @@ impl ActivityService {
             // for activity types where unit_price is a real asset price.
             if PRICE_BEARING_ACTIVITY_TYPES.contains(&activity.activity_type.as_str()) {
                 if let Some(Some(unit_price)) = activity.unit_price {
-                    let effective_manual = quote_mode
-                        .as_deref()
-                        .map(|m| m.eq_ignore_ascii_case("manual"))
-                        .unwrap_or(asset.quote_mode == QuoteMode::Manual);
-                    let source = if effective_manual {
-                        DATA_SOURCE_MANUAL.to_string()
-                    } else {
-                        DATA_SOURCE_BROKER.to_string()
-                    };
+                    let source = DATA_SOURCE_MANUAL.to_string();
                     self.create_quote_from_activity(
                         asset_id,
                         unit_price,

@@ -68,7 +68,7 @@ const HoldingRow = memo(
     setFocus: ReturnType<typeof useFormContext<BulkHoldingsFormValues>>["setFocus"];
     canRemove: boolean;
   }) => {
-    const { control, setValue } = useFormContext<BulkHoldingsFormValues>();
+    const { control, setValue, getValues } = useFormContext<BulkHoldingsFormValues>();
 
     // Use useWatch for specific fields instead of watch() in parent
     const ticker = useWatch({
@@ -131,10 +131,13 @@ const HoldingRow = memo(
         );
 
         // Always update symbol metadata to avoid carrying stale values across selections.
+        // Fall back to the account currency when the search result has no currency
+        // (common for bonds/OTC securities).
+        const accountCurrency = getValues("currency") || "";
         setValue(`holdings.${index}.exchangeMic`, searchResult?.exchangeMic ?? "", {
           shouldDirty: true,
         });
-        setValue(`holdings.${index}.symbolQuoteCcy`, searchResult?.currency ?? "", {
+        setValue(`holdings.${index}.symbolQuoteCcy`, searchResult?.currency || accountCurrency, {
           shouldDirty: true,
         });
         setValue(`holdings.${index}.assetKind`, searchResult?.assetKind ?? "", {

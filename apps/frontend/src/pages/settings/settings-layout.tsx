@@ -43,12 +43,12 @@ const settingsSections = [
         subtitle: "Limits by year and account",
         icon: <Icons.TrendingUp className="size-5" />,
       },
-      {
-        title: "FIRE Planner",
-        href: "fire-planner",
-        subtitle: "Retirement planning settings",
-        icon: <Icons.Target className="size-5" />,
-      },
+      // {
+      //   title: "FIRE Planner",
+      //   href: "fire-planner",
+      //   subtitle: "Retirement planning settings",
+      //   icon: <Icons.Target className="size-5" />,
+      // },
     ],
   },
   {
