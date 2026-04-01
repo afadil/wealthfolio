@@ -4211,6 +4211,78 @@ mod tests {
         );
     }
 
+    /// Test: force_import=true on a non-duplicate row is a no-op — the idempotency
+    /// key is preserved so future imports can still deduplicate against it.
+    #[tokio::test]
+    async fn test_import_force_import_noop_on_non_duplicate() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        let account = create_test_account("acc-1", "GBP");
+        account_service.add_account(account);
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let import = ActivityImport {
+            id: None,
+            date: "2024-01-15".to_string(),
+            symbol: "VWRL".to_string(),
+            activity_type: "BUY".to_string(),
+            quantity: Some(dec!(1)),
+            unit_price: Some(dec!(100)),
+            currency: "GBP".to_string(),
+            fee: Some(dec!(0)),
+            amount: Some(dec!(100)),
+            comment: None,
+            account_id: Some("acc-1".to_string()),
+            account_name: None,
+            symbol_name: Some("Vanguard FTSE All-World".to_string()),
+            exchange_mic: Some("XLON".to_string()),
+            quote_ccy: Some("GBP".to_string()),
+            instrument_type: Some("EQUITY".to_string()),
+            quote_mode: Some("MARKET".to_string()),
+            errors: None,
+            warnings: None,
+            duplicate_of_id: None,
+            duplicate_of_line_number: None,
+            is_draft: false,
+            is_valid: true,
+            line_number: Some(1),
+            fx_rate: None,
+            subtype: None,
+            asset_id: None,
+            isin: None,
+            force_import: true, // flag set but no duplicate exists
+        };
+
+        let result = activity_service
+            .import_activities(vec![import])
+            .await
+            .expect("import should succeed");
+
+        assert!(result.summary.success);
+        assert_eq!(result.summary.imported, 1);
+        assert_eq!(result.summary.duplicates, 0);
+
+        let stored = activity_repository
+            .get_activities()
+            .expect("stored activities should be readable");
+        assert_eq!(stored.len(), 1);
+        assert!(
+            stored[0].idempotency_key.is_some(),
+            "non-duplicate row should keep its idempotency key even with force_import=true"
+        );
+    }
+
     // ==========================================================================
     // Currency Normalization Tests (GBp -> GBP, etc.)
     // ==========================================================================

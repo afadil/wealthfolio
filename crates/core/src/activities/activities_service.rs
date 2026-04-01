@@ -3335,55 +3335,66 @@ impl ActivityServiceTrait for ActivityService {
         let mut insertable_positions: Vec<usize> = Vec::with_capacity(new_activities.len());
 
         for (position, activity) in new_activities.iter_mut().enumerate() {
-            // User explicitly chose to import this row despite it being a duplicate.
-            // Clear the idempotency key so the DB unique constraint is not violated.
-            if import_activities_indexed
-                .get(position)
-                .is_some_and(|(_, imp)| imp.force_import)
-            {
-                activity.idempotency_key = None;
-                insertable_positions.push(position);
-                continue;
-            }
-
-            let Some(key) = activity.idempotency_key.as_ref() else {
+            // Clone to avoid holding a borrow on `activity` across the mutable
+            // `activity.idempotency_key = None` needed for force-import.
+            let Some(key) = activity.idempotency_key.clone() else {
                 insertable_positions.push(position);
                 continue;
             };
 
-            if let Some(existing_id) = existing_duplicates.get(key) {
-                if let Some((_, import_activity)) = import_activities_indexed.get_mut(position) {
-                    Self::add_activity_warning(
-                        import_activity,
-                        "_duplicate",
-                        "Duplicate activity already exists",
-                    );
-                    import_activity.duplicate_of_id = Some(existing_id.clone());
+            let is_force_import = import_activities_indexed
+                .get(position)
+                .is_some_and(|(_, imp)| imp.force_import);
+
+            if let Some(existing_id) = existing_duplicates.get(&key) {
+                if is_force_import {
+                    // User explicitly chose to import despite DB duplicate.
+                    // Clear key so the unique constraint is not violated.
+                    activity.idempotency_key = None;
+                    insertable_positions.push(position);
+                } else {
+                    if let Some((_, import_activity)) = import_activities_indexed.get_mut(position)
+                    {
+                        Self::add_activity_warning(
+                            import_activity,
+                            "_duplicate",
+                            "Duplicate activity already exists",
+                        );
+                        import_activity.duplicate_of_id = Some(existing_id.clone());
+                    }
+                    duplicate_count += 1;
                 }
-                duplicate_count += 1;
                 continue;
             }
 
             if let Some(first_idx) = batch_dup_sources.get(&position).copied() {
-                let duplicate_line_number = import_activities_indexed
-                    .get(first_idx)
-                    .and_then(|(_, activity)| activity.line_number)
-                    .unwrap_or((first_idx + 1) as i32);
-                if let Some((_, import_activity)) = import_activities_indexed.get_mut(position) {
-                    Self::add_activity_warning(
-                        import_activity,
-                        "_duplicate",
-                        &format!(
-                            "Duplicate of line {} in this import batch",
-                            duplicate_line_number
-                        ),
-                    );
-                    import_activity.duplicate_of_line_number = Some(duplicate_line_number);
+                if is_force_import {
+                    // User explicitly chose to import despite batch duplicate.
+                    activity.idempotency_key = None;
+                    insertable_positions.push(position);
+                } else {
+                    let duplicate_line_number = import_activities_indexed
+                        .get(first_idx)
+                        .and_then(|(_, activity)| activity.line_number)
+                        .unwrap_or((first_idx + 1) as i32);
+                    if let Some((_, import_activity)) = import_activities_indexed.get_mut(position)
+                    {
+                        Self::add_activity_warning(
+                            import_activity,
+                            "_duplicate",
+                            &format!(
+                                "Duplicate of line {} in this import batch",
+                                duplicate_line_number
+                            ),
+                        );
+                        import_activity.duplicate_of_line_number = Some(duplicate_line_number);
+                    }
+                    duplicate_count += 1;
                 }
-                duplicate_count += 1;
                 continue;
             }
 
+            // Not a duplicate — force_import is a no-op, key is preserved.
             insertable_positions.push(position);
         }
 

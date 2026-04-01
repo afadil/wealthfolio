@@ -581,6 +581,19 @@ export function ImportProvider({ children, initialAccountId }: ImportProviderPro
             const hasErrors = Object.keys(mergedErrors).length > 0;
             const hasWarnings = Object.keys(mergedWarnings).length > 0;
 
+            const newStatus: DraftActivityStatus =
+              draft.status === "skipped"
+                ? draft.status
+                : hasErrors
+                  ? "error"
+                  : backendResult.duplicateOfLineNumber !== undefined ||
+                      backendResult.duplicateOfId !== undefined ||
+                      backendWarnings._duplicate?.length
+                    ? "duplicate"
+                    : hasWarnings
+                      ? "warning"
+                      : "valid";
+
             return {
               ...draft,
               assetId: backendResult.assetId,
@@ -592,18 +605,10 @@ export function ImportProvider({ children, initialAccountId }: ImportProviderPro
               exchangeMic: backendResult.exchangeMic,
               quoteCcy: backendResult.quoteCcy,
               instrumentType: backendResult.instrumentType,
-              status:
-                draft.status === "skipped"
-                  ? draft.status
-                  : hasErrors
-                    ? "error"
-                    : backendResult.duplicateOfLineNumber !== undefined ||
-                        backendResult.duplicateOfId !== undefined ||
-                        backendWarnings._duplicate?.length
-                      ? "duplicate"
-                      : hasWarnings
-                        ? "warning"
-                        : "valid",
+              status: newStatus,
+              // Clear forceImport when the row is no longer a duplicate
+              // (e.g. user edited the row after marking it "import anyway").
+              forceImport: newStatus === "duplicate" ? draft.forceImport : false,
             } as DraftActivity;
           });
         }
