@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS market_data_custom_providers;
+
 -- Remove the CUSTOM_SCRAPER seed row
 DELETE FROM market_data_providers WHERE id = 'CUSTOM_SCRAPER';
 

@@ -1,20 +1,22 @@
 use async_trait::async_trait;
+use chrono::Utc;
 use diesel::prelude::*;
 use log::warn;
 use std::sync::Arc;
+use uuid::Uuid;
 
+use crate::custom_provider::model::CustomProviderDB;
 use crate::db::{get_connection, DbPool, WriteHandle};
 use crate::errors::{IntoCore, StorageError};
-use crate::schema::market_data_providers;
+use crate::schema::market_data_custom_providers as custom_providers;
 
 use wealthfolio_core::custom_provider::{
-    CustomProviderRepository, CustomProviderSource, CustomProviderWithSources,
-    NewCustomProviderSource,
+    CustomProviderRepository, CustomProviderSource, CustomProviderWithSources, NewCustomProvider,
+    NewCustomProviderSource, UpdateCustomProvider,
 };
 use wealthfolio_core::errors::Result;
-use wealthfolio_core::quotes::provider_settings::MarketDataProviderSetting;
 
-/// JSON wrapper stored in market_data_providers.config
+/// JSON wrapper stored in custom_providers.config
 #[derive(serde::Serialize, serde::Deserialize, Default)]
 struct ProviderConfig {
     sources: Vec<NewCustomProviderSource>,
@@ -31,15 +33,15 @@ impl CustomProviderSqliteRepository {
     }
 }
 
-/// Parse the config JSON column into sources, converting NewCustomProviderSource → CustomProviderSource.
-fn parse_sources(config_json: Option<&str>, provider_id: &str) -> Vec<CustomProviderSource> {
+/// Parse the config JSON column into sources.
+fn parse_sources(config_json: Option<&str>, provider_code: &str) -> Vec<CustomProviderSource> {
     let config: ProviderConfig = match config_json {
         Some(s) => match serde_json::from_str(s) {
             Ok(c) => c,
             Err(e) => {
                 warn!(
                     "Failed to parse config JSON for provider '{}': {}",
-                    provider_id, e
+                    provider_code, e
                 );
                 ProviderConfig::default()
             }
@@ -51,8 +53,8 @@ fn parse_sources(config_json: Option<&str>, provider_id: &str) -> Vec<CustomProv
         .sources
         .into_iter()
         .map(|s| CustomProviderSource {
-            id: format!("{}:{}", provider_id, s.kind),
-            provider_id: provider_id.to_string(),
+            id: format!("{}:{}", provider_code, s.kind),
+            provider_id: provider_code.to_string(),
             kind: s.kind,
             format: s.format,
             url: s.url,
@@ -83,153 +85,163 @@ fn sources_to_config_json(sources: &[NewCustomProviderSource]) -> String {
     })
 }
 
+fn db_to_domain(row: CustomProviderDB) -> CustomProviderWithSources {
+    let sources = parse_sources(row.config.as_deref(), &row.code);
+    CustomProviderWithSources {
+        id: row.code,
+        name: row.name,
+        description: row.description,
+        enabled: row.enabled,
+        priority: row.priority,
+        sources,
+    }
+}
+
 #[async_trait]
 impl CustomProviderRepository for CustomProviderSqliteRepository {
     fn get_all(&self) -> Result<Vec<CustomProviderWithSources>> {
         let mut conn = get_connection(&self.pool)?;
 
-        let providers: Vec<(String, String, String, bool, i32, Option<String>)> =
-            market_data_providers::table
-                .filter(market_data_providers::provider_type.eq("custom"))
-                .order(market_data_providers::priority.asc())
-                .select((
-                    market_data_providers::id,
-                    market_data_providers::name,
-                    market_data_providers::description,
-                    market_data_providers::enabled,
-                    market_data_providers::priority,
-                    market_data_providers::config,
-                ))
-                .load(&mut conn)
-                .into_core()?;
+        let rows: Vec<CustomProviderDB> = custom_providers::table
+            .order(custom_providers::priority.asc())
+            .select(CustomProviderDB::as_select())
+            .load(&mut conn)
+            .into_core()?;
 
-        Ok(providers
-            .into_iter()
-            .map(|(id, name, description, enabled, priority, config)| {
-                let sources = parse_sources(config.as_deref(), &id);
-                CustomProviderWithSources {
-                    id,
-                    name,
-                    description,
-                    enabled,
-                    priority,
-                    sources,
-                }
-            })
-            .collect())
+        Ok(rows.into_iter().map(db_to_domain).collect())
     }
 
     fn get_source_by_kind(
         &self,
-        provider_id: &str,
+        provider_code: &str,
         kind: &str,
     ) -> Result<Option<CustomProviderSource>> {
         let mut conn = get_connection(&self.pool)?;
 
-        let row: Option<(bool, Option<String>)> = market_data_providers::table
-            .find(provider_id)
-            .select((
-                market_data_providers::enabled,
-                market_data_providers::config,
-            ))
+        let row: Option<CustomProviderDB> = custom_providers::table
+            .filter(custom_providers::code.eq(provider_code))
+            .select(CustomProviderDB::as_select())
             .first(&mut conn)
             .optional()
             .into_core()?;
 
         match row {
-            Some((true, config)) => {
-                let sources = parse_sources(config.as_deref(), provider_id);
+            Some(r) if r.enabled => {
+                let sources = parse_sources(r.config.as_deref(), provider_code);
                 Ok(sources.into_iter().find(|s| s.kind == kind))
             }
             _ => Ok(None),
         }
     }
 
-    async fn create(
+    async fn create(&self, payload: &NewCustomProvider) -> Result<CustomProviderWithSources> {
+        let code = payload.code.clone();
+        let name = payload.name.clone();
+        let description = payload.description.clone().unwrap_or_default();
+        let config_json = sources_to_config_json(&payload.sources);
+        let now = Utc::now().to_rfc3339();
+
+        let row = CustomProviderDB {
+            id: Uuid::new_v4().to_string(),
+            code: code.clone(),
+            name,
+            description,
+            enabled: true,
+            priority: 50,
+            config: Some(config_json),
+            created_at: now.clone(),
+            updated_at: now,
+        };
+
+        let row_clone = row.clone();
+        self.writer
+            .exec_tx(move |tx| {
+                diesel::insert_into(custom_providers::table)
+                    .values(&row_clone)
+                    .execute(tx.conn())
+                    .map_err(StorageError::QueryFailed)?;
+                tx.insert(&row_clone)?;
+                Ok(())
+            })
+            .await?;
+
+        Ok(db_to_domain(row))
+    }
+
+    async fn update(
         &self,
-        provider: &MarketDataProviderSetting,
-        sources: &[NewCustomProviderSource],
-    ) -> Result<()> {
-        let provider = provider.clone();
-        let config_json = sources_to_config_json(sources);
+        provider_code: &str,
+        payload: &UpdateCustomProvider,
+    ) -> Result<CustomProviderWithSources> {
+        let code = provider_code.to_string();
+        let payload = payload.clone();
 
         self.writer
             .exec_tx(move |tx| {
-                diesel::insert_into(market_data_providers::table)
-                    .values((
-                        market_data_providers::id.eq(&provider.id),
-                        market_data_providers::name.eq(&provider.name),
-                        market_data_providers::description.eq(&provider.description),
-                        market_data_providers::url.eq(&provider.url),
-                        market_data_providers::priority.eq(provider.priority),
-                        market_data_providers::enabled.eq(provider.enabled),
-                        market_data_providers::provider_type
-                            .eq(provider.provider_type.as_deref().unwrap_or("custom")),
-                        market_data_providers::config.eq(&config_json),
+                // Load current row
+                let existing: CustomProviderDB = custom_providers::table
+                    .filter(custom_providers::code.eq(&code))
+                    .select(CustomProviderDB::as_select())
+                    .first(tx.conn())
+                    .map_err(StorageError::QueryFailed)?;
+
+                let now = Utc::now().to_rfc3339();
+
+                let new_name = payload.name.unwrap_or(existing.name);
+                let new_desc = payload.description.unwrap_or(existing.description);
+                let new_enabled = payload.enabled.unwrap_or(existing.enabled);
+                let new_priority = payload.priority.unwrap_or(existing.priority);
+                let new_config = match &payload.sources {
+                    Some(sources) => Some(sources_to_config_json(sources)),
+                    None => existing.config,
+                };
+
+                diesel::update(custom_providers::table.filter(custom_providers::code.eq(&code)))
+                    .set((
+                        custom_providers::name.eq(&new_name),
+                        custom_providers::description.eq(&new_desc),
+                        custom_providers::enabled.eq(new_enabled),
+                        custom_providers::priority.eq(new_priority),
+                        custom_providers::config.eq(&new_config),
+                        custom_providers::updated_at.eq(&now),
                     ))
                     .execute(tx.conn())
                     .map_err(StorageError::QueryFailed)?;
-                Ok(())
+
+                let updated = CustomProviderDB {
+                    id: existing.id,
+                    code: code.clone(),
+                    name: new_name,
+                    description: new_desc,
+                    enabled: new_enabled,
+                    priority: new_priority,
+                    config: new_config,
+                    created_at: existing.created_at,
+                    updated_at: now,
+                };
+
+                tx.update(&updated)?;
+
+                Ok(db_to_domain(updated))
             })
             .await
     }
 
-    async fn update_provider(&self, provider: &MarketDataProviderSetting) -> Result<()> {
-        let provider = provider.clone();
+    async fn delete(&self, provider_code: &str) -> Result<()> {
+        let code = provider_code.to_string();
         self.writer
             .exec_tx(move |tx| {
-                diesel::update(
-                    market_data_providers::table
-                        .find(&provider.id)
-                        .filter(market_data_providers::provider_type.eq("custom")),
-                )
-                .set((
-                    market_data_providers::name.eq(&provider.name),
-                    market_data_providers::description.eq(&provider.description),
-                    market_data_providers::priority.eq(provider.priority),
-                    market_data_providers::enabled.eq(provider.enabled),
-                ))
-                .execute(tx.conn())
-                .map_err(StorageError::QueryFailed)?;
-                Ok(())
-            })
-            .await
-    }
+                let existing: CustomProviderDB = custom_providers::table
+                    .filter(custom_providers::code.eq(&code))
+                    .select(CustomProviderDB::as_select())
+                    .first(tx.conn())
+                    .map_err(StorageError::QueryFailed)?;
 
-    async fn update_sources(
-        &self,
-        provider_id: &str,
-        sources: &[NewCustomProviderSource],
-    ) -> Result<()> {
-        let provider_id = provider_id.to_string();
-        let config_json = sources_to_config_json(sources);
+                diesel::delete(custom_providers::table.filter(custom_providers::code.eq(&code)))
+                    .execute(tx.conn())
+                    .map_err(StorageError::QueryFailed)?;
 
-        self.writer
-            .exec_tx(move |tx| {
-                diesel::update(
-                    market_data_providers::table
-                        .find(&provider_id)
-                        .filter(market_data_providers::provider_type.eq("custom")),
-                )
-                .set(market_data_providers::config.eq(&config_json))
-                .execute(tx.conn())
-                .map_err(StorageError::QueryFailed)?;
-                Ok(())
-            })
-            .await
-    }
-
-    async fn delete(&self, provider_id: &str) -> Result<()> {
-        let provider_id = provider_id.to_string();
-        self.writer
-            .exec_tx(move |tx| {
-                diesel::delete(
-                    market_data_providers::table
-                        .find(&provider_id)
-                        .filter(market_data_providers::provider_type.eq("custom")),
-                )
-                .execute(tx.conn())
-                .map_err(StorageError::QueryFailed)?;
+                tx.delete_model(&existing);
                 Ok(())
             })
             .await
@@ -246,8 +258,6 @@ impl CustomProviderRepository for CustomProviderSqliteRepository {
             cnt: i64,
         }
 
-        // Check both custom_provider_code and symbol-mapping overrides (CUSTOM:<code>)
-        // Escape LIKE metacharacters in provider_code to prevent false matches
         let escaped_code = provider_code.replace('%', "\\%").replace('_', "\\_");
         let override_pattern = format!("%\"CUSTOM:{}\":%", escaped_code);
         let row: CountRow = diesel::sql_query(

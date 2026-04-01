@@ -22,17 +22,12 @@ export function useUpdateMarketDataProviderSettings() {
     mutationFn: async (variables: { providerId: string; priority: number; enabled: boolean }) =>
       updateMarketDataProviderSettings(variables),
     onMutate: async (variables) => {
-      // Cancel any outgoing refetches to avoid overwriting our optimistic update
       await queryClient.cancelQueries({ queryKey: [QueryKeys.MARKET_DATA_PROVIDER_SETTINGS] });
-      await queryClient.cancelQueries({ queryKey: [QueryKeys.CUSTOM_PROVIDERS] });
 
-      // Snapshot the previous values
       const previousProviders = queryClient.getQueryData<MarketDataProviderSetting[]>([
         QueryKeys.MARKET_DATA_PROVIDER_SETTINGS,
       ]);
-      const previousCustom = queryClient.getQueryData([QueryKeys.CUSTOM_PROVIDERS]);
 
-      // Optimistically update the provider settings cache
       queryClient.setQueryData<MarketDataProviderSetting[]>(
         [QueryKeys.MARKET_DATA_PROVIDER_SETTINGS],
         (old) => {
@@ -45,32 +40,14 @@ export function useUpdateMarketDataProviderSettings() {
         },
       );
 
-      // Optimistically update the custom providers cache
-      queryClient.setQueryData<{ id: string; enabled: boolean }[]>(
-        [QueryKeys.CUSTOM_PROVIDERS],
-        (old) => {
-          if (!old) return old;
-          return old.map((cp) =>
-            cp.id === variables.providerId ? { ...cp, enabled: variables.enabled } : cp,
-          );
-        },
-      );
-
-      return { previousProviders, previousCustom };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.MARKET_DATA_PROVIDER_SETTINGS] });
+      return { previousProviders };
     },
     onError: (error, variables, context) => {
-      // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousProviders) {
         queryClient.setQueryData(
           [QueryKeys.MARKET_DATA_PROVIDER_SETTINGS],
           context.previousProviders,
         );
-      }
-      if (context?.previousCustom) {
-        queryClient.setQueryData([QueryKeys.CUSTOM_PROVIDERS], context.previousCustom);
       }
       toast({
         title: `Failed to update settings for provider ${variables.providerId}`,
@@ -79,9 +56,7 @@ export function useUpdateMarketDataProviderSettings() {
       });
     },
     onSettled: () => {
-      // Always refetch after error or success to ensure we have the latest data
       queryClient.invalidateQueries({ queryKey: [QueryKeys.MARKET_DATA_PROVIDER_SETTINGS] });
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.CUSTOM_PROVIDERS] });
     },
   });
 }

@@ -81,6 +81,7 @@ const formSchema = z.object({
     .min(1, "Code is required")
     .regex(/^[a-z0-9-]+$/, "Lowercase alphanumeric and hyphens only"),
   description: z.string().optional(),
+  priority: z.coerce.number().int().min(1).default(50),
   latestSource: sourceSchema,
   historicalEnabled: z.boolean(),
   historicalSource: sourceSchema.optional(),
@@ -163,11 +164,13 @@ function CustomProviderFormContent({
   const historicalSource = provider?.sources.find((s) => s.kind === "historical");
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(formSchema) as any,
     defaultValues: {
       name: provider?.name ?? "",
       code: provider?.id ?? "",
       description: provider?.description ?? "",
+      priority: provider?.priority ?? 50,
       latestSource: {
         format: latestSource?.format ?? "json",
         url: latestSource?.url ?? "",
@@ -273,6 +276,7 @@ function CustomProviderFormContent({
             payload: {
               name: values.name,
               description: values.description || undefined,
+              priority: values.priority,
               sources,
             },
           },
@@ -409,7 +413,7 @@ function CustomProviderFormContent({
 
               {/* Provider identity — inside scroll area, always visible */}
               <div id="provider-identity" className="mt-4 border-t pt-4">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_140px]">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_140px_80px]">
                   <FormField
                     control={form.control}
                     name="name"
@@ -452,6 +456,19 @@ function CustomProviderFormContent({
                               field.onChange(e.target.value);
                             }}
                           />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="priority"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Priority</FormLabel>
+                        <FormControl>
+                          <Input type="number" min={1} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

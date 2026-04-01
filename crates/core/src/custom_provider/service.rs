@@ -64,28 +64,16 @@ impl CustomProviderService {
             validate_source_kind_format(&src.kind, &src.format)?;
         }
 
-        let provider = crate::quotes::provider_settings::MarketDataProviderSetting {
-            id: code.clone(),
-            name: payload.name.clone(),
-            description: payload.description.clone().unwrap_or_default(),
-            url: None,
-            priority: 50,
-            enabled: true,
-            logo_filename: None,
-            last_synced_at: None,
-            last_sync_status: None,
-            last_sync_error: None,
-            capabilities: None,
-            provider_type: Some("custom".to_string()),
+        let normalized = NewCustomProvider {
+            code,
+            name: payload.name,
+            description: payload.description,
+            sources: payload.sources,
         };
 
-        self.repo.create(&provider, &payload.sources).await?;
-        info!("Created custom provider: {}", code);
-
-        let all = self.repo.get_all()?;
-        all.into_iter()
-            .find(|p| p.id == code)
-            .ok_or_else(|| crate::Error::Unexpected("Created provider not found".into()))
+        let created = self.repo.create(&normalized).await?;
+        info!("Created custom provider: {}", created.id);
+        Ok(created)
     }
 
     /// Update an existing custom provider.
@@ -94,49 +82,15 @@ impl CustomProviderService {
         provider_id: &str,
         payload: UpdateCustomProvider,
     ) -> Result<CustomProviderWithSources> {
-        let existing_providers = self.repo.get_all()?;
-        let existing = existing_providers
-            .iter()
-            .find(|p| p.id == provider_id)
-            .ok_or_else(|| {
-                crate::Error::from(ValidationError::InvalidInput(format!(
-                    "Custom provider '{}' not found",
-                    provider_id
-                )))
-            })?;
-
-        let provider = crate::quotes::provider_settings::MarketDataProviderSetting {
-            id: provider_id.to_string(),
-            name: payload.name.unwrap_or_else(|| existing.name.clone()),
-            description: payload
-                .description
-                .unwrap_or_else(|| existing.description.clone()),
-            url: None,
-            priority: payload.priority.unwrap_or(existing.priority),
-            enabled: payload.enabled.unwrap_or(existing.enabled),
-            logo_filename: None,
-            last_synced_at: None,
-            last_sync_status: None,
-            last_sync_error: None,
-            capabilities: None,
-            provider_type: Some("custom".to_string()),
-        };
-
-        self.repo.update_provider(&provider).await?;
-
         if let Some(sources) = &payload.sources {
             for src in sources {
                 validate_source_kind_format(&src.kind, &src.format)?;
             }
-            self.repo.update_sources(provider_id, sources).await?;
         }
 
+        let updated = self.repo.update(provider_id, &payload).await?;
         info!("Updated custom provider: {}", provider_id);
-
-        let all = self.repo.get_all()?;
-        all.into_iter()
-            .find(|p| p.id == provider_id)
-            .ok_or_else(|| crate::Error::Unexpected("Updated provider not found".into()))
+        Ok(updated)
     }
 
     /// Delete a custom provider. Fails if it is not a user-created provider or assets reference it.
@@ -170,27 +124,20 @@ impl CustomProviderService {
 
     /// Test a source configuration by fetching and extracting a price.
     pub async fn test_source(&self, payload: TestSourceRequest) -> Result<TestSourceResult> {
-        let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
         let currency = payload.currency.as_deref().unwrap_or("usd");
-        let mut url = payload.url.replace("{SYMBOL}", &payload.symbol);
-        url = url.replace("{currency}", currency);
-        url = url.replace("{CURRENCY}", &currency.to_uppercase());
-        url = url.replace("{TODAY}", &today);
-        url = url.replace("{FROM}", &today);
-        url = url.replace("{TO}", &today);
-        // {ISIN} defaults to symbol (useful when testing bond/ISIN-based templates)
-        url = url.replace("{ISIN}", &payload.symbol);
-        // {MIC} defaults to empty (no exchange context in test mode)
-        url = url.replace("{MIC}", "");
-        if url.contains("{DATE:") {
-            url = DATE_TEMPLATE_RE
-                .replace_all(&url, |caps: &regex::Captures| {
-                    chrono::Utc::now().format(&caps[1]).to_string()
-                })
-                .to_string();
-        }
+        let tctx = TemplateContext {
+            symbol: &payload.symbol,
+            currency,
+            isin: None,
+            mic: None,
+            from: None,
+            to: None,
+        };
+        let url = expand_template(&payload.url, &tctx);
 
-        validate_url(&url).map_err(|e| crate::Error::Unexpected(e.to_string()))?;
+        validate_url_resolved(&url)
+            .await
+            .map_err(|e| crate::Error::Unexpected(e.to_string()))?;
 
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(15))
@@ -310,22 +257,7 @@ impl CustomProviderService {
             });
         }
 
-        // Build path expander that handles all template variables
-        let symbol = &payload.symbol;
-        let expand_path = |p: &str| -> String {
-            // Infer currency from URL (e.g., vs_currencies=cad → "cad")
-            let currency_lower = url
-                .split("vs_currenc")
-                .nth(1)
-                .and_then(|s| s.split('=').nth(1))
-                .and_then(|s| s.split('&').next())
-                .unwrap_or("usd")
-                .to_string();
-            let currency_upper = currency_lower.to_uppercase();
-            p.replace("{SYMBOL}", symbol)
-                .replace("{currency}", &currency_lower)
-                .replace("{CURRENCY}", &currency_upper)
-        };
+        let expand_path = |p: &str| -> String { expand_template(p, &tctx) };
 
         match payload.format.as_str() {
             "json" => {

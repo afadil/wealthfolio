@@ -180,6 +180,20 @@ diesel::table! {
 }
 
 diesel::table! {
+    market_data_custom_providers (id) {
+        id -> Text,
+        code -> Text,
+        name -> Text,
+        description -> Text,
+        enabled -> Bool,
+        priority -> Integer,
+        config -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
     daily_account_valuation (id) {
         id -> Text,
         account_id -> Text,
@@ -465,6 +479,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     assets,
     brokers_sync_state,
     contribution_limits,
+    market_data_custom_providers,
     daily_account_valuation,
     goals,
     goals_allocation,

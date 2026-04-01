@@ -2,8 +2,9 @@ use async_trait::async_trait;
 
 use crate::errors::Result;
 
-use super::model::{CustomProviderSource, CustomProviderWithSources, NewCustomProviderSource};
-use crate::quotes::provider_settings::MarketDataProviderSetting;
+use super::model::{
+    CustomProviderSource, CustomProviderWithSources, NewCustomProvider, UpdateCustomProvider,
+};
 
 /// Repository trait for custom provider persistence.
 ///
@@ -18,29 +19,22 @@ pub trait CustomProviderRepository: Send + Sync {
     /// Get the source for a provider by kind ("latest" or "historical").
     fn get_source_by_kind(
         &self,
-        provider_id: &str,
+        provider_code: &str,
         kind: &str,
     ) -> Result<Option<CustomProviderSource>>;
 
-    /// Create a new custom provider with sources.
-    async fn create(
-        &self,
-        provider: &MarketDataProviderSetting,
-        sources: &[NewCustomProviderSource],
-    ) -> Result<()>;
+    /// Create a new custom provider with sources. Returns the created provider.
+    async fn create(&self, payload: &NewCustomProvider) -> Result<CustomProviderWithSources>;
 
-    /// Update a custom provider's metadata (name, description, priority, enabled).
-    async fn update_provider(&self, provider: &MarketDataProviderSetting) -> Result<()>;
-
-    /// Replace a provider's source configurations.
-    async fn update_sources(
+    /// Update a custom provider (metadata and/or sources). Returns the updated provider.
+    async fn update(
         &self,
-        provider_id: &str,
-        sources: &[NewCustomProviderSource],
-    ) -> Result<()>;
+        provider_code: &str,
+        payload: &UpdateCustomProvider,
+    ) -> Result<CustomProviderWithSources>;
 
     /// Delete a custom provider.
-    async fn delete(&self, provider_id: &str) -> Result<()>;
+    async fn delete(&self, provider_code: &str) -> Result<()>;
 
     /// Count assets that reference a given custom provider code.
     fn get_asset_count_for_provider(&self, provider_code: &str) -> Result<i64>;

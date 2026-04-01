@@ -9,7 +9,7 @@ use log::debug;
 use rust_decimal::Decimal;
 
 use crate::custom_provider::model::{
-    extract_html_value, validate_url, DATE_TEMPLATE_RE, MAX_RESPONSE_BYTES,
+    expand_template, extract_html_value, validate_url_resolved, TemplateContext, MAX_RESPONSE_BYTES,
 };
 use crate::custom_provider::service::{
     detect_html_locale, parse_csv_records, parse_number_string, resolve_csv_column,
@@ -52,7 +52,7 @@ impl CustomScraperProvider {
         }
     }
 
-    /// Expand URL template variables.
+    /// Expand URL template variables using the shared template engine.
     fn expand_url(
         &self,
         url: &str,
@@ -61,59 +61,32 @@ impl CustomScraperProvider {
         from: Option<&str>,
         to: Option<&str>,
     ) -> String {
-        let today = Utc::now().format("%Y-%m-%d").to_string();
-        let mut expanded = url
-            .replace("{SYMBOL}", symbol)
-            .replace("{TODAY}", &today)
-            .replace("{FROM}", from.unwrap_or(&today))
-            .replace("{TO}", to.unwrap_or(&today));
+        let isin_owned: Option<String> = context.and_then(|ctx| match &ctx.instrument {
+            wealthfolio_market_data::InstrumentId::Bond { isin } => Some(isin.as_ref().to_string()),
+            _ => None,
+        });
 
-        // {ISIN} — from Bond instrument or symbol if it matches ISIN pattern
-        if expanded.contains("{ISIN}") {
-            let isin = context
-                .and_then(|ctx| match &ctx.instrument {
-                    wealthfolio_market_data::InstrumentId::Bond { isin } => {
-                        Some(isin.as_ref().to_string())
-                    }
-                    _ => None,
-                })
-                .unwrap_or_else(|| symbol.to_string());
-            expanded = expanded.replace("{ISIN}", &isin);
-        }
+        let mic_owned: Option<String> = context.and_then(|ctx| match &ctx.instrument {
+            wealthfolio_market_data::InstrumentId::Equity { mic, .. } => {
+                mic.as_ref().map(|m| m.as_ref().to_string())
+            }
+            _ => None,
+        });
 
-        // {CURRENCY} (uppercase) and {currency} (lowercase) — from currency_hint
-        if expanded.contains("{CURRENCY}") || expanded.contains("{currency}") {
-            let currency = context
-                .and_then(|ctx| ctx.currency_hint.as_deref())
-                .unwrap_or("USD");
-            expanded = expanded
-                .replace("{currency}", &currency.to_lowercase())
-                .replace("{CURRENCY}", currency);
-        }
+        let currency = context
+            .and_then(|ctx| ctx.currency_hint.as_deref())
+            .unwrap_or("USD");
 
-        // {MIC} — exchange MIC code from Equity instrument
-        if expanded.contains("{MIC}") {
-            let mic = context
-                .and_then(|ctx| match &ctx.instrument {
-                    wealthfolio_market_data::InstrumentId::Equity { mic, .. } => {
-                        mic.as_ref().map(|m| m.as_ref().to_string())
-                    }
-                    _ => None,
-                })
-                .unwrap_or_default();
-            expanded = expanded.replace("{MIC}", &mic);
-        }
+        let tctx = TemplateContext {
+            symbol,
+            currency,
+            isin: isin_owned.as_deref(),
+            mic: mic_owned.as_deref(),
+            from,
+            to,
+        };
 
-        // {DATE:format} — current date with custom format
-        if expanded.contains("{DATE:") {
-            expanded = DATE_TEMPLATE_RE
-                .replace_all(&expanded, |caps: &regex::Captures| {
-                    Utc::now().format(&caps[1]).to_string()
-                })
-                .to_string();
-        }
-
-        expanded
+        expand_template(url, &tctx)
     }
 
     /// Build HTTP headers from source config, resolving secrets.
@@ -245,11 +218,13 @@ impl CustomScraperProvider {
 
         let url = self.expand_url(&source.url, symbol, context, from, to);
 
-        // SSRF check
-        validate_url(&url).map_err(|e| MarketDataError::ProviderError {
-            provider: DATA_SOURCE_CUSTOM_SCRAPER.to_string(),
-            message: e.to_string(),
-        })?;
+        // SSRF check (includes DNS resolution to catch rebinding attacks)
+        validate_url_resolved(&url)
+            .await
+            .map_err(|e| MarketDataError::ProviderError {
+                provider: DATA_SOURCE_CUSTOM_SCRAPER.to_string(),
+                message: e.to_string(),
+            })?;
 
         let headers = self.build_headers(source)?;
 
@@ -563,8 +538,9 @@ impl MarketDataProvider for CustomScraperProvider {
 
 impl CustomScraperProvider {
     /// Find candidate sources for the given kind.
-    /// If `custom_provider_code` is set, returns that single source.
-    /// Otherwise, returns sources from all enabled custom providers (tried in order).
+    /// If `custom_provider_code` is set, returns that single provider's source.
+    /// Otherwise, returns sources from all enabled custom providers whose URL
+    /// contains `{SYMBOL}` (general-purpose sources that work like built-in providers).
     fn find_sources(
         &self,
         context: &QuoteContext,
@@ -586,7 +562,8 @@ impl CustomScraperProvider {
             return Ok(vec![source]);
         }
 
-        // No explicit code — collect sources from all enabled custom providers
+        // No explicit code — collect general-purpose sources (URL contains {SYMBOL})
+        // from all enabled custom providers, tried in priority order.
         let providers = self
             .repo
             .get_all()
@@ -595,8 +572,6 @@ impl CustomScraperProvider {
                 message: format!("Failed to list custom providers: {}", e),
             })?;
 
-        // Only include sources whose URL contains {SYMBOL} — those are general-purpose.
-        // Sources without {SYMBOL} are asset-specific and require explicit custom_provider_code.
         let sources: Vec<CustomProviderSource> = providers
             .into_iter()
             .filter(|p| p.enabled)
@@ -675,11 +650,20 @@ fn resolve_currency(
     body: &str,
 ) -> String {
     if source.format == "json" {
+        let currency = currency_hint.unwrap_or("USD");
+        let tctx = TemplateContext {
+            symbol,
+            currency,
+            isin: None,
+            mic: None,
+            from: None,
+            to: None,
+        };
         source
             .currency_path
             .as_ref()
             .and_then(|cp| {
-                let cp = cp.replace("{SYMBOL}", symbol);
+                let cp = expand_template(cp, &tctx);
                 extract_json_string(body, &cp)
             })
             .or_else(|| currency_hint.map(|s| s.to_string()))
@@ -971,14 +955,16 @@ fn extract_json_rows(
         Err(_) => return Vec::new(),
     };
 
-    // Expand {SYMBOL}, {CURRENCY} (as-is), and {currency} (lowercase) in paths.
     let currency = currency_hint.unwrap_or("USD");
-    let currency_lower = currency.to_lowercase();
-    let expand_path = |p: &str| -> String {
-        p.replace("{SYMBOL}", symbol)
-            .replace("{currency}", &currency_lower)
-            .replace("{CURRENCY}", currency)
+    let tctx = TemplateContext {
+        symbol,
+        currency,
+        isin: None,
+        mic: None,
+        from: None,
+        to: None,
     };
+    let expand_path = |p: &str| -> String { expand_template(p, &tctx) };
 
     const MAX_JSON_ROWS: usize = 10_000;
 

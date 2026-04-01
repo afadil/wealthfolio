@@ -27,7 +27,6 @@ export function useCreateCustomProvider() {
     mutationFn: (payload: NewCustomProvider) => createCustomProvider(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.CUSTOM_PROVIDERS] });
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.MARKET_DATA_PROVIDER_SETTINGS] });
     },
     onError: (error: Error) => {
       toast({
@@ -46,7 +45,6 @@ export function useUpdateCustomProvider() {
       updateCustomProvider(variables.providerId, variables.payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.CUSTOM_PROVIDERS] });
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.MARKET_DATA_PROVIDER_SETTINGS] });
     },
     onError: (error: Error) => {
       toast({
@@ -64,7 +62,6 @@ export function useDeleteCustomProvider() {
     mutationFn: (providerId: string) => deleteCustomProvider(providerId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.CUSTOM_PROVIDERS] });
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.MARKET_DATA_PROVIDER_SETTINGS] });
     },
     onError: (error: Error) => {
       toast({

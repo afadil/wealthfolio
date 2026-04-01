@@ -386,6 +386,7 @@ fn entity_storage_mapping(entity: &SyncEntity) -> Option<(&'static str, &'static
         SyncEntity::ContributionLimit => Some(("contribution_limits", "id")),
         SyncEntity::Platform => Some(("platforms", "id")),
         SyncEntity::Snapshot => Some(("holdings_snapshots", "id")),
+        SyncEntity::CustomProvider => Some(("market_data_custom_providers", "id")),
     }
 }
 

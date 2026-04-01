@@ -16,7 +16,11 @@ import {
   useRecalculatePortfolioMutation,
   useUpdatePortfolioMutation,
 } from "@/hooks/use-calculate-portfolio";
-import { useCustomProviders, useDeleteCustomProvider } from "@/hooks/use-custom-providers";
+import {
+  useCustomProviders,
+  useDeleteCustomProvider,
+  useUpdateCustomProvider,
+} from "@/hooks/use-custom-providers";
 import { QueryKeys } from "@/lib/query-keys";
 import type { CustomProviderWithSources } from "@/lib/types/custom-provider";
 import { cn } from "@/lib/utils";
@@ -566,6 +570,7 @@ export default function MarketDataSettingsPage() {
     useRecalculatePortfolioMutation();
   const { data: customProviders = [] } = useCustomProviders();
   const { mutate: deleteCustomProvider } = useDeleteCustomProvider();
+  const { mutate: updateCustomProvider } = useUpdateCustomProvider();
 
   const [priorityInputs, setPriorityInputs] = useState<Record<string, number>>({});
   const [customFormOpen, setCustomFormOpen] = useState(false);
@@ -573,33 +578,23 @@ export default function MarketDataSettingsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
-  // Split providers into built-in and custom using the providerType field
-  const { builtinProviders, customSettingsProviders, customScraperErrors } = useMemo(() => {
-    if (!providers)
-      return { builtinProviders: [], customSettingsProviders: [], customScraperErrors: undefined };
+  // Split providers into built-in providers and the CUSTOM_SCRAPER aggregate
+  const { builtinProviders, customScraperErrors } = useMemo(() => {
+    if (!providers) return { builtinProviders: [], customScraperErrors: undefined };
     const builtin: MarketDataProviderSetting[] = [];
-    const custom: MarketDataProviderSetting[] = [];
     let scraperInfo: MarketDataProviderSetting | undefined;
     for (const p of providers) {
       if (p.id === "CUSTOM_SCRAPER") {
         scraperInfo = p;
-      } else if (p.providerType === "custom") {
-        custom.push(p);
       } else {
         builtin.push(p);
       }
     }
-    const sortFn = (a: MarketDataProviderSetting, b: MarketDataProviderSetting) => {
+    builtin.sort((a, b) => {
       if (a.enabled === b.enabled) return a.priority - b.priority;
       return a.enabled ? -1 : 1;
-    };
-    builtin.sort(sortFn);
-    custom.sort(sortFn);
-    return {
-      builtinProviders: builtin,
-      customSettingsProviders: custom,
-      customScraperErrors: scraperInfo,
-    };
+    });
+    return { builtinProviders: builtin, customScraperErrors: scraperInfo };
   }, [providers]);
 
   useEffect(() => {
@@ -898,7 +893,7 @@ export default function MarketDataSettingsPage() {
               </div>
             </div>
           )}
-          {customProviders.length === 0 && customSettingsProviders.length === 0 ? (
+          {customProviders.length === 0 ? (
             <div className="rounded-lg border border-dashed p-6 text-center">
               <Icons.Globe className="text-muted-foreground/50 mx-auto h-8 w-8" />
               <p className="text-muted-foreground mt-2 text-sm">No custom providers configured</p>
@@ -924,8 +919,8 @@ export default function MarketDataSettingsPage() {
                   }}
                   onToggleEnabled={(enabled) => {
                     setTogglingId(cp.id);
-                    updateSettings(
-                      { providerId: cp.id, priority: cp.priority, enabled },
+                    updateCustomProvider(
+                      { providerId: cp.id, payload: { enabled } },
                       { onSettled: () => setTogglingId(null) },
                     );
                   }}
