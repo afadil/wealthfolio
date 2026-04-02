@@ -24,35 +24,69 @@ export function HoldingsConfirmStep() {
   const { headers, parsedRows, mapping, parseConfig, accountId, draftActivities } = state;
   const navigate = useNavigate();
 
-  // Build symbol→assetId lookup from synthetic drafts (set during asset review).
-  // Key by both the resolved symbol AND the raw CSV symbol so that
-  // parseHoldingsSnapshots can match regardless of which symbol it uses.
-  const symbolAssetIds = useMemo(() => {
+  // Build enriched symbol mappings that merge resolutions from the asset review step.
+  // AssetReviewStep updates draftActivities (via applyAssetResolution) but NOT
+  // mapping.symbolMappings. We merge those resolutions back so that:
+  // 1. parseHoldingsSnapshots uses the correct resolved symbols and exchange MICs
+  // 2. The saved mapping template remembers resolutions for future imports
+  // 3. Both existing-asset (assetId) and new-asset (importAssetKey) resolutions are captured
+  const { enrichedMapping, symbolAssetIds } = useMemo(() => {
     const fieldMappings = (mapping?.fieldMappings || {}) as Record<string, string>;
     const symHeader = fieldMappings[HoldingsFormat.SYMBOL];
     const symIndex = symHeader ? headers.indexOf(symHeader) : -1;
 
-    const map: Record<string, string> = {};
-    for (const draft of draftActivities) {
-      if (!draft.assetId) continue;
-      // Key by resolved symbol
-      if (draft.symbol) {
-        map[draft.symbol] = draft.assetId;
+    const mergedSymbolMappings = { ...(mapping?.symbolMappings || {}) };
+    const mergedSymbolMeta: Record<
+      string,
+      {
+        exchangeMic?: string;
+        quoteCcy?: string;
+        instrumentType?: string;
+        symbolName?: string;
       }
-      // Also key by the raw CSV symbol from the original row
-      if (symIndex >= 0) {
+    > = { ...(mapping?.symbolMappingMeta || {}) };
+    const assetIdMap: Record<string, string> = {};
+
+    if (symIndex >= 0) {
+      for (const draft of draftActivities) {
         const rawSym = draft.rawRow[symIndex]?.trim().toUpperCase();
-        if (rawSym && rawSym !== "$CASH") {
-          map[rawSym] = draft.assetId;
+        if (!rawSym || rawSym === "$CASH" || !draft.symbol) continue;
+
+        // Always overwrite with latest resolution from asset review step
+        if (draft.symbol !== rawSym) {
+          mergedSymbolMappings[rawSym] = draft.symbol;
+        }
+        if (draft.exchangeMic || draft.quoteCcy || draft.instrumentType) {
+          mergedSymbolMeta[rawSym] = {
+            exchangeMic: draft.exchangeMic,
+            quoteCcy: draft.quoteCcy,
+            instrumentType: draft.instrumentType,
+            symbolName: draft.symbolName,
+          };
+        }
+
+        // Collect assetId for existing assets (new assets get created by the backend)
+        if (draft.assetId) {
+          assetIdMap[draft.symbol] = draft.assetId;
+          assetIdMap[rawSym] = draft.assetId;
         }
       }
     }
-    return map;
-  }, [draftActivities, mapping?.fieldMappings, headers]);
 
-  // Parse snapshots from CSV data
+    const enriched = mapping
+      ? {
+          ...mapping,
+          symbolMappings: mergedSymbolMappings,
+          symbolMappingMeta: mergedSymbolMeta,
+        }
+      : mapping;
+
+    return { enrichedMapping: enriched, symbolAssetIds: assetIdMap };
+  }, [mapping, draftActivities, headers]);
+
+  // Parse snapshots from CSV data using enriched mappings
   const snapshots = useMemo(() => {
-    const fieldMappings = (mapping?.fieldMappings || {}) as Record<string, string>;
+    const fieldMappings = (enrichedMapping?.fieldMappings || {}) as Record<string, string>;
     return parseHoldingsSnapshots(
       headers,
       parsedRows,
@@ -63,59 +97,11 @@ export function HoldingsConfirmStep() {
         thousandsSeparator: parseConfig.thousandsSeparator,
         defaultCurrency: parseConfig.defaultCurrency,
       },
-      mapping?.symbolMappings,
-      mapping?.symbolMappingMeta,
+      enrichedMapping?.symbolMappings,
+      enrichedMapping?.symbolMappingMeta,
       symbolAssetIds,
     );
-  }, [
-    headers,
-    parsedRows,
-    mapping?.fieldMappings,
-    mapping?.symbolMappings,
-    mapping?.symbolMappingMeta,
-    parseConfig,
-    symbolAssetIds,
-  ]);
-
-  // Build enriched symbol mappings that include resolutions from the asset review step.
-  // AssetReviewStep only updates draftActivities (via applyAssetResolution), not
-  // mapping.symbolMappings, so we merge those resolutions back for template saving.
-  const enrichedMapping = useMemo(() => {
-    if (!mapping) return mapping;
-    const fieldMappings = (mapping.fieldMappings || {}) as Record<string, string>;
-    const symHeader = fieldMappings[HoldingsFormat.SYMBOL];
-    const symIndex = symHeader ? headers.indexOf(symHeader) : -1;
-    if (symIndex === -1) return mapping;
-
-    const mergedSymbolMappings = { ...mapping.symbolMappings };
-    const mergedSymbolMeta = { ...(mapping.symbolMappingMeta || {}) };
-
-    for (const draft of draftActivities) {
-      const rawSym = draft.rawRow[symIndex]?.trim().toUpperCase();
-      if (!rawSym || rawSym === "$CASH" || !draft.symbol) continue;
-      // If the resolved symbol differs from the raw CSV symbol, record the mapping
-      if (draft.symbol !== rawSym && !mergedSymbolMappings[rawSym]) {
-        mergedSymbolMappings[rawSym] = draft.symbol;
-      }
-      if (
-        !mergedSymbolMeta[rawSym] &&
-        (draft.exchangeMic || draft.quoteCcy || draft.instrumentType)
-      ) {
-        mergedSymbolMeta[rawSym] = {
-          exchangeMic: draft.exchangeMic,
-          quoteCcy: draft.quoteCcy,
-          instrumentType: draft.instrumentType,
-          symbolName: draft.symbolName,
-        };
-      }
-    }
-
-    return {
-      ...mapping,
-      symbolMappings: mergedSymbolMappings,
-      symbolMappingMeta: mergedSymbolMeta,
-    };
-  }, [mapping, draftActivities, headers]);
+  }, [headers, parsedRows, enrichedMapping, parseConfig, symbolAssetIds]);
 
   // Import mutation
   const importMutation = useMutation({
