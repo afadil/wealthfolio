@@ -1,15 +1,18 @@
+import { useHapticFeedback } from "@/hooks";
 import { ChartConfig, ChartContainer } from "@wealthfolio/ui/components/ui/chart";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { formatDate } from "@/lib/utils";
 import { AmountDisplay } from "@wealthfolio/ui";
-import { useId, useMemo } from "react";
+import { useId, useMemo, useRef } from "react";
 import { Area, AreaChart, Tooltip, YAxis } from "recharts";
 import type { NetWorthHistoryPoint } from "@/lib/types";
+import type { MouseHandlerDataParam } from "recharts/types/synchronisation/types";
 
 // Goldish orange for net worth chart (consistent across light/dark modes)
 const CHART_COLOR = "hsl(38, 75%, 50%)";
 const NEGATIVE_COLOR = "var(--destructive)";
+const CHART_SCRUB_HAPTIC_INTERVAL_MS = 80;
 
 interface ChartDataPoint {
   date: string;
@@ -113,8 +116,12 @@ interface NetWorthChartProps {
 }
 
 export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
+  const { triggerHaptic } = useHapticFeedback();
   const { isBalanceHidden } = useBalancePrivacy();
   const isMobile = useIsMobileViewport();
+  const isTouchScrubbingRef = useRef(false);
+  const lastHapticLabelRef = useRef<string | number | undefined>(undefined);
+  const lastHapticAtRef = useRef(0);
   const id = useId();
   const fillGradientId = `nwFill-${id}`;
   const strokeGradientId = `nwStroke-${id}`;
@@ -150,8 +157,33 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
 
   const zeroPercent = `${(zeroOffset * 100).toFixed(1)}%`;
 
+  const maybeTriggerScrubHaptic = (chartState: MouseHandlerDataParam) => {
+    if (!isMobile || !isTouchScrubbingRef.current || !chartState.isTooltipActive) {
+      return;
+    }
+
+    const activeLabel = chartState.activeLabel;
+    if (activeLabel == null || activeLabel === lastHapticLabelRef.current) {
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastHapticAtRef.current < CHART_SCRUB_HAPTIC_INTERVAL_MS) {
+      return;
+    }
+
+    lastHapticLabelRef.current = activeLabel;
+    lastHapticAtRef.current = now;
+    triggerHaptic();
+  };
+
+  const resetTouchScrubState = () => {
+    isTouchScrubbingRef.current = false;
+    lastHapticLabelRef.current = undefined;
+  };
+
   return (
-    <ChartContainer config={chartConfig} className="h-full w-full">
+    <ChartContainer config={chartConfig} className="h-full w-full" data-no-swipe-drag>
       <AreaChart
         data={chartData}
         margin={{
@@ -160,6 +192,13 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
           left: 0,
           bottom: 0,
         }}
+        onMouseLeave={resetTouchScrubState}
+        onTouchStart={(chartState) => {
+          isTouchScrubbingRef.current = true;
+          maybeTriggerScrubHaptic(chartState);
+        }}
+        onTouchMove={maybeTriggerScrubHaptic}
+        onTouchEnd={resetTouchScrubState}
       >
         <defs>
           <linearGradient id={fillGradientId} x1="0" y1="0" x2="0" y2="1">
