@@ -33,13 +33,15 @@ impl ImportRunRepository {
     /// Create a new import run
     pub async fn create(&self, import_run: ImportRun) -> Result<ImportRun> {
         self.writer
-            .exec(move |conn| {
+            .exec_tx(move |tx| {
                 let db_model: ImportRunDB = import_run.into();
 
                 diesel::insert_into(import_runs::table)
                     .values(&db_model)
-                    .execute(conn)
+                    .execute(tx.conn())
                     .map_err(StorageError::from)?;
+
+                tx.insert(&db_model)?;
 
                 Ok(db_model.into())
             })
@@ -49,13 +51,15 @@ impl ImportRunRepository {
     /// Update an import run
     pub async fn update(&self, import_run: ImportRun) -> Result<ImportRun> {
         self.writer
-            .exec(move |conn| {
+            .exec_tx(move |tx| {
                 let db_model: ImportRunDB = import_run.into();
 
                 diesel::update(import_runs::table.find(&db_model.id))
                     .set(&db_model)
-                    .execute(conn)
+                    .execute(tx.conn())
                     .map_err(StorageError::from)?;
+
+                tx.update(&db_model)?;
 
                 Ok(db_model.into())
             })

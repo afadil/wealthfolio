@@ -64,6 +64,13 @@ pub fn should_sync_outbox_for_activity(
         && source_record_id.is_none_or(|value| value.trim().is_empty())
 }
 
+/// Import runs sync only user-initiated CSV/manual runs, not broker sync runs.
+pub fn should_sync_outbox_for_import_run(run_type: &str, source_system: &str) -> bool {
+    run_type.eq_ignore_ascii_case("IMPORT")
+        && (source_system.eq_ignore_ascii_case("CSV")
+            || source_system.eq_ignore_ascii_case("MANUAL"))
+}
+
 pub fn should_sync_outbox_for_snapshot_source(source: SnapshotSource) -> bool {
     matches!(
         source,
@@ -176,6 +183,23 @@ mod tests {
         assert!(!should_sync_outbox_for_snapshot_source(
             SnapshotSource::Calculated
         ));
+    }
+
+    #[test]
+    fn import_run_outbox_rules_only_sync_user_initiated_runs() {
+        // CSV imports sync
+        assert!(should_sync_outbox_for_import_run("IMPORT", "csv"));
+        assert!(should_sync_outbox_for_import_run("IMPORT", "CSV"));
+        // Manual imports sync
+        assert!(should_sync_outbox_for_import_run("IMPORT", "manual"));
+        assert!(should_sync_outbox_for_import_run("IMPORT", "MANUAL"));
+        // Broker sync runs do NOT sync
+        assert!(!should_sync_outbox_for_import_run("SYNC", "snaptrade"));
+        assert!(!should_sync_outbox_for_import_run("SYNC", "plaid"));
+        assert!(!should_sync_outbox_for_import_run("SYNC", "csv"));
+        // Import from broker sources do NOT sync
+        assert!(!should_sync_outbox_for_import_run("IMPORT", "snaptrade"));
+        assert!(!should_sync_outbox_for_import_run("IMPORT", "plaid"));
     }
 
     #[test]
