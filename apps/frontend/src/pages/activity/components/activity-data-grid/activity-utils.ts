@@ -1,5 +1,5 @@
 import { isCashActivity, isCashTransfer, isIncomeActivity } from "@/lib/activity-utils";
-import { ActivityType } from "@/lib/constants";
+import { ACTIVITY_SUBTYPES, ActivityType } from "@/lib/constants";
 import type { Account } from "@/lib/types";
 import { normalizeDecimalString, parseLocalDateTime } from "@/lib/utils";
 import type {
@@ -20,6 +20,12 @@ const NUMERIC_FIELDS = new Set(["quantity", "unitPrice", "amount", "fee", "fxRat
 const isTransferActivity = (activityType: string | undefined): boolean => {
   return activityType === ActivityType.TRANSFER_IN || activityType === ActivityType.TRANSFER_OUT;
 };
+
+/** Subtypes where amount = quantity × unitPrice (DRIP, DIVIDEND_IN_KIND, STAKING_REWARD). */
+const isAssetBackedSubtype = (subtype: string | undefined): boolean =>
+  subtype === ACTIVITY_SUBTYPES.DRIP ||
+  subtype === ACTIVITY_SUBTYPES.DIVIDEND_IN_KIND ||
+  subtype === ACTIVITY_SUBTYPES.STAKING_REWARD;
 
 const isAlwaysCashActivity = (activityType: string | undefined): boolean => {
   if (!activityType) {
@@ -216,7 +222,15 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
       updated = { ...updated, date: value };
     }
   } else if (field === "quantity") {
-    updated = { ...updated, quantity: normalizedDecimalOrNull(value) };
+    const newQty = normalizedDecimalOrNull(value);
+    updated = { ...updated, quantity: newQty };
+    if (isAssetBackedSubtype(updated.subtype) && newQty != null && updated.unitPrice != null) {
+      const q = parseFloat(newQty);
+      const p = parseFloat(updated.unitPrice);
+      if (q > 0 && p > 0) {
+        updated = { ...updated, amount: String(q * p) };
+      }
+    }
     updated = applySplitDefaults(updated);
   } else if (field === "unitPrice") {
     const newUnitPrice = normalizedDecimalOrNull(value);
@@ -225,7 +239,14 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
       newUnitPrice != null &&
       (isAlwaysCashActivity(updated.activityType) || isIncomeActivity(updated.activityType))
     ) {
-      updated = { ...updated, amount: newUnitPrice };
+      if (isAssetBackedSubtype(updated.subtype)) {
+        const qty = updated.quantity != null ? parseFloat(updated.quantity) : NaN;
+        if (qty > 0) {
+          updated = { ...updated, amount: String(qty * parseFloat(newUnitPrice)) };
+        }
+      } else {
+        updated = { ...updated, amount: newUnitPrice };
+      }
     }
     updated = applySplitDefaults(updated);
   } else if (field === "amount") {
@@ -284,8 +305,15 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
   } else if (field === "fxRate") {
     updated = { ...updated, fxRate: normalizeDecimalString(value) };
   } else if (field === "subtype") {
-    // Subtype is optional, can be string or null/undefined
-    updated = { ...updated, subtype: typeof value === "string" && value ? value : undefined };
+    const newSubtype = typeof value === "string" && value ? value : undefined;
+    updated = { ...updated, subtype: newSubtype };
+    if (isAssetBackedSubtype(newSubtype) && updated.quantity != null && updated.unitPrice != null) {
+      const q = parseFloat(updated.quantity);
+      const p = parseFloat(updated.unitPrice);
+      if (q > 0 && p > 0) {
+        updated = { ...updated, amount: String(q * p) };
+      }
+    }
   } else if (field === "isExternal") {
     // isExternal flag for TRANSFER_IN/TRANSFER_OUT (stored in metadata.flow.is_external)
     updated = { ...updated, isExternal: Boolean(value) };
