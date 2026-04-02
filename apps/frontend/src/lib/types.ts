@@ -713,13 +713,7 @@ export interface SettingsContextType {
   setAccountsGrouped: (value: boolean) => void;
 }
 
-export type GoalType =
-  | "retirement"
-  | "education"
-  | "wedding"
-  | "home"
-  | "emergency_fund"
-  | "custom_save_up";
+export type GoalType = "retirement" | "education" | "wedding" | "home" | "car" | "custom_save_up";
 export type GoalLifecycle = "draft" | "active" | "achieved" | "archived" | "paused";
 export type GoalHealth = "on_track" | "at_risk" | "off_track" | "not_applicable";
 export type PlanKind = "retirement" | "save_up";
@@ -1996,4 +1990,75 @@ export interface CheckHoldingsImportResult {
   symbols: SymbolCheckResult[];
   /** Validation errors found in the import data */
   validationErrors: string[];
+}
+
+// ─── Planning DTOs (backend-computed overviews) ──────────────────
+
+export interface RetirementOverview {
+  analysisMode: string;
+  status: string;
+  desiredFireAge: number;
+  fiAge: number | null;
+  fundedAtGoalAge: boolean;
+  portfolioNow: number;
+  netFireTarget: number;
+  grossFireTarget: number;
+  portfolioAtGoalAge: number;
+  requiredCapitalAtGoalAge: number;
+  shortfallAtGoalAge: number;
+  surplusAtGoalAge: number;
+  requiredAdditionalMonthlyContribution: number;
+  suggestedGoalAgeIfUnchanged: number | null;
+  coastAmountToday: number;
+  coastReached: boolean;
+  progress: number;
+  budgetBreakdown: BudgetBreakdown;
+  trajectory: RetirementTrajectoryPoint[];
+}
+
+export interface RetirementTrajectoryPoint {
+  age: number;
+  year: number;
+  phase: string;
+  portfolioStart: number;
+  annualContribution: number;
+  annualIncome: number;
+  annualExpenses: number;
+  netWithdrawalFromPortfolio: number;
+  portfolioEnd: number;
+  requiredCapital: number;
+  pensionAssets: number;
+}
+
+export interface BudgetBreakdown {
+  totalMonthlyBudget: number;
+  monthlyLivingExpenses: number;
+  monthlyHealthcare: number;
+  monthlyPortfolioWithdrawal: number;
+  incomeStreams: BudgetStreamItem[];
+}
+
+export interface BudgetStreamItem {
+  label: string;
+  monthlyAmount: number;
+  percentageOfBudget: number;
+}
+
+export interface SaveUpOverviewDTO {
+  currentValue: number;
+  targetAmount: number;
+  progress: number;
+  health: string;
+  projectedValueAtTargetDate: number;
+  requiredMonthlyContribution: number;
+  projectedCompletionDate: string | null;
+  trajectory: SaveUpTrajectoryPointDTO[];
+}
+
+export interface SaveUpTrajectoryPointDTO {
+  date: string;
+  nominal: number;
+  optimistic: number;
+  pessimistic: number;
+  target: number;
 }

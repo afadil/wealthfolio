@@ -2,6 +2,8 @@ import {
   getGoal,
   getGoalFunding,
   getGoalPlan,
+  getRetirementOverview,
+  getSaveUpOverview,
   saveGoalFunding,
   saveGoalPlan,
   refreshGoalSummary,
@@ -12,7 +14,9 @@ import type {
   GoalFundingRule,
   GoalFundingRuleInput,
   GoalPlan,
+  RetirementOverview,
   SaveGoalPlan,
+  SaveUpOverviewDTO,
 } from "@/lib/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -52,6 +56,8 @@ export function useGoalPlanMutations(goalId: string) {
     queryClient.invalidateQueries({ queryKey: QueryKeys.goalPlan(goalId) });
     queryClient.invalidateQueries({ queryKey: QueryKeys.goal(goalId) });
     queryClient.invalidateQueries({ queryKey: [QueryKeys.GOALS] });
+    queryClient.invalidateQueries({ queryKey: QueryKeys.saveUpOverview(goalId) });
+    queryClient.invalidateQueries({ queryKey: QueryKeys.retirementOverview(goalId) });
   };
 
   const savePlanMutation = useMutation({
@@ -81,4 +87,20 @@ export function useGoalPlanMutations(goalId: string) {
   });
 
   return { savePlanMutation, saveFundingMutation, refreshSummaryMutation };
+}
+
+export function useRetirementOverview(goalId: string | undefined) {
+  return useQuery<RetirementOverview, Error>({
+    queryKey: QueryKeys.retirementOverview(goalId ?? ""),
+    queryFn: () => getRetirementOverview(goalId!),
+    enabled: !!goalId,
+  });
+}
+
+export function useSaveUpOverview(goalId: string | undefined) {
+  return useQuery<SaveUpOverviewDTO, Error>({
+    queryKey: QueryKeys.saveUpOverview(goalId ?? ""),
+    queryFn: () => getSaveUpOverview(goalId!),
+    enabled: !!goalId,
+  });
 }

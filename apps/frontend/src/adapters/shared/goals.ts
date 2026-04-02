@@ -5,7 +5,9 @@ import type {
   GoalFundingRuleInput,
   GoalPlan,
   NewGoal,
+  RetirementOverview,
   SaveGoalPlan,
+  SaveUpOverviewDTO,
 } from "@/lib/types";
 
 import { invoke, logger } from "./platform";
@@ -117,6 +119,24 @@ export const refreshGoalSummary = async (goalId: string): Promise<Goal> => {
     return await invoke<Goal>("refresh_goal_summary", { goalId });
   } catch (error) {
     logger.error("Error refreshing goal summary.");
+    throw error;
+  }
+};
+
+export const getRetirementOverview = async (goalId: string): Promise<RetirementOverview> => {
+  try {
+    return await invoke<RetirementOverview>("get_retirement_overview", { goalId });
+  } catch (error) {
+    logger.error("Error fetching retirement overview.");
+    throw error;
+  }
+};
+
+export const getSaveUpOverview = async (goalId: string): Promise<SaveUpOverviewDTO> => {
+  try {
+    return await invoke<SaveUpOverviewDTO>("get_save_up_overview", { goalId });
+  } catch (error) {
+    logger.error("Error fetching save-up overview.");
     throw error;
   }
 };

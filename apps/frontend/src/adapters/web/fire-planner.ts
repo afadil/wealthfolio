@@ -7,14 +7,7 @@ import type {
   SensitivityResult,
   StrategyComparisonResult,
 } from "@/pages/fire-planner/types";
-import {
-  projectFireDate,
-  runMonteCarlo,
-  runScenarioAnalysis,
-  runSequenceOfReturnsRisk,
-  runSensitivityAnalysis,
-  runStrategyComparison,
-} from "@/pages/fire-planner/lib/fire-math";
+import { invoke } from "./core";
 
 const STORAGE_KEY = "fire_planner_settings";
 
@@ -36,24 +29,29 @@ export const calculateFireProjection = async (
   settings: FireSettings,
   currentPortfolio: number,
 ): Promise<FireProjection> => {
-  return projectFireDate(settings, currentPortfolio);
+  return invoke<FireProjection>("calculate_fire_projection", { settings, currentPortfolio });
 };
-
-const WEB_MAX_SIMS = 10_000;
 
 export const runFireMonteCarlo = async (
   settings: FireSettings,
   currentPortfolio: number,
-  nSims = WEB_MAX_SIMS,
+  nSims = 100_000,
 ): Promise<MonteCarloResult> => {
-  return runMonteCarlo(settings, currentPortfolio, Math.min(nSims, WEB_MAX_SIMS));
+  return invoke<MonteCarloResult>("run_fire_monte_carlo", {
+    settings,
+    currentPortfolio,
+    nSims,
+  });
 };
 
 export const runFireScenarioAnalysis = async (
   settings: FireSettings,
   currentPortfolio: number,
 ): Promise<ScenarioResult[]> => {
-  return runScenarioAnalysis(settings, currentPortfolio);
+  return invoke<ScenarioResult[]>("run_fire_scenario_analysis", {
+    settings,
+    currentPortfolio,
+  });
 };
 
 export const runFireSorr = async (
@@ -61,14 +59,21 @@ export const runFireSorr = async (
   portfolioAtFire: number,
   retirementStartAge: number,
 ): Promise<SorrScenario[]> => {
-  return runSequenceOfReturnsRisk(settings, portfolioAtFire, retirementStartAge);
+  return invoke<SorrScenario[]>("run_fire_sorr", {
+    settings,
+    portfolioAtFire,
+    retirementStartAge,
+  });
 };
 
 export const runFireSensitivity = async (
   settings: FireSettings,
   currentPortfolio: number,
 ): Promise<SensitivityResult> => {
-  return runSensitivityAnalysis(settings, currentPortfolio);
+  return invoke<SensitivityResult>("run_fire_sensitivity", {
+    settings,
+    currentPortfolio,
+  });
 };
 
 export const runFireStrategyComparison = async (
@@ -76,5 +81,9 @@ export const runFireStrategyComparison = async (
   currentPortfolio: number,
   nSims = 5_000,
 ): Promise<StrategyComparisonResult> => {
-  return runStrategyComparison(settings, currentPortfolio, nSims);
+  return invoke<StrategyComparisonResult>("run_fire_strategy_comparison", {
+    settings,
+    currentPortfolio,
+    nSims,
+  });
 };
