@@ -21,22 +21,58 @@ import {
   XAxis,
   YAxis,
 } from "@wealthfolio/ui/chart";
-import { useState, useMemo, useEffect } from "react";
-import type { FireSettings, MonteCarloResult } from "../types";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import type {
+  FireSettings,
+  MonteCarloResult,
+  ScenarioResult,
+  SorrScenario,
+  SensitivityResult,
+} from "../types";
+import type { RetirementOverview } from "@/lib/types";
 import {
-  calculateNetFireTarget,
-  resolveDcPayouts,
-  runScenarioAnalysis,
-  runSequenceOfReturnsRisk,
-  runSensitivityAnalysis,
-  projectFireDate,
-} from "../lib/fire-math";
-import { runFireMonteCarlo, runFireStrategyComparison } from "@/adapters";
+  runFireMonteCarlo,
+  runFireStrategyComparison,
+  runFireScenarioAnalysis,
+  runFireSorr,
+  runFireSensitivity,
+} from "@/adapters";
 
 interface Props {
   settings: FireSettings;
   totalValue: number;
   isLoading: boolean;
+  retirementOverview?: RetirementOverview;
+}
+
+/**
+ * Resolve DC stream monthly payouts at a given retirement age.
+ * Pure display helper: balance * (1+r)^years * swr / 12.
+ */
+function resolveDcPayouts(
+  streams: FireSettings["additionalIncomeStreams"],
+  currentAge: number,
+  retirementAge: number,
+  swr: number,
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const s of streams) {
+    if (s.streamType !== "dc") continue;
+    const totalYears = Math.max(0, s.startAge - currentAge);
+    const contribYears = Math.max(0, Math.min(s.startAge, retirementAge) - currentAge);
+    const growthOnlyYears = totalYears - contribYears;
+    const r = s.accumulationReturn ?? 0.04;
+    const initial = s.currentValue ?? 0;
+    const monthly = s.monthlyContribution ?? 0;
+    const fvLump = initial * Math.pow(1 + r, totalYears);
+    const fvAnnuityAtStop =
+      r > 1e-9
+        ? (monthly * 12 * (Math.pow(1 + r, contribYears) - 1)) / r
+        : monthly * 12 * contribYears;
+    const fvAnnuity = fvAnnuityAtStop * Math.pow(1 + r, growthOnlyYears);
+    map.set(s.id, ((fvLump + fvAnnuity) * swr) / 12);
+  }
+  return map;
 }
 
 function fmt(value: number, currency: string) {
@@ -54,9 +90,11 @@ function fmtCompact(value: number) {
 function MonteCarloSection({
   settings,
   totalValue,
+  fireTarget,
 }: {
   settings: FireSettings;
   totalValue: number;
+  fireTarget: number;
 }) {
   const [result, setResult] = useState<MonteCarloResult | null>(null);
   const [running, setRunning] = useState(false);
@@ -67,10 +105,6 @@ function MonteCarloSection({
   } | null>(null);
   const [comparing, setComparing] = useState(false);
   const [compareError, setCompareError] = useState<string | null>(null);
-  const fireTarget = useMemo(
-    () => calculateNetFireTarget(settings, settings.targetFireAge),
-    [settings],
-  );
   const strategy = settings.withdrawalStrategy ?? "constant-dollar";
 
   // Invalidate stale results whenever settings change
@@ -349,14 +383,34 @@ function MonteCarloSection({
 // ─── Scenario Analysis Section ─────────────────────────────────────────────────
 
 function ScenarioSection({ settings, totalValue }: { settings: FireSettings; totalValue: number }) {
-  const scenarios = useMemo(
-    () => runScenarioAnalysis(settings, totalValue),
-    [settings, totalValue],
-  );
+  const [scenarios, setScenarios] = useState<ScenarioResult[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await runFireScenarioAnalysis(settings, totalValue);
+      setScenarios(res);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [settings, totalValue]);
+
+  // Auto-run on mount and when settings change
+  useEffect(() => {
+    setScenarios(null);
+    setError(null);
+    run();
+  }, [run]);
 
   const COLORS = ["#ef4444", "#3b82f6", "#22c55e"];
 
   const chartData = useMemo(() => {
+    if (!scenarios) return [];
     const maxLen = Math.max(...scenarios.map((s) => s.yearByYear.length));
     return Array.from({ length: maxLen }, (_, i) => {
       const entry: Record<string, number | string> = {
@@ -376,75 +430,86 @@ function ScenarioSection({ settings, totalValue }: { settings: FireSettings; tot
         <p className="text-muted-foreground text-xs">Same settings, three return assumptions</p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <ResponsiveContainer width="100%" height={260}>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="age" />
-            <YAxis tickFormatter={fmtCompact} />
-            <Tooltip
-              formatter={(value: number | undefined) => fmt(value ?? 0, settings.currency)}
-              labelFormatter={(age) => `Age ${age}`}
-            />
-            <Legend />
-            {scenarios.map((s, i) =>
-              s.fireAge != null ? (
-                <ReferenceLine
-                  key={`fire-${s.label}`}
-                  x={s.fireAge}
-                  stroke={COLORS[i]}
-                  strokeWidth={2}
-                  strokeDasharray="5 3"
-                  label={{
-                    value: `${s.fireAge}`,
-                    position: i === 0 ? "insideTopRight" : i === 1 ? "top" : "insideTopLeft",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    fill: COLORS[i],
-                  }}
+        {error && <p className="text-destructive py-2 text-sm">{error}</p>}
+        {loading && (
+          <div className="space-y-2 py-4">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-[200px] w-full" />
+          </div>
+        )}
+        {!loading && scenarios && (
+          <>
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="age" />
+                <YAxis tickFormatter={fmtCompact} />
+                <Tooltip
+                  formatter={(value: number | undefined) => fmt(value ?? 0, settings.currency)}
+                  labelFormatter={(age) => `Age ${age}`}
                 />
-              ) : null,
-            )}
-            {scenarios.map((s, i) => (
-              <Line
-                key={s.label}
-                dataKey={s.label}
-                stroke={COLORS[i]}
-                dot={false}
-                strokeWidth={2}
-              />
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
+                <Legend />
+                {scenarios.map((s, i) =>
+                  s.fireAge != null ? (
+                    <ReferenceLine
+                      key={`fire-${s.label}`}
+                      x={s.fireAge}
+                      stroke={COLORS[i]}
+                      strokeWidth={2}
+                      strokeDasharray="5 3"
+                      label={{
+                        value: `${s.fireAge}`,
+                        position: i === 0 ? "insideTopRight" : i === 1 ? "top" : "insideTopLeft",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        fill: COLORS[i],
+                      }}
+                    />
+                  ) : null,
+                )}
+                {scenarios.map((s, i) => (
+                  <Line
+                    key={s.label}
+                    dataKey={s.label}
+                    stroke={COLORS[i]}
+                    dot={false}
+                    strokeWidth={2}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
 
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="text-muted-foreground border-b">
-              <th className="pb-2 text-left">Scenario</th>
-              <th className="pb-2 text-right">Return</th>
-              <th className="pb-2 text-right">FIRE Age</th>
-              <th className="pb-2 text-right">Portfolio at Horizon</th>
-            </tr>
-          </thead>
-          <tbody>
-            {scenarios.map((s, i) => (
-              <tr key={s.label} className="border-b last:border-0">
-                <td className="py-1.5 font-medium" style={{ color: COLORS[i] }}>
-                  {s.label}
-                </td>
-                <td className="py-1.5 text-right">{(s.annualReturn * 100).toFixed(1)}%</td>
-                <td
-                  className="py-1.5 text-right font-semibold"
-                  style={{ color: s.fireAge ? COLORS[i] : undefined }}
-                >
-                  {s.fireAge ?? "—"}
-                </td>
-                <td className="py-1.5 text-right">
-                  {fmt(s.portfolioAtHorizon, settings.currency)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-muted-foreground border-b">
+                  <th className="pb-2 text-left">Scenario</th>
+                  <th className="pb-2 text-right">Return</th>
+                  <th className="pb-2 text-right">FIRE Age</th>
+                  <th className="pb-2 text-right">Portfolio at Horizon</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scenarios.map((s, i) => (
+                  <tr key={s.label} className="border-b last:border-0">
+                    <td className="py-1.5 font-medium" style={{ color: COLORS[i] }}>
+                      {s.label}
+                    </td>
+                    <td className="py-1.5 text-right">{(s.annualReturn * 100).toFixed(1)}%</td>
+                    <td
+                      className="py-1.5 text-right font-semibold"
+                      style={{ color: s.fireAge ? COLORS[i] : undefined }}
+                    >
+                      {s.fireAge ?? "—"}
+                    </td>
+                    <td className="py-1.5 text-right">
+                      {fmt(s.portfolioAtHorizon, settings.currency)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
       </CardContent>
     </Card>
   );
@@ -655,12 +720,28 @@ function SensitivitySection({
   settings: FireSettings;
   totalValue: number;
 }) {
-  const sensitivity = useMemo(
-    () => runSensitivityAnalysis(settings, totalValue),
-    [settings, totalValue],
-  );
+  const [sensitivity, setSensitivity] = useState<SensitivityResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const { contribution, swr } = sensitivity;
+  const run = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await runFireSensitivity(settings, totalValue);
+      setSensitivity(res);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [settings, totalValue]);
+
+  useEffect(() => {
+    setSensitivity(null);
+    setError(null);
+    run();
+  }, [run]);
 
   function cellBg(fireAge: number | null): string {
     if (fireAge === null) return "bg-red-100 dark:bg-red-950/30";
@@ -677,6 +758,8 @@ function SensitivitySection({
     return Math.abs(ret - settings.expectedAnnualReturn) < 0.001;
   }
 
+  const { contribution, swr } = sensitivity ?? {};
+
   return (
     <Card>
       <CardHeader>
@@ -687,96 +770,107 @@ function SensitivitySection({
         </p>
       </CardHeader>
       <CardContent className="space-y-6 overflow-x-auto">
-        <div>
-          <p className="mb-2 text-xs font-semibold">FIRE Age (monthly contribution × return)</p>
-          <table className="text-xs">
-            <thead>
-              <tr>
-                <th className="text-muted-foreground pr-2 text-left font-normal">
-                  Monthly ↓ / Return →
-                </th>
-                {contribution.returnColumns.map((r) => (
-                  <th
-                    key={r}
-                    className={`px-2 py-1 text-center ${isCurrentReturn(r) ? "font-bold text-blue-600" : "text-muted-foreground font-normal"}`}
-                  >
-                    {(r * 100).toFixed(0)}%
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {contribution.contributionRows.map((contrib, ri) => (
-                <tr key={contrib}>
-                  <td
-                    className={`py-1 pr-2 ${isCurrentContrib(contrib) ? "font-bold text-blue-600" : "text-muted-foreground"}`}
-                  >
-                    {formatAmount(contrib, settings.currency)}
-                  </td>
-                  {contribution.returnColumns.map((r, ci) => {
-                    const age = contribution.fireAges[ri][ci];
-                    const highlight = isCurrentContrib(contrib) && isCurrentReturn(r);
-                    return (
-                      <td
+        {error && <p className="text-destructive py-2 text-sm">{error}</p>}
+        {loading && (
+          <div className="space-y-2 py-4">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-[120px] w-full" />
+          </div>
+        )}
+        {!loading && contribution && swr && (
+          <>
+            <div>
+              <p className="mb-2 text-xs font-semibold">FIRE Age (monthly contribution × return)</p>
+              <table className="text-xs">
+                <thead>
+                  <tr>
+                    <th className="text-muted-foreground pr-2 text-left font-normal">
+                      Monthly ↓ / Return →
+                    </th>
+                    {contribution.returnColumns.map((r) => (
+                      <th
                         key={r}
-                        className={`px-2 py-1 text-center ${cellBg(age)} ${highlight ? "ring-2 ring-blue-500" : ""}`}
+                        className={`px-2 py-1 text-center ${isCurrentReturn(r) ? "font-bold text-blue-600" : "text-muted-foreground font-normal"}`}
                       >
-                        {age ?? `>${settings.planningHorizonAge}`}
+                        {(r * 100).toFixed(0)}%
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {contribution.contributionRows.map((contrib, ri) => (
+                    <tr key={contrib}>
+                      <td
+                        className={`py-1 pr-2 ${isCurrentContrib(contrib) ? "font-bold text-blue-600" : "text-muted-foreground"}`}
+                      >
+                        {formatAmount(contrib, settings.currency)}
                       </td>
+                      {contribution.returnColumns.map((r, ci) => {
+                        const age = contribution.fireAges[ri][ci];
+                        const highlight = isCurrentContrib(contrib) && isCurrentReturn(r);
+                        return (
+                          <td
+                            key={r}
+                            className={`px-2 py-1 text-center ${cellBg(age)} ${highlight ? "ring-2 ring-blue-500" : ""}`}
+                          >
+                            {age ?? `>${settings.planningHorizonAge}`}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-semibold">FIRE Age (SWR × return)</p>
+              <table className="text-xs">
+                <thead>
+                  <tr>
+                    <th className="text-muted-foreground pr-2 text-left font-normal">
+                      SWR ↓ / Return →
+                    </th>
+                    {swr.returnColumns.map((r) => (
+                      <th
+                        key={r}
+                        className={`px-2 py-1 text-center ${isCurrentReturn(r) ? "font-bold text-blue-600" : "text-muted-foreground font-normal"}`}
+                      >
+                        {(r * 100).toFixed(0)}%
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {swr.swrRows.map((rate, ri) => {
+                    const isCurrentSWR = Math.abs(rate - settings.safeWithdrawalRate) < 0.001;
+                    return (
+                      <tr key={rate}>
+                        <td
+                          className={`py-1 pr-2 ${isCurrentSWR ? "font-bold text-blue-600" : "text-muted-foreground"}`}
+                        >
+                          {(rate * 100).toFixed(1)}%
+                        </td>
+                        {swr.returnColumns.map((r, ci) => {
+                          const age = swr.fireAges[ri][ci];
+                          const highlight = isCurrentSWR && isCurrentReturn(r);
+                          return (
+                            <td
+                              key={r}
+                              className={`px-2 py-1 text-center ${cellBg(age)} ${highlight ? "ring-2 ring-blue-500" : ""}`}
+                            >
+                              {age ?? `>${settings.planningHorizonAge}`}
+                            </td>
+                          );
+                        })}
+                      </tr>
                     );
                   })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div>
-          <p className="mb-2 text-xs font-semibold">FIRE Age (SWR × return)</p>
-          <table className="text-xs">
-            <thead>
-              <tr>
-                <th className="text-muted-foreground pr-2 text-left font-normal">
-                  SWR ↓ / Return →
-                </th>
-                {swr.returnColumns.map((r) => (
-                  <th
-                    key={r}
-                    className={`px-2 py-1 text-center ${isCurrentReturn(r) ? "font-bold text-blue-600" : "text-muted-foreground font-normal"}`}
-                  >
-                    {(r * 100).toFixed(0)}%
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {swr.swrRows.map((rate, ri) => {
-                const isCurrentSWR = Math.abs(rate - settings.safeWithdrawalRate) < 0.001;
-                return (
-                  <tr key={rate}>
-                    <td
-                      className={`py-1 pr-2 ${isCurrentSWR ? "font-bold text-blue-600" : "text-muted-foreground"}`}
-                    >
-                      {(rate * 100).toFixed(1)}%
-                    </td>
-                    {swr.returnColumns.map((r, ci) => {
-                      const age = swr.fireAges[ri][ci];
-                      const highlight = isCurrentSWR && isCurrentReturn(r);
-                      return (
-                        <td
-                          key={r}
-                          className={`px-2 py-1 text-center ${cellBg(age)} ${highlight ? "ring-2 ring-blue-500" : ""}`}
-                        >
-                          {age ?? `>${settings.planningHorizonAge}`}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );
@@ -784,20 +878,49 @@ function SensitivitySection({
 
 // ─── Sequence of Returns Risk Section ─────────────────────────────────────────
 
-function SorrSection({ settings, totalValue }: { settings: FireSettings; totalValue: number }) {
-  const proj = useMemo(() => projectFireDate(settings, totalValue), [settings, totalValue]);
-  const fireReached = proj.fundedAtRetirement;
-  const portfolioAtFire = proj.portfolioAtFire > 0 ? proj.portfolioAtFire : totalValue;
-  const retirementStartAge = proj.fireAge ?? settings.targetFireAge;
+function SorrSection({
+  settings,
+  totalValue,
+  portfolioAtFire: portfolioAtFireProp,
+  retirementStartAge: retirementStartAgeProp,
+  fireReached,
+}: {
+  settings: FireSettings;
+  totalValue: number;
+  portfolioAtFire: number;
+  retirementStartAge: number;
+  fireReached: boolean;
+}) {
+  const portfolioAtFire = portfolioAtFireProp > 0 ? portfolioAtFireProp : totalValue;
+  const retirementStartAge = retirementStartAgeProp;
 
-  const scenarios = useMemo(
-    () => runSequenceOfReturnsRisk(settings, portfolioAtFire, retirementStartAge),
-    [settings, portfolioAtFire, retirementStartAge],
-  );
+  const [scenarios, setScenarios] = useState<SorrScenario[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await runFireSorr(settings, portfolioAtFire, retirementStartAge);
+      setScenarios(res);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [settings, portfolioAtFire, retirementStartAge]);
+
+  useEffect(() => {
+    setScenarios(null);
+    setError(null);
+    run();
+  }, [run]);
 
   const COLORS = ["#3b82f6", "#ef4444", "#f97316", "#a855f7", "#64748b"];
 
   const chartData = useMemo(() => {
+    if (!scenarios) return [];
     const maxLen = Math.max(...scenarios.map((s) => s.portfolioPath.length));
     return Array.from({ length: maxLen }, (_, i) => {
       const entry: Record<string, number | string> = {
@@ -834,6 +957,7 @@ function SorrSection({ settings, totalValue }: { settings: FireSettings; totalVa
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
+        {error && <p className="text-destructive py-2 text-sm">{error}</p>}
         {!fireReached && (
           <div className="rounded bg-yellow-50 p-3 text-xs dark:bg-yellow-950/20">
             FIRE has not been reached within your planning horizon. Results below show crash
@@ -847,54 +971,68 @@ function SorrSection({ settings, totalValue }: { settings: FireSettings; totalVa
             sequence-of-returns risk.
           </div>
         )}
+        {loading && (
+          <div className="space-y-2 py-4">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-[200px] w-full" />
+          </div>
+        )}
+        {!loading && scenarios && (
+          <>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-muted-foreground border-b">
+                  <th className="pb-2 text-left">Scenario</th>
+                  <th className="pb-2 text-right">Final Value</th>
+                  <th className="pb-2 text-center">
+                    Survived to age {settings.planningHorizonAge}?
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {scenarios.map((s, i) => (
+                  <tr key={s.label} className="border-b last:border-0">
+                    <td className="py-1.5 font-medium" style={{ color: COLORS[i] }}>
+                      {s.label}
+                    </td>
+                    <td className="py-1.5 text-right">{fmt(s.finalValue, settings.currency)}</td>
+                    <td className="py-1.5 text-center">
+                      <Badge variant={s.survived ? "default" : "destructive"} className="text-xs">
+                        {s.survived ? "Yes" : "No"}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="text-muted-foreground border-b">
-              <th className="pb-2 text-left">Scenario</th>
-              <th className="pb-2 text-right">Final Value</th>
-              <th className="pb-2 text-center">Survived to age {settings.planningHorizonAge}?</th>
-            </tr>
-          </thead>
-          <tbody>
-            {scenarios.map((s, i) => (
-              <tr key={s.label} className="border-b last:border-0">
-                <td className="py-1.5 font-medium" style={{ color: COLORS[i] }}>
-                  {s.label}
-                </td>
-                <td className="py-1.5 text-right">{fmt(s.finalValue, settings.currency)}</td>
-                <td className="py-1.5 text-center">
-                  <Badge variant={s.survived ? "default" : "destructive"} className="text-xs">
-                    {s.survived ? "Yes" : "No"}
-                  </Badge>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <ResponsiveContainer width="100%" height={260}>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="age" label={{ value: "Age", position: "insideBottom", offset: -2 }} />
-            <YAxis tickFormatter={fmtCompact} />
-            <Tooltip
-              formatter={(value: number | undefined) => fmt(value ?? 0, settings.currency)}
-              labelFormatter={(age) => `Age ${age}`}
-            />
-            <Legend />
-            {scenarios.map((s, i) => (
-              <Line
-                key={s.label}
-                dataKey={s.label}
-                stroke={COLORS[i]}
-                dot={false}
-                strokeWidth={s.label === "Base (constant)" ? 2 : 1.5}
-                strokeDasharray={s.label === "Base (constant)" ? undefined : "4 2"}
-              />
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="age"
+                  label={{ value: "Age", position: "insideBottom", offset: -2 }}
+                />
+                <YAxis tickFormatter={fmtCompact} />
+                <Tooltip
+                  formatter={(value: number | undefined) => fmt(value ?? 0, settings.currency)}
+                  labelFormatter={(age) => `Age ${age}`}
+                />
+                <Legend />
+                {scenarios.map((s, i) => (
+                  <Line
+                    key={s.label}
+                    dataKey={s.label}
+                    stroke={COLORS[i]}
+                    dot={false}
+                    strokeWidth={s.label === "Base (constant)" ? 2 : 1.5}
+                    strokeDasharray={s.label === "Base (constant)" ? undefined : "4 2"}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </>
+        )}
       </CardContent>
     </Card>
   );
@@ -902,9 +1040,16 @@ function SorrSection({ settings, totalValue }: { settings: FireSettings; totalVa
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
-export default function SimulationsPage({ settings, totalValue, isLoading }: Props) {
-  const projection = useMemo(() => projectFireDate(settings, totalValue), [settings, totalValue]);
-  const actualFireAge = projection.fireAge ?? settings.targetFireAge;
+export default function SimulationsPage({
+  settings,
+  totalValue,
+  isLoading,
+  retirementOverview,
+}: Props) {
+  const actualFireAge = retirementOverview?.fiAge ?? settings.targetFireAge;
+  const fireTarget = retirementOverview?.netFireTarget ?? 0;
+  const portfolioAtFire = retirementOverview?.portfolioAtGoalAge ?? totalValue;
+  const fireReached = retirementOverview?.fundedAtGoalAge ?? false;
 
   if (isLoading) {
     return (
@@ -917,11 +1062,17 @@ export default function SimulationsPage({ settings, totalValue, isLoading }: Pro
 
   return (
     <div className="space-y-6">
-      <MonteCarloSection settings={settings} totalValue={totalValue} />
+      <MonteCarloSection settings={settings} totalValue={totalValue} fireTarget={fireTarget} />
       <ScenarioSection settings={settings} totalValue={totalValue} />
       <IncomeProjectionSection settings={settings} actualFireAge={actualFireAge} />
       <SensitivitySection settings={settings} totalValue={totalValue} />
-      <SorrSection settings={settings} totalValue={totalValue} />
+      <SorrSection
+        settings={settings}
+        totalValue={totalValue}
+        portfolioAtFire={portfolioAtFire}
+        retirementStartAge={actualFireAge}
+        fireReached={fireReached}
+      />
     </div>
   );
 }

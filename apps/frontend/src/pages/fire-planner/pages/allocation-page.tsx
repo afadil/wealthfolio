@@ -10,8 +10,67 @@ import {
 } from "@wealthfolio/ui";
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "@wealthfolio/ui/chart";
 import { useMemo } from "react";
-import type { FireSettings } from "../types";
-import { checkAllocationDrift } from "../lib/fire-math";
+import type { FireSettings, AllocationHealth } from "../types";
+
+// ─── Local allocation-drift helper (pure UI logic) ───────────────────────────
+
+interface HoldingInput {
+  symbol: string;
+  name: string;
+  marketValue: number;
+}
+
+interface ActivityInput {
+  symbol: string;
+  activityType: string;
+  date: string;
+}
+
+function checkAllocationDrift(
+  holdings: HoldingInput[],
+  targetAllocations: Record<string, number>,
+  activities: ActivityInput[],
+): AllocationHealth[] {
+  const totalValue = holdings.reduce((sum, h) => sum + h.marketValue, 0);
+  if (totalValue === 0) return [];
+
+  const today = new Date();
+
+  return Object.entries(targetAllocations)
+    .filter(([, target]) => target > 0)
+    .map(([symbol, targetWeight]) => {
+      const holding = holdings.find((h) => h.symbol === symbol || h.name === symbol);
+      const currentValue = holding?.marketValue ?? 0;
+      const currentWeight = currentValue / totalValue;
+      const drift = currentWeight - targetWeight;
+
+      const buys = activities
+        .filter(
+          (a) => (a.symbol === symbol || a.symbol === holding?.symbol) && a.activityType === "BUY",
+        )
+        .map((a) => new Date(a.date).getTime())
+        .filter((t) => !isNaN(t));
+
+      const lastBuy = buys.length > 0 ? Math.max(...buys) : null;
+      const daysSinceLastBuy = lastBuy
+        ? Math.floor((today.getTime() - lastBuy) / (1000 * 60 * 60 * 24))
+        : null;
+
+      const status: AllocationHealth["status"] =
+        drift < -0.02 ? "underweight" : drift > 0.02 ? "overweight" : "ok";
+
+      return {
+        symbol,
+        name: holding?.name ?? symbol,
+        currentWeight,
+        targetWeight,
+        drift,
+        status,
+        currentValue,
+        daysSinceLastBuy,
+      };
+    });
+}
 
 interface Props {
   settings: FireSettings;
