@@ -1,6 +1,7 @@
 import { Button, Page, PageContent, PageHeader, Skeleton } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Link } from "react-router-dom";
+import { useState } from "react";
 import { GoalCard } from "./components/goal-card";
 import { useGoals } from "./hooks/use-goals";
 
@@ -14,31 +15,9 @@ function GoalGrid({ goals }: { goals: ReturnType<typeof useGoals>["active"] }) {
   );
 }
 
-function SectionHeader({
-  children,
-  count,
-  className,
-}: {
-  children: React.ReactNode;
-  count: number;
-  className?: string;
-}) {
-  return (
-    <div className="flex items-center gap-2 pb-3">
-      <h2
-        className={`text-xs font-semibold uppercase tracking-wider ${className ?? "text-muted-foreground"}`}
-      >
-        {children}
-      </h2>
-      <span className="bg-muted text-muted-foreground inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-medium">
-        {count}
-      </span>
-    </div>
-  );
-}
-
 export default function GoalsDashboardPage() {
   const { active, atRisk, achieved, archived, isLoading } = useGoals();
+  const [archivedOpen, setArchivedOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -55,8 +34,17 @@ export default function GoalsDashboardPage() {
     );
   }
 
-  const hasGoals =
-    active.length > 0 || atRisk.length > 0 || achieved.length > 0 || archived.length > 0;
+  // Merge all non-archived goals into one flat list
+  // Sort: priority DESC → nearest targetDate ASC (undated last) → createdAt ASC
+  const allActive = [...atRisk, ...active, ...achieved].sort((a, b) => {
+    const pDiff = (b.priority ?? 0) - (a.priority ?? 0);
+    if (pDiff !== 0) return pDiff;
+    const aDate = a.targetDate ? new Date(a.targetDate).getTime() : Infinity;
+    const bDate = b.targetDate ? new Date(b.targetDate).getTime() : Infinity;
+    if (aDate !== bDate) return aDate - bDate;
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  });
+  const hasGoals = allActive.length > 0 || archived.length > 0;
 
   return (
     <Page>
@@ -93,34 +81,25 @@ export default function GoalsDashboardPage() {
             </Link>
           </div>
         ) : (
-          <div className="space-y-10">
-            {atRisk.length > 0 && (
-              <section>
-                <SectionHeader count={atRisk.length} className="text-amber-600 dark:text-amber-400">
-                  Needs Attention
-                </SectionHeader>
-                <GoalGrid goals={atRisk} />
-              </section>
-            )}
-
-            {active.length > 0 && (
-              <section>
-                <SectionHeader count={active.length}>Active</SectionHeader>
-                <GoalGrid goals={active} />
-              </section>
-            )}
-
-            {achieved.length > 0 && (
-              <section>
-                <SectionHeader count={achieved.length}>Achieved</SectionHeader>
-                <GoalGrid goals={achieved} />
-              </section>
-            )}
+          <div className="space-y-8">
+            {allActive.length > 0 && <GoalGrid goals={allActive} />}
 
             {archived.length > 0 && (
               <section>
-                <SectionHeader count={archived.length}>Archived</SectionHeader>
-                <GoalGrid goals={archived} />
+                <button
+                  onClick={() => setArchivedOpen((o) => !o)}
+                  className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-xs font-medium transition-colors"
+                >
+                  <Icons.ChevronRight
+                    className={`h-3.5 w-3.5 transition-transform ${archivedOpen ? "rotate-90" : ""}`}
+                  />
+                  Archived ({archived.length})
+                </button>
+                {archivedOpen && (
+                  <div className="mt-3">
+                    <GoalGrid goals={archived} />
+                  </div>
+                )}
               </section>
             )}
           </div>

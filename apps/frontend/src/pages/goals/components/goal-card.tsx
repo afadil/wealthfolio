@@ -1,40 +1,40 @@
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import type { Goal } from "@/lib/types";
+import { AmountDisplay, formatPercent } from "@wealthfolio/ui";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Progress } from "@wealthfolio/ui/components/ui/progress";
-import { AmountDisplay, formatPercent } from "@wealthfolio/ui";
-import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { Link } from "react-router-dom";
 
-const COVER_IMAGE_MAP: Record<string, string> = {
-  retirement: "/goals/retirement.png",
-  home: "/goals/house.png",
-};
+/** Cover image by convention: /goals/{goalType}.png */
+function coverImageSrc(goalType: string): string {
+  return `/goals/${goalType}.png`;
+}
 
 const GOAL_TYPE_ICONS: Record<string, React.ReactNode> = {
   retirement: <Icons.Target className="h-8 w-8" />,
   education: <Icons.Briefcase className="h-8 w-8" />,
   home: <Icons.Home className="h-8 w-8" />,
+  car: <Icons.Car className="h-8 w-8" />,
   wedding: <Icons.Star className="h-8 w-8" />,
-  emergency_fund: <Icons.ShieldCheck className="h-8 w-8" />,
   custom_save_up: <Icons.Wallet className="h-8 w-8" />,
 };
 
 const GOAL_TYPE_LABELS: Record<string, string> = {
   retirement: "Retirement",
   education: "Education",
-  home: "Home",
+  home: "Home Purchase",
+  car: "Car Purchase",
   wedding: "Wedding",
-  emergency_fund: "Emergency Fund",
-  custom_save_up: "Savings",
+  custom_save_up: "Savings Goal",
 };
 
 const HEALTH_CONFIG: Record<
   string,
-  { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
+  { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "warning" }
 > = {
   on_track: { label: "On Track", variant: "default" },
-  at_risk: { label: "At Risk", variant: "secondary" },
+  at_risk: { label: "At Risk", variant: "warning" },
   off_track: { label: "Off Track", variant: "destructive" },
   not_applicable: { label: "", variant: "outline" },
 };
@@ -44,7 +44,7 @@ export function GoalCard({ goal }: { goal: Goal }) {
   const progress = goal.progressCached ?? 0;
   const health = HEALTH_CONFIG[goal.statusHealth] ?? HEALTH_CONFIG.not_applicable;
   const typeLabel = GOAL_TYPE_LABELS[goal.goalType] ?? "Goal";
-  const coverImage = COVER_IMAGE_MAP[goal.coverImageKey ?? goal.goalType];
+  const coverImage = coverImageSrc(goal.coverImageKey ?? goal.goalType);
   const icon = GOAL_TYPE_ICONS[goal.goalType] ?? GOAL_TYPE_ICONS.custom_save_up;
   const target = goal.targetAmountCached ?? goal.targetAmount ?? 0;
   const current = goal.currentValueCached ?? 0;
@@ -56,34 +56,42 @@ export function GoalCard({ goal }: { goal: Goal }) {
       <div className="border-border/60 bg-card hover:border-border shadow-xs relative overflow-hidden rounded-xl border transition-all hover:shadow-md">
         {/* Cover area */}
         <div className="relative h-36 overflow-hidden sm:h-40">
-          {coverImage ? (
-            <img
-              src={coverImage}
-              alt=""
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-            />
-          ) : (
-            <div className="bg-secondary/50 flex h-full w-full items-center justify-center">
-              <div className="text-muted-foreground/20 scale-150">{icon}</div>
-            </div>
-          )}
+          <img
+            src={coverImage}
+            alt=""
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+            onError={(e) => {
+              // Fallback: hide broken image, show icon placeholder instead
+              e.currentTarget.parentElement!.classList.add("goal-cover-fallback");
+              e.currentTarget.style.display = "none";
+            }}
+          />
+          {/* Fallback icon (visible only when image fails via .goal-cover-fallback) */}
+          <div className="bg-secondary/50 hidden h-full w-full items-center justify-center [.goal-cover-fallback>&]:flex">
+            <div className="text-muted-foreground/20 scale-150">{icon}</div>
+          </div>
 
-          {/* Heavy bottom gradient for text legibility on light illustrations */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+          {/* Bottom gradient for text legibility */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 via-black/30 via-40% to-transparent" />
 
           {/* Title overlaid on image */}
           <div className="absolute bottom-3 left-4 right-4">
-            <h3 className="truncate text-sm font-semibold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
+            <h3 className="truncate text-base font-semibold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
               {goal.title}
             </h3>
-            <p className="text-[11px] text-white/80 drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">
+            <p className="flex items-center gap-1.5 text-[11px] text-white/80 drop-shadow-[0_1px_1px_rgba(0,0,0,0.3)]">
               {typeLabel}
+              {goal.goalType === "retirement" && (
+                <span className="rounded bg-white/20 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-white backdrop-blur-sm">
+                  FIRE
+                </span>
+              )}
               {goal.targetDate && <> &middot; {new Date(goal.targetDate).toLocaleDateString()}</>}
             </p>
           </div>
 
           {/* Status badges */}
-          <div className="absolute right-3 top-3 flex gap-1.5">
+          <div className="absolute left-3 top-3 flex gap-1.5">
             {isAchieved && (
               <Badge className="border-0 bg-green-600/90 text-[10px] text-white backdrop-blur-sm">
                 Achieved
