@@ -9,11 +9,13 @@ use crate::goals::{GoalDB, GoalsAllocationDB};
 use crate::limits::ContributionLimitDB;
 use crate::market_data::QuoteDB;
 use crate::portfolio::snapshot::AccountStateSnapshotDB;
+use crate::sync::import_run::ImportRunDB;
 use crate::sync::platform::PlatformDB;
 use crate::sync::SyncOutboxModel;
 use crate::sync::{
     should_sync_outbox_for_account_create, should_sync_outbox_for_activity,
-    should_sync_outbox_for_platform, should_sync_outbox_for_snapshot_source,
+    should_sync_outbox_for_import_run, should_sync_outbox_for_platform,
+    should_sync_outbox_for_snapshot_source,
 };
 use crate::taxonomies::AssetTaxonomyAssignmentDB;
 use uuid::Uuid;
@@ -165,6 +167,18 @@ impl SyncOutboxModel for PlatformDB {
 
     fn should_sync_outbox(&self, _op: SyncOperation) -> bool {
         should_sync_outbox_for_platform(&self.id, self.external_id.as_deref())
+    }
+}
+
+impl SyncOutboxModel for ImportRunDB {
+    const ENTITY: SyncEntity = SyncEntity::ImportRun;
+
+    fn sync_entity_id(&self) -> &str {
+        &self.id
+    }
+
+    fn should_sync_outbox(&self, _op: SyncOperation) -> bool {
+        should_sync_outbox_for_import_run(&self.run_type, &self.source_system)
     }
 }
 

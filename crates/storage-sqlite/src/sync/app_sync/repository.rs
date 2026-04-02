@@ -369,6 +369,45 @@ fn normalize_outbox_payload(payload: serde_json::Value) -> Result<serde_json::Va
     Ok(serde_json::Value::Object(normalized))
 }
 
+/// Per-table WHERE filters for snapshot export and restore.
+/// During export: only rows matching the filter are copied to the snapshot.
+/// During restore: only rows matching the filter are deleted before importing snapshot data,
+/// so that unfiltered rows (e.g. system taxonomies) are preserved.
+/// Tables not listed here are exported/restored unfiltered.
+const SYNC_TABLE_SNAPSHOT_FILTERS: &[(&str, &str)] = &[
+    (
+        "holdings_snapshots",
+        "source IN ('MANUAL_ENTRY', 'CSV_IMPORT', 'SYNTHETIC', 'BROKER_IMPORTED')",
+    ),
+    ("quotes", "source = 'MANUAL'"),
+    // Taxonomy rows are all seeded by migrations — no user-created taxonomies yet.
+    // Export nothing; the table is in APP_SYNC_TABLES for future custom taxonomy support.
+    ("taxonomies", "is_system = 0"),
+    // Only export user-created categories under custom_groups.
+    ("taxonomy_categories", "taxonomy_id = 'custom_groups'"),
+    // Only export user-initiated import runs (CSV/manual), matching the outbox policy.
+    (
+        "import_runs",
+        "UPPER(run_type) = 'IMPORT' AND UPPER(source_system) IN ('CSV', 'MANUAL')",
+    ),
+    // Activities: match the outbox policy so broker activities don't reference
+    // filtered-out import_runs (which would cause FK violations on restore).
+    (
+        "activities",
+        "is_user_modified = 1 \
+         OR UPPER(COALESCE(source_system, '')) IN ('MANUAL', 'CSV') \
+         OR ((import_run_id IS NULL OR TRIM(import_run_id) = '') \
+             AND (source_record_id IS NULL OR TRIM(source_record_id) = ''))",
+    ),
+];
+
+fn snapshot_filter_for_table(table: &str) -> Option<&'static str> {
+    SYNC_TABLE_SNAPSHOT_FILTERS
+        .iter()
+        .find(|(t, _)| *t == table)
+        .map(|(_, f)| *f)
+}
+
 fn entity_storage_mapping(entity: &SyncEntity) -> Option<(&'static str, &'static str)> {
     match entity {
         SyncEntity::Account => Some(("accounts", "id")),
@@ -387,6 +426,9 @@ fn entity_storage_mapping(entity: &SyncEntity) -> Option<(&'static str, &'static
         SyncEntity::Platform => Some(("platforms", "id")),
         SyncEntity::Snapshot => Some(("holdings_snapshots", "id")),
         SyncEntity::CustomProvider => Some(("market_data_custom_providers", "id")),
+        SyncEntity::ImportRun => Some(("import_runs", "id")),
+        // CustomTaxonomy uses bundle replay — handled by custom branch in apply_remote_event_lww_tx
+        SyncEntity::CustomTaxonomy => None,
     }
 }
 
@@ -546,6 +588,200 @@ fn to_entity_metadata(row: SyncEntityMetadataDB) -> Result<SyncEntityMetadata> {
     })
 }
 
+/// Build an upsert SQL statement from a JSON object and execute it.
+/// `conflict_keys` are the columns used in `ON CONFLICT(...)`.
+fn upsert_json_row(
+    conn: &mut SqliteConnection,
+    table: &str,
+    conflict_keys: &[&str],
+    row: &serde_json::Map<String, serde_json::Value>,
+) -> Result<()> {
+    let fields: Vec<(&String, &serde_json::Value)> = row.iter().collect();
+    if fields.is_empty() {
+        return Ok(());
+    }
+
+    let columns = fields
+        .iter()
+        .map(|(k, _)| quote_identifier(k))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let values = fields
+        .iter()
+        .map(|(_, v)| json_value_to_sql_literal(v))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let upserts = fields
+        .iter()
+        .map(|(k, _)| {
+            let q = quote_identifier(k);
+            format!("{q}=excluded.{q}")
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    let conflict = conflict_keys
+        .iter()
+        .map(|k| quote_identifier(k))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    let sql = format!(
+        "INSERT INTO {table_q} ({columns}) VALUES ({values}) ON CONFLICT({conflict}) DO UPDATE SET {upserts}",
+        table_q = quote_identifier(table),
+    );
+    diesel::sql_query(sql)
+        .execute(conn)
+        .map_err(StorageError::from)?;
+    Ok(())
+}
+
+/// Convert a serializable DB model to a JSON object with snake_case keys
+/// suitable for SQL upsert. Returns None if serialization fails.
+fn model_to_sql_fields<T: serde::Serialize>(
+    model: &T,
+) -> Result<serde_json::Map<String, serde_json::Value>> {
+    let value = serde_json::to_value(model)?;
+    let obj = value.as_object().ok_or_else(|| {
+        Error::Database(DatabaseError::Internal(
+            "Expected JSON object from model serialization".to_string(),
+        ))
+    })?;
+
+    // The DB models use #[serde(rename_all = "camelCase")], so we need to
+    // convert keys back to snake_case for the DB columns.
+    let mut fields = serde_json::Map::new();
+    for (key, val) in obj {
+        let snake = normalize_payload_key_to_snake_case(key);
+        let col = if snake.is_empty() { key.clone() } else { snake };
+        fields.insert(col, val.clone());
+    }
+    Ok(fields)
+}
+
+/// Apply a custom taxonomy bundle event (create/update/delete).
+/// For create/update: upserts taxonomy row, upserts each category, deletes stale categories.
+/// For delete: deletes the taxonomy row (FK cascade handles categories + assignments).
+fn apply_custom_taxonomy_event(
+    conn: &mut SqliteConnection,
+    taxonomy_id: &str,
+    op: SyncOperation,
+    payload_json: &serde_json::Value,
+) -> Result<()> {
+    match op {
+        SyncOperation::Delete => {
+            let sql = format!(
+                "DELETE FROM \"taxonomies\" WHERE \"id\" = '{}'",
+                escape_sqlite_str(taxonomy_id)
+            );
+            diesel::sql_query(sql)
+                .execute(conn)
+                .map_err(StorageError::from)?;
+        }
+        SyncOperation::Create | SyncOperation::Update => {
+            let bundle: crate::taxonomies::CustomTaxonomyPayload =
+                serde_json::from_value(payload_json.clone()).map_err(|e| {
+                    Error::Database(DatabaseError::Internal(format!(
+                        "Invalid custom_taxonomy payload: {}",
+                        e
+                    )))
+                })?;
+
+            // Reject system taxonomy payloads (except custom_groups which allows user categories)
+            if bundle.taxonomy.is_system != 0 && bundle.taxonomy.id != "custom_groups" {
+                return Err(Error::Database(DatabaseError::Internal(
+                    "Cannot sync system taxonomy".to_string(),
+                )));
+            }
+
+            // Validate payload taxonomy ID matches event entity_id
+            if bundle.taxonomy.id != taxonomy_id {
+                return Err(Error::Database(DatabaseError::Internal(format!(
+                    "custom_taxonomy payload id '{}' does not match entity_id '{}'",
+                    bundle.taxonomy.id, taxonomy_id
+                ))));
+            }
+
+            // Validate all categories belong to this taxonomy
+            for cat in &bundle.categories {
+                if cat.taxonomy_id != taxonomy_id {
+                    return Err(Error::Database(DatabaseError::Internal(format!(
+                        "custom_taxonomy category '{}' has taxonomy_id '{}', expected '{}'",
+                        cat.id, cat.taxonomy_id, taxonomy_id
+                    ))));
+                }
+            }
+
+            // Upsert taxonomy row — skip for custom_groups since it's seeded by migrations
+            // and only its categories are user data.
+            if taxonomy_id != "custom_groups" {
+                let tax_fields = model_to_sql_fields(&bundle.taxonomy)?;
+                upsert_json_row(conn, "taxonomies", &["id"], &tax_fields)?;
+            }
+
+            // Upsert each category
+            let mut incoming_cat_ids: Vec<String> = Vec::new();
+            for cat in &bundle.categories {
+                incoming_cat_ids.push(cat.id.clone());
+                let cat_fields = model_to_sql_fields(cat)?;
+                upsert_json_row(
+                    conn,
+                    "taxonomy_categories",
+                    &["taxonomy_id", "id"],
+                    &cat_fields,
+                )?;
+            }
+
+            // Delete local categories that are NOT in the incoming payload.
+            // This cascades their assignments via FK ON DELETE CASCADE.
+            if incoming_cat_ids.is_empty() {
+                let sql = format!(
+                    "DELETE FROM \"taxonomy_categories\" WHERE \"taxonomy_id\" = '{}'",
+                    escape_sqlite_str(taxonomy_id)
+                );
+                diesel::sql_query(sql)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+            } else {
+                let placeholders = incoming_cat_ids
+                    .iter()
+                    .map(|id| format!("'{}'", escape_sqlite_str(id)))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let sql = format!(
+                    "DELETE FROM \"taxonomy_categories\" WHERE \"taxonomy_id\" = '{}' AND \"id\" NOT IN ({})",
+                    escape_sqlite_str(taxonomy_id),
+                    placeholders
+                );
+                diesel::sql_query(sql)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+            }
+        }
+    }
+
+    // Mark both tables as touched
+    let now = Utc::now().to_rfc3339();
+    for table in &["taxonomies", "taxonomy_categories"] {
+        diesel::insert_into(sync_table_state::table)
+            .values(SyncTableStateDB {
+                table_name: table.to_string(),
+                enabled: 1,
+                last_snapshot_restore_at: None,
+                last_incremental_apply_at: Some(now.clone()),
+            })
+            .on_conflict(sync_table_state::table_name)
+            .do_update()
+            .set((
+                sync_table_state::enabled.eq(1),
+                sync_table_state::last_incremental_apply_at.eq(Some(now.clone())),
+            ))
+            .execute(conn)
+            .map_err(StorageError::from)?;
+    }
+
+    Ok(())
+}
+
 #[allow(clippy::too_many_arguments)]
 fn apply_remote_event_lww_tx(
     conn: &mut SqliteConnection,
@@ -586,7 +822,9 @@ fn apply_remote_event_lww_tx(
     };
 
     if should_apply {
-        if let Some((table_name, pk_name)) = entity_storage_mapping(&entity) {
+        if entity == SyncEntity::CustomTaxonomy {
+            apply_custom_taxonomy_event(conn, &entity_id_value, op, &payload_json)?;
+        } else if let Some((table_name, pk_name)) = entity_storage_mapping(&entity) {
             match op {
                 SyncOperation::Delete => {
                     let sql = format!(
@@ -1541,16 +1779,6 @@ impl AppSyncRepository {
     }
 
     pub async fn export_snapshot_sqlite_image(&self, tables: Vec<String>) -> Result<Vec<u8>> {
-        /// Per-table WHERE filters applied during snapshot export.
-        /// Tables not listed here are exported unfiltered.
-        const SYNC_TABLE_EXPORT_FILTERS: &[(&str, &str)] = &[
-            (
-                "holdings_snapshots",
-                "source IN ('MANUAL_ENTRY', 'CSV_IMPORT', 'SYNTHETIC', 'BROKER_IMPORTED')",
-            ),
-            ("quotes", "source = 'MANUAL'"),
-        ];
-
         let pool = Arc::clone(&self.pool);
         tokio::task::spawn_blocking(move || -> Result<Vec<u8>> {
             let mut conn = get_connection(&pool)?;
@@ -1579,10 +1807,7 @@ impl AppSyncRepository {
                 let run_export = (|| -> Result<()> {
                     for table in &table_set {
                         let table_ident = quote_identifier(table);
-                        let filter = SYNC_TABLE_EXPORT_FILTERS
-                            .iter()
-                            .find(|(t, _)| *t == table.as_str())
-                            .map(|(_, f)| *f);
+                        let filter = snapshot_filter_for_table(table);
                         let copy_sql = match filter {
                             Some(where_clause) => format!(
                                 "CREATE TABLE {snapshot_alias}.{table_ident} AS SELECT * FROM main.{table_ident} WHERE {where_clause}"
@@ -1721,7 +1946,14 @@ impl AppSyncRepository {
                         let copy_sql = format!(
                             "INSERT INTO {table_ident} ({columns_sql}) SELECT {columns_sql} FROM {alias_ident}.{table_ident}"
                         );
-                        let clear_sql = format!("DELETE FROM {table_ident}");
+                        // For filtered tables, only delete rows matching the filter so
+                        // unfiltered rows (e.g. system taxonomies) are preserved.
+                        let clear_sql = match snapshot_filter_for_table(table) {
+                            Some(where_clause) => {
+                                format!("DELETE FROM {table_ident} WHERE {where_clause}")
+                            }
+                            None => format!("DELETE FROM {table_ident}"),
+                        };
                         diesel::sql_query(clear_sql)
                             .execute(conn)
                             .map_err(StorageError::from)?;
@@ -1826,7 +2058,8 @@ mod tests {
     use crate::db::{create_pool, get_connection, init, run_migrations, write_actor::spawn_writer};
     use crate::schema::{
         accounts, assets, goals, import_account_templates, import_templates, platforms,
-        sync_applied_events, sync_device_config, sync_entity_metadata, sync_outbox,
+        sync_applied_events, sync_device_config, sync_entity_metadata, sync_outbox, taxonomies,
+        taxonomy_categories,
     };
 
     fn setup_db() -> (
@@ -3114,5 +3347,327 @@ mod tests {
             "error should mention conflicting alias values: {}",
             err_msg
         );
+    }
+
+    #[tokio::test]
+    async fn replay_custom_taxonomy_create_upserts_taxonomy_and_categories() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        let applied = repo
+            .apply_remote_event_lww(
+                SyncEntity::CustomTaxonomy,
+                "tax-custom-1".to_string(),
+                SyncOperation::Create,
+                "evt-tax-create".to_string(),
+                "2026-03-01T00:00:00Z".to_string(),
+                1,
+                serde_json::json!({
+                    "taxonomy": {
+                        "id": "tax-custom-1",
+                        "name": "My Sectors",
+                        "color": "#ff0000",
+                        "description": null,
+                        "isSystem": 0,
+                        "isSingleSelect": 0,
+                        "sortOrder": 99,
+                        "createdAt": "2026-03-01T00:00:00+00:00",
+                        "updatedAt": "2026-03-01T00:00:00+00:00"
+                    },
+                    "categories": [
+                        {
+                            "id": "cat-a",
+                            "taxonomyId": "tax-custom-1",
+                            "parentId": null,
+                            "name": "Tech",
+                            "key": "tech",
+                            "color": "#00ff00",
+                            "description": null,
+                            "sortOrder": 1,
+                            "createdAt": "2026-03-01T00:00:00+00:00",
+                            "updatedAt": "2026-03-01T00:00:00+00:00"
+                        },
+                        {
+                            "id": "cat-b",
+                            "taxonomyId": "tax-custom-1",
+                            "parentId": null,
+                            "name": "Finance",
+                            "key": "finance",
+                            "color": "#0000ff",
+                            "description": "Financial sector",
+                            "sortOrder": 2,
+                            "createdAt": "2026-03-01T00:00:00+00:00",
+                            "updatedAt": "2026-03-01T00:00:00+00:00"
+                        }
+                    ]
+                }),
+            )
+            .await
+            .expect("apply custom taxonomy create");
+        assert!(applied);
+
+        let mut conn = get_connection(&pool).expect("conn");
+        let tax_name: String = taxonomies::table
+            .find("tax-custom-1")
+            .select(taxonomies::name)
+            .first(&mut conn)
+            .expect("taxonomy row");
+        assert_eq!(tax_name, "My Sectors");
+
+        let cat_count: i64 = taxonomy_categories::table
+            .filter(taxonomy_categories::taxonomy_id.eq("tax-custom-1"))
+            .select(count_star())
+            .first(&mut conn)
+            .expect("category count");
+        assert_eq!(cat_count, 2);
+    }
+
+    #[tokio::test]
+    async fn replay_custom_taxonomy_update_adds_and_removes_categories() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        // First: create with two categories
+        repo.apply_remote_event_lww(
+            SyncEntity::CustomTaxonomy,
+            "tax-upd-1".to_string(),
+            SyncOperation::Create,
+            "evt-1".to_string(),
+            "2026-03-01T00:00:00Z".to_string(),
+            1,
+            serde_json::json!({
+                "taxonomy": {
+                    "id": "tax-upd-1", "name": "Original", "color": "#aaa",
+                    "description": null, "isSystem": 0, "isSingleSelect": 0,
+                    "sortOrder": 1,
+                    "createdAt": "2026-03-01T00:00:00+00:00",
+                    "updatedAt": "2026-03-01T00:00:00+00:00"
+                },
+                "categories": [
+                    { "id": "c1", "taxonomyId": "tax-upd-1", "parentId": null,
+                      "name": "Cat1", "key": "c1", "color": "#111",
+                      "description": null, "sortOrder": 1,
+                      "createdAt": "2026-03-01T00:00:00+00:00",
+                      "updatedAt": "2026-03-01T00:00:00+00:00" },
+                    { "id": "c2", "taxonomyId": "tax-upd-1", "parentId": null,
+                      "name": "Cat2", "key": "c2", "color": "#222",
+                      "description": null, "sortOrder": 2,
+                      "createdAt": "2026-03-01T00:00:00+00:00",
+                      "updatedAt": "2026-03-01T00:00:00+00:00" }
+                ]
+            }),
+        )
+        .await
+        .expect("create");
+
+        // Update: remove c2, add c3, rename taxonomy
+        let applied = repo
+            .apply_remote_event_lww(
+                SyncEntity::CustomTaxonomy,
+                "tax-upd-1".to_string(),
+                SyncOperation::Update,
+                "evt-2".to_string(),
+                "2026-03-02T00:00:00Z".to_string(),
+                2,
+                serde_json::json!({
+                    "taxonomy": {
+                        "id": "tax-upd-1", "name": "Renamed", "color": "#bbb",
+                        "description": "Now with description", "isSystem": 0,
+                        "isSingleSelect": 1, "sortOrder": 1,
+                        "createdAt": "2026-03-01T00:00:00+00:00",
+                        "updatedAt": "2026-03-02T00:00:00+00:00"
+                    },
+                    "categories": [
+                        { "id": "c1", "taxonomyId": "tax-upd-1", "parentId": null,
+                          "name": "Cat1-updated", "key": "c1", "color": "#111",
+                          "description": null, "sortOrder": 1,
+                          "createdAt": "2026-03-01T00:00:00+00:00",
+                          "updatedAt": "2026-03-02T00:00:00+00:00" },
+                        { "id": "c3", "taxonomyId": "tax-upd-1", "parentId": null,
+                          "name": "Cat3-new", "key": "c3", "color": "#333",
+                          "description": null, "sortOrder": 2,
+                          "createdAt": "2026-03-02T00:00:00+00:00",
+                          "updatedAt": "2026-03-02T00:00:00+00:00" }
+                    ]
+                }),
+            )
+            .await
+            .expect("update");
+        assert!(applied);
+
+        let mut conn = get_connection(&pool).expect("conn");
+
+        // Taxonomy was renamed
+        let name: String = taxonomies::table
+            .find("tax-upd-1")
+            .select(taxonomies::name)
+            .first(&mut conn)
+            .expect("taxonomy");
+        assert_eq!(name, "Renamed");
+
+        // c1 was updated, c2 was deleted, c3 was added
+        let cat_ids: Vec<String> = taxonomy_categories::table
+            .filter(taxonomy_categories::taxonomy_id.eq("tax-upd-1"))
+            .select(taxonomy_categories::id)
+            .order(taxonomy_categories::sort_order.asc())
+            .load(&mut conn)
+            .expect("cats");
+        assert_eq!(cat_ids, vec!["c1", "c3"]);
+
+        // c1 name was updated
+        let c1_name: String = taxonomy_categories::table
+            .filter(taxonomy_categories::taxonomy_id.eq("tax-upd-1"))
+            .filter(taxonomy_categories::id.eq("c1"))
+            .select(taxonomy_categories::name)
+            .first(&mut conn)
+            .expect("c1");
+        assert_eq!(c1_name, "Cat1-updated");
+    }
+
+    #[tokio::test]
+    async fn replay_custom_taxonomy_delete_cascades() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        // Create a taxonomy with categories
+        repo.apply_remote_event_lww(
+            SyncEntity::CustomTaxonomy,
+            "tax-del-1".to_string(),
+            SyncOperation::Create,
+            "evt-del-1".to_string(),
+            "2026-03-01T00:00:00Z".to_string(),
+            1,
+            serde_json::json!({
+                "taxonomy": {
+                    "id": "tax-del-1", "name": "ToDelete", "color": "#000",
+                    "description": null, "isSystem": 0, "isSingleSelect": 0,
+                    "sortOrder": 1,
+                    "createdAt": "2026-03-01T00:00:00+00:00",
+                    "updatedAt": "2026-03-01T00:00:00+00:00"
+                },
+                "categories": [
+                    { "id": "dc1", "taxonomyId": "tax-del-1", "parentId": null,
+                      "name": "D1", "key": "d1", "color": "#111",
+                      "description": null, "sortOrder": 1,
+                      "createdAt": "2026-03-01T00:00:00+00:00",
+                      "updatedAt": "2026-03-01T00:00:00+00:00" }
+                ]
+            }),
+        )
+        .await
+        .expect("create for delete test");
+
+        // Delete the taxonomy
+        let applied = repo
+            .apply_remote_event_lww(
+                SyncEntity::CustomTaxonomy,
+                "tax-del-1".to_string(),
+                SyncOperation::Delete,
+                "evt-del-2".to_string(),
+                "2026-03-02T00:00:00Z".to_string(),
+                2,
+                serde_json::json!({ "id": "tax-del-1" }),
+            )
+            .await
+            .expect("delete");
+        assert!(applied);
+
+        let mut conn = get_connection(&pool).expect("conn");
+
+        // Taxonomy gone
+        let tax_count: i64 = taxonomies::table
+            .filter(taxonomies::id.eq("tax-del-1"))
+            .select(count_star())
+            .first(&mut conn)
+            .expect("tax count");
+        assert_eq!(tax_count, 0);
+
+        // Categories cascaded
+        let cat_count: i64 = taxonomy_categories::table
+            .filter(taxonomy_categories::taxonomy_id.eq("tax-del-1"))
+            .select(count_star())
+            .first(&mut conn)
+            .expect("cat count");
+        assert_eq!(cat_count, 0);
+    }
+
+    #[tokio::test]
+    async fn replay_custom_taxonomy_rejects_system_payload() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        let result = repo
+            .apply_remote_event_lww(
+                SyncEntity::CustomTaxonomy,
+                "instrument_type".to_string(),
+                SyncOperation::Update,
+                "evt-system-hack".to_string(),
+                "2026-03-01T00:00:00Z".to_string(),
+                1,
+                serde_json::json!({
+                    "taxonomy": {
+                        "id": "instrument_type", "name": "Hacked", "color": "#000",
+                        "description": null, "isSystem": 1, "isSingleSelect": 0,
+                        "sortOrder": 1,
+                        "createdAt": "2026-03-01T00:00:00+00:00",
+                        "updatedAt": "2026-03-01T00:00:00+00:00"
+                    },
+                    "categories": []
+                }),
+            )
+            .await;
+
+        assert!(result.is_err(), "should reject system taxonomy payload");
+        assert!(
+            result.unwrap_err().to_string().contains("system taxonomy"),
+            "error should mention system taxonomy"
+        );
+    }
+
+    #[tokio::test]
+    async fn replay_import_run_upserts_user_initiated_run() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+        let mut conn = get_connection(&pool).expect("conn");
+        insert_account_for_test(&mut conn, "acc-import-run").expect("insert account");
+
+        let applied = repo
+            .apply_remote_event_lww(
+                SyncEntity::ImportRun,
+                "run-csv-1".to_string(),
+                SyncOperation::Create,
+                "evt-run-1".to_string(),
+                "2026-03-01T00:00:00Z".to_string(),
+                1,
+                serde_json::json!({
+                    "id": "run-csv-1",
+                    "account_id": "acc-import-run",
+                    "source_system": "csv",
+                    "run_type": "IMPORT",
+                    "mode": "INCREMENTAL",
+                    "status": "APPLIED",
+                    "started_at": "2026-03-01T00:00:00+00:00",
+                    "finished_at": "2026-03-01T00:01:00+00:00",
+                    "review_mode": "NEVER",
+                    "applied_at": "2026-03-01T00:01:00+00:00",
+                    "checkpoint_in": null,
+                    "checkpoint_out": null,
+                    "summary": null,
+                    "warnings": null,
+                    "error": null,
+                    "created_at": "2026-03-01T00:00:00+00:00",
+                    "updated_at": "2026-03-01T00:01:00+00:00"
+                }),
+            )
+            .await
+            .expect("apply import run create");
+        assert!(applied);
+
+        let source: String = crate::schema::import_runs::table
+            .find("run-csv-1")
+            .select(crate::schema::import_runs::source_system)
+            .first(&mut conn)
+            .expect("import run row");
+        assert_eq!(source, "csv");
     }
 }

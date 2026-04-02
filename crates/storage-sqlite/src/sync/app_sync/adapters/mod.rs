@@ -77,5 +77,15 @@ pub fn default_adapter_descriptors() -> Vec<EntityAdapterDescriptor> {
             entity: SyncEntity::CustomProvider,
             table_name: "market_data_custom_providers",
         },
+        EntityAdapterDescriptor {
+            entity: SyncEntity::ImportRun,
+            table_name: "import_runs",
+        },
+        // CustomTaxonomy is a bundle entity covering both taxonomies and taxonomy_categories.
+        // It does not map 1:1 to a single table, but we register it for adapter discovery.
+        EntityAdapterDescriptor {
+            entity: SyncEntity::CustomTaxonomy,
+            table_name: "taxonomies",
+        },
     ]
 }

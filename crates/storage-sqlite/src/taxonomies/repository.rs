@@ -17,6 +17,7 @@ use super::model::{
     AssetTaxonomyAssignmentDB, CategoryDB, NewAssetTaxonomyAssignmentDB, NewCategoryDB,
     NewTaxonomyDB, TaxonomyDB,
 };
+use super::sync;
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
 use crate::schema::{asset_taxonomy_assignments, taxonomies, taxonomy_categories};
@@ -58,7 +59,7 @@ impl TaxonomyRepositoryTrait for TaxonomyRepository {
 
     async fn create_taxonomy(&self, taxonomy: NewTaxonomy) -> Result<Taxonomy> {
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<Taxonomy> {
+            .exec_projected(move |conn, projection| -> Result<Taxonomy> {
                 let mut db: NewTaxonomyDB = taxonomy.into();
                 db.id = Some(db.id.unwrap_or_else(|| Uuid::new_v4().to_string()));
 
@@ -68,6 +69,15 @@ impl TaxonomyRepositoryTrait for TaxonomyRepository {
                     .get_result(conn)
                     .map_err(StorageError::from)?;
 
+                // Queue sync event (no-op for system taxonomies)
+                sync::queue_custom_taxonomy_bundle(
+                    conn,
+                    projection,
+                    &result.id,
+                    wealthfolio_core::sync::SyncOperation::Create,
+                )
+                .map_err(StorageError::from)?;
+
                 Ok(Taxonomy::from(result))
             })
             .await
@@ -76,7 +86,7 @@ impl TaxonomyRepositoryTrait for TaxonomyRepository {
     async fn update_taxonomy(&self, taxonomy: Taxonomy) -> Result<Taxonomy> {
         let id = taxonomy.id.clone();
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<Taxonomy> {
+            .exec_projected(move |conn, projection| -> Result<Taxonomy> {
                 let db = TaxonomyDB {
                     id: taxonomy.id,
                     name: taxonomy.name,
@@ -102,6 +112,14 @@ impl TaxonomyRepositoryTrait for TaxonomyRepository {
                     .first::<TaxonomyDB>(conn)
                     .map_err(StorageError::from)?;
 
+                sync::queue_custom_taxonomy_bundle(
+                    conn,
+                    projection,
+                    &id,
+                    wealthfolio_core::sync::SyncOperation::Update,
+                )
+                .map_err(StorageError::from)?;
+
                 Ok(Taxonomy::from(result))
             })
             .await
@@ -110,10 +128,19 @@ impl TaxonomyRepositoryTrait for TaxonomyRepository {
     async fn delete_taxonomy(&self, id: &str) -> Result<usize> {
         let id = id.to_string();
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
-                Ok(diesel::delete(taxonomies::table.find(&id))
+            .exec_projected(move |conn, projection| -> Result<usize> {
+                // Check if custom before deleting (need the row to inspect)
+                let is_custom = sync::is_syncable_taxonomy(conn, &id);
+
+                let affected = diesel::delete(taxonomies::table.find(&id))
                     .execute(conn)
-                    .map_err(StorageError::from)?)
+                    .map_err(StorageError::from)?;
+
+                if affected > 0 && is_custom {
+                    sync::queue_custom_taxonomy_delete(projection, &id);
+                }
+
+                Ok(affected)
             })
             .await
     }
@@ -141,7 +168,8 @@ impl TaxonomyRepositoryTrait for TaxonomyRepository {
 
     async fn create_category(&self, category: NewCategory) -> Result<Category> {
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<Category> {
+            .exec_projected(move |conn, projection| -> Result<Category> {
+                let taxonomy_id = category.taxonomy_id.clone();
                 let mut db: NewCategoryDB = category.into();
                 db.id = Some(db.id.unwrap_or_else(|| Uuid::new_v4().to_string()));
 
@@ -150,6 +178,15 @@ impl TaxonomyRepositoryTrait for TaxonomyRepository {
                     .returning(CategoryDB::as_returning())
                     .get_result(conn)
                     .map_err(StorageError::from)?;
+
+                // Emit taxonomy.update bundle (category added)
+                sync::queue_custom_taxonomy_bundle(
+                    conn,
+                    projection,
+                    &taxonomy_id,
+                    wealthfolio_core::sync::SyncOperation::Update,
+                )
+                .map_err(StorageError::from)?;
 
                 Ok(Category::from(result))
             })
@@ -160,7 +197,7 @@ impl TaxonomyRepositoryTrait for TaxonomyRepository {
         let taxonomy_id = category.taxonomy_id.clone();
         let id = category.id.clone();
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<Category> {
+            .exec_projected(move |conn, projection| -> Result<Category> {
                 let db = CategoryDB {
                     id: category.id,
                     taxonomy_id: category.taxonomy_id,
@@ -192,6 +229,15 @@ impl TaxonomyRepositoryTrait for TaxonomyRepository {
                     .first::<CategoryDB>(conn)
                     .map_err(StorageError::from)?;
 
+                // Emit taxonomy.update bundle (category modified)
+                sync::queue_custom_taxonomy_bundle(
+                    conn,
+                    projection,
+                    &taxonomy_id,
+                    wealthfolio_core::sync::SyncOperation::Update,
+                )
+                .map_err(StorageError::from)?;
+
                 Ok(Category::from(result))
             })
             .await
@@ -201,23 +247,43 @@ impl TaxonomyRepositoryTrait for TaxonomyRepository {
         let taxonomy_id = taxonomy_id.to_string();
         let category_id = category_id.to_string();
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
-                Ok(diesel::delete(
+            .exec_projected(move |conn, projection| -> Result<usize> {
+                // Check eligibility before the delete
+                let is_custom = sync::is_syncable_taxonomy(conn, &taxonomy_id);
+
+                let affected = diesel::delete(
                     taxonomy_categories::table
                         .filter(taxonomy_categories::taxonomy_id.eq(&taxonomy_id))
                         .filter(taxonomy_categories::id.eq(&category_id)),
                 )
                 .execute(conn)
-                .map_err(StorageError::from)?)
+                .map_err(StorageError::from)?;
+
+                if affected > 0 && is_custom {
+                    // Emit taxonomy.update bundle (category removed)
+                    sync::queue_custom_taxonomy_bundle(
+                        conn,
+                        projection,
+                        &taxonomy_id,
+                        wealthfolio_core::sync::SyncOperation::Update,
+                    )
+                    .map_err(StorageError::from)?;
+                }
+
+                Ok(affected)
             })
             .await
     }
 
     async fn bulk_create_categories(&self, categories: Vec<NewCategory>) -> Result<usize> {
         self.writer
-            .exec(move |conn: &mut SqliteConnection| -> Result<usize> {
+            .exec_projected(move |conn, projection| -> Result<usize> {
                 let mut count = 0;
+                let mut taxonomy_id_for_sync: Option<String> = None;
                 for cat in categories {
+                    if taxonomy_id_for_sync.is_none() {
+                        taxonomy_id_for_sync = Some(cat.taxonomy_id.clone());
+                    }
                     let mut db: NewCategoryDB = cat.into();
                     db.id = Some(db.id.unwrap_or_else(|| Uuid::new_v4().to_string()));
 
@@ -227,6 +293,18 @@ impl TaxonomyRepositoryTrait for TaxonomyRepository {
                         .map_err(StorageError::from)?;
                     count += 1;
                 }
+
+                // Emit one taxonomy.update bundle after all categories are inserted
+                if let Some(tid) = taxonomy_id_for_sync {
+                    sync::queue_custom_taxonomy_bundle(
+                        conn,
+                        projection,
+                        &tid,
+                        wealthfolio_core::sync::SyncOperation::Update,
+                    )
+                    .map_err(StorageError::from)?;
+                }
+
                 Ok(count)
             })
             .await
