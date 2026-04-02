@@ -1,9 +1,6 @@
 import { parse, parseISO, isValid, format as formatDate } from "date-fns";
 
-import type {
-  HoldingsSnapshotInput,
-  HoldingsPositionInput,
-} from "@/lib/types";
+import type { HoldingsSnapshotInput, HoldingsPositionInput } from "@/lib/types";
 import type { DraftActivity } from "../context";
 import { HoldingsFormat } from "../steps/holdings-mapping-step";
 import { getDateFnsPattern } from "./date-format-options";

@@ -27,16 +27,19 @@ function createDraft(overrides: Partial<DraftActivity>): DraftActivity {
 
 describe("holdings review helpers", () => {
   it("maps created asset ids back onto row resolutions", () => {
-    const resolutions = buildHoldingsRowResolutionMap([
-      createDraft({
-        rowIndex: 2,
-        symbol: "VOO",
-        exchangeMic: "ARCX",
-        importAssetKey: "asset-key-1",
-      }),
-    ], {
-      "asset-key-1": "asset-123",
-    });
+    const resolutions = buildHoldingsRowResolutionMap(
+      [
+        createDraft({
+          rowIndex: 2,
+          symbol: "VOO",
+          exchangeMic: "ARCX",
+          importAssetKey: "asset-key-1",
+        }),
+      ],
+      {
+        "asset-key-1": "asset-123",
+      },
+    );
 
     expect(resolutions[2]).toEqual({
       symbol: "VOO",

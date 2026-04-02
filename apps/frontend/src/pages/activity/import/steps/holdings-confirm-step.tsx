@@ -308,13 +308,7 @@ export function HoldingsConfirmStep() {
         setIsPreparingAssets(false);
       }
     })();
-  }, [
-    buildSnapshots,
-    draftActivities,
-    mutateImport,
-    pendingImportAssets,
-    persistCreatedAssets,
-  ]);
+  }, [buildSnapshots, draftActivities, mutateImport, pendingImportAssets, persistCreatedAssets]);
 
   const handleCancel = useCallback(() => {
     navigate(-1);
