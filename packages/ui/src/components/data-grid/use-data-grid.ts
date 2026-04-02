@@ -146,6 +146,7 @@ interface UseDataGridProps<TData> extends Omit<
 function useDataGrid<TData>({
   data,
   columns,
+  state: externalState,
   overscan = OVERSCAN,
   rowHeight: rowHeightProp = DEFAULT_ROW_HEIGHT,
   dir: dirProp,
@@ -2227,12 +2228,12 @@ function useDataGrid<TData>({
   // Memoize state object to reduce shallow equality checks
   const tableState = React.useMemo<Partial<TableState>>(
     () => ({
-      ...propsRef.current.state,
+      ...externalState,
       sorting,
       columnFilters,
       rowSelection,
     }),
-    [propsRef, sorting, columnFilters, rowSelection],
+    [externalState, sorting, columnFilters, rowSelection],
   );
 
   const tableOptions = React.useMemo<TableOptions<TData>>(() => {
@@ -2290,7 +2291,12 @@ function useDataGrid<TData>({
       colSizes[`--col-${header.column.id}-size`] = header.column.getSize();
     }
     return colSizes;
-  }, [table.getState().columnSizingInfo, table.getState().columnSizing, columns]);
+  }, [
+    table.getState().columnSizingInfo,
+    table.getState().columnSizing,
+    table.getState().columnVisibility,
+    columns,
+  ]);
 
   const rowVirtualizer = useVirtualizer({
     count: table.getRowModel().rows.length,
