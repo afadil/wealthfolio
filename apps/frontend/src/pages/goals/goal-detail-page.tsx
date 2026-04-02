@@ -11,10 +11,17 @@ import {
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { DeleteConfirm } from "@wealthfolio/ui/components/common";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { useGoalDetail, useGoalPlanMutations } from "./hooks/use-goal-detail";
+import {
+  useGoalDetail,
+  useGoalPlanMutations,
+  useRetirementOverview,
+  useSaveUpOverview,
+} from "./hooks/use-goal-detail";
 import { useGoalMutations } from "./hooks/use-goals";
+import type { RetirementOverview } from "@/lib/types";
 import type { FireSettings } from "@/pages/fire-planner/types";
 import { DEFAULT_SETTINGS } from "@/pages/fire-planner/types";
 import { usePortfolioData } from "@/pages/fire-planner/hooks/use-portfolio";
@@ -29,10 +36,10 @@ import { GoalEditDialog } from "./components/goal-edit-dialog";
 const GOAL_TYPE_LABELS: Record<string, string> = {
   retirement: "Retirement",
   education: "Education",
-  home: "Home",
+  home: "Home Purchase",
+  car: "Car Purchase",
   wedding: "Wedding",
-  emergency_fund: "Emergency Fund",
-  custom_save_up: "Savings",
+  custom_save_up: "Savings Goal",
 };
 
 export default function GoalDetailPage() {
@@ -48,6 +55,14 @@ export default function GoalDetailPage() {
 
   const isRetirement = goal?.goalType === "retirement";
   const isSaveUp = goal && !isRetirement;
+
+  // Fetch backend-computed retirement overview when a retirement plan exists
+  const { data: retirementOverview } = useRetirementOverview(
+    isRetirement && plan ? goalId : undefined,
+  );
+
+  // Fetch backend-computed save-up overview when this is a save-up goal
+  const { data: saveUpOverview } = useSaveUpOverview(isSaveUp ? goalId : undefined);
 
   // Derive eligible account IDs from funding rules (replaces includedAccountIds in settings)
   const eligibleAccountIds = useMemo(
@@ -167,7 +182,7 @@ export default function GoalDetailPage() {
     <Page>
       <PageHeader
         heading={goal.title}
-        text={goal.description ? `${typeLabel} · ${goal.description}` : typeLabel}
+        text={goal.description ? `${typeLabel} goal · ${goal.description}` : `${typeLabel} goal`}
         onBack={() => navigate("/goals")}
         actions={
           <div className="flex items-center gap-2">
@@ -176,9 +191,17 @@ export default function GoalDetailPage() {
               <Icons.Settings2 className="mr-1 h-4 w-4" />
               Edit
             </Button>
-            <Button variant="destructive" size="sm" onClick={handleDelete}>
-              <Icons.Trash className="h-4 w-4" />
-            </Button>
+            <DeleteConfirm
+              deleteConfirmTitle="Delete goal"
+              deleteConfirmMessage={`Are you sure you want to delete "${goal.title}"? This action cannot be undone.`}
+              handleDeleteConfirm={handleDelete}
+              isPending={deleteMutation.isPending}
+              button={
+                <Button variant="destructive" size="sm">
+                  <Icons.Trash className="h-4 w-4" />
+                </Button>
+              }
+            />
           </div>
         }
       />
@@ -192,9 +215,10 @@ export default function GoalDetailPage() {
               settings={retirementSettings}
               portfolioData={portfolioData}
               onSaveSettings={handleSaveRetirementSettings}
-              plannerMode={(plan.plannerMode as "fire" | "traditional") ?? "fire"}
+              plannerMode={(plan.plannerMode! as "fire" | "traditional") ?? "fire"}
               goalId={goalId!}
               dcLinkedAccountIds={dcLinkedAccountIds}
+              retirementOverview={retirementOverview}
             />
           ) : (
             <div className="space-y-3">
@@ -203,7 +227,7 @@ export default function GoalDetailPage() {
             </div>
           )
         ) : isSaveUp ? (
-          <SaveUpDetailPage goal={goal} plan={plan} />
+          <SaveUpDetailPage goal={goal} plan={plan} overview={saveUpOverview} />
         ) : (
           <div className="flex flex-col items-center gap-4 py-12">
             <p className="text-muted-foreground text-sm">
@@ -225,6 +249,7 @@ function RetirementDetail({
   plannerMode,
   goalId,
   dcLinkedAccountIds,
+  retirementOverview,
 }: {
   activeTab: string;
   onTabChange: (tab: string) => void;
@@ -234,6 +259,7 @@ function RetirementDetail({
   plannerMode: "fire" | "traditional";
   goalId: string;
   dcLinkedAccountIds: string[];
+  retirementOverview?: RetirementOverview;
 }) {
   return (
     <Tabs value={activeTab} onValueChange={onTabChange} className="space-y-4">
@@ -251,6 +277,11 @@ function RetirementDetail({
           portfolioData={portfolioData}
           isLoading={portfolioData.isLoading}
           plannerMode={plannerMode}
+          onSaveSettings={onSaveSettings}
+          onNavigateToTab={onTabChange}
+          retirementOverview={retirementOverview}
+          goalId={goalId}
+          dcLinkedAccountIds={dcLinkedAccountIds}
         />
       </TabsContent>
 
@@ -279,6 +310,7 @@ function RetirementDetail({
           settings={settings}
           totalValue={portfolioData.totalValue}
           isLoading={portfolioData.isLoading}
+          retirementOverview={retirementOverview}
         />
       </TabsContent>
 
