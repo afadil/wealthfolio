@@ -22,10 +22,10 @@ import { useState } from "react";
 const GOAL_TYPES: { value: GoalType; label: string }[] = [
   { value: "retirement", label: "Retirement" },
   { value: "education", label: "Education" },
-  { value: "home", label: "Home" },
+  { value: "home", label: "Home Purchase" },
+  { value: "car", label: "Car Purchase" },
   { value: "wedding", label: "Wedding" },
-  { value: "emergency_fund", label: "Emergency Fund" },
-  { value: "custom_save_up", label: "Custom Savings" },
+  { value: "custom_save_up", label: "Savings Goal" },
 ];
 
 const LIFECYCLE_OPTIONS = [

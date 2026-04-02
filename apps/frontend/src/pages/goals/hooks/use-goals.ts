@@ -25,24 +25,19 @@ export function useGoals() {
     }
   }, [query.data, queryClient]);
 
-  const byTarget = (a: Goal, b: Goal) =>
-    (b.targetAmountCached ?? b.targetAmount ?? 0) - (a.targetAmountCached ?? a.targetAmount ?? 0);
-
   const nonArchived = query.data?.filter(
     (g) => !g.isArchived && g.statusLifecycle !== "archived" && g.statusLifecycle !== "achieved",
   );
-  const atRisk = (
-    nonArchived?.filter((g) => g.statusHealth === "at_risk" || g.statusHealth === "off_track") ?? []
-  ).sort(byTarget);
-  const active = (
-    nonArchived?.filter((g) => g.statusHealth !== "at_risk" && g.statusHealth !== "off_track") ?? []
-  ).sort(byTarget);
-  const achieved = (
-    query.data?.filter((g) => g.statusLifecycle === "achieved" && !g.isArchived) ?? []
-  ).sort(byTarget);
-  const archived = (
-    query.data?.filter((g) => g.isArchived || g.statusLifecycle === "archived") ?? []
-  ).sort(byTarget);
+  const atRisk =
+    nonArchived?.filter((g) => g.statusHealth === "at_risk" || g.statusHealth === "off_track") ??
+    [];
+  const active =
+    nonArchived?.filter((g) => g.statusHealth !== "at_risk" && g.statusHealth !== "off_track") ??
+    [];
+  const achieved =
+    query.data?.filter((g) => g.statusLifecycle === "achieved" && !g.isArchived) ?? [];
+  const archived =
+    query.data?.filter((g) => g.isArchived || g.statusLifecycle === "archived") ?? [];
 
   return {
     goals: query.data ?? [],
