@@ -22,7 +22,7 @@ const isTransferActivity = (activityType: string | undefined): boolean => {
 };
 
 /** Subtypes where amount = quantity × unitPrice (DRIP, DIVIDEND_IN_KIND, STAKING_REWARD). */
-const isAssetBackedSubtype = (subtype: string | undefined): boolean =>
+const isAssetBackedSubtype = (subtype: string | null | undefined): boolean =>
   subtype === ACTIVITY_SUBTYPES.DRIP ||
   subtype === ACTIVITY_SUBTYPES.DIVIDEND_IN_KIND ||
   subtype === ACTIVITY_SUBTYPES.STAKING_REWARD;
