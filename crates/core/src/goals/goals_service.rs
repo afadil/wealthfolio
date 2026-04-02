@@ -4,10 +4,69 @@ use crate::goals::goals_model::{
     NewGoal, SaveGoalPlan,
 };
 use crate::goals::goals_traits::{GoalRepositoryTrait, GoalServiceTrait};
-use crate::portfolio::fire::{calculate_net_fire_target, FireSettings};
+use crate::planning::{SaveUpInput, SaveUpOverview};
+use crate::portfolio::fire::{
+    calculate_net_fire_target, FireSettings, RetirementOverview, StreamType,
+};
 use async_trait::async_trait;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+
+// ─── Shared helpers ──────────────────────────────────────────────────────────
+
+/// Extract account IDs linked to defined-contribution income streams from FIRE settings.
+fn extract_dc_linked_account_ids(settings: &FireSettings) -> HashSet<String> {
+    settings
+        .additional_income_streams
+        .iter()
+        .filter(|s| s.stream_type == Some(StreamType::DefinedContribution))
+        .filter_map(|s| s.linked_account_id.clone())
+        .collect()
+}
+
+/// Compute the residual portfolio value for a retirement goal.
+///
+/// For each eligible account, subtracts explicit reservations from other goals,
+/// and excludes accounts linked to DC income streams (tracked separately by FIRE engine).
+fn compute_residual_portfolio_value(
+    funding_rules: &[GoalFundingRule],
+    all_active_rules: &[GoalFundingRule],
+    valuations: &AccountValuationMap,
+    dc_linked_accounts: &HashSet<String>,
+) -> f64 {
+    // Sum explicit_reservation percentages per account across all goals
+    let mut account_reservations: HashMap<&str, f64> = HashMap::new();
+    for r in all_active_rules {
+        if r.funding_role == "explicit_reservation" {
+            if let Some(pct) = r.reservation_percent {
+                *account_reservations.entry(&r.account_id).or_default() += pct;
+            }
+        }
+    }
+
+    let residual_for = |account_id: &str, value: f64| -> f64 {
+        if dc_linked_accounts.contains(account_id) {
+            return 0.0;
+        }
+        let reserved = account_reservations.get(account_id).copied().unwrap_or(0.0);
+        value * (1.0 - reserved / 100.0).max(0.0)
+    };
+
+    if funding_rules.is_empty() {
+        // No funding rules — fall back to all accounts (residual of each)
+        valuations.iter().map(|(id, &v)| residual_for(id, v)).sum()
+    } else {
+        funding_rules
+            .iter()
+            .filter(|r| r.funding_role == "residual_eligible")
+            .filter_map(|r| {
+                valuations
+                    .get(&r.account_id)
+                    .map(|&v| residual_for(&r.account_id, v))
+            })
+            .sum()
+    }
+}
 
 pub struct GoalService<T: GoalRepositoryTrait> {
     goal_repo: Arc<T>,
@@ -202,45 +261,15 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
         let is_retirement = goal.goal_type == "retirement";
 
         let current_value = if is_retirement {
-            // Retirement: residual funding
+            // Retirement: residual funding (excludes DC-linked accounts)
             let all_rules = self.goal_repo.load_all_active_funding_rules()?;
-            let mut account_reservations: HashMap<String, f64> = HashMap::new();
-            for r in &all_rules {
-                if r.funding_role == "explicit_reservation" {
-                    if let Some(pct) = r.reservation_percent {
-                        *account_reservations
-                            .entry(r.account_id.clone())
-                            .or_default() += pct;
-                    }
-                }
-            }
-
-            if rules.is_empty() {
-                // No funding rules configured yet — fall back to all accounts
-                // (residual of each after explicit reservations by other goals)
-                let mut total = 0.0;
-                for (account_id, &v) in valuations {
-                    let reserved = account_reservations.get(account_id).copied().unwrap_or(0.0);
-                    let residual = (1.0 - reserved / 100.0).max(0.0);
-                    total += v * residual;
-                }
-                total
-            } else {
-                let mut total = 0.0;
-                for rule in &rules {
-                    if rule.funding_role == "residual_eligible" {
-                        if let Some(&v) = valuations.get(&rule.account_id) {
-                            let reserved = account_reservations
-                                .get(&rule.account_id)
-                                .copied()
-                                .unwrap_or(0.0);
-                            let residual = (1.0 - reserved / 100.0).max(0.0);
-                            total += v * residual;
-                        }
-                    }
-                }
-                total
-            }
+            let dc_linked = self
+                .goal_repo
+                .load_goal_plan(goal_id)?
+                .and_then(|p| serde_json::from_str::<FireSettings>(&p.settings_json).ok())
+                .map(|s| extract_dc_linked_account_ids(&s))
+                .unwrap_or_default();
+            compute_residual_portfolio_value(&rules, &all_rules, valuations, &dc_linked)
         } else {
             // Save-up: explicit reservation
             let mut total = 0.0;
@@ -306,5 +335,83 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
             .update_goal_cached_fields(goal_id, update)
             .await?;
         self.goal_repo.load_goal(goal_id)
+    }
+
+    async fn compute_retirement_overview(
+        &self,
+        goal_id: &str,
+        valuation_map: &AccountValuationMap,
+    ) -> Result<RetirementOverview> {
+        let goal = self.goal_repo.load_goal(goal_id)?;
+        let plan = self.goal_repo.load_goal_plan(goal_id)?.ok_or_else(|| {
+            crate::errors::ValidationError::InvalidInput(format!(
+                "No plan found for goal {}",
+                goal_id
+            ))
+        })?;
+        let funding_rules = self.goal_repo.load_funding_rules(goal_id)?;
+        let all_rules = self.goal_repo.load_all_active_funding_rules()?;
+
+        let settings: FireSettings = serde_json::from_str(&plan.settings_json)?;
+
+        // Compute funded portfolio value using shared residual logic (excludes DC-linked accounts)
+        let dc_linked = extract_dc_linked_account_ids(&settings);
+        let current_portfolio =
+            compute_residual_portfolio_value(&funding_rules, &all_rules, valuation_map, &dc_linked);
+
+        let _ = goal; // goal loaded for validation; not needed further
+        let mode = plan.planner_mode.as_deref().unwrap_or("fire");
+        Ok(crate::portfolio::fire::compute_retirement_overview(
+            &settings,
+            current_portfolio,
+            mode,
+        ))
+    }
+
+    async fn compute_save_up_overview(
+        &self,
+        goal_id: &str,
+        valuation_map: &AccountValuationMap,
+    ) -> Result<SaveUpOverview> {
+        let goal = self.goal_repo.load_goal(goal_id)?;
+        let plan = self.goal_repo.load_goal_plan(goal_id)?;
+        let funding_rules = self.goal_repo.load_funding_rules(goal_id)?;
+
+        // Compute current value from explicit reservations (same as refresh_goal_summary)
+        let mut current_value = 0.0;
+        for rule in &funding_rules {
+            if let Some(pct) = rule.reservation_percent {
+                if let Some(&v) = valuation_map.get(&rule.account_id) {
+                    current_value += v * pct / 100.0;
+                }
+            }
+        }
+
+        // Parse settings from plan if it exists
+        let (monthly_contribution, expected_return) = if let Some(p) = &plan {
+            let settings: serde_json::Value = serde_json::from_str(&p.settings_json)?;
+            (
+                settings
+                    .get("monthlyContribution")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0),
+                settings
+                    .get("expectedAnnualReturn")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.07),
+            )
+        } else {
+            (0.0, 0.07)
+        };
+
+        let input = SaveUpInput {
+            current_value,
+            target_amount: goal.target_amount.unwrap_or(0.0),
+            target_date: goal.target_date.clone(),
+            monthly_contribution,
+            expected_annual_return: expected_return,
+        };
+
+        Ok(crate::planning::compute_save_up_overview(&input))
     }
 }

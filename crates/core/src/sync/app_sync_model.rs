@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// Canonical list of local tables that participate in app-side device sync.
 /// Order matters: parent tables before children (FK dependencies).
-pub const APP_SYNC_TABLES: [&str; 17] = [
+pub const APP_SYNC_TABLES: [&str; 18] = [
     // Base tables (no FK deps)
     "platforms",
     "assets",
