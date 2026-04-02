@@ -580,9 +580,9 @@ impl CustomScraperProvider {
             .collect();
 
         if sources.is_empty() {
-            return Err(MarketDataError::ProviderError {
+            return Err(MarketDataError::NotSupported {
+                operation: format!("{} quotes", kind),
                 provider: DATA_SOURCE_CUSTOM_SCRAPER.to_string(),
-                message: format!("No enabled custom provider has a '{}' source", kind),
             });
         }
 

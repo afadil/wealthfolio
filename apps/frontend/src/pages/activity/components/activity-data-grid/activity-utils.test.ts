@@ -1,4 +1,4 @@
-import { ActivityType } from "@/lib/constants";
+import { ACTIVITY_SUBTYPES, ActivityType } from "@/lib/constants";
 import type { Account } from "@/lib/types";
 import { describe, expect, it } from "vitest";
 import {
@@ -600,6 +600,32 @@ describe("activity-utils", () => {
       });
 
       expect(updated.amount).toBeNull();
+    });
+
+    it("should round asset-backed auto-computed amounts before storing them", () => {
+      const accountLookup = new Map<string, { id: string; name: string; currency: string }>([
+        ["account-1", { id: "account-1", name: "Test Account", currency: "USD" }],
+      ]);
+      const assetCurrencyLookup = new Map<string, string>();
+      const tx = createMockTransaction({
+        activityType: ActivityType.DIVIDEND,
+        subtype: ACTIVITY_SUBTYPES.DRIP,
+        quantity: "1",
+        unitPrice: "0.2",
+        amount: "0.2",
+      });
+
+      const updated = applyTransactionUpdate({
+        transaction: tx,
+        field: "quantity",
+        value: "0.1",
+        accountLookup,
+        assetCurrencyLookup,
+        fallbackCurrency: "USD",
+        resolveTransactionCurrency: () => "USD",
+      });
+
+      expect(updated.amount).toBe("0.02");
     });
 
     it("should not force transfer activity rows to CASH", () => {
