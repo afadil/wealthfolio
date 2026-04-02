@@ -185,6 +185,13 @@ pub fn build_option_metadata(symbol: &str, multiplier: Decimal) -> Option<serde_
     Some(serde_json::json!({ "option": spec }))
 }
 
+/// Strip any weight suffix from a metal symbol, returning the canonical market code.
+///
+/// `"XAU-1KG"` → `"XAU"`, `"XAG"` → `"XAG"`.
+pub fn canonical_metal_code(symbol: &str) -> &str {
+    symbol.split_once('-').map_or(symbol, |(base, _)| base)
+}
+
 /// Parse a metal weight-in-troy-ounces from a symbol weight suffix.
 ///
 /// Symbol format: BASE[-SUFFIX] e.g. "XAU", "XAU-1KG", "XAG-100G"
@@ -450,7 +457,7 @@ impl Asset {
                 quote: Cow::Owned(self.quote_ccy.clone()),
             }),
             InstrumentType::Metal => Some(InstrumentId::Metal {
-                code: Arc::from(symbol.as_str()),
+                code: Arc::from(canonical_metal_code(symbol)),
                 quote: Cow::Owned(self.quote_ccy.clone()),
             }),
             InstrumentType::Option => {
@@ -695,7 +702,7 @@ impl NewAsset {
         }
     }
 
-    /// Creates a new precious metal asset.
+    /// Creates a new market-tracked metal commodity asset.
     ///
     /// `base_code` is the ISO 4217 metal code (XAU, XAG, XPT, XPD).
     /// `weight_suffix` is the optional weight descriptor (e.g. "1KG", "100G", "2OZ").
@@ -719,7 +726,7 @@ impl NewAsset {
         };
 
         Self {
-            kind: AssetKind::PreciousMetal,
+            kind: AssetKind::Investment,
             name: Some(name.clone()),
             display_code: Some(symbol.clone()),
             quote_mode: QuoteMode::Market,

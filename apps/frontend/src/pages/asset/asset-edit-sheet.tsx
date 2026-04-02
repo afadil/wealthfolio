@@ -98,7 +98,7 @@ const EDIT_INSTRUMENT_TYPE_OPTIONS = [
   { value: "CRYPTO", label: "Cryptocurrency" },
   { value: "BOND", label: "Bond" },
   { value: "OPTION", label: "Option" },
-  { value: "METAL", label: "Precious Metal" },
+  { value: "METAL", label: "Metal (Commodity)" },
 ] as const;
 
 // Parse provider overrides from config JSON (supports nested and flat formats)

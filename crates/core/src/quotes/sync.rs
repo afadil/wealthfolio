@@ -89,6 +89,18 @@ fn market_fetch_end_date(now: DateTime<Utc>, exchange_mic: Option<&str>) -> Naiv
     time_utils::market_calendar_date(now, exchange_mic)
 }
 
+/// Determine the effective data provider for an asset.
+///
+/// Priority: sync state `data_source` (if non-empty) → asset `preferred_provider` → Yahoo default.
+fn effective_provider(state: Option<&QuoteSyncState>, asset: &Asset) -> String {
+    state
+        .map(|s| &s.data_source)
+        .filter(|ds| !ds.is_empty())
+        .cloned()
+        .or_else(|| asset.preferred_provider())
+        .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string())
+}
+
 fn extends_to_fetch_end(category: &SyncCategory) -> bool {
     matches!(
         category,
@@ -417,11 +429,7 @@ where
         let mut quote_bounds: HashMap<String, (NaiveDate, NaiveDate)> = HashMap::new();
         let mut assets_by_provider: HashMap<String, Vec<String>> = HashMap::new();
         for asset in assets.iter().filter(|a| self.should_sync_asset(a)) {
-            let provider = existing_states
-                .get(&asset.id)
-                .map(|s| s.data_source.clone())
-                .or_else(|| asset.preferred_provider())
-                .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string());
+            let provider = effective_provider(existing_states.get(&asset.id), asset);
             assets_by_provider
                 .entry(provider)
                 .or_default()
@@ -1349,11 +1357,7 @@ where
         let mut quote_bounds: HashMap<String, (NaiveDate, NaiveDate)> = HashMap::new();
         let mut assets_by_provider: HashMap<String, Vec<String>> = HashMap::new();
         for asset in &syncable {
-            let provider = existing_states
-                .get(&asset.id)
-                .map(|s| s.data_source.clone())
-                .or_else(|| asset.preferred_provider())
-                .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string());
+            let provider = effective_provider(existing_states.get(&asset.id), asset);
             assets_by_provider
                 .entry(provider)
                 .or_default()
@@ -1369,11 +1373,7 @@ where
         let mut plans: Vec<SymbolSyncPlan> = Vec::new();
         for asset in &syncable {
             let state = existing_states.get(&asset.id).cloned();
-            let data_source = state
-                .as_ref()
-                .map(|s| s.data_source.clone())
-                .or_else(|| asset.preferred_provider())
-                .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string());
+            let data_source = effective_provider(state.as_ref(), asset);
             let effective_today =
                 effective_market_today(now, asset.instrument_exchange_mic.as_deref());
             let fetch_end_date =
