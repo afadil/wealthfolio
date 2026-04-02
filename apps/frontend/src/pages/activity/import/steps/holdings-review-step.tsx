@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { parse, parseISO, isValid, format as formatDate } from "date-fns";
-import type { SymbolSearchResult as GridSymbolSearchResult } from "@wealthfolio/ui";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 
 import { checkHoldingsImport } from "@/adapters";
 import { useImportContext } from "../context";
-import { setMapping, setParsedData, setHoldingsCheckPassed } from "../context/import-actions";
+import { setParsedData, setHoldingsCheckPassed } from "../context/import-actions";
 import { ImportAlert } from "../components/import-alert";
-import { SymbolResolutionPanel } from "../components/symbol-resolution-panel";
 import { HoldingsFormat } from "./holdings-mapping-step";
 import { getDateFnsPattern } from "../utils/date-format-options";
 import { HoldingsDataGrid, type HoldingsRow } from "../components/holdings-data-grid";
@@ -16,7 +14,6 @@ import type {
   HoldingsSnapshotInput,
   HoldingsPositionInput,
   CheckHoldingsImportResult,
-  SymbolSearchResult,
 } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -178,6 +175,7 @@ export function parseHoldingsSnapshots(
   parseOptions: ParseOptions,
   symbolMappings?: Record<string, string>,
   symbolMeta?: Record<string, { exchangeMic?: string }>,
+  symbolAssetIds?: Record<string, string>,
 ): HoldingsSnapshotInput[] {
   const { dateFormat, decimalSeparator, thousandsSeparator, defaultCurrency } = parseOptions;
 
@@ -241,12 +239,14 @@ export function parseHoldingsSnapshots(
     } else {
       // Security position
       const exchangeMic = symbolMeta?.[rawSymbol]?.exchangeMic ?? symbolMeta?.[symbol]?.exchangeMic;
+      const assetId = symbolAssetIds?.[symbol] ?? symbolAssetIds?.[rawSymbol];
       snapshot.positions.push({
         symbol,
         quantity,
         avgCost: avgCost || undefined,
         currency: currency || defaultCurrency,
         ...(exchangeMic ? { exchangeMic } : {}),
+        ...(assetId ? { assetId } : {}),
       });
     }
   }
@@ -389,26 +389,9 @@ export function HoldingsReviewStep() {
         if (cancelled) return;
         setCheckResult(result);
 
-        const unfound = result.symbols.filter((s) => !s.found);
-        const hasErrors = result.validationErrors.length > 0;
-        dispatch(setHoldingsCheckPassed(unfound.length === 0 && !hasErrors));
-
-        // Merge check-resolved exchange_mic into symbolMappingMeta
-        // (don't overwrite entries already set by user via ticker search)
-        if (mapping && result.symbols.length > 0) {
-          const existingMeta = mapping.symbolMappingMeta || {};
-          let changed = false;
-          const merged = { ...existingMeta };
-          for (const sym of result.symbols) {
-            if (sym.exchangeMic && !merged[sym.symbol]?.exchangeMic) {
-              merged[sym.symbol] = { ...merged[sym.symbol], exchangeMic: sym.exchangeMic };
-              changed = true;
-            }
-          }
-          if (changed) {
-            dispatch(setMapping({ ...mapping, symbolMappingMeta: merged }));
-          }
-        }
+        // Assets are already resolved in the asset review step,
+        // so only validation errors (bad dates, quantities) block progress.
+        dispatch(setHoldingsCheckPassed(result.validationErrors.length === 0));
       })
       .catch(() => {
         if (!cancelled) {
@@ -425,9 +408,6 @@ export function HoldingsReviewStep() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId, snapshots]);
-
-  const newSymbols = checkResult?.symbols.filter((s) => !s.found) ?? [];
-  const foundSymbols = checkResult?.symbols.filter((s) => s.found) ?? [];
 
   // Handle data changes from the grid (quantity, avgCost, currency edits)
   const handleDataChange = useCallback(
@@ -456,73 +436,6 @@ export function HoldingsReviewStep() {
       dispatch(setParsedData(headers, updatedParsedRows));
     },
     [parsedRows, headers, fieldMappings, dispatch],
-  );
-
-  // Handle symbol selection from the grid's ticker search
-  const handleSymbolSelect = useCallback(
-    (_rowIndex: number, symbol: string, result?: GridSymbolSearchResult) => {
-      if (!mapping || !result) return;
-
-      // Find the raw symbol for this row to create the mapping
-      const row = holdingsRows.find((r) => r.rowIndex === _rowIndex);
-      if (!row) return;
-
-      const csvSymbol = row.rawSymbol;
-      const newSymbolMappings = { ...mapping.symbolMappings, [csvSymbol]: symbol };
-      const newSymbolMappingMeta = {
-        ...(mapping.symbolMappingMeta || {}),
-        [csvSymbol]: {
-          exchangeMic: result.exchangeMic,
-          symbolName: result.longName,
-          quoteCcy: result.currency,
-          instrumentType:
-            "quoteType" in result ? (result as { quoteType?: string }).quoteType : undefined,
-        },
-      };
-
-      dispatch(
-        setMapping({
-          ...mapping,
-          symbolMappings: newSymbolMappings,
-          symbolMappingMeta: newSymbolMappingMeta,
-        }),
-      );
-    },
-    [mapping, holdingsRows, dispatch],
-  );
-
-  // Handle batch symbol resolution from the shared panel (same pattern as activity import)
-  const handleSymbolResolution = useCallback(
-    (mappings: Record<string, SymbolSearchResult>) => {
-      if (!mapping) return;
-
-      const newSymbolMappings = { ...mapping.symbolMappings };
-      const newSymbolMappingMeta = { ...(mapping.symbolMappingMeta || {}) };
-
-      for (const [csvSymbol, result] of Object.entries(mappings)) {
-        newSymbolMappings[csvSymbol] = result.symbol;
-        newSymbolMappingMeta[csvSymbol] = {
-          exchangeMic: result.exchangeMic,
-          symbolName: result.longName,
-          quoteCcy: result.currency,
-          instrumentType: result.quoteType,
-        };
-      }
-
-      dispatch(
-        setMapping({
-          ...mapping,
-          symbolMappings: newSymbolMappings,
-          symbolMappingMeta: newSymbolMappingMeta,
-        }),
-      );
-    },
-    [mapping, dispatch],
-  );
-
-  const unresolvedSymbols = useMemo(
-    () => newSymbols.map((s) => ({ csvSymbol: s.symbol })),
-    [newSymbols],
   );
 
   return (
@@ -564,15 +477,6 @@ export function HoldingsReviewStep() {
             icon={Icons.AlertTriangle}
             className="mb-0"
           />
-        ) : newSymbols.length > 0 ? (
-          <ImportAlert
-            variant="warning"
-            size="sm"
-            title="Unresolved Symbols"
-            description={`${newSymbols.length} to map`}
-            icon={Icons.AlertTriangle}
-            className="mb-0"
-          />
         ) : (
           <ImportAlert
             variant="success"
@@ -599,18 +503,6 @@ export function HoldingsReviewStep() {
               </p>
             </ImportAlert>
           )}
-          <SymbolResolutionPanel
-            unresolvedSymbols={unresolvedSymbols}
-            onApplyMappings={handleSymbolResolution}
-          />
-          {foundSymbols.length > 0 && (
-            <ImportAlert variant="info" size="sm" title="Matched Assets">
-              <p className="text-xs">
-                {foundSymbols.length} symbol{foundSymbols.length !== 1 ? "s" : ""} matched existing
-                assets: {foundSymbols.map((s) => `${s.symbol} (${s.assetName})`).join(", ")}
-              </p>
-            </ImportAlert>
-          )}
           {checkResult.validationErrors.length > 0 && (
             <ImportAlert variant="destructive" size="sm" title="Validation Errors">
               <ul className="list-inside list-disc text-xs">
@@ -624,11 +516,7 @@ export function HoldingsReviewStep() {
       )}
 
       {/* Editable Data Grid */}
-      <HoldingsDataGrid
-        rows={holdingsRows}
-        onDataChange={handleDataChange}
-        onSymbolSelect={handleSymbolSelect}
-      />
+      <HoldingsDataGrid rows={holdingsRows} onDataChange={handleDataChange} />
     </div>
   );
 }

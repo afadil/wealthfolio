@@ -48,7 +48,10 @@ import { HoldingsReviewStep } from "./steps/holdings-review-step";
 // Constants
 import { IMPORT_REQUIRED_FIELDS, ImportFormat } from "@/lib/constants";
 import { computeFieldMappings } from "./hooks/use-import-mapping";
-import { buildImportAssetCandidateFromDraft } from "./utils/asset-review-utils";
+import {
+  buildImportAssetCandidateFromDraft,
+  buildSyntheticDraftsFromHoldings,
+} from "./utils/asset-review-utils";
 import { isFieldMapped, primaryHeader } from "./utils/draft-utils";
 import { findMappedActivityType, validateTickerSymbol } from "./utils/validation-utils";
 
@@ -75,18 +78,19 @@ const STEP_COMPONENTS: Record<ImportStep, React.ComponentType> = {
 
 // Holdings import steps (for HOLDINGS-mode accounts)
 const HOLDINGS_STEP_COMPONENTS: Record<ImportStep, React.ComponentType> = {
-  upload: UploadStep, // Same upload step
+  upload: UploadStep,
   mapping: HoldingsMappingStep,
-  assets: HoldingsReviewStep,
+  assets: AssetReviewStep,
   review: HoldingsReviewStep,
   confirm: HoldingsConfirmStep,
-  result: ContextResultStep, // Same result step
+  result: ContextResultStep,
 };
 
 const HOLDINGS_STEPS: WizardStep[] = [
   { id: "upload", label: "Upload" },
   { id: "mapping", label: "Mapping" },
-  { id: "review", label: "Review" },
+  { id: "assets", label: "Review Assets" },
+  { id: "review", label: "Review Holdings" },
   { id: "confirm", label: "Import" },
 ];
 
@@ -113,32 +117,12 @@ function useStepValidation(isHoldingsMode: boolean, accounts?: Account[]) {
 
       case "mapping": {
         if (isHoldingsMode) {
-          // Holdings mode: check if required holdings fields are mapped
+          // Holdings mode: only check required fields are mapped.
+          // Symbol resolution happens in the asset review step.
           if (!mapping) return false;
-          const requiredFieldsMapped = HOLDINGS_REQUIRED_FIELDS.every((field) =>
+          return HOLDINGS_REQUIRED_FIELDS.every((field) =>
             isFieldMapped(mapping.fieldMappings[field], headers),
           );
-          if (!requiredFieldsMapped) return false;
-
-          // Check if all non-$CASH symbols are valid or resolved
-          const symbolCol = primaryHeader(mapping.fieldMappings[HoldingsFormat.SYMBOL]);
-          if (symbolCol) {
-            const symIndex = headers.indexOf(symbolCol);
-            if (symIndex !== -1) {
-              const uniqueSyms = new Set<string>();
-              for (const row of parsedRows) {
-                const sym = row[symIndex]?.trim().toUpperCase();
-                if (sym && sym !== "$CASH") uniqueSyms.add(sym);
-              }
-              for (const sym of uniqueSyms) {
-                if (!validateTickerSymbol(sym) && !mapping.symbolMappings?.[sym]) {
-                  return false;
-                }
-              }
-            }
-          }
-
-          return true;
         }
 
         // Activity mode: existing validation logic
@@ -401,12 +385,25 @@ function ImportWizardContent() {
         );
       }
 
-      if (
-        state.step === "mapping" &&
-        !isHoldingsMode &&
-        state.mapping &&
-        state.parsedRows.length > 0
-      ) {
+      if (state.step === "mapping" && state.mapping && state.parsedRows.length > 0) {
+        if (isHoldingsMode) {
+          // Holdings mode: build synthetic drafts for asset review
+          const drafts = buildSyntheticDraftsFromHoldings(
+            state.headers,
+            state.parsedRows,
+            state.mapping,
+            state.accountId,
+            state.parseConfig.defaultCurrency,
+          );
+          dispatch(setDraftActivities(drafts));
+          dispatch({ type: "SET_ASSET_PREVIEW_ITEMS", payload: [] });
+          dispatch({ type: "CLEAR_PENDING_IMPORT_ASSETS" });
+          dispatch(nextStep());
+          void previewAssets(drafts);
+          return;
+        }
+
+        // Activity mode: build draft activities
         const drafts = createDraftActivities(
           state.parsedRows,
           state.headers,
@@ -433,7 +430,12 @@ function ImportWizardContent() {
         return;
       }
 
-      if (state.step === "assets" && !isHoldingsMode) {
+      if (state.step === "assets") {
+        if (isHoldingsMode) {
+          // Holdings mode: just advance to review step (no validateDrafts needed)
+          dispatch(nextStep());
+          return;
+        }
         setIsNextLoading(true);
         try {
           const result = await validateDrafts(state.draftActivities);
@@ -498,9 +500,9 @@ function ImportWizardContent() {
       case "upload":
         return "Configure Mapping";
       case "mapping":
-        return isHoldingsMode ? "Review Holdings" : "Review Assets";
+        return "Review Assets";
       case "assets":
-        return "Review Activities";
+        return isHoldingsMode ? "Review Holdings" : "Review Activities";
       case "review":
         return state.lastValidatedRevision === state.draftRevision
           ? "Continue to Import"

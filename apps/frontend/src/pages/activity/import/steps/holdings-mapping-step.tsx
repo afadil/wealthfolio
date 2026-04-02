@@ -17,9 +17,7 @@ import { QueryKeys } from "@/lib/query-keys";
 import { useImportContext } from "../context";
 import { setMapping } from "../context/import-actions";
 import { ImportAlert } from "../components/import-alert";
-import { validateTickerSymbol } from "../utils/validation-utils";
-import TickerSearchInput from "@/components/ticker-search";
-import type { ImportMappingData, SymbolSearchResult } from "@/lib/types";
+import type { ImportMappingData } from "@/lib/types";
 import { ImportType } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -329,28 +327,6 @@ export function HoldingsMappingStep() {
     return parsedRows.filter((row) => row[symbolIndex]?.toUpperCase() === "$CASH").length;
   }, [parsedRows, symbolIndex]);
 
-  // Extract unique non-$CASH symbols and validate them
-  const uniqueSymbols = useMemo(() => {
-    if (symbolIndex === -1) return [];
-    const symbolCounts = new Map<string, number>();
-    for (const row of parsedRows) {
-      const sym = row[symbolIndex]?.trim().toUpperCase();
-      if (sym && sym !== "$CASH") {
-        symbolCounts.set(sym, (symbolCounts.get(sym) || 0) + 1);
-      }
-    }
-    return Array.from(symbolCounts.entries()).map(([symbol, count]) => ({
-      symbol,
-      count,
-      isValid: validateTickerSymbol(symbol),
-    }));
-  }, [parsedRows, symbolIndex]);
-
-  const unresolvedSymbolCount = useMemo(
-    () => uniqueSymbols.filter((s) => !s.isValid && !mapping?.symbolMappings?.[s.symbol]).length,
-    [uniqueSymbols, mapping?.symbolMappings],
-  );
-
   // ───────────────────────────────────────────────────────────────────────────
   // Handlers
   // ───────────────────────────────────────────────────────────────────────────
@@ -383,41 +359,6 @@ export function HoldingsMappingStep() {
   const accountIdRef = useRef(state.accountId);
   accountIdRef.current = state.accountId;
 
-  // Handle symbol resolution from TickerSearchInput
-  const handleSymbolResolution = useCallback(
-    (csvSymbol: string, resolvedSymbol: string, result?: SymbolSearchResult) => {
-      const currentMapping = mappingRef.current || {
-        accountId: accountIdRef.current,
-        importType: ImportType.HOLDINGS,
-        name: "holdings-import",
-        fieldMappings: localFieldMappings,
-        activityMappings: {},
-        symbolMappings: {},
-        accountMappings: {},
-      };
-
-      const updatedMapping: ImportMappingData = {
-        ...currentMapping,
-        fieldMappings: localFieldMappings,
-        symbolMappings: {
-          ...currentMapping.symbolMappings,
-          [csvSymbol]: resolvedSymbol,
-        },
-        symbolMappingMeta: {
-          ...(currentMapping.symbolMappingMeta || {}),
-          [csvSymbol]: {
-            exchangeMic: result?.exchangeMic,
-            symbolName: result?.longName,
-            quoteCcy: result?.currency,
-            instrumentType: result?.quoteType,
-          },
-        },
-      };
-      dispatch(setMapping(updatedMapping));
-    },
-    [localFieldMappings, dispatch],
-  );
-
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
@@ -443,12 +384,10 @@ export function HoldingsMappingStep() {
   // Render
   // ───────────────────────────────────────────────────────────────────────────
 
-  const showSymbolSection = requiredFieldsMapped && uniqueSymbols.length > 0;
-
   return (
     <div className="space-y-4">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <ImportAlert
           variant={requiredFieldsMapped ? "success" : "destructive"}
           size="sm"
@@ -458,18 +397,6 @@ export function HoldingsMappingStep() {
           className="mb-0"
           rightIcon={requiredFieldsMapped ? Icons.CheckCircle : Icons.AlertCircle}
         />
-
-        {showSymbolSection && (
-          <ImportAlert
-            variant={unresolvedSymbolCount === 0 ? "success" : "destructive"}
-            size="sm"
-            title="Symbols"
-            description={`${uniqueSymbols.length - unresolvedSymbolCount} of ${uniqueSymbols.length} resolved`}
-            icon={Icons.Tag}
-            className="mb-0"
-            rightIcon={unresolvedSymbolCount === 0 ? Icons.CheckCircle : Icons.AlertCircle}
-          />
-        )}
 
         {requiredFieldsMapped && (
           <>
@@ -493,9 +420,8 @@ export function HoldingsMappingStep() {
         )}
       </div>
 
-      {/* Two-column layout: Columns + Symbols */}
-      <div className={cn("grid gap-4", showSymbolSection ? "grid-cols-1 lg:grid-cols-2" : "")}>
-        {/* Left: Column Mapping */}
+      {/* Column Mapping */}
+      <div className="grid gap-4">
         <Card>
           <CardHeader className="px-4 py-3">
             <CardTitle className="text-sm font-medium">Column Mapping</CardTitle>
@@ -581,62 +507,6 @@ export function HoldingsMappingStep() {
             })}
           </CardContent>
         </Card>
-
-        {/* Right: Symbol Resolution */}
-        {showSymbolSection && (
-          <Card>
-            <CardHeader className="px-4 py-3">
-              <CardTitle className="text-sm font-medium">Symbol Resolution</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1.5 px-4 pb-4">
-              {uniqueSymbols.map(({ symbol, count, isValid }) => {
-                const resolved = mapping?.symbolMappings?.[symbol];
-                const isOk = isValid || !!resolved;
-                return (
-                  <div
-                    key={symbol}
-                    className={cn(
-                      "flex items-center gap-2 rounded-md border px-2.5 py-1",
-                      isOk
-                        ? "border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/20"
-                        : "border-amber-200 bg-amber-50/50 dark:border-amber-900 dark:bg-amber-950/20",
-                    )}
-                  >
-                    {/* Status icon */}
-                    {isOk ? (
-                      <Icons.CheckCircle className="h-4 w-4 shrink-0 text-green-600" />
-                    ) : (
-                      <Icons.AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
-                    )}
-
-                    {/* Symbol info */}
-                    <div className="min-w-0 flex-1">
-                      <span className="text-sm font-medium">{symbol}</span>
-                      <span className="text-muted-foreground ml-2 text-xs">
-                        {count} {count === 1 ? "row" : "rows"}
-                      </span>
-                    </div>
-
-                    {/* Arrow */}
-                    <Icons.ArrowRight className="text-muted-foreground h-4 w-4 shrink-0" />
-
-                    {/* Ticker search */}
-                    <TickerSearchInput
-                      defaultValue={resolved || symbol}
-                      placeholder={`Search for ${symbol}...`}
-                      onSelectResult={(resolvedSym, result) => {
-                        if (resolvedSym) {
-                          handleSymbolResolution(symbol, resolvedSym, result);
-                        }
-                      }}
-                      className="h-8 w-[200px] shrink-0 text-xs"
-                    />
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        )}
       </div>
 
       {/* CSV Preview */}

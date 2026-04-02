@@ -11,6 +11,7 @@ import { importHoldingsCsv, saveAccountImportMapping, logger } from "@/adapters"
 import { useImportContext } from "../context";
 import { setImportResult, nextStep } from "../context/import-actions";
 import { parseHoldingsSnapshots } from "./holdings-review-step";
+import { HoldingsFormat } from "./holdings-mapping-step";
 import type { ImportHoldingsCsvResult } from "@/lib/types";
 import { ImportType } from "@/lib/types";
 
@@ -20,8 +21,34 @@ import { ImportType } from "@/lib/types";
 
 export function HoldingsConfirmStep() {
   const { state, dispatch } = useImportContext();
-  const { headers, parsedRows, mapping, parseConfig, accountId } = state;
+  const { headers, parsedRows, mapping, parseConfig, accountId, draftActivities } = state;
   const navigate = useNavigate();
+
+  // Build symbol→assetId lookup from synthetic drafts (set during asset review).
+  // Key by both the resolved symbol AND the raw CSV symbol so that
+  // parseHoldingsSnapshots can match regardless of which symbol it uses.
+  const symbolAssetIds = useMemo(() => {
+    const fieldMappings = (mapping?.fieldMappings || {}) as Record<string, string>;
+    const symHeader = fieldMappings[HoldingsFormat.SYMBOL];
+    const symIndex = symHeader ? headers.indexOf(symHeader) : -1;
+
+    const map: Record<string, string> = {};
+    for (const draft of draftActivities) {
+      if (!draft.assetId) continue;
+      // Key by resolved symbol
+      if (draft.symbol) {
+        map[draft.symbol] = draft.assetId;
+      }
+      // Also key by the raw CSV symbol from the original row
+      if (symIndex >= 0) {
+        const rawSym = draft.rawRow[symIndex]?.trim().toUpperCase();
+        if (rawSym && rawSym !== "$CASH") {
+          map[rawSym] = draft.assetId;
+        }
+      }
+    }
+    return map;
+  }, [draftActivities, mapping?.fieldMappings, headers]);
 
   // Parse snapshots from CSV data
   const snapshots = useMemo(() => {
@@ -38,6 +65,7 @@ export function HoldingsConfirmStep() {
       },
       mapping?.symbolMappings,
       mapping?.symbolMappingMeta,
+      symbolAssetIds,
     );
   }, [
     headers,
@@ -46,7 +74,48 @@ export function HoldingsConfirmStep() {
     mapping?.symbolMappings,
     mapping?.symbolMappingMeta,
     parseConfig,
+    symbolAssetIds,
   ]);
+
+  // Build enriched symbol mappings that include resolutions from the asset review step.
+  // AssetReviewStep only updates draftActivities (via applyAssetResolution), not
+  // mapping.symbolMappings, so we merge those resolutions back for template saving.
+  const enrichedMapping = useMemo(() => {
+    if (!mapping) return mapping;
+    const fieldMappings = (mapping.fieldMappings || {}) as Record<string, string>;
+    const symHeader = fieldMappings[HoldingsFormat.SYMBOL];
+    const symIndex = symHeader ? headers.indexOf(symHeader) : -1;
+    if (symIndex === -1) return mapping;
+
+    const mergedSymbolMappings = { ...mapping.symbolMappings };
+    const mergedSymbolMeta = { ...(mapping.symbolMappingMeta || {}) };
+
+    for (const draft of draftActivities) {
+      const rawSym = draft.rawRow[symIndex]?.trim().toUpperCase();
+      if (!rawSym || rawSym === "$CASH" || !draft.symbol) continue;
+      // If the resolved symbol differs from the raw CSV symbol, record the mapping
+      if (draft.symbol !== rawSym && !mergedSymbolMappings[rawSym]) {
+        mergedSymbolMappings[rawSym] = draft.symbol;
+      }
+      if (
+        !mergedSymbolMeta[rawSym] &&
+        (draft.exchangeMic || draft.quoteCcy || draft.instrumentType)
+      ) {
+        mergedSymbolMeta[rawSym] = {
+          exchangeMic: draft.exchangeMic,
+          quoteCcy: draft.quoteCcy,
+          instrumentType: draft.instrumentType,
+          symbolName: draft.symbolName,
+        };
+      }
+    }
+
+    return {
+      ...mapping,
+      symbolMappings: mergedSymbolMappings,
+      symbolMappingMeta: mergedSymbolMeta,
+    };
+  }, [mapping, draftActivities, headers]);
 
   // Import mutation
   const importMutation = useMutation({
@@ -55,10 +124,10 @@ export function HoldingsConfirmStep() {
     },
     onSuccess: async (result: ImportHoldingsCsvResult) => {
       // Save the mapping profile for future imports
-      if (mapping && accountId) {
+      if (enrichedMapping && accountId) {
         try {
           await saveAccountImportMapping({
-            ...mapping,
+            ...enrichedMapping,
             accountId,
             importType: ImportType.HOLDINGS,
             parseConfig: parseConfig,

@@ -28,7 +28,7 @@ export interface HoldingsRow {
 export interface HoldingsDataGridProps {
   rows: HoldingsRow[];
   onDataChange: (nextRows: HoldingsRow[]) => void;
-  onSymbolSelect: (rowIndex: number, symbol: string, result?: SymbolSearchResult) => void;
+  onSymbolSelect?: (rowIndex: number, symbol: string, result?: SymbolSearchResult) => void;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -157,7 +157,7 @@ export function HoldingsDataGrid({ rows, onDataChange, onSymbolSelect }: Holding
       if (!row) return;
 
       const currency = result.currency ?? row.currency ?? fallbackCurrency;
-      onSymbolSelect(row.rowIndex, result.symbol, result);
+      onSymbolSelect?.(row.rowIndex, result.symbol, result);
 
       // Also update currency from search result
       const nextRows = [...rows];
@@ -180,7 +180,7 @@ export function HoldingsDataGrid({ rows, onDataChange, onSymbolSelect }: Holding
       if (!row) return;
 
       const currency = result.currency ?? row.currency ?? fallbackCurrency;
-      onSymbolSelect(row.rowIndex, result.symbol, result);
+      onSymbolSelect?.(row.rowIndex, result.symbol, result);
 
       const nextRows = [...rows];
       nextRows[rowIndex] = { ...nextRows[rowIndex], symbol: result.symbol, currency };

@@ -1829,6 +1829,8 @@ export interface HoldingsPositionInput {
   currency: string;
   /** Exchange MIC code (e.g., "XNAS", "XTSE") resolved during check step */
   exchangeMic?: string;
+  /** Resolved asset ID from asset review step */
+  assetId?: string;
 }
 
 /**
