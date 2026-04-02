@@ -103,6 +103,8 @@ export {
   getGoalFunding,
   getGoalPlan,
   getGoals,
+  getRetirementOverview,
+  getSaveUpOverview,
   refreshAllGoalSummaries,
   refreshGoalSummary,
   saveGoalFunding,

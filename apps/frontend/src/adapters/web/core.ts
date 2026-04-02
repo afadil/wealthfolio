@@ -54,6 +54,12 @@ export const COMMANDS: CommandMap = {
   create_goal: { method: "POST", path: "/goals" },
   update_goal: { method: "PUT", path: "/goals" },
   delete_goal: { method: "DELETE", path: "/goals" },
+  // FIRE simulations
+  run_fire_monte_carlo: { method: "POST", path: "/fire/monte-carlo" },
+  run_fire_scenario_analysis: { method: "POST", path: "/fire/scenario-analysis" },
+  run_fire_sensitivity: { method: "POST", path: "/fire/sensitivity-analysis" },
+  run_fire_sorr: { method: "POST", path: "/fire/sequence-of-returns" },
+  run_fire_strategy_comparison: { method: "POST", path: "/fire/strategy-comparison" },
   // FX
   get_latest_exchange_rates: { method: "GET", path: "/exchange-rates/latest" },
   update_exchange_rate: { method: "PUT", path: "/exchange-rates" },
@@ -520,6 +526,15 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "delete_goal": {
       const { goalId } = payload as { goalId: string };
       url += `/${encodeURIComponent(goalId)}`;
+      break;
+    }
+    // FIRE simulation commands
+    case "run_fire_monte_carlo":
+    case "run_fire_scenario_analysis":
+    case "run_fire_sensitivity":
+    case "run_fire_sorr":
+    case "run_fire_strategy_comparison": {
+      body = JSON.stringify(payload);
       break;
     }
     case "create_goal": {
