@@ -601,7 +601,7 @@ async fn import_single_snapshot_impl(
             .unwrap_or(Decimal::ZERO);
 
         positions.push(ManualHoldingInput {
-            asset_id: None,
+            asset_id: pos_input.asset_id.clone(),
             symbol: pos_input.symbol.clone(),
             exchange_mic: pos_input.exchange_mic.clone(),
             quantity,

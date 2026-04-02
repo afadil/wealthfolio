@@ -9,9 +9,9 @@ const SWIPE_DRAG_BLOCK_SELECTOR = "[data-no-swipe-drag]";
 
 function hasSwipeDragBlocker(evt: Event): boolean {
   if (typeof evt.composedPath === "function") {
-    return evt.composedPath().some(
-      (node) => node instanceof Element && node.closest(SWIPE_DRAG_BLOCK_SELECTOR) !== null,
-    );
+    return evt
+      .composedPath()
+      .some((node) => node instanceof Element && node.closest(SWIPE_DRAG_BLOCK_SELECTOR) !== null);
   }
 
   return evt.target instanceof Element && evt.target.closest(SWIPE_DRAG_BLOCK_SELECTOR) !== null;

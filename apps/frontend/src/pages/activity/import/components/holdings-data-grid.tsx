@@ -28,7 +28,8 @@ export interface HoldingsRow {
 export interface HoldingsDataGridProps {
   rows: HoldingsRow[];
   onDataChange: (nextRows: HoldingsRow[]) => void;
-  onSymbolSelect: (rowIndex: number, symbol: string, result?: SymbolSearchResult) => void;
+  onSymbolSelect?: (rowIndex: number, symbol: string, result?: SymbolSearchResult) => void;
+  enableSymbolEditing?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -39,12 +40,14 @@ interface UseHoldingsColumnsOptions {
   onSymbolSearch: (query: string) => Promise<SymbolSearchResult[]>;
   onSymbolSelect?: (rowIndex: number, symbol: string, result?: SymbolSearchResult) => void;
   onCreateCustomAsset?: (rowIndex: number, symbol: string) => void;
+  enableSymbolEditing: boolean;
 }
 
 function useHoldingsColumns({
   onSymbolSearch,
   onSymbolSelect,
   onCreateCustomAsset,
+  enableSymbolEditing,
 }: UseHoldingsColumnsOptions): ColumnDef<HoldingsRow>[] {
   return useMemo<ColumnDef<HoldingsRow>[]>(
     () => [
@@ -77,15 +80,17 @@ function useHoldingsColumns({
         accessorKey: "symbol",
         header: "Symbol",
         size: 160,
-        meta: {
-          cell: {
-            variant: "symbol",
-            onSearch: onSymbolSearch,
-            onSelect: onSymbolSelect,
-            onCreateCustomAsset,
-            isDisabled: (rowData: unknown) => (rowData as HoldingsRow).isCash,
-          },
-        },
+        meta: enableSymbolEditing
+          ? {
+              cell: {
+                variant: "symbol",
+                onSearch: onSymbolSearch,
+                onSelect: onSymbolSelect,
+                onCreateCustomAsset,
+                isDisabled: (rowData: unknown) => (rowData as HoldingsRow).isCash,
+              },
+            }
+          : { cell: { variant: "short-text" } },
       },
       // 4. Quantity
       {
@@ -115,7 +120,7 @@ function useHoldingsColumns({
         meta: { cell: { variant: "currency" } },
       },
     ],
-    [onSymbolSearch, onSymbolSelect, onCreateCustomAsset],
+    [enableSymbolEditing, onSymbolSearch, onSymbolSelect, onCreateCustomAsset],
   );
 }
 
@@ -123,7 +128,12 @@ function useHoldingsColumns({
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function HoldingsDataGrid({ rows, onDataChange, onSymbolSelect }: HoldingsDataGridProps) {
+export function HoldingsDataGrid({
+  rows,
+  onDataChange,
+  onSymbolSelect,
+  enableSymbolEditing = true,
+}: HoldingsDataGridProps) {
   const { settings } = useSettingsContext();
   const fallbackCurrency = settings?.baseCurrency ?? "USD";
 
@@ -157,7 +167,7 @@ export function HoldingsDataGrid({ rows, onDataChange, onSymbolSelect }: Holding
       if (!row) return;
 
       const currency = result.currency ?? row.currency ?? fallbackCurrency;
-      onSymbolSelect(row.rowIndex, result.symbol, result);
+      onSymbolSelect?.(row.rowIndex, result.symbol, result);
 
       // Also update currency from search result
       const nextRows = [...rows];
@@ -180,7 +190,7 @@ export function HoldingsDataGrid({ rows, onDataChange, onSymbolSelect }: Holding
       if (!row) return;
 
       const currency = result.currency ?? row.currency ?? fallbackCurrency;
-      onSymbolSelect(row.rowIndex, result.symbol, result);
+      onSymbolSelect?.(row.rowIndex, result.symbol, result);
 
       const nextRows = [...rows];
       nextRows[rowIndex] = { ...nextRows[rowIndex], symbol: result.symbol, currency };
@@ -196,6 +206,7 @@ export function HoldingsDataGrid({ rows, onDataChange, onSymbolSelect }: Holding
     onSymbolSearch: handleSymbolSearch,
     onSymbolSelect: handleSymbolSelect,
     onCreateCustomAsset: handleCreateCustomAsset,
+    enableSymbolEditing,
   });
 
   // Handle data changes from inline editing

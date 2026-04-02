@@ -1,6 +1,12 @@
 import { isCashSymbol, needsImportAssetResolution } from "@/lib/activity-utils";
-import type { ImportAssetCandidate, NewAsset, SymbolSearchResult } from "@/lib/types";
+import type {
+  ImportAssetCandidate,
+  ImportMappingData,
+  NewAsset,
+  SymbolSearchResult,
+} from "@/lib/types";
 import type { DraftActivity } from "../context";
+import { HoldingsFormat } from "../steps/holdings-mapping-step";
 
 export function applyAssetResolution(
   drafts: DraftActivity[],
@@ -155,4 +161,73 @@ export function buildNewAssetFromDraft(draft: DraftActivity): NewAsset | null {
     instrumentSymbol: draft.symbol,
     instrumentExchangeMic: draft.exchangeMic,
   };
+}
+
+/**
+ * Build synthetic DraftActivity[] from parsed holdings CSV rows.
+ * These are used to drive the existing AssetReviewStep for holdings import.
+ */
+export function buildSyntheticDraftsFromHoldings(
+  headers: string[],
+  parsedRows: string[][],
+  mapping: ImportMappingData,
+  accountId: string,
+  defaultCurrency: string,
+): DraftActivity[] {
+  const fieldMappings = mapping.fieldMappings as Record<string, string>;
+  const symbolMappings = mapping.symbolMappings || {};
+  const symbolMeta = mapping.symbolMappingMeta || {};
+
+  const symbolIndex = fieldMappings[HoldingsFormat.SYMBOL]
+    ? headers.indexOf(fieldMappings[HoldingsFormat.SYMBOL])
+    : -1;
+  const currencyIndex = fieldMappings[HoldingsFormat.CURRENCY]
+    ? headers.indexOf(fieldMappings[HoldingsFormat.CURRENCY])
+    : -1;
+
+  if (symbolIndex === -1) return [];
+
+  const drafts: DraftActivity[] = [];
+
+  for (let i = 0; i < parsedRows.length; i++) {
+    const row = parsedRows[i];
+    const rawSymbol = row[symbolIndex]?.trim().toUpperCase();
+    if (!rawSymbol || rawSymbol === "$CASH") continue;
+
+    const resolvedSymbol = symbolMappings[rawSymbol] || rawSymbol;
+    const currency =
+      (currencyIndex >= 0 ? row[currencyIndex]?.trim() : undefined) || defaultCurrency;
+    const meta = symbolMeta[rawSymbol] || symbolMeta[resolvedSymbol] || {};
+
+    const key = buildImportAssetCandidateKey({
+      accountId,
+      symbol: resolvedSymbol,
+      instrumentType: meta.instrumentType,
+      quoteCcy: meta.quoteCcy || currency,
+      exchangeMic: meta.exchangeMic,
+    });
+
+    drafts.push({
+      rowIndex: i,
+      rawRow: row,
+      activityDate: "2000-01-01",
+      activityType: "BUY",
+      symbol: resolvedSymbol,
+      currency,
+      accountId,
+      quantity: "1",
+      unitPrice: "1",
+      exchangeMic: meta.exchangeMic,
+      quoteCcy: meta.quoteCcy,
+      instrumentType: meta.instrumentType,
+      symbolName: meta.symbolName,
+      assetCandidateKey: key,
+      status: "valid",
+      errors: {},
+      warnings: {},
+      isEdited: false,
+    });
+  }
+
+  return drafts;
 }
