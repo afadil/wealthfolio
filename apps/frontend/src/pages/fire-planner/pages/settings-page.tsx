@@ -12,6 +12,12 @@ import {
   Label,
   Switch,
 } from "@wealthfolio/ui";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@wealthfolio/ui/components/ui/collapsible";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useState, useEffect } from "react";
 import type { FireSettings, IncomeStream } from "../types";
 import { DEFAULT_SETTINGS } from "../types";
@@ -100,6 +106,31 @@ function NumberField({
   );
 }
 
+function SettingsSection({
+  title,
+  defaultOpen = true,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger className="hover:bg-muted/50 flex w-full items-center justify-between rounded-t-lg border px-4 py-3 transition-colors">
+        <span className="text-sm font-semibold">{title}</span>
+        <Icons.ChevronDown
+          className={`text-muted-foreground h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="space-y-4 rounded-b-lg border border-t-0 px-4 pb-4 pt-3">{children}</div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 export default function SettingsPage({
   settings,
   onSave,
@@ -140,7 +171,7 @@ export default function SettingsPage({
     if (!autoConfigResult) return;
     setDraft((prev) => applyAutoConfig(prev, autoConfigResult));
     setAutoConfigResult(null);
-    toast({ title: "Auto-config applied — review and save when ready." });
+    toast({ title: "Auto-config applied \u2014 review and save when ready." });
   }
 
   function update<K extends keyof FireSettings>(key: K, value: FireSettings[K]) {
@@ -249,288 +280,437 @@ export default function SettingsPage({
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Auto-configure from portfolio */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <div>
-            <CardTitle className="text-sm">Auto-configure from portfolio</CardTitle>
-            <p className="text-muted-foreground mt-1 text-xs">
-              Detect monthly contribution, expected return, and target allocations from your
-              portfolio data.
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleAutoConfig}
-            disabled={autoConfigLoading}
-          >
-            {autoConfigLoading ? "Analyzing…" : "Detect from portfolio"}
-          </Button>
-        </CardHeader>
-
-        {autoConfigResult && (
-          <CardContent className="space-y-3">
-            <div className="space-y-2 rounded border p-3 text-xs">
-              {autoConfigResult.monthlyContribution !== null && (
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <span className="font-medium">Monthly contribution</span>
-                    <p className="text-muted-foreground">
-                      {autoConfigResult.notes.monthlyContribution}
-                    </p>
-                  </div>
-                  <span className="shrink-0 font-semibold text-green-600">
-                    {autoConfigResult.monthlyContribution.toLocaleString(undefined, {
-                      maximumFractionDigits: 0,
-                    })}{" "}
-                    {draft.currency}
-                  </span>
-                </div>
-              )}
-              {autoConfigResult.expectedAnnualReturn !== null && (
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <span className="font-medium">Expected annual return</span>
-                    <p className="text-muted-foreground">
-                      {autoConfigResult.notes.expectedAnnualReturn}
-                    </p>
-                  </div>
-                  <span className="shrink-0 font-semibold text-green-600">
-                    {(autoConfigResult.expectedAnnualReturn * 100).toFixed(1)}%
-                  </span>
-                </div>
-              )}
-              {autoConfigResult.targetAllocations !== null && (
-                <div>
-                  <span className="font-medium">Target allocations</span>
-                  <p className="text-muted-foreground">
-                    {autoConfigResult.notes.targetAllocations}
-                  </p>
-                  <p className="mt-1">
-                    {Object.entries(autoConfigResult.targetAllocations)
-                      .map(([sym, w]) => `${sym} ${(w * 100).toFixed(1)}%`)
-                      .join(" · ")}
-                  </p>
-                </div>
-              )}
-              {autoConfigResult.monthlyContribution === null &&
-                autoConfigResult.expectedAnnualReturn === null &&
-                autoConfigResult.targetAllocations === null && (
-                  <p className="text-muted-foreground">
-                    No data could be detected. Add activities and holdings to Wealthfolio first.
-                  </p>
-                )}
-            </div>
-            {(autoConfigResult.monthlyContribution !== null ||
-              autoConfigResult.expectedAnnualReturn !== null ||
-              autoConfigResult.targetAllocations !== null) && (
-              <div className="flex gap-2">
-                <Button size="sm" onClick={applyDetected}>
-                  Apply detected values
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setAutoConfigResult(null)}>
-                  Dismiss
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        )}
-      </Card>
-
-      {/* FIRE Parameters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">FIRE Parameters</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <NumberField
-              label={`Monthly expenses in FIRE (${draft.currency})`}
-              value={draft.monthlyExpensesAtFire}
-              onChange={(v) => update("monthlyExpensesAtFire", v)}
-              min={0}
-            />
-            <NumberField
-              label="Current age"
-              value={draft.currentAge}
-              onChange={(v) => update("currentAge", v)}
-              min={1}
-            />
-            <NumberField
-              label="Target FIRE age"
-              value={draft.targetFireAge}
-              onChange={(v) => update("targetFireAge", v)}
-              min={1}
-            />
-            <NumberField
-              label="Planning horizon age (life expectancy)"
-              value={draft.planningHorizonAge}
-              onChange={(v) => update("planningHorizonAge", v)}
-              min={draft.targetFireAge + 1}
-            />
-          </div>
-          <SliderField
-            label="Safe Withdrawal Rate"
-            value={draft.safeWithdrawalRate}
-            min={0.025}
-            max={0.06}
-            step={0.0025}
-            displayValue={(draft.safeWithdrawalRate * 100).toFixed(2) + "%"}
-            onChange={(v) => update("safeWithdrawalRate", v)}
-          />
-          <div className="space-y-2">
-            <Label className="text-xs">Withdrawal Strategy</Label>
-            <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
-              {(["constant-dollar", "constant-percentage"] as const).map((s) => (
-                <label key={s} className="flex cursor-pointer items-center gap-2 text-xs">
-                  <input
-                    type="radio"
-                    name="withdrawalStrategy"
-                    value={s}
-                    checked={(draft.withdrawalStrategy ?? "constant-dollar") === s}
-                    onChange={() => update("withdrawalStrategy", s)}
-                  />
-                  {s === "constant-dollar"
-                    ? "Constant dollar (fixed real spending)"
-                    : "Constant percentage (% of portfolio)"}
-                </label>
-              ))}
-            </div>
-            <p className="text-muted-foreground text-xs">
-              {(draft.withdrawalStrategy ?? "constant-dollar") === "constant-dollar"
-                ? "Withdraw a fixed inflation-adjusted amount each year. Spending is stable but the portfolio can deplete."
-                : `Withdraw ${(draft.safeWithdrawalRate * 100).toFixed(1)}% of the portfolio each year. Spending varies with market performance; the portfolio never fully depletes.`}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Healthcare Costs */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Healthcare Costs</CardTitle>
-          <p className="text-muted-foreground mt-1 text-xs">
-            Out-of-pocket healthcare expenses in retirement, on top of your living expenses. Set to
-            0 if already included above.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      {/* ── Section 1: Core ── */}
+      <SettingsSection title="Core" defaultOpen={true}>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <NumberField
-            label={`Monthly healthcare cost at FIRE (${draft.currency}, today's money)`}
+            label="Current age"
+            value={draft.currentAge}
+            onChange={(v) => update("currentAge", v)}
+            min={1}
+          />
+          <NumberField
+            label="Target FIRE age"
+            value={draft.targetFireAge}
+            onChange={(v) => update("targetFireAge", v)}
+            min={1}
+          />
+          <NumberField
+            label="Planning horizon age (life expectancy)"
+            value={draft.planningHorizonAge}
+            onChange={(v) => update("planningHorizonAge", v)}
+            min={draft.targetFireAge + 1}
+          />
+          <NumberField
+            label={`Monthly expenses in FIRE (${draft.currency})`}
+            value={draft.monthlyExpensesAtFire}
+            onChange={(v) => update("monthlyExpensesAtFire", v)}
+            min={0}
+          />
+          <NumberField
+            label={`Monthly healthcare cost (${draft.currency}, today\u2019s money)`}
             value={draft.healthcareMonthlyAtFire ?? 0}
             onChange={(v) => update("healthcareMonthlyAtFire", v > 0 ? v : undefined)}
             min={0}
           />
-          {(draft.healthcareMonthlyAtFire ?? 0) > 0 && (
-            <SliderField
-              label="Healthcare inflation rate (typically higher than general inflation)"
-              value={draft.healthcareInflationRate ?? draft.inflationRate}
-              min={0.01}
-              max={0.08}
-              step={0.0025}
-              displayValue={
-                ((draft.healthcareInflationRate ?? draft.inflationRate) * 100).toFixed(2) + "%"
-              }
-              onChange={(v) => update("healthcareInflationRate", v)}
-            />
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Investment Parameters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Investment Parameters</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <NumberField
-              label={`Monthly contribution (${draft.currency})`}
-              value={draft.monthlyContribution}
-              onChange={(v) => update("monthlyContribution", v)}
-              min={0}
-            />
-            <NumberField
-              label={`Net annual salary / take-home (${draft.currency}) — optional`}
-              value={draft.currentAnnualSalary ?? 0}
-              onChange={(v) =>
-                update("currentAnnualSalary", v > 0 ? v : (undefined as unknown as number))
-              }
-              min={0}
-            />
-          </div>
-          {(draft.currentAnnualSalary ?? 0) > 0 && (
-            <p className="text-muted-foreground text-xs">
-              Implied savings rate:{" "}
-              <span className="text-foreground font-medium">
-                {(((draft.monthlyContribution * 12) / draft.currentAnnualSalary!) * 100).toFixed(1)}
-                %
-              </span>{" "}
-              of net salary (take-home)
-            </p>
-          )}
-          <SliderField
-            label={
-              (draft.salaryGrowthRate !== undefined
-                ? "Salary growth rate (per year)"
-                : "Contribution growth rate (per year)") + " — drives annual contribution increase"
-            }
-            value={draft.salaryGrowthRate ?? draft.contributionGrowthRate}
+          <NumberField
+            label={`Monthly contribution (${draft.currency})`}
+            value={draft.monthlyContribution}
+            onChange={(v) => update("monthlyContribution", v)}
             min={0}
-            max={0.1}
-            step={0.005}
-            displayValue={
-              ((draft.salaryGrowthRate ?? draft.contributionGrowthRate) * 100).toFixed(1) + "%"
-            }
-            onChange={(v) => {
-              if (draft.currentAnnualSalary) {
-                update("salaryGrowthRate", v);
-              } else {
-                update("contributionGrowthRate", v);
-              }
-            }}
           />
-          <SliderField
-            label="Expected annual portfolio return"
-            value={draft.expectedAnnualReturn}
-            min={0.03}
-            max={0.12}
-            step={0.005}
-            displayValue={(draft.expectedAnnualReturn * 100).toFixed(1) + "%"}
-            onChange={(v) => update("expectedAnnualReturn", v)}
-          />
-          <SliderField
-            label="Return standard deviation (volatility)"
-            value={draft.expectedReturnStdDev}
-            min={0.05}
-            max={0.25}
-            step={0.005}
-            displayValue={(draft.expectedReturnStdDev * 100).toFixed(1) + "%"}
-            onChange={(v) => update("expectedReturnStdDev", v)}
-          />
-          <p className="text-muted-foreground text-xs">
-            Volatility is used only for Monte Carlo simulation. Higher values produce a wider fan of
-            outcomes.
-          </p>
-          <SliderField
-            label="Inflation rate"
-            value={draft.inflationRate}
-            min={0.01}
-            max={0.05}
-            step={0.0025}
-            displayValue={(draft.inflationRate * 100).toFixed(2) + "%"}
-            onChange={(v) => update("inflationRate", v)}
-          />
-        </CardContent>
-      </Card>
+        </div>
+        <SliderField
+          label="Safe Withdrawal Rate"
+          value={draft.safeWithdrawalRate}
+          min={0.025}
+          max={0.06}
+          step={0.0025}
+          displayValue={(draft.safeWithdrawalRate * 100).toFixed(2) + "%"}
+          onChange={(v) => update("safeWithdrawalRate", v)}
+        />
+      </SettingsSection>
 
-      {/* Glide Path */}
-      <Card>
-        <CardHeader>
+      {/* ── Section 2: Income Streams ── */}
+      <SettingsSection title="Income Streams" defaultOpen={true}>
+        <div className="flex items-center justify-between">
+          <p className="text-muted-foreground text-xs">
+            Pension, rental income, part-time work, etc. Enter amounts as net (after tax).
+          </p>
+          <Button variant="outline" size="sm" onClick={addStream}>
+            + Add
+          </Button>
+        </div>
+        {draft.additionalIncomeStreams.length === 0 && (
+          <p className="text-muted-foreground text-xs">No income streams added.</p>
+        )}
+        {draft.additionalIncomeStreams.map((stream) => {
+          const isDc = stream.streamType === "dc";
+          const hasPension =
+            isDc ||
+            (stream.currentValue ?? 0) > 0 ||
+            (stream.monthlyContribution ?? 0) > 0 ||
+            (stream.accumulationReturn ?? 0) > 0;
+
+          // Computed payout preview for DC streams (two-phase: contributions until FIRE, growth-only after)
+          const totalYears = Math.max(0, stream.startAge - draft.currentAge);
+          const contribYears = Math.max(
+            0,
+            Math.min(stream.startAge, draft.targetFireAge) - draft.currentAge,
+          );
+          const growthOnlyYears = totalYears - contribYears;
+          const r = stream.accumulationReturn ?? 0.04;
+          const fvLump = (stream.currentValue ?? 0) * Math.pow(1 + r, totalYears);
+          const fvAnnuityAtStop =
+            r > 1e-9
+              ? ((stream.monthlyContribution ?? 0) * 12 * (Math.pow(1 + r, contribYears) - 1)) / r
+              : (stream.monthlyContribution ?? 0) * 12 * contribYears;
+          const fvAnnuity = fvAnnuityAtStop * Math.pow(1 + r, growthOnlyYears);
+          const estimatedMonthlyPayout = ((fvLump + fvAnnuity) * draft.safeWithdrawalRate) / 12;
+
+          return (
+            <div key={stream.id} className="rounded border p-3">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                {/* Label */}
+                <div className="col-span-2 sm:col-span-1">
+                  <Label className="text-xs">Label</Label>
+                  <Input
+                    value={stream.label}
+                    onChange={(e) => updateStream(stream.id, { label: e.target.value })}
+                    placeholder="e.g. State Pension"
+                    className="mt-1 h-8 text-sm"
+                  />
+                </div>
+                {/* Monthly amount (DB only) / computed payout preview (DC) */}
+                {isDc ? (
+                  <div>
+                    <Label className="text-xs">Est. monthly payout ({draft.currency})</Label>
+                    <p className="mt-1 flex h-8 items-center text-sm font-medium">
+                      {Math.round(estimatedMonthlyPayout).toLocaleString()}
+                      <span className="text-muted-foreground ml-1 text-xs">
+                        (derived from balance)
+                      </span>
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <Label className="text-xs">Monthly amount ({draft.currency})</Label>
+                    <Input
+                      type="number"
+                      value={stream.monthlyAmount}
+                      min={0}
+                      onChange={(e) =>
+                        updateStream(stream.id, {
+                          monthlyAmount: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className="mt-1 h-8 text-sm"
+                    />
+                  </div>
+                )}
+                {/* Payout start age */}
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-xs">Payout start age</Label>
+                    <label className="text-muted-foreground flex cursor-pointer items-center gap-1 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={stream.startAgeIsAuto ?? false}
+                        onChange={(e) =>
+                          updateStream(stream.id, { startAgeIsAuto: e.target.checked })
+                        }
+                      />
+                      Auto
+                    </label>
+                  </div>
+                  {stream.startAgeIsAuto ? (
+                    <p className="mt-1 flex h-8 items-center text-sm font-medium">
+                      {draft.targetFireAge}
+                      <span className="text-muted-foreground ml-1 text-xs">(= FIRE age)</span>
+                    </p>
+                  ) : (
+                    <Input
+                      type="number"
+                      value={stream.startAge}
+                      min={1}
+                      onChange={(e) =>
+                        updateStream(stream.id, { startAge: parseInt(e.target.value) || 0 })
+                      }
+                      className="mt-1 h-8 text-sm"
+                    />
+                  )}
+                </div>
+                {/* Inflation-adjusted */}
+                <div className="flex flex-col gap-2">
+                  <Label className="text-xs">Inflation-adjusted</Label>
+                  <Switch
+                    checked={stream.annualGrowthRate === undefined && stream.adjustForInflation}
+                    disabled={stream.annualGrowthRate !== undefined}
+                    onCheckedChange={(v) => updateStream(stream.id, { adjustForInflation: v })}
+                  />
+                </div>
+                {/* Custom growth rate */}
+                <div className="col-span-1 sm:col-span-2">
+                  <Label className="text-xs">
+                    Custom growth rate (%/yr){" "}
+                    <span className="text-muted-foreground">
+                      {"\u2014"} overrides inflation flag
+                    </span>
+                  </Label>
+                  <div className="mt-1 flex w-40 items-center gap-1">
+                    <Input
+                      type="number"
+                      value={
+                        stream.annualGrowthRate !== undefined
+                          ? Math.round(stream.annualGrowthRate * 1000) / 10
+                          : ""
+                      }
+                      placeholder="e.g. 1.5"
+                      min={0}
+                      max={20}
+                      step={0.1}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        updateStream(stream.id, {
+                          annualGrowthRate: raw === "" ? undefined : (parseFloat(raw) || 0) / 100,
+                        });
+                      }}
+                      className="h-8 text-sm"
+                    />
+                    <span className="text-muted-foreground text-xs">%</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center gap-2">
+                <Switch
+                  checked={hasPension}
+                  onCheckedChange={(v) => {
+                    if (v) {
+                      updateStream(stream.id, {
+                        streamType: "dc",
+                        currentValue: 0,
+                        monthlyContribution: 0,
+                        accumulationReturn: 0.04,
+                        startAgeIsAuto: true,
+                      });
+                    } else {
+                      updateStream(stream.id, {
+                        streamType: undefined,
+                        currentValue: undefined,
+                        monthlyContribution: undefined,
+                        accumulationReturn: undefined,
+                      });
+                    }
+                  }}
+                />
+                <Label className="text-muted-foreground cursor-pointer text-xs">
+                  Accumulation fund {"\u2014"} payout derived from balance (pension fund, TFR\u2026)
+                </Label>
+              </div>
+
+              {hasPension && (
+                <div className="bg-muted/40 mt-3 grid grid-cols-1 gap-3 rounded p-3 sm:grid-cols-3">
+                  <div>
+                    <Label className="text-xs">Current fund value ({draft.currency})</Label>
+                    <Input
+                      type="number"
+                      value={stream.currentValue ?? 0}
+                      min={0}
+                      onChange={(e) =>
+                        updateStream(stream.id, {
+                          currentValue: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className="mt-1 h-8 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Monthly contribution ({draft.currency})</Label>
+                    <Input
+                      type="number"
+                      value={stream.monthlyContribution ?? 0}
+                      min={0}
+                      onChange={(e) =>
+                        updateStream(stream.id, {
+                          monthlyContribution: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className="mt-1 h-8 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Accumulation return (%/yr)</Label>
+                    <Input
+                      type="number"
+                      value={Math.round((stream.accumulationReturn ?? 0.04) * 1000) / 10}
+                      min={0}
+                      max={20}
+                      step={0.1}
+                      onChange={(e) =>
+                        updateStream(stream.id, {
+                          accumulationReturn: (parseFloat(e.target.value) || 0) / 100,
+                        })
+                      }
+                      className="mt-1 h-8 text-sm"
+                    />
+                  </div>
+                  <div className="col-span-full space-y-1">
+                    <Label className="text-xs">
+                      Link to Wealthfolio account{" "}
+                      <span className="text-muted-foreground">
+                        (optional {"\u2014"} syncs current value)
+                      </span>
+                    </Label>
+                    <div className="flex gap-2">
+                      <select
+                        value={stream.linkedAccountId ?? ""}
+                        onChange={(e) =>
+                          updateStream(stream.id, {
+                            linkedAccountId: e.target.value || undefined,
+                          })
+                        }
+                        className="border-input bg-background h-8 flex-1 rounded-md border px-2 text-sm"
+                      >
+                        <option value="">
+                          {"\u2014"} Not linked {"\u2014"}
+                        </option>
+                        {accounts
+                          .filter((a) => a.isActive && !a.isArchived)
+                          .map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.name} ({a.currency})
+                            </option>
+                          ))}
+                      </select>
+                      {stream.linkedAccountId && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs"
+                          disabled={syncingStreamId === stream.id}
+                          onClick={() => syncStreamFromAccount(stream.id, stream.linkedAccountId!)}
+                        >
+                          {syncingStreamId === stream.id ? "Syncing\u2026" : "Sync value"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-muted-foreground col-span-full text-xs">
+                    Phase 1 (now {"\u2192"} FIRE): fund grows with contributions + return. Phase 2
+                    (FIRE {"\u2192"} payout age): contributions stop, fund keeps growing. Phase 3
+                    (payout age+): balance converted to income using the same SWR as the main
+                    portfolio.
+                  </p>
+                </div>
+              )}
+
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mt-2 h-6 text-xs text-red-500 hover:text-red-600"
+                onClick={() => removeStream(stream.id)}
+              >
+                Remove
+              </Button>
+            </div>
+          );
+        })}
+      </SettingsSection>
+
+      {/* ── Section 3: Investment Assumptions ── */}
+      <SettingsSection title="Investment Assumptions" defaultOpen={true}>
+        <SliderField
+          label="Expected annual portfolio return"
+          value={draft.expectedAnnualReturn}
+          min={0.03}
+          max={0.12}
+          step={0.005}
+          displayValue={(draft.expectedAnnualReturn * 100).toFixed(1) + "%"}
+          onChange={(v) => update("expectedAnnualReturn", v)}
+        />
+        <SliderField
+          label="Return standard deviation (volatility)"
+          value={draft.expectedReturnStdDev}
+          min={0.05}
+          max={0.25}
+          step={0.005}
+          displayValue={(draft.expectedReturnStdDev * 100).toFixed(1) + "%"}
+          onChange={(v) => update("expectedReturnStdDev", v)}
+        />
+        <p className="text-muted-foreground text-xs">
+          Volatility is used only for Monte Carlo simulation. Higher values produce a wider fan of
+          outcomes.
+        </p>
+        <SliderField
+          label="Inflation rate"
+          value={draft.inflationRate}
+          min={0.01}
+          max={0.05}
+          step={0.0025}
+          displayValue={(draft.inflationRate * 100).toFixed(2) + "%"}
+          onChange={(v) => update("inflationRate", v)}
+        />
+        {(draft.healthcareMonthlyAtFire ?? 0) > 0 && (
+          <SliderField
+            label="Healthcare inflation rate (typically higher than general inflation)"
+            value={draft.healthcareInflationRate ?? draft.inflationRate}
+            min={0.01}
+            max={0.08}
+            step={0.0025}
+            displayValue={
+              ((draft.healthcareInflationRate ?? draft.inflationRate) * 100).toFixed(2) + "%"
+            }
+            onChange={(v) => update("healthcareInflationRate", v)}
+          />
+        )}
+        <SliderField
+          label={
+            (draft.salaryGrowthRate !== undefined
+              ? "Salary growth rate (per year)"
+              : "Contribution growth rate (per year)") +
+            " \u2014 drives annual contribution increase"
+          }
+          value={draft.salaryGrowthRate ?? draft.contributionGrowthRate}
+          min={0}
+          max={0.1}
+          step={0.005}
+          displayValue={
+            ((draft.salaryGrowthRate ?? draft.contributionGrowthRate) * 100).toFixed(1) + "%"
+          }
+          onChange={(v) => {
+            if (draft.currentAnnualSalary) {
+              update("salaryGrowthRate", v);
+            } else {
+              update("contributionGrowthRate", v);
+            }
+          }}
+        />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <NumberField
+            label={`Net annual salary / take-home (${draft.currency}) \u2014 optional`}
+            value={draft.currentAnnualSalary ?? 0}
+            onChange={(v) =>
+              update("currentAnnualSalary", v > 0 ? v : (undefined as unknown as number))
+            }
+            min={0}
+          />
+        </div>
+        {(draft.currentAnnualSalary ?? 0) > 0 && (
+          <p className="text-muted-foreground text-xs">
+            Implied savings rate:{" "}
+            <span className="text-foreground font-medium">
+              {(((draft.monthlyContribution * 12) / draft.currentAnnualSalary!) * 100).toFixed(1)}%
+            </span>{" "}
+            of net salary (take-home)
+          </p>
+        )}
+
+        {/* Glide Path */}
+        <div className="border-border space-y-3 rounded border p-3">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-sm">Glide Path (Bond Shift)</CardTitle>
+              <Label className="text-xs font-semibold">Glide Path (Bond Shift)</Label>
               <p className="text-muted-foreground mt-1 text-xs">
                 Gradually shift from equities to bonds during retirement to reduce
                 sequence-of-returns risk.
@@ -560,406 +740,239 @@ export default function SettingsPage({
               }
             />
           </div>
-        </CardHeader>
-        {draft.glidePath?.enabled && (
-          <CardContent className="space-y-4">
-            <SliderField
-              label="Bond return rate"
-              value={draft.glidePath.bondReturnRate}
-              min={0.01}
-              max={0.06}
-              step={0.0025}
-              displayValue={(draft.glidePath.bondReturnRate * 100).toFixed(2) + "%"}
-              onChange={(v) => update("glidePath", { ...draft.glidePath!, bondReturnRate: v })}
-            />
-            <SliderField
-              label="Bond allocation at FIRE date"
-              value={draft.glidePath.bondAllocationAtFire}
-              min={0}
-              max={0.6}
-              step={0.05}
-              displayValue={(draft.glidePath.bondAllocationAtFire * 100).toFixed(0) + "%"}
-              onChange={(v) =>
-                update("glidePath", { ...draft.glidePath!, bondAllocationAtFire: v })
-              }
-            />
-            <SliderField
-              label="Bond allocation at planning horizon"
-              value={draft.glidePath.bondAllocationAtHorizon}
-              min={0}
-              max={0.9}
-              step={0.05}
-              displayValue={(draft.glidePath.bondAllocationAtHorizon * 100).toFixed(0) + "%"}
-              onChange={(v) =>
-                update("glidePath", { ...draft.glidePath!, bondAllocationAtHorizon: v })
-              }
-            />
-            <p className="text-muted-foreground text-xs">
-              The portfolio shifts linearly from{" "}
-              {(draft.glidePath.bondAllocationAtFire * 100).toFixed(0)}% bonds at FIRE to{" "}
-              {(draft.glidePath.bondAllocationAtHorizon * 100).toFixed(0)}% bonds at age{" "}
-              {draft.planningHorizonAge}. Equity allocation ={" "}
-              {((1 - draft.glidePath.bondAllocationAtFire) * 100).toFixed(0)}% →{" "}
-              {((1 - draft.glidePath.bondAllocationAtHorizon) * 100).toFixed(0)}%.
-            </p>
-          </CardContent>
-        )}
-      </Card>
-
-      {/* Portfolio Accounts — managed via the Funding tab on the goal detail page */}
-
-      {/* Additional Income Streams */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-sm">Additional Income Streams</CardTitle>
-          <Button variant="outline" size="sm" onClick={addStream}>
-            + Add
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {draft.additionalIncomeStreams.length === 0 && (
-            <p className="text-muted-foreground text-xs">
-              No income streams added. Examples: state pension, rental income, part-time work. Enter
-              amounts as net (after tax).
-            </p>
+          {draft.glidePath?.enabled && (
+            <div className="space-y-4">
+              <SliderField
+                label="Bond return rate"
+                value={draft.glidePath.bondReturnRate}
+                min={0.01}
+                max={0.06}
+                step={0.0025}
+                displayValue={(draft.glidePath.bondReturnRate * 100).toFixed(2) + "%"}
+                onChange={(v) => update("glidePath", { ...draft.glidePath!, bondReturnRate: v })}
+              />
+              <SliderField
+                label="Bond allocation at FIRE date"
+                value={draft.glidePath.bondAllocationAtFire}
+                min={0}
+                max={0.6}
+                step={0.05}
+                displayValue={(draft.glidePath.bondAllocationAtFire * 100).toFixed(0) + "%"}
+                onChange={(v) =>
+                  update("glidePath", { ...draft.glidePath!, bondAllocationAtFire: v })
+                }
+              />
+              <SliderField
+                label="Bond allocation at planning horizon"
+                value={draft.glidePath.bondAllocationAtHorizon}
+                min={0}
+                max={0.9}
+                step={0.05}
+                displayValue={(draft.glidePath.bondAllocationAtHorizon * 100).toFixed(0) + "%"}
+                onChange={(v) =>
+                  update("glidePath", { ...draft.glidePath!, bondAllocationAtHorizon: v })
+                }
+              />
+              <p className="text-muted-foreground text-xs">
+                The portfolio shifts linearly from{" "}
+                {(draft.glidePath.bondAllocationAtFire * 100).toFixed(0)}% bonds at FIRE to{" "}
+                {(draft.glidePath.bondAllocationAtHorizon * 100).toFixed(0)}% bonds at age{" "}
+                {draft.planningHorizonAge}. Equity allocation ={" "}
+                {((1 - draft.glidePath.bondAllocationAtFire) * 100).toFixed(0)}% {"\u2192"}{" "}
+                {((1 - draft.glidePath.bondAllocationAtHorizon) * 100).toFixed(0)}%.
+              </p>
+            </div>
           )}
-          {draft.additionalIncomeStreams.map((stream) => {
-            const isDc = stream.streamType === "dc";
-            const hasPension =
-              isDc ||
-              (stream.currentValue ?? 0) > 0 ||
-              (stream.monthlyContribution ?? 0) > 0 ||
-              (stream.accumulationReturn ?? 0) > 0;
+        </div>
 
-            // Computed payout preview for DC streams (two-phase: contributions until FIRE, growth-only after)
-            const totalYears = Math.max(0, stream.startAge - draft.currentAge);
-            const contribYears = Math.max(
-              0,
-              Math.min(stream.startAge, draft.targetFireAge) - draft.currentAge,
-            );
-            const growthOnlyYears = totalYears - contribYears;
-            const r = stream.accumulationReturn ?? 0.04;
-            const fvLump = (stream.currentValue ?? 0) * Math.pow(1 + r, totalYears);
-            const fvAnnuityAtStop =
-              r > 1e-9
-                ? ((stream.monthlyContribution ?? 0) * 12 * (Math.pow(1 + r, contribYears) - 1)) / r
-                : (stream.monthlyContribution ?? 0) * 12 * contribYears;
-            const fvAnnuity = fvAnnuityAtStop * Math.pow(1 + r, growthOnlyYears);
-            const estimatedMonthlyPayout = ((fvLump + fvAnnuity) * draft.safeWithdrawalRate) / 12;
+        {/* Withdrawal Strategy */}
+        <div className="space-y-2">
+          <Label className="text-xs">Withdrawal Strategy</Label>
+          <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
+            {(["constant-dollar", "constant-percentage"] as const).map((s) => (
+              <label key={s} className="flex cursor-pointer items-center gap-2 text-xs">
+                <input
+                  type="radio"
+                  name="withdrawalStrategy"
+                  value={s}
+                  checked={(draft.withdrawalStrategy ?? "constant-dollar") === s}
+                  onChange={() => update("withdrawalStrategy", s)}
+                />
+                {s === "constant-dollar"
+                  ? "Constant dollar (fixed real spending)"
+                  : "Constant percentage (% of portfolio)"}
+              </label>
+            ))}
+          </div>
+          <p className="text-muted-foreground text-xs">
+            {(draft.withdrawalStrategy ?? "constant-dollar") === "constant-dollar"
+              ? "Withdraw a fixed inflation-adjusted amount each year. Spending is stable but the portfolio can deplete."
+              : `Withdraw ${(draft.safeWithdrawalRate * 100).toFixed(1)}% of the portfolio each year. Spending varies with market performance; the portfolio never fully depletes.`}
+          </p>
+        </div>
+      </SettingsSection>
 
-            return (
-              <div key={stream.id} className="rounded border p-3">
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                  {/* Label */}
-                  <div className="col-span-2 sm:col-span-1">
-                    <Label className="text-xs">Label</Label>
-                    <Input
-                      value={stream.label}
-                      onChange={(e) => updateStream(stream.id, { label: e.target.value })}
-                      placeholder="e.g. State Pension"
-                      className="mt-1 h-8 text-sm"
-                    />
-                  </div>
-                  {/* Monthly amount (DB only) / computed payout preview (DC) */}
-                  {isDc ? (
+      {/* ── Section 4: Advanced ── */}
+      <SettingsSection title="Advanced" defaultOpen={false}>
+        {/* Auto-configure from portfolio */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle className="text-sm">Auto-configure from portfolio</CardTitle>
+              <p className="text-muted-foreground mt-1 text-xs">
+                Detect monthly contribution, expected return, and target allocations from your
+                portfolio data.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleAutoConfig}
+              disabled={autoConfigLoading}
+            >
+              {autoConfigLoading ? "Analyzing\u2026" : "Detect from portfolio"}
+            </Button>
+          </CardHeader>
+
+          {autoConfigResult && (
+            <CardContent className="space-y-3">
+              <div className="space-y-2 rounded border p-3 text-xs">
+                {autoConfigResult.monthlyContribution !== null && (
+                  <div className="flex items-start justify-between gap-4">
                     <div>
-                      <Label className="text-xs">Est. monthly payout ({draft.currency})</Label>
-                      <p className="mt-1 flex h-8 items-center text-sm font-medium">
-                        {Math.round(estimatedMonthlyPayout).toLocaleString()}
-                        <span className="text-muted-foreground ml-1 text-xs">
-                          (derived from balance)
-                        </span>
+                      <span className="font-medium">Monthly contribution</span>
+                      <p className="text-muted-foreground">
+                        {autoConfigResult.notes.monthlyContribution}
                       </p>
                     </div>
-                  ) : (
+                    <span className="shrink-0 font-semibold text-green-600">
+                      {autoConfigResult.monthlyContribution.toLocaleString(undefined, {
+                        maximumFractionDigits: 0,
+                      })}{" "}
+                      {draft.currency}
+                    </span>
+                  </div>
+                )}
+                {autoConfigResult.expectedAnnualReturn !== null && (
+                  <div className="flex items-start justify-between gap-4">
                     <div>
-                      <Label className="text-xs">Monthly amount ({draft.currency})</Label>
-                      <Input
-                        type="number"
-                        value={stream.monthlyAmount}
-                        min={0}
-                        onChange={(e) =>
-                          updateStream(stream.id, {
-                            monthlyAmount: parseFloat(e.target.value) || 0,
-                          })
-                        }
-                        className="mt-1 h-8 text-sm"
-                      />
+                      <span className="font-medium">Expected annual return</span>
+                      <p className="text-muted-foreground">
+                        {autoConfigResult.notes.expectedAnnualReturn}
+                      </p>
                     </div>
-                  )}
-                  {/* Payout start age */}
+                    <span className="shrink-0 font-semibold text-green-600">
+                      {(autoConfigResult.expectedAnnualReturn * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                )}
+                {autoConfigResult.targetAllocations !== null && (
                   <div>
-                    <div className="flex items-center justify-between gap-2">
-                      <Label className="text-xs">Payout start age</Label>
-                      <label className="text-muted-foreground flex cursor-pointer items-center gap-1 text-xs">
-                        <input
-                          type="checkbox"
-                          checked={stream.startAgeIsAuto ?? false}
-                          onChange={(e) =>
-                            updateStream(stream.id, { startAgeIsAuto: e.target.checked })
-                          }
-                        />
-                        Auto
-                      </label>
-                    </div>
-                    {stream.startAgeIsAuto ? (
-                      <p className="mt-1 flex h-8 items-center text-sm font-medium">
-                        {draft.targetFireAge}
-                        <span className="text-muted-foreground ml-1 text-xs">(= FIRE age)</span>
-                      </p>
-                    ) : (
-                      <Input
-                        type="number"
-                        value={stream.startAge}
-                        min={1}
-                        onChange={(e) =>
-                          updateStream(stream.id, { startAge: parseInt(e.target.value) || 0 })
-                        }
-                        className="mt-1 h-8 text-sm"
-                      />
-                    )}
-                  </div>
-                  {/* Inflation-adjusted */}
-                  <div className="flex flex-col gap-2">
-                    <Label className="text-xs">Inflation-adjusted</Label>
-                    <Switch
-                      checked={stream.annualGrowthRate === undefined && stream.adjustForInflation}
-                      disabled={stream.annualGrowthRate !== undefined}
-                      onCheckedChange={(v) => updateStream(stream.id, { adjustForInflation: v })}
-                    />
-                  </div>
-                  {/* Custom growth rate */}
-                  <div className="col-span-1 sm:col-span-2">
-                    <Label className="text-xs">
-                      Custom growth rate (%/yr){" "}
-                      <span className="text-muted-foreground">— overrides inflation flag</span>
-                    </Label>
-                    <div className="mt-1 flex w-40 items-center gap-1">
-                      <Input
-                        type="number"
-                        value={
-                          stream.annualGrowthRate !== undefined
-                            ? Math.round(stream.annualGrowthRate * 1000) / 10
-                            : ""
-                        }
-                        placeholder="e.g. 1.5"
-                        min={0}
-                        max={20}
-                        step={0.1}
-                        onChange={(e) => {
-                          const raw = e.target.value;
-                          updateStream(stream.id, {
-                            annualGrowthRate: raw === "" ? undefined : (parseFloat(raw) || 0) / 100,
-                          });
-                        }}
-                        className="h-8 text-sm"
-                      />
-                      <span className="text-muted-foreground text-xs">%</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-3 flex items-center gap-2">
-                  <Switch
-                    checked={hasPension}
-                    onCheckedChange={(v) => {
-                      if (v) {
-                        updateStream(stream.id, {
-                          streamType: "dc",
-                          currentValue: 0,
-                          monthlyContribution: 0,
-                          accumulationReturn: 0.04,
-                          startAgeIsAuto: true,
-                        });
-                      } else {
-                        updateStream(stream.id, {
-                          streamType: undefined,
-                          currentValue: undefined,
-                          monthlyContribution: undefined,
-                          accumulationReturn: undefined,
-                        });
-                      }
-                    }}
-                  />
-                  <Label className="text-muted-foreground cursor-pointer text-xs">
-                    Accumulation fund — payout derived from balance (pension fund, TFR…)
-                  </Label>
-                </div>
-
-                {hasPension && (
-                  <div className="bg-muted/40 mt-3 grid grid-cols-1 gap-3 rounded p-3 sm:grid-cols-3">
-                    <div>
-                      <Label className="text-xs">Current fund value ({draft.currency})</Label>
-                      <Input
-                        type="number"
-                        value={stream.currentValue ?? 0}
-                        min={0}
-                        onChange={(e) =>
-                          updateStream(stream.id, {
-                            currentValue: parseFloat(e.target.value) || 0,
-                          })
-                        }
-                        className="mt-1 h-8 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Monthly contribution ({draft.currency})</Label>
-                      <Input
-                        type="number"
-                        value={stream.monthlyContribution ?? 0}
-                        min={0}
-                        onChange={(e) =>
-                          updateStream(stream.id, {
-                            monthlyContribution: parseFloat(e.target.value) || 0,
-                          })
-                        }
-                        className="mt-1 h-8 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Accumulation return (%/yr)</Label>
-                      <Input
-                        type="number"
-                        value={Math.round((stream.accumulationReturn ?? 0.04) * 1000) / 10}
-                        min={0}
-                        max={20}
-                        step={0.1}
-                        onChange={(e) =>
-                          updateStream(stream.id, {
-                            accumulationReturn: (parseFloat(e.target.value) || 0) / 100,
-                          })
-                        }
-                        className="mt-1 h-8 text-sm"
-                      />
-                    </div>
-                    <div className="col-span-full space-y-1">
-                      <Label className="text-xs">
-                        Link to Wealthfolio account{" "}
-                        <span className="text-muted-foreground">
-                          (optional — syncs current value)
-                        </span>
-                      </Label>
-                      <div className="flex gap-2">
-                        <select
-                          value={stream.linkedAccountId ?? ""}
-                          onChange={(e) =>
-                            updateStream(stream.id, {
-                              linkedAccountId: e.target.value || undefined,
-                            })
-                          }
-                          className="border-input bg-background h-8 flex-1 rounded-md border px-2 text-sm"
-                        >
-                          <option value="">— Not linked —</option>
-                          {accounts
-                            .filter((a) => a.isActive && !a.isArchived)
-                            .map((a) => (
-                              <option key={a.id} value={a.id}>
-                                {a.name} ({a.currency})
-                              </option>
-                            ))}
-                        </select>
-                        {stream.linkedAccountId && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 text-xs"
-                            disabled={syncingStreamId === stream.id}
-                            onClick={() =>
-                              syncStreamFromAccount(stream.id, stream.linkedAccountId!)
-                            }
-                          >
-                            {syncingStreamId === stream.id ? "Syncing…" : "Sync value"}
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                    <p className="text-muted-foreground col-span-full text-xs">
-                      Phase 1 (now → FIRE): fund grows with contributions + return. Phase 2 (FIRE →
-                      payout age): contributions stop, fund keeps growing. Phase 3 (payout age+):
-                      balance converted to income using the same SWR as the main portfolio.
+                    <span className="font-medium">Target allocations</span>
+                    <p className="text-muted-foreground">
+                      {autoConfigResult.notes.targetAllocations}
+                    </p>
+                    <p className="mt-1">
+                      {Object.entries(autoConfigResult.targetAllocations)
+                        .map(([sym, w]) => `${sym} ${(w * 100).toFixed(1)}%`)
+                        .join(" \u00b7 ")}
                     </p>
                   </div>
                 )}
+                {autoConfigResult.monthlyContribution === null &&
+                  autoConfigResult.expectedAnnualReturn === null &&
+                  autoConfigResult.targetAllocations === null && (
+                    <p className="text-muted-foreground">
+                      No data could be detected. Add activities and holdings to Wealthfolio first.
+                    </p>
+                  )}
+              </div>
+              {(autoConfigResult.monthlyContribution !== null ||
+                autoConfigResult.expectedAnnualReturn !== null ||
+                autoConfigResult.targetAllocations !== null) && (
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={applyDetected}>
+                    Apply detected values
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setAutoConfigResult(null)}>
+                    Dismiss
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          )}
+        </Card>
 
+        {/* Target Allocations */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle className="text-sm">Target Allocations</CardTitle>
+              {allocEntries.length > 0 && (
+                <p
+                  className={`mt-1 text-xs ${allocWarning ? "text-red-500" : "text-muted-foreground"}`}
+                >
+                  Total: {(totalAllocPct * 100).toFixed(1)}%
+                  {allocWarning && " \u2014 must equal 100%"}
+                </p>
+              )}
+            </div>
+            <div className="flex gap-2">
+              {holdings.length > 0 && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="mt-2 h-6 text-xs text-red-500 hover:text-red-600"
-                  onClick={() => removeStream(stream.id)}
+                  className="text-xs"
+                  onClick={autoDetectAllocations}
                 >
-                  Remove
+                  Auto-detect from holdings
                 </Button>
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
-
-      {/* Target Allocations */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <div>
-            <CardTitle className="text-sm">Target Allocations</CardTitle>
-            {allocEntries.length > 0 && (
-              <p
-                className={`mt-1 text-xs ${allocWarning ? "text-red-500" : "text-muted-foreground"}`}
-              >
-                Total: {(totalAllocPct * 100).toFixed(1)}%{allocWarning && " — must equal 100%"}
-              </p>
-            )}
-          </div>
-          <div className="flex gap-2">
-            {holdings.length > 0 && (
-              <Button variant="ghost" size="sm" className="text-xs" onClick={autoDetectAllocations}>
-                Auto-detect from holdings
-              </Button>
-            )}
-            <Button variant="outline" size="sm" onClick={addAllocation}>
-              + Add
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {allocEntries.length === 0 && (
-            <p className="text-muted-foreground text-xs">
-              Add target weights to enable drift monitoring in the Allocation tab.
-            </p>
-          )}
-          {allocEntries.map(([sym, weight]) => (
-            <div key={sym} className="flex items-center gap-2">
-              <Input
-                value={sym}
-                placeholder="Ticker / symbol"
-                className="h-8 flex-1 text-sm"
-                onChange={(e) => updateAllocation(sym, e.target.value, weight)}
-              />
-              <Input
-                type="number"
-                value={Math.round(weight * 1000) / 10}
-                min={0}
-                max={100}
-                step={0.1}
-                className="h-8 w-24 text-sm"
-                onChange={(e) =>
-                  updateAllocation(sym, sym, (parseFloat(e.target.value) || 0) / 100)
-                }
-              />
-              <span className="text-muted-foreground text-xs">%</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-red-500 hover:text-red-600"
-                onClick={() => removeAllocation(sym)}
-              >
-                ×
+              )}
+              <Button variant="outline" size="sm" onClick={addAllocation}>
+                + Add
               </Button>
             </div>
-          ))}
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {allocEntries.length === 0 && (
+              <p className="text-muted-foreground text-xs">
+                Add target weights to enable drift monitoring in the Allocation tab.
+              </p>
+            )}
+            {allocEntries.map(([sym, weight]) => (
+              <div key={sym} className="flex items-center gap-2">
+                <Input
+                  value={sym}
+                  placeholder="Ticker / symbol"
+                  className="h-8 flex-1 text-sm"
+                  onChange={(e) => updateAllocation(sym, e.target.value, weight)}
+                />
+                <Input
+                  type="number"
+                  value={Math.round(weight * 1000) / 10}
+                  min={0}
+                  max={100}
+                  step={0.1}
+                  className="h-8 w-24 text-sm"
+                  onChange={(e) =>
+                    updateAllocation(sym, sym, (parseFloat(e.target.value) || 0) / 100)
+                  }
+                />
+                <span className="text-muted-foreground text-xs">%</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-red-500 hover:text-red-600"
+                  onClick={() => removeAllocation(sym)}
+                >
+                  {"\u00d7"}
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
 
-      {/* Actions */}
-      <div className="flex items-center justify-between">
+        {/* Reset to defaults */}
         <div>
           {showResetConfirm ? (
             <div className="flex items-center gap-2">
@@ -982,8 +995,12 @@ export default function SettingsPage({
             </Button>
           )}
         </div>
+      </SettingsSection>
+
+      {/* Save */}
+      <div className="flex justify-end">
         <Button onClick={handleSave} disabled={isSaving}>
-          {isSaving ? "Saving…" : "Save Settings"}
+          {isSaving ? "Saving\u2026" : "Save Settings"}
         </Button>
       </div>
     </div>
