@@ -1,7 +1,7 @@
 import { isCashActivity, isCashTransfer, isIncomeActivity } from "@/lib/activity-utils";
 import { ACTIVITY_SUBTYPES, ActivityType } from "@/lib/constants";
 import type { Account } from "@/lib/types";
-import { normalizeDecimalString, parseLocalDateTime } from "@/lib/utils";
+import { normalizeDecimalString, parseLocalDateTime, toPayloadNumber } from "@/lib/utils";
 import type {
   ActivityCreatePayload,
   ActivityUpdatePayload,
@@ -195,6 +195,21 @@ function applySplitDefaults(transaction: LocalTransaction): LocalTransaction {
   };
 }
 
+function getAssetBackedAmount(
+  quantity: string | null | undefined,
+  unitPrice: string | null | undefined,
+): string | null {
+  const q = quantity != null ? Number.parseFloat(quantity) : NaN;
+  const p = unitPrice != null ? Number.parseFloat(unitPrice) : NaN;
+
+  if (!(q > 0) || !(p > 0)) {
+    return null;
+  }
+
+  const rounded = toPayloadNumber(q * p);
+  return rounded === undefined ? null : normalizeDecimalString(rounded);
+}
+
 /**
  * Applies an update to a transaction field with proper type handling and side effects
  */
@@ -225,10 +240,9 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
     const newQty = normalizedDecimalOrNull(value);
     updated = { ...updated, quantity: newQty };
     if (isAssetBackedSubtype(updated.subtype) && newQty != null && updated.unitPrice != null) {
-      const q = parseFloat(newQty);
-      const p = parseFloat(updated.unitPrice);
-      if (q > 0 && p > 0) {
-        updated = { ...updated, amount: String(q * p) };
+      const computedAmount = getAssetBackedAmount(newQty, updated.unitPrice);
+      if (computedAmount != null) {
+        updated = { ...updated, amount: computedAmount };
       }
     }
     updated = applySplitDefaults(updated);
@@ -240,9 +254,9 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
       (isAlwaysCashActivity(updated.activityType) || isIncomeActivity(updated.activityType))
     ) {
       if (isAssetBackedSubtype(updated.subtype)) {
-        const qty = updated.quantity != null ? parseFloat(updated.quantity) : NaN;
-        if (qty > 0) {
-          updated = { ...updated, amount: String(qty * parseFloat(newUnitPrice)) };
+        const computedAmount = getAssetBackedAmount(updated.quantity, newUnitPrice);
+        if (computedAmount != null) {
+          updated = { ...updated, amount: computedAmount };
         }
       } else {
         updated = { ...updated, amount: newUnitPrice };
@@ -308,10 +322,9 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
     const newSubtype = typeof value === "string" && value ? value : undefined;
     updated = { ...updated, subtype: newSubtype };
     if (isAssetBackedSubtype(newSubtype) && updated.quantity != null && updated.unitPrice != null) {
-      const q = parseFloat(updated.quantity);
-      const p = parseFloat(updated.unitPrice);
-      if (q > 0 && p > 0) {
-        updated = { ...updated, amount: String(q * p) };
+      const computedAmount = getAssetBackedAmount(updated.quantity, updated.unitPrice);
+      if (computedAmount != null) {
+        updated = { ...updated, amount: computedAmount };
       }
     }
   } else if (field === "isExternal") {
