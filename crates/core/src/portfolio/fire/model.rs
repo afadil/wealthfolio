@@ -199,3 +199,63 @@ pub struct StrategyComparisonResult {
     pub constant_dollar: MonteCarloResult,
     pub constant_percentage: MonteCarloResult,
 }
+
+// ─── Retirement Overview ──────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RetirementOverview {
+    pub analysis_mode: String,
+    pub status: String, // "on_track", "at_risk", "off_track", "achieved"
+    pub desired_fire_age: u32,
+    pub fi_age: Option<u32>,
+    pub funded_at_goal_age: bool,
+    pub portfolio_now: f64,
+    pub net_fire_target: f64,
+    pub gross_fire_target: f64,
+    pub portfolio_at_goal_age: f64,
+    pub required_capital_at_goal_age: f64,
+    pub shortfall_at_goal_age: f64,
+    pub surplus_at_goal_age: f64,
+    pub required_additional_monthly_contribution: f64,
+    pub suggested_goal_age_if_unchanged: Option<u32>,
+    pub coast_amount_today: f64,
+    pub coast_reached: bool,
+    pub progress: f64, // 0.0 to 1.0
+    pub budget_breakdown: BudgetBreakdown,
+    pub trajectory: Vec<RetirementTrajectoryPoint>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RetirementTrajectoryPoint {
+    pub age: u32,
+    pub year: u32,
+    pub phase: String,
+    pub portfolio_start: f64,
+    pub annual_contribution: f64,
+    pub annual_income: f64,
+    pub annual_expenses: f64,
+    pub net_withdrawal_from_portfolio: f64,
+    pub portfolio_end: f64,
+    pub required_capital: f64,
+    pub pension_assets: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BudgetBreakdown {
+    pub total_monthly_budget: f64,
+    pub monthly_living_expenses: f64,
+    pub monthly_healthcare: f64,
+    pub monthly_portfolio_withdrawal: f64,
+    pub income_streams: Vec<BudgetStreamItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BudgetStreamItem {
+    pub label: String,
+    pub monthly_amount: f64,
+    pub percentage_of_budget: f64,
+}

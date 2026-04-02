@@ -5,6 +5,8 @@ use crate::goals::goals_model::{
     AccountValuationMap, Goal, GoalCachedUpdate, GoalFundingRule, GoalFundingRuleInput, GoalPlan,
     NewGoal, SaveGoalPlan,
 };
+use crate::planning::SaveUpOverview;
+use crate::portfolio::fire::RetirementOverview;
 use async_trait::async_trait;
 
 /// Trait for goal repository operations
@@ -66,4 +68,18 @@ pub trait GoalServiceTrait: Send + Sync {
         goal_id: &str,
         valuations: &AccountValuationMap,
     ) -> Result<Goal>;
+
+    // Retirement overview
+    async fn compute_retirement_overview(
+        &self,
+        goal_id: &str,
+        valuation_map: &AccountValuationMap,
+    ) -> Result<RetirementOverview>;
+
+    // Save-up overview
+    async fn compute_save_up_overview(
+        &self,
+        goal_id: &str,
+        valuation_map: &AccountValuationMap,
+    ) -> Result<SaveUpOverview>;
 }
