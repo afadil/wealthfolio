@@ -1,4 +1,4 @@
-import type { GoalType, PlannerMode } from "@/lib/types";
+import type { Goal, GoalType, PlannerMode } from "@/lib/types";
 import { Button, Page, PageContent, PageHeader } from "@wealthfolio/ui";
 import {
   Card,
@@ -10,13 +10,13 @@ import {
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useGoalMutations } from "./hooks/use-goals";
+import { useGoalMutations, useGoals } from "./hooks/use-goals";
+import { toast } from "sonner";
 
-const COVER_IMAGES: Record<string, string> = {
-  retirement: "/goals/retirement.png",
-  home: "/goals/house.png",
-  education: "/goals/education.png",
-};
+/** Cover image by convention: /goals/{goalType}.png */
+function coverImageSrc(goalType: string): string {
+  return `/goals/${goalType}.png`;
+}
 
 const GOAL_TEMPLATES: {
   type: GoalType;
@@ -43,10 +43,17 @@ const GOAL_TEMPLATES: {
   },
   {
     type: "home",
-    title: "Home",
+    title: "Home Purchase",
     description: "Save for a down payment or home purchase",
     icon: <Icons.Home className="h-6 w-6" />,
     defaultTarget: 100000,
+  },
+  {
+    type: "car",
+    title: "Car Purchase",
+    description: "Save for your next vehicle purchase or down payment",
+    icon: <Icons.Car className="h-6 w-6" />,
+    defaultTarget: 40000,
   },
   {
     type: "wedding",
@@ -56,28 +63,37 @@ const GOAL_TEMPLATES: {
     defaultTarget: 30000,
   },
   {
-    type: "emergency_fund",
-    title: "Emergency Fund",
-    description: "Build a financial safety net for unexpected expenses",
-    icon: <Icons.ShieldCheck className="h-6 w-6" />,
-    defaultTarget: 10000,
-  },
-  {
     type: "custom_save_up",
-    title: "Custom Savings",
+    title: "Savings Goal",
     description: "Create a custom savings goal for any purpose",
     icon: <Icons.Wallet className="h-6 w-6" />,
     defaultTarget: 10000,
   },
 ];
 
+function hasRetirementGoal(goals: Goal[]): boolean {
+  return goals.some((g) => g.goalType === "retirement" && !g.isArchived);
+}
+
 export default function GoalNewPage() {
   const navigate = useNavigate();
   const { createMutation } = useGoalMutations();
+  const { goals } = useGoals();
   const [selectedType, setSelectedType] = useState<GoalType | null>(null);
   const [plannerMode, setPlannerMode] = useState<PlannerMode>("fire");
 
+  const retirementExists = hasRetirementGoal(goals);
   const template = GOAL_TEMPLATES.find((t) => t.type === selectedType);
+
+  const handleSelectType = (type: GoalType) => {
+    if (type === "retirement" && retirementExists) {
+      toast.error(
+        "You already have an active retirement goal. Only one retirement goal is allowed.",
+      );
+      return;
+    }
+    setSelectedType(type);
+  };
 
   const handleCreate = () => {
     if (!selectedType || !template) return;
@@ -93,12 +109,15 @@ export default function GoalNewPage() {
       },
       {
         onSuccess: (goal) => {
-          // For retirement goals, we'll set up the plan in the detail page
           if (selectedType === "retirement") {
             navigate(`/goals/${goal.id}?setup=true&mode=${plannerMode}`);
           } else {
             navigate(`/goals/${goal.id}?setup=true`);
           }
+        },
+        onError: (error) => {
+          const message = error instanceof Error ? error.message : "Failed to create goal.";
+          toast.error(message);
         },
       },
     );
@@ -115,36 +134,45 @@ export default function GoalNewPage() {
         {!selectedType ? (
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {GOAL_TEMPLATES.map((tmpl) => {
-              const coverSrc = COVER_IMAGES[tmpl.type];
+              const disabled = tmpl.type === "retirement" && retirementExists;
               return (
                 <div
                   key={tmpl.type}
-                  className="border-border/60 bg-card hover:border-border shadow-xs group cursor-pointer overflow-hidden rounded-xl border transition-all hover:shadow-md"
-                  onClick={() => setSelectedType(tmpl.type)}
+                  className={`border-border/60 bg-card shadow-xs group overflow-hidden rounded-xl border transition-all ${
+                    disabled
+                      ? "cursor-not-allowed opacity-50"
+                      : "hover:border-border cursor-pointer hover:shadow-md"
+                  }`}
+                  onClick={() => handleSelectType(tmpl.type)}
                 >
-                  {coverSrc ? (
-                    <div className="relative h-36 overflow-hidden sm:h-40">
-                      <img
-                        src={coverSrc}
-                        alt={tmpl.title}
-                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                      />
-                      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/30 to-transparent" />
-                      <div className="absolute bottom-3 left-4">
-                        <p className="text-sm font-semibold text-white drop-shadow-md">
-                          {tmpl.title}
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-secondary/40 flex h-36 items-center justify-center sm:h-40">
+                  <div className="relative h-36 overflow-hidden sm:h-40">
+                    <img
+                      src={coverImageSrc(tmpl.type)}
+                      alt={tmpl.title}
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                      onError={(e) => {
+                        e.currentTarget.parentElement!.classList.add("goal-cover-fallback");
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                    <div className="bg-secondary/40 hidden h-full w-full items-center justify-center [.goal-cover-fallback>&]:flex">
                       <div className="text-muted-foreground/25">{tmpl.icon}</div>
                     </div>
-                  )}
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent" />
+                    <div className="absolute bottom-3 left-4">
+                      <p className="text-base font-semibold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
+                        {tmpl.title}
+                      </p>
+                    </div>
+                  </div>
                   <CardHeader className="pb-4">
-                    {!coverSrc && <CardTitle className="text-base">{tmpl.title}</CardTitle>}
                     <CardDescription className="text-xs leading-relaxed">
                       {tmpl.description}
+                      {disabled && (
+                        <span className="text-muted-foreground mt-1 block text-[11px]">
+                          You already have a retirement goal.
+                        </span>
+                      )}
                     </CardDescription>
                   </CardHeader>
                 </div>
@@ -167,7 +195,7 @@ export default function GoalNewPage() {
               </CardHeader>
               {template?.requiresPlannerMode && (
                 <CardContent className="space-y-3">
-                  <p className="text-sm font-medium">Choose your planning approach:</p>
+                  <p className="text-sm font-medium">Choose your analysis mode:</p>
                   <div className="grid grid-cols-2 gap-3">
                     <Card
                       className={`cursor-pointer p-3 transition-colors ${
@@ -183,17 +211,16 @@ export default function GoalNewPage() {
                       </p>
                     </Card>
                     <Card
-                      className={`cursor-pointer p-3 transition-colors ${
-                        plannerMode === "traditional"
-                          ? "border-primary bg-primary/5"
-                          : "hover:border-muted-foreground"
-                      }`}
-                      onClick={() => setPlannerMode("traditional")}
+                      className="relative cursor-not-allowed p-3 opacity-50"
+                      aria-disabled="true"
                     >
                       <p className="text-sm font-medium">Traditional</p>
                       <p className="text-muted-foreground text-xs">
                         Sustainable retirement at target age
                       </p>
+                      <span className="text-muted-foreground absolute right-2 top-2 text-[10px] font-medium uppercase tracking-wide">
+                        Coming soon
+                      </span>
                     </Card>
                   </div>
                 </CardContent>
