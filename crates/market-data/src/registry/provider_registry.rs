@@ -212,6 +212,7 @@ impl ProviderRegistry {
                     );
                     return Ok(valid_quotes);
                 }
+                Err(MarketDataError::NotSupported { .. }) => continue,
                 Err(e) => {
                     let retry_class = e.retry_class();
 
@@ -293,6 +294,7 @@ impl ProviderRegistry {
 
                     return Ok(quote);
                 }
+                Err(MarketDataError::NotSupported { .. }) => continue,
                 Err(e) => {
                     let retry_class = e.retry_class();
 
@@ -761,6 +763,7 @@ impl ProviderRegistry {
                     diagnostics.record_success(provider_id);
                     return (Ok(valid_quotes), diagnostics);
                 }
+                Err(MarketDataError::NotSupported { .. }) => continue,
                 Err(e) => {
                     let retry_class = e.retry_class();
                     diagnostics.record_error(provider_id.clone(), format!("{:?}", e));
@@ -841,6 +844,7 @@ impl ProviderRegistry {
                     diagnostics.record_success(provider_id);
                     return (Ok(quote), diagnostics);
                 }
+                Err(MarketDataError::NotSupported { .. }) => continue,
                 Err(e) => {
                     let retry_class = e.retry_class();
                     diagnostics.record_error(provider_id.clone(), format!("{:?}", e));
