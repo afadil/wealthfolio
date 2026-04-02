@@ -120,8 +120,7 @@ export function buildNewAssetFromSearchResult(
   fallbackCurrency: string,
 ): NewAsset {
   const instrumentType = mapQuoteTypeToInstrumentType(result.quoteType);
-  const kind =
-    instrumentType === "METAL" ? "PRECIOUS_METAL" : instrumentType === "FX" ? "FX" : "INVESTMENT";
+  const kind = instrumentType === "FX" ? "FX" : "INVESTMENT";
   const quoteMode = result.dataSource === "MANUAL" ? "MANUAL" : "MARKET";
 
   return {
@@ -143,12 +142,7 @@ export function buildNewAssetFromDraft(draft: DraftActivity): NewAsset | null {
   }
 
   const normalizedInstrumentType = draft.instrumentType.toUpperCase();
-  const kind =
-    normalizedInstrumentType === "METAL"
-      ? "PRECIOUS_METAL"
-      : normalizedInstrumentType === "FX"
-        ? "FX"
-        : "INVESTMENT";
+  const kind = normalizedInstrumentType === "FX" ? "FX" : "INVESTMENT";
 
   return {
     kind,

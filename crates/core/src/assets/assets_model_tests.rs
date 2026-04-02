@@ -367,6 +367,55 @@ mod tests {
         );
     }
 
+    // =========================================================================
+    // Metal domain model tests
+    // =========================================================================
+
+    #[test]
+    fn test_metal_instrument_type_maps_to_investment_kind() {
+        // Market-tracked metals (XAU, XAG spot) should be AssetKind::Investment,
+        // not PreciousMetal (which is reserved for physical/alternative metals).
+        let asset = Asset {
+            kind: AssetKind::Investment,
+            instrument_type: Some(InstrumentType::Metal),
+            instrument_symbol: Some("XAU".to_string()),
+            quote_mode: QuoteMode::Market,
+            quote_ccy: "USD".to_string(),
+            ..create_test_asset(AssetKind::Investment)
+        };
+
+        assert_eq!(asset.kind, AssetKind::Investment);
+        assert_eq!(asset.instrument_type, Some(InstrumentType::Metal));
+        assert!(!asset.kind.is_alternative());
+    }
+
+    #[test]
+    fn test_precious_metal_kind_remains_alternative() {
+        // Physical precious metals stay as PreciousMetal (alternative asset).
+        let asset = create_test_asset(AssetKind::PreciousMetal);
+
+        assert_eq!(asset.kind, AssetKind::PreciousMetal);
+        assert!(asset.kind.is_alternative());
+    }
+
+    #[test]
+    fn test_metal_to_instrument_id_uses_bare_symbol() {
+        let asset = Asset {
+            instrument_type: Some(InstrumentType::Metal),
+            instrument_symbol: Some("XAU".to_string()),
+            quote_ccy: "USD".to_string(),
+            ..create_test_asset(AssetKind::Investment)
+        };
+
+        let id = asset.to_instrument_id().unwrap();
+        match id {
+            crate::assets::InstrumentId::Metal { ref code, .. } => {
+                assert_eq!(code.as_ref(), "XAU");
+            }
+            _ => panic!("expected InstrumentId::Metal"),
+        }
+    }
+
     // Helper function
     fn create_test_asset(kind: AssetKind) -> Asset {
         let quote_mode = match kind {

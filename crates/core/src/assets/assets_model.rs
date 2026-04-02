@@ -2,7 +2,6 @@
 
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::str::FromStr;
 use std::sync::Arc;
 
 use chrono::NaiveDateTime;
@@ -183,28 +182,6 @@ pub fn build_option_metadata(symbol: &str, multiplier: Decimal) -> Option<serde_
         occ_symbol: Some(parsed.to_occ_symbol()),
     };
     Some(serde_json::json!({ "option": spec }))
-}
-
-/// Parse a metal weight-in-troy-ounces from a symbol weight suffix.
-///
-/// Symbol format: BASE[-SUFFIX] e.g. "XAU", "XAU-1KG", "XAG-100G"
-/// Returns 1.0 (one troy oz) for symbols with no suffix or unknown suffix.
-pub fn parse_metal_weight_oz(symbol: &str) -> Decimal {
-    let suffix = symbol
-        .split_once('-')
-        .map(|(_, s)| s.to_uppercase())
-        .unwrap_or_default();
-    match suffix.as_str() {
-        "1KG" => Decimal::from_str("32.1507").unwrap_or(Decimal::ONE),
-        "500G" => Decimal::from_str("16.0754").unwrap_or(Decimal::ONE),
-        "250G" => Decimal::from_str("8.03768").unwrap_or(Decimal::ONE),
-        "100G" => Decimal::from_str("3.21507").unwrap_or(Decimal::ONE),
-        "10OZ" => Decimal::from(10),
-        "5OZ" => Decimal::from(5),
-        "2OZ" => Decimal::from(2),
-        "1OZ" | "" => Decimal::ONE,
-        _ => Decimal::ONE,
-    }
 }
 
 /// Domain model representing an asset in the system.
@@ -391,17 +368,6 @@ impl Asset {
             Decimal::from(100)
         } else {
             Decimal::ONE
-        }
-    }
-
-    /// Returns the weight in troy ounces for a precious metal position.
-    ///
-    /// Derived from the weight suffix in `instrument_symbol` (e.g. "XAU-1KG").
-    /// Returns 1.0 for symbols without a weight suffix.
-    pub fn metal_weight_oz(&self) -> Decimal {
-        match &self.instrument_symbol {
-            Some(sym) => parse_metal_weight_oz(sym),
-            None => Decimal::ONE,
         }
     }
 
@@ -695,42 +661,6 @@ impl NewAsset {
             instrument_type: Some(InstrumentType::Bond),
             instrument_symbol: Some(isin.to_uppercase()),
             metadata: Some(serde_json::json!({ "bond": spec })),
-            is_active: true,
-            ..Default::default()
-        }
-    }
-
-    /// Creates a new precious metal asset.
-    ///
-    /// `base_code` is the ISO 4217 metal code (XAU, XAG, XPT, XPD).
-    /// `weight_suffix` is the optional weight descriptor (e.g. "1KG", "100G", "2OZ").
-    /// The symbol is formed as `{base_code}[-{weight_suffix}]`.
-    pub fn new_metal(base_code: &str, weight_suffix: Option<&str>, currency: &str) -> Self {
-        let code = base_code.to_uppercase();
-        let symbol = match weight_suffix {
-            Some(s) if !s.is_empty() => format!("{}-{}", code, s.to_uppercase()),
-            _ => code.clone(),
-        };
-        let metal_name = match code.as_str() {
-            "XAU" => "Gold",
-            "XAG" => "Silver",
-            "XPT" => "Platinum",
-            "XPD" => "Palladium",
-            _ => base_code,
-        };
-        let name = match weight_suffix {
-            Some(s) if !s.is_empty() => format!("{} ({})", metal_name, s.to_uppercase()),
-            _ => metal_name.to_string(),
-        };
-
-        Self {
-            kind: AssetKind::PreciousMetal,
-            name: Some(name.clone()),
-            display_code: Some(symbol.clone()),
-            quote_mode: QuoteMode::Market,
-            quote_ccy: currency.to_uppercase(),
-            instrument_type: Some(InstrumentType::Metal),
-            instrument_symbol: Some(symbol),
             is_active: true,
             ..Default::default()
         }

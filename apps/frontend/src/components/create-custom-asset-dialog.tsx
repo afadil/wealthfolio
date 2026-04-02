@@ -36,7 +36,7 @@ const ASSET_TYPE_OPTIONS = [
   { value: "CRYPTO", label: "Cryptocurrency" },
   { value: "BOND", label: "Bond" },
   { value: "OPTION", label: "Option" },
-  { value: "METAL", label: "Precious Metal" },
+  { value: "METAL", label: "Metal (Commodity)" },
   { value: "OTHER", label: "Other" },
 ] as const;
 
