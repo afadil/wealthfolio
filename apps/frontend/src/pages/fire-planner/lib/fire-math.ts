@@ -238,30 +238,23 @@ export function projectFireDate(settings: FireSettings, currentPortfolio: number
     // Snapshot uses start-of-year pension value (before stepping for this year)
     const pensionAssets = [...pensionBalances.values()].reduce((s, v) => s + v, 0);
 
-    // Trigger retirement when FI target reached OR forced by targetFireAge.
-    // fireAge is only set when FI is actually reached (portfolio >= target).
-    // Net target computed per-year: only income available at THIS age reduces it.
+    // Trigger retirement ONLY when FI target is actually reached (portfolio >= target).
+    // The desired FIRE age is a reference for comparison, NOT a retirement trigger.
     const realFireTarget = calculateNetFireTarget(settings, age);
     const nominalFireTarget = realFireTarget * Math.pow(1 + settings.inflationRate, i);
-    if (!inFire) {
-      const fiReached = portfolio >= nominalFireTarget;
-      const ageForced = age >= settings.targetFireAge;
-      if (fiReached || ageForced) {
-        inFire = true;
-        actualRetirementAge = age;
-        resolvedPayouts = resolveDcPayouts(
-          settings.additionalIncomeStreams,
-          settings.currentAge,
-          age,
-          settings.safeWithdrawalRate,
-        );
-        if (fiReached) {
-          fireAge = age;
-          fireYear = year;
-        }
-        fundedAtRetirement = fiReached;
-        portfolioAtFire = portfolio;
-      }
+    if (!inFire && portfolio >= nominalFireTarget) {
+      inFire = true;
+      actualRetirementAge = age;
+      fireAge = age;
+      fireYear = year;
+      fundedAtRetirement = true;
+      portfolioAtFire = portfolio;
+      resolvedPayouts = resolveDcPayouts(
+        settings.additionalIncomeStreams,
+        settings.currentAge,
+        age,
+        settings.safeWithdrawalRate,
+      );
     }
 
     const { mean: effectiveReturn } = blendedReturnParams(settings, i, inFire, actualRetirementAge);
