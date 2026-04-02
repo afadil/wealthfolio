@@ -296,31 +296,24 @@ pub fn project_fire_date(settings: &FireSettings, current_portfolio: f64) -> Fir
         // Snapshot uses start-of-year pension value (before stepping for this year)
         let pension_assets: f64 = pension_balances.values().sum();
 
-        // Trigger retirement when FI target reached OR forced by target_fire_age.
-        // fire_age is only set when FI is actually reached (portfolio >= target).
-        // Net target is computed per-year: only income available at THIS age reduces it.
+        // Trigger retirement ONLY when FI target is actually reached (portfolio >= target).
+        // The desired FIRE age is a reference for comparison, NOT a retirement trigger.
+        // This ensures projected FI age is independent of the desired age.
         let real_fire_target = calculate_net_fire_target(settings, age);
         let nominal_fire_target = real_fire_target * (1.0 + settings.inflation_rate).powi(i as i32);
-        if !in_fire {
-            let fi_reached = portfolio >= nominal_fire_target;
-            let age_forced = age >= settings.target_fire_age;
-            if fi_reached || age_forced {
-                in_fire = true;
-                actual_retirement_age = age;
-                // Resolve DC payouts once at the actual retirement age
-                resolved_payouts = Some(resolve_dc_payouts(
-                    &settings.additional_income_streams,
-                    settings.current_age,
-                    age,
-                    settings.safe_withdrawal_rate,
-                ));
-                if fi_reached {
-                    fire_age = Some(age);
-                    fire_year = Some(year);
-                }
-                funded_at_retirement = fi_reached;
-                portfolio_at_fire = portfolio;
-            }
+        if !in_fire && portfolio >= nominal_fire_target {
+            in_fire = true;
+            actual_retirement_age = age;
+            fire_age = Some(age);
+            fire_year = Some(year);
+            funded_at_retirement = true;
+            portfolio_at_fire = portfolio;
+            resolved_payouts = Some(resolve_dc_payouts(
+                &settings.additional_income_streams,
+                settings.current_age,
+                age,
+                settings.safe_withdrawal_rate,
+            ));
         }
 
         // Year-specific return accounting for glide path
@@ -823,6 +816,242 @@ pub fn run_strategy_comparison(
             current_portfolio,
             n_sims,
         ),
+    }
+}
+
+// ─── Retirement Overview ──────────────────────────────────────────────────────
+
+/// Bisection solver: finds how much additional monthly contribution is needed
+/// so the projected portfolio at `target_age` reaches `required_capital`.
+fn solve_required_additional_monthly(
+    settings: &FireSettings,
+    current_portfolio: f64,
+    required_capital: f64,
+) -> f64 {
+    let mut lo = 0.0_f64;
+    let mut hi = required_capital / 12.0; // upper bound: save entire shortfall in one year
+    for _ in 0..50 {
+        let mid = (lo + hi) / 2.0;
+        let adjusted = FireSettings {
+            monthly_contribution: settings.monthly_contribution + mid,
+            ..settings.clone()
+        };
+        let proj = project_fire_date(&adjusted, current_portfolio);
+        let portfolio_at_goal = proj
+            .year_by_year
+            .iter()
+            .find(|s| s.age == settings.target_fire_age)
+            .map(|s| s.portfolio_value)
+            .unwrap_or(0.0);
+        if portfolio_at_goal >= required_capital {
+            hi = mid;
+        } else {
+            lo = mid;
+        }
+    }
+    (lo + hi) / 2.0
+}
+
+/// Compute a monthly budget breakdown at the given retirement age.
+fn compute_budget_breakdown(settings: &FireSettings, retirement_age: u32) -> BudgetBreakdown {
+    let monthly_living = settings.monthly_expenses_at_fire;
+    let monthly_healthcare = settings.healthcare_monthly_at_fire.unwrap_or(0.0);
+    let total_monthly_budget = monthly_living + monthly_healthcare;
+
+    let resolved = resolve_dc_payouts(
+        &settings.additional_income_streams,
+        settings.current_age,
+        retirement_age,
+        settings.safe_withdrawal_rate,
+    );
+
+    let mut income_streams = Vec::new();
+    let mut total_income_monthly = 0.0_f64;
+    for s in &settings.additional_income_streams {
+        if s.start_age <= retirement_age {
+            let monthly = resolved.get(&s.id).copied().unwrap_or(s.monthly_amount);
+            total_income_monthly += monthly;
+            income_streams.push(BudgetStreamItem {
+                label: s.label.clone(),
+                monthly_amount: monthly,
+                percentage_of_budget: if total_monthly_budget > 0.0 {
+                    monthly / total_monthly_budget
+                } else {
+                    0.0
+                },
+            });
+        }
+    }
+
+    let monthly_portfolio_withdrawal = (total_monthly_budget - total_income_monthly).max(0.0);
+
+    BudgetBreakdown {
+        total_monthly_budget,
+        monthly_living_expenses: monthly_living,
+        monthly_healthcare,
+        monthly_portfolio_withdrawal,
+        income_streams,
+    }
+}
+
+/// Map yearly snapshots to trajectory points, adding required_capital at each year.
+fn build_trajectory(
+    year_by_year: &[YearlySnapshot],
+    settings: &FireSettings,
+    net_target: f64,
+) -> Vec<RetirementTrajectoryPoint> {
+    let current_age = settings.current_age;
+    let inflation = settings.inflation_rate;
+
+    // Find retirement start index (first "fire" phase snapshot)
+    let retirement_idx = year_by_year
+        .iter()
+        .position(|s| s.phase == "fire")
+        .unwrap_or(year_by_year.len());
+
+    // Required capital line:
+    //   Pre-retirement: inflation-adjusted FIRE target (what you need to accumulate)
+    //   Post-retirement: conservative drawdown simulation — start with the FIRE target
+    //     at retirement, grow at inflation only (0% real), subtract actual withdrawals.
+    //     This produces the classic triangle: peak at retirement, decline toward horizon.
+    let mut required_capitals = Vec::with_capacity(year_by_year.len());
+    let mut drawdown_balance = 0.0_f64;
+
+    for (idx, snap) in year_by_year.iter().enumerate() {
+        let years_from_now = (snap.age as i32 - current_age as i32).max(0) as u32;
+
+        if idx < retirement_idx {
+            // Pre-retirement: inflation-adjusted target (what you need to save up to)
+            let cap = net_target * (1.0 + inflation).powi(years_from_now as i32);
+            required_capitals.push(cap);
+        } else if idx == retirement_idx {
+            // At retirement: peak — the nominal FIRE target at this year
+            let cap = net_target * (1.0 + inflation).powi(years_from_now as i32);
+            drawdown_balance = cap;
+            required_capitals.push(cap);
+        } else {
+            // Post-retirement: conservative drawdown
+            // Grow at inflation only (preserves purchasing power, no real growth)
+            // then subtract the actual nominal withdrawal for this year.
+            // This declines because withdrawals exceed inflation-only growth.
+            drawdown_balance = (drawdown_balance * (1.0 + inflation)
+                - snap.net_withdrawal_from_portfolio)
+                .max(0.0);
+            required_capitals.push(drawdown_balance);
+        }
+    }
+
+    year_by_year
+        .iter()
+        .enumerate()
+        .map(|(idx, snap)| {
+            let portfolio_end = if idx + 1 < year_by_year.len() {
+                year_by_year[idx + 1].portfolio_value
+            } else {
+                snap.portfolio_value
+            };
+
+            RetirementTrajectoryPoint {
+                age: snap.age,
+                year: snap.year,
+                phase: snap.phase.clone(),
+                portfolio_start: snap.portfolio_value,
+                annual_contribution: snap.annual_contribution,
+                annual_income: snap.annual_income,
+                annual_expenses: snap.annual_withdrawal,
+                net_withdrawal_from_portfolio: snap.net_withdrawal_from_portfolio,
+                portfolio_end,
+                required_capital: required_capitals[idx],
+                pension_assets: snap.pension_assets,
+            }
+        })
+        .collect()
+}
+
+pub fn compute_retirement_overview(
+    settings: &FireSettings,
+    current_portfolio: f64,
+    analysis_mode: &str,
+) -> RetirementOverview {
+    let gross_target = calculate_fire_target(settings);
+    let net_target = calculate_net_fire_target(settings, settings.target_fire_age);
+    let coast = calculate_coast_fire_amount(settings);
+    let projection = project_fire_date(settings, current_portfolio);
+
+    let fi_age = projection.fire_age;
+    let funded = projection.funded_at_retirement;
+
+    // Portfolio at goal age: find snapshot at target_fire_age
+    let portfolio_at_goal = projection
+        .year_by_year
+        .iter()
+        .find(|s| s.age == settings.target_fire_age)
+        .map(|s| s.portfolio_value)
+        .unwrap_or(0.0);
+
+    // Required capital at goal age (inflation-adjusted)
+    let years_to_goal = (settings.target_fire_age as i32 - settings.current_age as i32).max(0);
+    let required_capital = net_target * (1.0 + settings.inflation_rate).powi(years_to_goal);
+
+    // Shortfall / surplus
+    let shortfall = (required_capital - portfolio_at_goal).max(0.0);
+    let surplus = (portfolio_at_goal - required_capital).max(0.0);
+
+    // Required additional monthly contribution
+    let required_additional = if shortfall > 0.0 {
+        solve_required_additional_monthly(settings, current_portfolio, required_capital)
+    } else {
+        0.0
+    };
+
+    // Suggested goal age if unchanged (if underfunded, when would they reach it?)
+    let suggested_age = if !funded { fi_age } else { None };
+
+    // Status
+    let status = if current_portfolio >= net_target {
+        "achieved"
+    } else if fi_age.map_or(false, |a| a <= settings.target_fire_age) {
+        "on_track"
+    } else if fi_age.map_or(false, |a| a <= settings.target_fire_age + 3) {
+        "at_risk"
+    } else {
+        "off_track"
+    };
+
+    // Progress
+    let progress = if net_target > 0.0 {
+        (current_portfolio / net_target).min(1.0)
+    } else {
+        0.0
+    };
+
+    // Budget breakdown at FIRE age
+    let fire_age_for_budget = fi_age.unwrap_or(settings.target_fire_age);
+    let budget = compute_budget_breakdown(settings, fire_age_for_budget);
+
+    // Trajectory with required capital series
+    let trajectory = build_trajectory(&projection.year_by_year, settings, net_target);
+
+    RetirementOverview {
+        analysis_mode: analysis_mode.to_string(),
+        status: status.to_string(),
+        desired_fire_age: settings.target_fire_age,
+        fi_age,
+        funded_at_goal_age: funded,
+        portfolio_now: current_portfolio,
+        net_fire_target: net_target,
+        gross_fire_target: gross_target,
+        portfolio_at_goal_age: portfolio_at_goal,
+        required_capital_at_goal_age: required_capital,
+        shortfall_at_goal_age: shortfall,
+        surplus_at_goal_age: surplus,
+        required_additional_monthly_contribution: required_additional,
+        suggested_goal_age_if_unchanged: suggested_age,
+        coast_amount_today: coast,
+        coast_reached: current_portfolio >= coast,
+        progress,
+        budget_breakdown: budget,
+        trajectory,
     }
 }
 
