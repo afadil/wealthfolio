@@ -29,11 +29,10 @@ pub use asset_id::{
     unknown_dotted_suffix_fallback,
 };
 pub use assets_model::{
-    build_asset_metadata, build_option_metadata, canonical_metal_code,
-    canonicalize_market_identity, normalize_quote_ccy_code, parse_metal_weight_oz,
-    resolve_quote_ccy_precedence, Asset, AssetKind, AssetMetadata, AssetSpec, BondSpec, Country,
-    EnsureAssetsResult, InstrumentId, InstrumentType, NewAsset, OptionSpec, ProviderProfile,
-    QuoteCcyResolutionSource, QuoteMode, Sector, UpdateAssetProfile,
+    build_asset_metadata, build_option_metadata, canonicalize_market_identity,
+    normalize_quote_ccy_code, resolve_quote_ccy_precedence, Asset, AssetKind, AssetMetadata,
+    AssetSpec, BondSpec, Country, EnsureAssetsResult, InstrumentId, InstrumentType, NewAsset,
+    OptionSpec, ProviderProfile, QuoteCcyResolutionSource, QuoteMode, Sector, UpdateAssetProfile,
 };
 pub use assets_service::AssetService;
 pub use assets_traits::{AssetRepositoryTrait, AssetServiceTrait};

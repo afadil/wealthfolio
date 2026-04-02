@@ -2334,6 +2334,89 @@ mod tests {
     }
 
     // =========================================================================
+    // effective_provider Tests
+    // =========================================================================
+
+    mod effective_provider_tests {
+        use super::*;
+
+        fn test_asset() -> Asset {
+            Asset {
+                id: "test-id".to_string(),
+                kind: AssetKind::Investment,
+                ..Default::default()
+            }
+        }
+
+        fn test_asset_with_preferred(provider: &str) -> Asset {
+            Asset {
+                id: "test-id".to_string(),
+                kind: AssetKind::Investment,
+                provider_config: Some(serde_json::json!({
+                    "preferred_provider": provider
+                })),
+                ..Default::default()
+            }
+        }
+
+        fn test_sync_state(data_source: &str) -> QuoteSyncState {
+            QuoteSyncState {
+                asset_id: "test-id".to_string(),
+                is_active: true,
+                position_closed_date: None,
+                last_synced_at: None,
+                data_source: data_source.to_string(),
+                sync_priority: 0,
+                error_count: 0,
+                last_error: None,
+                profile_enriched_at: None,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            }
+        }
+
+        #[test]
+        fn uses_sync_state_data_source_when_present() {
+            let state = test_sync_state("ALPHA_VANTAGE");
+            let asset = test_asset();
+            assert_eq!(effective_provider(Some(&state), &asset), "ALPHA_VANTAGE");
+        }
+
+        #[test]
+        fn empty_data_source_falls_through_to_preferred_provider() {
+            let state = test_sync_state("");
+            let asset = test_asset_with_preferred("METAL_PRICE_API");
+            assert_eq!(effective_provider(Some(&state), &asset), "METAL_PRICE_API");
+        }
+
+        #[test]
+        fn no_state_uses_preferred_provider() {
+            let asset = test_asset_with_preferred("METAL_PRICE_API");
+            assert_eq!(effective_provider(None, &asset), "METAL_PRICE_API");
+        }
+
+        #[test]
+        fn no_state_no_preferred_defaults_to_yahoo() {
+            let asset = test_asset();
+            assert_eq!(effective_provider(None, &asset), DATA_SOURCE_YAHOO);
+        }
+
+        #[test]
+        fn empty_data_source_no_preferred_defaults_to_yahoo() {
+            let state = test_sync_state("");
+            let asset = test_asset();
+            assert_eq!(effective_provider(Some(&state), &asset), DATA_SOURCE_YAHOO);
+        }
+
+        #[test]
+        fn data_source_takes_priority_over_preferred_provider() {
+            let state = test_sync_state("YAHOO");
+            let asset = test_asset_with_preferred("METAL_PRICE_API");
+            assert_eq!(effective_provider(Some(&state), &asset), "YAHOO");
+        }
+    }
+
+    // =========================================================================
     // Closed Position Grace Period Tests
     // =========================================================================
 
