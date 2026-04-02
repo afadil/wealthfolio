@@ -6,6 +6,8 @@ use tauri::State;
 use wealthfolio_core::goals::{
     Goal, GoalFundingRule, GoalFundingRuleInput, GoalPlan, NewGoal, SaveGoalPlan,
 };
+use wealthfolio_core::planning::SaveUpOverview;
+use wealthfolio_core::portfolio::fire::RetirementOverview;
 
 #[tauri::command]
 pub async fn get_goals(state: State<'_, Arc<ServiceContext>>) -> Result<Vec<Goal>, String> {
@@ -175,6 +177,34 @@ pub async fn refresh_all_goal_summaries(
         }
     }
     Ok(results)
+}
+
+#[tauri::command]
+pub async fn get_retirement_overview(
+    goal_id: String,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<RetirementOverview, String> {
+    debug!("Computing retirement overview for goal {}...", goal_id);
+    let valuation_map = build_valuation_map(&state).await?;
+    state
+        .goal_service()
+        .compute_retirement_overview(&goal_id, &valuation_map)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_save_up_overview(
+    goal_id: String,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<SaveUpOverview, String> {
+    debug!("Computing save-up overview for goal {}...", goal_id);
+    let valuation_map = build_valuation_map(&state).await?;
+    state
+        .goal_service()
+        .compute_save_up_overview(&goal_id, &valuation_map)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Internal helper: fetch valuations and refresh goal summary.

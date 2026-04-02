@@ -319,6 +319,8 @@ pub fn run() {
             commands::goal::delete_goal_plan,
             commands::goal::refresh_all_goal_summaries,
             commands::goal::refresh_goal_summary,
+            commands::goal::get_retirement_overview,
+            commands::goal::get_save_up_overview,
             // Portfolio commands
             commands::portfolio::get_holdings,
             commands::portfolio::get_holding,
