@@ -384,7 +384,7 @@ export function ReviewStep() {
             {filterStats.duplicates > 0 && (
               <Badge
                 variant="outline"
-                className="cursor-pointer border-blue-500/50 text-blue-700 hover:bg-blue-500/10 dark:text-blue-400"
+                className="cursor-pointer border-yellow-500/50 text-yellow-700 hover:bg-yellow-500/10 dark:text-yellow-400"
                 onClick={() => setStatusFilter(new Set(["duplicate"]))}
               >
                 {filterStats.duplicates} duplicates
