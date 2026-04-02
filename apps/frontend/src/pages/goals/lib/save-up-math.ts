@@ -218,8 +218,7 @@ export function generateProjectionSeries(input: SaveUpInput): ProjectionPoint[] 
   ];
 
   // Build monthly balances for each scenario
-  const series: Map<string, { nominal: number; optimistic: number; pessimistic: number }> =
-    new Map();
+  const series = new Map<string, { nominal: number; optimistic: number; pessimistic: number }>();
   const points: ProjectionPoint[] = [];
 
   for (const { key, rate } of scenarios) {
