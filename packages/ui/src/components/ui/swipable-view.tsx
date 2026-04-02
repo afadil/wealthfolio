@@ -5,6 +5,17 @@ import useEmblaCarousel, { type UseEmblaCarouselType } from "embla-carousel-reac
 import * as React from "react";
 
 type CarouselApi = UseEmblaCarouselType[1];
+const SWIPE_DRAG_BLOCK_SELECTOR = "[data-no-swipe-drag]";
+
+function hasSwipeDragBlocker(evt: Event): boolean {
+  if (typeof evt.composedPath === "function") {
+    return evt.composedPath().some(
+      (node) => node instanceof Element && node.closest(SWIPE_DRAG_BLOCK_SELECTOR) !== null,
+    );
+  }
+
+  return evt.target instanceof Element && evt.target.closest(SWIPE_DRAG_BLOCK_SELECTOR) !== null;
+}
 
 export interface SwipableViewItem {
   name: string;
@@ -47,6 +58,7 @@ export function SwipableView({
     skipSnaps: false,
     dragFree: false,
     startIndex: initialIndex, // OPTIMIZATION: Start at correct slide instantly
+    watchDrag: (_api, evt) => !hasSwipeDragBlocker(evt),
   });
 
   const [selectedIndex, setSelectedIndex] = React.useState(initialIndex);
