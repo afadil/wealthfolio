@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { parse, parseISO, isValid, format as formatDate } from "date-fns";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 
 import { checkHoldingsImport } from "@/adapters";
@@ -8,263 +7,17 @@ import { useImportContext } from "../context";
 import { setParsedData, setHoldingsCheckPassed } from "../context/import-actions";
 import { ImportAlert } from "../components/import-alert";
 import { HoldingsFormat } from "./holdings-mapping-step";
-import { getDateFnsPattern } from "../utils/date-format-options";
+import {
+  CASH_SYMBOL,
+  buildHoldingsRowResolutionMap,
+  type HoldingsRowResolution,
+  parseDateToYMD,
+  parseHoldingsSnapshots,
+  parseNumericValue,
+  type ParseOptions,
+} from "../utils/holdings-import-utils";
 import { HoldingsDataGrid, type HoldingsRow } from "../components/holdings-data-grid";
-import type {
-  HoldingsSnapshotInput,
-  HoldingsPositionInput,
-  CheckHoldingsImportResult,
-} from "@/lib/types";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-const CASH_SYMBOL = "$CASH";
-
-interface ParseOptions {
-  dateFormat: string;
-  decimalSeparator: string;
-  thousandsSeparator: string;
-  defaultCurrency: string;
-}
-
-/**
- * Parse a numeric value from a string, handling various decimal/thousands formats.
- * Mirrors the logic in review-step.tsx's parseNumericValue.
- */
-function parseNumericValue(
-  value: string | undefined,
-  decimalSeparator: string,
-  thousandsSeparator: string,
-): string | undefined {
-  if (!value || value.trim() === "") return undefined;
-
-  let normalized = value.trim();
-  let isNegative = false;
-
-  if (normalized.startsWith("(") && normalized.endsWith(")")) {
-    isNegative = true;
-    normalized = normalized.slice(1, -1);
-  }
-
-  const lastComma = normalized.lastIndexOf(",");
-  const lastDot = normalized.lastIndexOf(".");
-  let resolvedDecimal = decimalSeparator;
-  if (decimalSeparator === "auto") {
-    if (lastComma !== -1 && lastDot !== -1) {
-      resolvedDecimal = lastComma > lastDot ? "," : ".";
-    } else if (lastComma !== -1) {
-      resolvedDecimal = ",";
-    } else {
-      resolvedDecimal = ".";
-    }
-  }
-
-  let cleaned = normalized.replace(/[^\d.,+-]/g, "");
-
-  if (thousandsSeparator !== "none" && thousandsSeparator !== "auto") {
-    cleaned = cleaned.replace(new RegExp(`\\${thousandsSeparator}`, "g"), "");
-  } else {
-    const defaultThousands = resolvedDecimal === "," ? "." : ",";
-    cleaned = cleaned.replace(new RegExp(`\\${defaultThousands}`, "g"), "");
-  }
-
-  if (resolvedDecimal === ",") {
-    const parts = cleaned.split(",");
-    if (parts.length > 1) {
-      const decimalPart = parts.pop() ?? "";
-      cleaned = `${parts.join("")}.${decimalPart}`;
-    }
-  } else {
-    const parts = cleaned.split(".");
-    if (parts.length > 1) {
-      const decimalPart = parts.pop() ?? "";
-      cleaned = `${parts.join("")}.${decimalPart}`;
-    }
-  }
-
-  let candidate = cleaned;
-  if (isNegative && candidate && !candidate.startsWith("-")) {
-    candidate = `-${candidate}`;
-  }
-
-  if (candidate === "" || candidate === "-" || candidate === "+") {
-    return undefined;
-  }
-
-  const numericCheck = Number(candidate);
-  return Number.isFinite(numericCheck) ? candidate : undefined;
-}
-
-/**
- * Parse a date value to YYYY-MM-DD using the configured format.
- * Uses date-fns for robust parsing, matching the activity import approach.
- */
-function parseDateToYMD(dateStr: string, dateFormat: string): string | null {
-  const trimmed = dateStr.trim();
-  if (!trimmed) return null;
-
-  // 1. If user specified a format, try it first
-  const pattern = getDateFnsPattern(dateFormat);
-  if (pattern) {
-    try {
-      const parsed = parse(trimmed, pattern, new Date());
-      if (isValid(parsed)) return formatDate(parsed, "yyyy-MM-dd");
-    } catch {
-      // fall through to auto-detection
-    }
-  }
-
-  // 2. ISO8601 preset
-  if (dateFormat === "ISO8601") {
-    try {
-      const parsed = parseISO(trimmed);
-      if (isValid(parsed)) return formatDate(parsed, "yyyy-MM-dd");
-    } catch {
-      // fall through
-    }
-  }
-
-  // 3. Auto-detection: try ISO format first
-  const isoMatch = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(trimmed);
-  if (isoMatch) {
-    try {
-      const parsed = parseISO(trimmed);
-      if (isValid(parsed)) return formatDate(parsed, "yyyy-MM-dd");
-    } catch {
-      // fall through
-    }
-  }
-
-  // 4. Try common separated formats with date-fns
-  const commonPatterns = [
-    "MM/dd/yyyy",
-    "dd/MM/yyyy",
-    "MM-dd-yyyy",
-    "dd-MM-yyyy",
-    "dd.MM.yyyy",
-    "MM.dd.yyyy",
-    "yyyy/MM/dd",
-  ];
-  for (const p of commonPatterns) {
-    try {
-      const parsed = parse(trimmed, p, new Date());
-      if (isValid(parsed)) return formatDate(parsed, "yyyy-MM-dd");
-    } catch {
-      continue;
-    }
-  }
-
-  // 5. Fallback to JS Date
-  const date = new Date(trimmed);
-  if (!isNaN(date.getTime())) {
-    return formatDate(date, "yyyy-MM-dd");
-  }
-
-  return null;
-}
-
-/**
- * Parse CSV rows into holdings snapshots grouped by date
- */
-export function parseHoldingsSnapshots(
-  headers: string[],
-  rows: string[][],
-  mapping: Record<string, string>,
-  parseOptions: ParseOptions,
-  symbolMappings?: Record<string, string>,
-  symbolMeta?: Record<string, { exchangeMic?: string }>,
-  symbolAssetIds?: Record<string, string>,
-): HoldingsSnapshotInput[] {
-  const { dateFormat, decimalSeparator, thousandsSeparator, defaultCurrency } = parseOptions;
-
-  const dateHeader = mapping[HoldingsFormat.DATE];
-  const symbolHeader = mapping[HoldingsFormat.SYMBOL];
-  const quantityHeader = mapping[HoldingsFormat.QUANTITY];
-  const avgCostHeader = mapping[HoldingsFormat.AVG_COST];
-  const currencyHeader = mapping[HoldingsFormat.CURRENCY];
-
-  const dateIndex = dateHeader ? headers.indexOf(dateHeader) : -1;
-  const symbolIndex = symbolHeader ? headers.indexOf(symbolHeader) : -1;
-  const quantityIndex = quantityHeader ? headers.indexOf(quantityHeader) : -1;
-  const avgCostIndex = avgCostHeader ? headers.indexOf(avgCostHeader) : -1;
-  const currencyIndex = currencyHeader ? headers.indexOf(currencyHeader) : -1;
-
-  // Group rows by date
-  const snapshotsByDate = new Map<
-    string,
-    { positions: HoldingsPositionInput[]; cashBalances: Record<string, string> }
-  >();
-
-  for (const row of rows) {
-    const rawDate = dateIndex >= 0 ? row[dateIndex]?.trim() : "";
-    const rawSymbol = symbolIndex >= 0 ? row[symbolIndex]?.trim().toUpperCase() : "";
-    const rawQuantity = quantityIndex >= 0 ? row[quantityIndex]?.trim() : "";
-    const rawAvgCost = avgCostIndex >= 0 ? row[avgCostIndex]?.trim() : undefined;
-    const currency = currencyIndex >= 0 ? row[currencyIndex]?.trim() : defaultCurrency;
-
-    if (!rawDate || !rawSymbol || !rawQuantity) {
-      continue; // Skip rows with missing required fields
-    }
-
-    // Normalize date using configured format
-    const normalizedDate = parseDateToYMD(rawDate, dateFormat);
-    if (!normalizedDate) {
-      continue; // Skip invalid dates
-    }
-
-    // Normalize numeric values using configured separators
-    const quantity = parseNumericValue(rawQuantity, decimalSeparator, thousandsSeparator);
-    if (!quantity) {
-      continue; // Skip rows with invalid quantity
-    }
-    const avgCost = parseNumericValue(rawAvgCost, decimalSeparator, thousandsSeparator);
-
-    if (!snapshotsByDate.has(normalizedDate)) {
-      snapshotsByDate.set(normalizedDate, { positions: [], cashBalances: {} });
-    }
-
-    const snapshot = snapshotsByDate.get(normalizedDate)!;
-
-    // Apply symbol mapping if available
-    const symbol = symbolMappings?.[rawSymbol] || rawSymbol;
-
-    if (symbol === CASH_SYMBOL) {
-      // Cash balance entry — accumulate by currency
-      const cashCurrency = currency || defaultCurrency;
-      const existingAmount = parseFloat(snapshot.cashBalances[cashCurrency] || "0");
-      const newAmount = parseFloat(quantity) || 0;
-      snapshot.cashBalances[cashCurrency] = String(existingAmount + newAmount);
-    } else {
-      // Security position
-      const exchangeMic = symbolMeta?.[rawSymbol]?.exchangeMic ?? symbolMeta?.[symbol]?.exchangeMic;
-      const assetId = symbolAssetIds?.[symbol] ?? symbolAssetIds?.[rawSymbol];
-      snapshot.positions.push({
-        symbol,
-        quantity,
-        avgCost: avgCost || undefined,
-        currency: currency || defaultCurrency,
-        ...(exchangeMic ? { exchangeMic } : {}),
-        ...(assetId ? { assetId } : {}),
-      });
-    }
-  }
-
-  // Convert map to array sorted by date (newest first)
-  const snapshots: HoldingsSnapshotInput[] = [];
-  for (const [date, data] of snapshotsByDate.entries()) {
-    snapshots.push({
-      date,
-      positions: data.positions,
-      cashBalances: data.cashBalances,
-    });
-  }
-
-  snapshots.sort((a, b) => b.date.localeCompare(a.date));
-
-  return snapshots;
-}
+import type { CheckHoldingsImportResult } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Build flat rows for the data grid
@@ -276,6 +29,7 @@ function buildHoldingsRows(
   fieldMappings: Record<string, string>,
   parseOptions: ParseOptions,
   symbolMappings?: Record<string, string>,
+  rowResolutions?: Record<number, HoldingsRowResolution>,
 ): HoldingsRow[] {
   const { dateFormat, decimalSeparator, thousandsSeparator, defaultCurrency } = parseOptions;
 
@@ -299,6 +53,7 @@ function buildHoldingsRows(
 
   for (let i = 0; i < parsedRows.length; i++) {
     const row = parsedRows[i];
+    const rowResolution = rowResolutions?.[i];
     const rawDate = dateIndex >= 0 ? row[dateIndex]?.trim() : "";
     const rawSymbol = symbolIndex >= 0 ? row[symbolIndex]?.trim().toUpperCase() : "";
     const rawQuantity = quantityIndex >= 0 ? row[quantityIndex]?.trim() : "";
@@ -315,7 +70,9 @@ function buildHoldingsRows(
       parseNumericValue(rawAvgCost, decimalSeparator, thousandsSeparator) ?? rawAvgCost;
     const currency = rawCurrency || defaultCurrency;
     const isCash = rawSymbol === CASH_SYMBOL;
-    const resolvedSymbol = isCash ? CASH_SYMBOL : symbolMappings?.[rawSymbol] || rawSymbol;
+    const resolvedSymbol = isCash
+      ? CASH_SYMBOL
+      : rowResolution?.symbol || symbolMappings?.[rawSymbol] || rawSymbol;
 
     rows.push({
       rowIndex: i,
@@ -338,11 +95,14 @@ function buildHoldingsRows(
 
 export function HoldingsReviewStep() {
   const { state, dispatch } = useImportContext();
-  const { headers, parsedRows, mapping, parseConfig, accountId } = state;
+  const { headers, parsedRows, mapping, parseConfig, accountId, draftActivities } = state;
 
   // Holdings imports never use fallback-column arrays — narrow to Record<string, string>
-  const fieldMappings = (mapping?.fieldMappings || {}) as Record<string, string>;
-  const symbolMappings = mapping?.symbolMappings || {};
+  const fieldMappings = useMemo(
+    () => (mapping?.fieldMappings || {}) as Record<string, string>,
+    [mapping?.fieldMappings],
+  );
+  const symbolMappings = useMemo(() => mapping?.symbolMappings || {}, [mapping?.symbolMappings]);
   const parseOptions: ParseOptions = useMemo(
     () => ({
       dateFormat: parseConfig.dateFormat,
@@ -352,17 +112,38 @@ export function HoldingsReviewStep() {
     }),
     [parseConfig],
   );
+  const rowResolutions = useMemo(
+    () => buildHoldingsRowResolutionMap(draftActivities),
+    [draftActivities],
+  );
 
   // Build flat row data for the grid
   const holdingsRows = useMemo(
-    () => buildHoldingsRows(headers, parsedRows, fieldMappings, parseOptions, symbolMappings),
-    [headers, parsedRows, fieldMappings, parseOptions, symbolMappings],
+    () =>
+      buildHoldingsRows(
+        headers,
+        parsedRows,
+        fieldMappings,
+        parseOptions,
+        symbolMappings,
+        rowResolutions,
+      ),
+    [headers, parsedRows, fieldMappings, parseOptions, symbolMappings, rowResolutions],
   );
 
   // Parse snapshots for the summary stats
   const snapshots = useMemo(
-    () => parseHoldingsSnapshots(headers, parsedRows, fieldMappings, parseOptions, symbolMappings),
-    [headers, parsedRows, fieldMappings, parseOptions, symbolMappings],
+    () =>
+      parseHoldingsSnapshots(
+        headers,
+        parsedRows,
+        fieldMappings,
+        parseOptions,
+        symbolMappings,
+        undefined,
+        rowResolutions,
+      ),
+    [headers, parsedRows, fieldMappings, parseOptions, symbolMappings, rowResolutions],
   );
 
   const totalPositions = snapshots.reduce((sum, s) => sum + s.positions.length, 0);
@@ -516,7 +297,11 @@ export function HoldingsReviewStep() {
       )}
 
       {/* Editable Data Grid */}
-      <HoldingsDataGrid rows={holdingsRows} onDataChange={handleDataChange} />
+      <HoldingsDataGrid
+        rows={holdingsRows}
+        onDataChange={handleDataChange}
+        enableSymbolEditing={false}
+      />
     </div>
   );
 }
