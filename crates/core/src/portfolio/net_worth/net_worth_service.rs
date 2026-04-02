@@ -297,7 +297,12 @@ impl NetWorthServiceTrait for NetWorthService {
 
                 // Get asset info to determine category more precisely
                 let asset = asset_map.get(asset_id);
-                let asset_name = asset.and_then(|a| a.name.clone());
+                let asset_name = asset.and_then(|a| {
+                    a.name
+                        .clone()
+                        .filter(|n| !n.is_empty())
+                        .or_else(|| a.display_code.clone())
+                });
 
                 // Determine category: prefer asset kind if available, fallback to account type
                 let category = if let Some(asset) = asset {
@@ -457,7 +462,11 @@ impl NetWorthServiceTrait for NetWorthService {
 
             valuations.push(ValuationInfo {
                 asset_id: asset.id.clone(),
-                name: asset.name.clone(),
+                name: asset
+                    .name
+                    .clone()
+                    .filter(|n| !n.is_empty())
+                    .or_else(|| asset.display_code.clone()),
                 market_value_base,
                 valuation_date,
                 category,
