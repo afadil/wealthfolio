@@ -217,3 +217,10 @@ export function setSelectedTemplate(
 ): ImportAction {
   return { type: "SET_SELECTED_TEMPLATE", payload: { id, scope } };
 }
+
+/**
+ * Suppress auto-applying account-linked templates for the current import session.
+ */
+export function setSuppressLinkedTemplate(value: boolean): ImportAction {
+  return { type: "SET_SUPPRESS_LINKED_TEMPLATE", payload: value };
+}

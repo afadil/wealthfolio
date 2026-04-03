@@ -858,8 +858,6 @@ export interface DepositsCalculation {
   byAccount: Record<string, AccountDeposit>;
 }
 
-export const ACTIVITY_TYPE_PREFIX_LENGTH = 12;
-
 // Renamed from CumulativeReturn to match Rust struct ReturnData
 export interface ReturnData {
   date: string; // Changed from CumulativeReturn

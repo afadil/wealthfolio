@@ -12,6 +12,7 @@ import { logger } from "@/adapters";
 import { SUBTYPES_BY_ACTIVITY_TYPE, SUBTYPE_DISPLAY_NAMES } from "@/lib/constants";
 import { looksLikeOccSymbol, normalizeOptionSymbol } from "@/lib/occ-symbol";
 import { looksLikeIsin } from "@/lib/isin";
+import { findMappedActivityType } from "./activity-type-mapping";
 import { normalizeInstrumentType, splitInstrumentPrefixedSymbol } from "./instrument-type";
 
 // Ticker symbol validation regex
@@ -36,7 +37,7 @@ export function validateTickerSymbol(symbol: string): boolean {
 }
 
 // Re-export shared activity type mapping utilities
-export { ACTIVITY_TYPE_SMART_DEFAULTS, findMappedActivityType } from "./activity-type-mapping";
+export { findMappedActivityType };
 
 // Build reverse lookup from display names to subtype codes
 const DISPLAY_NAME_TO_SUBTYPE: Record<string, string> = {};
@@ -478,13 +479,8 @@ function transformRowToActivity(
 
   // 2. Determine Activity Type
   if (csvActivityType) {
-    const trimmedCsvType = csvActivityType.trim().toUpperCase();
-    for (const [appType, csvTypes] of Object.entries(mapping.activityMappings)) {
-      if (csvTypes?.some((ct) => trimmedCsvType.startsWith(ct.trim().toUpperCase()))) {
-        activity.activityType = appType as ActivityType;
-        break;
-      }
-    }
+    activity.activityType =
+      findMappedActivityType(csvActivityType, mapping.activityMappings) ?? activity.activityType;
   }
 
   // Validate subtype against allowed subtypes for the determined activity type
