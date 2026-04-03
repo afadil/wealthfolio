@@ -256,11 +256,33 @@ impl LotRepositoryTrait for LotsRepository {
                         .map_err(StorageError::from)?;
                 }
 
-                // Insert any open lots not yet in the DB (new lots from this run)
-                // The ON CONFLICT above handles updates; new rows are inserted automatically.
-                // Remove closed lots from the account that are no longer referenced
-                // (lots closed in a prior run and not in open_lots are already marked closed — no delete needed)
-                let _ = account_id; // keep borrow alive
+                // Delete orphaned lots for this account that weren't produced by
+                // this recalculation. Orphans arise when activities are deleted
+                // (FK SET NULL on open_activity_id) and a subsequent rebuild
+                // creates new lots with new IDs, leaving the old ones behind.
+                let known_ids: Vec<&str> = db_lots
+                    .iter()
+                    .map(|l| l.id.as_str())
+                    .chain(closures.iter().map(|c| c.lot_id.as_str()))
+                    .collect();
+
+                if known_ids.is_empty() {
+                    // No lots produced — delete everything for this account
+                    diesel::delete(
+                        dsl::lots.filter(dsl::account_id.eq(&account_id)),
+                    )
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                } else {
+                    diesel::delete(
+                        dsl::lots
+                            .filter(dsl::account_id.eq(&account_id))
+                            .filter(diesel::dsl::not(dsl::id.eq_any(&known_ids))),
+                    )
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                }
+
                 Ok(())
             })
             .await
