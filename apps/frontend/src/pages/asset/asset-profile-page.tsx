@@ -621,12 +621,13 @@ export const AssetProfilePage = () => {
       });
     }
 
-    if (holding?.lots && holding.lots.length > 0 && profile) {
+    if (((holding?.lots && holding.lots.length > 0) || holding?.lotDetails) && profile) {
       tabs.push({
         name: "Lots",
         content: (
           <AssetLotsTable
-            lots={holding.lots}
+            lots={holding.lots ?? []}
+            lotDetails={holding.lotDetails}
             currency={symbolHolding?.currency ?? profile.currency ?? baseCurrency}
             marketPrice={Number(holding.price ?? profile.marketPrice)}
           />
@@ -1237,15 +1238,17 @@ export const AssetProfilePage = () => {
             )}
 
             {/* Lots Content: Requires profile and holding with lots */}
-            {profile && holding?.lots && holding.lots.length > 0 && (
-              <TabsContent value="lots" className="pt-6">
-                <AssetLotsTable
-                  lots={holding.lots}
-                  currency={symbolHolding?.currency ?? profile.currency ?? baseCurrency}
-                  marketPrice={Number(holding.price ?? profile.marketPrice)}
-                />
-              </TabsContent>
-            )}
+            {profile &&
+              ((holding?.lots && holding.lots.length > 0) || holding?.lotDetails) && (
+                <TabsContent value="lots" className="pt-6">
+                  <AssetLotsTable
+                    lots={holding?.lots ?? []}
+                    lotDetails={holding?.lotDetails}
+                    currency={symbolHolding?.currency ?? profile.currency ?? baseCurrency}
+                    marketPrice={Number(holding?.price ?? profile.marketPrice)}
+                  />
+                </TabsContent>
+              )}
 
             {/* History/Quotes Content: Requires quoteHistory */}
             <TabsContent value="history" className="space-y-16 pt-6">

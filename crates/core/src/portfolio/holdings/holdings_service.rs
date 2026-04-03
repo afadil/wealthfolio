@@ -4,7 +4,9 @@ use crate::constants::DECIMAL_PRECISION;
 use crate::errors::{CalculatorError, Error as CoreError, Result};
 use crate::fx::currency::{get_normalization_rule, normalize_currency_code};
 use crate::lots::{LotRecord, LotRepositoryTrait};
-use crate::portfolio::holdings::holdings_model::{Holding, HoldingType, Instrument, MonetaryValue};
+use crate::portfolio::holdings::holdings_model::{
+    Holding, HoldingType, Instrument, LotView, MonetaryValue,
+};
 use crate::portfolio::snapshot::{self, SnapshotServiceTrait};
 use crate::utils::time_utils::{parse_user_timezone_or_default, user_today};
 use async_trait::async_trait;
@@ -242,6 +244,31 @@ impl HoldingsService {
                 None
             };
 
+            // Build detailed lot view (open + closed) when lots are requested.
+            // For TOTAL, fetch all lots across accounts; otherwise per-account.
+            let lot_details: Option<Vec<LotView>> = if include_lots {
+                let all_lots = if account_id == "TOTAL" {
+                    self.lot_repository.get_all_lots().await
+                } else {
+                    self.lot_repository
+                        .get_all_lots_for_account(account_id)
+                        .await
+                }
+                .unwrap_or_default();
+                let views: Vec<LotView> = all_lots
+                    .iter()
+                    .filter(|l| l.asset_id == *asset_id)
+                    .filter_map(LotView::from_record)
+                    .collect();
+                if views.is_empty() {
+                    None
+                } else {
+                    Some(views)
+                }
+            } else {
+                None
+            };
+
             let holding_view = Holding {
                 id: format!("{}-{}-{}", id_prefix, account_id, asset_id),
                 account_id: account_id.to_string(),
@@ -251,6 +278,7 @@ impl HoldingsService {
                 quantity,
                 open_date: Some(inception_date),
                 lots: lot_display,
+                lot_details,
                 contract_multiplier: asset_info.contract_multiplier,
                 local_currency: asset_info.instrument.currency.clone(),
                 base_currency: base_currency.to_string(),
@@ -303,6 +331,7 @@ impl HoldingsService {
                 quantity: amount,
                 open_date: None,
                 lots: None,
+                lot_details: None,
                 contract_multiplier: Decimal::ONE,
                 local_currency: currency.clone(),
                 base_currency: base_currency.to_string(),
@@ -791,6 +820,7 @@ impl HoldingsServiceTrait for HoldingsService {
                     quantity,
                     open_date: Some(inception_date),
                     lots: Some(display_lots),
+                    lot_details: None,
                     contract_multiplier: asset.contract_multiplier(),
                     local_currency: asset.quote_ccy.clone(),
                     base_currency: base_currency.to_string(),
@@ -845,6 +875,7 @@ impl HoldingsServiceTrait for HoldingsService {
                 quantity: amount,
                 open_date: None,
                 lots: None,
+                lot_details: None,
                 contract_multiplier: Decimal::ONE,
                 local_currency: currency.clone(),
                 base_currency: base_currency.to_string(),
@@ -921,6 +952,7 @@ mod tests {
                 acquisition_fees: dec!(0),
                 fx_rate_to_position: None,
             }])),
+            lot_details: None,
             contract_multiplier: Decimal::ONE,
             local_currency: "GBp".to_string(),
             base_currency: "GBP".to_string(),
@@ -996,6 +1028,7 @@ mod tests {
             quantity: dec!(1000),
             open_date: None,
             lots: None,
+            lot_details: None,
             contract_multiplier: Decimal::ONE,
             local_currency: "GBp".to_string(),
             base_currency: "GBP".to_string(),

@@ -537,6 +537,19 @@ export interface Lot {
   acquisitionFees: number;
 }
 
+export interface LotView {
+  id: string;
+  accountId: string;
+  acquisitionDate: string;
+  originalQuantity: number;
+  remainingQuantity: number;
+  costPerUnit: number;
+  totalCostBasis: number;
+  fees: number;
+  isClosed: boolean;
+  closeDate?: string;
+}
+
 export interface Position {
   id: string;
   accountId: string;
@@ -566,6 +579,7 @@ export interface Holding {
   quantity: number;
   openDate?: string | Date | null;
   lots?: Lot[] | null;
+  lotDetails?: LotView[] | null;
   localCurrency: string;
   baseCurrency: string;
   fxRate?: number | null;
