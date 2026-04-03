@@ -34,6 +34,22 @@ describe("activity-type-mapping", () => {
     expect(mapped).toBe(ActivityType.DEPOSIT);
   });
 
+  it("preserves legacy truncated mappings when the old prefix cuts mid-label", () => {
+    expect(
+      findMappedActivityType("DIVIDEND QUALIFIED", {
+        [ActivityType.DIVIDEND]: ["DIVIDEND_QUA"],
+      }),
+    ).toBe(ActivityType.DIVIDEND);
+  });
+
+  it("does not treat exact 12-character labels as legacy prefixes", () => {
+    expect(
+      findMappedActivityType("TRANSFER OUT FEE", {
+        [ActivityType.TRANSFER_OUT]: ["TRANSFER_OUT"],
+      }),
+    ).toBeNull();
+  });
+
   it("treats the selected template as the source of truth", () => {
     expect(
       findMappedActivityType("BUY", {

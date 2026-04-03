@@ -18,6 +18,12 @@ describe("default-activity-template", () => {
     },
   );
 
+  it("includes SPLIT in the code-defined default baseline", () => {
+    expect(createDefaultActivityTemplate().activityMappings[ActivityType.SPLIT]).toEqual([
+      ActivityType.SPLIT,
+    ]);
+  });
+
   it("creates a clean default activity mapping state", () => {
     expect(createDefaultActivityMapping("acc-1")).toMatchObject({
       accountId: "acc-1",

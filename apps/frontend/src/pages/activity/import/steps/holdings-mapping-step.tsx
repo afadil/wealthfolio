@@ -19,6 +19,7 @@ import { setMapping } from "../context/import-actions";
 import { ImportAlert } from "../components/import-alert";
 import type { ImportMappingData } from "@/lib/types";
 import { ImportType } from "@/lib/types";
+import { shouldUseSavedHoldingsMapping } from "../utils/import-flow-utils";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Holdings Format Fields
@@ -182,8 +183,7 @@ export function HoldingsMappingStep() {
   const { state, dispatch } = useImportContext();
   const { headers, parsedRows, mapping, accountId } = state;
   const hasAutoInitialized = useRef(false);
-  const shouldUseSavedMapping =
-    !state.suppressLinkedTemplate && !(mapping && !state.selectedTemplateId);
+  const shouldUseSavedMapping = shouldUseSavedHoldingsMapping(state.suppressLinkedTemplate);
 
   // Fetch saved mapping from backend
   const { data: savedMapping } = useQuery({

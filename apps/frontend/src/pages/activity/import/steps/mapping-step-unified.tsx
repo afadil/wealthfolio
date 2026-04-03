@@ -35,6 +35,7 @@ import {
   isDefaultActivityTemplateId,
   prependDefaultActivityTemplate,
 } from "../utils/default-activity-template";
+import { mergeDetectedParseConfig } from "../utils/import-flow-utils";
 
 import { isCashSymbol, needsImportAssetResolution } from "@/lib/activity-utils";
 import { IMPORT_REQUIRED_FIELDS, ImportFormat } from "@/lib/constants";
@@ -492,11 +493,9 @@ export function MappingStepUnified() {
         if (state.file) {
           const parsed = await parseCsv(state.file, nextParseConfig);
           nextHeaders = parsed.headers;
-          nextParseConfig = {
-            ...nextParseConfig,
-            ...parsed.detectedConfig,
-          };
+          nextParseConfig = mergeDetectedParseConfig(nextParseConfig, parsed.detectedConfig);
           dispatch(setParsedData(parsed.headers, parsed.rows));
+          dispatch(setParseConfig(nextParseConfig));
         }
 
         updateMapping({
@@ -507,7 +506,7 @@ export function MappingStepUnified() {
           symbolMappings: template.symbolMappings,
           accountMappings: template.accountMappings || {},
           symbolMappingMeta: template.symbolMappingMeta || {},
-          parseConfig: template.parseConfig,
+          parseConfig: nextParseConfig,
         });
         dispatch(setSelectedTemplate(template.id, template.scope));
       } catch (error) {
