@@ -114,7 +114,7 @@ interface ActivityTypeDisplayCellProps {
   csvType: string;
   appType: string | null;
   subtype?: string;
-  handleActivityTypeMapping: (csvActivity: string, activityType: ActivityType) => void;
+  handleActivityTypeMapping: (csvActivity: string, activityType: string) => void;
 }
 function ActivityTypeDisplayCell({
   csvType,
@@ -355,7 +355,7 @@ export function MappingCell({
   mapping: ImportMappingData;
   accounts: Account[];
   getMappedValue: (row: CsvRowData, field: ImportFormat) => string;
-  handleActivityTypeMapping: (csvActivity: string, activityType: ActivityType) => void;
+  handleActivityTypeMapping: (csvActivity: string, activityType: string) => void;
   handleSymbolMapping: (
     csvSymbol: string,
     newSymbol: string,

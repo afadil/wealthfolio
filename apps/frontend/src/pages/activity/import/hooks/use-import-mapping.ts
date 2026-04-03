@@ -1,16 +1,11 @@
 import { useState, useCallback } from "react";
-import {
-  ImportFormat,
-  ActivityType,
-  ImportMappingData,
-  ImportType,
-  type SymbolSearchResult,
-} from "@/lib/types";
-import { ACTIVITY_TYPE_PREFIX_LENGTH } from "@/lib/types";
+import { ImportFormat, ImportMappingData, type SymbolSearchResult } from "@/lib/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { saveAccountImportMapping, logger } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
+import { createDefaultActivityMapping } from "../utils/default-activity-template";
+import { normalizeActivityLabel } from "../utils/activity-type-mapping";
 
 /**
  * Common column name aliases for each ImportFormat field.
@@ -353,16 +348,7 @@ export function computeFieldMappings(
   return result;
 }
 
-const emptyMapping: ImportMappingData = {
-  accountId: "",
-  importType: ImportType.ACTIVITY,
-  name: "",
-  fieldMappings: {},
-  activityMappings: {},
-  symbolMappings: {},
-  accountMappings: {},
-  symbolMappingMeta: {},
-};
+const emptyMapping: ImportMappingData = createDefaultActivityMapping();
 
 interface UseImportMappingProps {
   defaultMapping?: ImportMappingData;
@@ -422,29 +408,33 @@ export function useImportMapping({
     }));
   }, []);
 
-  const handleActivityTypeMapping = useCallback(
-    (csvActivity: string, activityType: ActivityType) => {
-      const trimmedCsvType = csvActivity.trim().toUpperCase();
-      const compareValue = trimmedCsvType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH);
+  const handleActivityTypeMapping = useCallback((csvActivity: string, activityType: string) => {
+    const normalizedCsvType = normalizeActivityLabel(csvActivity);
+    const legacyPrefix = normalizedCsvType.slice(0, 12);
 
-      setMapping((prev) => {
-        const updatedMappings = { ...prev.activityMappings };
-        Object.keys(updatedMappings).forEach((key) => {
-          updatedMappings[key] = (updatedMappings[key] ?? []).filter(
-            (type) => type.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH) !== compareValue,
-          );
-        });
-        if (!updatedMappings[activityType]) {
-          updatedMappings[activityType] = [];
-        }
-        if (!updatedMappings[activityType]?.includes(compareValue)) {
-          updatedMappings[activityType]?.push(compareValue);
-        }
+    setMapping((prev) => {
+      const updatedMappings = Object.fromEntries(
+        Object.entries(prev.activityMappings).flatMap(([key, values]) => {
+          const nextValues = (values ?? []).filter((value) => {
+            const normalizedValue = normalizeActivityLabel(value);
+            return normalizedValue !== normalizedCsvType && normalizedValue !== legacyPrefix;
+          });
+          return nextValues.length > 0 ? [[key, nextValues]] : [];
+        }),
+      );
+
+      if (!activityType.trim()) {
         return { ...prev, activityMappings: updatedMappings };
-      });
-    },
-    [],
-  );
+      }
+
+      const nextValues = updatedMappings[activityType] ?? [];
+      if (!nextValues.includes(normalizedCsvType)) {
+        updatedMappings[activityType] = [...nextValues, normalizedCsvType];
+      }
+
+      return { ...prev, activityMappings: updatedMappings };
+    });
+  }, []);
 
   const handleSymbolMapping = useCallback(
     (csvSymbol: string, newSymbol: string, searchResult?: SymbolSearchResult) => {

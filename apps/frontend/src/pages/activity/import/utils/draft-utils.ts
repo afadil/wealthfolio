@@ -25,6 +25,9 @@ import type { DraftActivity, DraftActivityStatus } from "../context";
 
 /** Sentinel value for activity types the user chooses to skip during import. */
 export const ACTIVITY_SKIP = "_SKIP_";
+const IMPORTABLE_ACTIVITY_TYPES = new Set<string>(
+  Object.values(ActivityType).filter((type) => type !== ActivityType.UNKNOWN),
+);
 
 // ---------------------------------------------------------------------------
 // Fallback-column helpers — support `string | string[]` in fieldMappings
@@ -108,14 +111,14 @@ export function parseDateValue(value: string | undefined, dateFormat: string): s
 
 /**
  * Map a CSV activity type value to a Wealthfolio activity type.
- * Uses findMappedActivityType which checks explicit mappings + smart defaults.
+ * Returns only explicit user/template mappings.
  */
 export function mapActivityType(
   csvValue: string | undefined,
   activityMappings: Record<string, string[]>,
 ): string | undefined {
   if (!csvValue) return undefined;
-  return findMappedActivityType(csvValue, activityMappings) ?? csvValue.trim();
+  return findMappedActivityType(csvValue, activityMappings) ?? undefined;
 }
 
 /**
@@ -178,6 +181,8 @@ export function validateDraft(draft: Partial<DraftActivity>): {
 
   if (!draft.activityType) {
     errors.activityType = ["Activity type is required"];
+  } else if (!IMPORTABLE_ACTIVITY_TYPES.has(draft.activityType.toUpperCase() as ActivityType)) {
+    errors.activityType = ["Map the CSV activity type before continuing"];
   }
 
   // SPLIT is a ratio event — currency is not meaningful
@@ -335,7 +340,6 @@ export function validateDraft(draft: Partial<DraftActivity>): {
 
   return { status, errors, warnings };
 }
-
 /**
  * Create DraftActivity objects from parsed CSV data and mapping
  */
@@ -414,22 +418,7 @@ export function createDraftActivities(
 
     // Parse and normalize values
     const activityDate = parseDateValue(rawDate, dateFormat);
-    let activityType = mapActivityType(rawType, activityMappings);
-
-    // Sign-based direction inference: peek at raw amount before sign is stripped.
-    // Flip DEPOSIT↔WITHDRAWAL when the CSV amount sign disagrees with the mapped type.
-    // Safe for all brokers — explicit labels already resolve correctly (no-op).
-    const rawAmountTrimmed = rawAmount?.trim();
-    const isNegativeRaw = rawAmountTrimmed?.startsWith("-") || rawAmountTrimmed?.startsWith("(");
-    if (isNegativeRaw && activityType === ActivityType.DEPOSIT) {
-      activityType = ActivityType.WITHDRAWAL;
-    } else if (!isNegativeRaw && rawAmountTrimmed && activityType === ActivityType.WITHDRAWAL) {
-      activityType = ActivityType.DEPOSIT;
-    } else if (isNegativeRaw && activityType === ActivityType.TRANSFER_IN) {
-      activityType = ActivityType.TRANSFER_OUT;
-    } else if (!isNegativeRaw && rawAmountTrimmed && activityType === ActivityType.TRANSFER_OUT) {
-      activityType = ActivityType.TRANSFER_IN;
-    }
+    const activityType = mapActivityType(rawType, activityMappings);
     const {
       symbol: mappedSymbol,
       exchangeMic: mappedExchangeMic,

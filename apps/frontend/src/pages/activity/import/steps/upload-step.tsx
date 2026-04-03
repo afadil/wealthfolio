@@ -46,8 +46,16 @@ import {
   setParseConfig,
   setParsedData,
   setSelectedTemplate,
+  setSuppressLinkedTemplate,
 } from "../context/import-actions";
 import { useImportContext, type ParseConfig } from "../context/import-context";
+import {
+  createDefaultParseConfig,
+  createDefaultActivityTemplate,
+  createEmptyHoldingsMapping,
+  isDefaultActivityTemplateId,
+  prependDefaultActivityTemplate,
+} from "../utils/default-activity-template";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CSV Preview Component
@@ -310,7 +318,7 @@ interface TemplateSelectorProps {
   templates: ImportTemplateData[];
   selectedTemplateId: string | null;
   onSelect: (templateId: string) => void;
-  onClear: () => void;
+  onClear?: () => void;
   config: ParseConfig;
   onConfigChange: (updates: Partial<ParseConfig>) => void;
   hasConfigErrors?: boolean;
@@ -486,6 +494,10 @@ export function UploadStep() {
   );
   const importType =
     selectedAccount?.trackingMode === "HOLDINGS" ? ImportType.HOLDINGS : ImportType.ACTIVITY;
+  const baselineParseConfig = useMemo(
+    () => createDefaultParseConfig(selectedAccount?.currency),
+    [selectedAccount?.currency],
+  );
 
   // Templates — filtered by the active import kind
   const { data: allTemplates = [] } = useQuery<ImportTemplateData[], Error>({
@@ -493,19 +505,28 @@ export function UploadStep() {
     queryFn: listImportTemplates,
   });
   const templates = useMemo(
-    () => allTemplates.filter((t) => t.kind === importType),
+    () =>
+      importType === ImportType.ACTIVITY
+        ? prependDefaultActivityTemplate(allTemplates.filter((t) => t.kind === importType))
+        : allTemplates.filter((t) => t.kind === importType),
     [allTemplates, importType],
   );
+  const effectiveSelectedTemplateId =
+    importType === ImportType.ACTIVITY
+      ? (state.selectedTemplateId ?? templates[0]?.id ?? null)
+      : state.selectedTemplateId;
 
   const applyTemplate = useCallback(
-    async (template: ImportTemplateData) => {
-      const nextParseConfig = template.parseConfig
-        ? { ...state.parseConfig, ...template.parseConfig }
-        : state.parseConfig;
+    async (template: ImportTemplateData, options?: { selectTemplate?: boolean }) => {
+      const selectTemplate = options?.selectTemplate ?? true;
+      const nextParseConfig =
+        importType === ImportType.ACTIVITY && isDefaultActivityTemplateId(template.id)
+          ? baselineParseConfig
+          : template.parseConfig
+            ? { ...state.parseConfig, ...template.parseConfig }
+            : state.parseConfig;
 
-      if (template.parseConfig) {
-        dispatch(setParseConfig(template.parseConfig));
-      }
+      dispatch(setParseConfig(nextParseConfig));
 
       // Re-parse with the template's config to get fresh headers, then compute mappings
       // so auto-detected columns (e.g., ISIN) are merged with the saved template mappings.
@@ -526,7 +547,7 @@ export function UploadStep() {
         setMapping({
           accountId: state.accountId || "",
           importType,
-          name: template.name,
+          name: isDefaultActivityTemplateId(template.id) ? "" : template.name,
           fieldMappings: computeFieldMappings(headers, template.fieldMappings),
           activityMappings: template.activityMappings,
           symbolMappings: template.symbolMappings,
@@ -535,17 +556,28 @@ export function UploadStep() {
           parseConfig: template.parseConfig,
         }),
       );
-      dispatch(setSelectedTemplate(template.id, template.scope));
+      if (selectTemplate) {
+        dispatch(setSelectedTemplate(template.id, template.scope));
+      }
     },
-    [dispatch, importType, state.accountId, state.file, state.parseConfig, state.headers],
+    [
+      baselineParseConfig,
+      dispatch,
+      importType,
+      state.accountId,
+      state.file,
+      state.parseConfig,
+      state.headers,
+    ],
   );
 
   const handleTemplateSelect = useCallback(
     async (templateId: string) => {
       const template = templates.find((t) => t.id === templateId);
       if (!template) return;
+      dispatch(setSuppressLinkedTemplate(false));
       await applyTemplate(template);
-      if (state.accountId) {
+      if (state.accountId && !isDefaultActivityTemplateId(template.id)) {
         linkAccountTemplate(state.accountId, templateId, importType).catch(() => {
           /* non-critical */
         });
@@ -555,8 +587,28 @@ export function UploadStep() {
   );
 
   const handleTemplateClear = useCallback(() => {
+    dispatch(setSuppressLinkedTemplate(true));
     dispatch(setSelectedTemplate(null, null));
-  }, [dispatch]);
+
+    if (importType === ImportType.ACTIVITY) {
+      void applyTemplate(createDefaultActivityTemplate(), { selectTemplate: false });
+      return;
+    }
+
+    dispatch(setParseConfig(baselineParseConfig));
+    dispatch(setMapping(createEmptyHoldingsMapping(state.accountId || "")));
+    if (state.file) {
+      parseCsv(state.file, baselineParseConfig)
+        .then((result) => {
+          setParseError(null);
+          dispatch(setParsedData(result.headers, result.rows));
+          dispatch(setParseConfig(result.detectedConfig));
+        })
+        .catch((error) => {
+          setParseError(error instanceof Error ? error.message : "Failed to parse CSV file");
+        });
+    }
+  }, [applyTemplate, baselineParseConfig, dispatch, importType, state.accountId, state.file]);
 
   // Auto-suggest linked template when account changes.
   // Two-phase approach: fetch the linked template ID, then apply once templates are loaded.
@@ -569,9 +621,33 @@ export function UploadStep() {
       setPendingLinkedTemplateId(null);
       // Clear the previous account's template so the new account's linked template can apply
       dispatch(setSelectedTemplate(null, null));
+      dispatch(setSuppressLinkedTemplate(false));
+      if (importType === ImportType.ACTIVITY) {
+        void applyTemplate(createDefaultActivityTemplate(), { selectTemplate: false });
+      } else {
+        dispatch(setParseConfig(baselineParseConfig));
+        dispatch(setMapping(createEmptyHoldingsMapping(state.accountId || "")));
+        if (state.file) {
+          parseCsv(state.file, baselineParseConfig)
+            .then((result) => {
+              setParseError(null);
+              dispatch(setParsedData(result.headers, result.rows));
+              dispatch(setParseConfig(result.detectedConfig));
+            })
+            .catch((error) => {
+              setParseError(error instanceof Error ? error.message : "Failed to parse CSV file");
+            });
+        }
+      }
     }
     // Skip if no account, or if a template is already selected and the account hasn't changed
-    if (!state.accountId || (state.selectedTemplateId && !accountChanged)) return;
+    if (
+      !state.accountId ||
+      state.suppressLinkedTemplate ||
+      (state.selectedTemplateId && !accountChanged)
+    ) {
+      return;
+    }
     getAccountImportMapping(state.accountId, importType)
       .then((mapping) => {
         setPendingLinkedTemplateId(mapping?.templateId ?? null);
@@ -580,7 +656,16 @@ export function UploadStep() {
         /* no saved mapping — ignore */
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.accountId, importType]);
+  }, [
+    applyTemplate,
+    baselineParseConfig,
+    dispatch,
+    importType,
+    state.accountId,
+    state.file,
+    state.selectedTemplateId,
+    state.suppressLinkedTemplate,
+  ]);
 
   // Apply the pending linked template once the template list is available
   const applyTemplateRef = useRef(applyTemplate);
@@ -764,9 +849,13 @@ export function UploadStep() {
         </div>
         <TemplateSelector
           templates={templates}
-          selectedTemplateId={state.selectedTemplateId}
+          selectedTemplateId={effectiveSelectedTemplateId}
           onSelect={handleTemplateSelect}
-          onClear={handleTemplateClear}
+          onClear={
+            isDefaultActivityTemplateId(effectiveSelectedTemplateId)
+              ? undefined
+              : handleTemplateClear
+          }
           config={state.parseConfig}
           onConfigChange={handleConfigChange}
           hasConfigErrors={hasParseErrors}

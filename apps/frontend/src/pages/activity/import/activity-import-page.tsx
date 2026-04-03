@@ -4,7 +4,6 @@ import { isCashSymbol, needsImportAssetResolution } from "@/lib/activity-utils";
 import { canImportCSV } from "@/lib/activity-restrictions";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account } from "@/lib/types";
-import { ImportType } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { AlertFeedback, Page, PageContent, PageHeader } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
@@ -25,6 +24,7 @@ import {
   type ImportStep,
 } from "./context";
 import { createDraftActivities } from "./utils/draft-utils";
+import { createDefaultActivityMapping } from "./utils/default-activity-template";
 
 // Components
 import { CancelConfirmationDialog } from "./components/cancel-confirmation-dialog";
@@ -213,7 +213,7 @@ function useStepValidation(isHoldingsMode: boolean, accounts?: Account[]) {
               const symbol = row[symbolHeaderIndex]?.trim();
               if (!symbol) return;
 
-              // Resolve activity type with fallback
+              // Resolve activity type using explicit mappings only
               let csvActivityType: string | undefined;
               for (const idx of atCols) {
                 const val = row[idx]?.trim();
@@ -369,16 +369,7 @@ function ImportWizardContent() {
             : existingAccountMappings;
         dispatch(
           setMapping({
-            ...(state.mapping ?? {
-              accountId: state.accountId || "",
-              importType: ImportType.ACTIVITY,
-              name: "",
-              fieldMappings: {},
-              activityMappings: {},
-              symbolMappings: {},
-              accountMappings: {},
-              symbolMappingMeta: {},
-            }),
+            ...(state.mapping ?? createDefaultActivityMapping(state.accountId || "")),
             fieldMappings: mergedFieldMappings,
             accountMappings,
           }),

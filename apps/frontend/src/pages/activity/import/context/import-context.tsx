@@ -120,6 +120,7 @@ export interface ImportState {
   pendingImportAssets: Record<string, PendingImportAsset>;
   selectedTemplateId: string | null;
   selectedTemplateScope: ImportTemplateScope | null;
+  suppressLinkedTemplate: boolean;
   duplicates: Record<string, string>; // idempotencyKey -> existingActivityId
   importResult: ImportResult | null;
   accountId: string;
@@ -161,6 +162,7 @@ const INITIAL_STATE: ImportState = {
   pendingImportAssets: {},
   selectedTemplateId: null,
   selectedTemplateScope: null,
+  suppressLinkedTemplate: false,
   duplicates: {},
   importResult: null,
   accountId: "",
@@ -202,6 +204,7 @@ export type ImportAction =
       type: "SET_SELECTED_TEMPLATE";
       payload: { id: string | null; scope: ImportTemplateScope | null };
     }
+  | { type: "SET_SUPPRESS_LINKED_TEMPLATE"; payload: boolean }
   | { type: "SET_DUPLICATES"; payload: Record<string, string> }
   | { type: "SET_IMPORT_RESULT"; payload: ImportResult }
   | { type: "SET_HOLDINGS_CHECK_PASSED"; payload: boolean }
@@ -371,6 +374,12 @@ function importReducer(state: ImportState, action: ImportAction): ImportState {
         ...state,
         selectedTemplateId: action.payload.id,
         selectedTemplateScope: action.payload.scope,
+      };
+
+    case "SET_SUPPRESS_LINKED_TEMPLATE":
+      return {
+        ...state,
+        suppressLinkedTemplate: action.payload,
       };
 
     case "SET_DUPLICATES":

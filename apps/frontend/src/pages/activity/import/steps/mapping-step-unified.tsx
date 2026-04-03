@@ -22,12 +22,19 @@ import {
   setParseConfig,
   setParsedData,
   setSelectedTemplate,
+  setSuppressLinkedTemplate,
   useImportContext,
 } from "../context";
 import { TemplatePicker } from "../components/template-picker";
 import { computeFieldMappings, useImportMapping } from "../hooks/use-import-mapping";
 import { isFieldMapped } from "../utils/draft-utils";
 import { validateTickerSymbol, findMappedActivityType } from "../utils/validation-utils";
+import {
+  createDefaultActivityMapping,
+  createDefaultParseConfig,
+  isDefaultActivityTemplateId,
+  prependDefaultActivityTemplate,
+} from "../utils/default-activity-template";
 
 import { isCashSymbol, needsImportAssetResolution } from "@/lib/activity-utils";
 import { IMPORT_REQUIRED_FIELDS, ImportFormat } from "@/lib/constants";
@@ -47,15 +54,25 @@ export function MappingStepUnified() {
     queryKey: [QueryKeys.ACCOUNTS],
     queryFn: () => getAccounts(),
   });
+  const selectedAccount = useMemo(
+    () => accounts.find((account) => account.id === accountId) ?? null,
+    [accountId, accounts],
+  );
+  const baselineParseConfig = useMemo(
+    () => createDefaultParseConfig(selectedAccount?.currency),
+    [selectedAccount?.currency],
+  );
 
   const { data: allTemplates = [] } = useQuery<ImportTemplateData[], Error>({
     queryKey: [QueryKeys.IMPORT_TEMPLATES],
     queryFn: listImportTemplates,
   });
   const templates = useMemo(
-    () => allTemplates.filter((t) => t.kind === ImportType.ACTIVITY),
+    () =>
+      prependDefaultActivityTemplate(allTemplates.filter((t) => t.kind === ImportType.ACTIVITY)),
     [allTemplates],
   );
+  const effectiveSelectedTemplateId = state.selectedTemplateId ?? templates[0]?.id ?? null;
 
   // Convert string[][] to CsvRowData[]
   const data: CsvRowData[] = useMemo(() => {
@@ -78,16 +95,7 @@ export function MappingStepUnified() {
     handleAccountIdMapping,
   } = useImportMapping({
     accountId,
-    defaultMapping: mapping || {
-      accountId: accountId || "",
-      importType: ImportType.ACTIVITY,
-      name: "",
-      fieldMappings: {},
-      activityMappings: {},
-      symbolMappings: {},
-      accountMappings: {},
-      symbolMappingMeta: {},
-    },
+    defaultMapping: mapping || createDefaultActivityMapping(accountId || ""),
   });
 
   // Sync localMapping to context whenever it changes (covers auto-detection, user edits, etc.)
@@ -456,6 +464,7 @@ export function MappingStepUnified() {
   const applyTemplate = useCallback(
     async (templateId: string) => {
       try {
+        const isDefaultTemplate = isDefaultActivityTemplateId(templateId);
         if (templateId === "__custom__") {
           dispatch(setSelectedTemplate(null, null));
           setTemplateError(null);
@@ -471,10 +480,14 @@ export function MappingStepUnified() {
         setTemplateError(null);
 
         let nextHeaders = headers;
-        let nextParseConfig: typeof state.parseConfig = {
-          ...state.parseConfig,
-          ...(template.parseConfig ?? {}),
-        };
+        let nextParseConfig: typeof state.parseConfig = isDefaultTemplate
+          ? baselineParseConfig
+          : template.parseConfig
+            ? ({ ...state.parseConfig, ...template.parseConfig } as typeof state.parseConfig)
+            : state.parseConfig;
+
+        dispatch(setParseConfig(nextParseConfig));
+        dispatch(setSuppressLinkedTemplate(false));
 
         if (state.file) {
           const parsed = await parseCsv(state.file, nextParseConfig);
@@ -486,15 +499,14 @@ export function MappingStepUnified() {
           dispatch(setParsedData(parsed.headers, parsed.rows));
         }
 
-        dispatch(setParseConfig(nextParseConfig));
         updateMapping({
           accountId: accountId || "",
-          name: template.name,
+          name: isDefaultActivityTemplateId(template.id) ? "" : template.name,
           fieldMappings: computeFieldMappings(nextHeaders, template.fieldMappings),
           activityMappings: template.activityMappings,
           symbolMappings: template.symbolMappings,
-          accountMappings: template.accountMappings,
-          symbolMappingMeta: template.symbolMappingMeta,
+          accountMappings: template.accountMappings || {},
+          symbolMappingMeta: template.symbolMappingMeta || {},
           parseConfig: template.parseConfig,
         });
         dispatch(setSelectedTemplate(template.id, template.scope));
@@ -504,7 +516,16 @@ export function MappingStepUnified() {
         );
       }
     },
-    [accountId, dispatch, headers, state.file, state.parseConfig, templates, updateMapping],
+    [
+      accountId,
+      baselineParseConfig,
+      dispatch,
+      headers,
+      state.file,
+      state.parseConfig,
+      templates,
+      updateMapping,
+    ],
   );
 
   const buildTemplatePayload = useCallback(
@@ -589,7 +610,7 @@ export function MappingStepUnified() {
             <Label>Template</Label>
             <TemplatePicker
               templates={templates}
-              selectedTemplateId={state.selectedTemplateId}
+              selectedTemplateId={effectiveSelectedTemplateId}
               onSelect={(id) => void applyTemplate(id)}
             />
           </div>
@@ -615,7 +636,9 @@ export function MappingStepUnified() {
             >
               {saveTemplateMutation.isPending
                 ? "Saving..."
-                : state.selectedTemplateId && state.selectedTemplateScope === "USER"
+                : state.selectedTemplateId &&
+                    !isDefaultActivityTemplateId(state.selectedTemplateId) &&
+                    state.selectedTemplateScope === "USER"
                   ? "Update Template"
                   : "Save Template"}
             </Button>

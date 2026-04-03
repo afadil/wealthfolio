@@ -1,5 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
-import { Account, ActivityType, CsvRowData, ImportFormat, ImportMappingData } from "@/lib/types";
+import { Account, CsvRowData, ImportFormat, ImportMappingData } from "@/lib/types";
 import { useMemo } from "react";
 
 import { CardContent } from "@wealthfolio/ui/components/ui/card";
@@ -14,7 +14,7 @@ interface CsvMappingEditorProps {
   data: CsvRowData[];
   accounts: Account[];
   handleColumnMapping: (field: ImportFormat, value: string) => void;
-  handleActivityTypeMapping: (csvActivity: string, activityType: ActivityType) => void;
+  handleActivityTypeMapping: (csvActivity: string, activityType: string) => void;
   handleSymbolMapping: (csvSymbol: string, newSymbol: string) => void;
   getMappedValue: (row: CsvRowData, field: ImportFormat) => string;
   handleAccountIdMapping: (csvAccountId: string, accountId: string) => void;

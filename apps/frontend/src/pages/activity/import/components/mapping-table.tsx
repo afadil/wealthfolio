@@ -10,7 +10,6 @@ import { TooltipProvider } from "@wealthfolio/ui/components/ui/tooltip";
 import { IMPORT_REQUIRED_FIELDS } from "@/lib/constants";
 import {
   Account,
-  ActivityType,
   CsvRowData,
   ImportFormat,
   ImportMappingData,
@@ -27,7 +26,7 @@ interface MappingTableProps {
   data: CsvRowData[];
   accounts: Account[];
   handleColumnMapping: (field: ImportFormat, value: string) => void;
-  handleActivityTypeMapping: (csvActivity: string, activityType: ActivityType) => void;
+  handleActivityTypeMapping: (csvActivity: string, activityType: string) => void;
   handleSymbolMapping: (
     csvSymbol: string,
     newSymbol: string,

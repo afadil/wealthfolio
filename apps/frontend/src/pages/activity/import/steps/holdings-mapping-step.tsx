@@ -182,12 +182,14 @@ export function HoldingsMappingStep() {
   const { state, dispatch } = useImportContext();
   const { headers, parsedRows, mapping, accountId } = state;
   const hasAutoInitialized = useRef(false);
+  const shouldUseSavedMapping =
+    !state.suppressLinkedTemplate && !(mapping && !state.selectedTemplateId);
 
   // Fetch saved mapping from backend
   const { data: savedMapping } = useQuery({
     queryKey: [QueryKeys.IMPORT_MAPPING, accountId],
     queryFn: () => (accountId ? getAccountImportMapping(accountId, ImportType.HOLDINGS) : null),
-    enabled: !!accountId,
+    enabled: !!accountId && shouldUseSavedMapping,
   });
 
   // Local state for the field mappings being edited
@@ -205,7 +207,7 @@ export function HoldingsMappingStep() {
     const merged: Record<string, string> = {};
 
     // 1. Apply saved field mappings (only valid HoldingsFormat keys with headers in this CSV)
-    if (savedMapping?.fieldMappings) {
+    if (shouldUseSavedMapping && savedMapping?.fieldMappings) {
       for (const [field, value] of Object.entries(savedMapping.fieldMappings)) {
         const header = Array.isArray(value) ? value[0] : value;
         if (validHoldingsFields.has(field) && header && headers.includes(header)) {
@@ -227,7 +229,10 @@ export function HoldingsMappingStep() {
     }
 
     // 3. Merge saved symbol mappings into context
-    if (savedMapping?.symbolMappings || savedMapping?.symbolMappingMeta) {
+    if (
+      shouldUseSavedMapping &&
+      (savedMapping?.symbolMappings || savedMapping?.symbolMappingMeta)
+    ) {
       const currentMapping = mapping || {
         accountId,
         importType: ImportType.HOLDINGS,
@@ -253,7 +258,15 @@ export function HoldingsMappingStep() {
     }
 
     hasAutoInitialized.current = true;
-  }, [headers, savedMapping, mapping, accountId, dispatch, validHoldingsFields]);
+  }, [
+    headers,
+    savedMapping,
+    mapping,
+    accountId,
+    dispatch,
+    shouldUseSavedMapping,
+    validHoldingsFields,
+  ]);
 
   // ───────────────────────────────────────────────────────────────────────────
   // Derived data
