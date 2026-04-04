@@ -6,7 +6,7 @@ mod goals_traits;
 
 pub use goals_model::{
     AccountValuationMap, Goal, GoalCachedUpdate, GoalFundingRule, GoalFundingRuleInput, GoalPlan,
-    NewGoal, SaveGoalPlan,
+    NewGoal, PreparedRetirementSimulationInput, SaveGoalPlan,
 };
-pub use goals_service::GoalService;
+pub use goals_service::{validate_retirement_plan, GoalService};
 pub use goals_traits::{GoalRepositoryTrait, GoalServiceTrait};
