@@ -323,8 +323,14 @@ impl ValuationServiceTrait for ValuationService {
                             continue;
                         }
                     }
-                    let qty = lot.remaining_quantity.parse::<Decimal>().unwrap_or_default();
-                    let cost = lot.total_cost_basis.parse::<Decimal>().unwrap_or_default();
+                    let qty = lot.remaining_quantity.parse::<Decimal>().unwrap_or_else(|e| {
+                        log::error!("Lot {} has malformed remaining_quantity '{}': {}", lot.id, lot.remaining_quantity, e);
+                        Decimal::ZERO
+                    });
+                    let cost = lot.total_cost_basis.parse::<Decimal>().unwrap_or_else(|e| {
+                        log::error!("Lot {} has malformed total_cost_basis '{}': {}", lot.id, lot.total_cost_basis, e);
+                        Decimal::ZERO
+                    });
                     aggregated
                         .entry(lot.asset_id.clone())
                         .and_modify(|(q, c)| {
