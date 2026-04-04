@@ -136,4 +136,14 @@ pub async fn backfill_lots_if_needed(context: &std::sync::Arc<ServiceContext>) {
     {
         warn!("Lot backfill recalculation failed: {}", e);
     }
+
+    // HOLDINGS-mode accounts are skipped by recalculate_holdings_snapshots.
+    // Backfill them separately from their latest snapshots.
+    if let Err(e) = context
+        .snapshot_service
+        .backfill_lots_for_holdings_accounts()
+        .await
+    {
+        warn!("HOLDINGS lot backfill failed: {}", e);
+    }
 }

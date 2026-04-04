@@ -118,6 +118,11 @@ pub trait SnapshotServiceTrait: Send + Sync {
     /// snapshot remains). CALCULATED snapshots are ignored — those accounts have their
     /// lots managed by the transaction-replay pipeline.
     async fn refresh_lots_from_latest_snapshot(&self, account_id: &str) -> Result<()>;
+
+    /// Populates the lots table for all HOLDINGS-mode accounts by deriving lots from
+    /// each account's latest snapshot. Called during startup backfill because
+    /// `recalculate_holdings_snapshots` only processes TRANSACTIONS-mode accounts.
+    async fn backfill_lots_for_holdings_accounts(&self) -> Result<usize>;
 }
 
 // --- Service Implementation ---
@@ -2024,6 +2029,59 @@ impl SnapshotServiceTrait for SnapshotService {
         );
 
         Ok(())
+    }
+
+    async fn backfill_lots_for_holdings_accounts(&self) -> Result<usize> {
+        let lot_repo = match &self.lot_repository {
+            Some(r) => r,
+            None => return Ok(0),
+        };
+
+        let accounts = self.account_repository.list(Some(true), None, None)?;
+        let holdings_accounts: Vec<_> = accounts
+            .into_iter()
+            .filter(|a| a.tracking_mode == TrackingMode::Holdings)
+            .collect();
+
+        if holdings_accounts.is_empty() {
+            return Ok(0);
+        }
+
+        let mut total_lots = 0usize;
+        for acc in &holdings_accounts {
+            match self.refresh_lots_from_latest_snapshot(&acc.id).await {
+                Ok(()) => {
+                    // Count lots written by checking what's now in the table for this account
+                    match lot_repo.get_open_lots_for_account(&acc.id).await {
+                        Ok(lots) => {
+                            total_lots += lots.len();
+                            if !lots.is_empty() {
+                                info!(
+                                    "Backfilled {} lot(s) for HOLDINGS account {}",
+                                    lots.len(),
+                                    acc.id
+                                );
+                            }
+                        }
+                        Err(e) => warn!(
+                            "Could not count backfilled lots for account {}: {}",
+                            acc.id, e
+                        ),
+                    }
+                }
+                Err(e) => warn!(
+                    "Failed to backfill lots for HOLDINGS account {}: {}",
+                    acc.id, e
+                ),
+            }
+        }
+
+        info!(
+            "HOLDINGS lot backfill complete: {} lot(s) across {} account(s)",
+            total_lots,
+            holdings_accounts.len()
+        );
+        Ok(total_lots)
     }
 }
 
