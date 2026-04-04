@@ -1779,17 +1779,15 @@ impl SnapshotServiceTrait for SnapshotService {
         // Write lots from the snapshot positions — but only if this is the latest snapshot
         // for the account (i.e. don't overwrite current open lots with stale historical data).
         if let Some(ref lot_repo) = self.lot_repository {
-            let is_latest = self
+            let later_snapshots = self
                 .snapshot_repository
-                .get_latest_snapshot_before_date(
+                .get_snapshots_by_account(
                     account_id,
-                    snapshot
-                        .snapshot_date
-                        .succ_opt()
-                        .unwrap_or(snapshot.snapshot_date),
+                    snapshot.snapshot_date.succ_opt(),
+                    None,
                 )
-                .map(|opt| opt.is_none_or(|s| s.snapshot_date <= snapshot.snapshot_date))
-                .unwrap_or(false);
+                .unwrap_or_default();
+            let is_latest = later_snapshots.is_empty();
 
             if is_latest {
                 let now = Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
