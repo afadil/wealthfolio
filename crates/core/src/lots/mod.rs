@@ -177,21 +177,27 @@ pub enum HoldingPeriod {
 ///
 /// Each open lot in every position of the snapshot becomes one row.
 /// `open_activity_id` is always `None` — see the module-level doc for the reason.
-/// `original_quantity` equals `remaining_quantity` because the snapshot only
-/// carries the still-open portion of each lot.
+/// `original_quantity` comes from `lot.original_quantity` when available (new
+/// snapshots). For old snapshots that predate the field (where it deserializes
+/// as zero), falls back to `lot.quantity` (the remaining amount).
 pub fn extract_lot_records(snapshot: &AccountStateSnapshot) -> Vec<LotRecord> {
     let now = Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
     let mut records = Vec::new();
 
     for position in snapshot.positions.values() {
         for lot in &position.lots {
+            let orig_qty = if lot.original_quantity.is_zero() {
+                lot.quantity
+            } else {
+                lot.original_quantity
+            };
             records.push(LotRecord {
                 id: lot.id.clone(),
                 account_id: snapshot.account_id.clone(),
                 asset_id: position.asset_id.clone(),
                 open_date: lot.acquisition_date.format("%Y-%m-%d").to_string(),
                 open_activity_id: None,
-                original_quantity: lot.quantity.to_string(),
+                original_quantity: orig_qty.to_string(),
                 remaining_quantity: lot.quantity.to_string(),
                 cost_per_unit: lot.acquisition_price.to_string(),
                 total_cost_basis: lot.cost_basis.to_string(),
@@ -278,6 +284,7 @@ mod tests {
                 .with_ymd_and_hms(date_ymd.0, date_ymd.1, date_ymd.2, 0, 0, 0)
                 .unwrap(),
             quantity: qty,
+            original_quantity: qty,
             cost_basis: qty * price + fee,
             acquisition_price: price,
             acquisition_fees: fee,

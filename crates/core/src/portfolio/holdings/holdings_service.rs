@@ -13,6 +13,7 @@ use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 
 use super::HoldingsValuationServiceTrait;
@@ -375,11 +376,13 @@ fn lot_records_to_display_lots(
                 .ok()?
                 .and_hms_opt(0, 0, 0)?
                 .and_utc();
+            let orig_qty = Decimal::from_str(&r.original_quantity).unwrap_or(quantity);
             Some(snapshot::Lot {
                 id: r.id.clone(),
                 position_id: position_id.clone(),
                 acquisition_date,
                 quantity,
+                original_quantity: orig_qty,
                 cost_basis,
                 acquisition_price,
                 acquisition_fees,
@@ -852,6 +855,7 @@ mod tests {
                 position_id: "POS-TEST".to_string(),
                 acquisition_date: Utc::now(),
                 quantity: dec!(1),
+                original_quantity: dec!(1),
                 cost_basis: dec!(3000),
                 acquisition_price: dec!(3000),
                 acquisition_fees: dec!(0),
