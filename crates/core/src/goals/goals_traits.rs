@@ -3,7 +3,7 @@
 use crate::errors::Result;
 use crate::goals::goals_model::{
     AccountValuationMap, Goal, GoalCachedUpdate, GoalFundingRule, GoalFundingRuleInput, GoalPlan,
-    NewGoal, SaveGoalPlan,
+    NewGoal, PreparedRetirementSimulationInput, SaveGoalPlan,
 };
 use crate::planning::SaveUpOverview;
 use crate::portfolio::fire::RetirementOverview;
@@ -75,6 +75,12 @@ pub trait GoalServiceTrait: Send + Sync {
         goal_id: &str,
         valuation_map: &AccountValuationMap,
     ) -> Result<RetirementOverview>;
+
+    async fn prepare_retirement_simulation_input(
+        &self,
+        goal_id: &str,
+        valuation_map: &AccountValuationMap,
+    ) -> Result<PreparedRetirementSimulationInput>;
 
     // Save-up overview
     async fn compute_save_up_overview(

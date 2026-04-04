@@ -1,5 +1,6 @@
 //! Goals domain models.
 
+use crate::planning::retirement::{RetirementPlan, RetirementTimingMode};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -61,6 +62,8 @@ pub struct GoalFundingRule {
     pub account_id: String,
     pub funding_role: String,
     pub reservation_percent: Option<f64>,
+    pub countable_percent: Option<f64>,
+    pub tax_bucket: Option<String>, // "taxable", "tax_deferred", "tax_free", "unknown"
     pub created_at: String,
     pub updated_at: String,
 }
@@ -72,6 +75,8 @@ pub struct GoalFundingRuleInput {
     pub account_id: String,
     pub funding_role: String,
     pub reservation_percent: Option<f64>,
+    pub countable_percent: Option<f64>,
+    pub tax_bucket: Option<String>,
 }
 
 /// Cached field updates written back to goal root after summary computation
@@ -108,6 +113,14 @@ pub struct SaveGoalPlan {
     pub planner_mode: Option<String>,
     pub settings_json: String,
     pub summary_json: Option<String>,
+}
+
+/// Backend-owned retirement simulation inputs derived from a goal plan and funding rules.
+#[derive(Debug, Clone)]
+pub struct PreparedRetirementSimulationInput {
+    pub plan: RetirementPlan,
+    pub current_portfolio: f64,
+    pub planner_mode: RetirementTimingMode,
 }
 
 /// Account valuations map: account_id → total value in base currency
