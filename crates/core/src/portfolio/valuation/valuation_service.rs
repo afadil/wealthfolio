@@ -393,7 +393,7 @@ impl ValuationServiceTrait for ValuationService {
         // Security positions: fetch all lots for this account once so we can filter per date
         // in memory rather than issuing one query per day in the range.
         // For the TOTAL pseudo-account, aggregate lots across all accounts.
-        let all_lots = if account_id == "TOTAL" {
+        let all_lots = if account_id == PORTFOLIO_TOTAL_ACCOUNT_ID {
             self.lot_repository.get_all_lots().await?
         } else {
             self.lot_repository

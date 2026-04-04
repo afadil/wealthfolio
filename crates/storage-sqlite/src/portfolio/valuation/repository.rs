@@ -12,6 +12,7 @@ use std::sync::Arc;
 use super::model::{DailyAccountValuationDB, DailyPortfolioValuationDB};
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
+use wealthfolio_core::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
 use crate::schema::daily_account_valuation;
 use crate::schema::daily_account_valuation::dsl::*;
 use crate::schema::daily_portfolio_valuation;
@@ -361,7 +362,7 @@ impl ValuationRepositoryTrait for ValuationRepository {
         let mut conn = get_connection(&self.pool)?;
 
         let mut query = daily_account_valuation::table
-            .filter(account_id.ne("TOTAL"))
+            .filter(account_id.ne(PORTFOLIO_TOTAL_ACCOUNT_ID))
             .order(valuation_date.asc())
             .into_boxed();
 

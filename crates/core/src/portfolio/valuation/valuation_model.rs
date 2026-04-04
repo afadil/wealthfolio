@@ -1,5 +1,6 @@
 //! Portfolio valuation domain models.
 
+use crate::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
 use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -49,7 +50,7 @@ impl DailyPortfolioValuation {
     pub fn to_account_valuation(&self) -> DailyAccountValuation {
         DailyAccountValuation {
             id: self.id.clone(),
-            account_id: "TOTAL".to_string(),
+            account_id: PORTFOLIO_TOTAL_ACCOUNT_ID.to_string(),
             valuation_date: self.valuation_date,
             account_currency: self.base_currency.clone(),
             base_currency: self.base_currency.clone(),

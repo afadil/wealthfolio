@@ -1,5 +1,6 @@
 use crate::activities::ActivityRepositoryTrait;
 use crate::assets::{Asset, AssetClassificationService, AssetKind, AssetServiceTrait};
+use crate::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
 use crate::constants::DECIMAL_PRECISION;
 use crate::errors::{CalculatorError, Error as CoreError, Result};
 use crate::fx::currency::{get_normalization_rule, normalize_currency_code};
@@ -118,7 +119,7 @@ impl HoldingsService {
 
         // --- Security positions: read from lots table ---
         // For TOTAL pseudo-account, aggregate open lots across all accounts.
-        let open_lots = match if account_id == "TOTAL" {
+        let open_lots = match if account_id == PORTFOLIO_TOTAL_ACCOUNT_ID {
             self.lot_repository.get_all_open_lots().await
         } else {
             self.lot_repository
@@ -247,7 +248,7 @@ impl HoldingsService {
             // Build detailed lot view (open + closed) when lots are requested.
             // For TOTAL, fetch all lots across accounts; otherwise per-account.
             let lot_details: Option<Vec<LotView>> = if include_lots {
-                let all_lots = if account_id == "TOTAL" {
+                let all_lots = if account_id == PORTFOLIO_TOTAL_ACCOUNT_ID {
                     self.lot_repository.get_all_lots().await
                 } else {
                     self.lot_repository

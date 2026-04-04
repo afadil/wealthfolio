@@ -483,7 +483,7 @@ impl SnapshotRepository {
         }
         let mut query = holdings_snapshots
             .into_boxed()
-            .filter(account_id.ne("TOTAL"))
+            .filter(account_id.ne(PORTFOLIO_TOTAL_ACCOUNT_ID))
             .filter(account_id.eq_any(non_archived_account_ids));
         if let Some(start) = start_date_opt {
             query = query.filter(snapshot_date.ge(start.format("%Y-%m-%d").to_string()));

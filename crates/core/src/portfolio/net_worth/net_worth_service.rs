@@ -14,6 +14,7 @@ use super::net_worth_model::{
 use super::net_worth_traits::NetWorthServiceTrait;
 use crate::accounts::{account_types, AccountRepositoryTrait};
 use crate::activities::ActivityRepositoryTrait;
+use crate::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
 use crate::assets::{AssetKind, AssetRepositoryTrait};
 use crate::constants::DECIMAL_PRECISION;
 use crate::errors::Result;
@@ -584,7 +585,7 @@ impl NetWorthServiceTrait for NetWorthService {
         // The TOTAL account has aggregated values already converted to base currency.
         // Fields: total_value, net_contribution, fx_rate_to_base (always 1 for TOTAL)
         let total_valuations = self.valuation_repository.get_historical_valuations(
-            "TOTAL",
+            PORTFOLIO_TOTAL_ACCOUNT_ID,
             Some(start_date),
             Some(end_date),
         )?;

@@ -1,4 +1,4 @@
-use crate::constants::DISPLAY_DECIMAL_PRECISION;
+use crate::constants::{DISPLAY_DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
 use crate::utils::time_utils::{parse_user_timezone_or_default, user_today};
 use crate::{
     activities::{ActivityError, ActivityRepositoryTrait, IncomeData},
@@ -130,7 +130,7 @@ impl IncomeServiceTrait for IncomeService {
             months_two_years_ago = 13 - oldest_date.month() as i32
         }
 
-        let mut total_summary = IncomeSummary::new("TOTAL", base_currency.clone());
+        let mut total_summary = IncomeSummary::new(PORTFOLIO_TOTAL_ACCOUNT_ID, base_currency.clone());
         let mut ytd_summary = IncomeSummary::new("YTD", base_currency.clone());
         let mut last_year_summary = IncomeSummary::new("LAST_YEAR", base_currency.clone());
         let mut two_years_ago_summary = IncomeSummary::new("TWO_YEARS_AGO", base_currency.clone());
