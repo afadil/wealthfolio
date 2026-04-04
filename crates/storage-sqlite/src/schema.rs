@@ -259,6 +259,8 @@ diesel::table! {
         reservation_percent -> Nullable<Double>,
         created_at -> Text,
         updated_at -> Text,
+        countable_percent -> Nullable<Double>,
+        tax_bucket -> Nullable<Text>,
     }
 }
 
