@@ -21,28 +21,25 @@ import {
   XAxis,
   YAxis,
 } from "@wealthfolio/ui/chart";
-import { useState, useMemo, useEffect, useCallback } from "react";
-import type {
-  FireSettings,
-  MonteCarloResult,
-  ScenarioResult,
-  SorrScenario,
-  SensitivityResult,
-} from "../types";
-import type { RetirementOverview } from "@/lib/types";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import type { RetirementPlan, RetirementIncomeStream } from "../types";
+import type { PlannerMode, RetirementOverview } from "@/lib/types";
 import {
-  runFireMonteCarlo,
-  runFireStrategyComparison,
-  runFireScenarioAnalysis,
-  runFireSorr,
-  runFireSensitivity,
+  runRetirementMonteCarlo,
+  runRetirementStrategyComparison,
+  runRetirementScenarioAnalysis,
+  runRetirementSorr,
+  runRetirementSensitivity,
 } from "@/adapters";
 
 interface Props {
-  settings: FireSettings;
+  plan: RetirementPlan;
   totalValue: number;
   isLoading: boolean;
   retirementOverview?: RetirementOverview;
+  plannerMode?: PlannerMode;
+  goalId?: string;
 }
 
 /**
@@ -50,7 +47,7 @@ interface Props {
  * Pure display helper: balance * (1+r)^years * swr / 12.
  */
 function resolveDcPayouts(
-  streams: FireSettings["additionalIncomeStreams"],
+  streams: RetirementIncomeStream[],
   currentAge: number,
   retirementAge: number,
   swr: number,
@@ -88,58 +85,48 @@ function fmtCompact(value: number) {
 // ─── Monte Carlo Section ───────────────────────────────────────────────────────
 
 function MonteCarloSection({
-  settings,
+  plan,
   totalValue,
   fireTarget,
+  plannerMode,
+  goalId,
 }: {
-  settings: FireSettings;
+  plan: RetirementPlan;
   totalValue: number;
   fireTarget: number;
+  plannerMode?: PlannerMode;
+  goalId?: string;
 }) {
-  const [result, setResult] = useState<MonteCarloResult | null>(null);
-  const [running, setRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [compResult, setCompResult] = useState<{
-    constantDollar: MonteCarloResult;
-    constantPercentage: MonteCarloResult;
-  } | null>(null);
-  const [comparing, setComparing] = useState(false);
-  const [compareError, setCompareError] = useState<string | null>(null);
-  const strategy = settings.withdrawalStrategy ?? "constant-dollar";
+  const planKey = JSON.stringify(plan);
+  const strategy = plan.withdrawal.strategy ?? "constant-dollar";
 
-  // Invalidate stale results whenever settings change
-  useEffect(() => {
-    setResult(null);
-    setCompResult(null);
-    setError(null);
-    setCompareError(null);
-  }, [settings]);
+  const {
+    data: result,
+    isFetching: running,
+    error: mcError,
+    refetch: run,
+  } = useQuery({
+    queryKey: ["retirement-mc", goalId, plannerMode, planKey, totalValue],
+    queryFn: () => runRetirementMonteCarlo(plan, totalValue, 100_000, plannerMode, goalId),
+    enabled: false,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  const run = async () => {
-    setRunning(true);
-    setError(null);
-    try {
-      const res = await runFireMonteCarlo(settings, totalValue, 100_000);
-      setResult(res);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setRunning(false);
-    }
-  };
+  const {
+    data: compResult,
+    isFetching: comparing,
+    error: compError,
+    refetch: compare,
+  } = useQuery({
+    queryKey: ["retirement-strategy-comp", goalId, plannerMode, planKey, totalValue],
+    queryFn: () => runRetirementStrategyComparison(plan, totalValue, 5_000, plannerMode, goalId),
+    enabled: false,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  const compare = async () => {
-    setComparing(true);
-    setCompareError(null);
-    try {
-      const res = await runFireStrategyComparison(settings, totalValue, 5_000);
-      setCompResult(res);
-    } catch (e) {
-      setCompareError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setComparing(false);
-    }
-  };
+  const error = mcError instanceof Error ? mcError.message : mcError ? String(mcError) : null;
+  const compareError =
+    compError instanceof Error ? compError.message : compError ? String(compError) : null;
 
   const chartData = result
     ? result.ageAxis.map((age, i) => ({
@@ -159,18 +146,28 @@ function MonteCarloSection({
           <CardTitle className="text-sm">Monte Carlo Simulation</CardTitle>
           <p className="text-muted-foreground mt-1 text-xs">
             100,000 simulations · fat-tailed two-regime returns (μ={" "}
-            {(settings.expectedAnnualReturn * 100).toFixed(1)}%, σ={" "}
-            {(settings.expectedReturnStdDev * 100).toFixed(1)}%) · stochastic inflation ·{" "}
+            {(plan.investment.expectedAnnualReturn * 100).toFixed(1)}%, σ={" "}
+            {(plan.investment.expectedReturnStdDev * 100).toFixed(1)}%) · stochastic inflation ·{" "}
             <span className="font-medium">
-              {strategy === "constant-dollar" ? "constant-dollar" : "constant-%"} strategy
+              {strategy === "constant-dollar"
+                ? "constant-dollar"
+                : strategy === "guardrails"
+                  ? "guardrails (spending-policy based)"
+                  : "constant-%"}{" "}
+              strategy
             </span>
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={compare} disabled={comparing || running} variant="outline" size="sm">
+          <Button
+            onClick={() => compare()}
+            disabled={comparing || running}
+            variant="outline"
+            size="sm"
+          >
             {comparing ? "Comparing…" : "Compare Strategies"}
           </Button>
-          <Button onClick={run} disabled={running || comparing} size="sm">
+          <Button onClick={() => run()} disabled={running || comparing} size="sm">
             {running ? "Running…" : result ? "Re-run" : "Run Simulation"}
           </Button>
         </div>
@@ -212,7 +209,7 @@ function MonteCarloSection({
                       {result.medianFireAge}
                     </p>
                     <p className="text-xs text-amber-600 dark:text-amber-400">
-                      {new Date().getFullYear() + (result.medianFireAge - settings.currentAge)}
+                      {new Date().getFullYear() + (result.medianFireAge - plan.personal.currentAge)}
                     </p>
                   </>
                 ) : (
@@ -222,13 +219,13 @@ function MonteCarloSection({
               <div>
                 <p className="text-muted-foreground text-xs">P50 Portfolio at Horizon</p>
                 <p className="text-lg font-bold">
-                  {fmt(result.finalPortfolioAtHorizon.p50, settings.currency)}
+                  {fmt(result.finalPortfolioAtHorizon.p50, plan.currency)}
                 </p>
               </div>
               <div>
                 <p className="text-muted-foreground text-xs">P10 Portfolio at Horizon</p>
                 <p className="text-lg font-bold">
-                  {fmt(result.finalPortfolioAtHorizon.p10, settings.currency)}
+                  {fmt(result.finalPortfolioAtHorizon.p10, plan.currency)}
                 </p>
               </div>
             </div>
@@ -244,7 +241,7 @@ function MonteCarloSection({
                   />
                   <YAxis tickFormatter={fmtCompact} />
                   <Tooltip
-                    formatter={(value: number | undefined) => fmt(value ?? 0, settings.currency)}
+                    formatter={(value: number | undefined) => fmt(value ?? 0, plan.currency)}
                     labelFormatter={(age) => `Age ${age}`}
                   />
                   <Legend />
@@ -255,7 +252,7 @@ function MonteCarloSection({
                     label={{ value: "FIRE Target", position: "right", fontSize: 10 }}
                   />
                   <ReferenceLine
-                    x={settings.targetFireAge}
+                    x={plan.personal.targetRetirementAge}
                     stroke="#94a3b8"
                     strokeDasharray="4 2"
                     label={{
@@ -293,8 +290,8 @@ function MonteCarloSection({
                 </LineChart>
               </ResponsiveContainer>
               <p className="text-muted-foreground mt-1 text-center text-xs">
-                Portfolio value from age {settings.currentAge} to {settings.planningHorizonAge}{" "}
-                across 100,000 simulations
+                Portfolio value from age {plan.personal.currentAge} to{" "}
+                {plan.personal.planningHorizonAge} across 100,000 simulations
               </p>
             </div>
           </div>
@@ -322,8 +319,9 @@ function MonteCarloSection({
               <thead>
                 <tr className="text-muted-foreground border-b">
                   <th className="pb-2 text-left">Metric</th>
-                  <th className="pb-2 text-right">Constant Dollar</th>
+                  <th className="pb-2 text-right">Constant $</th>
                   <th className="pb-2 text-right">Constant %</th>
+                  <th className="pb-2 text-right">Guardrails</th>
                 </tr>
               </thead>
               <tbody>
@@ -335,43 +333,51 @@ function MonteCarloSection({
                   <td className="py-1.5 text-right">
                     {(compResult.constantPercentage.successRate * 100).toFixed(0)}%
                   </td>
+                  <td className="py-1.5 text-right">
+                    {(compResult.guardrails.successRate * 100).toFixed(0)}%
+                  </td>
                 </tr>
                 <tr className="border-b">
                   <td className="py-1.5">Median FIRE Age</td>
-                  <td className="py-1.5 text-right">{compResult.constantDollar.medianFireAge}</td>
                   <td className="py-1.5 text-right">
-                    {compResult.constantPercentage.medianFireAge}
+                    {compResult.constantDollar.medianFireAge ?? "—"}
+                  </td>
+                  <td className="py-1.5 text-right">
+                    {compResult.constantPercentage.medianFireAge ?? "—"}
+                  </td>
+                  <td className="py-1.5 text-right">
+                    {compResult.guardrails.medianFireAge ?? "—"}
                   </td>
                 </tr>
                 <tr className="border-b">
                   <td className="py-1.5">Median portfolio at horizon</td>
                   <td className="py-1.5 text-right">
-                    {fmt(compResult.constantDollar.finalPortfolioAtHorizon.p50, settings.currency)}
+                    {fmt(compResult.constantDollar.finalPortfolioAtHorizon.p50, plan.currency)}
                   </td>
                   <td className="py-1.5 text-right">
-                    {fmt(
-                      compResult.constantPercentage.finalPortfolioAtHorizon.p50,
-                      settings.currency,
-                    )}
+                    {fmt(compResult.constantPercentage.finalPortfolioAtHorizon.p50, plan.currency)}
+                  </td>
+                  <td className="py-1.5 text-right">
+                    {fmt(compResult.guardrails.finalPortfolioAtHorizon.p50, plan.currency)}
                   </td>
                 </tr>
                 <tr>
                   <td className="py-1.5">P10 portfolio at horizon</td>
                   <td className="py-1.5 text-right">
-                    {fmt(compResult.constantDollar.finalPortfolioAtHorizon.p10, settings.currency)}
+                    {fmt(compResult.constantDollar.finalPortfolioAtHorizon.p10, plan.currency)}
                   </td>
                   <td className="py-1.5 text-right">
-                    {fmt(
-                      compResult.constantPercentage.finalPortfolioAtHorizon.p10,
-                      settings.currency,
-                    )}
+                    {fmt(compResult.constantPercentage.finalPortfolioAtHorizon.p10, plan.currency)}
+                  </td>
+                  <td className="py-1.5 text-right">
+                    {fmt(compResult.guardrails.finalPortfolioAtHorizon.p10, plan.currency)}
                   </td>
                 </tr>
               </tbody>
             </table>
             <p className="text-muted-foreground mt-2 text-xs">
-              Constant %: the portfolio mathematically never depletes (high success rate expected),
-              but annual spending varies with market performance.
+              Constant %: spending adjusts to portfolio (never depletes but varies). Guardrails:
+              dynamic floor/ceiling keeps spending within bounds.
             </p>
           </div>
         )}
@@ -382,30 +388,35 @@ function MonteCarloSection({
 
 // ─── Scenario Analysis Section ─────────────────────────────────────────────────
 
-function ScenarioSection({ settings, totalValue }: { settings: FireSettings; totalValue: number }) {
-  const [scenarios, setScenarios] = useState<ScenarioResult[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+function ScenarioSection({
+  plan,
+  totalValue,
+  plannerMode,
+  goalId,
+}: {
+  plan: RetirementPlan;
+  totalValue: number;
+  plannerMode?: PlannerMode;
+  goalId?: string;
+}) {
+  const planKey = JSON.stringify(plan);
 
-  const run = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await runFireScenarioAnalysis(settings, totalValue);
-      setScenarios(res);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [settings, totalValue]);
+  const {
+    data: scenarios,
+    isLoading: loading,
+    error: scenarioError,
+  } = useQuery({
+    queryKey: ["retirement-scenarios", goalId, plannerMode, planKey, totalValue],
+    queryFn: () => runRetirementScenarioAnalysis(plan, totalValue, plannerMode, goalId),
+    staleTime: 5 * 60 * 1000,
+  });
 
-  // Auto-run on mount and when settings change
-  useEffect(() => {
-    setScenarios(null);
-    setError(null);
-    run();
-  }, [run]);
+  const error =
+    scenarioError instanceof Error
+      ? scenarioError.message
+      : scenarioError
+        ? String(scenarioError)
+        : null;
 
   const COLORS = ["#ef4444", "#3b82f6", "#22c55e"];
 
@@ -414,14 +425,14 @@ function ScenarioSection({ settings, totalValue }: { settings: FireSettings; tot
     const maxLen = Math.max(...scenarios.map((s) => s.yearByYear.length));
     return Array.from({ length: maxLen }, (_, i) => {
       const entry: Record<string, number | string> = {
-        age: settings.currentAge + i,
+        age: plan.personal.currentAge + i,
       };
       scenarios.forEach((s) => {
         entry[s.label] = s.yearByYear[i]?.portfolioValue ?? 0;
       });
       return entry;
     });
-  }, [scenarios, settings.currentAge]);
+  }, [scenarios, plan.personal.currentAge]);
 
   return (
     <Card>
@@ -445,7 +456,7 @@ function ScenarioSection({ settings, totalValue }: { settings: FireSettings; tot
                 <XAxis dataKey="age" />
                 <YAxis tickFormatter={fmtCompact} />
                 <Tooltip
-                  formatter={(value: number | undefined) => fmt(value ?? 0, settings.currency)}
+                  formatter={(value: number | undefined) => fmt(value ?? 0, plan.currency)}
                   labelFormatter={(age) => `Age ${age}`}
                 />
                 <Legend />
@@ -502,7 +513,7 @@ function ScenarioSection({ settings, totalValue }: { settings: FireSettings; tot
                       {s.fireAge ?? "—"}
                     </td>
                     <td className="py-1.5 text-right">
-                      {fmt(s.portfolioAtHorizon, settings.currency)}
+                      {fmt(s.portfolioAtHorizon, plan.currency)}
                     </td>
                   </tr>
                 ))}
@@ -520,41 +531,49 @@ function ScenarioSection({ settings, totalValue }: { settings: FireSettings; tot
 const STREAM_COLORS = ["#3b82f6", "#22c55e", "#f97316", "#a855f7", "#ec4899", "#14b8a6"];
 
 function IncomeProjectionSection({
-  settings,
+  plan,
   actualFireAge,
 }: {
-  settings: FireSettings;
+  plan: RetirementPlan;
   actualFireAge: number;
 }) {
-  const streams = settings.additionalIncomeStreams;
+  const streams = plan.incomeStreams;
   if (streams.length === 0) return null;
 
-  const horizonYears = Math.max(1, settings.planningHorizonAge - settings.currentAge);
+  const { currentAge, planningHorizonAge } = plan.personal;
+  const horizonYears = Math.max(1, planningHorizonAge - currentAge);
   const fireAge = actualFireAge;
   const dcPayouts = resolveDcPayouts(
-    settings.additionalIncomeStreams,
-    settings.currentAge,
-    settings.targetFireAge,
-    settings.safeWithdrawalRate,
+    streams,
+    currentAge,
+    fireAge,
+    plan.withdrawal.safeWithdrawalRate,
   );
 
+  const inflationRate = plan.investment.inflationRate;
+
   function realStreamValue(s: (typeof streams)[number], i: number): number {
-    const baseMonthly = dcPayouts.get(s.id) ?? s.monthlyAmount;
+    const baseMonthly = dcPayouts.get(s.id) ?? s.monthlyAmount ?? 0;
     const rate =
       s.annualGrowthRate !== undefined
         ? s.annualGrowthRate
         : s.adjustForInflation
-          ? settings.inflationRate
+          ? inflationRate
           : 0;
     const nominal = baseMonthly * 12 * Math.pow(1 + rate, i);
-    return nominal / Math.pow(1 + settings.inflationRate, i);
+    return nominal / Math.pow(1 + inflationRate, i);
   }
 
-  const realExpenses = settings.monthlyExpensesAtFire * 12;
+  const totalMonthlyExpenses =
+    plan.expenses.living.monthlyAmount +
+    plan.expenses.healthcare.monthlyAmount +
+    (plan.expenses.housing?.monthlyAmount ?? 0) +
+    (plan.expenses.discretionary?.monthlyAmount ?? 0);
+  const realExpenses = totalMonthlyExpenses * 12;
 
   const chartData = useMemo(() => {
     return Array.from({ length: horizonYears + 1 }, (_, i) => {
-      const age = settings.currentAge + i;
+      const age = currentAge + i;
       const entry: Record<string, number | null> = {
         age,
         expenses: age >= fireAge ? realExpenses : null,
@@ -564,15 +583,16 @@ function IncomeProjectionSection({
       }
       return entry;
     });
-  }, [settings, streams, fireAge, horizonYears, realExpenses]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streams, fireAge, horizonYears, realExpenses]);
 
   const keyAges = useMemo(() => {
     const ages = new Set<number>([fireAge, fireAge + 5, fireAge + 10, fireAge + 20]);
     streams.forEach((s) => ages.add(s.startAge));
     return [...ages]
-      .filter((a) => a >= settings.currentAge && a <= settings.planningHorizonAge)
+      .filter((a) => a >= currentAge && a <= planningHorizonAge)
       .sort((a, b) => a - b);
-  }, [streams, fireAge, settings.currentAge, settings.planningHorizonAge]);
+  }, [streams, fireAge, currentAge, planningHorizonAge]);
 
   return (
     <Card>
@@ -594,7 +614,7 @@ function IncomeProjectionSection({
               formatter={(value: number | undefined, name: string | undefined) => {
                 const stream = streams.find((s) => s.id === name);
                 const label = stream ? stream.label || "Stream" : (name ?? "");
-                return [fmt(value ?? 0, settings.currency), label];
+                return [fmt(value ?? 0, plan.currency), label];
               }}
               labelFormatter={(age) => `Age ${age} (today's €)`}
             />
@@ -651,7 +671,7 @@ function IncomeProjectionSection({
           </thead>
           <tbody>
             {keyAges.map((age) => {
-              const i = age - settings.currentAge;
+              const i = age - currentAge;
               const totalIncome = streams.reduce((sum, s) => {
                 if (age < s.startAge) return sum;
                 return sum + realStreamValue(s, i);
@@ -680,13 +700,13 @@ function IncomeProjectionSection({
                       );
                     return (
                       <td key={s.id} className="py-1.5 text-right">
-                        {fmt(realStreamValue(s, i), settings.currency)}
+                        {fmt(realStreamValue(s, i), plan.currency)}
                       </td>
                     );
                   })}
-                  <td className="py-1.5 text-right">{fmt(totalIncome, settings.currency)}</td>
+                  <td className="py-1.5 text-right">{fmt(totalIncome, plan.currency)}</td>
                   <td className="py-1.5 text-right">
-                    {expenses !== null ? fmt(expenses, settings.currency) : "—"}
+                    {expenses !== null ? fmt(expenses, plan.currency) : "—"}
                   </td>
                   <td
                     className={`py-1.5 text-right font-medium ${
@@ -714,48 +734,50 @@ function IncomeProjectionSection({
 // ─── Sensitivity Analysis Section ─────────────────────────────────────────────
 
 function SensitivitySection({
-  settings,
+  plan,
   totalValue,
+  plannerMode,
+  goalId,
 }: {
-  settings: FireSettings;
+  plan: RetirementPlan;
   totalValue: number;
+  plannerMode?: PlannerMode;
+  goalId?: string;
 }) {
-  const [sensitivity, setSensitivity] = useState<SensitivityResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const planKey = JSON.stringify(plan);
 
-  const run = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await runFireSensitivity(settings, totalValue);
-      setSensitivity(res);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [settings, totalValue]);
+  const {
+    data: sensitivity,
+    isLoading: loading,
+    error: sensitivityError,
+  } = useQuery({
+    queryKey: ["retirement-sensitivity", goalId, plannerMode, planKey, totalValue],
+    queryFn: () => runRetirementSensitivity(plan, totalValue, plannerMode, goalId),
+    staleTime: 5 * 60 * 1000,
+  });
 
-  useEffect(() => {
-    setSensitivity(null);
-    setError(null);
-    run();
-  }, [run]);
+  const error =
+    sensitivityError instanceof Error
+      ? sensitivityError.message
+      : sensitivityError
+        ? String(sensitivityError)
+        : null;
 
   function cellBg(fireAge: number | null): string {
     if (fireAge === null) return "bg-red-100 dark:bg-red-950/30";
-    if (fireAge <= settings.targetFireAge - 5) return "bg-green-100 dark:bg-green-950/30";
-    if (fireAge <= settings.targetFireAge) return "bg-blue-100 dark:bg-blue-950/30";
-    if (fireAge <= settings.targetFireAge + 5) return "bg-yellow-50 dark:bg-yellow-950/20";
+    if (fireAge <= plan.personal.targetRetirementAge - 5)
+      return "bg-green-100 dark:bg-green-950/30";
+    if (fireAge <= plan.personal.targetRetirementAge) return "bg-blue-100 dark:bg-blue-950/30";
+    if (fireAge <= plan.personal.targetRetirementAge + 5)
+      return "bg-yellow-50 dark:bg-yellow-950/20";
     return "bg-red-50 dark:bg-red-950/20";
   }
 
   function isCurrentContrib(contrib: number) {
-    return Math.abs(contrib - settings.monthlyContribution) < 1;
+    return Math.abs(contrib - plan.investment.monthlyContribution) < 1;
   }
   function isCurrentReturn(ret: number) {
-    return Math.abs(ret - settings.expectedAnnualReturn) < 0.001;
+    return Math.abs(ret - plan.investment.expectedAnnualReturn) < 0.001;
   }
 
   const { contribution, swr } = sensitivity ?? {};
@@ -803,7 +825,7 @@ function SensitivitySection({
                       <td
                         className={`py-1 pr-2 ${isCurrentContrib(contrib) ? "font-bold text-blue-600" : "text-muted-foreground"}`}
                       >
-                        {formatAmount(contrib, settings.currency)}
+                        {formatAmount(contrib, plan.currency)}
                       </td>
                       {contribution.returnColumns.map((r, ci) => {
                         const age = contribution.fireAges[ri][ci];
@@ -813,7 +835,7 @@ function SensitivitySection({
                             key={r}
                             className={`px-2 py-1 text-center ${cellBg(age)} ${highlight ? "ring-2 ring-blue-500" : ""}`}
                           >
-                            {age ?? `>${settings.planningHorizonAge}`}
+                            {age ?? `>${plan.personal.planningHorizonAge}`}
                           </td>
                         );
                       })}
@@ -824,12 +846,12 @@ function SensitivitySection({
             </div>
 
             <div>
-              <p className="mb-2 text-xs font-semibold">FIRE Age (SWR × return)</p>
+              <p className="mb-2 text-xs font-semibold">FIRE Age (withdrawal rate × return)</p>
               <table className="text-xs">
                 <thead>
                   <tr>
                     <th className="text-muted-foreground pr-2 text-left font-normal">
-                      SWR ↓ / Return →
+                      Rate ↓ / Return →
                     </th>
                     {swr.returnColumns.map((r) => (
                       <th
@@ -843,7 +865,8 @@ function SensitivitySection({
                 </thead>
                 <tbody>
                   {swr.swrRows.map((rate, ri) => {
-                    const isCurrentSWR = Math.abs(rate - settings.safeWithdrawalRate) < 0.001;
+                    const isCurrentSWR =
+                      Math.abs(rate - plan.withdrawal.safeWithdrawalRate) < 0.001;
                     return (
                       <tr key={rate}>
                         <td
@@ -859,7 +882,7 @@ function SensitivitySection({
                               key={r}
                               className={`px-2 py-1 text-center ${cellBg(age)} ${highlight ? "ring-2 ring-blue-500" : ""}`}
                             >
-                              {age ?? `>${settings.planningHorizonAge}`}
+                              {age ?? `>${plan.personal.planningHorizonAge}`}
                             </td>
                           );
                         })}
@@ -879,43 +902,39 @@ function SensitivitySection({
 // ─── Sequence of Returns Risk Section ─────────────────────────────────────────
 
 function SorrSection({
-  settings,
+  plan,
   totalValue,
   portfolioAtFire: portfolioAtFireProp,
   retirementStartAge: retirementStartAgeProp,
   fireReached,
+  goalId,
 }: {
-  settings: FireSettings;
+  plan: RetirementPlan;
   totalValue: number;
   portfolioAtFire: number;
   retirementStartAge: number;
   fireReached: boolean;
+  goalId?: string;
 }) {
   const portfolioAtFire = portfolioAtFireProp > 0 ? portfolioAtFireProp : totalValue;
   const retirementStartAge = retirementStartAgeProp;
 
-  const [scenarios, setScenarios] = useState<SorrScenario[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const planKey = JSON.stringify(plan);
 
-  const run = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await runFireSorr(settings, portfolioAtFire, retirementStartAge);
-      setScenarios(res);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [settings, portfolioAtFire, retirementStartAge]);
+  const {
+    data: scenarios,
+    isFetching: loading,
+    error: sorrError,
+    refetch: run,
+  } = useQuery({
+    queryKey: ["retirement-sorr", goalId, planKey, portfolioAtFire, retirementStartAge],
+    queryFn: () => runRetirementSorr(plan, portfolioAtFire, retirementStartAge, goalId),
+    enabled: false,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  useEffect(() => {
-    setScenarios(null);
-    setError(null);
-    run();
-  }, [run]);
+  const error =
+    sorrError instanceof Error ? sorrError.message : sorrError ? String(sorrError) : null;
 
   const COLORS = ["#3b82f6", "#ef4444", "#f97316", "#a855f7", "#64748b"];
 
@@ -934,39 +953,50 @@ function SorrSection({
     });
   }, [scenarios, retirementStartAge]);
 
-  const annualExpenses = settings.monthlyExpensesAtFire * 12;
+  const annualExpenses =
+    (plan.expenses.living.monthlyAmount +
+      plan.expenses.healthcare.monthlyAmount +
+      (plan.expenses.housing?.monthlyAmount ?? 0) +
+      (plan.expenses.discretionary?.monthlyAmount ?? 0)) *
+    12;
   const dcPayouts = resolveDcPayouts(
-    settings.additionalIncomeStreams,
-    settings.currentAge,
+    plan.incomeStreams,
+    plan.personal.currentAge,
     retirementStartAge,
-    settings.safeWithdrawalRate,
+    plan.withdrawal.safeWithdrawalRate,
   );
-  const annualIncomeAtFire = settings.additionalIncomeStreams
+  const annualIncomeAtFire = plan.incomeStreams
     .filter((s) => retirementStartAge >= s.startAge)
-    .reduce((sum, s) => sum + (dcPayouts.get(s.id) ?? s.monthlyAmount) * 12, 0);
+    .reduce((sum, s) => sum + (dcPayouts.get(s.id) ?? s.monthlyAmount ?? 0) * 12, 0);
   const incomeRatio = annualExpenses > 0 ? annualIncomeAtFire / annualExpenses : 0;
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-sm">Sequence of Returns Risk</CardTitle>
-        <p className="text-muted-foreground text-xs">
-          A market crash in the first years of FIRE is more dangerous than the same crash later.
-          Starting portfolio: {fmt(portfolioAtFire, settings.currency)}
-          {!fireReached && " (current portfolio — FIRE not yet reached in projection)"}.
-        </p>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <div>
+          <CardTitle className="text-sm">Sequence of Returns Risk</CardTitle>
+          <p className="text-muted-foreground mt-1 text-xs">
+            A market crash in the first years of FIRE is more dangerous than the same crash later.
+            {fireReached && <>Starting portfolio: {fmt(portfolioAtFire, plan.currency)}.</>}
+          </p>
+        </div>
+        {fireReached && (
+          <Button onClick={() => run()} disabled={loading} size="sm">
+            {loading ? "Running…" : scenarios ? "Re-run" : "Run SORR"}
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {error && <p className="text-destructive py-2 text-sm">{error}</p>}
         {!fireReached && (
-          <div className="rounded bg-yellow-50 p-3 text-xs dark:bg-yellow-950/20">
-            FIRE has not been reached within your planning horizon. Results below show crash
-            scenarios starting from your current portfolio — they are illustrative only.
+          <div className="text-muted-foreground py-8 text-center text-sm">
+            SORR analysis requires a funded retirement plan. Adjust your plan to reach financial
+            independence first.
           </div>
         )}
-        {incomeRatio > 0.3 && (
+        {fireReached && incomeRatio > 0.3 && (
           <div className="rounded bg-green-50 p-3 text-xs dark:bg-green-950/20">
-            Your additional income ({fmt(annualIncomeAtFire / 12, settings.currency)}/mo) covers{" "}
+            Your additional income ({fmt(annualIncomeAtFire / 12, plan.currency)}/mo) covers{" "}
             {(incomeRatio * 100).toFixed(0)}% of your FIRE expenses, significantly reducing
             sequence-of-returns risk.
           </div>
@@ -977,6 +1007,11 @@ function SorrSection({
             <Skeleton className="h-[200px] w-full" />
           </div>
         )}
+        {fireReached && !loading && !scenarios && (
+          <p className="text-muted-foreground py-8 text-center text-sm">
+            Click "Run SORR" to analyze sequence-of-returns risk.
+          </p>
+        )}
         {!loading && scenarios && (
           <>
             <table className="w-full text-xs">
@@ -985,7 +1020,7 @@ function SorrSection({
                   <th className="pb-2 text-left">Scenario</th>
                   <th className="pb-2 text-right">Final Value</th>
                   <th className="pb-2 text-center">
-                    Survived to age {settings.planningHorizonAge}?
+                    Survived {plan.personal.planningHorizonAge - retirementStartAge} years?
                   </th>
                 </tr>
               </thead>
@@ -995,7 +1030,7 @@ function SorrSection({
                     <td className="py-1.5 font-medium" style={{ color: COLORS[i] }}>
                       {s.label}
                     </td>
-                    <td className="py-1.5 text-right">{fmt(s.finalValue, settings.currency)}</td>
+                    <td className="py-1.5 text-right">{fmt(s.finalValue, plan.currency)}</td>
                     <td className="py-1.5 text-center">
                       <Badge variant={s.survived ? "default" : "destructive"} className="text-xs">
                         {s.survived ? "Yes" : "No"}
@@ -1015,7 +1050,7 @@ function SorrSection({
                 />
                 <YAxis tickFormatter={fmtCompact} />
                 <Tooltip
-                  formatter={(value: number | undefined) => fmt(value ?? 0, settings.currency)}
+                  formatter={(value: number | undefined) => fmt(value ?? 0, plan.currency)}
                   labelFormatter={(age) => `Age ${age}`}
                 />
                 <Legend />
@@ -1041,15 +1076,21 @@ function SorrSection({
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function SimulationsPage({
-  settings,
+  plan,
   totalValue,
   isLoading,
   retirementOverview,
+  plannerMode,
+  goalId,
 }: Props) {
-  const actualFireAge = retirementOverview?.fiAge ?? settings.targetFireAge;
+  const actualRetirementStartAge =
+    retirementOverview?.retirementStartAge ?? plan.personal.targetRetirementAge;
   const fireTarget = retirementOverview?.netFireTarget ?? 0;
-  const portfolioAtFire = retirementOverview?.portfolioAtGoalAge ?? totalValue;
-  const fireReached = retirementOverview?.fundedAtGoalAge ?? false;
+  const fireReached =
+    retirementOverview?.retirementStartAge != null &&
+    retirementOverview.portfolioAtRetirementStart > 0;
+  const portfolioNow = retirementOverview?.portfolioNow ?? totalValue;
+  const portfolioAtRetirementStart = retirementOverview?.portfolioAtRetirementStart ?? portfolioNow;
 
   if (isLoading) {
     return (
@@ -1062,16 +1103,33 @@ export default function SimulationsPage({
 
   return (
     <div className="space-y-6">
-      <MonteCarloSection settings={settings} totalValue={totalValue} fireTarget={fireTarget} />
-      <ScenarioSection settings={settings} totalValue={totalValue} />
-      <IncomeProjectionSection settings={settings} actualFireAge={actualFireAge} />
-      <SensitivitySection settings={settings} totalValue={totalValue} />
+      <MonteCarloSection
+        plan={plan}
+        totalValue={portfolioNow}
+        fireTarget={fireTarget}
+        plannerMode={plannerMode}
+        goalId={goalId}
+      />
+      <ScenarioSection
+        plan={plan}
+        totalValue={portfolioNow}
+        plannerMode={plannerMode}
+        goalId={goalId}
+      />
+      <IncomeProjectionSection plan={plan} actualFireAge={actualRetirementStartAge} />
+      <SensitivitySection
+        plan={plan}
+        totalValue={portfolioNow}
+        plannerMode={plannerMode}
+        goalId={goalId}
+      />
       <SorrSection
-        settings={settings}
-        totalValue={totalValue}
-        portfolioAtFire={portfolioAtFire}
-        retirementStartAge={actualFireAge}
+        plan={plan}
+        totalValue={portfolioNow}
+        portfolioAtFire={portfolioAtRetirementStart}
+        retirementStartAge={actualRetirementStartAge}
         fireReached={fireReached}
+        goalId={goalId}
       />
     </div>
   );

@@ -1,9 +1,4 @@
-import type {
-  Holding,
-  ActivityDetails,
-  RetirementOverview,
-  RetirementTrajectoryPoint,
-} from "@/lib/types";
+import type { Holding, RetirementOverview, RetirementTrajectoryPoint } from "@/lib/types";
 import {
   Badge,
   Button,
@@ -17,9 +12,17 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { Progress } from "@wealthfolio/ui/components/ui/progress";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { GoalFundingEditor } from "@/pages/goals/components/goal-funding-editor";
-import type { FireSettings } from "../types";
+import { Input, Label } from "@wealthfolio/ui";
+import type {
+  RetirementPlan,
+  WithdrawalConfig,
+  TaxProfile,
+  ExpenseBucket,
+  RetirementIncomeStream,
+  InvestmentAssumptions,
+} from "../types";
 import {
   Area,
   AreaChart,
@@ -33,17 +36,16 @@ import {
 type PlannerMode = "fire" | "traditional";
 
 interface Props {
-  settings: FireSettings;
+  plan: RetirementPlan;
   portfolioData: {
     holdings: Holding[];
-    activities: ActivityDetails[];
     totalValue: number;
     isLoading: boolean;
     error: Error | null;
   };
   isLoading: boolean;
   plannerMode?: PlannerMode;
-  onSaveSettings?: (settings: FireSettings) => void;
+  onSavePlan?: (plan: RetirementPlan) => void;
   onNavigateToTab?: (tab: string) => void;
   retirementOverview?: RetirementOverview;
   goalId?: string;
@@ -69,10 +71,6 @@ function fmt(value: number, currency: string) {
 function fmtCompact(value: number, currency: string) {
   if (Math.abs(value) >= 1_000_000) return formatAmount(Math.round(value / 1000) * 1000, currency);
   return formatAmount(value, currency);
-}
-
-function pct(value: number) {
-  return (value * 100).toFixed(1) + "%";
 }
 
 /** Radial progress ring */
@@ -116,22 +114,13 @@ function RadialProgress({ value, size = 80 }: { value: number; size?: number }) 
   );
 }
 
-function SidebarRow({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span className="text-sm font-semibold tabular-nums">{children}</span>
-    </div>
-  );
-}
-
 // ─── Chart types & helpers ───────────────────────────────────────
 
 interface ChartPoint {
   label: string; // category axis for reliable ReferenceLine
   age: number;
   portfolio: number;
-  target: number;
+  target: number | undefined;
   withdrawal: number; // annual withdrawal (0 during accumulation)
   phase: string;
   annualContribution: number;
@@ -174,15 +163,17 @@ function RetirementChartTooltip({
           {fmtCompact(point.portfolio, currency)}
         </span>
       </div>
-      <div className="flex items-center justify-between space-x-4">
-        <div className="flex items-center space-x-1.5">
-          <span className="block h-0 w-3 border-b border-dashed border-[#888]" />
-          <span className="text-muted-foreground text-xs">Target:</span>
+      {point.target != null && (
+        <div className="flex items-center justify-between space-x-4">
+          <div className="flex items-center space-x-1.5">
+            <span className="block h-0 w-3 border-b border-dashed border-[#888]" />
+            <span className="text-muted-foreground text-xs">Target:</span>
+          </div>
+          <span className="text-xs font-semibold tabular-nums">
+            {fmtCompact(point.target, currency)}
+          </span>
         </div>
-        <span className="text-xs font-semibold tabular-nums">
-          {fmtCompact(point.target, currency)}
-        </span>
-      </div>
+      )}
       {point.annualContribution > 0 && (
         <div className="flex items-center justify-between space-x-4">
           <span className="text-muted-foreground text-xs">Contribution/yr:</span>
@@ -326,289 +317,646 @@ function RetirementChart({
 
 // ─── Sidebar cards ──────────────────────────────────────────────
 
-function PlanDetailsCard({
-  settings,
-  currency,
-  onSaveSettings,
-  onNavigateToTab,
-  plannerMode = "fire",
-}: {
-  settings: FireSettings;
-  currency: string;
-  onSaveSettings?: (settings: FireSettings) => void;
-  onNavigateToTab?: (tab: string) => void;
-  plannerMode?: PlannerMode;
-}) {
-  const fireAgeLabel = plannerMode === "fire" ? "Desired FIRE age" : "Target retirement age";
-  const [isEditing, setIsEditing] = useState(false);
-  const [draft, setDraft] = useState<FireSettings>(settings);
+// ─── Sidebar Configurator ─────────────────────────────────────────────────────
 
-  const startEdit = () => {
-    setDraft({ ...settings });
-    setIsEditing(true);
-  };
-
-  const cancel = () => setIsEditing(false);
-
-  const save = () => {
-    onSaveSettings?.(draft);
-    setIsEditing(false);
-  };
-
-  const updateDraft = (field: keyof FireSettings, value: number) => {
-    setDraft((d) => ({ ...d, [field]: value }));
-  };
-
-  const healthcareMonthly = settings.healthcareMonthlyAtFire ?? 0;
-
+/** Read-only label:value row */
+function ConfigRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between pb-3">
-        <CardTitle className="text-sm">Plan Details</CardTitle>
-        {!isEditing && onSaveSettings && (
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={startEdit}>
-            Update
-          </Button>
-        )}
-      </CardHeader>
-      <CardContent>
-        {isEditing ? (
-          <div className="space-y-3">
-            <EditRow
-              label={fireAgeLabel}
-              value={draft.targetFireAge}
-              onChange={(v) => updateDraft("targetFireAge", v)}
-              step={1}
-            />
-            <EditRow
-              label="Planning horizon"
-              value={draft.planningHorizonAge}
-              onChange={(v) => updateDraft("planningHorizonAge", v)}
-              step={1}
-            />
-            <EditRow
-              label="Monthly contribution"
-              value={draft.monthlyContribution}
-              onChange={(v) => updateDraft("monthlyContribution", v)}
-              step={100}
-            />
-            <EditRow
-              label="Monthly spending"
-              value={draft.monthlyExpensesAtFire}
-              onChange={(v) => updateDraft("monthlyExpensesAtFire", v)}
-              step={100}
-            />
-            <EditRow
-              label="Healthcare/mo"
-              value={draft.healthcareMonthlyAtFire ?? 0}
-              onChange={(v) => updateDraft("healthcareMonthlyAtFire", v)}
-              step={50}
-            />
-            <EditRow
-              label="SWR (%)"
-              value={+(draft.safeWithdrawalRate * 100).toFixed(2)}
-              onChange={(v) => updateDraft("safeWithdrawalRate", v / 100)}
-              step={0.1}
-            />
-            <div className="flex gap-2 pt-2">
-              <Button size="sm" className="flex-1" onClick={save}>
-                Save
-              </Button>
-              <Button variant="outline" size="sm" className="flex-1" onClick={cancel}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="divide-border divide-y">
-            <SidebarRow label="Current age">{settings.currentAge}</SidebarRow>
-            <SidebarRow label={fireAgeLabel}>{settings.targetFireAge}</SidebarRow>
-            <SidebarRow label="Planning horizon">{settings.planningHorizonAge}</SidebarRow>
-            <SidebarRow label="Monthly contribution">
-              {fmt(settings.monthlyContribution, currency)}
-            </SidebarRow>
-            <SidebarRow label="Monthly spending">
-              {fmt(settings.monthlyExpensesAtFire, currency)}
-            </SidebarRow>
-            {healthcareMonthly > 0 && (
-              <SidebarRow label="Healthcare">{fmt(healthcareMonthly, currency)}/mo</SidebarRow>
-            )}
-            <SidebarRow label="SWR">{pct(settings.safeWithdrawalRate)}</SidebarRow>
-          </div>
-        )}
-      </CardContent>
-      {!isEditing && onNavigateToTab && (
-        <div className="border-t px-6 py-3">
-          <button
-            onClick={() => onNavigateToTab("plan")}
-            className="text-muted-foreground text-[11px] hover:underline"
-          >
-            Full settings &rarr;
-          </button>
-        </div>
-      )}
-    </Card>
+    <div className="flex items-center justify-between gap-2 py-1.5 first:pt-0 last:pb-0">
+      <span className="text-muted-foreground text-xs">{label}</span>
+      <span className="text-right text-xs font-semibold tabular-nums">{children}</span>
+    </div>
   );
 }
 
-function InvestmentAssumptionsCard({
-  settings,
-  onSaveSettings,
-}: {
-  settings: FireSettings;
-  onSaveSettings?: (settings: FireSettings) => void;
-}) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [draft, setDraft] = useState<FireSettings>(settings);
-
-  const startEdit = () => {
-    setDraft({ ...settings });
-    setIsEditing(true);
-  };
-
-  const cancel = () => setIsEditing(false);
-
-  const save = () => {
-    onSaveSettings?.(draft);
-    setIsEditing(false);
-  };
-
-  const updateDraft = (field: keyof FireSettings, value: number) => {
-    setDraft((d) => ({ ...d, [field]: value }));
-  };
-
-  return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between pb-3">
-        <CardTitle className="text-sm">Investment Assumptions</CardTitle>
-        {!isEditing && onSaveSettings && (
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={startEdit}>
-            Update
-          </Button>
-        )}
-      </CardHeader>
-      <CardContent>
-        {isEditing ? (
-          <div className="space-y-3">
-            <EditRow
-              label="Expected return (%)"
-              value={+(draft.expectedAnnualReturn * 100).toFixed(2)}
-              onChange={(v) => updateDraft("expectedAnnualReturn", v / 100)}
-              step={0.1}
-            />
-            <EditRow
-              label="Volatility (%)"
-              value={+(draft.expectedReturnStdDev * 100).toFixed(2)}
-              onChange={(v) => updateDraft("expectedReturnStdDev", v / 100)}
-              step={0.1}
-            />
-            <EditRow
-              label="Inflation (%)"
-              value={+(draft.inflationRate * 100).toFixed(2)}
-              onChange={(v) => updateDraft("inflationRate", v / 100)}
-              step={0.1}
-            />
-            <EditRow
-              label="Contribution growth (%)"
-              value={+(draft.contributionGrowthRate * 100).toFixed(2)}
-              onChange={(v) => updateDraft("contributionGrowthRate", v / 100)}
-              step={0.1}
-            />
-            <div className="flex gap-2 pt-2">
-              <Button size="sm" className="flex-1" onClick={save}>
-                Save
-              </Button>
-              <Button variant="outline" size="sm" className="flex-1" onClick={cancel}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="divide-border divide-y">
-            <SidebarRow label="Expected return">{pct(settings.expectedAnnualReturn)}</SidebarRow>
-            <SidebarRow label="Volatility">{pct(settings.expectedReturnStdDev)}</SidebarRow>
-            <SidebarRow label="Inflation">{pct(settings.inflationRate)}</SidebarRow>
-            {settings.contributionGrowthRate > 0 && (
-              <SidebarRow label="Contribution growth">
-                {pct(settings.contributionGrowthRate)}
-              </SidebarRow>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function IncomeStreamsCard({
-  settings,
-  currency,
-  onNavigateToTab,
-}: {
-  settings: FireSettings;
-  currency: string;
-  onNavigateToTab?: (tab: string) => void;
-}) {
-  const streams = settings.additionalIncomeStreams;
-
-  return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between pb-3">
-        <CardTitle className="text-sm">Income Streams</CardTitle>
-        {streams.length > 0 && (
-          <Badge variant="secondary" className="text-[10px]">
-            {streams.length} stream{streams.length !== 1 ? "s" : ""}
-          </Badge>
-        )}
-      </CardHeader>
-      <CardContent>
-        {streams.length > 0 ? (
-          <div className="divide-border divide-y">
-            {streams.map((s) => (
-              <SidebarRow key={s.id} label={s.label || "Income stream"}>
-                {fmt(s.monthlyAmount, currency)}/mo from age {s.startAge}
-              </SidebarRow>
-            ))}
-          </div>
-        ) : (
-          <p className="text-muted-foreground text-xs">No income streams configured</p>
-        )}
-      </CardContent>
-      {onNavigateToTab && (
-        <div className="border-t px-6 py-3">
-          <button
-            onClick={() => onNavigateToTab("plan")}
-            className="text-muted-foreground text-[11px] hover:underline"
-          >
-            Manage in Plan &rarr;
-          </button>
-        </div>
-      )}
-    </Card>
-  );
-}
-
-function EditRow({
+/** Inline number input */
+function InlineField({
   label,
   value,
   onChange,
   step = 1,
+  min,
+  suffix,
 }: {
   label: string;
   value: number;
   onChange: (v: number) => void;
   step?: number;
+  min?: number;
+  suffix?: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <input
-        type="number"
-        value={value}
-        step={step}
-        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-        className="border-input bg-background w-24 rounded-md border px-2 py-1 text-right text-xs tabular-nums"
+    <div className="flex items-center justify-between gap-2">
+      <Label className="text-muted-foreground min-w-0 shrink text-xs font-normal">{label}</Label>
+      <div className="flex items-center gap-1">
+        <Input
+          type="number"
+          value={value}
+          step={step}
+          min={min}
+          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+          className="h-7 w-20 px-2 text-right text-xs tabular-nums"
+        />
+        {suffix && <span className="text-muted-foreground text-[10px]">{suffix}</span>}
+      </div>
+    </div>
+  );
+}
+
+function fmtPct(v: number) {
+  return (v * 100).toFixed(1) + "%";
+}
+
+/** A single sidebar card: title + edit button → read rows or edit fields */
+function SidebarCard({
+  title,
+  editing,
+  onEdit,
+  onSave,
+  onCancel,
+  dirty,
+  readContent,
+  editContent,
+}: {
+  title: string;
+  editing: boolean;
+  onEdit: () => void;
+  onSave: () => void;
+  onCancel: () => void;
+  dirty: boolean;
+  readContent: React.ReactNode;
+  editContent: React.ReactNode;
+}) {
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between pb-3">
+        <CardTitle className="text-sm">{title}</CardTitle>
+        {editing ? (
+          <div className="flex gap-1.5">
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button size="sm" className="h-7 text-xs" onClick={onSave} disabled={!dirty}>
+              Save
+            </Button>
+          </div>
+        ) : (
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onEdit}>
+            <Icons.Pencil className="mr-1.5 h-3 w-3" />
+            Edit
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent>
+        {editing ? <div className="space-y-2.5">{editContent}</div> : readContent}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Complete sidebar configurator — each section is its own card */
+function SidebarConfigurator({
+  plan,
+  currency,
+  onSavePlan,
+  retirementOverview,
+  goalId,
+  dcLinkedAccountIds,
+}: {
+  plan: RetirementPlan;
+  currency: string;
+  onSavePlan?: (plan: RetirementPlan) => void;
+  retirementOverview?: RetirementOverview;
+  goalId?: string;
+  dcLinkedAccountIds?: string[];
+}) {
+  const [draft, setDraft] = useState<RetirementPlan>(() => structuredClone(plan));
+  const [dirty, setDirty] = useState(false);
+  const [editingSection, setEditingSection] = useState<string | null>(null);
+
+  const planKey = JSON.stringify(plan);
+  useMemo(() => {
+    setDraft(structuredClone(plan));
+    setDirty(false);
+    setEditingSection(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planKey]);
+
+  const update = useCallback((updater: (d: RetirementPlan) => RetirementPlan) => {
+    setDraft((prev) => updater(prev));
+    setDirty(true);
+  }, []);
+
+  const saveDraft = useCallback(() => {
+    onSavePlan?.(draft);
+    setDirty(false);
+    setEditingSection(null);
+  }, [draft, onSavePlan]);
+
+  const cancelEdit = useCallback(() => {
+    setDraft(structuredClone(plan));
+    setDirty(false);
+    setEditingSection(null);
+  }, [plan]);
+
+  // Shorthand updaters
+  const setPersonal = <K extends keyof RetirementPlan["personal"]>(
+    key: K,
+    val: RetirementPlan["personal"][K],
+  ) => update((d) => ({ ...d, personal: { ...d.personal, [key]: val } }));
+
+  const setInvestment = <K extends keyof InvestmentAssumptions>(
+    key: K,
+    val: InvestmentAssumptions[K],
+  ) => update((d) => ({ ...d, investment: { ...d.investment, [key]: val } }));
+
+  const setWithdrawal = <K extends keyof WithdrawalConfig>(key: K, val: WithdrawalConfig[K]) =>
+    update((d) => ({ ...d, withdrawal: { ...d.withdrawal, [key]: val } }));
+
+  const setTax = <K extends keyof TaxProfile>(key: K, val: TaxProfile[K]) =>
+    update((d) => ({
+      ...d,
+      tax: {
+        taxableWithdrawalRate: 0,
+        taxDeferredWithdrawalRate: 0,
+        taxFreeWithdrawalRate: 0,
+        ...d.tax,
+        [key]: val,
+      },
+    }));
+
+  const setExpense = (
+    bucket: "living" | "healthcare" | "housing" | "discretionary",
+    patch: Partial<ExpenseBucket>,
+  ) =>
+    update((d) => ({
+      ...d,
+      expenses: { ...d.expenses, [bucket]: { ...d.expenses[bucket], ...patch } },
+    }));
+
+  const addStream = () => {
+    update((d) => ({
+      ...d,
+      incomeStreams: [
+        ...d.incomeStreams,
+        {
+          id: crypto.randomUUID?.() ?? `stream-${Date.now()}`,
+          label: `Income ${d.incomeStreams.length + 1}`,
+          streamType: "db" as const,
+          startAge: d.personal.targetRetirementAge,
+          adjustForInflation: true,
+          monthlyAmount: 0,
+        },
+      ],
+    }));
+    setEditingSection("income");
+  };
+
+  const updateStream = (id: string, patch: Partial<RetirementIncomeStream>) =>
+    update((d) => ({
+      ...d,
+      incomeStreams: d.incomeStreams.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+    }));
+
+  const removeStream = (id: string) =>
+    update((d) => ({ ...d, incomeStreams: d.incomeStreams.filter((s) => s.id !== id) }));
+
+  const budget = retirementOverview?.budgetBreakdown;
+  const effectiveTaxRate = budget?.effectiveTaxRate ?? 0;
+
+  const strategyLabels: Record<string, string> = {
+    "constant-dollar": "Constant Dollar",
+    "constant-percentage": "Constant %",
+    guardrails: "Guardrails",
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* ── Plan ── */}
+      <SidebarCard
+        title="Plan Details"
+        editing={editingSection === "plan"}
+        onEdit={() => setEditingSection("plan")}
+        onSave={saveDraft}
+        onCancel={cancelEdit}
+        dirty={dirty}
+        readContent={
+          <div className="divide-border divide-y">
+            <ConfigRow label="Current age">{draft.personal.currentAge}</ConfigRow>
+            <ConfigRow label="Retirement age">{draft.personal.targetRetirementAge}</ConfigRow>
+            <ConfigRow label="Planning horizon">{draft.personal.planningHorizonAge}</ConfigRow>
+            <ConfigRow label="Monthly contribution">
+              {fmt(draft.investment.monthlyContribution, currency)}
+            </ConfigRow>
+            <ConfigRow label="Withdrawal rate">
+              {fmtPct(draft.withdrawal.safeWithdrawalRate)}
+            </ConfigRow>
+          </div>
+        }
+        editContent={
+          <>
+            <InlineField
+              label="Current age"
+              value={draft.personal.currentAge}
+              onChange={(v) => setPersonal("currentAge", v)}
+              min={1}
+            />
+            <InlineField
+              label="Retirement age"
+              value={draft.personal.targetRetirementAge}
+              onChange={(v) => setPersonal("targetRetirementAge", v)}
+              min={draft.personal.currentAge + 1}
+            />
+            <InlineField
+              label="Planning horizon"
+              value={draft.personal.planningHorizonAge}
+              onChange={(v) => setPersonal("planningHorizonAge", v)}
+              min={draft.personal.targetRetirementAge + 1}
+            />
+            <InlineField
+              label="Monthly contribution"
+              value={draft.investment.monthlyContribution}
+              onChange={(v) => setInvestment("monthlyContribution", v)}
+              step={100}
+              min={0}
+            />
+            <InlineField
+              label="Withdrawal rate"
+              value={+(draft.withdrawal.safeWithdrawalRate * 100).toFixed(2)}
+              onChange={(v) => setWithdrawal("safeWithdrawalRate", v / 100)}
+              step={0.1}
+              suffix="%"
+            />
+          </>
+        }
       />
+
+      {/* ── Expenses ── */}
+      <SidebarCard
+        title="Expenses"
+        editing={editingSection === "expenses"}
+        onEdit={() => setEditingSection("expenses")}
+        onSave={saveDraft}
+        onCancel={cancelEdit}
+        dirty={dirty}
+        readContent={
+          <div className="divide-border divide-y">
+            <ConfigRow label="Living">
+              {fmt(draft.expenses.living.monthlyAmount, currency)}/mo
+            </ConfigRow>
+            {draft.expenses.healthcare.monthlyAmount > 0 && (
+              <ConfigRow label="Healthcare">
+                {fmt(draft.expenses.healthcare.monthlyAmount, currency)}/mo
+              </ConfigRow>
+            )}
+            {draft.expenses.housing && (
+              <ConfigRow label="Housing">
+                {fmt(draft.expenses.housing.monthlyAmount, currency)}/mo
+              </ConfigRow>
+            )}
+            {draft.expenses.discretionary && (
+              <ConfigRow label="Discretionary">
+                {fmt(draft.expenses.discretionary.monthlyAmount, currency)}/mo
+              </ConfigRow>
+            )}
+          </div>
+        }
+        editContent={
+          <>
+            <InlineField
+              label="Living"
+              value={draft.expenses.living.monthlyAmount}
+              onChange={(v) => setExpense("living", { monthlyAmount: v })}
+              step={100}
+              suffix="/mo"
+            />
+            <InlineField
+              label="Healthcare"
+              value={draft.expenses.healthcare.monthlyAmount}
+              onChange={(v) => setExpense("healthcare", { monthlyAmount: v })}
+              step={50}
+              suffix="/mo"
+            />
+            {draft.expenses.housing && (
+              <div className="flex items-center gap-1">
+                <div className="flex-1">
+                  <InlineField
+                    label="Housing"
+                    value={draft.expenses.housing.monthlyAmount}
+                    onChange={(v) => setExpense("housing", { monthlyAmount: v })}
+                    step={100}
+                    suffix="/mo"
+                  />
+                </div>
+                <button
+                  onClick={() =>
+                    update((d) => ({ ...d, expenses: { ...d.expenses, housing: undefined } }))
+                  }
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Icons.X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
+            {draft.expenses.discretionary && (
+              <div className="flex items-center gap-1">
+                <div className="flex-1">
+                  <InlineField
+                    label="Discretionary"
+                    value={draft.expenses.discretionary.monthlyAmount}
+                    onChange={(v) => setExpense("discretionary", { monthlyAmount: v })}
+                    step={50}
+                    suffix="/mo"
+                  />
+                </div>
+                <button
+                  onClick={() =>
+                    update((d) => ({ ...d, expenses: { ...d.expenses, discretionary: undefined } }))
+                  }
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Icons.X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
+            <div className="flex gap-2">
+              {!draft.expenses.housing && (
+                <button
+                  className="text-muted-foreground hover:text-foreground text-[11px] underline underline-offset-2"
+                  onClick={() =>
+                    update((d) => ({
+                      ...d,
+                      expenses: { ...d.expenses, housing: { monthlyAmount: 0 } },
+                    }))
+                  }
+                >
+                  + Housing
+                </button>
+              )}
+              {!draft.expenses.discretionary && (
+                <button
+                  className="text-muted-foreground hover:text-foreground text-[11px] underline underline-offset-2"
+                  onClick={() =>
+                    update((d) => ({
+                      ...d,
+                      expenses: { ...d.expenses, discretionary: { monthlyAmount: 0 } },
+                    }))
+                  }
+                >
+                  + Discretionary
+                </button>
+              )}
+            </div>
+          </>
+        }
+      />
+
+      {/* ── Income Streams ── */}
+      <SidebarCard
+        title="Income Streams"
+        editing={editingSection === "income"}
+        onEdit={() => setEditingSection("income")}
+        onSave={saveDraft}
+        onCancel={cancelEdit}
+        dirty={dirty}
+        readContent={
+          draft.incomeStreams.length > 0 ? (
+            <div className="divide-border divide-y">
+              {draft.incomeStreams.map((s) => (
+                <ConfigRow key={s.id} label={s.label || "Stream"}>
+                  {fmt(s.monthlyAmount ?? 0, currency)}/mo from {s.startAge}
+                </ConfigRow>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-xs">No income streams configured</p>
+          )
+        }
+        editContent={
+          <>
+            {draft.incomeStreams.map((s) => (
+              <div key={s.id} className="space-y-1.5 rounded-md border p-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <Input
+                    value={s.label}
+                    onChange={(e) => updateStream(s.id, { label: e.target.value })}
+                    placeholder="Label"
+                    className="h-6 flex-1 border-0 px-0 text-xs font-medium shadow-none focus-visible:ring-0"
+                  />
+                  <button
+                    onClick={() => removeStream(s.id)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <Icons.X className="h-3 w-3" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                  {s.streamType !== "dc" && (
+                    <InlineField
+                      label="Amount"
+                      value={s.monthlyAmount ?? 0}
+                      onChange={(v) => updateStream(s.id, { monthlyAmount: v })}
+                      suffix="/mo"
+                    />
+                  )}
+                  <InlineField
+                    label="Start age"
+                    value={s.startAge}
+                    onChange={(v) => updateStream(s.id, { startAge: v })}
+                    min={1}
+                  />
+                </div>
+              </div>
+            ))}
+            <button
+              className="text-muted-foreground hover:text-foreground flex w-full items-center justify-center gap-1 rounded-md border border-dashed py-1.5 text-[11px] transition-colors"
+              onClick={addStream}
+            >
+              <Icons.Plus className="h-3 w-3" /> Add stream
+            </button>
+          </>
+        }
+      />
+
+      {/* ── Investment ── */}
+      <SidebarCard
+        title="Investment Assumptions"
+        editing={editingSection === "investment"}
+        onEdit={() => setEditingSection("investment")}
+        onSave={saveDraft}
+        onCancel={cancelEdit}
+        dirty={dirty}
+        readContent={
+          <div className="divide-border divide-y">
+            <ConfigRow label="Expected return">
+              {fmtPct(draft.investment.expectedAnnualReturn)}
+            </ConfigRow>
+            <ConfigRow label="Volatility">
+              {fmtPct(draft.investment.expectedReturnStdDev)}
+            </ConfigRow>
+            <ConfigRow label="Inflation">{fmtPct(draft.investment.inflationRate)}</ConfigRow>
+            {draft.investment.contributionGrowthRate > 0 && (
+              <ConfigRow label="Contribution growth">
+                {fmtPct(draft.investment.contributionGrowthRate)}
+              </ConfigRow>
+            )}
+          </div>
+        }
+        editContent={
+          <>
+            <InlineField
+              label="Expected return"
+              value={+(draft.investment.expectedAnnualReturn * 100).toFixed(2)}
+              onChange={(v) => setInvestment("expectedAnnualReturn", v / 100)}
+              step={0.1}
+              suffix="%"
+            />
+            <InlineField
+              label="Volatility"
+              value={+(draft.investment.expectedReturnStdDev * 100).toFixed(2)}
+              onChange={(v) => setInvestment("expectedReturnStdDev", v / 100)}
+              step={0.1}
+              suffix="%"
+            />
+            <InlineField
+              label="Inflation"
+              value={+(draft.investment.inflationRate * 100).toFixed(2)}
+              onChange={(v) => setInvestment("inflationRate", v / 100)}
+              step={0.1}
+              suffix="%"
+            />
+            <InlineField
+              label="Contribution growth"
+              value={+(draft.investment.contributionGrowthRate * 100).toFixed(2)}
+              onChange={(v) => setInvestment("contributionGrowthRate", v / 100)}
+              step={0.1}
+              suffix="%"
+            />
+          </>
+        }
+      />
+
+      {/* ── Withdrawal ── */}
+      <SidebarCard
+        title="Withdrawal Policy"
+        editing={editingSection === "withdrawal"}
+        onEdit={() => setEditingSection("withdrawal")}
+        onSave={saveDraft}
+        onCancel={cancelEdit}
+        dirty={dirty}
+        readContent={
+          <ConfigRow label="Strategy">
+            {strategyLabels[draft.withdrawal.strategy] ?? draft.withdrawal.strategy}
+          </ConfigRow>
+        }
+        editContent={
+          <>
+            <div className="space-y-1.5">
+              {(["constant-dollar", "constant-percentage", "guardrails"] as const).map((s) => (
+                <label
+                  key={s}
+                  className={`flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${draft.withdrawal.strategy === s ? "border-foreground/30 bg-muted/50" : "border-transparent"}`}
+                >
+                  <input
+                    type="radio"
+                    name="strategy"
+                    checked={draft.withdrawal.strategy === s}
+                    onChange={() => setWithdrawal("strategy", s)}
+                    className="accent-foreground h-3 w-3"
+                  />
+                  {strategyLabels[s]}
+                </label>
+              ))}
+            </div>
+            {draft.withdrawal.strategy === "guardrails" && (
+              <div className="space-y-1.5 pt-1">
+                <InlineField
+                  label="Ceiling rate"
+                  value={+((draft.withdrawal.guardrails?.ceilingRate ?? 0.06) * 100).toFixed(2)}
+                  onChange={(v) =>
+                    setWithdrawal("guardrails", {
+                      ceilingRate: v / 100,
+                      floorRate: draft.withdrawal.guardrails?.floorRate ?? 0.03,
+                    })
+                  }
+                  step={0.1}
+                  suffix="%"
+                />
+                <InlineField
+                  label="Floor rate"
+                  value={+((draft.withdrawal.guardrails?.floorRate ?? 0.03) * 100).toFixed(2)}
+                  onChange={(v) =>
+                    setWithdrawal("guardrails", {
+                      ceilingRate: draft.withdrawal.guardrails?.ceilingRate ?? 0.06,
+                      floorRate: v / 100,
+                    })
+                  }
+                  step={0.1}
+                  suffix="%"
+                />
+              </div>
+            )}
+          </>
+        }
+      />
+
+      {/* ── Tax ── */}
+      <SidebarCard
+        title="Tax Profile"
+        editing={editingSection === "tax"}
+        onEdit={() => setEditingSection("tax")}
+        onSave={saveDraft}
+        onCancel={cancelEdit}
+        dirty={dirty}
+        readContent={
+          <div className="divide-border divide-y">
+            <ConfigRow label="Taxable">{fmtPct(draft.tax?.taxableWithdrawalRate ?? 0)}</ConfigRow>
+            <ConfigRow label="Tax-deferred">
+              {fmtPct(draft.tax?.taxDeferredWithdrawalRate ?? 0)}
+            </ConfigRow>
+            <ConfigRow label="Tax-free">{fmtPct(draft.tax?.taxFreeWithdrawalRate ?? 0)}</ConfigRow>
+            {effectiveTaxRate > 0 && (
+              <ConfigRow label="Effective blended">
+                {(effectiveTaxRate * 100).toFixed(1)}%
+              </ConfigRow>
+            )}
+          </div>
+        }
+        editContent={
+          <>
+            <InlineField
+              label="Taxable rate"
+              value={+((draft.tax?.taxableWithdrawalRate ?? 0) * 100).toFixed(1)}
+              onChange={(v) => setTax("taxableWithdrawalRate", v / 100)}
+              step={0.5}
+              suffix="%"
+            />
+            <InlineField
+              label="Tax-deferred rate"
+              value={+((draft.tax?.taxDeferredWithdrawalRate ?? 0) * 100).toFixed(1)}
+              onChange={(v) => setTax("taxDeferredWithdrawalRate", v / 100)}
+              step={0.5}
+              suffix="%"
+            />
+            <InlineField
+              label="Tax-free rate"
+              value={+((draft.tax?.taxFreeWithdrawalRate ?? 0) * 100).toFixed(1)}
+              onChange={(v) => setTax("taxFreeWithdrawalRate", v / 100)}
+              step={0.5}
+              suffix="%"
+            />
+          </>
+        }
+      />
+
+      {/* ── Eligible Accounts ── */}
+      {goalId && (
+        <GoalFundingEditor
+          goalId={goalId}
+          goalType="retirement"
+          dcLinkedAccountIds={dcLinkedAccountIds}
+        />
+      )}
     </div>
   );
 }
@@ -616,38 +964,47 @@ function EditRow({
 // ─── Main component ──────────────────────────────────────────────
 
 export default function DashboardPage({
-  settings,
+  plan,
   portfolioData,
   isLoading,
   plannerMode = "fire",
-  onSaveSettings,
-  onNavigateToTab,
+  onSavePlan,
+  onNavigateToTab: _onNavigateToTab,
   retirementOverview,
   goalId,
   dcLinkedAccountIds,
 }: Props) {
+  void _onNavigateToTab; // kept in Props for tab navigation; unused in new sidebar
   const L = modeLabel(plannerMode);
   const { totalValue, error } = portfolioData;
-  const currency = settings.currency;
+  const portfolioNow = retirementOverview?.portfolioNow ?? totalValue;
+  const currency = plan.currency;
 
   // All numbers come from the backend DTO
   const fireTarget = retirementOverview?.grossFireTarget ?? 0;
   const netFireTarget = retirementOverview?.netFireTarget ?? 0;
   const coastAmount = retirementOverview?.coastAmountToday ?? 0;
   const fiAge = retirementOverview?.fiAge ?? null;
+  const retirementStartAge = retirementOverview?.retirementStartAge ?? null;
+  const suggestedAge = retirementOverview?.suggestedGoalAgeIfUnchanged ?? null;
+  // Effective FI age: genuine FI age, or the accumulation-only suggested age for display
+  const effectiveFiAge = fiAge ?? suggestedAge;
   const coastReached = retirementOverview?.coastReached ?? false;
   const progress = retirementOverview?.progress ?? 0;
 
-  const fireAgeForBudget = fiAge ?? settings.targetFireAge;
+  const fireAgeForBudget = retirementStartAge ?? plan.personal.targetRetirementAge;
 
   // Budget from backend DTO
   const budget = retirementOverview?.budgetBreakdown;
   const totalBudget = budget?.totalMonthlyBudget ?? 0;
   const healthcareMonthly = budget?.monthlyHealthcare ?? 0;
+  const housingMonthly = budget?.monthlyHousing ?? 0;
+  const discretionaryMonthly = budget?.monthlyDiscretionary ?? 0;
+  const effectiveTaxRate = budget?.effectiveTaxRate ?? 0;
   const portfolioWithdrawalAtFire = budget?.monthlyPortfolioWithdrawal ?? 0;
   const budgetStreams = budget?.incomeStreams ?? [];
 
-  const hasPensionFunds = settings.additionalIncomeStreams.some(
+  const hasPensionFunds = plan.incomeStreams.some(
     (s) => (s.currentValue ?? 0) > 0 || (s.monthlyContribution ?? 0) > 0,
   );
 
@@ -699,22 +1056,23 @@ export default function DashboardPage({
   return (
     <div className="space-y-6">
       {/* Status banner */}
-      {totalValue >= netFireTarget && netFireTarget > 0 ? (
+      {portfolioNow >= netFireTarget && netFireTarget > 0 ? (
         <div className="rounded-lg border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-700 dark:bg-green-950/30 dark:text-green-300">
           <strong>Congratulations!</strong> You've reached financial independence!
         </div>
-      ) : fiAge != null && fiAge > settings.targetFireAge ? (
+      ) : effectiveFiAge != null && effectiveFiAge > plan.personal.targetRetirementAge ? (
         <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
           <strong>
-            Projected FI is {fiAge - settings.targetFireAge} year
-            {fiAge - settings.targetFireAge !== 1 ? "s" : ""} after your desired age.
+            Projected FI is {effectiveFiAge - plan.personal.targetRetirementAge} year
+            {effectiveFiAge - plan.personal.targetRetirementAge !== 1 ? "s" : ""} after your desired
+            age.
           </strong>{" "}
           Consider: increase contributions, extend target age, or reduce expenses.
         </div>
-      ) : fiAge == null && netFireTarget > 0 ? (
+      ) : effectiveFiAge == null && netFireTarget > 0 ? (
         <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-700 dark:bg-red-950/30 dark:text-red-300">
           <strong>{L.target} not reachable</strong> by planning horizon age{" "}
-          {settings.planningHorizonAge}.
+          {plan.personal.planningHorizonAge}.
         </div>
       ) : null}
 
@@ -731,33 +1089,39 @@ export default function DashboardPage({
                   <RadialProgress value={progress} size={80} />
                   <div className="space-y-1">
                     <p className="text-3xl font-bold tabular-nums">
-                      {fiAge != null
-                        ? `Age ${fiAge}`
-                        : totalValue >= netFireTarget && netFireTarget > 0
+                      {effectiveFiAge != null
+                        ? `Age ${effectiveFiAge}`
+                        : portfolioNow >= netFireTarget && netFireTarget > 0
                           ? "FI Reached"
                           : "Not reachable"}
                     </p>
                     <p className="text-muted-foreground text-sm">
                       Projected FI Age
-                      {settings.targetFireAge > 0 && (
-                        <span> · Desired: {settings.targetFireAge}</span>
+                      {plan.personal.targetRetirementAge > 0 && (
+                        <span> · Desired: {plan.personal.targetRetirementAge}</span>
                       )}
                     </p>
                     <p className="text-sm font-medium">
-                      {totalValue >= netFireTarget && netFireTarget > 0 ? (
+                      {portfolioNow >= netFireTarget && netFireTarget > 0 ? (
                         <span className="text-green-600">Financially independent</span>
-                      ) : fiAge != null ? (
-                        fiAge < settings.targetFireAge ? (
+                      ) : effectiveFiAge != null ? (
+                        effectiveFiAge < plan.personal.targetRetirementAge ? (
                           <span className="text-green-600">
-                            {settings.targetFireAge - fiAge} year
-                            {settings.targetFireAge - fiAge !== 1 ? "s" : ""} early
+                            {plan.personal.targetRetirementAge - effectiveFiAge} year
+                            {plan.personal.targetRetirementAge - effectiveFiAge !== 1
+                              ? "s"
+                              : ""}{" "}
+                            early
                           </span>
-                        ) : fiAge === settings.targetFireAge ? (
+                        ) : effectiveFiAge === plan.personal.targetRetirementAge ? (
                           <span className="text-green-600">On track</span>
                         ) : (
                           <span className="text-amber-600">
-                            {fiAge - settings.targetFireAge} year
-                            {fiAge - settings.targetFireAge !== 1 ? "s" : ""} late
+                            {effectiveFiAge - plan.personal.targetRetirementAge} year
+                            {effectiveFiAge - plan.personal.targetRetirementAge !== 1
+                              ? "s"
+                              : ""}{" "}
+                            late
                           </span>
                         )
                       ) : (
@@ -768,9 +1132,10 @@ export default function DashboardPage({
                 </div>
                 {(() => {
                   const health =
-                    fiAge != null && fiAge <= settings.targetFireAge
+                    effectiveFiAge != null && effectiveFiAge <= plan.personal.targetRetirementAge
                       ? "on_track"
-                      : fiAge != null && fiAge <= settings.targetFireAge + 3
+                      : effectiveFiAge != null &&
+                          effectiveFiAge <= plan.personal.targetRetirementAge + 3
                         ? "at_risk"
                         : "off_track";
                   return health === "on_track" ? (
@@ -797,7 +1162,7 @@ export default function DashboardPage({
                 />
                 <div className="mt-1.5 flex justify-between text-xs">
                   <span>
-                    Portfolio <span className="font-semibold">{fmt(totalValue, currency)}</span>
+                    Portfolio <span className="font-semibold">{fmt(portfolioNow, currency)}</span>
                   </span>
                   <span>
                     <Tooltip>
@@ -824,8 +1189,9 @@ export default function DashboardPage({
 
               {/* Key metrics grid — context-aware */}
               {(() => {
-                const onTrack = fiAge != null && fiAge <= settings.targetFireAge;
-                const currentGap = netFireTarget - totalValue;
+                const onTrack =
+                  effectiveFiAge != null && effectiveFiAge <= plan.personal.targetRetirementAge;
+                const currentGap = netFireTarget - portfolioNow;
                 return (
                   <div className="mt-5 grid grid-cols-2 gap-x-8 gap-y-4 border-t pt-5 sm:grid-cols-3">
                     {plannerMode === "fire" && (
@@ -860,7 +1226,7 @@ export default function DashboardPage({
                         <div>
                           <p className="text-muted-foreground text-xs">Projected FI</p>
                           <p className="mt-0.5 text-base font-semibold tabular-nums text-green-600">
-                            Age {fiAge}
+                            Age {effectiveFiAge}
                           </p>
                         </div>
                       </>
@@ -876,13 +1242,13 @@ export default function DashboardPage({
                             </span>
                           </p>
                         </div>
-                        {fiAge != null && (
+                        {effectiveFiAge != null && (
                           <div>
                             <p className="text-muted-foreground text-xs">Projected FI</p>
                             <p className="mt-0.5 text-base font-semibold tabular-nums text-amber-600">
-                              Age {fiAge}
+                              Age {effectiveFiAge}
                               <span className="text-muted-foreground ml-1 text-xs font-normal">
-                                ({fiAge - settings.targetFireAge}yr late)
+                                ({effectiveFiAge - plan.personal.targetRetirementAge}yr late)
                               </span>
                             </p>
                           </div>
@@ -918,8 +1284,8 @@ export default function DashboardPage({
                 <RetirementChart
                   data={chartData}
                   currency={currency}
-                  retirementAge={settings.targetFireAge}
-                  projectedFireAge={fiAge}
+                  retirementAge={plan.personal.targetRetirementAge}
+                  projectedFireAge={effectiveFiAge}
                 />
               </CardContent>
             </Card>
@@ -937,12 +1303,6 @@ export default function DashboardPage({
               <div>
                 <p className="mb-2 text-xs font-medium">
                   At age {fireAgeForBudget} — {fmt(totalBudget, currency)}/mo
-                  {healthcareMonthly > 0 && (
-                    <span className="text-muted-foreground ml-1">
-                      ({fmt(budget?.monthlyLivingExpenses ?? 0, currency)} living +{" "}
-                      {fmt(healthcareMonthly, currency)} healthcare)
-                    </span>
-                  )}
                 </p>
                 <div className="mb-3 flex h-5 w-full overflow-hidden rounded-full">
                   {budgetStreams.map((s, i) => {
@@ -969,22 +1329,46 @@ export default function DashboardPage({
                   )}
                 </div>
                 <div className="space-y-1">
+                  {/* Expense buckets breakdown */}
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Living expenses</span>
+                    <span className="text-muted-foreground">
+                      {fmt(budget?.monthlyLivingExpenses ?? 0, currency)}/mo
+                    </span>
+                  </div>
                   {healthcareMonthly > 0 && (
-                    <>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Living expenses</span>
-                        <span className="text-muted-foreground">
-                          {fmt(budget?.monthlyLivingExpenses ?? 0, currency)}/mo
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Healthcare</span>
-                        <span className="text-muted-foreground">
-                          {fmt(healthcareMonthly, currency)}/mo
-                        </span>
-                      </div>
-                    </>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Healthcare</span>
+                      <span className="text-muted-foreground">
+                        {fmt(healthcareMonthly, currency)}/mo
+                      </span>
+                    </div>
                   )}
+                  {housingMonthly > 0 && (
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Housing</span>
+                      <span className="text-muted-foreground">
+                        {fmt(housingMonthly, currency)}/mo
+                      </span>
+                    </div>
+                  )}
+                  {discretionaryMonthly > 0 && (
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Discretionary</span>
+                      <span className="text-muted-foreground">
+                        {fmt(discretionaryMonthly, currency)}/mo
+                      </span>
+                    </div>
+                  )}
+                  {effectiveTaxRate > 0 && (
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Tax drag</span>
+                      <span className="text-muted-foreground">
+                        {(effectiveTaxRate * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  )}
+                  {/* Funding sources */}
                   {budgetStreams.map((s, i) => {
                     const colors = ["#3b82f6", "#22c55e", "#f97316", "#a855f7", "#ec4899"];
                     return (
@@ -1090,9 +1474,7 @@ export default function DashboardPage({
                     {pagedSnapshots.map((snap) => {
                       const isFire = snap.phase === "fire";
                       const isFireRow = snap.age === fiAge;
-                      const isIncomeRow = settings.additionalIncomeStreams.some(
-                        (s) => s.startAge === snap.age,
-                      );
+                      const isIncomeRow = plan.incomeStreams.some((s) => s.startAge === snap.age);
                       return (
                         <tr
                           key={snap.age}
@@ -1144,31 +1526,19 @@ export default function DashboardPage({
         </div>
 
         {/* ── Sidebar ── */}
-        <div className="space-y-6 lg:sticky lg:top-6 lg:col-span-1 lg:self-start">
-          <PlanDetailsCard
-            settings={settings}
+        <div className="lg:sticky lg:top-6 lg:col-span-1 lg:self-start">
+          <SidebarConfigurator
+            plan={plan}
             currency={currency}
-            onSaveSettings={onSaveSettings}
-            onNavigateToTab={onNavigateToTab}
-            plannerMode={plannerMode}
+            onSavePlan={onSavePlan}
+            retirementOverview={retirementOverview}
+            goalId={goalId}
+            dcLinkedAccountIds={dcLinkedAccountIds}
           />
-          <InvestmentAssumptionsCard settings={settings} onSaveSettings={onSaveSettings} />
-          <IncomeStreamsCard
-            settings={settings}
-            currency={currency}
-            onNavigateToTab={onNavigateToTab}
-          />
-          {goalId && (
-            <GoalFundingEditor
-              goalId={goalId}
-              goalType="retirement"
-              dcLinkedAccountIds={dcLinkedAccountIds}
-            />
-          )}
         </div>
       </div>
 
-      {totalValue === 0 && (
+      {portfolioNow === 0 && (
         <Card>
           <CardContent className="text-muted-foreground py-8 text-center text-sm">
             No portfolio data found. Add accounts and holdings to see your retirement projection.

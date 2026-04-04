@@ -19,6 +19,7 @@ import type {
   SaveUpOverviewDTO,
 } from "@/lib/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { toast } from "sonner";
 
 export function useGoalDetail(goalId: string | undefined) {
@@ -40,10 +41,12 @@ export function useGoalDetail(goalId: string | undefined) {
     enabled: !!goalId,
   });
 
+  const fundingRules = useMemo(() => funding.data ?? [], [funding.data]);
+
   return {
     goal: goal.data,
     plan: plan.data,
-    fundingRules: funding.data ?? [],
+    fundingRules,
     isLoading: goal.isLoading || plan.isLoading,
     error: goal.error || plan.error,
   };

@@ -22,8 +22,8 @@ import {
 } from "./hooks/use-goal-detail";
 import { useGoalMutations } from "./hooks/use-goals";
 import type { RetirementOverview } from "@/lib/types";
-import type { FireSettings } from "@/pages/fire-planner/types";
-import { DEFAULT_SETTINGS } from "@/pages/fire-planner/types";
+import type { RetirementPlan } from "@/pages/fire-planner/types";
+import { parseSettingsJson, DEFAULT_RETIREMENT_PLAN } from "@/pages/fire-planner/lib/plan-adapter";
 import { usePortfolioData } from "@/pages/fire-planner/hooks/use-portfolio";
 import DashboardPage from "@/pages/fire-planner/pages/dashboard-page";
 import SimulationsPage from "@/pages/fire-planner/pages/simulations-page";
@@ -70,30 +70,20 @@ export default function GoalDetailPage() {
     [fundingRules],
   );
 
-  // DC-linked account IDs from retirement plan settings
-  const dcLinkedAccountIds = useMemo(() => {
-    if (!plan?.settingsJson || plan.planKind !== "retirement") return [];
-    try {
-      const settings = JSON.parse(plan.settingsJson);
-      return (settings.additionalIncomeStreams ?? [])
-        .filter((s: { linkedAccountId?: string }) => s.linkedAccountId)
-        .map((s: { linkedAccountId: string }) => s.linkedAccountId);
-    } catch {
-      return [];
+  // Parse retirement plan from settings JSON
+  const retirementPlan: RetirementPlan = useMemo(() => {
+    if (!plan?.settingsJson || plan.planKind !== "retirement") {
+      return { ...DEFAULT_RETIREMENT_PLAN };
     }
+    return parseSettingsJson(plan.settingsJson);
   }, [plan]);
 
-  // Parse retirement settings from plan
-  const retirementSettings: FireSettings = useMemo(() => {
-    if (!plan?.settingsJson || plan.planKind !== "retirement") {
-      return { ...DEFAULT_SETTINGS };
-    }
-    try {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(plan.settingsJson) };
-    } catch {
-      return { ...DEFAULT_SETTINGS };
-    }
-  }, [plan]);
+  // DC-linked account IDs from retirement plan income streams
+  const dcLinkedAccountIds = useMemo(() => {
+    return retirementPlan.incomeStreams
+      .filter((s) => s.streamType === "dc" && s.linkedAccountId)
+      .map((s) => s.linkedAccountId!);
+  }, [retirementPlan]);
 
   // Feed portfolio data from funding-rule-derived accounts
   const portfolioData = usePortfolioData(
@@ -113,24 +103,22 @@ export default function GoalDetailPage() {
           goalId,
           planKind: "retirement",
           plannerMode: mode,
-          settingsJson: JSON.stringify({ ...DEFAULT_SETTINGS }),
+          settingsJson: JSON.stringify({ ...DEFAULT_RETIREMENT_PLAN }),
         });
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSetup, goalId, plan, isRetirement, setupMode, planCreationPending]);
 
-  const handleSaveRetirementSettings = useCallback(
-    (updated: FireSettings) => {
+  const handleSaveRetirementPlan = useCallback(
+    (updated: RetirementPlan) => {
       if (!goalId) return;
-      // Strip includedAccountIds — account selection lives in funding rules now
-      const { includedAccountIds: _, ...settingsToSave } = updated;
       savePlanMutation.mutate(
         {
           goalId,
           planKind: "retirement",
           plannerMode: plan?.plannerMode ?? "fire",
-          settingsJson: JSON.stringify(settingsToSave),
+          settingsJson: JSON.stringify(updated),
         },
         {
           onSuccess: () => {
@@ -212,9 +200,9 @@ export default function GoalDetailPage() {
             <RetirementDetail
               activeTab={activeTab}
               onTabChange={setActiveTab}
-              settings={retirementSettings}
+              plan={retirementPlan}
               portfolioData={portfolioData}
-              onSaveSettings={handleSaveRetirementSettings}
+              onSavePlan={handleSaveRetirementPlan}
               plannerMode={(plan.plannerMode! as "fire" | "traditional") ?? "fire"}
               goalId={goalId!}
               dcLinkedAccountIds={dcLinkedAccountIds}
@@ -243,9 +231,9 @@ export default function GoalDetailPage() {
 function RetirementDetail({
   activeTab,
   onTabChange,
-  settings,
+  plan,
   portfolioData,
-  onSaveSettings,
+  onSavePlan,
   plannerMode,
   goalId,
   dcLinkedAccountIds,
@@ -253,9 +241,9 @@ function RetirementDetail({
 }: {
   activeTab: string;
   onTabChange: (tab: string) => void;
-  settings: FireSettings;
+  plan: RetirementPlan;
   portfolioData: ReturnType<typeof usePortfolioData>;
-  onSaveSettings: (s: FireSettings) => void;
+  onSavePlan: (p: RetirementPlan) => void;
   plannerMode: "fire" | "traditional";
   goalId: string;
   dcLinkedAccountIds: string[];
@@ -273,11 +261,11 @@ function RetirementDetail({
 
       <TabsContent value="overview">
         <DashboardPage
-          settings={settings}
+          plan={plan}
           portfolioData={portfolioData}
           isLoading={portfolioData.isLoading}
           plannerMode={plannerMode}
-          onSaveSettings={onSaveSettings}
+          onSavePlan={onSavePlan}
           onNavigateToTab={onTabChange}
           retirementOverview={retirementOverview}
           goalId={goalId}
@@ -287,11 +275,11 @@ function RetirementDetail({
 
       <TabsContent value="plan">
         <SettingsPage
-          settings={settings}
-          onSave={onSaveSettings}
+          plan={plan}
+          onSave={onSavePlan}
           isSaving={false}
           holdings={portfolioData.holdings}
-          activities={portfolioData.activities}
+          accountIds={portfolioData.activeAccountIds}
           accounts={portfolioData.accounts}
           activeAccounts={portfolioData.activeAccounts}
         />
@@ -307,18 +295,20 @@ function RetirementDetail({
 
       <TabsContent value="scenarios">
         <SimulationsPage
-          settings={settings}
+          plan={plan}
           totalValue={portfolioData.totalValue}
           isLoading={portfolioData.isLoading}
           retirementOverview={retirementOverview}
+          plannerMode={plannerMode}
+          goalId={goalId}
         />
       </TabsContent>
 
       <TabsContent value="allocation">
         <AllocationPage
-          settings={settings}
+          plan={plan}
           holdings={portfolioData.holdings}
-          activities={portfolioData.activities}
+          accountIds={portfolioData.activeAccountIds}
           isLoading={portfolioData.isLoading}
           onSetupTargets={() => onTabChange("plan")}
         />

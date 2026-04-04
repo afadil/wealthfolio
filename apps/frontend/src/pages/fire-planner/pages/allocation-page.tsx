@@ -1,4 +1,5 @@
-import type { Holding, ActivityDetails } from "@/lib/types";
+import type { Holding } from "@/lib/types";
+import { searchActivities } from "@/adapters";
 import {
   Button,
   Card,
@@ -10,7 +11,8 @@ import {
 } from "@wealthfolio/ui";
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "@wealthfolio/ui/chart";
 import { useMemo } from "react";
-import type { FireSettings, AllocationHealth } from "../types";
+import { useQuery } from "@tanstack/react-query";
+import type { RetirementPlan, AllocationHealth } from "../types";
 
 // ─── Local allocation-drift helper (pure UI logic) ───────────────────────────
 
@@ -73,9 +75,9 @@ function checkAllocationDrift(
 }
 
 interface Props {
-  settings: FireSettings;
+  plan: RetirementPlan;
   holdings: Holding[];
-  activities: ActivityDetails[];
+  accountIds: string[];
   isLoading: boolean;
   onSetupTargets?: () => void;
 }
@@ -104,14 +106,30 @@ function pct(value: number) {
 }
 
 export default function AllocationPage({
-  settings,
+  plan,
   holdings,
-  activities,
+  accountIds,
   isLoading,
   onSetupTargets,
 }: Props) {
-  const { targetAllocations, currency } = settings;
+  const { targetAllocations } = plan.investment;
+  const { currency } = plan;
   const hasTargets = Object.keys(targetAllocations).length > 0;
+
+  // Fetch activities lazily (only needed for "days since last buy")
+  const { data: activitiesData } = useQuery({
+    queryKey: ["allocation-activities", accountIds],
+    queryFn: async () => {
+      if (accountIds.length === 0) return [];
+      const result = await searchActivities(0, Number.MAX_SAFE_INTEGER, { accountIds }, "", {
+        id: "date",
+        desc: true,
+      });
+      return result.data;
+    },
+    enabled: accountIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const holdingInputs = useMemo(
     () =>
@@ -127,12 +145,12 @@ export default function AllocationPage({
 
   const activityInputs = useMemo(
     () =>
-      activities.map((a) => ({
+      (activitiesData ?? []).map((a) => ({
         symbol: a.assetSymbol ?? "",
         activityType: a.activityType,
         date: typeof a.date === "string" ? a.date : a.date.toISOString(),
       })),
-    [activities],
+    [activitiesData],
   );
 
   const driftData = useMemo(

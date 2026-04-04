@@ -1,6 +1,6 @@
 import { calculatePerformanceSummary } from "@/adapters";
 import type { Account, ActivityDetails, Holding } from "@/lib/types";
-import type { FireSettings } from "../types";
+import type { RetirementPlan } from "../types";
 
 export interface AutoConfigResult {
   monthlyContribution: number | null;
@@ -179,15 +179,18 @@ export async function runAutoConfig(
   };
 }
 
-export function applyAutoConfig(current: FireSettings, result: AutoConfigResult): FireSettings {
+export function applyAutoConfig(current: RetirementPlan, result: AutoConfigResult): RetirementPlan {
   return {
     ...current,
-    ...(result.monthlyContribution !== null
-      ? { monthlyContribution: result.monthlyContribution }
-      : {}),
-    ...(result.expectedAnnualReturn !== null
-      ? { expectedAnnualReturn: result.expectedAnnualReturn }
-      : {}),
-    ...(result.targetAllocations !== null ? { targetAllocations: result.targetAllocations } : {}),
+    investment: {
+      ...current.investment,
+      ...(result.monthlyContribution !== null
+        ? { monthlyContribution: result.monthlyContribution }
+        : {}),
+      ...(result.expectedAnnualReturn !== null
+        ? { expectedAnnualReturn: result.expectedAnnualReturn }
+        : {}),
+      ...(result.targetAllocations !== null ? { targetAllocations: result.targetAllocations } : {}),
+    },
   };
 }

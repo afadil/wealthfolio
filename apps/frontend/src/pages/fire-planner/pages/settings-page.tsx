@@ -1,4 +1,4 @@
-import type { Account, ActivityDetails, Holding } from "@/lib/types";
+import type { Account, Holding } from "@/lib/types";
 import { generateId } from "@/lib/id";
 import { getLatestValuations } from "@/adapters";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
@@ -19,16 +19,24 @@ import {
 } from "@wealthfolio/ui/components/ui/collapsible";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useState, useEffect } from "react";
-import type { FireSettings, IncomeStream } from "../types";
-import { DEFAULT_SETTINGS } from "../types";
+import type {
+  RetirementPlan,
+  RetirementIncomeStream,
+  PersonalProfile,
+  InvestmentAssumptions,
+  WithdrawalConfig,
+  TaxProfile,
+  ExpenseBucket,
+} from "../types";
+import { DEFAULT_RETIREMENT_PLAN } from "../lib/plan-adapter";
 import { runAutoConfig, applyAutoConfig, type AutoConfigResult } from "../lib/auto-config";
 
 interface Props {
-  settings: FireSettings;
-  onSave: (settings: FireSettings) => void | Promise<void>;
+  plan: RetirementPlan;
+  onSave: (plan: RetirementPlan) => void | Promise<void>;
   isSaving: boolean;
   holdings: Holding[];
-  activities: ActivityDetails[];
+  accountIds: string[];
   accounts: Account[];
   /** Accounts already filtered to the FIRE scope — used for auto-config expected return. */
   activeAccounts: Account[];
@@ -77,13 +85,15 @@ function NumberField({
   prefix,
   suffix,
   min,
+  step,
 }: {
   label: string;
-  value: number;
+  value: number | undefined;
   onChange: (v: number) => void;
   prefix?: string;
   suffix?: string;
   min?: number;
+  step?: number;
 }) {
   return (
     <div className="space-y-1">
@@ -92,8 +102,9 @@ function NumberField({
         {prefix && <span className="text-muted-foreground text-xs">{prefix}</span>}
         <Input
           type="number"
-          value={value}
+          value={value ?? ""}
           min={min}
+          step={step}
           onChange={(e) => {
             const v = parseFloat(e.target.value);
             if (!isNaN(v)) onChange(v);
@@ -131,30 +142,148 @@ function SettingsSection({
   );
 }
 
+function ExpenseBucketRow({
+  label,
+  bucket,
+  onChange,
+  generalInflation,
+  removable,
+  onRemove,
+}: {
+  label: string;
+  bucket: ExpenseBucket;
+  onChange: (patch: Partial<ExpenseBucket>) => void;
+  generalInflation: number;
+  removable?: boolean;
+  onRemove?: () => void;
+}) {
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  return (
+    <div className="space-y-2 rounded-md border p-3">
+      <div className="flex items-center justify-between">
+        <Label className="font-medium">{label}</Label>
+        <div className="flex items-center gap-2">
+          {removable && (
+            <Button variant="ghost" size="sm" onClick={onRemove}>
+              <Icons.X className="h-3 w-3" />
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={() => setShowAdvanced(!showAdvanced)}>
+            <Icons.Settings className="h-3 w-3" />
+          </Button>
+        </div>
+      </div>
+      <NumberField
+        label="Monthly amount"
+        value={bucket.monthlyAmount}
+        onChange={(v) => onChange({ monthlyAmount: v })}
+        min={0}
+      />
+      {showAdvanced && (
+        <div className="grid grid-cols-3 gap-2">
+          <NumberField
+            label="Inflation %"
+            value={Math.round((bucket.inflationRate ?? generalInflation) * 10000) / 100}
+            onChange={(v) => onChange({ inflationRate: v / 100 })}
+            step={0.1}
+          />
+          <NumberField
+            label="Start age"
+            value={bucket.startAge}
+            onChange={(v) => onChange({ startAge: v || undefined })}
+          />
+          <NumberField
+            label="End age"
+            value={bucket.endAge}
+            onChange={(v) => onChange({ endAge: v || undefined })}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SettingsPage({
-  settings,
+  plan,
   onSave,
   isSaving,
   holdings,
-  activities,
+  accountIds,
   accounts,
   activeAccounts,
 }: Props) {
-  const [draft, setDraft] = useState<FireSettings>(settings);
+  const [draft, setDraft] = useState<RetirementPlan>(plan);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [autoConfigResult, setAutoConfigResult] = useState<AutoConfigResult | null>(null);
   const [autoConfigLoading, setAutoConfigLoading] = useState(false);
   const [syncingStreamId, setSyncingStreamId] = useState<string | null>(null);
+  // Local state for streams with startAgeIsAuto behaviour (not persisted in plan)
+  const [autoStartAgeIds, setAutoStartAgeIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
-    setDraft(settings);
-  }, [settings]);
+    setDraft(plan);
+  }, [plan]);
+
+  // ── Nested updaters ──
+
+  function updatePersonal<K extends keyof PersonalProfile>(key: K, value: PersonalProfile[K]) {
+    setDraft((prev) => ({ ...prev, personal: { ...prev.personal, [key]: value } }));
+  }
+
+  function updateInvestment<K extends keyof InvestmentAssumptions>(
+    key: K,
+    value: InvestmentAssumptions[K],
+  ) {
+    setDraft((prev) => ({ ...prev, investment: { ...prev.investment, [key]: value } }));
+  }
+
+  function updateWithdrawal<K extends keyof WithdrawalConfig>(key: K, value: WithdrawalConfig[K]) {
+    setDraft((prev) => ({ ...prev, withdrawal: { ...prev.withdrawal, [key]: value } }));
+  }
+
+  function updateTax<K extends keyof TaxProfile>(key: K, value: TaxProfile[K]) {
+    setDraft((prev) => ({
+      ...prev,
+      tax: {
+        ...(prev.tax ?? {
+          taxableWithdrawalRate: 0,
+          taxDeferredWithdrawalRate: 0,
+          taxFreeWithdrawalRate: 0,
+        }),
+        [key]: value,
+      },
+    }));
+  }
+
+  function updateExpenseBucket(
+    name: "living" | "healthcare" | "housing" | "discretionary",
+    patch: Partial<ExpenseBucket>,
+  ) {
+    setDraft((prev) => ({
+      ...prev,
+      expenses: {
+        ...prev.expenses,
+        [name]: { ...(prev.expenses[name] ?? { monthlyAmount: 0 }), ...patch },
+      },
+    }));
+  }
+
+  // ── Auto-config ──
 
   async function handleAutoConfig() {
     setAutoConfigLoading(true);
     setAutoConfigResult(null);
     try {
-      const result = await runAutoConfig(activities, holdings, activeAccounts);
+      // Fetch activities on demand (only needed for auto-config)
+      const { searchActivities } = await import("@/adapters");
+      const activitiesResult = await searchActivities(
+        0,
+        Number.MAX_SAFE_INTEGER,
+        { accountIds: accountIds },
+        "",
+        { id: "date", desc: true },
+      );
+      const result = await runAutoConfig(activitiesResult.data, holdings, activeAccounts);
       setAutoConfigResult(result);
     } catch (e) {
       toast({
@@ -174,28 +303,32 @@ export default function SettingsPage({
     toast({ title: "Auto-config applied \u2014 review and save when ready." });
   }
 
-  function update<K extends keyof FireSettings>(key: K, value: FireSettings[K]) {
-    setDraft((prev) => ({ ...prev, [key]: value }));
-  }
+  // ── Income stream helpers ──
 
   function addStream() {
-    update("additionalIncomeStreams", [
-      ...draft.additionalIncomeStreams,
-      {
-        id: generateId(),
-        label: "",
-        monthlyAmount: 0,
-        startAge: draft.targetFireAge,
-        adjustForInflation: false,
-      },
-    ]);
+    const id = generateId();
+    setDraft((prev) => ({
+      ...prev,
+      incomeStreams: [
+        ...prev.incomeStreams,
+        {
+          id,
+          label: `Income ${prev.incomeStreams.length + 1}`,
+          streamType: "db",
+          monthlyAmount: 0,
+          startAge: prev.personal.targetRetirementAge,
+          adjustForInflation: true,
+        },
+      ],
+    }));
+    setAutoStartAgeIds((prev) => new Set(prev).add(id));
   }
 
-  function updateStream(id: string, patch: Partial<IncomeStream>) {
-    update(
-      "additionalIncomeStreams",
-      draft.additionalIncomeStreams.map((s) => (s.id === id ? { ...s, ...patch } : s)),
-    );
+  function updateStream(id: string, patch: Partial<RetirementIncomeStream>) {
+    setDraft((prev) => ({
+      ...prev,
+      incomeStreams: prev.incomeStreams.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+    }));
   }
 
   async function syncStreamFromAccount(streamId: string, accountId: string) {
@@ -218,32 +351,39 @@ export default function SettingsPage({
   }
 
   function removeStream(id: string) {
-    update(
-      "additionalIncomeStreams",
-      draft.additionalIncomeStreams.filter((s) => s.id !== id),
-    );
+    setDraft((prev) => ({
+      ...prev,
+      incomeStreams: prev.incomeStreams.filter((s) => s.id !== id),
+    }));
+    setAutoStartAgeIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
   }
 
-  const allocEntries = Object.entries(draft.targetAllocations);
+  // ── Target allocation helpers ──
+
+  const allocEntries = Object.entries(draft.investment.targetAllocations);
   const totalAllocPct = allocEntries.reduce((sum, [, w]) => sum + w, 0);
   const allocDiff = Math.abs(totalAllocPct - 1);
   const allocWarning = allocEntries.length > 0 && allocDiff > 0.01;
 
   function addAllocation() {
-    update("targetAllocations", { ...draft.targetAllocations, "": 0 });
+    updateInvestment("targetAllocations", { ...draft.investment.targetAllocations, "": 0 });
   }
 
   function updateAllocation(oldKey: string, newKey: string, weight: number) {
-    const next = { ...draft.targetAllocations };
+    const next = { ...draft.investment.targetAllocations };
     if (oldKey !== newKey) delete next[oldKey];
     next[newKey] = weight;
-    update("targetAllocations", next);
+    updateInvestment("targetAllocations", next);
   }
 
   function removeAllocation(key: string) {
-    const next = { ...draft.targetAllocations };
+    const next = { ...draft.investment.targetAllocations };
     delete next[key];
-    update("targetAllocations", next);
+    updateInvestment("targetAllocations", next);
   }
 
   function autoDetectAllocations() {
@@ -258,21 +398,39 @@ export default function SettingsPage({
           allocs[sym] = Math.round(((h.marketValue?.base ?? 0) / totalValue) * 100) / 100;
         }
       });
-    update("targetAllocations", allocs);
+    updateInvestment("targetAllocations", allocs);
   }
 
+  // ── Expenses helpers ──
+
+  function addOptionalBucket(name: "housing" | "discretionary") {
+    setDraft((prev) => ({
+      ...prev,
+      expenses: { ...prev.expenses, [name]: { monthlyAmount: 0 } },
+    }));
+  }
+
+  function removeOptionalBucket(name: "housing" | "discretionary") {
+    setDraft((prev) => {
+      const next = { ...prev.expenses };
+      delete next[name];
+      return { ...prev, expenses: next };
+    });
+  }
+
+  // ── Reset & Save ──
+
   function handleReset() {
-    setDraft({ ...DEFAULT_SETTINGS, currency: draft.currency });
+    setDraft({ ...DEFAULT_RETIREMENT_PLAN, currency: draft.currency });
     setShowResetConfirm(false);
   }
 
   async function handleSave() {
-    // Strip includedAccountIds — account selection is managed via funding rules
-    const { includedAccountIds: _, ...rest } = draft;
-    const resolved: FireSettings = {
-      ...rest,
-      additionalIncomeStreams: draft.additionalIncomeStreams.map((s) =>
-        s.startAgeIsAuto ? { ...s, startAge: draft.targetFireAge } : s,
+    // Resolve auto start-age streams before saving
+    const resolved: RetirementPlan = {
+      ...draft,
+      incomeStreams: draft.incomeStreams.map((s) =>
+        autoStartAgeIds.has(s.id) ? { ...s, startAge: draft.personal.targetRetirementAge } : s,
       ),
     };
     await onSave(resolved);
@@ -285,53 +443,89 @@ export default function SettingsPage({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <NumberField
             label="Current age"
-            value={draft.currentAge}
-            onChange={(v) => update("currentAge", v)}
+            value={draft.personal.currentAge}
+            onChange={(v) => updatePersonal("currentAge", v)}
             min={1}
           />
           <NumberField
-            label="Target FIRE age"
-            value={draft.targetFireAge}
-            onChange={(v) => update("targetFireAge", v)}
+            label="Target retirement age"
+            value={draft.personal.targetRetirementAge}
+            onChange={(v) => updatePersonal("targetRetirementAge", v)}
             min={1}
           />
           <NumberField
             label="Planning horizon age (life expectancy)"
-            value={draft.planningHorizonAge}
-            onChange={(v) => update("planningHorizonAge", v)}
-            min={draft.targetFireAge + 1}
-          />
-          <NumberField
-            label={`Monthly expenses in FIRE (${draft.currency})`}
-            value={draft.monthlyExpensesAtFire}
-            onChange={(v) => update("monthlyExpensesAtFire", v)}
-            min={0}
-          />
-          <NumberField
-            label={`Monthly healthcare cost (${draft.currency}, today\u2019s money)`}
-            value={draft.healthcareMonthlyAtFire ?? 0}
-            onChange={(v) => update("healthcareMonthlyAtFire", v > 0 ? v : undefined)}
-            min={0}
+            value={draft.personal.planningHorizonAge}
+            onChange={(v) => updatePersonal("planningHorizonAge", v)}
+            min={draft.personal.targetRetirementAge + 1}
           />
           <NumberField
             label={`Monthly contribution (${draft.currency})`}
-            value={draft.monthlyContribution}
-            onChange={(v) => update("monthlyContribution", v)}
+            value={draft.investment.monthlyContribution}
+            onChange={(v) => updateInvestment("monthlyContribution", v)}
             min={0}
           />
         </div>
         <SliderField
-          label="Safe Withdrawal Rate"
-          value={draft.safeWithdrawalRate}
+          label="Annual withdrawal rate"
+          value={draft.withdrawal.safeWithdrawalRate}
           min={0.025}
           max={0.06}
           step={0.0025}
-          displayValue={(draft.safeWithdrawalRate * 100).toFixed(2) + "%"}
-          onChange={(v) => update("safeWithdrawalRate", v)}
+          displayValue={(draft.withdrawal.safeWithdrawalRate * 100).toFixed(2) + "%"}
+          onChange={(v) => updateWithdrawal("safeWithdrawalRate", v)}
         />
       </SettingsSection>
 
-      {/* ── Section 2: Income Streams ── */}
+      {/* ── Section 2: Expenses ── */}
+      <SettingsSection title="Expenses" defaultOpen={true}>
+        <ExpenseBucketRow
+          label="Living"
+          bucket={draft.expenses.living}
+          onChange={(patch) => updateExpenseBucket("living", patch)}
+          generalInflation={draft.investment.inflationRate}
+        />
+        <ExpenseBucketRow
+          label="Healthcare"
+          bucket={draft.expenses.healthcare}
+          onChange={(patch) => updateExpenseBucket("healthcare", patch)}
+          generalInflation={draft.investment.inflationRate}
+        />
+        {draft.expenses.housing && (
+          <ExpenseBucketRow
+            label="Housing"
+            bucket={draft.expenses.housing}
+            onChange={(patch) => updateExpenseBucket("housing", patch)}
+            generalInflation={draft.investment.inflationRate}
+            removable
+            onRemove={() => removeOptionalBucket("housing")}
+          />
+        )}
+        {draft.expenses.discretionary && (
+          <ExpenseBucketRow
+            label="Discretionary"
+            bucket={draft.expenses.discretionary}
+            onChange={(patch) => updateExpenseBucket("discretionary", patch)}
+            generalInflation={draft.investment.inflationRate}
+            removable
+            onRemove={() => removeOptionalBucket("discretionary")}
+          />
+        )}
+        <div className="flex gap-2">
+          {!draft.expenses.housing && (
+            <Button variant="outline" size="sm" onClick={() => addOptionalBucket("housing")}>
+              + Housing
+            </Button>
+          )}
+          {!draft.expenses.discretionary && (
+            <Button variant="outline" size="sm" onClick={() => addOptionalBucket("discretionary")}>
+              + Discretionary
+            </Button>
+          )}
+        </div>
+      </SettingsSection>
+
+      {/* ── Section 3: Income Streams ── */}
       <SettingsSection title="Income Streams" defaultOpen={true}>
         <div className="flex items-center justify-between">
           <p className="text-muted-foreground text-xs">
@@ -341,10 +535,10 @@ export default function SettingsPage({
             + Add
           </Button>
         </div>
-        {draft.additionalIncomeStreams.length === 0 && (
+        {draft.incomeStreams.length === 0 && (
           <p className="text-muted-foreground text-xs">No income streams added.</p>
         )}
-        {draft.additionalIncomeStreams.map((stream) => {
+        {draft.incomeStreams.map((stream) => {
           const isDc = stream.streamType === "dc";
           const hasPension =
             isDc ||
@@ -353,10 +547,11 @@ export default function SettingsPage({
             (stream.accumulationReturn ?? 0) > 0;
 
           // Computed payout preview for DC streams (two-phase: contributions until FIRE, growth-only after)
-          const totalYears = Math.max(0, stream.startAge - draft.currentAge);
+          const totalYears = Math.max(0, stream.startAge - draft.personal.currentAge);
           const contribYears = Math.max(
             0,
-            Math.min(stream.startAge, draft.targetFireAge) - draft.currentAge,
+            Math.min(stream.startAge, draft.personal.targetRetirementAge) -
+              draft.personal.currentAge,
           );
           const growthOnlyYears = totalYears - contribYears;
           const r = stream.accumulationReturn ?? 0.04;
@@ -366,7 +561,10 @@ export default function SettingsPage({
               ? ((stream.monthlyContribution ?? 0) * 12 * (Math.pow(1 + r, contribYears) - 1)) / r
               : (stream.monthlyContribution ?? 0) * 12 * contribYears;
           const fvAnnuity = fvAnnuityAtStop * Math.pow(1 + r, growthOnlyYears);
-          const estimatedMonthlyPayout = ((fvLump + fvAnnuity) * draft.safeWithdrawalRate) / 12;
+          const estimatedMonthlyPayout =
+            ((fvLump + fvAnnuity) * draft.withdrawal.safeWithdrawalRate) / 12;
+
+          const isAutoStart = autoStartAgeIds.has(stream.id);
 
           return (
             <div key={stream.id} className="rounded border p-3">
@@ -397,7 +595,7 @@ export default function SettingsPage({
                     <Label className="text-xs">Monthly amount ({draft.currency})</Label>
                     <Input
                       type="number"
-                      value={stream.monthlyAmount}
+                      value={stream.monthlyAmount ?? 0}
                       min={0}
                       onChange={(e) =>
                         updateStream(stream.id, {
@@ -415,18 +613,29 @@ export default function SettingsPage({
                     <label className="text-muted-foreground flex cursor-pointer items-center gap-1 text-xs">
                       <input
                         type="checkbox"
-                        checked={stream.startAgeIsAuto ?? false}
-                        onChange={(e) =>
-                          updateStream(stream.id, { startAgeIsAuto: e.target.checked })
-                        }
+                        checked={isAutoStart}
+                        onChange={(e) => {
+                          setAutoStartAgeIds((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) {
+                              next.add(stream.id);
+                              updateStream(stream.id, {
+                                startAge: draft.personal.targetRetirementAge,
+                              });
+                            } else {
+                              next.delete(stream.id);
+                            }
+                            return next;
+                          });
+                        }}
                       />
                       Auto
                     </label>
                   </div>
-                  {stream.startAgeIsAuto ? (
+                  {isAutoStart ? (
                     <p className="mt-1 flex h-8 items-center text-sm font-medium">
-                      {draft.targetFireAge}
-                      <span className="text-muted-foreground ml-1 text-xs">(= FIRE age)</span>
+                      {draft.personal.targetRetirementAge}
+                      <span className="text-muted-foreground ml-1 text-xs">(= retirement age)</span>
                     </p>
                   ) : (
                     <Input
@@ -492,11 +701,11 @@ export default function SettingsPage({
                         currentValue: 0,
                         monthlyContribution: 0,
                         accumulationReturn: 0.04,
-                        startAgeIsAuto: true,
                       });
+                      setAutoStartAgeIds((prev) => new Set(prev).add(stream.id));
                     } else {
                       updateStream(stream.id, {
-                        streamType: undefined,
+                        streamType: "db",
                         currentValue: undefined,
                         monthlyContribution: undefined,
                         accumulationReturn: undefined,
@@ -505,7 +714,8 @@ export default function SettingsPage({
                   }}
                 />
                 <Label className="text-muted-foreground cursor-pointer text-xs">
-                  Accumulation fund {"\u2014"} payout derived from balance (pension fund, TFR\u2026)
+                  Accumulation fund {"\u2014"} payout derived from balance (pension fund, TFR
+                  {"\u2026"})
                 </Label>
               </div>
 
@@ -599,8 +809,8 @@ export default function SettingsPage({
                   <p className="text-muted-foreground col-span-full text-xs">
                     Phase 1 (now {"\u2192"} FIRE): fund grows with contributions + return. Phase 2
                     (FIRE {"\u2192"} payout age): contributions stop, fund keeps growing. Phase 3
-                    (payout age+): balance converted to income using the same SWR as the main
-                    portfolio.
+                    (payout age+): balance converted to income using the same withdrawal rate as the
+                    main portfolio.
                   </p>
                 </div>
               )}
@@ -618,25 +828,25 @@ export default function SettingsPage({
         })}
       </SettingsSection>
 
-      {/* ── Section 3: Investment Assumptions ── */}
+      {/* ── Section 4: Investment Assumptions ── */}
       <SettingsSection title="Investment Assumptions" defaultOpen={true}>
         <SliderField
           label="Expected annual portfolio return"
-          value={draft.expectedAnnualReturn}
+          value={draft.investment.expectedAnnualReturn}
           min={0.03}
           max={0.12}
           step={0.005}
-          displayValue={(draft.expectedAnnualReturn * 100).toFixed(1) + "%"}
-          onChange={(v) => update("expectedAnnualReturn", v)}
+          displayValue={(draft.investment.expectedAnnualReturn * 100).toFixed(1) + "%"}
+          onChange={(v) => updateInvestment("expectedAnnualReturn", v)}
         />
         <SliderField
           label="Return standard deviation (volatility)"
-          value={draft.expectedReturnStdDev}
+          value={draft.investment.expectedReturnStdDev}
           min={0.05}
           max={0.25}
           step={0.005}
-          displayValue={(draft.expectedReturnStdDev * 100).toFixed(1) + "%"}
-          onChange={(v) => update("expectedReturnStdDev", v)}
+          displayValue={(draft.investment.expectedReturnStdDev * 100).toFixed(1) + "%"}
+          onChange={(v) => updateInvestment("expectedReturnStdDev", v)}
         />
         <p className="text-muted-foreground text-xs">
           Volatility is used only for Monte Carlo simulation. Higher values produce a wider fan of
@@ -644,63 +854,57 @@ export default function SettingsPage({
         </p>
         <SliderField
           label="Inflation rate"
-          value={draft.inflationRate}
+          value={draft.investment.inflationRate}
           min={0.01}
           max={0.05}
           step={0.0025}
-          displayValue={(draft.inflationRate * 100).toFixed(2) + "%"}
-          onChange={(v) => update("inflationRate", v)}
+          displayValue={(draft.investment.inflationRate * 100).toFixed(2) + "%"}
+          onChange={(v) => updateInvestment("inflationRate", v)}
         />
-        {(draft.healthcareMonthlyAtFire ?? 0) > 0 && (
-          <SliderField
-            label="Healthcare inflation rate (typically higher than general inflation)"
-            value={draft.healthcareInflationRate ?? draft.inflationRate}
-            min={0.01}
-            max={0.08}
-            step={0.0025}
-            displayValue={
-              ((draft.healthcareInflationRate ?? draft.inflationRate) * 100).toFixed(2) + "%"
-            }
-            onChange={(v) => update("healthcareInflationRate", v)}
-          />
-        )}
         <SliderField
           label={
-            (draft.salaryGrowthRate !== undefined
+            (draft.personal.salaryGrowthRate !== undefined
               ? "Salary growth rate (per year)"
               : "Contribution growth rate (per year)") +
             " \u2014 drives annual contribution increase"
           }
-          value={draft.salaryGrowthRate ?? draft.contributionGrowthRate}
+          value={draft.personal.salaryGrowthRate ?? draft.investment.contributionGrowthRate}
           min={0}
           max={0.1}
           step={0.005}
           displayValue={
-            ((draft.salaryGrowthRate ?? draft.contributionGrowthRate) * 100).toFixed(1) + "%"
+            (
+              (draft.personal.salaryGrowthRate ?? draft.investment.contributionGrowthRate) * 100
+            ).toFixed(1) + "%"
           }
           onChange={(v) => {
-            if (draft.currentAnnualSalary) {
-              update("salaryGrowthRate", v);
+            if (draft.personal.currentAnnualSalary) {
+              updatePersonal("salaryGrowthRate", v);
             } else {
-              update("contributionGrowthRate", v);
+              updateInvestment("contributionGrowthRate", v);
             }
           }}
         />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <NumberField
             label={`Net annual salary / take-home (${draft.currency}) \u2014 optional`}
-            value={draft.currentAnnualSalary ?? 0}
+            value={draft.personal.currentAnnualSalary ?? 0}
             onChange={(v) =>
-              update("currentAnnualSalary", v > 0 ? v : (undefined as unknown as number))
+              updatePersonal("currentAnnualSalary", v > 0 ? v : (undefined as unknown as number))
             }
             min={0}
           />
         </div>
-        {(draft.currentAnnualSalary ?? 0) > 0 && (
+        {(draft.personal.currentAnnualSalary ?? 0) > 0 && (
           <p className="text-muted-foreground text-xs">
             Implied savings rate:{" "}
             <span className="text-foreground font-medium">
-              {(((draft.monthlyContribution * 12) / draft.currentAnnualSalary!) * 100).toFixed(1)}%
+              {(
+                ((draft.investment.monthlyContribution * 12) /
+                  draft.personal.currentAnnualSalary!) *
+                100
+              ).toFixed(1)}
+              %
             </span>{" "}
             of net salary (take-home)
           </p>
@@ -717,19 +921,21 @@ export default function SettingsPage({
               </p>
             </div>
             <Switch
-              checked={draft.glidePath?.enabled ?? false}
+              checked={draft.investment.glidePath?.enabled ?? false}
               onCheckedChange={(v) =>
-                update(
+                updateInvestment(
                   "glidePath",
                   v
                     ? {
                         enabled: true,
-                        bondReturnRate: draft.glidePath?.bondReturnRate ?? 0.03,
-                        bondAllocationAtFire: draft.glidePath?.bondAllocationAtFire ?? 0.2,
-                        bondAllocationAtHorizon: draft.glidePath?.bondAllocationAtHorizon ?? 0.5,
+                        bondReturnRate: draft.investment.glidePath?.bondReturnRate ?? 0.03,
+                        bondAllocationAtFire:
+                          draft.investment.glidePath?.bondAllocationAtFire ?? 0.2,
+                        bondAllocationAtHorizon:
+                          draft.investment.glidePath?.bondAllocationAtHorizon ?? 0.5,
                       }
                     : {
-                        ...(draft.glidePath ?? {
+                        ...(draft.investment.glidePath ?? {
                           bondReturnRate: 0.03,
                           bondAllocationAtFire: 0.2,
                           bondAllocationAtHorizon: 0.5,
@@ -740,79 +946,190 @@ export default function SettingsPage({
               }
             />
           </div>
-          {draft.glidePath?.enabled && (
+          {draft.investment.glidePath?.enabled && (
             <div className="space-y-4">
               <SliderField
                 label="Bond return rate"
-                value={draft.glidePath.bondReturnRate}
+                value={draft.investment.glidePath.bondReturnRate}
                 min={0.01}
                 max={0.06}
                 step={0.0025}
-                displayValue={(draft.glidePath.bondReturnRate * 100).toFixed(2) + "%"}
-                onChange={(v) => update("glidePath", { ...draft.glidePath!, bondReturnRate: v })}
+                displayValue={(draft.investment.glidePath.bondReturnRate * 100).toFixed(2) + "%"}
+                onChange={(v) =>
+                  updateInvestment("glidePath", {
+                    ...draft.investment.glidePath!,
+                    bondReturnRate: v,
+                  })
+                }
               />
               <SliderField
-                label="Bond allocation at FIRE date"
-                value={draft.glidePath.bondAllocationAtFire}
+                label="Bond allocation at retirement date"
+                value={draft.investment.glidePath.bondAllocationAtFire}
                 min={0}
                 max={0.6}
                 step={0.05}
-                displayValue={(draft.glidePath.bondAllocationAtFire * 100).toFixed(0) + "%"}
+                displayValue={
+                  (draft.investment.glidePath.bondAllocationAtFire * 100).toFixed(0) + "%"
+                }
                 onChange={(v) =>
-                  update("glidePath", { ...draft.glidePath!, bondAllocationAtFire: v })
+                  updateInvestment("glidePath", {
+                    ...draft.investment.glidePath!,
+                    bondAllocationAtFire: v,
+                  })
                 }
               />
               <SliderField
                 label="Bond allocation at planning horizon"
-                value={draft.glidePath.bondAllocationAtHorizon}
+                value={draft.investment.glidePath.bondAllocationAtHorizon}
                 min={0}
                 max={0.9}
                 step={0.05}
-                displayValue={(draft.glidePath.bondAllocationAtHorizon * 100).toFixed(0) + "%"}
+                displayValue={
+                  (draft.investment.glidePath.bondAllocationAtHorizon * 100).toFixed(0) + "%"
+                }
                 onChange={(v) =>
-                  update("glidePath", { ...draft.glidePath!, bondAllocationAtHorizon: v })
+                  updateInvestment("glidePath", {
+                    ...draft.investment.glidePath!,
+                    bondAllocationAtHorizon: v,
+                  })
                 }
               />
               <p className="text-muted-foreground text-xs">
                 The portfolio shifts linearly from{" "}
-                {(draft.glidePath.bondAllocationAtFire * 100).toFixed(0)}% bonds at FIRE to{" "}
-                {(draft.glidePath.bondAllocationAtHorizon * 100).toFixed(0)}% bonds at age{" "}
-                {draft.planningHorizonAge}. Equity allocation ={" "}
-                {((1 - draft.glidePath.bondAllocationAtFire) * 100).toFixed(0)}% {"\u2192"}{" "}
-                {((1 - draft.glidePath.bondAllocationAtHorizon) * 100).toFixed(0)}%.
+                {(draft.investment.glidePath.bondAllocationAtFire * 100).toFixed(0)}% bonds at
+                retirement to{" "}
+                {(draft.investment.glidePath.bondAllocationAtHorizon * 100).toFixed(0)}% bonds at
+                age {draft.personal.planningHorizonAge}. Equity allocation ={" "}
+                {((1 - draft.investment.glidePath.bondAllocationAtFire) * 100).toFixed(0)}%{" "}
+                {"\u2192"}{" "}
+                {((1 - draft.investment.glidePath.bondAllocationAtHorizon) * 100).toFixed(0)}%.
               </p>
             </div>
           )}
         </div>
+      </SettingsSection>
 
-        {/* Withdrawal Strategy */}
+      {/* ── Section 5: Withdrawal Policy ── */}
+      <SettingsSection title="Withdrawal Policy" defaultOpen={true}>
         <div className="space-y-2">
-          <Label className="text-xs">Withdrawal Strategy</Label>
+          <Label className="text-xs">Strategy</Label>
           <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
-            {(["constant-dollar", "constant-percentage"] as const).map((s) => (
+            {(["constant-dollar", "constant-percentage", "guardrails"] as const).map((s) => (
               <label key={s} className="flex cursor-pointer items-center gap-2 text-xs">
                 <input
                   type="radio"
                   name="withdrawalStrategy"
                   value={s}
-                  checked={(draft.withdrawalStrategy ?? "constant-dollar") === s}
-                  onChange={() => update("withdrawalStrategy", s)}
+                  checked={draft.withdrawal.strategy === s}
+                  onChange={() => updateWithdrawal("strategy", s)}
                 />
                 {s === "constant-dollar"
                   ? "Constant dollar (fixed real spending)"
-                  : "Constant percentage (% of portfolio)"}
+                  : s === "constant-percentage"
+                    ? "Constant percentage (% of portfolio)"
+                    : "Guardrails (dynamic ceiling/floor)"}
               </label>
             ))}
           </div>
           <p className="text-muted-foreground text-xs">
-            {(draft.withdrawalStrategy ?? "constant-dollar") === "constant-dollar"
+            {draft.withdrawal.strategy === "constant-dollar"
               ? "Withdraw a fixed inflation-adjusted amount each year. Spending is stable but the portfolio can deplete."
-              : `Withdraw ${(draft.safeWithdrawalRate * 100).toFixed(1)}% of the portfolio each year. Spending varies with market performance; the portfolio never fully depletes.`}
+              : draft.withdrawal.strategy === "constant-percentage"
+                ? `Withdraw ${(draft.withdrawal.safeWithdrawalRate * 100).toFixed(1)}% of the portfolio each year. Income varies with market performance; the portfolio never fully depletes.`
+                : "Withdraw a percentage that adjusts within ceiling/floor bands. Smooths spending while protecting the portfolio."}
           </p>
+          {draft.withdrawal.strategy === "guardrails" && (
+            <div className="ml-6 space-y-2 border-l pl-4">
+              <SliderField
+                label="Ceiling rate"
+                value={draft.withdrawal.guardrails?.ceilingRate ?? 0.06}
+                min={0.03}
+                max={0.1}
+                step={0.005}
+                displayValue={
+                  ((draft.withdrawal.guardrails?.ceilingRate ?? 0.06) * 100).toFixed(1) + "%"
+                }
+                onChange={(v) =>
+                  updateWithdrawal("guardrails", {
+                    ceilingRate: v,
+                    floorRate: draft.withdrawal.guardrails?.floorRate ?? 0.03,
+                  })
+                }
+              />
+              <SliderField
+                label="Floor rate"
+                value={draft.withdrawal.guardrails?.floorRate ?? 0.03}
+                min={0.01}
+                max={0.06}
+                step={0.005}
+                displayValue={
+                  ((draft.withdrawal.guardrails?.floorRate ?? 0.03) * 100).toFixed(1) + "%"
+                }
+                onChange={(v) =>
+                  updateWithdrawal("guardrails", {
+                    ceilingRate: draft.withdrawal.guardrails?.ceilingRate ?? 0.06,
+                    floorRate: v,
+                  })
+                }
+              />
+            </div>
+          )}
         </div>
       </SettingsSection>
 
-      {/* ── Section 4: Advanced ── */}
+      {/* ── Section 6: Tax Profile ── */}
+      <SettingsSection title="Tax Profile" defaultOpen={false}>
+        <p className="text-muted-foreground mb-3 text-xs">
+          Simple effective tax rates applied to retirement withdrawals.
+        </p>
+        <div className="grid grid-cols-2 gap-4">
+          <SliderField
+            label="Taxable withdrawal rate"
+            value={(draft.tax?.taxableWithdrawalRate ?? 0) * 100}
+            min={0}
+            max={50}
+            step={0.5}
+            displayValue={((draft.tax?.taxableWithdrawalRate ?? 0) * 100).toFixed(1) + "%"}
+            onChange={(v) => updateTax("taxableWithdrawalRate", v / 100)}
+          />
+          <SliderField
+            label="Tax-deferred rate"
+            value={(draft.tax?.taxDeferredWithdrawalRate ?? 0) * 100}
+            min={0}
+            max={50}
+            step={0.5}
+            displayValue={((draft.tax?.taxDeferredWithdrawalRate ?? 0) * 100).toFixed(1) + "%"}
+            onChange={(v) => updateTax("taxDeferredWithdrawalRate", v / 100)}
+          />
+          <SliderField
+            label="Tax-free rate"
+            value={(draft.tax?.taxFreeWithdrawalRate ?? 0) * 100}
+            min={0}
+            max={50}
+            step={0.5}
+            displayValue={((draft.tax?.taxFreeWithdrawalRate ?? 0) * 100).toFixed(1) + "%"}
+            onChange={(v) => updateTax("taxFreeWithdrawalRate", v / 100)}
+          />
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-4">
+          <SliderField
+            label="Early withdrawal penalty"
+            value={(draft.tax?.earlyWithdrawalPenaltyRate ?? 0) * 100}
+            min={0}
+            max={20}
+            step={0.5}
+            displayValue={((draft.tax?.earlyWithdrawalPenaltyRate ?? 0) * 100).toFixed(1) + "%"}
+            onChange={(v) => updateTax("earlyWithdrawalPenaltyRate", v / 100)}
+          />
+          <NumberField
+            label="Penalty cutoff age"
+            value={draft.tax?.earlyWithdrawalPenaltyAge ?? 59}
+            onChange={(v) => updateTax("earlyWithdrawalPenaltyAge", v)}
+          />
+        </div>
+      </SettingsSection>
+
+      {/* ── Section 7: Advanced ── */}
       <SettingsSection title="Advanced" defaultOpen={false}>
         {/* Auto-configure from portfolio */}
         <Card>

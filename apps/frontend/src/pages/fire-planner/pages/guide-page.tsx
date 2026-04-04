@@ -82,14 +82,15 @@ export default function GuidePage({ country }: { country?: string }) {
           <Term t="FIRE Target (net)">
             The portfolio you need to accumulate, after subtracting income available from day one of
             FIRE. A €1,200/mo stream that starts at your FIRE age reduces your target by €1,200 × 12
-            / SWR. Deferred streams (e.g. state pension at 67) do NOT reduce this number — your
-            portfolio must bridge the gap on its own until those streams start.
+            / withdrawal rate. Deferred streams (e.g. state pension at 67) do NOT reduce this number
+            — your portfolio must bridge the gap on its own until those streams start.
           </Term>
           <Term t="Gross vs net target">
-            The gross target (monthly expenses × 12 / SWR) ignores income streams. The net target
-            subtracts day-one income, giving the actual amount your portfolio needs to accumulate.
-            The Dashboard shows the net target as the primary figure. The FIRE goal synced to your
-            portfolio uses the gross target — the number you "see" as your savings milestone.
+            The gross target (annual expenses / withdrawal rate) ignores income streams. The net
+            target subtracts day-one income, giving the actual amount your portfolio needs to
+            accumulate. The Dashboard shows the net target as the primary figure. The FIRE goal
+            synced to your portfolio uses the gross target — the number you "see" as your savings
+            milestone.
           </Term>
           <Term t="Coast FIRE amount">
             If you stopped contributing today, this is the minimum portfolio needed to grow to your
@@ -144,19 +145,48 @@ export default function GuidePage({ country }: { country?: string }) {
           </Term>
           <Term t="Sensitivity Analysis">
             Two heatmaps: FIRE age across contribution levels × return rates, and FIRE age across
-            SWR × return rates. Your current settings are highlighted in blue. Use this to identify
-            which lever — saving more, earning more, or spending less — matters most.
+            withdrawal rate × return rates. Your current settings are highlighted in blue. Use this
+            to identify which lever — saving more, earning more, or spending less — matters most.
           </Term>
         </div>
       </Section>
 
       <Section title="Key concepts">
         <div className="space-y-4">
-          <Term t="Safe Withdrawal Rate (SWR)">
-            The % of your portfolio you withdraw annually in retirement. The classic 4% rule
-            (Trinity Study) means a €1M portfolio supports €40k/year. This planner defaults to 3.5%
-            — more conservative and appropriate for early retirees with longer horizons. Lower SWR =
-            larger required portfolio = more safety.
+          <Term t="Annual withdrawal rate">
+            The percentage of your portfolio you withdraw each year in retirement. The classic 4%
+            rule (Trinity Study) means a €1M portfolio supports €40k/year. This planner defaults to
+            3.5% — more conservative and appropriate for early retirees with longer horizons. A
+            lower rate means a larger required portfolio but more safety margin.
+          </Term>
+          <Term t="How the withdrawal rate is used">
+            Its role depends on which withdrawal strategy you choose:
+            <ul className="text-muted-foreground mt-2 list-disc space-y-1.5 pl-4 text-xs">
+              <li>
+                <strong>Constant Dollar</strong> — Your expenses drive the withdrawal, not the rate.
+                Each year you withdraw exactly what you need (expenses minus income, grossed up for
+                taxes). The rate is only used to convert defined-contribution pension fund balances
+                into monthly income.
+              </li>
+              <li>
+                <strong>Constant %</strong> — You withdraw the rate × your portfolio each year,
+                regardless of expenses. Income varies with market performance.
+              </li>
+              <li>
+                <strong>Guardrails</strong> — Targets your expenses like Constant Dollar, but clips
+                withdrawals to ceiling (1.5× the rate) or floor (0.8× the rate) bands relative to
+                the portfolio. Protects against overspending in down markets while allowing raises
+                in up markets.
+              </li>
+            </ul>
+          </Term>
+          <Term t="How you reach financial independence">
+            The planner computes the present value of your full spending schedule from retirement
+            through your planning horizon — accounting for each expense bucket's inflation rate,
+            income streams that start at different ages, and tax drag on withdrawals. When your
+            portfolio reaches this amount, you're financially independent. This is more accurate
+            than the classic "25× expenses" rule because it handles varying expenses, deferred
+            pensions, and finite horizons.
           </Term>
           <Term t="Inflation rate">
             All projections grow expenses and inflation-linked income at this rate year over year.
