@@ -205,12 +205,10 @@ export {
 
 // FIRE Planner (desktop-only feature)
 export {
-  getFireSettings,
-  saveFireSettings,
-  calculateFireProjection,
-  runFireMonteCarlo,
-  runFireScenarioAnalysis,
-  runFireSorr,
-  runFireSensitivity,
-  runFireStrategyComparison,
+  calculateRetirementProjection,
+  runRetirementMonteCarlo,
+  runRetirementScenarioAnalysis,
+  runRetirementSorr,
+  runRetirementSensitivity,
+  runRetirementStrategyComparison,
 } from "./fire-planner";

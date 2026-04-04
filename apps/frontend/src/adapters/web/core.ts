@@ -54,12 +54,13 @@ export const COMMANDS: CommandMap = {
   create_goal: { method: "POST", path: "/goals" },
   update_goal: { method: "PUT", path: "/goals" },
   delete_goal: { method: "DELETE", path: "/goals" },
-  // FIRE simulations
-  run_fire_monte_carlo: { method: "POST", path: "/fire/monte-carlo" },
-  run_fire_scenario_analysis: { method: "POST", path: "/fire/scenario-analysis" },
-  run_fire_sensitivity: { method: "POST", path: "/fire/sensitivity-analysis" },
-  run_fire_sorr: { method: "POST", path: "/fire/sequence-of-returns" },
-  run_fire_strategy_comparison: { method: "POST", path: "/fire/strategy-comparison" },
+  // Retirement plan simulations
+  calculate_retirement_projection: { method: "POST", path: "/retirement/projection" },
+  run_retirement_monte_carlo: { method: "POST", path: "/retirement/monte-carlo" },
+  run_retirement_scenario_analysis: { method: "POST", path: "/retirement/scenario-analysis" },
+  run_retirement_sensitivity: { method: "POST", path: "/retirement/sensitivity-analysis" },
+  run_retirement_sorr: { method: "POST", path: "/retirement/sequence-of-returns" },
+  run_retirement_strategy_comparison: { method: "POST", path: "/retirement/strategy-comparison" },
   // FX
   get_latest_exchange_rates: { method: "GET", path: "/exchange-rates/latest" },
   update_exchange_rate: { method: "PUT", path: "/exchange-rates" },
@@ -528,12 +529,13 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       url += `/${encodeURIComponent(goalId)}`;
       break;
     }
-    // FIRE simulation commands
-    case "run_fire_monte_carlo":
-    case "run_fire_scenario_analysis":
-    case "run_fire_sensitivity":
-    case "run_fire_sorr":
-    case "run_fire_strategy_comparison": {
+    // Retirement plan simulation commands
+    case "calculate_retirement_projection":
+    case "run_retirement_monte_carlo":
+    case "run_retirement_scenario_analysis":
+    case "run_retirement_sensitivity":
+    case "run_retirement_sorr":
+    case "run_retirement_strategy_comparison": {
       body = JSON.stringify(payload);
       break;
     }

@@ -766,6 +766,8 @@ export interface GoalFundingRule {
   accountId: string;
   fundingRole: FundingRole;
   reservationPercent?: number;
+  countablePercent?: number;
+  taxBucket?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -774,6 +776,8 @@ export interface GoalFundingRuleInput {
   accountId: string;
   fundingRole: FundingRole;
   reservationPercent?: number;
+  countablePercent?: number;
+  taxBucket?: string;
 }
 
 /** @deprecated Use GoalFundingRule */
@@ -1949,8 +1953,13 @@ export interface RetirementOverview {
   status: string;
   desiredFireAge: number;
   fiAge: number | null;
+  retirementStartAge: number | null;
+  retirementStartReason?: "funded" | "target_age_forced" | null;
   fundedAtGoalAge: boolean;
+  eventuallyReachesFi: boolean;
+  fundedAtRetirementStart: boolean;
   portfolioNow: number;
+  portfolioAtRetirementStart: number;
   netFireTarget: number;
   grossFireTarget: number;
   portfolioAtGoalAge: number;
@@ -1964,6 +1973,7 @@ export interface RetirementOverview {
   progress: number;
   budgetBreakdown: BudgetBreakdown;
   trajectory: RetirementTrajectoryPoint[];
+  withdrawalPolicy?: string;
 }
 
 export interface RetirementTrajectoryPoint {
@@ -1986,6 +1996,9 @@ export interface BudgetBreakdown {
   monthlyHealthcare: number;
   monthlyPortfolioWithdrawal: number;
   incomeStreams: BudgetStreamItem[];
+  monthlyHousing?: number;
+  monthlyDiscretionary?: number;
+  effectiveTaxRate?: number;
 }
 
 export interface BudgetStreamItem {
