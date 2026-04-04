@@ -200,6 +200,8 @@ impl GoalRepositoryTrait for GoalRepository {
                         reservation_percent: rule.reservation_percent,
                         created_at: now.clone(),
                         updated_at: now.clone(),
+                        countable_percent: rule.countable_percent,
+                        tax_bucket: rule.tax_bucket.clone(),
                     };
                     diesel::insert_into(goals_allocation::table)
                         .values(&db)

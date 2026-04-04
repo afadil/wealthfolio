@@ -1,5 +1,5 @@
--- SQLite does not support DROP COLUMN; recreate the table.
--- This is only used in development.
+-- Best-effort reverse (SQLite cannot drop columns without table rebuild)
+DROP INDEX IF EXISTS idx_goals_allocation_goal_account;
 
 DELETE FROM sync_table_state WHERE table_name = 'goal_plans';
 DROP TABLE IF EXISTS goal_plans;

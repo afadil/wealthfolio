@@ -95,6 +95,8 @@ pub struct GoalsAllocationDB {
     pub reservation_percent: Option<f64>,
     pub created_at: String,
     pub updated_at: String,
+    pub countable_percent: Option<f64>,
+    pub tax_bucket: Option<String>,
 }
 
 /// Database model for goal plans
@@ -168,6 +170,8 @@ impl From<GoalsAllocationDB> for wealthfolio_core::goals::GoalFundingRule {
             account_id: db.account_id,
             funding_role: db.funding_role,
             reservation_percent: db.reservation_percent,
+            countable_percent: db.countable_percent,
+            tax_bucket: db.tax_bucket,
             created_at: db.created_at,
             updated_at: db.updated_at,
         }
