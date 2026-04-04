@@ -1107,6 +1107,8 @@ export interface CreateAlternativeAssetRequest {
   metadata?: Record<string, string>;
   /** For liabilities: optional ID of the financed asset (UI-only linking) */
   linkedAssetId?: string;
+  /** Optional link to the account this asset belongs to */
+  accountId?: string;
 }
 
 /**
@@ -1282,6 +1284,8 @@ export interface AlternativeAssetHolding {
   linkedAssetId?: string;
   /** Asset notes */
   notes?: string | null;
+  /** Optional linked account ID */
+  accountId?: string | null;
 }
 
 /**
