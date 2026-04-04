@@ -23,6 +23,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
 
+use crate::activities::{
+    Activity, ACTIVITY_TYPE_ADJUSTMENT, ACTIVITY_TYPE_SELL, ACTIVITY_TYPE_TRANSFER_OUT,
+};
 use crate::errors::Result;
 use crate::portfolio::snapshot::AccountStateSnapshot;
 
@@ -255,6 +258,160 @@ pub fn check_lot_quantity_consistency(
         }
     }
     mismatches
+}
+
+// ── Historical replay ────────────────────────────────────────────────────────
+
+/// Adjusts lot quantities to reflect their state at `as_of_date` by replaying
+/// activities (Sell, TransferOut, Adjustment, Split) in chronological order.
+///
+/// Each lot's `remaining_quantity` is reset to `original_quantity` (the
+/// as-acquired, pre-split amount), then activities are applied:
+/// - Sell/TransferOut/Adjustment: FIFO reduction of lot quantities
+/// - Split: multiply all open lot quantities for that asset by the split ratio
+///
+/// Lots whose adjusted quantity reaches zero are removed from the result.
+/// Lots with `original_quantity` of "0" (old snapshots that predate the field)
+/// are returned as-is since there is no anchor to replay from.
+pub fn replay_lots_to_date(
+    lots: Vec<LotRecord>,
+    activities: &[Activity],
+    as_of_date: NaiveDate,
+) -> Vec<LotRecord> {
+    use crate::activities::ACTIVITY_TYPE_SPLIT;
+
+    if lots.is_empty() {
+        return lots;
+    }
+
+    // Filter to activity types that affect lot quantities, sorted by date
+    let relevant_types = [
+        ACTIVITY_TYPE_SELL,
+        ACTIVITY_TYPE_TRANSFER_OUT,
+        ACTIVITY_TYPE_ADJUSTMENT,
+        ACTIVITY_TYPE_SPLIT,
+    ];
+    let mut relevant: Vec<&Activity> = activities
+        .iter()
+        .filter(|a| relevant_types.contains(&a.effective_type()))
+        .filter(|a| a.activity_date.date_naive() <= as_of_date)
+        .collect();
+    relevant.sort_by_key(|a| a.activity_date);
+
+    // Group lots by (account_id, asset_id), preserving FIFO order by open_date
+    let mut groups: HashMap<(String, String), Vec<LotRecord>> = HashMap::new();
+    for lot in lots {
+        groups
+            .entry((lot.account_id.clone(), lot.asset_id.clone()))
+            .or_default()
+            .push(lot);
+    }
+    for group in groups.values_mut() {
+        group.sort_by(|a, b| a.open_date.cmp(&b.open_date));
+    }
+
+    // Reset each lot's remaining_quantity to original_quantity
+    for group in groups.values_mut() {
+        for lot in group.iter_mut() {
+            let orig = Decimal::from_str(&lot.original_quantity).unwrap_or(Decimal::ZERO);
+            if !orig.is_zero() {
+                lot.remaining_quantity = lot.original_quantity.clone();
+                let cost_per_unit =
+                    Decimal::from_str(&lot.cost_per_unit).unwrap_or(Decimal::ZERO);
+                let fee = Decimal::from_str(&lot.fee_allocated).unwrap_or(Decimal::ZERO);
+                lot.total_cost_basis = (orig * cost_per_unit + fee).to_string();
+                lot.is_closed = false;
+                lot.close_date = None;
+                lot.close_activity_id = None;
+            }
+        }
+    }
+
+    // Replay activities in chronological order
+    for activity in &relevant {
+        let asset_id: String = match &activity.asset_id {
+            Some(id) => id.clone(),
+            None => continue,
+        };
+        let key = (activity.account_id.clone(), asset_id);
+        let group = match groups.get_mut(&key) {
+            Some(g) => g,
+            None => continue,
+        };
+
+        if activity.effective_type() == ACTIVITY_TYPE_SPLIT {
+            // Splits multiply all open lot quantities by the split ratio
+            let split_ratio = activity.qty();
+            if split_ratio.is_sign_positive() {
+                for lot in group.iter_mut() {
+                    let remaining =
+                        Decimal::from_str(&lot.remaining_quantity).unwrap_or(Decimal::ZERO);
+                    if remaining > Decimal::ZERO {
+                        lot.remaining_quantity = (remaining * split_ratio).to_string();
+                        // cost_per_unit adjusts inversely; total_cost_basis unchanged
+                        let cpu =
+                            Decimal::from_str(&lot.cost_per_unit).unwrap_or(Decimal::ZERO);
+                        if !split_ratio.is_zero() {
+                            lot.cost_per_unit = (cpu / split_ratio).to_string();
+                        }
+                    }
+                }
+            }
+        } else {
+            // FIFO reduction for Sell/TransferOut/Adjustment
+            let mut qty_to_reduce = activity.qty().abs();
+            for lot in group.iter_mut() {
+                if qty_to_reduce <= Decimal::ZERO {
+                    break;
+                }
+                let remaining =
+                    Decimal::from_str(&lot.remaining_quantity).unwrap_or(Decimal::ZERO);
+                if remaining <= Decimal::ZERO {
+                    continue;
+                }
+                let reduce_from_lot = std::cmp::min(remaining, qty_to_reduce);
+                let new_remaining = remaining - reduce_from_lot;
+                lot.remaining_quantity = new_remaining.to_string();
+
+                // Adjust cost basis proportionally
+                let orig =
+                    Decimal::from_str(&lot.original_quantity).unwrap_or(Decimal::ONE);
+                if !orig.is_zero() {
+                    let cost_per_unit =
+                        Decimal::from_str(&lot.cost_per_unit).unwrap_or(Decimal::ZERO);
+                    let fee =
+                        Decimal::from_str(&lot.fee_allocated).unwrap_or(Decimal::ZERO);
+                    lot.total_cost_basis =
+                        (new_remaining * cost_per_unit + fee * new_remaining / orig)
+                            .to_string();
+                }
+
+                if new_remaining <= Decimal::ZERO {
+                    lot.is_closed = true;
+                    lot.close_date = Some(
+                        activity
+                            .activity_date
+                            .date_naive()
+                            .format("%Y-%m-%d")
+                            .to_string(),
+                    );
+                    lot.close_activity_id = Some(activity.id.clone());
+                }
+
+                qty_to_reduce -= reduce_from_lot;
+            }
+        }
+    }
+
+    // Return lots that still have positive quantity
+    groups
+        .into_values()
+        .flatten()
+        .filter(|lot| {
+            let qty = Decimal::from_str(&lot.remaining_quantity).unwrap_or(Decimal::ZERO);
+            qty > Decimal::ZERO
+        })
+        .collect()
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -650,5 +807,223 @@ mod tests {
 
         let mismatches = check_lot_quantity_consistency(&snap, &partial_records);
         assert_eq!(mismatches, 1);
+    }
+
+    // ── replay_lots_to_date tests ──────────────────────────────────────────
+
+    fn make_lot_record(
+        id: &str,
+        account_id: &str,
+        asset_id: &str,
+        open_date: &str,
+        original_qty: &str,
+        remaining_qty: &str,
+        cost_per_unit: &str,
+    ) -> LotRecord {
+        let orig = Decimal::from_str(original_qty).unwrap();
+        let cpu = Decimal::from_str(cost_per_unit).unwrap();
+        LotRecord {
+            id: id.to_string(),
+            account_id: account_id.to_string(),
+            asset_id: asset_id.to_string(),
+            open_date: open_date.to_string(),
+            open_activity_id: Some(id.to_string()),
+            original_quantity: original_qty.to_string(),
+            remaining_quantity: remaining_qty.to_string(),
+            cost_per_unit: cost_per_unit.to_string(),
+            total_cost_basis: (orig * cpu).to_string(),
+            fee_allocated: "0".to_string(),
+            disposal_method: DisposalMethod::Fifo,
+            is_closed: remaining_qty == "0",
+            close_date: None,
+            close_activity_id: None,
+            is_wash_sale: false,
+            holding_period: None,
+            created_at: "2024-01-01T00:00:00.000Z".to_string(),
+            updated_at: "2024-01-01T00:00:00.000Z".to_string(),
+        }
+    }
+
+    fn make_activity(
+        id: &str,
+        account_id: &str,
+        asset_id: &str,
+        activity_type: &str,
+        date: &str,
+        quantity: Decimal,
+    ) -> Activity {
+        use crate::activities::ActivityStatus;
+        Activity {
+            id: id.to_string(),
+            account_id: account_id.to_string(),
+            asset_id: Some(asset_id.to_string()),
+            activity_type: activity_type.to_string(),
+            activity_type_override: None,
+            source_type: None,
+            subtype: None,
+            status: ActivityStatus::Posted,
+            activity_date: NaiveDate::parse_from_str(date, "%Y-%m-%d")
+                .unwrap()
+                .and_hms_opt(0, 0, 0)
+                .unwrap()
+                .and_utc(),
+            settlement_date: None,
+            quantity: Some(quantity),
+            unit_price: Some(dec!(100)),
+            amount: None,
+            fee: Some(Decimal::ZERO),
+            currency: "USD".to_string(),
+            fx_rate: None,
+            notes: None,
+            metadata: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+            import_run_id: None,
+            is_user_modified: false,
+            needs_review: false,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    #[test]
+    fn replay_no_activities_returns_lots_with_original_qty() {
+        // Buy 10 on Jan 1, current remaining is 6 (some sells happened).
+        // Replay to Jan 15 with no activities → should get 10 (original).
+        let lots = vec![make_lot_record("buy1", "acc1", "AAPL", "2024-01-01", "10", "6", "150")];
+        let result = replay_lots_to_date(lots, &[], NaiveDate::from_ymd_opt(2024, 1, 15).unwrap());
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].remaining_quantity, "10");
+    }
+
+    #[test]
+    fn replay_partial_sell() {
+        // Buy 10 on Jan 1, sell 4 on Feb 1. Query Jan 15 → 10, query Feb 15 → 6.
+        let lots = vec![make_lot_record("buy1", "acc1", "AAPL", "2024-01-01", "10", "6", "150")];
+        let activities = vec![make_activity("sell1", "acc1", "AAPL", "SELL", "2024-02-01", dec!(4))];
+
+        // Before the sell
+        let result = replay_lots_to_date(
+            lots.clone(),
+            &activities,
+            NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+        );
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].remaining_quantity, "10");
+
+        // After the sell
+        let result = replay_lots_to_date(
+            lots,
+            &activities,
+            NaiveDate::from_ymd_opt(2024, 2, 15).unwrap(),
+        );
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].remaining_quantity, "6");
+    }
+
+    #[test]
+    fn replay_full_sell_removes_lot() {
+        // Buy 10, sell 10 → lot should not appear.
+        let lots = vec![make_lot_record("buy1", "acc1", "AAPL", "2024-01-01", "10", "0", "150")];
+        let activities =
+            vec![make_activity("sell1", "acc1", "AAPL", "SELL", "2024-02-01", dec!(10))];
+
+        let result = replay_lots_to_date(
+            lots,
+            &activities,
+            NaiveDate::from_ymd_opt(2024, 3, 1).unwrap(),
+        );
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn replay_fifo_order_across_lots() {
+        // Two lots: buy 10 on Jan 1, buy 5 on Feb 1. Sell 12 on Mar 1.
+        // Jan 15: 10 + 5 = 15. Feb 15: 10 + 5 = 15. Mar 15: FIFO removes 10 + 2 = 3 left.
+        let lots = vec![
+            make_lot_record("buy1", "acc1", "AAPL", "2024-01-01", "10", "0", "150"),
+            make_lot_record("buy2", "acc1", "AAPL", "2024-02-01", "5", "3", "160"),
+        ];
+        let activities =
+            vec![make_activity("sell1", "acc1", "AAPL", "SELL", "2024-03-01", dec!(12))];
+
+        let result = replay_lots_to_date(
+            lots,
+            &activities,
+            NaiveDate::from_ymd_opt(2024, 3, 15).unwrap(),
+        );
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, "buy2");
+        assert_eq!(result[0].remaining_quantity, "3");
+    }
+
+    #[test]
+    fn replay_split_multiplies_quantities() {
+        // Buy 10 on Jan 1, 4:1 split on Feb 1.
+        // Jan 15: 10. Feb 15: 40.
+        let lots = vec![make_lot_record("buy1", "acc1", "AAPL", "2024-01-01", "10", "40", "150")];
+        let activities =
+            vec![make_activity("split1", "acc1", "AAPL", "SPLIT", "2024-02-01", dec!(4))];
+
+        // Before split
+        let result = replay_lots_to_date(
+            lots.clone(),
+            &activities,
+            NaiveDate::from_ymd_opt(2024, 1, 15).unwrap(),
+        );
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].remaining_quantity, "10");
+
+        // After split
+        let result = replay_lots_to_date(
+            lots,
+            &activities,
+            NaiveDate::from_ymd_opt(2024, 2, 15).unwrap(),
+        );
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].remaining_quantity, "40");
+    }
+
+    #[test]
+    fn replay_split_then_sell() {
+        // Buy 10 on Jan 1, 2:1 split on Feb 1, sell 5 on Mar 1.
+        // Feb 15: 20. Mar 15: 15.
+        let lots = vec![make_lot_record("buy1", "acc1", "AAPL", "2024-01-01", "10", "15", "150")];
+        let activities = vec![
+            make_activity("split1", "acc1", "AAPL", "SPLIT", "2024-02-01", dec!(2)),
+            make_activity("sell1", "acc1", "AAPL", "SELL", "2024-03-01", dec!(5)),
+        ];
+
+        let result = replay_lots_to_date(
+            lots,
+            &activities,
+            NaiveDate::from_ymd_opt(2024, 3, 15).unwrap(),
+        );
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].remaining_quantity, "15");
+    }
+
+    #[test]
+    fn replay_different_accounts_isolated() {
+        // Same asset in two accounts. Sell in acc1 doesn't affect acc2.
+        let lots = vec![
+            make_lot_record("buy1", "acc1", "AAPL", "2024-01-01", "10", "5", "150"),
+            make_lot_record("buy2", "acc2", "AAPL", "2024-01-01", "10", "10", "150"),
+        ];
+        let activities =
+            vec![make_activity("sell1", "acc1", "AAPL", "SELL", "2024-02-01", dec!(5))];
+
+        let result = replay_lots_to_date(
+            lots,
+            &activities,
+            NaiveDate::from_ymd_opt(2024, 3, 1).unwrap(),
+        );
+        assert_eq!(result.len(), 2);
+        let acc1_lot = result.iter().find(|l| l.account_id == "acc1").unwrap();
+        let acc2_lot = result.iter().find(|l| l.account_id == "acc2").unwrap();
+        assert_eq!(acc1_lot.remaining_quantity, "5");
+        assert_eq!(acc2_lot.remaining_quantity, "10");
     }
 }

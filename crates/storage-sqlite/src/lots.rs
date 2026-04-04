@@ -171,17 +171,22 @@ impl LotRepositoryTrait for LotsRepository {
         date: NaiveDate,
     ) -> Result<Vec<LotRecord>> {
         use crate::schema::lots::dsl;
-        use diesel::NullableExpressionMethods;
 
         let date_str = date.format("%Y-%m-%d").to_string();
         let mut conn = get_connection(&self.pool)?;
+        // A lot was active on `date` if it opened on or before that date AND
+        // either (a) it is still open, or (b) it closed after that date.
+        // The old query used .assume_not_null() on close_date which could drop
+        // open lots (NULL > 'x' is NULL in SQL, not TRUE).
         let rows: Vec<LotRecordDB> = dsl::lots
             .filter(dsl::account_id.eq_any(account_ids))
             .filter(dsl::open_date.le(&date_str))
             .filter(
                 dsl::is_closed
                     .eq(0)
-                    .or(dsl::close_date.assume_not_null().gt(&date_str)),
+                    .or(dsl::close_date.is_not_null().and(
+                        dsl::close_date.gt(&date_str),
+                    )),
             )
             .load(&mut conn)
             .map_err(StorageError::from)?;

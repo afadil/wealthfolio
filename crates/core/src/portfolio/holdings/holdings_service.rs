@@ -1,3 +1,4 @@
+use crate::activities::ActivityRepositoryTrait;
 use crate::assets::{Asset, AssetClassificationService, AssetKind, AssetServiceTrait};
 use crate::constants::DECIMAL_PRECISION;
 use crate::errors::{CalculatorError, Error as CoreError, Result};
@@ -46,6 +47,7 @@ pub struct HoldingsService {
     valuation_service: Arc<dyn HoldingsValuationServiceTrait>,
     classification_service: Arc<AssetClassificationService>,
     lot_repository: Arc<dyn LotRepositoryTrait>,
+    activity_repository: Arc<dyn ActivityRepositoryTrait>,
     timezone: Arc<RwLock<String>>,
 }
 
@@ -64,6 +66,7 @@ impl HoldingsService {
         valuation_service: Arc<dyn HoldingsValuationServiceTrait>,
         classification_service: Arc<AssetClassificationService>,
         lot_repository: Arc<dyn LotRepositoryTrait>,
+        activity_repository: Arc<dyn ActivityRepositoryTrait>,
     ) -> Self {
         Self::new_with_timezone(
             asset_service,
@@ -71,6 +74,7 @@ impl HoldingsService {
             valuation_service,
             classification_service,
             lot_repository,
+            activity_repository,
             Arc::new(RwLock::new(String::new())),
         )
     }
@@ -81,6 +85,7 @@ impl HoldingsService {
         valuation_service: Arc<dyn HoldingsValuationServiceTrait>,
         classification_service: Arc<AssetClassificationService>,
         lot_repository: Arc<dyn LotRepositoryTrait>,
+        activity_repository: Arc<dyn ActivityRepositoryTrait>,
         timezone: Arc<RwLock<String>>,
     ) -> Self {
         Self {
@@ -89,6 +94,7 @@ impl HoldingsService {
             valuation_service,
             classification_service,
             lot_repository,
+            activity_repository,
             timezone,
         }
     }
@@ -645,12 +651,17 @@ impl HoldingsServiceTrait for HoldingsService {
     ) -> Result<Vec<Holding>> {
         let mut holdings: Vec<Holding> = Vec::new();
 
-        // Security positions: read from lots table.
+        // Security positions: read from lots table, then replay activities to
+        // get correct point-in-time quantities.
         let account_ids = vec![account_id.to_string()];
-        let lots = self
+        let raw_lots = self
             .lot_repository
             .get_lots_as_of_date(&account_ids, date)
             .await?;
+        let activities = self
+            .activity_repository
+            .get_activities_by_account_ids(&account_ids)?;
+        let lots = crate::lots::replay_lots_to_date(raw_lots, &activities, date);
 
         if !lots.is_empty() {
             // Group lots by asset_id.

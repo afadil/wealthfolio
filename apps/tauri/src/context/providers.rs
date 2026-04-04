@@ -245,6 +245,7 @@ pub async fn initialize_context(
         holdings_valuation_service.clone(),
         classification_service.clone(),
         lots_repository.clone(),
+        activity_repository.clone(),
         timezone.clone(),
     ));
 
@@ -259,6 +260,7 @@ pub async fn initialize_context(
         asset_repository.clone(),
         snapshot_repository.clone(),
         lots_repository.clone(),
+        activity_repository.clone(),
         quote_service.clone(),
         valuation_repository.clone(),
         fx_service.clone(),

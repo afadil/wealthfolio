@@ -13,6 +13,7 @@ use super::net_worth_model::{
 };
 use super::net_worth_traits::NetWorthServiceTrait;
 use crate::accounts::{account_types, AccountRepositoryTrait};
+use crate::activities::ActivityRepositoryTrait;
 use crate::assets::{AssetKind, AssetRepositoryTrait};
 use crate::constants::DECIMAL_PRECISION;
 use crate::errors::Result;
@@ -33,6 +34,7 @@ pub struct NetWorthService {
     asset_repository: Arc<dyn AssetRepositoryTrait>,
     snapshot_repository: Arc<dyn SnapshotRepositoryTrait>,
     lot_repository: Arc<dyn LotRepositoryTrait>,
+    activity_repository: Arc<dyn ActivityRepositoryTrait>,
     quote_service: Arc<dyn QuoteServiceTrait>,
     valuation_repository: Arc<dyn ValuationRepositoryTrait>,
     fx_service: Arc<dyn FxServiceTrait>,
@@ -47,6 +49,7 @@ impl NetWorthService {
         asset_repository: Arc<dyn AssetRepositoryTrait>,
         snapshot_repository: Arc<dyn SnapshotRepositoryTrait>,
         lot_repository: Arc<dyn LotRepositoryTrait>,
+        activity_repository: Arc<dyn ActivityRepositoryTrait>,
         quote_service: Arc<dyn QuoteServiceTrait>,
         valuation_repository: Arc<dyn ValuationRepositoryTrait>,
         fx_service: Arc<dyn FxServiceTrait>,
@@ -57,6 +60,7 @@ impl NetWorthService {
             asset_repository,
             snapshot_repository,
             lot_repository,
+            activity_repository,
             quote_service,
             valuation_repository,
             fx_service,
@@ -267,11 +271,16 @@ impl NetWorthServiceTrait for NetWorthService {
         // Get account IDs
         let account_ids: Vec<String> = accounts.iter().map(|a| a.id.clone()).collect();
 
-        // Security positions: read from lots table.
-        let lots = self
+        // Security positions: read from lots table, then replay activities to
+        // get correct point-in-time quantities.
+        let raw_lots = self
             .lot_repository
             .get_lots_as_of_date(&account_ids, date)
             .await?;
+        let activities = self
+            .activity_repository
+            .get_activities_by_account_ids(&account_ids)?;
+        let lots = crate::lots::replay_lots_to_date(raw_lots, &activities, date);
 
         // Cash balances: still read from snapshots.
         // NOTE: snapshots are fetched here only for cash_balances; security positions
