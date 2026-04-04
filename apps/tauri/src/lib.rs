@@ -606,13 +606,13 @@ pub fn run() {
             commands::health::execute_health_fix,
             commands::health::get_health_config,
             commands::health::update_health_config,
-            // FIRE calculation commands (used by retirement goal detail)
-            commands::fire::calculate_fire_projection,
-            commands::fire::run_fire_monte_carlo,
-            commands::fire::run_fire_scenario_analysis,
-            commands::fire::run_fire_sorr,
-            commands::fire::run_fire_sensitivity,
-            commands::fire::run_fire_strategy_comparison,
+            // RetirementPlan-based FIRE commands
+            commands::fire::calculate_retirement_projection,
+            commands::fire::run_retirement_monte_carlo,
+            commands::fire::run_retirement_scenario_analysis,
+            commands::fire::run_retirement_sorr,
+            commands::fire::run_retirement_sensitivity,
+            commands::fire::run_retirement_strategy_comparison,
         ])
         .build(tauri::generate_context!())
         .expect("Failed to build Wealthfolio application")
