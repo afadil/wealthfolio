@@ -85,8 +85,9 @@ pub trait LotRepositoryTrait: Send + Sync {
         closures: &[LotClosure],
     ) -> Result<()>;
 
-    /// Returns the total number of rows currently in the lots table.
-    fn count_open_lots(&self) -> Result<i64>;
+    /// Returns the total number of lot rows (open and closed) in the lots table.
+    /// Used by the startup backfill to check if the table is empty.
+    fn count_lots(&self) -> Result<i64>;
 }
 
 // ── Domain types ──────────────────────────────────────────────────────────────

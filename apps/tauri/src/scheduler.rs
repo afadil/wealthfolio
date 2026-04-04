@@ -116,7 +116,7 @@ pub async fn run_startup_sync(_handle: &AppHandle, _context: &std::sync::Arc<Ser
 pub async fn backfill_lots_if_needed(context: &std::sync::Arc<ServiceContext>) {
     use wealthfolio_core::portfolio::snapshot::SnapshotRecalcMode;
 
-    let count = match context.lots_repository.count_open_lots() {
+    let count = match context.lots_repository.count_lots() {
         Ok(n) => n,
         Err(e) => {
             warn!("Lot backfill skipped: could not count lots ({})", e);

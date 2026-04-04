@@ -299,7 +299,7 @@ impl LotRepositoryTrait for LotsRepository {
             .await
     }
 
-    fn count_open_lots(&self) -> Result<i64> {
+    fn count_lots(&self) -> Result<i64> {
         use crate::schema::lots::dsl;
         use diesel::dsl::count_star;
 
@@ -398,7 +398,7 @@ mod tests {
         repo.replace_lots_for_account("acc1", &initial)
             .await
             .unwrap();
-        assert_eq!(repo.count_open_lots().unwrap(), 3);
+        assert_eq!(repo.count_lots().unwrap(), 3);
 
         // Replace with 2 different lots
         let replacement = vec![
@@ -408,7 +408,7 @@ mod tests {
         repo.replace_lots_for_account("acc1", &replacement)
             .await
             .unwrap();
-        assert_eq!(repo.count_open_lots().unwrap(), 2);
+        assert_eq!(repo.count_lots().unwrap(), 2);
 
         // Old IDs must be gone
         let mut conn = get_connection(&pool).unwrap();
@@ -450,14 +450,14 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(repo.count_open_lots().unwrap(), 5);
+        assert_eq!(repo.count_lots().unwrap(), 5);
 
         // Replace only acc1; acc2 must be untouched
         repo.replace_lots_for_account("acc1", &[make_lot_record("a3", "acc1", "AAPL", "80")])
             .await
             .unwrap();
 
-        assert_eq!(repo.count_open_lots().unwrap(), 4); // 1 (acc1) + 3 (acc2)
+        assert_eq!(repo.count_lots().unwrap(), 4); // 1 (acc1) + 3 (acc2)
 
         let mut conn = get_connection(&pool).unwrap();
         let acc2_count: i64 = crate::schema::lots::dsl::lots
@@ -477,9 +477,9 @@ mod tests {
         repo.replace_lots_for_account("acc1", &[make_lot_record("l1", "acc1", "AAPL", "50")])
             .await
             .unwrap();
-        assert_eq!(repo.count_open_lots().unwrap(), 1);
+        assert_eq!(repo.count_lots().unwrap(), 1);
 
         repo.replace_lots_for_account("acc1", &[]).await.unwrap();
-        assert_eq!(repo.count_open_lots().unwrap(), 0);
+        assert_eq!(repo.count_lots().unwrap(), 0);
     }
 }

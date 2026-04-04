@@ -784,7 +784,7 @@ impl crate::lots::LotRepositoryTrait for MockLotRepository {
         Ok(())
     }
 
-    fn count_open_lots(&self) -> Result<i64> {
+    fn count_lots(&self) -> Result<i64> {
         Ok(self.lots.iter().filter(|l| !l.is_closed).count() as i64)
     }
 }

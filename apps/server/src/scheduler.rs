@@ -54,7 +54,7 @@ pub fn start_broker_sync_scheduler(_state: Arc<AppState>) {
 pub async fn backfill_lots_if_needed(state: &Arc<AppState>) {
     use wealthfolio_core::portfolio::snapshot::SnapshotRecalcMode;
 
-    let count = match state.lots_repository.count_open_lots() {
+    let count = match state.lots_repository.count_lots() {
         Ok(n) => n,
         Err(e) => {
             warn!("Lot backfill skipped: could not count lots ({})", e);

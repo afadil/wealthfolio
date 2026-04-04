@@ -5401,7 +5401,7 @@ mod tests {
             Ok(())
         }
 
-        fn count_open_lots(&self) -> AppResult<i64> {
+        fn count_lots(&self) -> AppResult<i64> {
             Ok(self
                 .calls
                 .read()
