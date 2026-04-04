@@ -1,73 +1,101 @@
 import { invoke } from "./core";
 import type {
-  FireSettings,
   FireProjection,
   MonteCarloResult,
+  RetirementPlan,
   ScenarioResult,
   SorrScenario,
   SensitivityResult,
   StrategyComparisonResult,
 } from "@/pages/fire-planner/types";
+import type { PlannerMode } from "@/lib/types";
 
 export type { SensitivityResult, StrategyComparisonResult };
 
-export const getFireSettings = async (): Promise<FireSettings | null> => {
-  return invoke<FireSettings | null>("get_fire_settings");
-};
-
-export const saveFireSettings = async (settings: FireSettings): Promise<void> => {
-  return invoke<void>("save_fire_settings", { settings });
-};
-
-export const calculateFireProjection = async (
-  settings: FireSettings,
+export const calculateRetirementProjection = async (
+  plan: RetirementPlan,
   currentPortfolio: number,
+  plannerMode?: PlannerMode,
+  goalId?: string,
 ): Promise<FireProjection> => {
-  return invoke<FireProjection>("calculate_fire_projection", { settings, currentPortfolio });
-};
-
-export const runFireMonteCarlo = async (
-  settings: FireSettings,
-  currentPortfolio: number,
-  nSims = 100_000,
-): Promise<MonteCarloResult> => {
-  return invoke<MonteCarloResult>("run_fire_monte_carlo", {
-    settings,
+  return invoke<FireProjection>("calculate_retirement_projection", {
+    plan,
     currentPortfolio,
-    nSims,
+    plannerMode,
+    goalId,
   });
 };
 
-export const runFireScenarioAnalysis = async (
-  settings: FireSettings,
+export const runRetirementMonteCarlo = async (
+  plan: RetirementPlan,
   currentPortfolio: number,
-): Promise<ScenarioResult[]> => {
-  return invoke<ScenarioResult[]>("run_fire_scenario_analysis", { settings, currentPortfolio });
-};
-
-export const runFireSorr = async (
-  settings: FireSettings,
-  portfolioAtFire: number,
-  retirementStartAge: number,
-): Promise<SorrScenario[]> => {
-  return invoke<SorrScenario[]>("run_fire_sorr", { settings, portfolioAtFire, retirementStartAge });
-};
-
-export const runFireSensitivity = async (
-  settings: FireSettings,
-  currentPortfolio: number,
-): Promise<SensitivityResult> => {
-  return invoke<SensitivityResult>("run_fire_sensitivity", { settings, currentPortfolio });
-};
-
-export const runFireStrategyComparison = async (
-  settings: FireSettings,
-  currentPortfolio: number,
-  nSims = 5_000,
-): Promise<StrategyComparisonResult> => {
-  return invoke<StrategyComparisonResult>("run_fire_strategy_comparison", {
-    settings,
+  nSims = 100_000,
+  plannerMode?: PlannerMode,
+  goalId?: string,
+): Promise<MonteCarloResult> => {
+  return invoke<MonteCarloResult>("run_retirement_monte_carlo", {
+    plan,
     currentPortfolio,
     nSims,
+    plannerMode,
+    goalId,
+  });
+};
+
+export const runRetirementScenarioAnalysis = async (
+  plan: RetirementPlan,
+  currentPortfolio: number,
+  plannerMode?: PlannerMode,
+  goalId?: string,
+): Promise<ScenarioResult[]> => {
+  return invoke<ScenarioResult[]>("run_retirement_scenario_analysis", {
+    plan,
+    currentPortfolio,
+    plannerMode,
+    goalId,
+  });
+};
+
+export const runRetirementSorr = async (
+  plan: RetirementPlan,
+  portfolioAtFire: number,
+  retirementStartAge: number,
+  goalId?: string,
+): Promise<SorrScenario[]> => {
+  return invoke<SorrScenario[]>("run_retirement_sorr", {
+    plan,
+    portfolioAtFire,
+    retirementStartAge,
+    goalId,
+  });
+};
+
+export const runRetirementSensitivity = async (
+  plan: RetirementPlan,
+  currentPortfolio: number,
+  plannerMode?: PlannerMode,
+  goalId?: string,
+): Promise<SensitivityResult> => {
+  return invoke<SensitivityResult>("run_retirement_sensitivity", {
+    plan,
+    currentPortfolio,
+    plannerMode,
+    goalId,
+  });
+};
+
+export const runRetirementStrategyComparison = async (
+  plan: RetirementPlan,
+  currentPortfolio: number,
+  nSims = 5_000,
+  plannerMode?: PlannerMode,
+  goalId?: string,
+): Promise<StrategyComparisonResult> => {
+  return invoke<StrategyComparisonResult>("run_retirement_strategy_comparison", {
+    plan,
+    currentPortfolio,
+    nSims,
+    plannerMode,
+    goalId,
   });
 };

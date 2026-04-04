@@ -384,14 +384,12 @@ export {
 
 // FIRE Planner (desktop-only — stubs throw at runtime)
 export {
-  getFireSettings,
-  saveFireSettings,
-  calculateFireProjection,
-  runFireMonteCarlo,
-  runFireScenarioAnalysis,
-  runFireSorr,
-  runFireSensitivity,
-  runFireStrategyComparison,
+  calculateRetirementProjection,
+  runRetirementMonteCarlo,
+  runRetirementScenarioAnalysis,
+  runRetirementSorr,
+  runRetirementSensitivity,
+  runRetirementStrategyComparison,
 } from "./fire-planner";
 
 // Crypto Commands (web stubs - not available in web mode)

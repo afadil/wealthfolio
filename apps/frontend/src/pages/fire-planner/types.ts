@@ -1,8 +1,6 @@
 // All monetary values in the user's base currency (from Wealthfolio settings)
 // All rates as decimals (0.065 = 6.5%)
 
-export type WithdrawalStrategy = "constant-dollar" | "constant-percentage";
-
 export interface GlidepathSettings {
   enabled: boolean;
   /** Expected annual return for the bond portion (e.g. 0.03 = 3%). */
@@ -13,69 +11,21 @@ export interface GlidepathSettings {
   bondAllocationAtHorizon: number;
 }
 
-export interface FireSettings {
-  monthlyExpensesAtFire: number;
-  safeWithdrawalRate: number;
-  withdrawalStrategy: WithdrawalStrategy;
-  expectedAnnualReturn: number;
-  expectedReturnStdDev: number;
-  inflationRate: number;
-  currentAge: number;
-  targetFireAge: number;
-  monthlyContribution: number;
-  contributionGrowthRate: number;
-  currentAnnualSalary?: number;
-  salaryGrowthRate?: number;
-  additionalIncomeStreams: IncomeStream[];
-  planningHorizonAge: number;
-  includedAccountIds?: string[];
-  targetAllocations: Record<string, number>;
-  currency: string;
-  linkedGoalId?: string;
-  /** Monthly healthcare cost at FIRE in today's money (on top of monthlyExpensesAtFire). */
-  healthcareMonthlyAtFire?: number;
-  /** Annual inflation rate for healthcare costs. Defaults to inflationRate when undefined. */
-  healthcareInflationRate?: number;
-  /** Glide-path settings for bond allocation shift during retirement. */
-  glidePath?: GlidepathSettings;
-}
-
-/**
- * "db" (defined-benefit, default): user enters `monthlyAmount` manually.
- * "dc" (defined-contribution): payout is derived as `balanceAtStartAge * swr / 12`.
- *  Absence of this field is treated as "db" for backward compatibility.
- */
-export type StreamType = "db" | "dc";
-
-export interface IncomeStream {
-  id: string;
-  label: string;
-  /** For DB streams: the manual monthly payout. For DC streams, ignored — payout is derived. */
-  monthlyAmount: number;
-  startAge: number;
-  startAgeIsAuto?: boolean;
-  adjustForInflation: boolean;
-  annualGrowthRate?: number;
-  linkedAccountId?: string;
-  currentValue?: number;
-  monthlyContribution?: number;
-  accumulationReturn?: number;
-  /** Undefined = defined-benefit (backward-compatible default). */
-  streamType?: StreamType;
-}
-
 export interface FireProjection {
   /** Age when portfolio first reached the FIRE target. null if target was never reached. */
   fireAge: number | null;
   fireYear: number | null;
+  retirementStartAge: number | null;
+  retirementStartReason?: RetirementStartReason | null;
   portfolioAtFire: number;
-  /** True when withdrawal phase started with portfolio >= FIRE target (genuine FI).
-   *  False means retirement was forced by targetFireAge before the target was reached. */
+  /** True when withdrawal phase started with portfolio >= required capital. */
   fundedAtRetirement: boolean;
   coastFireAmount: number;
   coastFireReached: boolean;
   yearByYear: YearlySnapshot[];
 }
+
+export type RetirementStartReason = "funded" | "target_age_forced";
 
 export interface YearlySnapshot {
   age: number;
@@ -87,6 +37,8 @@ export interface YearlySnapshot {
   annualIncome: number;
   netWithdrawalFromPortfolio: number;
   pensionAssets: number;
+  annualTaxes?: number;
+  grossWithdrawal?: number;
 }
 
 export interface MonteCarloResult {
@@ -128,6 +80,9 @@ export interface ScenarioResult {
   annualReturn: number;
   fireAge: number | null;
   portfolioAtHorizon: number;
+  fundedAtGoalAge: boolean;
+  success: boolean;
+  failureAge?: number | null;
   yearByYear: YearlySnapshot[];
 }
 
@@ -137,6 +92,7 @@ export interface SorrScenario {
   portfolioPath: number[];
   finalValue: number;
   survived: boolean;
+  failureAge?: number | null;
 }
 
 export interface SensitivityResult {
@@ -147,6 +103,7 @@ export interface SensitivityResult {
 export interface StrategyComparisonResult {
   constantDollar: MonteCarloResult;
   constantPercentage: MonteCarloResult;
+  guardrails: MonteCarloResult;
 }
 
 export interface SensitivityMatrix {
@@ -161,19 +118,89 @@ export interface SensitivitySWRMatrix {
   fireAges: (number | null)[][];
 }
 
-export const DEFAULT_SETTINGS: FireSettings = {
-  monthlyExpensesAtFire: 3000,
-  safeWithdrawalRate: 0.035,
-  withdrawalStrategy: "constant-dollar",
-  expectedAnnualReturn: 0.07,
-  expectedReturnStdDev: 0.12,
-  inflationRate: 0.02,
-  currentAge: 30,
-  targetFireAge: 50,
-  monthlyContribution: 1000,
-  contributionGrowthRate: 0.02,
-  planningHorizonAge: 90,
-  additionalIncomeStreams: [],
-  targetAllocations: {},
-  currency: "USD",
-};
+// ─── Retirement Plan Types ──────────────────────────────────────────────────
+
+export interface RetirementPlan {
+  version: "v2";
+  personal: PersonalProfile;
+  expenses: ExpenseBudget;
+  incomeStreams: RetirementIncomeStream[];
+  investment: InvestmentAssumptions;
+  withdrawal: WithdrawalConfig;
+  tax?: TaxProfile;
+  currency: string;
+}
+
+export interface PersonalProfile {
+  currentAge: number;
+  targetRetirementAge: number;
+  planningHorizonAge: number;
+  currentAnnualSalary?: number;
+  salaryGrowthRate?: number;
+}
+
+export interface ExpenseBudget {
+  living: ExpenseBucket;
+  healthcare: ExpenseBucket;
+  housing?: ExpenseBucket;
+  discretionary?: ExpenseBucket;
+}
+
+export interface ExpenseBucket {
+  monthlyAmount: number;
+  inflationRate?: number;
+  startAge?: number;
+  endAge?: number;
+  essential?: boolean;
+}
+
+export interface RetirementIncomeStream {
+  id: string;
+  label: string;
+  streamType: "db" | "dc";
+  startAge: number;
+  adjustForInflation: boolean;
+  annualGrowthRate?: number;
+  monthlyAmount?: number;
+  linkedAccountId?: string;
+  currentValue?: number;
+  monthlyContribution?: number;
+  accumulationReturn?: number;
+}
+
+export interface InvestmentAssumptions {
+  expectedAnnualReturn: number;
+  expectedReturnStdDev: number;
+  inflationRate: number;
+  monthlyContribution: number;
+  contributionGrowthRate: number;
+  glidePath?: GlidepathSettings;
+  targetAllocations: Record<string, number>;
+}
+
+export interface GuardrailsConfig {
+  ceilingRate: number;
+  floorRate: number;
+}
+
+export interface WithdrawalConfig {
+  safeWithdrawalRate: number;
+  strategy: "constant-dollar" | "constant-percentage" | "guardrails";
+  guardrails?: GuardrailsConfig;
+}
+
+export interface TaxProfile {
+  taxableWithdrawalRate: number;
+  taxDeferredWithdrawalRate: number;
+  taxFreeWithdrawalRate: number;
+  earlyWithdrawalPenaltyRate?: number;
+  earlyWithdrawalPenaltyAge?: number;
+  countryCode?: string;
+  withdrawalBuckets?: TaxBucketBalances;
+}
+
+export interface TaxBucketBalances {
+  taxable: number;
+  taxDeferred: number;
+  taxFree: number;
+}
