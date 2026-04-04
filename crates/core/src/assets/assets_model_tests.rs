@@ -439,6 +439,7 @@ mod tests {
             instrument_key: None,
             provider_config: None,
             exchange_name: None,
+            account_id: None,
             created_at: NaiveDateTime::default(),
             updated_at: NaiveDateTime::default(),
         }
