@@ -13,11 +13,15 @@ use axum::{
 use serde::Deserialize;
 use wealthfolio_core::{
     accounts::AccountServiceTrait,
-    goals::{Goal, GoalFundingRule, GoalFundingRuleInput, GoalPlan, NewGoal, SaveGoalPlan},
+    goals::{
+        validate_retirement_plan, Goal, GoalFundingRule, GoalFundingRuleInput, GoalPlan, NewGoal,
+        SaveGoalPlan,
+    },
+    planning::retirement::{RetirementPlan, RetirementTimingMode},
     planning::SaveUpOverview,
     portfolio::fire::{
-        self, FireSettings, MonteCarloResult, RetirementOverview, ScenarioResult,
-        SensitivityResult, SorrScenario, StrategyComparisonResult,
+        self, MonteCarloResult, RetirementOverview, ScenarioResult, SensitivityResult,
+        SorrScenario, StrategyComparisonResult,
     },
 };
 
@@ -143,80 +147,179 @@ async fn get_save_up_overview(
     Ok(Json(overview))
 }
 
-// ─── FIRE Simulation Endpoints ───────────────────────────────────────────────
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct FireSimulationRequest {
-    settings: FireSettings,
-    current_portfolio: f64,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct FireMonteCarloRequest {
-    settings: FireSettings,
-    current_portfolio: f64,
-    n_sims: Option<u32>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct FireSorrRequest {
-    settings: FireSettings,
-    portfolio_at_fire: f64,
-    retirement_start_age: u32,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct FireStrategyComparisonRequest {
-    settings: FireSettings,
-    current_portfolio: f64,
-    n_sims: Option<u32>,
-}
+// ─── RetirementPlan-based Simulation Endpoints ───────────────────────────────
 
 const MAX_SIMS: u32 = 500_000;
 
-async fn fire_monte_carlo(
-    Json(req): Json<FireMonteCarloRequest>,
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RetirementSimulationRequest {
+    plan: RetirementPlan,
+    current_portfolio: f64,
+    goal_id: Option<String>,
+    planner_mode: Option<RetirementTimingMode>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RetirementMonteCarloRequest {
+    plan: RetirementPlan,
+    current_portfolio: f64,
+    n_sims: Option<u32>,
+    goal_id: Option<String>,
+    planner_mode: Option<RetirementTimingMode>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RetirementSorrRequest {
+    plan: RetirementPlan,
+    portfolio_at_fire: f64,
+    retirement_start_age: u32,
+    goal_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RetirementStrategyComparisonRequest {
+    plan: RetirementPlan,
+    current_portfolio: f64,
+    n_sims: Option<u32>,
+    goal_id: Option<String>,
+    planner_mode: Option<RetirementTimingMode>,
+}
+
+async fn resolve_retirement_inputs(
+    state: &Arc<AppState>,
+    goal_id: &Option<String>,
+    planner_mode: Option<RetirementTimingMode>,
+    plan: RetirementPlan,
+    current_portfolio: f64,
+) -> ApiResult<(RetirementPlan, f64, RetirementTimingMode)> {
+    if let Some(goal_id) = goal_id {
+        let valuation_map = build_valuation_map(state).await?;
+        let prepared = state
+            .goal_service
+            .prepare_retirement_simulation_input(goal_id, &valuation_map)
+            .await?;
+        Ok((
+            prepared.plan,
+            prepared.current_portfolio,
+            prepared.planner_mode,
+        ))
+    } else {
+        validate_retirement_plan(&plan)?;
+        Ok((
+            plan,
+            current_portfolio,
+            planner_mode.unwrap_or(RetirementTimingMode::Fire),
+        ))
+    }
+}
+
+async fn retirement_projection(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<RetirementSimulationRequest>,
+) -> ApiResult<Json<fire::FireProjection>> {
+    let (plan, current_portfolio, planner_mode) = resolve_retirement_inputs(
+        &state,
+        &req.goal_id,
+        req.planner_mode,
+        req.plan,
+        req.current_portfolio,
+    )
+    .await?;
+    let result = fire::project_retirement_with_mode(&plan, current_portfolio, planner_mode);
+    Ok(Json(result))
+}
+
+async fn retirement_monte_carlo(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<RetirementMonteCarloRequest>,
 ) -> ApiResult<Json<MonteCarloResult>> {
-    let n = req.n_sims.unwrap_or(100_000).min(MAX_SIMS);
-    let result = fire::run_monte_carlo(&req.settings, req.current_portfolio, n);
+    let n = req.n_sims.unwrap_or(10_000).min(MAX_SIMS);
+    let (plan, current_portfolio, planner_mode) = resolve_retirement_inputs(
+        &state,
+        &req.goal_id,
+        req.planner_mode,
+        req.plan,
+        req.current_portfolio,
+    )
+    .await?;
+    let result = fire::run_monte_carlo_with_mode(&plan, current_portfolio, n, planner_mode);
     Ok(Json(result))
 }
 
-async fn fire_scenario_analysis(
-    Json(req): Json<FireSimulationRequest>,
+async fn retirement_scenario_analysis(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<RetirementSimulationRequest>,
 ) -> ApiResult<Json<Vec<ScenarioResult>>> {
-    let result = fire::run_scenario_analysis(&req.settings, req.current_portfolio);
+    let (plan, current_portfolio, planner_mode) = resolve_retirement_inputs(
+        &state,
+        &req.goal_id,
+        req.planner_mode,
+        req.plan,
+        req.current_portfolio,
+    )
+    .await?;
+    let result = fire::run_scenario_analysis_with_mode(&plan, current_portfolio, planner_mode);
     Ok(Json(result))
 }
 
-async fn fire_sensitivity_analysis(
-    Json(req): Json<FireSimulationRequest>,
+async fn retirement_sensitivity_analysis(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<RetirementSimulationRequest>,
 ) -> ApiResult<Json<SensitivityResult>> {
-    let result = fire::run_sensitivity_analysis(&req.settings, req.current_portfolio);
+    let (plan, current_portfolio, planner_mode) = resolve_retirement_inputs(
+        &state,
+        &req.goal_id,
+        req.planner_mode,
+        req.plan,
+        req.current_portfolio,
+    )
+    .await?;
+    let result = fire::run_sensitivity_analysis_with_mode(&plan, current_portfolio, planner_mode);
     Ok(Json(result))
 }
 
-async fn fire_sequence_of_returns(
-    Json(req): Json<FireSorrRequest>,
+async fn retirement_sequence_of_returns(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<RetirementSorrRequest>,
 ) -> ApiResult<Json<Vec<SorrScenario>>> {
-    let result = fire::run_sequence_of_returns_risk(
-        &req.settings,
-        req.portfolio_at_fire,
-        req.retirement_start_age,
-    );
+    let plan = if let Some(goal_id) = &req.goal_id {
+        let valuation_map = build_valuation_map(&state).await?;
+        state
+            .goal_service
+            .prepare_retirement_simulation_input(goal_id, &valuation_map)
+            .await?
+            .plan
+    } else {
+        validate_retirement_plan(&req.plan)?;
+        req.plan
+    };
+    let result = fire::run_sorr(&plan, req.portfolio_at_fire, req.retirement_start_age);
     Ok(Json(result))
 }
 
-async fn fire_strategy_comparison(
-    Json(req): Json<FireStrategyComparisonRequest>,
+async fn retirement_strategy_comparison(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<RetirementStrategyComparisonRequest>,
 ) -> ApiResult<Json<StrategyComparisonResult>> {
-    let n = req.n_sims.unwrap_or(5_000).min(MAX_SIMS);
-    let result = fire::run_strategy_comparison(&req.settings, req.current_portfolio, n);
-    Ok(Json(result))
+    let n = req.n_sims.unwrap_or(10_000).min(MAX_SIMS);
+    let (plan, current_portfolio, planner_mode) = resolve_retirement_inputs(
+        &state,
+        &req.goal_id,
+        req.planner_mode,
+        req.plan,
+        req.current_portfolio,
+    )
+    .await?;
+    Ok(Json(fire::run_strategy_comparison_with_mode(
+        &plan,
+        current_portfolio,
+        n,
+        planner_mode,
+    )))
 }
 
 pub fn router() -> Router<Arc<AppState>> {
@@ -237,22 +340,29 @@ pub fn router() -> Router<Arc<AppState>> {
         )
         .route("/goals/{id}/save-up-overview", get(get_save_up_overview))
         .route("/goals/plan", axum::routing::post(save_goal_plan))
-        // FIRE simulation endpoints
-        .route("/fire/monte-carlo", axum::routing::post(fire_monte_carlo))
+        // RetirementPlan-based simulation endpoints
         .route(
-            "/fire/scenario-analysis",
-            axum::routing::post(fire_scenario_analysis),
+            "/retirement/projection",
+            axum::routing::post(retirement_projection),
         )
         .route(
-            "/fire/sensitivity-analysis",
-            axum::routing::post(fire_sensitivity_analysis),
+            "/retirement/monte-carlo",
+            axum::routing::post(retirement_monte_carlo),
         )
         .route(
-            "/fire/sequence-of-returns",
-            axum::routing::post(fire_sequence_of_returns),
+            "/retirement/scenario-analysis",
+            axum::routing::post(retirement_scenario_analysis),
         )
         .route(
-            "/fire/strategy-comparison",
-            axum::routing::post(fire_strategy_comparison),
+            "/retirement/sensitivity-analysis",
+            axum::routing::post(retirement_sensitivity_analysis),
+        )
+        .route(
+            "/retirement/sequence-of-returns",
+            axum::routing::post(retirement_sequence_of_returns),
+        )
+        .route(
+            "/retirement/strategy-comparison",
+            axum::routing::post(retirement_strategy_comparison),
         )
 }
