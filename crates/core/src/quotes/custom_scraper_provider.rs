@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use chrono::{DateTime, NaiveDate, TimeZone, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use log::debug;
 use rust_decimal::Decimal;
 
@@ -741,6 +741,14 @@ fn parse_date(s: &str, explicit_format: Option<&str>) -> Option<NaiveDate> {
     }
     if let Some(fmt) = explicit_format {
         return NaiveDate::parse_from_str(s, fmt).ok();
+    }
+    // Try ISO 8601 datetime (e.g. "2025-04-03T00:00:00-04:00")
+    if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
+        return Some(dt.date_naive());
+    }
+    // Also try without timezone (e.g. "2025-04-03T00:00:00")
+    if let Ok(dt) = NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S") {
+        return Some(dt.date());
     }
     // Try unix timestamp (seconds or milliseconds)
     if let Ok(n) = s.parse::<i64>() {
