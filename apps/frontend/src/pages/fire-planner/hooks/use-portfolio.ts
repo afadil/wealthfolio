@@ -1,13 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { getAccounts, getLatestValuations, getHoldings, searchActivities } from "@/adapters";
+import { getAccounts, getLatestValuations, getHoldings } from "@/adapters";
 import type { Holding } from "@/lib/types";
-import type { FireSettings } from "../types";
 
 const INVESTMENT_TYPES = new Set(["SECURITIES", "CRYPTOCURRENCY"]);
 
-export function usePortfolioData(
-  settingsOrAccountIds?: Pick<FireSettings, "includedAccountIds"> | string[],
-) {
+export function usePortfolioData(accountIds?: string[]) {
   const accountsQuery = useQuery({
     queryKey: ["fire-planner-accounts"],
     queryFn: () => getAccounts(),
@@ -17,10 +14,7 @@ export function usePortfolioData(
   const accounts = accountsQuery.data ?? [];
   const allActiveAccounts = accounts.filter((a) => a.isActive && !a.isArchived);
 
-  // Accept either explicit account IDs array or settings object
-  const explicitIds = Array.isArray(settingsOrAccountIds)
-    ? settingsOrAccountIds
-    : settingsOrAccountIds?.includedAccountIds;
+  const explicitIds = accountIds;
 
   const activeAccountIds = (
     explicitIds && explicitIds.length > 0
@@ -63,23 +57,6 @@ export function usePortfolioData(
     staleTime: 5 * 60 * 1000,
   });
 
-  const activitiesQuery = useQuery({
-    queryKey: ["fire-planner-activities", activeAccountIds],
-    queryFn: async () => {
-      if (activeAccountIds.length === 0) return [];
-      const result = await searchActivities(
-        0,
-        Number.MAX_SAFE_INTEGER,
-        { accountIds: activeAccountIds },
-        "",
-        { id: "date", desc: true },
-      );
-      return result.data;
-    },
-    enabled: activeAccountIds.length > 0,
-    staleTime: 5 * 60 * 1000,
-  });
-
   const totalValue = (valuationsQuery.data ?? []).reduce(
     (sum, v) => sum + v.totalValue * v.fxRateToBase,
     0,
@@ -89,15 +66,11 @@ export function usePortfolioData(
 
   return {
     holdings: holdingsQuery.data ?? [],
-    activities: activitiesQuery.data ?? [],
+    activeAccountIds,
     accounts,
     activeAccounts,
     totalValue,
-    isLoading:
-      accountsQuery.isLoading ||
-      valuationsQuery.isLoading ||
-      holdingsQuery.isLoading ||
-      activitiesQuery.isLoading,
-    error: valuationsQuery.error || holdingsQuery.error || activitiesQuery.error,
+    isLoading: accountsQuery.isLoading || valuationsQuery.isLoading || holdingsQuery.isLoading,
+    error: valuationsQuery.error || holdingsQuery.error,
   };
 }

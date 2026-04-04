@@ -4,12 +4,22 @@ import { Button, Input } from "@wealthfolio/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Checkbox } from "@wealthfolio/ui/components/ui/checkbox";
 import { useGoalPlanMutations } from "../hooks/use-goal-detail";
 import { useGoalDetail } from "../hooks/use-goal-detail";
 import { useState, useCallback, useMemo, useEffect } from "react";
 
-// Palette for account indicators — uses theme CSS variables (always available, not purged)
+const TAX_BUCKET_LABELS: Record<string, string> = {
+  taxable: "Taxable",
+  tax_deferred: "Tax-deferred",
+  tax_free: "Tax-free",
+};
+
+const TAX_BUCKET_COLORS: Record<string, string> = {
+  taxable: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+  tax_deferred: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+  tax_free: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+};
+
 const INDICATOR_COLORS = [
   "var(--color-blue-400)",
   "var(--color-orange-400)",
@@ -32,7 +42,6 @@ const INDICATOR_COLORS = [
 interface Props {
   goalId: string;
   goalType: string;
-  /** DC-linked account IDs to block from funding rules */
   dcLinkedAccountIds?: string[];
 }
 
@@ -47,30 +56,32 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
     [accounts],
   );
 
-  // Local state for edits
   const [selectedAccounts, setSelectedAccounts] = useState<Map<string, number | null>>(new Map());
+  const [countablePercents, setCountablePercents] = useState<Map<string, number>>(new Map());
+  const [taxBuckets, setTaxBuckets] = useState<Map<string, string>>(new Map());
   const [dirty, setDirty] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
-  // Initialize from existing rules
   useEffect(() => {
     const map = new Map<string, number | null>();
+    const cpMap = new Map<string, number>();
+    const tbMap = new Map<string, string>();
     for (const rule of fundingRules) {
       map.set(rule.accountId, rule.reservationPercent ?? null);
+      if (rule.countablePercent != null) cpMap.set(rule.accountId, rule.countablePercent);
+      if (rule.taxBucket) tbMap.set(rule.accountId, rule.taxBucket);
     }
     setSelectedAccounts(map);
+    setCountablePercents(cpMap);
+    setTaxBuckets(tbMap);
     setDirty(false);
   }, [fundingRules]);
 
-  const toggleAccount = useCallback(
-    (accountId: string, checked: boolean) => {
+  const addAccount = useCallback(
+    (accountId: string) => {
       setSelectedAccounts((prev) => {
         const next = new Map(prev);
-        if (checked) {
-          next.set(accountId, isRetirement ? null : 100);
-        } else {
-          next.delete(accountId);
-        }
+        next.set(accountId, isRetirement ? null : 100);
         return next;
       });
       setDirty(true);
@@ -78,10 +89,42 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
     [isRetirement],
   );
 
-  const updatePercent = useCallback((accountId: string, value: number) => {
+  const removeAccount = useCallback((accountId: string) => {
     setSelectedAccounts((prev) => {
       const next = new Map(prev);
-      next.set(accountId, value);
+      next.delete(accountId);
+      return next;
+    });
+    setCountablePercents((prev) => {
+      const next = new Map(prev);
+      next.delete(accountId);
+      return next;
+    });
+    setTaxBuckets((prev) => {
+      const next = new Map(prev);
+      next.delete(accountId);
+      return next;
+    });
+    setDirty(true);
+  }, []);
+
+  const updatePercent = useCallback((accountId: string, value: number) => {
+    setSelectedAccounts((prev) => new Map(prev).set(accountId, value));
+    setDirty(true);
+  }, []);
+
+  const updateCountablePercent = useCallback((accountId: string, value: number) => {
+    setCountablePercents((prev) => new Map(prev).set(accountId, Math.max(0, Math.min(100, value))));
+    setDirty(true);
+  }, []);
+
+  const cycleTaxBucket = useCallback((accountId: string) => {
+    const order = ["taxable", "tax_deferred", "tax_free"];
+    setTaxBuckets((prev) => {
+      const next = new Map(prev);
+      const current = prev.get(accountId);
+      const idx = current ? order.indexOf(current) : -1;
+      next.set(accountId, order[(idx + 1) % order.length]);
       return next;
     });
     setDirty(true);
@@ -91,7 +134,12 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
     const rules: GoalFundingRuleInput[] = [];
     for (const [accountId, percent] of selectedAccounts) {
       if (isRetirement) {
-        rules.push({ accountId, fundingRole: "residual_eligible" });
+        rules.push({
+          accountId,
+          fundingRole: "residual_eligible",
+          countablePercent: countablePercents.get(accountId) ?? 100,
+          taxBucket: taxBuckets.get(accountId),
+        });
       } else {
         rules.push({
           accountId,
@@ -103,25 +151,34 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
     saveFundingMutation.mutate(rules);
     setDirty(false);
     setIsEditing(false);
-  }, [selectedAccounts, isRetirement, saveFundingMutation]);
+  }, [selectedAccounts, countablePercents, taxBuckets, isRetirement, saveFundingMutation]);
 
   const handleCancel = useCallback(() => {
-    // Revert to saved rules
     const map = new Map<string, number | null>();
+    const cpMap = new Map<string, number>();
+    const tbMap = new Map<string, string>();
     for (const rule of fundingRules) {
       map.set(rule.accountId, rule.reservationPercent ?? null);
+      if (rule.countablePercent != null) cpMap.set(rule.accountId, rule.countablePercent);
+      if (rule.taxBucket) tbMap.set(rule.accountId, rule.taxBucket);
     }
     setSelectedAccounts(map);
+    setCountablePercents(cpMap);
+    setTaxBuckets(tbMap);
     setDirty(false);
     setIsEditing(false);
   }, [fundingRules]);
 
   const dcLinkedSet = useMemo(() => new Set(dcLinkedAccountIds), [dcLinkedAccountIds]);
 
-  // Accounts that are currently selected (for read mode)
   const includedAccounts = useMemo(
     () => activeAccounts.filter((a) => selectedAccounts.has(a.id)),
     [activeAccounts, selectedAccounts],
+  );
+
+  const availableAccounts = useMemo(
+    () => activeAccounts.filter((a) => !selectedAccounts.has(a.id) && !dcLinkedSet.has(a.id)),
+    [activeAccounts, selectedAccounts, dcLinkedSet],
   );
 
   return (
@@ -130,14 +187,29 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
         <CardTitle className="text-sm">
           {isRetirement ? "Eligible Accounts" : "Account Funding"}
         </CardTitle>
-        {!isEditing && (
+        {isEditing ? (
+          <div className="flex gap-1.5">
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleCancel}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="h-7 text-xs"
+              onClick={handleSave}
+              disabled={saveFundingMutation.isPending || !dirty}
+            >
+              {saveFundingMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        ) : (
           <Button
             variant="outline"
             size="sm"
             className="h-7 text-xs"
             onClick={() => setIsEditing(true)}
           >
-            Update
+            <Icons.Pencil className="mr-1.5 h-3 w-3" />
+            Edit
           </Button>
         )}
       </CardHeader>
@@ -145,83 +217,118 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
         {isEditing ? (
           /* ── Edit mode ── */
           <div className="space-y-3">
-            <p className="text-muted-foreground text-xs">
-              {isRetirement
-                ? "Select accounts that contribute to your retirement portfolio."
-                : "Assign a percentage of each account's value to this goal."}
-            </p>
-            {activeAccounts.length === 0 ? (
-              <p className="text-muted-foreground text-xs">No active accounts found.</p>
-            ) : (
-              <div className="divide-border divide-y">
-                {activeAccounts.map((a) => {
+            {/* Selected accounts */}
+            {includedAccounts.length > 0 && (
+              <div className="space-y-1">
+                {includedAccounts.map((a) => {
                   const isDcLinked = dcLinkedSet.has(a.id);
-                  const isSelected = selectedAccounts.has(a.id);
+                  const tb = taxBuckets.get(a.id);
+                  const cp = countablePercents.get(a.id) ?? 100;
                   const percent = selectedAccounts.get(a.id);
 
                   return (
-                    <div key={a.id} className="flex items-center gap-3 py-2.5 text-sm">
-                      {isDcLinked ? (
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Checkbox disabled checked={false} className="opacity-50" />
-                          </TooltipTrigger>
-                          <TooltipContent className="text-xs">
-                            Linked to a pension income stream.
-                          </TooltipContent>
-                        </Tooltip>
-                      ) : (
-                        <Checkbox
-                          id={`funding-${a.id}`}
-                          checked={isSelected}
-                          onCheckedChange={(checked) => toggleAccount(a.id, !!checked)}
-                        />
+                    <div
+                      key={a.id}
+                      className="bg-muted/30 flex items-center gap-2 rounded-lg px-2.5 py-2"
+                    >
+                      {/* Name */}
+                      <span className="min-w-0 flex-1 truncate text-xs font-medium">{a.name}</span>
+
+                      {/* Tax bucket pill (retirement only, click to cycle) */}
+                      {isRetirement && !isDcLinked && (
+                        <button
+                          onClick={() => cycleTaxBucket(a.id)}
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                            tb ? (TAX_BUCKET_COLORS[tb] ?? "") : "bg-muted text-muted-foreground"
+                          }`}
+                          title="Click to change tax bucket"
+                        >
+                          {tb ? TAX_BUCKET_LABELS[tb] : "Set type"}
+                        </button>
                       )}
-                      <label
-                        htmlFor={`funding-${a.id}`}
-                        className="min-w-0 flex-1 cursor-pointer truncate text-xs"
-                      >
-                        {a.name}
-                      </label>
-                      <span className="text-muted-foreground shrink-0 text-[11px]">
-                        {a.accountType}
-                      </span>
-                      {!isRetirement && isSelected && (
-                        <div className="flex w-[4.5rem] shrink-0 items-center gap-1">
+
+                      {/* Countable % (retirement, only if not 100%) */}
+                      {isRetirement && !isDcLinked && (
+                        <div className="flex w-14 shrink-0 items-center gap-0.5">
+                          <Input
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={cp}
+                            onChange={(e) => updateCountablePercent(a.id, Number(e.target.value))}
+                            className="h-6 w-10 px-1 text-center text-[11px]"
+                          />
+                          <span className="text-muted-foreground text-[10px]">%</span>
+                        </div>
+                      )}
+
+                      {/* Reservation % (save-up goals) */}
+                      {!isRetirement && (
+                        <div className="flex w-14 shrink-0 items-center gap-0.5">
                           <Input
                             type="number"
                             min={0}
                             max={100}
                             value={percent ?? 0}
                             onChange={(e) => updatePercent(a.id, Number(e.target.value))}
-                            className="h-7 w-12 px-1.5 text-right text-xs"
+                            className="h-6 w-10 px-1 text-center text-[11px]"
                           />
-                          <span className="text-muted-foreground text-xs">%</span>
+                          <span className="text-muted-foreground text-[10px]">%</span>
                         </div>
                       )}
+
+                      {/* DC linked badge */}
                       {isDcLinked && (
-                        <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-[11px]">
-                          <Icons.ShieldCheck className="h-3 w-3" /> Pension
-                        </span>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <span className="text-muted-foreground flex items-center gap-0.5 text-[10px]">
+                              <Icons.ShieldCheck className="h-3 w-3" /> Pension
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent className="text-xs">
+                            Linked to pension income stream
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+
+                      {/* Remove button */}
+                      {!isDcLinked && (
+                        <button
+                          onClick={() => removeAccount(a.id)}
+                          className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
+                        >
+                          <Icons.X className="h-3 w-3" />
+                        </button>
                       )}
                     </div>
                   );
                 })}
               </div>
             )}
-            <div className="flex gap-2 pt-2">
-              <Button
-                size="sm"
-                className="flex-1"
-                onClick={handleSave}
-                disabled={saveFundingMutation.isPending || !dirty}
-              >
-                {saveFundingMutation.isPending ? "Saving..." : "Save"}
-              </Button>
-              <Button variant="outline" size="sm" className="flex-1" onClick={handleCancel}>
-                Cancel
-              </Button>
-            </div>
+
+            {/* Available accounts to add */}
+            {availableAccounts.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-muted-foreground px-1 text-[10px] uppercase tracking-wider">
+                  Add accounts
+                </p>
+                {availableAccounts.map((a) => (
+                  <button
+                    key={a.id}
+                    onClick={() => addAccount(a.id)}
+                    className="hover:bg-muted/50 flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors"
+                  >
+                    <Icons.Plus className="text-muted-foreground h-3 w-3 shrink-0" />
+                    <span className="min-w-0 flex-1 truncate text-xs">{a.name}</span>
+                    <span className="text-muted-foreground text-[10px]">{a.accountType}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {activeAccounts.length === 0 && (
+              <p className="text-muted-foreground text-xs">No active accounts found.</p>
+            )}
           </div>
         ) : (
           /* ── Read mode ── */
@@ -240,6 +347,9 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
               <div className="divide-border divide-y">
                 {includedAccounts.map((a, i) => {
                   const percent = selectedAccounts.get(a.id);
+                  const cp = countablePercents.get(a.id) ?? 100;
+                  const tb = taxBuckets.get(a.id);
+                  const tbLabel = tb ? TAX_BUCKET_LABELS[tb] : null;
                   return (
                     <div key={a.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
                       <span
@@ -247,12 +357,19 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
                         style={{ backgroundColor: INDICATOR_COLORS[i % INDICATOR_COLORS.length] }}
                       />
                       <span className="min-w-0 flex-1 truncate text-xs font-medium">{a.name}</span>
+                      {isRetirement && tbLabel && (
+                        <span
+                          className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${tb ? (TAX_BUCKET_COLORS[tb] ?? "") : ""}`}
+                        >
+                          {tbLabel}
+                        </span>
+                      )}
                       {!isRetirement && percent != null && (
                         <span className="text-sm font-semibold tabular-nums">{percent}%</span>
                       )}
-                      <span className="text-muted-foreground shrink-0 text-[11px]">
-                        {a.accountType}
-                      </span>
+                      {isRetirement && cp !== 100 && (
+                        <span className="text-muted-foreground text-xs tabular-nums">{cp}%</span>
+                      )}
                     </div>
                   );
                 })}
