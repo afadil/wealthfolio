@@ -5401,6 +5401,10 @@ mod tests {
             Ok(())
         }
 
+        async fn get_open_position_quantities(&self) -> AppResult<std::collections::HashMap<String, rust_decimal::Decimal>> {
+            Ok(std::collections::HashMap::new())
+        }
+
         fn count_lots(&self) -> AppResult<i64> {
             Ok(self
                 .calls

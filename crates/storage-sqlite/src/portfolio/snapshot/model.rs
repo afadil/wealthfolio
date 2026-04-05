@@ -53,7 +53,7 @@ impl From<AccountStateSnapshotDB> for AccountStateSnapshot {
             snapshot_date: NaiveDate::parse_from_str(&db.snapshot_date, "%Y-%m-%d")
                 .unwrap_or_default(),
             currency: db.currency,
-            positions: serde_json::from_str(&db.positions).unwrap_or_default(),
+            positions: std::collections::HashMap::new(), // Positions now live in the lots table
             cash_balances: serde_json::from_str(&db.cash_balances).unwrap_or_default(),
             cost_basis: Decimal::from_str(&db.cost_basis).unwrap_or_default(),
             net_contribution: Decimal::from_str(&db.net_contribution).unwrap_or_default(),
@@ -88,8 +88,7 @@ impl From<AccountStateSnapshot> for AccountStateSnapshotDB {
             account_id: domain.account_id,
             snapshot_date: domain.snapshot_date.format("%Y-%m-%d").to_string(),
             currency: domain.currency,
-            positions: serde_json::to_string(&domain.positions)
-                .unwrap_or_else(|_| "{}".to_string()),
+            positions: "{}".to_string(), // Positions now live in the lots table
             cash_balances: serde_json::to_string(&domain.cash_balances)
                 .unwrap_or_else(|_| "{}".to_string()),
             cost_basis: domain.cost_basis.round_dp(DECIMAL_PRECISION).to_string(),

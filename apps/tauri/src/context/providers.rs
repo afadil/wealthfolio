@@ -294,6 +294,7 @@ pub async fn initialize_context(
         )
         .with_event_sink(domain_event_sink.clone())
         .with_snapshot_service(snapshot_service.clone())
+        .with_lot_repository(lots_repository.clone())
         .with_quote_store(market_data_repo.clone()),
     );
 

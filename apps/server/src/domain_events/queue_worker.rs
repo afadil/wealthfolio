@@ -42,6 +42,7 @@ pub struct QueueWorkerDeps {
     pub secret_store: Arc<dyn SecretStore>,
     /// Shared token lifecycle state; must be the same instance used by API handlers.
     pub token_lifecycle: Arc<TokenLifecycleState>,
+    pub lots_repository: Arc<dyn wealthfolio_core::lots::LotRepositoryTrait + Send + Sync>,
 }
 
 /// Runs the event queue worker.
@@ -370,27 +371,22 @@ async fn run_portfolio_job(
         return;
     }
 
-    // Update position status from TOTAL snapshot
-    if let Ok(Some(total_snapshot)) = deps
-        .snapshot_service
-        .get_latest_holdings_snapshot(PORTFOLIO_TOTAL_ACCOUNT_ID)
-    {
-        let current_holdings: std::collections::HashMap<String, rust_decimal::Decimal> =
-            total_snapshot
-                .positions
-                .iter()
-                .map(|(asset_id, position)| (asset_id.clone(), position.quantity))
-                .collect();
-
-        if let Err(e) = deps
-            .quote_service
-            .update_position_status_from_holdings(&current_holdings)
-            .await
-        {
-            tracing::warn!(
-                "Failed to update position status from holdings: {}. Quote sync planning may be affected.",
-                e
-            );
+    // Update position status from lots for quote sync planning
+    match deps.lots_repository.get_open_position_quantities().await {
+        Ok(current_holdings) => {
+            if let Err(e) = deps
+                .quote_service
+                .update_position_status_from_holdings(&current_holdings)
+                .await
+            {
+                tracing::warn!(
+                    "Failed to update position status from holdings: {}. Quote sync planning may be affected.",
+                    e
+                );
+            }
+        }
+        Err(e) => {
+            tracing::warn!("Failed to read position quantities from lots: {}", e);
         }
     }
 
