@@ -1,0 +1,5 @@
+-- Cannot restore positions JSON from lots alone (lots don't store all
+-- Position fields like inception_date, lots VecDeque, etc.). A full
+-- recalculation would be needed to repopulate. This is a one-way migration.
+-- The positions column remains in the schema; it just contains '{}' until
+-- a recalculation writes fresh data.

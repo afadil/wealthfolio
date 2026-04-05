@@ -393,26 +393,22 @@ async fn run_portfolio_calculation(
         return;
     }
 
-    // Update position status from TOTAL snapshot
-    if let Ok(Some(total_snapshot)) =
-        snapshot_service.get_latest_holdings_snapshot(PORTFOLIO_TOTAL_ACCOUNT_ID)
-    {
-        let current_holdings: std::collections::HashMap<String, rust_decimal::Decimal> =
-            total_snapshot
-                .positions
-                .iter()
-                .map(|(asset_id, position)| (asset_id.clone(), position.quantity))
-                .collect();
-
-        let quote_service = context.quote_service();
-        if let Err(e) = quote_service
-            .update_position_status_from_holdings(&current_holdings)
-            .await
-        {
-            warn!(
-                "Failed to update position status from holdings: {}. Quote sync planning may be affected.",
-                e
-            );
+    // Update position status from lots for quote sync planning
+    match context.lots_repository.get_open_position_quantities().await {
+        Ok(current_holdings) => {
+            let quote_service = context.quote_service();
+            if let Err(e) = quote_service
+                .update_position_status_from_holdings(&current_holdings)
+                .await
+            {
+                warn!(
+                    "Failed to update position status from holdings: {}. Quote sync planning may be affected.",
+                    e
+                );
+            }
+        }
+        Err(e) => {
+            warn!("Failed to read position quantities from lots: {}", e);
         }
     }
 

@@ -553,6 +553,14 @@ impl Position {
         // Convert the final Vec back to VecDeque and assign to self.lots
         self.lots = vec_lots.into();
 
+        // Debug: log remaining lots after FIFO reduction
+        for lot in &self.lots {
+            debug!(
+                "[LOT-DEBUG] reduce_lots_fifo result: id={} asset={} quantity={} original_quantity={}",
+                lot.id, self.asset_id, lot.quantity, lot.original_quantity
+            );
+        }
+
         self.recalculate_aggregates();
 
         Ok(FifoReductionResult {

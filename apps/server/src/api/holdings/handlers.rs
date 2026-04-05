@@ -8,7 +8,6 @@ use chrono::{NaiveDate, Utc};
 use rust_decimal::Decimal;
 use wealthfolio_core::{
     accounts::AccountServiceTrait,
-    constants::PORTFOLIO_TOTAL_ACCOUNT_ID,
     portfolio::{
         allocation::{AllocationHoldings, PortfolioAllocations},
         holdings::Holding,
@@ -172,14 +171,36 @@ pub async fn get_snapshots(
             .snapshot_service
             .get_holdings_keyframes(&q.account_id, start_date, end_date)?;
 
+    // Fetch all lots (open + closed) to compute per-date position counts.
+    let all_lots = state
+        .lots_repository
+        .get_all_lots_for_account(&q.account_id)
+        .await
+        .unwrap_or_default();
+
     let result: Vec<SnapshotInfo> = snapshots
         .into_iter()
-        .map(|s| SnapshotInfo {
-            id: s.id,
-            snapshot_date: s.snapshot_date.format("%Y-%m-%d").to_string(),
-            source: snapshot_source_to_string(s.source),
-            position_count: s.positions.len(),
-            cash_currency_count: s.cash_balances.len(),
+        .map(|s| {
+            let date_str = s.snapshot_date.format("%Y-%m-%d").to_string();
+            let position_count = all_lots
+                .iter()
+                .filter(|l| {
+                    l.open_date.as_str() <= date_str.as_str()
+                        && (!l.is_closed
+                            || l.close_date
+                                .as_deref()
+                                .is_some_and(|cd| cd > date_str.as_str()))
+                })
+                .map(|l| &l.asset_id)
+                .collect::<std::collections::HashSet<_>>()
+                .len();
+            SnapshotInfo {
+                id: s.id,
+                snapshot_date: date_str,
+                source: snapshot_source_to_string(s.source),
+                position_count,
+                cash_currency_count: s.cash_balances.len(),
+            }
         })
         .collect();
 
@@ -273,27 +294,22 @@ pub async fn delete_snapshot_handler(
         tracing::warn!("Failed to recalculate TOTAL snapshots after delete: {}", e);
     }
 
-    // Update position status from TOTAL snapshot for quote sync planning
-    if let Ok(Some(total_snapshot)) = state
-        .snapshot_service
-        .get_latest_holdings_snapshot(PORTFOLIO_TOTAL_ACCOUNT_ID)
-    {
-        let current_holdings: std::collections::HashMap<String, rust_decimal::Decimal> =
-            total_snapshot
-                .positions
-                .iter()
-                .map(|(asset_id, position)| (asset_id.clone(), position.quantity))
-                .collect();
-
-        if let Err(e) = state
-            .quote_service
-            .update_position_status_from_holdings(&current_holdings)
-            .await
-        {
-            tracing::warn!(
-                "Failed to update position status from holdings after delete: {}",
-                e
-            );
+    // Update position status from lots for quote sync planning
+    match state.lots_repository.get_open_position_quantities().await {
+        Ok(current_holdings) => {
+            if let Err(e) = state
+                .quote_service
+                .update_position_status_from_holdings(&current_holdings)
+                .await
+            {
+                tracing::warn!(
+                    "Failed to update position status from holdings after delete: {}",
+                    e
+                );
+            }
+        }
+        Err(e) => {
+            tracing::warn!("Failed to read position quantities from lots: {}", e);
         }
     }
 

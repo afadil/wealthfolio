@@ -784,6 +784,10 @@ impl crate::lots::LotRepositoryTrait for MockLotRepository {
         Ok(())
     }
 
+    async fn get_open_position_quantities(&self) -> Result<std::collections::HashMap<String, rust_decimal::Decimal>> {
+        Ok(std::collections::HashMap::new())
+    }
+
     fn count_lots(&self) -> Result<i64> {
         Ok(self.lots.iter().filter(|l| !l.is_closed).count() as i64)
     }

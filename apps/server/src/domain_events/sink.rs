@@ -72,6 +72,7 @@ impl WebDomainEventSink {
         timezone: Arc<RwLock<String>>,
         secret_store: Arc<dyn SecretStore>,
         token_lifecycle: Arc<TokenLifecycleState>,
+        lots_repository: Arc<dyn wealthfolio_core::lots::LotRepositoryTrait + Send + Sync>,
     ) {
         let rx = self
             .rx
@@ -93,6 +94,7 @@ impl WebDomainEventSink {
             timezone,
             secret_store,
             token_lifecycle,
+            lots_repository,
         });
 
         // Spawn the background worker
