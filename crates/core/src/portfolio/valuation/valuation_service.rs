@@ -1,3 +1,4 @@
+use crate::assets::AssetRepositoryTrait;
 use crate::errors::{CalculatorError, Error as CoreError, Result as CoreResult};
 use crate::fx::currency::normalize_currency_code;
 use crate::fx::FxServiceTrait;
@@ -95,6 +96,7 @@ pub struct ValuationService {
     valuation_repository: Arc<dyn ValuationRepositoryTrait>,
     snapshot_service: Arc<dyn SnapshotServiceTrait>,
     lot_repository: Arc<dyn LotRepositoryTrait>,
+    asset_repository: Arc<dyn AssetRepositoryTrait>,
     quote_service: Arc<dyn QuoteServiceTrait>,
     fx_service: Arc<dyn FxServiceTrait>,
 }
@@ -105,6 +107,7 @@ impl ValuationService {
         valuation_repository: Arc<dyn ValuationRepositoryTrait>,
         snapshot_service: Arc<dyn SnapshotServiceTrait>,
         lot_repository: Arc<dyn LotRepositoryTrait>,
+        asset_repository: Arc<dyn AssetRepositoryTrait>,
         quote_service: Arc<dyn QuoteServiceTrait>,
         fx_service: Arc<dyn FxServiceTrait>,
     ) -> Self {
@@ -113,6 +116,7 @@ impl ValuationService {
             valuation_repository,
             snapshot_service,
             lot_repository,
+            asset_repository,
             quote_service,
             fx_service,
         }
@@ -401,6 +405,19 @@ impl ValuationServiceTrait for ValuationService {
                 .await?
         };
 
+        // Pre-fetch asset metadata for all assets referenced by lots.
+        let lot_asset_ids: Vec<String> = all_lots
+            .iter()
+            .map(|l| l.asset_id.clone())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+        let assets = self.asset_repository.list_by_asset_ids(&lot_asset_ids)?;
+        let asset_map: HashMap<String, _> = assets
+            .into_iter()
+            .map(|a| (a.id.clone(), a))
+            .collect();
+
         let newly_calculated_valuations: Vec<DailyAccountValuation> = snapshots_to_process
             .into_iter()
             .filter_map(|holdings_snapshot| {
@@ -410,10 +427,6 @@ impl ValuationServiceTrait for ValuationService {
                 let date_str = current_date.format("%Y-%m-%d").to_string();
 
                 // Build security positions from lots active on current_date.
-                // NOTE: currency, is_alternative, and contract_multiplier are still read from
-                // the snapshot's position entries because the lot table does not store currency
-                // (it's redundant with assets.quote_ccy). This snapshot dependency will be
-                // removed once ValuationService has direct access to the asset repository.
                 let mut aggregated: HashMap<String, (Decimal, Decimal)> = HashMap::new();
                 for lot in &all_lots {
                     if lot.open_date.as_str() > date_str.as_str() {
@@ -450,9 +463,9 @@ impl ValuationServiceTrait for ValuationService {
                     .filter(|(_, (qty, _))| !qty.is_zero())
                     .map(|(asset_id, (quantity, total_cost_basis))| {
                         let (currency, is_alternative, contract_multiplier) =
-                            holdings_snapshot.positions.get(&asset_id).map_or(
+                            asset_map.get(&asset_id).map_or(
                                 (String::new(), false, Decimal::ONE),
-                                |p| (p.currency.clone(), p.is_alternative, p.contract_multiplier),
+                                |a| (a.quote_ccy.clone(), a.is_alternative(), a.contract_multiplier()),
                             );
                         let average_cost = if quantity > Decimal::ZERO {
                             total_cost_basis / quantity

@@ -227,6 +227,7 @@ pub async fn initialize_context(
         valuation_repository.clone(),
         snapshot_service.clone(),
         lots_repository.clone(),
+        asset_repository.clone(),
         quote_service.clone(),
         fx_service.clone(),
     ));

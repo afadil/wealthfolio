@@ -253,6 +253,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         valuation_repository.clone(),
         snapshot_service.clone(),
         lots_repository.clone(),
+        asset_repository.clone(),
         quote_service.clone(),
         fx_service.clone(),
     ));
