@@ -2,12 +2,9 @@ use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::VecDeque;
 
-// Import Lot from its definition
 use crate::assets::{AssetClassifications, AssetKind};
 use crate::lots::LotRecord;
-use crate::portfolio::snapshot::Lot;
 
 /// Display-oriented lot view for the API response.
 /// Converted directly from LotRecord, independent of the calculation Lot struct.
@@ -119,9 +116,8 @@ pub struct Holding {
     // Position data
     pub quantity: Decimal,
     pub open_date: Option<DateTime<Utc>>,
-    pub lots: Option<VecDeque<Lot>>,
 
-    /// Detailed lot view including open and closed lots, for the lots tab display.
+    /// Lot view including open and closed lots, for the lots tab display.
     /// Populated only when a specific asset's lots are requested.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lot_details: Option<Vec<LotView>>,
