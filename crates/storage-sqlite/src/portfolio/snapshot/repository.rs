@@ -130,11 +130,11 @@ impl SnapshotRepository {
             .collect::<Vec<&str>>()
             .join(", ");
 
-        // Fields: id, account_id, snapshot_date, currency, positions, cash_balances, cost_basis, net_contribution, calculated_at, net_contribution_base, cash_total_account_currency, cash_total_base_currency, source
+        // Fields: id, account_id, snapshot_date, currency, cash_balances, cost_basis, net_contribution, calculated_at, net_contribution_base, cash_total_account_currency, cash_total_base_currency, source
         let sql = format!(
             "WITH RankedSnapshots AS ( \
                 SELECT \
-                    id, account_id, snapshot_date, currency, positions, \
+                    id, account_id, snapshot_date, currency, \
                     cash_balances, cost_basis, net_contribution, calculated_at, net_contribution_base, \
                     cash_total_account_currency, cash_total_base_currency, source, \
                     ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY snapshot_date DESC) as rn \
@@ -142,12 +142,12 @@ impl SnapshotRepository {
                 WHERE account_id IN ({}) AND snapshot_date <= ? \
             ) \
             SELECT \
-                id, account_id, snapshot_date, currency, positions, \
+                id, account_id, snapshot_date, currency, \
                 cash_balances, cost_basis, net_contribution, calculated_at, net_contribution_base, \
                 cash_total_account_currency, cash_total_base_currency, source \
             FROM RankedSnapshots \
             WHERE rn = 1",
-            "holdings_snapshots", // Use direct table name string
+            "holdings_snapshots",
             placeholders
         );
 
@@ -192,11 +192,11 @@ impl SnapshotRepository {
             .collect::<Vec<&str>>()
             .join(", ");
 
-        // Fields: id, account_id, snapshot_date, currency, positions, cash_balances, cost_basis, net_contribution, calculated_at, net_contribution_base, cash_total_account_currency, cash_total_base_currency, source
+        // Fields: id, account_id, snapshot_date, currency, cash_balances, cost_basis, net_contribution, calculated_at, net_contribution_base, cash_total_account_currency, cash_total_base_currency, source
         let sql = format!(
             "WITH RankedSnapshots AS ( \
                 SELECT \
-                    id, account_id, snapshot_date, currency, positions, \
+                    id, account_id, snapshot_date, currency, \
                     cash_balances, cost_basis, net_contribution, calculated_at, net_contribution_base, \
                     cash_total_account_currency, cash_total_base_currency, source, \
                     ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY snapshot_date DESC) as rn \
@@ -204,7 +204,7 @@ impl SnapshotRepository {
                 WHERE account_id IN ({}) \
             ) \
             SELECT \
-                id, account_id, snapshot_date, currency, positions, \
+                id, account_id, snapshot_date, currency, \
                 cash_balances, cost_basis, net_contribution, calculated_at, net_contribution_base, \
                 cash_total_account_currency, cash_total_base_currency, source \
             FROM RankedSnapshots \

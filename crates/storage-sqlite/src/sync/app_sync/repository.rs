@@ -3193,11 +3193,11 @@ mod tests {
         .expect("insert asset");
 
         diesel::sql_query(
-            "INSERT INTO holdings_snapshots (id, account_id, snapshot_date, currency, positions, cash_balances, cost_basis, net_contribution, calculated_at, net_contribution_base, cash_total_account_currency, cash_total_base_currency, source)
+            "INSERT INTO holdings_snapshots (id, account_id, snapshot_date, currency, cash_balances, cost_basis, net_contribution, calculated_at, net_contribution_base, cash_total_account_currency, cash_total_base_currency, source)
              VALUES
-             ('11111111-1111-4111-8111-111111111111', 'acc-export-filter', '2026-01-01', 'USD', '{}', '{}', '0', '0', '2026-01-01T00:00:00Z', '0', '0', '0', 'MANUAL_ENTRY'),
-             ('22222222-2222-4222-8222-222222222222', 'acc-export-filter', '2026-01-02', 'USD', '{}', '{}', '0', '0', '2026-01-02T00:00:00Z', '0', '0', '0', 'BROKER_IMPORTED'),
-             ('33333333-3333-4333-8333-333333333333', 'acc-export-filter', '2026-01-03', 'USD', '{}', '{}', '0', '0', '2026-01-03T00:00:00Z', '0', '0', '0', 'CALCULATED')",
+             ('11111111-1111-4111-8111-111111111111', 'acc-export-filter', '2026-01-01', 'USD', '{}', '0', '0', '2026-01-01T00:00:00Z', '0', '0', '0', 'MANUAL_ENTRY'),
+             ('22222222-2222-4222-8222-222222222222', 'acc-export-filter', '2026-01-02', 'USD', '{}', '0', '0', '2026-01-02T00:00:00Z', '0', '0', '0', 'BROKER_IMPORTED'),
+             ('33333333-3333-4333-8333-333333333333', 'acc-export-filter', '2026-01-03', 'USD', '{}', '0', '0', '2026-01-03T00:00:00Z', '0', '0', '0', 'CALCULATED')",
         )
         .execute(&mut conn)
         .expect("insert snapshots");

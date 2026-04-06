@@ -262,7 +262,6 @@ diesel::table! {
         account_id -> Text,
         snapshot_date -> Date,
         currency -> Text,
-        positions -> Text,
         cash_balances -> Text,
         cost_basis -> Text,
         net_contribution -> Text,
