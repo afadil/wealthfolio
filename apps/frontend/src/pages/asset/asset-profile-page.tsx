@@ -506,7 +506,7 @@ export const AssetProfilePage = () => {
       items.push({ value: "overview", label: "Overview" });
     }
 
-    if (holding?.lots && holding.lots.length > 0) {
+    if (holding?.lotDetails && holding.lotDetails.length > 0) {
       items.push({ value: "lots", label: "Lots" });
     }
 
@@ -621,12 +621,11 @@ export const AssetProfilePage = () => {
       });
     }
 
-    if (((holding?.lots && holding.lots.length > 0) || holding?.lotDetails) && profile) {
+    if (holding?.lotDetails && holding.lotDetails.length > 0 && profile) {
       tabs.push({
         name: "Lots",
         content: (
           <AssetLotsTable
-            lots={holding.lots ?? []}
             lotDetails={holding.lotDetails}
             currency={symbolHolding?.currency ?? profile.currency ?? baseCurrency}
             marketPrice={Number(holding.price ?? profile.marketPrice)}
@@ -1237,13 +1236,13 @@ export const AssetProfilePage = () => {
               </TabsContent>
             )}
 
-            {/* Lots Content: Requires profile and holding with lots */}
+            {/* Lots Content: Requires profile and holding with lot details */}
             {profile &&
-              ((holding?.lots && holding.lots.length > 0) || holding?.lotDetails) && (
+              holding?.lotDetails &&
+              holding.lotDetails.length > 0 && (
                 <TabsContent value="lots" className="pt-6">
                   <AssetLotsTable
-                    lots={holding?.lots ?? []}
-                    lotDetails={holding?.lotDetails}
+                    lotDetails={holding.lotDetails}
                     currency={symbolHolding?.currency ?? profile.currency ?? baseCurrency}
                     marketPrice={Number(holding?.price ?? profile.marketPrice)}
                   />

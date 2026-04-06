@@ -16,8 +16,7 @@ use log::{debug, error, warn};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde_json::Value;
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::str::FromStr;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 
 use super::HoldingsValuationServiceTrait;
@@ -237,15 +236,7 @@ impl HoldingsService {
                 .map(|id| id == asset_id.as_str())
                 .unwrap_or(false);
 
-            let lot_display: Option<VecDeque<snapshot::Lot>> = if include_lots {
-                Some(lot_records_to_display_lots(
-                    asset_lots, account_id, asset_id,
-                ))
-            } else {
-                None
-            };
-
-            // Build detailed lot view (open + closed) when lots are requested.
+            // Build lot view (open + closed) when lots are requested.
             // For TOTAL, fetch all lots across accounts; otherwise per-account.
             let lot_details: Option<Vec<LotView>> = if include_lots {
                 let all_lots = if account_id == PORTFOLIO_TOTAL_ACCOUNT_ID {
@@ -278,7 +269,6 @@ impl HoldingsService {
                 asset_kind: Some(asset_info.kind.clone()),
                 quantity,
                 open_date: Some(inception_date),
-                lots: lot_display,
                 lot_details,
                 contract_multiplier: asset_info.contract_multiplier,
                 local_currency: asset_info.instrument.currency.clone(),
@@ -331,7 +321,6 @@ impl HoldingsService {
                 asset_kind: None,
                 quantity: amount,
                 open_date: None,
-                lots: None,
                 lot_details: None,
                 contract_multiplier: Decimal::ONE,
                 local_currency: currency.clone(),
@@ -391,76 +380,6 @@ impl HoldingsService {
     }
 }
 
-fn lot_records_to_display_lots(
-    records: &[LotRecord],
-    account_id: &str,
-    asset_id: &str,
-) -> VecDeque<snapshot::Lot> {
-    let position_id = format!("POS-{}-{}", asset_id, account_id);
-    records
-        .iter()
-        .filter_map(|r| {
-            let quantity = r
-                .remaining_quantity
-                .parse::<Decimal>()
-                .inspect_err(|e| {
-                    error!(
-                        "Lot {} has malformed remaining_quantity '{}': {} — dropping from display",
-                        r.id, r.remaining_quantity, e
-                    );
-                })
-                .ok()?;
-            let cost_basis = r
-                .total_cost_basis
-                .parse::<Decimal>()
-                .inspect_err(|e| {
-                    error!(
-                        "Lot {} has malformed total_cost_basis '{}': {} — dropping from display",
-                        r.id, r.total_cost_basis, e
-                    );
-                })
-                .ok()?;
-            let acquisition_price = r
-                .cost_per_unit
-                .parse::<Decimal>()
-                .inspect_err(|e| {
-                    error!(
-                        "Lot {} has malformed cost_per_unit '{}': {} — dropping from display",
-                        r.id, r.cost_per_unit, e
-                    );
-                })
-                .ok()?;
-            let acquisition_fees = r
-                .fee_allocated
-                .parse::<Decimal>()
-                .ok()
-                .unwrap_or(Decimal::ZERO);
-            let acquisition_date = NaiveDate::parse_from_str(&r.open_date, "%Y-%m-%d")
-                .inspect_err(|e| {
-                    error!(
-                        "Lot {} has malformed open_date '{}': {} — dropping from display",
-                        r.id, r.open_date, e
-                    );
-                })
-                .ok()?
-                .and_hms_opt(0, 0, 0)?
-                .and_utc();
-            let orig_qty = Decimal::from_str(&r.original_quantity).unwrap_or(quantity);
-            Some(snapshot::Lot {
-                id: r.id.clone(),
-                position_id: position_id.clone(),
-                acquisition_date,
-                quantity,
-                original_quantity: orig_qty,
-                cost_basis,
-                acquisition_price,
-                acquisition_fees,
-                fx_rate_to_position: None,
-            })
-        })
-        .collect()
-}
-
 fn apply_factor_to_monetary_value(value: &mut MonetaryValue, factor: Decimal) {
     value.local *= factor;
 }
@@ -507,11 +426,11 @@ fn normalize_holding_currency(holding: &mut Holding) {
         apply_factor_to_optional_monetary_value(&mut holding.day_change, factor);
         apply_factor_to_optional_monetary_value(&mut holding.prev_close_value, factor);
 
-        if let Some(lots) = holding.lots.as_mut() {
-            for lot in lots {
-                lot.cost_basis *= factor;
-                lot.acquisition_price *= factor;
-                lot.acquisition_fees *= factor;
+        if let Some(lot_details) = holding.lot_details.as_mut() {
+            for lot in lot_details {
+                lot.cost_per_unit *= factor;
+                lot.total_cost_basis *= factor;
+                lot.fees *= factor;
             }
         }
     }
@@ -810,8 +729,6 @@ impl HoldingsServiceTrait for HoldingsService {
                     .min()
                     .unwrap_or_else(chrono::Utc::now);
 
-                let display_lots = lot_records_to_display_lots(asset_lots, account_id, asset_id);
-
                 holdings.push(Holding {
                     id: format!("{}-{}-{}", id_prefix, account_id, asset_id),
                     account_id: account_id.to_string(),
@@ -820,7 +737,6 @@ impl HoldingsServiceTrait for HoldingsService {
                     asset_kind: Some(asset.kind.clone()),
                     quantity,
                     open_date: Some(inception_date),
-                    lots: Some(display_lots),
                     lot_details: None,
                     contract_multiplier: asset.contract_multiplier(),
                     local_currency: asset.quote_ccy.clone(),
@@ -875,7 +791,6 @@ impl HoldingsServiceTrait for HoldingsService {
                 asset_kind: None,
                 quantity: amount,
                 open_date: None,
-                lots: None,
                 lot_details: None,
                 contract_multiplier: Decimal::ONE,
                 local_currency: currency.clone(),
@@ -913,14 +828,11 @@ impl HoldingsServiceTrait for HoldingsService {
 
 #[cfg(test)]
 mod tests {
-    use crate::snapshot::Lot;
     use crate::utils::time_utils::valuation_date_today;
 
     use super::*;
-    use chrono::Utc;
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
-    use std::collections::VecDeque;
 
     #[test]
     fn normalize_holding_currency_converts_minor_security_units() {
@@ -942,18 +854,18 @@ mod tests {
             asset_kind: None,
             quantity: dec!(1),
             open_date: None,
-            lots: Some(VecDeque::from(vec![Lot {
+            lot_details: Some(vec![LotView {
                 id: "LOT1".to_string(),
-                position_id: "POS-TEST".to_string(),
-                acquisition_date: Utc::now(),
-                quantity: dec!(1),
+                account_id: "TEST".to_string(),
+                acquisition_date: "2024-01-15".to_string(),
                 original_quantity: dec!(1),
-                cost_basis: dec!(3000),
-                acquisition_price: dec!(3000),
-                acquisition_fees: dec!(0),
-                fx_rate_to_position: None,
-            }])),
-            lot_details: None,
+                remaining_quantity: dec!(1),
+                cost_per_unit: dec!(3000),
+                total_cost_basis: dec!(3000),
+                fees: dec!(0),
+                is_closed: false,
+                close_date: None,
+            }]),
             contract_multiplier: Decimal::ONE,
             local_currency: "GBp".to_string(),
             base_currency: "GBP".to_string(),
@@ -1013,9 +925,9 @@ mod tests {
             dec!(31.34)
         );
         assert_eq!(holding.prev_close_value.as_ref().unwrap().base, dec!(31.34));
-        let lot = holding.lots.as_ref().unwrap().front().unwrap();
-        assert_eq!(lot.cost_basis, dec!(30));
-        assert_eq!(lot.acquisition_price, dec!(30));
+        let lot = &holding.lot_details.as_ref().unwrap()[0];
+        assert_eq!(lot.total_cost_basis, dec!(30));
+        assert_eq!(lot.cost_per_unit, dec!(30));
     }
 
     #[test]
@@ -1028,7 +940,6 @@ mod tests {
             asset_kind: None,
             quantity: dec!(1000),
             open_date: None,
-            lots: None,
             lot_details: None,
             contract_multiplier: Decimal::ONE,
             local_currency: "GBp".to_string(),

@@ -7,7 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from "@wealthfolio/ui/components/ui/table";
-import { Lot, LotView } from "@/lib/types";
+import { LotView } from "@/lib/types";
 import { formatAmount } from "@wealthfolio/ui";
 import { formatDate, formatQuantity } from "@/lib/utils";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
@@ -18,26 +18,17 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useAccounts } from "@/hooks/use-accounts";
 
 interface AssetLotsTableProps {
-  lots: Lot[];
   lotDetails?: LotView[] | null;
   currency: string;
   marketPrice: number;
 }
 
-export const AssetLotsTable = ({ lots, lotDetails, currency, marketPrice }: AssetLotsTableProps) => {
-  // Use lotDetails (rich view with open/closed + account) when available
-  if (lotDetails && lotDetails.length > 0) {
-    return (
-      <LotDetailsView lotDetails={lotDetails} currency={currency} marketPrice={marketPrice} />
-    );
-  }
-
-  // Fallback to legacy lots display
-  if (!lots || lots.length === 0) {
+export const AssetLotsTable = ({ lotDetails, currency, marketPrice }: AssetLotsTableProps) => {
+  if (!lotDetails || lotDetails.length === 0) {
     return null;
   }
 
-  return <LegacyLotsView lots={lots} currency={currency} marketPrice={marketPrice} />;
+  return <LotDetailsView lotDetails={lotDetails} currency={currency} marketPrice={marketPrice} />;
 };
 
 // ─── Rich lot details view with account grouping and open/closed status ───
@@ -264,124 +255,6 @@ function AccountLotGroup({
         </>
       )}
     </div>
-  );
-}
-
-// ─── Legacy view (original lots without account/status info) ───
-
-function LegacyLotsView({
-  lots,
-  currency,
-  marketPrice,
-}: {
-  lots: Lot[];
-  currency: string;
-  marketPrice: number;
-}) {
-  const sortedLots = [...lots].sort(
-    (a, b) => new Date(a.acquisitionDate).getTime() - new Date(b.acquisitionDate).getTime(),
-  );
-
-  return (
-    <Card className="mt-4">
-      <CardContent className="p-0">
-        <div className="hidden overflow-x-auto md:block">
-          <Table>
-            <TableHeader className="bg-muted">
-              <TableRow>
-                <TableHead className="w-[160px]">Acquired Date</TableHead>
-                <TableHead className="text-right">Quantity</TableHead>
-                <TableHead className="text-right">Acquisition Price</TableHead>
-                <TableHead className="text-right">Fees</TableHead>
-                <TableHead className="text-right">Cost Basis</TableHead>
-                <TableHead className="text-right">Market Value</TableHead>
-                <TableHead className="text-right">Gain/Loss</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedLots.map((lot) => {
-                const marketValue = lot.quantity * marketPrice;
-                const gainLossAmount = marketValue - lot.costBasis;
-                const gainLossPercent = lot.costBasis !== 0 ? gainLossAmount / lot.costBasis : 0;
-
-                return (
-                  <TableRow key={lot.id}>
-                    <TableCell className="font-medium">{formatDate(lot.acquisitionDate)}</TableCell>
-                    <TableCell className="text-right">{formatQuantity(lot.quantity)}</TableCell>
-                    <TableCell className="text-right">
-                      {formatAmount(lot.acquisitionPrice, currency)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatAmount(lot.acquisitionFees, currency)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatAmount(lot.costBasis, currency)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatAmount(marketValue, currency)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex flex-row items-center justify-end space-x-2">
-                        <GainAmount
-                          value={gainLossAmount}
-                          currency={currency}
-                          displayCurrency={false}
-                        />
-                        <GainPercent value={gainLossPercent} variant="badge" />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-
-        <div className="divide-y md:hidden">
-          {sortedLots.map((lot) => {
-            const marketValue = lot.quantity * marketPrice;
-            const gainLossAmount = marketValue - lot.costBasis;
-            const gainLossPercent = lot.costBasis !== 0 ? gainLossAmount / lot.costBasis : 0;
-
-            return (
-              <div key={lot.id} className="space-y-2 p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">{formatDate(lot.acquisitionDate)}</span>
-                  <div className="flex items-center space-x-2">
-                    <GainAmount
-                      value={gainLossAmount}
-                      currency={currency}
-                      displayCurrency={false}
-                    />
-                    <GainPercent value={gainLossPercent} variant="badge" />
-                  </div>
-                </div>
-                <div className="text-muted-foreground grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                  <span>Quantity</span>
-                  <span className="text-foreground text-right">{formatQuantity(lot.quantity)}</span>
-                  <span>Acq. Price</span>
-                  <span className="text-foreground text-right">
-                    {formatAmount(lot.acquisitionPrice, currency)}
-                  </span>
-                  <span>Fees</span>
-                  <span className="text-foreground text-right">
-                    {formatAmount(lot.acquisitionFees, currency)}
-                  </span>
-                  <span>Cost Basis</span>
-                  <span className="text-foreground text-right">
-                    {formatAmount(lot.costBasis, currency)}
-                  </span>
-                  <span>Market Value</span>
-                  <span className="text-foreground text-right">
-                    {formatAmount(marketValue, currency)}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 

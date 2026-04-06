@@ -578,7 +578,6 @@ export interface Holding {
   assetKind?: AssetKind | null;
   quantity: number;
   openDate?: string | Date | null;
-  lots?: Lot[] | null;
   lotDetails?: LotView[] | null;
   localCurrency: string;
   baseCurrency: string;
