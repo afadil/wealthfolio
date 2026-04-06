@@ -251,17 +251,44 @@ impl LotRepositoryTrait for LotsRepository {
                         .map_err(StorageError::from)?;
                 }
 
-                // Mark closed lots
+                // Upsert closed lots — INSERT the full record if it doesn't exist
+                // yet (happens during full recalc when a lot is created and fully
+                // consumed in one pass), or UPDATE if it was previously open.
+                let now = chrono::Utc::now()
+                    .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+                    .to_string();
                 for closure in &closures {
-                    diesel::update(dsl::lots.filter(dsl::id.eq(&closure.lot_id)))
+                    let closed_lot = LotRecordDB {
+                        id: closure.lot_id.clone(),
+                        account_id: closure.account_id.clone(),
+                        asset_id: closure.asset_id.clone(),
+                        open_date: closure.open_date.clone(),
+                        open_activity_id: None,
+                        original_quantity: closure.original_quantity.clone(),
+                        remaining_quantity: "0".to_string(),
+                        cost_per_unit: closure.cost_per_unit.clone(),
+                        total_cost_basis: closure.total_cost_basis.clone(),
+                        fee_allocated: closure.fee_allocated.clone(),
+                        disposal_method: "FIFO".to_string(),
+                        is_closed: 1,
+                        close_date: Some(closure.close_date.clone()),
+                        close_activity_id: closure.close_activity_id.clone(),
+                        is_wash_sale: 0,
+                        holding_period: None,
+                        created_at: now.clone(),
+                        updated_at: now.clone(),
+                    };
+                    diesel::insert_into(dsl::lots)
+                        .values(&closed_lot)
+                        .on_conflict(dsl::id)
+                        .do_update()
                         .set((
                             dsl::is_closed.eq(1),
-                            dsl::close_date.eq(&closure.close_date),
-                            dsl::close_activity_id.eq(&closure.close_activity_id),
+                            dsl::close_date.eq(diesel::upsert::excluded(dsl::close_date)),
+                            dsl::close_activity_id
+                                .eq(diesel::upsert::excluded(dsl::close_activity_id)),
                             dsl::remaining_quantity.eq("0"),
-                            dsl::updated_at.eq(chrono::Utc::now()
-                                .format("%Y-%m-%dT%H:%M:%S%.3fZ")
-                                .to_string()),
+                            dsl::updated_at.eq(diesel::upsert::excluded(dsl::updated_at)),
                         ))
                         .execute(conn)
                         .map_err(StorageError::from)?;
