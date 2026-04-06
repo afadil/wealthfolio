@@ -110,6 +110,11 @@ pub struct FifoReductionResult {
     /// IDs of lots that were fully consumed (remaining_quantity → 0) by this reduction.
     /// Used by the lot persistence layer to mark those rows as closed.
     pub fully_consumed_lot_ids: Vec<String>,
+    /// Full snapshot of each fully consumed lot *before* it was removed from the
+    /// VecDeque.  Needed so that `LotClosure` can carry enough data to INSERT
+    /// the lot into the database if it was never written there (e.g. during a
+    /// full recalc/replay where the lot was created and consumed in one pass).
+    pub fully_consumed_lots: Vec<Lot>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -441,6 +446,7 @@ impl Position {
                 cost_basis_removed: Decimal::ZERO,
                 removed_lots: Vec::new(),
                 fully_consumed_lot_ids: Vec::new(),
+                fully_consumed_lots: Vec::new(),
             });
         }
 
@@ -466,6 +472,8 @@ impl Position {
         let mut removed_lots: Vec<Lot> = Vec::new();
         // Track fully consumed lot IDs for persistence (mark as closed)
         let mut fully_consumed_lot_ids: Vec<String> = Vec::new();
+        // Full snapshots of consumed lots (before removal) for DB insertion
+        let mut fully_consumed_lots: Vec<Lot> = Vec::new();
 
         // Iterate over the sorted Vec
         for (index, lot) in vec_lots.iter().enumerate() {
@@ -515,6 +523,7 @@ impl Position {
             if remaining_lot_qty <= Decimal::ZERO || !is_quantity_significant(&remaining_lot_qty) {
                 lot_indices_to_remove.push(index);
                 fully_consumed_lot_ids.push(lot.id.clone());
+                fully_consumed_lots.push(lot.clone());
             } else {
                 // Calculate remaining cost basis and fees (asset currency)
                 let remaining_lot_basis = lot.cost_basis - cost_basis_removed;
@@ -568,6 +577,7 @@ impl Position {
             cost_basis_removed: cost_basis_of_sold_lots_asset_currency,
             removed_lots,
             fully_consumed_lot_ids,
+            fully_consumed_lots,
         })
     }
 

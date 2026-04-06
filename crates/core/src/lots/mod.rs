@@ -32,6 +32,12 @@ use crate::portfolio::snapshot::AccountStateSnapshot;
 // ── Repository trait ──────────────────────────────────────────────────────────
 
 /// Records a lot that was fully disposed (remaining_quantity → 0).
+///
+/// Carries the full lot data so that `sync_lots_for_account` can INSERT the
+/// closed lot even if it was never previously written to the database.  This
+/// happens during a full recalc/replay: the lot is created and consumed
+/// entirely within a single pass, so `extract_lot_records` (which only sees
+/// lots still in the in-memory VecDeque) never produces a row for it.
 #[derive(Debug, Clone)]
 pub struct LotClosure {
     pub lot_id: String,
@@ -39,6 +45,20 @@ pub struct LotClosure {
     pub close_date: String,
     /// The activity that fully disposed the lot, if known.
     pub close_activity_id: Option<String>,
+
+    // ── Fields needed to INSERT the lot if it doesn't exist yet ──
+    pub account_id: String,
+    pub asset_id: String,
+    /// ISO 8601 date the lot was opened ("YYYY-MM-DD").
+    pub open_date: String,
+    /// Quantity when the lot was first created.
+    pub original_quantity: String,
+    /// Cost per unit in the asset's quote currency.
+    pub cost_per_unit: String,
+    /// Total cost basis (cost_per_unit × original_quantity + fee).
+    pub total_cost_basis: String,
+    /// Transaction fees allocated to this lot.
+    pub fee_allocated: String,
 }
 
 /// Persistence interface for lot rows.
