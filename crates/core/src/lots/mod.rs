@@ -317,8 +317,7 @@ pub fn replay_lots_to_date(
             let orig = Decimal::from_str(&lot.original_quantity).unwrap_or(Decimal::ZERO);
             if !orig.is_zero() {
                 lot.remaining_quantity = lot.original_quantity.clone();
-                let cost_per_unit =
-                    Decimal::from_str(&lot.cost_per_unit).unwrap_or(Decimal::ZERO);
+                let cost_per_unit = Decimal::from_str(&lot.cost_per_unit).unwrap_or(Decimal::ZERO);
                 let fee = Decimal::from_str(&lot.fee_allocated).unwrap_or(Decimal::ZERO);
                 lot.total_cost_basis = (orig * cost_per_unit + fee).to_string();
                 lot.is_closed = false;
@@ -350,8 +349,7 @@ pub fn replay_lots_to_date(
                     if remaining > Decimal::ZERO {
                         lot.remaining_quantity = (remaining * split_ratio).to_string();
                         // cost_per_unit adjusts inversely; total_cost_basis unchanged
-                        let cpu =
-                            Decimal::from_str(&lot.cost_per_unit).unwrap_or(Decimal::ZERO);
+                        let cpu = Decimal::from_str(&lot.cost_per_unit).unwrap_or(Decimal::ZERO);
                         if !split_ratio.is_zero() {
                             lot.cost_per_unit = (cpu / split_ratio).to_string();
                         }
@@ -365,8 +363,7 @@ pub fn replay_lots_to_date(
                 if qty_to_reduce <= Decimal::ZERO {
                     break;
                 }
-                let remaining =
-                    Decimal::from_str(&lot.remaining_quantity).unwrap_or(Decimal::ZERO);
+                let remaining = Decimal::from_str(&lot.remaining_quantity).unwrap_or(Decimal::ZERO);
                 if remaining <= Decimal::ZERO {
                     continue;
                 }
@@ -375,16 +372,13 @@ pub fn replay_lots_to_date(
                 lot.remaining_quantity = new_remaining.to_string();
 
                 // Adjust cost basis proportionally
-                let orig =
-                    Decimal::from_str(&lot.original_quantity).unwrap_or(Decimal::ONE);
+                let orig = Decimal::from_str(&lot.original_quantity).unwrap_or(Decimal::ONE);
                 if !orig.is_zero() {
                     let cost_per_unit =
                         Decimal::from_str(&lot.cost_per_unit).unwrap_or(Decimal::ZERO);
-                    let fee =
-                        Decimal::from_str(&lot.fee_allocated).unwrap_or(Decimal::ZERO);
+                    let fee = Decimal::from_str(&lot.fee_allocated).unwrap_or(Decimal::ZERO);
                     lot.total_cost_basis =
-                        (new_remaining * cost_per_unit + fee * new_remaining / orig)
-                            .to_string();
+                        (new_remaining * cost_per_unit + fee * new_remaining / orig).to_string();
                 }
 
                 if new_remaining <= Decimal::ZERO {
@@ -893,7 +887,15 @@ mod tests {
     fn replay_no_activities_returns_lots_with_original_qty() {
         // Buy 10 on Jan 1, current remaining is 6 (some sells happened).
         // Replay to Jan 15 with no activities → should get 10 (original).
-        let lots = vec![make_lot_record("buy1", "acc1", "AAPL", "2024-01-01", "10", "6", "150")];
+        let lots = vec![make_lot_record(
+            "buy1",
+            "acc1",
+            "AAPL",
+            "2024-01-01",
+            "10",
+            "6",
+            "150",
+        )];
         let result = replay_lots_to_date(lots, &[], NaiveDate::from_ymd_opt(2024, 1, 15).unwrap());
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].remaining_quantity, "10");
@@ -902,8 +904,23 @@ mod tests {
     #[test]
     fn replay_partial_sell() {
         // Buy 10 on Jan 1, sell 4 on Feb 1. Query Jan 15 → 10, query Feb 15 → 6.
-        let lots = vec![make_lot_record("buy1", "acc1", "AAPL", "2024-01-01", "10", "6", "150")];
-        let activities = vec![make_activity("sell1", "acc1", "AAPL", "SELL", "2024-02-01", dec!(4))];
+        let lots = vec![make_lot_record(
+            "buy1",
+            "acc1",
+            "AAPL",
+            "2024-01-01",
+            "10",
+            "6",
+            "150",
+        )];
+        let activities = vec![make_activity(
+            "sell1",
+            "acc1",
+            "AAPL",
+            "SELL",
+            "2024-02-01",
+            dec!(4),
+        )];
 
         // Before the sell
         let result = replay_lots_to_date(
@@ -927,9 +944,23 @@ mod tests {
     #[test]
     fn replay_full_sell_removes_lot() {
         // Buy 10, sell 10 → lot should not appear.
-        let lots = vec![make_lot_record("buy1", "acc1", "AAPL", "2024-01-01", "10", "0", "150")];
-        let activities =
-            vec![make_activity("sell1", "acc1", "AAPL", "SELL", "2024-02-01", dec!(10))];
+        let lots = vec![make_lot_record(
+            "buy1",
+            "acc1",
+            "AAPL",
+            "2024-01-01",
+            "10",
+            "0",
+            "150",
+        )];
+        let activities = vec![make_activity(
+            "sell1",
+            "acc1",
+            "AAPL",
+            "SELL",
+            "2024-02-01",
+            dec!(10),
+        )];
 
         let result = replay_lots_to_date(
             lots,
@@ -947,8 +978,14 @@ mod tests {
             make_lot_record("buy1", "acc1", "AAPL", "2024-01-01", "10", "0", "150"),
             make_lot_record("buy2", "acc1", "AAPL", "2024-02-01", "5", "3", "160"),
         ];
-        let activities =
-            vec![make_activity("sell1", "acc1", "AAPL", "SELL", "2024-03-01", dec!(12))];
+        let activities = vec![make_activity(
+            "sell1",
+            "acc1",
+            "AAPL",
+            "SELL",
+            "2024-03-01",
+            dec!(12),
+        )];
 
         let result = replay_lots_to_date(
             lots,
@@ -964,9 +1001,23 @@ mod tests {
     fn replay_split_multiplies_quantities() {
         // Buy 10 on Jan 1, 4:1 split on Feb 1.
         // Jan 15: 10. Feb 15: 40.
-        let lots = vec![make_lot_record("buy1", "acc1", "AAPL", "2024-01-01", "10", "40", "150")];
-        let activities =
-            vec![make_activity("split1", "acc1", "AAPL", "SPLIT", "2024-02-01", dec!(4))];
+        let lots = vec![make_lot_record(
+            "buy1",
+            "acc1",
+            "AAPL",
+            "2024-01-01",
+            "10",
+            "40",
+            "150",
+        )];
+        let activities = vec![make_activity(
+            "split1",
+            "acc1",
+            "AAPL",
+            "SPLIT",
+            "2024-02-01",
+            dec!(4),
+        )];
 
         // Before split
         let result = replay_lots_to_date(
@@ -991,7 +1042,15 @@ mod tests {
     fn replay_split_then_sell() {
         // Buy 10 on Jan 1, 2:1 split on Feb 1, sell 5 on Mar 1.
         // Feb 15: 20. Mar 15: 15.
-        let lots = vec![make_lot_record("buy1", "acc1", "AAPL", "2024-01-01", "10", "15", "150")];
+        let lots = vec![make_lot_record(
+            "buy1",
+            "acc1",
+            "AAPL",
+            "2024-01-01",
+            "10",
+            "15",
+            "150",
+        )];
         let activities = vec![
             make_activity("split1", "acc1", "AAPL", "SPLIT", "2024-02-01", dec!(2)),
             make_activity("sell1", "acc1", "AAPL", "SELL", "2024-03-01", dec!(5)),
@@ -1013,8 +1072,14 @@ mod tests {
             make_lot_record("buy1", "acc1", "AAPL", "2024-01-01", "10", "5", "150"),
             make_lot_record("buy2", "acc2", "AAPL", "2024-01-01", "10", "10", "150"),
         ];
-        let activities =
-            vec![make_activity("sell1", "acc1", "AAPL", "SELL", "2024-02-01", dec!(5))];
+        let activities = vec![make_activity(
+            "sell1",
+            "acc1",
+            "AAPL",
+            "SELL",
+            "2024-02-01",
+            dec!(5),
+        )];
 
         let result = replay_lots_to_date(
             lots,

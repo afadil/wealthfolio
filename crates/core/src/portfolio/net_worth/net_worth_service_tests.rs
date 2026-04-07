@@ -791,42 +791,159 @@ impl crate::lots::LotRepositoryTrait for MockLotRepository {
 
 struct MockActivityRepository;
 impl MockActivityRepository {
-    fn new() -> Self { Self }
+    fn new() -> Self {
+        Self
+    }
 }
 #[async_trait]
 impl crate::activities::ActivityRepositoryTrait for MockActivityRepository {
-    fn get_activity(&self, _: &str) -> Result<crate::activities::Activity> { unimplemented!() }
-    fn get_activities(&self) -> Result<Vec<crate::activities::Activity>> { unimplemented!() }
-    fn get_activities_by_account_id(&self, _: &str) -> Result<Vec<crate::activities::Activity>> { unimplemented!() }
-    fn get_activities_by_account_ids(&self, _: &[String]) -> Result<Vec<crate::activities::Activity>> { Ok(Vec::new()) }
-    fn get_trading_activities(&self) -> Result<Vec<crate::activities::Activity>> { unimplemented!() }
-    fn get_income_activities(&self) -> Result<Vec<crate::activities::Activity>> { unimplemented!() }
-    fn get_contribution_activities(&self, _: &[String], _: DateTime<Utc>, _: DateTime<Utc>) -> Result<Vec<crate::limits::ContributionActivity>> { unimplemented!() }
-    fn search_activities(&self, _: i64, _: i64, _: Option<Vec<String>>, _: Option<Vec<String>>, _: Option<String>, _: Option<crate::activities::Sort>, _: Option<bool>, _: Option<NaiveDate>, _: Option<NaiveDate>, _: Option<Vec<String>>) -> Result<crate::activities::ActivitySearchResponse> { unimplemented!() }
-    async fn create_activity(&self, _: crate::activities::NewActivity) -> Result<crate::activities::Activity> { unimplemented!() }
-    async fn update_activity(&self, _: crate::activities::ActivityUpdate) -> Result<crate::activities::Activity> { unimplemented!() }
-    async fn delete_activity(&self, _: String) -> Result<crate::activities::Activity> { unimplemented!() }
-    async fn bulk_mutate_activities(&self, _: Vec<crate::activities::NewActivity>, _: Vec<crate::activities::ActivityUpdate>, _: Vec<String>) -> Result<crate::activities::ActivityBulkMutationResult> { unimplemented!() }
-    async fn create_activities(&self, _: Vec<crate::activities::NewActivity>) -> Result<usize> { unimplemented!() }
-    fn get_first_activity_date(&self, _: Option<&[String]>) -> Result<Option<DateTime<Utc>>> { unimplemented!() }
-    fn get_import_mapping(&self, _: &str, _: &str) -> Result<Option<crate::activities::ImportMapping>> { unimplemented!() }
-    async fn save_import_mapping(&self, _: &crate::activities::ImportMapping) -> Result<()> { unimplemented!() }
-    async fn link_account_template(&self, _: &str, _: &str, _: &str) -> Result<()> { unimplemented!() }
-    fn list_import_templates(&self) -> Result<Vec<crate::activities::ImportTemplate>> { Ok(Vec::new()) }
-    fn get_import_template(&self, _: &str) -> Result<Option<crate::activities::ImportTemplate>> { Ok(None) }
-    async fn save_import_template(&self, _: &crate::activities::ImportTemplate) -> Result<()> { unimplemented!() }
-    async fn delete_import_template(&self, _: &str) -> Result<()> { unimplemented!() }
-    fn get_broker_sync_profile(&self, _: &str, _: &str) -> Result<Option<crate::activities::ImportTemplate>> { Ok(None) }
-    async fn save_broker_sync_profile(&self, _: &crate::activities::ImportTemplate) -> Result<()> { Ok(()) }
-    async fn link_broker_sync_profile(&self, _: &str, _: &str, _: &str) -> Result<()> { Ok(()) }
-    fn calculate_average_cost(&self, _: &str, _: &str) -> Result<Decimal> { unimplemented!() }
-    fn get_income_activities_data(&self, _: Option<&str>) -> Result<Vec<crate::activities::IncomeData>> { unimplemented!() }
-    fn get_first_activity_date_overall(&self) -> Result<DateTime<Utc>> { unimplemented!() }
-    fn get_activity_bounds_for_assets(&self, _: &[String]) -> Result<HashMap<String, (Option<NaiveDate>, Option<NaiveDate>)>> { Ok(HashMap::new()) }
-    fn check_existing_duplicates(&self, _: &[String]) -> Result<HashMap<String, String>> { Ok(HashMap::new()) }
-    async fn bulk_upsert(&self, _: Vec<crate::activities::ActivityUpsert>) -> Result<crate::activities::BulkUpsertResult> { unimplemented!() }
-    async fn reassign_asset(&self, _: &str, _: &str) -> Result<u32> { Ok(0) }
-    async fn get_activity_accounts_and_currencies_by_asset_id(&self, _: &str) -> Result<(Vec<String>, Vec<String>)> { Ok((Vec::new(), Vec::new())) }
+    fn get_activity(&self, _: &str) -> Result<crate::activities::Activity> {
+        unimplemented!()
+    }
+    fn get_activities(&self) -> Result<Vec<crate::activities::Activity>> {
+        unimplemented!()
+    }
+    fn get_activities_by_account_id(&self, _: &str) -> Result<Vec<crate::activities::Activity>> {
+        unimplemented!()
+    }
+    fn get_activities_by_account_ids(
+        &self,
+        _: &[String],
+    ) -> Result<Vec<crate::activities::Activity>> {
+        Ok(Vec::new())
+    }
+    fn get_trading_activities(&self) -> Result<Vec<crate::activities::Activity>> {
+        unimplemented!()
+    }
+    fn get_income_activities(&self) -> Result<Vec<crate::activities::Activity>> {
+        unimplemented!()
+    }
+    fn get_contribution_activities(
+        &self,
+        _: &[String],
+        _: DateTime<Utc>,
+        _: DateTime<Utc>,
+    ) -> Result<Vec<crate::limits::ContributionActivity>> {
+        unimplemented!()
+    }
+    fn search_activities(
+        &self,
+        _: i64,
+        _: i64,
+        _: Option<Vec<String>>,
+        _: Option<Vec<String>>,
+        _: Option<String>,
+        _: Option<crate::activities::Sort>,
+        _: Option<bool>,
+        _: Option<NaiveDate>,
+        _: Option<NaiveDate>,
+        _: Option<Vec<String>>,
+    ) -> Result<crate::activities::ActivitySearchResponse> {
+        unimplemented!()
+    }
+    async fn create_activity(
+        &self,
+        _: crate::activities::NewActivity,
+    ) -> Result<crate::activities::Activity> {
+        unimplemented!()
+    }
+    async fn update_activity(
+        &self,
+        _: crate::activities::ActivityUpdate,
+    ) -> Result<crate::activities::Activity> {
+        unimplemented!()
+    }
+    async fn delete_activity(&self, _: String) -> Result<crate::activities::Activity> {
+        unimplemented!()
+    }
+    async fn bulk_mutate_activities(
+        &self,
+        _: Vec<crate::activities::NewActivity>,
+        _: Vec<crate::activities::ActivityUpdate>,
+        _: Vec<String>,
+    ) -> Result<crate::activities::ActivityBulkMutationResult> {
+        unimplemented!()
+    }
+    async fn create_activities(&self, _: Vec<crate::activities::NewActivity>) -> Result<usize> {
+        unimplemented!()
+    }
+    fn get_first_activity_date(&self, _: Option<&[String]>) -> Result<Option<DateTime<Utc>>> {
+        unimplemented!()
+    }
+    fn get_import_mapping(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<crate::activities::ImportMapping>> {
+        unimplemented!()
+    }
+    async fn save_import_mapping(&self, _: &crate::activities::ImportMapping) -> Result<()> {
+        unimplemented!()
+    }
+    async fn link_account_template(&self, _: &str, _: &str, _: &str) -> Result<()> {
+        unimplemented!()
+    }
+    fn list_import_templates(&self) -> Result<Vec<crate::activities::ImportTemplate>> {
+        Ok(Vec::new())
+    }
+    fn get_import_template(&self, _: &str) -> Result<Option<crate::activities::ImportTemplate>> {
+        Ok(None)
+    }
+    async fn save_import_template(&self, _: &crate::activities::ImportTemplate) -> Result<()> {
+        unimplemented!()
+    }
+    async fn delete_import_template(&self, _: &str) -> Result<()> {
+        unimplemented!()
+    }
+    fn get_broker_sync_profile(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<crate::activities::ImportTemplate>> {
+        Ok(None)
+    }
+    async fn save_broker_sync_profile(&self, _: &crate::activities::ImportTemplate) -> Result<()> {
+        Ok(())
+    }
+    async fn link_broker_sync_profile(&self, _: &str, _: &str, _: &str) -> Result<()> {
+        Ok(())
+    }
+    fn calculate_average_cost(&self, _: &str, _: &str) -> Result<Decimal> {
+        unimplemented!()
+    }
+    fn get_income_activities_data(
+        &self,
+        _: Option<&str>,
+    ) -> Result<Vec<crate::activities::IncomeData>> {
+        unimplemented!()
+    }
+    fn get_first_activity_date_overall(&self) -> Result<DateTime<Utc>> {
+        unimplemented!()
+    }
+    fn get_activity_bounds_for_assets(
+        &self,
+        _: &[String],
+    ) -> Result<HashMap<String, (Option<NaiveDate>, Option<NaiveDate>)>> {
+        Ok(HashMap::new())
+    }
+    fn check_existing_duplicates(&self, _: &[String]) -> Result<HashMap<String, String>> {
+        Ok(HashMap::new())
+    }
+    async fn bulk_upsert(
+        &self,
+        _: Vec<crate::activities::ActivityUpsert>,
+    ) -> Result<crate::activities::BulkUpsertResult> {
+        unimplemented!()
+    }
+    async fn reassign_asset(&self, _: &str, _: &str) -> Result<u32> {
+        Ok(0)
+    }
+    async fn get_activity_accounts_and_currencies_by_asset_id(
+        &self,
+        _: &str,
+    ) -> Result<(Vec<String>, Vec<String>)> {
+        Ok((Vec::new(), Vec::new()))
+    }
 }
 
 struct MockValuationRepository {

@@ -182,11 +182,9 @@ impl LotRepositoryTrait for LotsRepository {
             .filter(dsl::account_id.eq_any(account_ids))
             .filter(dsl::open_date.le(&date_str))
             .filter(
-                dsl::is_closed
-                    .eq(0)
-                    .or(dsl::close_date.is_not_null().and(
-                        dsl::close_date.gt(&date_str),
-                    )),
+                dsl::is_closed.eq(0).or(dsl::close_date
+                    .is_not_null()
+                    .and(dsl::close_date.gt(&date_str))),
             )
             .load(&mut conn)
             .map_err(StorageError::from)?;
@@ -239,10 +237,8 @@ impl LotRepositoryTrait for LotsRepository {
                                 .eq(diesel::upsert::excluded(dsl::remaining_quantity)),
                             dsl::total_cost_basis
                                 .eq(diesel::upsert::excluded(dsl::total_cost_basis)),
-                            dsl::is_closed
-                                .eq(diesel::upsert::excluded(dsl::is_closed)),
-                            dsl::close_date
-                                .eq(diesel::upsert::excluded(dsl::close_date)),
+                            dsl::is_closed.eq(diesel::upsert::excluded(dsl::is_closed)),
+                            dsl::close_date.eq(diesel::upsert::excluded(dsl::close_date)),
                             dsl::close_activity_id
                                 .eq(diesel::upsert::excluded(dsl::close_activity_id)),
                             dsl::updated_at.eq(diesel::upsert::excluded(dsl::updated_at)),
@@ -279,11 +275,9 @@ impl LotRepositoryTrait for LotsRepository {
 
                 if known_ids.is_empty() {
                     // No lots produced — delete everything for this account
-                    diesel::delete(
-                        dsl::lots.filter(dsl::account_id.eq(&account_id)),
-                    )
-                    .execute(conn)
-                    .map_err(StorageError::from)?;
+                    diesel::delete(dsl::lots.filter(dsl::account_id.eq(&account_id)))
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
                 } else {
                     diesel::delete(
                         dsl::lots

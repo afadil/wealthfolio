@@ -1781,11 +1781,7 @@ impl SnapshotServiceTrait for SnapshotService {
         if let Some(ref lot_repo) = self.lot_repository {
             let later_snapshots = self
                 .snapshot_repository
-                .get_snapshots_by_account(
-                    account_id,
-                    snapshot.snapshot_date.succ_opt(),
-                    None,
-                )
+                .get_snapshots_by_account(account_id, snapshot.snapshot_date.succ_opt(), None)
                 .unwrap_or_default();
             let is_latest = later_snapshots.is_empty();
 

@@ -370,15 +370,36 @@ fn lot_records_to_display_lots(
     records
         .iter()
         .filter_map(|r| {
-            let quantity = r.remaining_quantity.parse::<Decimal>().inspect_err(|e| {
-                error!("Lot {} has malformed remaining_quantity '{}': {} — dropping from display", r.id, r.remaining_quantity, e);
-            }).ok()?;
-            let cost_basis = r.total_cost_basis.parse::<Decimal>().inspect_err(|e| {
-                error!("Lot {} has malformed total_cost_basis '{}': {} — dropping from display", r.id, r.total_cost_basis, e);
-            }).ok()?;
-            let acquisition_price = r.cost_per_unit.parse::<Decimal>().inspect_err(|e| {
-                error!("Lot {} has malformed cost_per_unit '{}': {} — dropping from display", r.id, r.cost_per_unit, e);
-            }).ok()?;
+            let quantity = r
+                .remaining_quantity
+                .parse::<Decimal>()
+                .inspect_err(|e| {
+                    error!(
+                        "Lot {} has malformed remaining_quantity '{}': {} — dropping from display",
+                        r.id, r.remaining_quantity, e
+                    );
+                })
+                .ok()?;
+            let cost_basis = r
+                .total_cost_basis
+                .parse::<Decimal>()
+                .inspect_err(|e| {
+                    error!(
+                        "Lot {} has malformed total_cost_basis '{}': {} — dropping from display",
+                        r.id, r.total_cost_basis, e
+                    );
+                })
+                .ok()?;
+            let acquisition_price = r
+                .cost_per_unit
+                .parse::<Decimal>()
+                .inspect_err(|e| {
+                    error!(
+                        "Lot {} has malformed cost_per_unit '{}': {} — dropping from display",
+                        r.id, r.cost_per_unit, e
+                    );
+                })
+                .ok()?;
             let acquisition_fees = r
                 .fee_allocated
                 .parse::<Decimal>()
@@ -386,7 +407,10 @@ fn lot_records_to_display_lots(
                 .unwrap_or(Decimal::ZERO);
             let acquisition_date = NaiveDate::parse_from_str(&r.open_date, "%Y-%m-%d")
                 .inspect_err(|e| {
-                    error!("Lot {} has malformed open_date '{}': {} — dropping from display", r.id, r.open_date, e);
+                    error!(
+                        "Lot {} has malformed open_date '{}': {} — dropping from display",
+                        r.id, r.open_date, e
+                    );
                 })
                 .ok()?
                 .and_hms_opt(0, 0, 0)?
@@ -696,7 +720,10 @@ impl HoldingsServiceTrait for HoldingsService {
                     .iter()
                     .map(|l| {
                         l.remaining_quantity.parse::<Decimal>().unwrap_or_else(|e| {
-                            error!("Lot {} has malformed remaining_quantity '{}': {}", l.id, l.remaining_quantity, e);
+                            error!(
+                                "Lot {} has malformed remaining_quantity '{}': {}",
+                                l.id, l.remaining_quantity, e
+                            );
                             Decimal::ZERO
                         })
                     })
@@ -708,7 +735,10 @@ impl HoldingsServiceTrait for HoldingsService {
                     .iter()
                     .map(|l| {
                         l.total_cost_basis.parse::<Decimal>().unwrap_or_else(|e| {
-                            error!("Lot {} has malformed total_cost_basis '{}': {}", l.id, l.total_cost_basis, e);
+                            error!(
+                                "Lot {} has malformed total_cost_basis '{}': {}",
+                                l.id, l.total_cost_basis, e
+                            );
                             Decimal::ZERO
                         })
                     })
