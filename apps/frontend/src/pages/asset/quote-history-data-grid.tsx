@@ -26,7 +26,7 @@ const getDecimalPrecision = (assetKind?: AssetKind | null): number => {
     case "FX":
       return 6; // FX rates need high precision
     default:
-      return 2; // Standard precision for stocks, ETFs, etc.
+      return 4; // Standard precision for stocks, ETFs, bonds, etc.
   }
 };
 
