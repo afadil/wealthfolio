@@ -419,7 +419,13 @@ impl HoldingsCalculator {
             let reduction = position.reduce_lots_fifo(activity.qty())?;
             let close_date = self.activity_local_date(activity).to_string();
             for lot in &reduction.fully_consumed_lots {
-                self.record_lot_closure(&state.account_id, asset_id, lot, &close_date, &activity.id);
+                self.record_lot_closure(
+                    &state.account_id,
+                    asset_id,
+                    lot,
+                    &close_date,
+                    &activity.id,
+                );
             }
         } else {
             warn!(
@@ -840,7 +846,13 @@ impl HoldingsCalculator {
                 // Record fully consumed lots as closed
                 let close_date = activity_date.to_string();
                 for lot in &reduction.fully_consumed_lots {
-                    self.record_lot_closure(&state.account_id, asset_id, lot, &close_date, &activity.id);
+                    self.record_lot_closure(
+                        &state.account_id,
+                        asset_id,
+                        lot,
+                        &close_date,
+                        &activity.id,
+                    );
                 }
 
                 // Cache removed lots for paired TRANSFER_IN (lot-level transfer)

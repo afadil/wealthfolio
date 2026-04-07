@@ -340,10 +340,7 @@ impl ValuationServiceTrait for ValuationService {
             .into_iter()
             .collect();
         let assets = self.asset_repository.list_by_asset_ids(&lot_asset_ids)?;
-        let asset_map: HashMap<String, _> = assets
-            .into_iter()
-            .map(|a| (a.id.clone(), a))
-            .collect();
+        let asset_map: HashMap<String, _> = assets.into_iter().map(|a| (a.id.clone(), a)).collect();
 
         let mut required_asset_ids: HashSet<String> = lot_asset_ids.into_iter().collect();
         let mut required_fx_pairs = HashSet::new();

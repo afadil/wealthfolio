@@ -5401,7 +5401,9 @@ mod tests {
             Ok(())
         }
 
-        async fn get_open_position_quantities(&self) -> AppResult<std::collections::HashMap<String, rust_decimal::Decimal>> {
+        async fn get_open_position_quantities(
+            &self,
+        ) -> AppResult<std::collections::HashMap<String, rust_decimal::Decimal>> {
             Ok(std::collections::HashMap::new())
         }
 
@@ -5693,10 +5695,6 @@ mod tests {
         );
         // Parse as Decimal to avoid trailing-zero formatting differences
         let cost_per_unit: Decimal = closures[0].cost_per_unit.parse().unwrap();
-        assert_eq!(
-            cost_per_unit,
-            dec!(185),
-            "cost_per_unit = buy price"
-        );
+        assert_eq!(cost_per_unit, dec!(185), "cost_per_unit = buy price");
     }
 }

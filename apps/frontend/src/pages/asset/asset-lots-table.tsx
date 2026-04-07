@@ -205,23 +205,14 @@ function AccountLotGroup({
                 <div key={lot.id} className={`space-y-2 p-4 ${lot.isClosed ? "opacity-50" : ""}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Badge
-                        variant={lot.isClosed ? "secondary" : "outline"}
-                        className="text-xs"
-                      >
+                      <Badge variant={lot.isClosed ? "secondary" : "outline"} className="text-xs">
                         {lot.isClosed ? "Closed" : "Open"}
                       </Badge>
-                      <span className="text-sm font-medium">
-                        {formatDate(lot.acquisitionDate)}
-                      </span>
+                      <span className="text-sm font-medium">{formatDate(lot.acquisitionDate)}</span>
                     </div>
                     {!lot.isClosed && (
                       <div className="flex items-center space-x-2">
-                        <GainAmount
-                          value={gainLoss}
-                          currency={currency}
-                          displayCurrency={false}
-                        />
+                        <GainAmount value={gainLoss} currency={currency} displayCurrency={false} />
                         <GainPercent value={gainPct} variant="badge" />
                       </div>
                     )}
@@ -229,7 +220,8 @@ function AccountLotGroup({
                   <div className="text-muted-foreground grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                     <span>Remaining</span>
                     <span className="text-foreground text-right">
-                      {formatQuantity(lot.remainingQuantity)} / {formatQuantity(lot.originalQuantity)}
+                      {formatQuantity(lot.remainingQuantity)} /{" "}
+                      {formatQuantity(lot.originalQuantity)}
                     </span>
                     <span>Cost/Unit</span>
                     <span className="text-foreground text-right">

@@ -1237,17 +1237,15 @@ export const AssetProfilePage = () => {
             )}
 
             {/* Lots Content: Requires profile and holding with lot details */}
-            {profile &&
-              holding?.lotDetails &&
-              holding.lotDetails.length > 0 && (
-                <TabsContent value="lots" className="pt-6">
-                  <AssetLotsTable
-                    lotDetails={holding.lotDetails}
-                    currency={symbolHolding?.currency ?? profile.currency ?? baseCurrency}
-                    marketPrice={Number(holding?.price ?? profile.marketPrice)}
-                  />
-                </TabsContent>
-              )}
+            {profile && holding?.lotDetails && holding.lotDetails.length > 0 && (
+              <TabsContent value="lots" className="pt-6">
+                <AssetLotsTable
+                  lotDetails={holding.lotDetails}
+                  currency={symbolHolding?.currency ?? profile.currency ?? baseCurrency}
+                  marketPrice={Number(holding?.price ?? profile.marketPrice)}
+                />
+              </TabsContent>
+            )}
 
             {/* History/Quotes Content: Requires quoteHistory */}
             <TabsContent value="history" className="space-y-16 pt-6">
