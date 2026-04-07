@@ -1,7 +1,7 @@
 use crate::activities::ActivityRepositoryTrait;
 use crate::assets::{Asset, AssetClassificationService, AssetKind, AssetServiceTrait};
-use crate::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
 use crate::constants::DECIMAL_PRECISION;
+use crate::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
 use crate::errors::{CalculatorError, Error as CoreError, Result};
 use crate::fx::currency::{get_normalization_rule, normalize_currency_code};
 use crate::lots::{LotRecord, LotRepositoryTrait};

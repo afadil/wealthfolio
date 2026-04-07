@@ -14,9 +14,9 @@ use super::net_worth_model::{
 use super::net_worth_traits::NetWorthServiceTrait;
 use crate::accounts::{account_types, AccountRepositoryTrait};
 use crate::activities::ActivityRepositoryTrait;
-use crate::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
 use crate::assets::{AssetKind, AssetRepositoryTrait};
 use crate::constants::DECIMAL_PRECISION;
+use crate::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
 use crate::errors::Result;
 use crate::fx::currency::normalize_amount;
 use crate::fx::FxServiceTrait;
