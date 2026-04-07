@@ -20,7 +20,10 @@ use wealthfolio_core::{
     },
 };
 
-use crate::{error::ApiResult, main_lib::AppState};
+use crate::{
+    error::{ApiError, ApiResult},
+    main_lib::AppState,
+};
 
 use super::dto::{
     AllocationHoldingsQuery, AssetHoldingsQuery, CheckHoldingsImportRequest,
@@ -196,6 +199,9 @@ pub async fn get_snapshot_by_date(
         .holdings_service
         .holdings_from_snapshot(&q.account_id, target_date, &base_currency)
         .await?;
+    if holdings.is_empty() {
+        return Err(ApiError::NotFound);
+    }
     Ok(Json(holdings))
 }
 
