@@ -380,17 +380,20 @@ impl HealthService {
             });
         let consistency_issues: Vec<ConsistencyIssueInfo> = negative_balance_accounts
             .into_iter()
-            .map(|acc_id| {
+            .map(|info| {
                 let name = account_name_map
-                    .get(&acc_id)
+                    .get(&info.account_id)
                     .cloned()
-                    .unwrap_or_else(|| acc_id.clone());
+                    .unwrap_or_else(|| info.account_id.clone());
                 ConsistencyIssueInfo {
                     issue_type: super::checks::ConsistencyIssueType::NegativeAccountBalance,
-                    record_id: acc_id.clone(),
+                    record_id: info.account_id.clone(),
                     description: name,
-                    account_id: Some(acc_id),
+                    account_id: Some(info.account_id),
                     asset_id: None,
+                    first_negative_date: Some(info.first_negative_date),
+                    cash_balance: Some(info.cash_balance),
+                    account_currency: Some(info.account_currency),
                 }
             })
             .collect();

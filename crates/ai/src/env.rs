@@ -11,9 +11,11 @@ use wealthfolio_core::{
     activities::ActivityServiceTrait,
     goals::GoalServiceTrait,
     portfolio::{
-        allocation::AllocationServiceTrait, holdings::HoldingsServiceTrait,
-        income::IncomeServiceTrait, performance::PerformanceServiceTrait,
-        valuation::ValuationServiceTrait,
+        allocation::AllocationServiceTrait,
+        holdings::HoldingsServiceTrait,
+        income::IncomeServiceTrait,
+        performance::PerformanceServiceTrait,
+        valuation::{NegativeBalanceInfo, ValuationServiceTrait},
     },
     quotes::QuoteServiceTrait,
     secrets::SecretStore,
@@ -526,7 +528,7 @@ pub mod test_env {
         fn get_accounts_with_negative_balance(
             &self,
             _account_ids: &[String],
-        ) -> CoreResult<Vec<String>> {
+        ) -> CoreResult<Vec<NegativeBalanceInfo>> {
             Ok(Vec::new())
         }
 

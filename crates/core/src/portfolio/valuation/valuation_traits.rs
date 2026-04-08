@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use chrono::NaiveDate;
 
-use super::DailyAccountValuation;
+use super::{DailyAccountValuation, NegativeBalanceInfo};
 use crate::errors::Result;
 
 /// Repository trait for managing daily account valuations.
@@ -42,6 +42,9 @@ pub trait ValuationRepositoryTrait: Send + Sync {
         date: NaiveDate,
     ) -> Result<Vec<DailyAccountValuation>>;
 
-    /// Returns account IDs that have at least one negative total_value in their history.
-    fn get_accounts_with_negative_balance(&self, account_ids: &[String]) -> Result<Vec<String>>;
+    /// Returns info about accounts that have at least one negative total_value in their history.
+    fn get_accounts_with_negative_balance(
+        &self,
+        account_ids: &[String],
+    ) -> Result<Vec<NegativeBalanceInfo>>;
 }
