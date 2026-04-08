@@ -11,11 +11,9 @@ use wealthfolio_core::{
     activities::ActivityServiceTrait,
     goals::GoalServiceTrait,
     portfolio::{
-        allocation::AllocationServiceTrait,
-        holdings::HoldingsServiceTrait,
-        income::IncomeServiceTrait,
-        performance::PerformanceServiceTrait,
-        valuation::{NegativeBalanceInfo, ValuationServiceTrait},
+        allocation::AllocationServiceTrait, holdings::HoldingsServiceTrait,
+        income::IncomeServiceTrait, performance::PerformanceServiceTrait,
+        valuation::ValuationServiceTrait,
     },
     quotes::QuoteServiceTrait,
     secrets::SecretStore,
@@ -104,7 +102,9 @@ pub mod test_env {
         },
         secrets::SecretStore,
         settings::{Settings, SettingsServiceTrait, SettingsUpdate},
-        valuation::{DailyAccountValuation, ValuationRecalcMode, ValuationServiceTrait},
+        valuation::{
+            DailyAccountValuation, NegativeBalanceInfo, ValuationRecalcMode, ValuationServiceTrait,
+        },
         Error as CoreError, Result as CoreResult,
     };
 
