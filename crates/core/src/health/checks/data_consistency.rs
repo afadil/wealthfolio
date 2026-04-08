@@ -5,7 +5,9 @@
 use async_trait::async_trait;
 
 use crate::errors::Result;
-use crate::health::model::{FixAction, HealthCategory, HealthIssue, NavigateAction, Severity};
+use crate::health::model::{
+    AffectedItem, FixAction, HealthCategory, HealthIssue, NavigateAction, Severity,
+};
 use crate::health::traits::{HealthCheck, HealthContext};
 
 /// Types of data consistency issues.
@@ -200,6 +202,10 @@ impl DataConsistencyCheck {
                 .map(|i| i.record_id.clone())
                 .collect();
             let data_hash = compute_data_hash(&account_ids);
+            let affected_items: Vec<AffectedItem> = negative_balance_issues
+                .iter()
+                .map(|i| AffectedItem::account(i.record_id.clone(), i.description.clone()))
+                .collect();
 
             health_issues.push(
                 HealthIssue::builder()
@@ -215,6 +221,7 @@ impl DataConsistencyCheck {
                         "One or more accounts show a negative total value in their history. This is usually caused by missing buy transactions. Review your activities to fix this.",
                     )
                     .affected_count(count as u32)
+                    .affected_items(affected_items)
                     .navigate_action(NavigateAction::to_activities(None))
                     .data_hash(data_hash)
                     .build(),
