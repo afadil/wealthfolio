@@ -366,8 +366,13 @@ impl HealthService {
         };
         let unclassified_assets: Vec<UnclassifiedAssetInfo> = Vec::new();
 
-        // Detect accounts with negative portfolio balance in their history
-        let account_ids: Vec<String> = accounts.iter().map(|a| a.id.clone()).collect();
+        // Detect accounts with negative portfolio balance in their history.
+        // Exclude CASH accounts — a negative cash balance is a normal bank overdraft.
+        let account_ids: Vec<String> = accounts
+            .iter()
+            .filter(|a| a.account_type != crate::accounts::account_types::CASH)
+            .map(|a| a.id.clone())
+            .collect();
         let account_name_map: std::collections::HashMap<String, String> = accounts
             .iter()
             .map(|a| (a.id.clone(), a.name.clone()))
