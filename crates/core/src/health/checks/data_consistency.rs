@@ -3,6 +3,8 @@
 //! Detects orphan references, negative positions, and legacy data needing migration.
 
 use async_trait::async_trait;
+use chrono::NaiveDate;
+use rust_decimal::Decimal;
 
 use crate::errors::Result;
 use crate::health::model::{
@@ -32,12 +34,18 @@ pub struct ConsistencyIssueInfo {
     pub issue_type: ConsistencyIssueType,
     /// ID of the affected record (activity_id, asset_id, etc.)
     pub record_id: String,
-    /// Human-readable description
+    /// Human-readable description (used as display name for affected items)
     pub description: String,
     /// Related account ID (if applicable)
     pub account_id: Option<String>,
     /// Related asset ID (if applicable)
     pub asset_id: Option<String>,
+    /// First date the balance went negative (NegativeAccountBalance only)
+    pub first_negative_date: Option<NaiveDate>,
+    /// Cash balance on first_negative_date, in account currency (NegativeAccountBalance only)
+    pub cash_balance: Option<Decimal>,
+    /// Account currency (NegativeAccountBalance only)
+    pub account_currency: Option<String>,
 }
 
 /// Health check that detects data consistency problems.
@@ -204,7 +212,17 @@ impl DataConsistencyCheck {
             let data_hash = compute_data_hash(&account_ids);
             let affected_items: Vec<AffectedItem> = negative_balance_issues
                 .iter()
-                .map(|i| AffectedItem::account(i.record_id.clone(), i.description.clone()))
+                .map(|i| {
+                    let mut name = i.description.clone();
+                    if let Some(date) = i.first_negative_date {
+                        name.push_str(&format!(" — since {}", date.format("%Y-%m-%d")));
+                    }
+                    if let (Some(cash), Some(ccy)) = (i.cash_balance, i.account_currency.as_deref())
+                    {
+                        name.push_str(&format!(" (cash: {} {})", cash.round_dp(2), ccy));
+                    }
+                    AffectedItem::account(i.record_id.clone(), name)
+                })
                 .collect();
 
             health_issues.push(
@@ -285,6 +303,9 @@ mod tests {
             description: "Activity references deleted account".to_string(),
             account_id: Some("acc_deleted".to_string()),
             asset_id: None,
+            first_negative_date: None,
+            cash_balance: None,
+            account_currency: None,
         }];
 
         let issues = check.analyze(&issues_data, &ctx);
@@ -304,6 +325,9 @@ mod tests {
             description: "Position has negative quantity".to_string(),
             account_id: Some("acc_1".to_string()),
             asset_id: Some("SEC:AAPL:XNAS".to_string()),
+            first_negative_date: None,
+            cash_balance: None,
+            account_currency: None,
         }];
 
         let issues = check.analyze(&issues_data, &ctx);
@@ -322,6 +346,9 @@ mod tests {
             description: "Asset has legacy sector data".to_string(),
             account_id: None,
             asset_id: Some("SEC:AAPL:XNAS".to_string()),
+            first_negative_date: None,
+            cash_balance: None,
+            account_currency: None,
         }];
 
         let issues = check.analyze(&issues_data, &ctx);
@@ -342,6 +369,9 @@ mod tests {
                 description: "Orphan 1".to_string(),
                 account_id: None,
                 asset_id: None,
+                first_negative_date: None,
+                cash_balance: None,
+                account_currency: None,
             },
             ConsistencyIssueInfo {
                 issue_type: ConsistencyIssueType::OrphanActivityAccount,
@@ -349,6 +379,9 @@ mod tests {
                 description: "Orphan 2".to_string(),
                 account_id: None,
                 asset_id: None,
+                first_negative_date: None,
+                cash_balance: None,
+                account_currency: None,
             },
             ConsistencyIssueInfo {
                 issue_type: ConsistencyIssueType::NegativePosition,
@@ -356,6 +389,9 @@ mod tests {
                 description: "Negative".to_string(),
                 account_id: None,
                 asset_id: None,
+                first_negative_date: None,
+                cash_balance: None,
+                account_currency: None,
             },
         ];
 
@@ -372,9 +408,12 @@ mod tests {
         let issues_data = vec![ConsistencyIssueInfo {
             issue_type: ConsistencyIssueType::NegativeAccountBalance,
             record_id: "acc_123".to_string(),
-            description: "Account has negative total value".to_string(),
+            description: "My Account".to_string(),
             account_id: Some("acc_123".to_string()),
             asset_id: None,
+            first_negative_date: Some(chrono::NaiveDate::from_ymd_opt(2025, 1, 10).unwrap()),
+            cash_balance: Some(rust_decimal_macros::dec!(-50.20)),
+            account_currency: Some("EUR".to_string()),
         }];
 
         let issues = check.analyze(&issues_data, &ctx);

@@ -4,6 +4,20 @@ use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
+/// Details about an account that has a negative total_value in its history.
+#[derive(Debug, Clone)]
+pub struct NegativeBalanceInfo {
+    pub account_id: String,
+    /// First date the total_value went negative.
+    pub first_negative_date: NaiveDate,
+    /// Cash balance on that date (account currency).
+    pub cash_balance: Decimal,
+    /// Total value on that date (account currency).
+    pub total_value: Decimal,
+    /// Account currency (e.g. "EUR").
+    pub account_currency: String,
+}
+
 /// Domain model for daily account valuation
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]

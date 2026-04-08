@@ -15,7 +15,9 @@ use crate::errors::StorageError;
 use crate::schema::daily_account_valuation;
 use crate::schema::daily_account_valuation::dsl::*;
 use wealthfolio_core::errors::Result;
-use wealthfolio_core::portfolio::valuation::{DailyAccountValuation, ValuationRepositoryTrait};
+use wealthfolio_core::portfolio::valuation::{
+    DailyAccountValuation, NegativeBalanceInfo, ValuationRepositoryTrait,
+};
 
 pub struct ValuationRepository {
     pool: Arc<Pool<ConnectionManager<SqliteConnection>>>,
@@ -215,7 +217,7 @@ impl ValuationRepositoryTrait for ValuationRepository {
     fn get_accounts_with_negative_balance(
         &self,
         input_account_ids: &[String],
-    ) -> Result<Vec<String>> {
+    ) -> Result<Vec<NegativeBalanceInfo>> {
         if input_account_ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -225,9 +227,13 @@ impl ValuationRepositoryTrait for ValuationRepository {
             .map(|_| "?")
             .collect::<Vec<&str>>()
             .join(", ");
+        // SQLite returns non-aggregated columns from the row that determines MIN().
         let sql = format!(
-            "SELECT DISTINCT account_id FROM daily_account_valuation \
-             WHERE CAST(total_value AS REAL) < 0 AND account_id IN ({})",
+            "SELECT account_id, MIN(valuation_date) AS first_negative_date, \
+             cash_balance, total_value, account_currency \
+             FROM daily_account_valuation \
+             WHERE CAST(total_value AS REAL) < 0 AND account_id IN ({}) \
+             GROUP BY account_id",
             placeholders
         );
         let mut query_builder = sql_query(sql).into_boxed::<Sqlite>();
@@ -235,14 +241,37 @@ impl ValuationRepositoryTrait for ValuationRepository {
             query_builder = query_builder.bind::<Text, _>(acc_id);
         }
         #[derive(QueryableByName)]
-        struct AccountIdRow {
+        struct NegativeBalanceRow {
             #[diesel(sql_type = diesel::sql_types::Text, column_name = "account_id")]
             acc_id: String,
+            #[diesel(sql_type = diesel::sql_types::Text, column_name = "first_negative_date")]
+            neg_date: String,
+            #[diesel(sql_type = diesel::sql_types::Text, column_name = "cash_balance")]
+            cash_bal: String,
+            #[diesel(sql_type = diesel::sql_types::Text, column_name = "total_value")]
+            total_val: String,
+            #[diesel(sql_type = diesel::sql_types::Text, column_name = "account_currency")]
+            acc_currency: String,
         }
-        let rows: Vec<AccountIdRow> = query_builder
-            .load::<AccountIdRow>(&mut conn)
+        let rows: Vec<NegativeBalanceRow> = query_builder
+            .load::<NegativeBalanceRow>(&mut conn)
             .map_err(StorageError::from)?;
-        Ok(rows.into_iter().map(|r| r.acc_id).collect())
+        let result = rows
+            .into_iter()
+            .filter_map(|r| {
+                let date = NaiveDate::parse_from_str(&r.neg_date, "%Y-%m-%d").ok()?;
+                let cash = r.cash_bal.parse::<rust_decimal::Decimal>().ok()?;
+                let total = r.total_val.parse::<rust_decimal::Decimal>().ok()?;
+                Some(NegativeBalanceInfo {
+                    account_id: r.acc_id,
+                    first_negative_date: date,
+                    cash_balance: cash,
+                    total_value: total,
+                    account_currency: r.acc_currency,
+                })
+            })
+            .collect();
+        Ok(result)
     }
 
     fn get_valuations_on_date(
