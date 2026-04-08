@@ -368,6 +368,10 @@ impl HealthService {
 
         // Detect accounts with negative portfolio balance in their history
         let account_ids: Vec<String> = accounts.iter().map(|a| a.id.clone()).collect();
+        let account_name_map: std::collections::HashMap<String, String> = accounts
+            .iter()
+            .map(|a| (a.id.clone(), a.name.clone()))
+            .collect();
         let negative_balance_accounts = valuation_service
             .get_accounts_with_negative_balance(&account_ids)
             .unwrap_or_else(|e| {
@@ -376,12 +380,18 @@ impl HealthService {
             });
         let consistency_issues: Vec<ConsistencyIssueInfo> = negative_balance_accounts
             .into_iter()
-            .map(|acc_id| ConsistencyIssueInfo {
-                issue_type: super::checks::ConsistencyIssueType::NegativeAccountBalance,
-                record_id: acc_id.clone(),
-                description: format!("Account {} has negative total value in history", acc_id),
-                account_id: Some(acc_id),
-                asset_id: None,
+            .map(|acc_id| {
+                let name = account_name_map
+                    .get(&acc_id)
+                    .cloned()
+                    .unwrap_or_else(|| acc_id.clone());
+                ConsistencyIssueInfo {
+                    issue_type: super::checks::ConsistencyIssueType::NegativeAccountBalance,
+                    record_id: acc_id.clone(),
+                    description: name,
+                    account_id: Some(acc_id),
+                    asset_id: None,
+                }
             })
             .collect();
 
