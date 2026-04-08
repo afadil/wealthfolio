@@ -210,7 +210,7 @@ export function IssueDetailSheet({
               <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
                 Details
               </h4>
-              <p className="text-muted-foreground text-sm">{issue.details}</p>
+              <p className="text-muted-foreground whitespace-pre-line text-sm">{issue.details}</p>
             </div>
           )}
         </div>

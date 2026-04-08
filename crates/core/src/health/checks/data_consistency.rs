@@ -44,6 +44,8 @@ pub struct ConsistencyIssueInfo {
     pub first_negative_date: Option<NaiveDate>,
     /// Cash balance on first_negative_date, in account currency (NegativeAccountBalance only)
     pub cash_balance: Option<Decimal>,
+    /// Total portfolio value on first_negative_date, in account currency (NegativeAccountBalance only)
+    pub total_value_at_date: Option<Decimal>,
     /// Account currency (NegativeAccountBalance only)
     pub account_currency: Option<String>,
 }
@@ -210,40 +212,60 @@ impl DataConsistencyCheck {
                 .map(|i| i.record_id.clone())
                 .collect();
             let data_hash = compute_data_hash(&account_ids);
+            // AffectedItem: name = account name, symbol = date badge
             let affected_items: Vec<AffectedItem> = negative_balance_issues
                 .iter()
                 .map(|i| {
-                    let mut name = i.description.clone();
-                    if let Some(date) = i.first_negative_date {
-                        name.push_str(&format!(" — since {}", date.format("%Y-%m-%d")));
-                    }
-                    if let (Some(cash), Some(ccy)) = (i.cash_balance, i.account_currency.as_deref())
-                    {
-                        name.push_str(&format!(" (cash: {} {})", cash.round_dp(2), ccy));
-                    }
-                    AffectedItem::account(i.record_id.clone(), name)
+                    let date_str = i
+                        .first_negative_date
+                        .map(|d| d.format("%Y-%m-%d").to_string());
+                    let mut item =
+                        AffectedItem::account(i.record_id.clone(), i.description.clone());
+                    item.symbol = date_str;
+                    item
                 })
                 .collect();
 
-            health_issues.push(
-                HealthIssue::builder()
-                    .id(format!("negative_account_balance:{}", data_hash))
-                    .severity(Severity::Warning)
-                    .category(HealthCategory::DataConsistency)
-                    .title(if count == 1 {
-                        "Account has negative portfolio balance".to_string()
-                    } else {
-                        format!("{} accounts have negative portfolio balance", count)
-                    })
-                    .message(
-                        "One or more accounts show a negative total value in their history. This is usually caused by missing buy transactions. Review your activities to fix this.",
-                    )
-                    .affected_count(count as u32)
-                    .affected_items(affected_items)
-                    .navigate_action(NavigateAction::to_activities(None))
-                    .data_hash(data_hash)
-                    .build(),
-            );
+            // Details: one line per account with cash / investments breakdown
+            let details: String = negative_balance_issues
+                .iter()
+                .filter_map(|i| {
+                    let ccy = i.account_currency.as_deref()?;
+                    let cash = i.cash_balance?;
+                    let total = i.total_value_at_date?;
+                    let investments = total - cash;
+                    Some(format!(
+                        "{}: cash {} {}, investments {} {}",
+                        i.description,
+                        cash.round_dp(2),
+                        ccy,
+                        investments.round_dp(2),
+                        ccy,
+                    ))
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+
+            let mut builder = HealthIssue::builder()
+                .id(format!("negative_account_balance:{}", data_hash))
+                .severity(Severity::Warning)
+                .category(HealthCategory::DataConsistency)
+                .title(if count == 1 {
+                    "Account has negative portfolio balance".to_string()
+                } else {
+                    format!("{} accounts have negative portfolio balance", count)
+                })
+                .message(
+                    "One or more accounts show a negative total value in their history. This is usually caused by missing buy transactions. Review your activities to fix this.",
+                )
+                .affected_count(count as u32)
+                .affected_items(affected_items)
+                .navigate_action(NavigateAction::to_activities(None))
+                .data_hash(data_hash);
+            if !details.is_empty() {
+                builder = builder.details(details);
+            }
+            health_issues.push(builder.build());
         }
 
         health_issues
@@ -305,6 +327,7 @@ mod tests {
             asset_id: None,
             first_negative_date: None,
             cash_balance: None,
+            total_value_at_date: None,
             account_currency: None,
         }];
 
@@ -327,6 +350,7 @@ mod tests {
             asset_id: Some("SEC:AAPL:XNAS".to_string()),
             first_negative_date: None,
             cash_balance: None,
+            total_value_at_date: None,
             account_currency: None,
         }];
 
@@ -348,6 +372,7 @@ mod tests {
             asset_id: Some("SEC:AAPL:XNAS".to_string()),
             first_negative_date: None,
             cash_balance: None,
+            total_value_at_date: None,
             account_currency: None,
         }];
 
@@ -371,6 +396,7 @@ mod tests {
                 asset_id: None,
                 first_negative_date: None,
                 cash_balance: None,
+                total_value_at_date: None,
                 account_currency: None,
             },
             ConsistencyIssueInfo {
@@ -381,6 +407,7 @@ mod tests {
                 asset_id: None,
                 first_negative_date: None,
                 cash_balance: None,
+                total_value_at_date: None,
                 account_currency: None,
             },
             ConsistencyIssueInfo {
@@ -391,6 +418,7 @@ mod tests {
                 asset_id: None,
                 first_negative_date: None,
                 cash_balance: None,
+                total_value_at_date: None,
                 account_currency: None,
             },
         ];
@@ -413,6 +441,7 @@ mod tests {
             asset_id: None,
             first_negative_date: Some(chrono::NaiveDate::from_ymd_opt(2025, 1, 10).unwrap()),
             cash_balance: Some(rust_decimal_macros::dec!(-50.20)),
+            total_value_at_date: Some(rust_decimal_macros::dec!(-50.20)),
             account_currency: Some("EUR".to_string()),
         }];
 
