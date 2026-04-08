@@ -25,6 +25,23 @@ export default function AiProvidersPage() {
 
   const providers = useMemo(() => data?.providers ?? [], [data?.providers]);
 
+  // The `claude-subscription` provider is rendered as an embedded sub-mode
+  // inside the Anthropic card, so it's filtered out of the top-level list and
+  // surfaced to the Anthropic card via props.
+  const { sortedProviders, claudeSubscriptionProvider } = useMemo(() => {
+    let claudeSubscription: (typeof providers)[number] | null = null;
+    const visible: typeof providers = [];
+    for (const p of providers) {
+      if (p.id === "claude-subscription") {
+        claudeSubscription = p;
+      } else {
+        visible.push(p);
+      }
+    }
+    visible.sort((a, b) => a.priority - b.priority);
+    return { sortedProviders: visible, claudeSubscriptionProvider: claudeSubscription };
+  }, [providers]);
+
   const handleCustomUrlChange = (providerId: string, customUrl: string) => {
     updateSettings({ providerId, customUrl });
   };
@@ -110,8 +127,6 @@ export default function AiProvidersPage() {
     );
   }
 
-  const sortedProviders = [...providers].sort((a, b) => a.priority - b.priority);
-
   return (
     <div className="text-foreground space-y-6">
       <SettingsHeader
@@ -144,6 +159,15 @@ export default function AiProvidersPage() {
                   handleSetCapabilityOverride(provider.id, modelId, overrides)
                 }
                 onToolsAllowlistChange={(tools) => handleToolsAllowlistChange(provider.id, tools)}
+                subscriptionProvider={
+                  provider.id === "anthropic" ? claudeSubscriptionProvider : null
+                }
+                onToggleSubscription={
+                  provider.id === "anthropic"
+                    ? (enabled) =>
+                        updateSettings({ providerId: "claude-subscription", enabled })
+                    : undefined
+                }
               />
             ))}
           </div>
@@ -166,6 +190,8 @@ function ProviderSettingsCardWrapper({
   onSetFavoriteModels,
   onSetCapabilityOverride,
   onToolsAllowlistChange,
+  subscriptionProvider,
+  onToggleSubscription,
 }: {
   provider: Parameters<typeof ProviderSettingsCard>[0]["provider"];
   isLast: boolean;
@@ -176,6 +202,8 @@ function ProviderSettingsCardWrapper({
   onSetFavoriteModels: (modelIds: string[]) => void;
   onSetCapabilityOverride: (modelId: string, overrides: ModelCapabilityOverrides | null) => void;
   onToolsAllowlistChange: (tools: string[] | null) => void;
+  subscriptionProvider?: Parameters<typeof ProviderSettingsCard>[0]["provider"] | null;
+  onToggleSubscription?: (enabled: boolean) => void;
 }) {
   const { setApiKey, deleteApiKey, revealApiKey } = useAiProviderApiKey(provider.id);
   const [modelComboboxOpen, setModelComboboxOpen] = useState(false);
@@ -209,6 +237,8 @@ function ProviderSettingsCardWrapper({
       onSetFavoriteModels={onSetFavoriteModels}
       onSetCapabilityOverride={onSetCapabilityOverride}
       onToolsAllowlistChange={onToolsAllowlistChange}
+      subscriptionProvider={subscriptionProvider}
+      onToggleSubscription={onToggleSubscription}
       modelComboboxOpen={modelComboboxOpen}
       onModelComboboxOpenChange={setModelComboboxOpen}
       fetchedModels={fetchedModels}

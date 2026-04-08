@@ -39,6 +39,12 @@ interface ProviderSettingsCardProps {
   onSetCapabilityOverride?: (modelId: string, overrides: ModelCapabilityOverrides | null) => void;
   onToolsAllowlistChange?: (tools: string[] | null) => void;
   isLast?: boolean;
+  /**
+   * For the Anthropic provider card, the related "Claude (Subscription)"
+   * provider state, surfaced as an embedded sub-mode toggle.
+   */
+  subscriptionProvider?: MergedProvider | null;
+  onToggleSubscription?: (enabled: boolean) => void;
   // Model fetching props (controlled by parent via React Query)
   modelComboboxOpen?: boolean;
   onModelComboboxOpenChange?: (open: boolean) => void;
@@ -85,6 +91,9 @@ export function ProviderSettingsCard({
   onSetCapabilityOverride,
   onToolsAllowlistChange,
   isLast = false,
+  // Embedded sub-provider (Claude Subscription inside Anthropic)
+  subscriptionProvider,
+  onToggleSubscription,
   // Model fetching props
   modelComboboxOpen: controlledComboboxOpen,
   onModelComboboxOpenChange,
@@ -390,6 +399,61 @@ export function ProviderSettingsCard({
                         Save
                       </Button>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Claude Code Subscription — embedded sub-mode of Anthropic.
+                  Lets the user authenticate Claude through their local Claude Code
+                  (Pro/Max) install instead of, or alongside, an API key. */}
+              {provider.id === "anthropic" && subscriptionProvider && (
+                <div className="border-primary/15 bg-primary/5 rounded-lg border border-dashed p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Label
+                          htmlFor="claude-subscription-toggle"
+                          className="text-sm font-medium"
+                        >
+                          Claude Code Subscription
+                        </Label>
+                        <Badge
+                          variant="outline"
+                          className="h-5 px-1.5 text-[10px] font-normal"
+                        >
+                          Alternative to API key
+                        </Badge>
+                        {subscriptionProvider.enabled && (
+                          <Badge
+                            variant="outline"
+                            className="border-success/30 bg-success/10 text-success h-5 px-1.5 text-[10px] font-normal"
+                          >
+                            Active
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-muted-foreground text-xs leading-relaxed">
+                        Use Claude through your local Claude Code (Pro / Max)
+                        subscription. No API key required, no per-token billing —
+                        usage is covered by your existing Claude plan. Requires
+                        Claude Code to be installed and logged in on this machine.
+                      </p>
+                      {subscriptionProvider.enabled && (
+                        <p className="text-muted-foreground flex items-center gap-1.5 pt-1 text-xs">
+                          <Icons.Sparkles className="h-3 w-3" />
+                          Selectable in chat as{" "}
+                          <span className="text-foreground font-medium">
+                            Claude (Subscription)
+                          </span>
+                        </p>
+                      )}
+                    </div>
+                    <Switch
+                      id="claude-subscription-toggle"
+                      checked={subscriptionProvider.enabled}
+                      onCheckedChange={(enabled) => onToggleSubscription?.(enabled)}
+                      className="data-[state=checked]:bg-success mt-1 shrink-0"
+                    />
                   </div>
                 </div>
               )}

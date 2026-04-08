@@ -50,6 +50,9 @@ export function useChatModel(): ChatModelState {
         if (!p.enabled) return false;
         // Local providers don't need API keys
         if (p.type === "local") return true;
+        // Subscription providers (e.g. Claude via Claude Code) authenticate
+        // through the host environment, not an API key.
+        if (p.type === "subscription") return true;
         // API providers require an API key
         return p.hasApiKey;
       }) ?? []
