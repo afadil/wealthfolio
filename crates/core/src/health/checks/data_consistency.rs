@@ -212,18 +212,9 @@ impl DataConsistencyCheck {
                 .map(|i| i.record_id.clone())
                 .collect();
             let data_hash = compute_data_hash(&account_ids);
-            // AffectedItem: name = account name, symbol = date badge
             let affected_items: Vec<AffectedItem> = negative_balance_issues
                 .iter()
-                .map(|i| {
-                    let date_str = i
-                        .first_negative_date
-                        .map(|d| d.format("%Y-%m-%d").to_string());
-                    let mut item =
-                        AffectedItem::account(i.record_id.clone(), i.description.clone());
-                    item.symbol = date_str;
-                    item
-                })
+                .map(|i| AffectedItem::account(i.record_id.clone(), i.description.clone()))
                 .collect();
 
             // Details: one entry per account with date, breakdown, and likely cause
@@ -236,7 +227,7 @@ impl DataConsistencyCheck {
                     let investments = total - cash;
                     let date_line = i
                         .first_negative_date
-                        .map(|d| format!("First went negative on {}", d.format("%Y-%m-%d")))
+                        .map(|d| format!("First went negative on {}.", d.format("%Y-%m-%d")))
                         .unwrap_or_default();
                     let breakdown = format!(
                         "Cash: {} {} | Investments: {} {}",
@@ -246,11 +237,11 @@ impl DataConsistencyCheck {
                         ccy,
                     );
                     let likely_cause = if cash < Decimal::ZERO && investments >= Decimal::ZERO {
-                        "→ Likely missing Transfer In or deposit before a buy transaction"
+                        "→ Likely missing Transfer In or deposit before a buy transaction."
                     } else if cash >= Decimal::ZERO && investments < Decimal::ZERO {
-                        "→ Likely missing Buy transaction before a Sell"
+                        "→ Likely missing Buy transaction before a Sell."
                     } else {
-                        "→ Multiple data issues — check activities around this date"
+                        "→ Multiple data issues — check activities around this date."
                     };
                     Some(format!(
                         "{}\n{}\n{}\n{}",
