@@ -362,6 +362,7 @@ impl HoldingsCalculator {
             fee_for_lot,
             activity.activity_date,
             fx_rate_used,
+            Some(activity.id.clone()),
         )?;
 
         // Book cash outflow
@@ -740,6 +741,7 @@ impl HoldingsCalculator {
                     fee_for_lot,
                     activity.activity_date,
                     fx_rate_used,
+                    Some(activity.id.clone()),
                 )?
             };
 

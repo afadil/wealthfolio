@@ -204,7 +204,10 @@ pub enum HoldingPeriod {
 /// suitable for persisting to the `lots` table.
 ///
 /// Each open lot in every position of the snapshot becomes one row.
-/// `open_activity_id` is always `None` — see the module-level doc for the reason.
+/// `open_activity_id` is set from the in-memory `Lot.source_activity_id` so
+/// the FK CASCADE removes the row when its activity is deleted. For
+/// HOLDINGS-mode lots and synthetic lots that don't correspond to an
+/// activity row, `source_activity_id` is `None` and the column stays NULL.
 /// `original_quantity` comes from `lot.original_quantity` when available (new
 /// snapshots). For old snapshots that predate the field (where it deserializes
 /// as zero), falls back to `lot.quantity` (the remaining amount).
@@ -224,7 +227,7 @@ pub fn extract_lot_records(snapshot: &AccountStateSnapshot) -> Vec<LotRecord> {
                 account_id: snapshot.account_id.clone(),
                 asset_id: position.asset_id.clone(),
                 open_date: lot.acquisition_date.format("%Y-%m-%d").to_string(),
-                open_activity_id: None,
+                open_activity_id: lot.source_activity_id.clone(),
                 original_quantity: orig_qty.to_string(),
                 remaining_quantity: lot.quantity.to_string(),
                 cost_per_unit: lot.acquisition_price.to_string(),
@@ -465,6 +468,7 @@ mod tests {
             acquisition_price: price,
             acquisition_fees: fee,
             fx_rate_to_position: None,
+            source_activity_id: None,
         }
     }
 
