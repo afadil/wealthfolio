@@ -393,6 +393,7 @@ impl HealthService {
                     asset_id: None,
                     first_negative_date: Some(info.first_negative_date),
                     cash_balance: Some(info.cash_balance),
+                    total_value_at_date: Some(info.total_value),
                     account_currency: Some(info.account_currency),
                 }
             })
