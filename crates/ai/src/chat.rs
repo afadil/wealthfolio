@@ -565,6 +565,41 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         .await
         .map_err(|e| AiError::Internal(e.to_string()))?;
 
+    // The Claude Subscription provider bypasses rig-core entirely; it streams
+    // through a Node sidecar that wraps the Claude Agent SDK and uses the
+    // user's local Claude Code login instead of an API key.
+    if provider_id == crate::claude_subscription::SUBSCRIPTION_PROVIDER_ID {
+        let provider_service = ProviderService::new(env.clone());
+        let tools_allowlist = provider_service.get_tools_allowlist(&provider_id);
+
+        let base_preamble = include_str!("system_prompt.txt").trim();
+        let base_currency = env.base_currency();
+        let current_datetime = chrono::Local::now().format("%Y-%m-%d %H:%M").to_string();
+        let preamble = format!(
+            "{}\n\n## Current Context\n- Current datetime: {}\n- Base currency: {}\n\n\
+            ## Web Access\n\
+            You have read-only web access via the `WebSearch` and `WebFetch` tools. \
+            Use them to look up current stock prices, ticker information, recent \
+            financial news, or any other up-to-date market data the user asks about. \
+            Do not invent prices or news — fetch them. Always cite the URL or source \
+            you fetched.",
+            base_preamble, current_datetime, base_currency
+        );
+
+        return crate::claude_subscription::subscription_chat_stream(
+            env,
+            tx,
+            user_message,
+            history_messages,
+            preamble,
+            tools_allowlist,
+            thread_id,
+            run_id,
+            message_id,
+        )
+        .await;
+    }
+
     // Get provider settings and model capabilities
     let provider_service = ProviderService::new(env.clone());
     let api_key = provider_service.get_api_key(&provider_id)?;
@@ -699,49 +734,11 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         };
         ($client:expr, $thinking_params:expr, $max_tokens:expr) => {{
             let tool_set = ToolSet::new(env.clone(), env.base_currency());
-
-            // Build filtered tool list based on provider allowlist
-            let is_allowed = |name: &str| -> bool {
-                match &tools_allowlist {
-                    None => true, // None = all tools allowed
-                    Some(list) => list.iter().any(|t| t == name),
-                }
-            };
-
-            let mut allowed_tools: Vec<Box<dyn ToolDyn>> = Vec::new();
-            if is_allowed("get_holdings") {
-                allowed_tools.push(Box::new(tool_set.holdings));
-            }
-            if is_allowed("get_accounts") {
-                allowed_tools.push(Box::new(tool_set.accounts));
-            }
-            if is_allowed("search_activities") {
-                allowed_tools.push(Box::new(tool_set.activities));
-            }
-            if is_allowed("get_goals") {
-                allowed_tools.push(Box::new(tool_set.goals));
-            }
-            if is_allowed("get_valuation_history") {
-                allowed_tools.push(Box::new(tool_set.valuation));
-            }
-            if is_allowed("get_income") {
-                allowed_tools.push(Box::new(tool_set.income));
-            }
-            if is_allowed("get_asset_allocation") {
-                allowed_tools.push(Box::new(tool_set.allocation));
-            }
-            if is_allowed("get_performance") {
-                allowed_tools.push(Box::new(tool_set.performance));
-            }
-            if is_allowed("record_activity") {
-                allowed_tools.push(Box::new(tool_set.record_activity));
-            }
-            if is_allowed("record_activities") {
-                allowed_tools.push(Box::new(tool_set.record_activities));
-            }
-            if is_allowed("import_csv") {
-                allowed_tools.push(Box::new(tool_set.import_csv));
-            }
+            let allowed_tools: Vec<Box<dyn ToolDyn>> = tool_set
+                .into_allowed_tools(tools_allowlist.as_deref())
+                .into_iter()
+                .map(|(_, t)| t)
+                .collect();
 
             let mut builder = $client
                 .agent(&model_id)

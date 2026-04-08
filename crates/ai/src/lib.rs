@@ -48,6 +48,7 @@
 //! ```
 
 pub mod chat;
+pub mod claude_subscription;
 pub mod env;
 pub mod error;
 #[cfg(test)]

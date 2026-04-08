@@ -167,6 +167,26 @@
       "titleModelId": "claude-haiku-4-5-20251001",
       "documentationUrl": "https://docs.anthropic.com/en/api/getting-started"
     },
+    "claude-subscription": {
+      "name": "Claude (Subscription)",
+      "type": "subscription",
+      "icon": "LogoAnthropic",
+      "description": "Use Claude via your local Claude Code subscription (Pro/Max). Requires Claude Code installed and logged in.",
+      "envKey": "",
+      "defaultConfig": {
+        "enabled": false,
+        "priority": 55
+      },
+      "connectionFields": [],
+      "models": {
+        "claude-code-default": {
+          "capabilities": { "tools": true, "thinking": true, "vision": true }
+        }
+      },
+      "defaultModel": "claude-code-default",
+      "titleModelId": "claude-code-default",
+      "documentationUrl": "https://docs.claude.com/en/docs/claude-code"
+    },
     "openai": {
       "name": "OpenAI",
       "type": "api",

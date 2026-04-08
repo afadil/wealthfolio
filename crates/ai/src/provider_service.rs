@@ -460,6 +460,19 @@ impl AiProviderServiceTrait for AiProviderService {
         &self,
         provider_id: &str,
     ) -> std::result::Result<ListModelsResponse, ProviderApiError> {
+        // The Claude Subscription provider doesn't have a remote model listing
+        // endpoint — the model is whatever the user's local Claude Code is
+        // configured with. Return the single static catalog entry instead.
+        if provider_id == crate::claude_subscription::SUBSCRIPTION_PROVIDER_ID {
+            return Ok(ListModelsResponse {
+                models: vec![crate::provider_model::FetchedModel {
+                    id: "claude-code-default".to_string(),
+                    name: Some("Claude (Subscription default)".to_string()),
+                }],
+                supports_listing: false,
+            });
+        }
+
         // Get provider config (validates provider exists and has API key if needed)
         let config = self.get_provider_config(provider_id)?;
 

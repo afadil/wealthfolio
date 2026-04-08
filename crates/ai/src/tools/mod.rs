@@ -45,6 +45,8 @@ pub use valuation::GetValuationHistoryTool;
 
 use std::sync::Arc;
 
+use rig::tool::ToolDyn;
+
 use crate::env::AiEnvironment;
 
 /// Container for all AI tools, simplifying tool registration across providers.
@@ -78,6 +80,64 @@ impl<E: AiEnvironment> ToolSet<E> {
             record_activities: RecordActivitiesTool::new(env.clone()),
             import_csv: ImportCsvTool::new(env, base_currency),
         }
+    }
+
+    /// Consume the tool set and return `(name, dyn handle)` pairs filtered
+    /// against an optional allowlist (`None` keeps all). The order is the
+    /// canonical registration order shared by every chat code path.
+    ///
+    /// Used by both the rig-core dispatch and the Claude Subscription bridge —
+    /// they iterate the same registry so any new tool only needs to be added
+    /// here.
+    pub fn into_allowed_tools(
+        self,
+        allowlist: Option<&[String]>,
+    ) -> Vec<(&'static str, Box<dyn ToolDyn>)>
+    where
+        E: 'static,
+    {
+        let is_allowed = |name: &str| -> bool {
+            match allowlist {
+                None => true,
+                Some(list) => list.iter().any(|t| t == name),
+            }
+        };
+
+        let mut out: Vec<(&'static str, Box<dyn ToolDyn>)> = Vec::new();
+        if is_allowed("get_holdings") {
+            out.push(("get_holdings", Box::new(self.holdings)));
+        }
+        if is_allowed("get_accounts") {
+            out.push(("get_accounts", Box::new(self.accounts)));
+        }
+        if is_allowed("search_activities") {
+            out.push(("search_activities", Box::new(self.activities)));
+        }
+        if is_allowed("get_goals") {
+            out.push(("get_goals", Box::new(self.goals)));
+        }
+        if is_allowed("get_valuation_history") {
+            out.push(("get_valuation_history", Box::new(self.valuation)));
+        }
+        if is_allowed("get_income") {
+            out.push(("get_income", Box::new(self.income)));
+        }
+        if is_allowed("get_asset_allocation") {
+            out.push(("get_asset_allocation", Box::new(self.allocation)));
+        }
+        if is_allowed("get_performance") {
+            out.push(("get_performance", Box::new(self.performance)));
+        }
+        if is_allowed("record_activity") {
+            out.push(("record_activity", Box::new(self.record_activity)));
+        }
+        if is_allowed("record_activities") {
+            out.push(("record_activities", Box::new(self.record_activities)));
+        }
+        if is_allowed("import_csv") {
+            out.push(("import_csv", Box::new(self.import_csv)));
+        }
+        out
     }
 }
 
