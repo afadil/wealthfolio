@@ -57,13 +57,18 @@ api_del()  { curl -s -X DELETE "$BASE_URL$1"; }
 
 # Create an activity. For options, pass kind as the 10th arg.
 # Usage: create_activity ACCT SYMBOL TYPE DATE QTY PRICE [FEE] [CCY] [EXCHANGE] [KIND]
+#
+# The symbol JSON includes `quoteCcy` so the backend can auto-create the
+# asset row if no provider can resolve the symbol. Without this, fresh DBs
+# (no pre-existing assets, no internet provider access) reject the activity
+# with "Quote currency is required. Please re-select the symbol."
 create_activity() {
     local acct="$1" symbol="$2" type="$3" date="$4" qty="$5" price="$6"
     local fee="${7:-0}" currency="${8:-USD}" exchange="${9:-}" kind="${10:-}"
 
     local symbol_json="null"
     if [ -n "$symbol" ]; then
-        symbol_json="{\"symbol\": \"$symbol\""
+        symbol_json="{\"symbol\": \"$symbol\", \"quoteCcy\": \"$currency\""
         [ -n "$exchange" ] && symbol_json="$symbol_json, \"exchangeMic\": \"$exchange\""
         [ -n "$kind" ]     && symbol_json="$symbol_json, \"kind\": \"$kind\""
         symbol_json="$symbol_json}"
@@ -486,6 +491,495 @@ do_diff() {
     echo "  FAIL       — unexpected difference (investigate)"
 }
 
+# ─── REGRESSION SCENARIOS ────────────────────────────────────────────────────
+#
+# Each scenario creates its own isolated test account, batches its setup
+# activities, performs one mutation, waits once for the queue worker, then
+# runs all its assertions before tearing down. They are independent — a
+# failing scenario doesn't prevent others from running.
+#
+# Why batched:
+#  - Recalcs are the slowest part of the test (~15s wait per worker cycle).
+#  - Creating activities one at a time would queue many recalcs back-to-back;
+#    the queue worker coalesces them anyway, so a single wait at the end is
+#    equivalent in coverage and much faster.
+#  - When a scenario fails, the assertion that fails (and the scenario name)
+#    pinpoints the bug — no need to test "both paths" for every change.
+#
+# Selecting individual scenarios for debugging:
+#   ./test-lots-migration.sh regression          # all scenarios
+#   ./test-lots-migration.sh regression 1        # only scenario 1
+#   ./test-lots-migration.sh regression 3        # only scenario 3
+
+REGRESSION_PASS=0
+REGRESSION_FAIL=0
+REGRESSION_FAILED_SCENARIOS=""
+
+# Wait long enough for queue worker debounce + market sync + recalc + lot
+# sync to complete. Default 8s in recalc_all isn't always enough on cold
+# starts; use 15s here for thoroughness.
+WORKER_WAIT=15
+
+wait_worker() {
+    local label="${1:-worker}"
+    echo "    waiting ${WORKER_WAIT}s for $label..."
+    sleep "$WORKER_WAIT"
+}
+
+# Assertion helpers. Each call increments the global pass/fail counts and
+# prints PASS/FAIL with the message. Scenarios continue after failures so
+# one bug doesn't mask others.
+assert_eq() {
+    local label="$1" expected="$2" actual="$3"
+    if [ "$expected" = "$actual" ]; then
+        echo "    PASS: $label (= $expected)"
+        REGRESSION_PASS=$((REGRESSION_PASS+1))
+    else
+        echo "    FAIL: $label — expected '$expected', got '$actual'"
+        REGRESSION_FAIL=$((REGRESSION_FAIL+1))
+    fi
+}
+
+assert_decimal_eq() {
+    # Compare two decimal strings as numbers, tolerating trailing zeros
+    # and minor precision drift (10^-6).
+    local label="$1" expected="$2" actual="$3"
+    local norm_e norm_a
+    norm_e=$(printf '%s' "$expected" | awk '{printf "%.6f", $1+0}')
+    norm_a=$(printf '%s' "$actual" | awk '{printf "%.6f", $1+0}')
+    if [ "$norm_e" = "$norm_a" ]; then
+        echo "    PASS: $label (= $expected)"
+        REGRESSION_PASS=$((REGRESSION_PASS+1))
+    else
+        echo "    FAIL: $label — expected $expected, got $actual"
+        REGRESSION_FAIL=$((REGRESSION_FAIL+1))
+    fi
+}
+
+# Returns total number of security holdings (excludes cash) for an account.
+account_security_count() {
+    local acct="$1"
+    api_get "/holdings?accountId=$acct" \
+        | jq '[.[] | select(.holdingType == "security")] | length'
+}
+
+# Returns total quantity of a given symbol held in an account. 0 if absent.
+account_holding_qty() {
+    local acct="$1" symbol="$2"
+    api_get "/holdings?accountId=$acct" \
+        | jq -r --arg s "$symbol" \
+            '[.[] | select(.instrument.symbol == $s) | .quantity | tonumber] | add // 0'
+}
+
+# Create an activity and return its id (or empty on failure). Used when
+# the test needs the id back for a later DELETE. Same quoteCcy handling as
+# create_activity above.
+create_activity_id() {
+    local acct="$1" symbol="$2" type="$3" date="$4" qty="$5" price="$6"
+    local fee="${7:-0}" currency="${8:-USD}" exchange="${9:-}" kind="${10:-}"
+    local symbol_json="null"
+    if [ -n "$symbol" ]; then
+        symbol_json="{\"symbol\": \"$symbol\", \"quoteCcy\": \"$currency\""
+        [ -n "$exchange" ] && symbol_json="$symbol_json, \"exchangeMic\": \"$exchange\""
+        [ -n "$kind" ]     && symbol_json="$symbol_json, \"kind\": \"$kind\""
+        symbol_json="$symbol_json}"
+    fi
+    api_post "/activities" "{
+        \"accountId\": \"$acct\",
+        \"symbol\": $symbol_json,
+        \"activityType\": \"$type\",
+        \"activityDate\": \"${date}T12:00:00.000Z\",
+        \"quantity\": $qty,
+        \"unitPrice\": $price,
+        \"fee\": $fee,
+        \"currency\": \"$currency\"
+    }" | jq -r '.id // empty'
+}
+
+scenario_failed() {
+    REGRESSION_FAILED_SCENARIOS="${REGRESSION_FAILED_SCENARIOS}\n  - $1"
+}
+
+# Internal-consistency invariant: SUM(lots.remaining_quantity) per asset must
+# match the quantity reported by /holdings. Catches divergence between the
+# lots table (source of truth) and the API read path. Skipped silently if
+# WF_DB_PATH is unset or sqlite3 isn't available.
+assert_lots_match_holdings() {
+    local acct="$1"
+    local db="${WF_DB_PATH:-./db/web-dev.db}"
+    if [ ! -f "$db" ] || ! command -v sqlite3 > /dev/null 2>&1; then
+        return
+    fi
+    local lots_csv holdings_csv mismatch
+    lots_csv=$(sqlite3 -separator , "$db" \
+        "SELECT asset_id, printf('%.6f', SUM(CAST(remaining_quantity AS REAL))) \
+         FROM lots WHERE account_id='$acct' AND is_closed=0 \
+         GROUP BY asset_id ORDER BY asset_id")
+    holdings_csv=$(api_get "/holdings?accountId=$acct" \
+        | jq -r '[.[] | select(.holdingType == "security")]
+                  | sort_by(.instrument.id)
+                  | .[] | "\(.instrument.id),\(.quantity | tonumber | . * 1000000 | round / 1000000 | tostring)"' \
+        | awk -F, '{printf "%s,%.6f\n", $1, $2}')
+    if [ "$lots_csv" = "$holdings_csv" ]; then
+        echo "    PASS: lots table matches /holdings (sum-of-lots invariant)"
+        REGRESSION_PASS=$((REGRESSION_PASS+1))
+    else
+        echo "    FAIL: lots table != /holdings"
+        echo "      lots:     $(echo "$lots_csv" | tr '\n' ';')"
+        echo "      holdings: $(echo "$holdings_csv" | tr '\n' ';')"
+        REGRESSION_FAIL=$((REGRESSION_FAIL+1))
+    fi
+}
+
+# ── Scenario 1: incremental recalc preserves lots ────────────────────────────
+#
+# Reproduces the PR #820 regression where adding a new activity to an
+# account with existing security positions would trigger a queue-worker
+# recalc that loaded the start state from the DB (with empty positions
+# post-column-drop) and replayed only the new activity, producing an
+# empty result that wiped the account's lots via sync_lots_for_account.
+#
+# Setup: account with 2 BUYs that establish open lots.
+# Mutation: add a DIVIDEND (cash-only activity, doesn't add positions).
+# Expected: lot count and position quantities unchanged.
+scenario_1_incremental_recalc_preserves_lots() {
+    echo ""
+    echo "=== Scenario 1: incremental recalc preserves lots ==="
+
+    local acct
+    acct=$(create_account "Regr - Incremental" "SECURITIES" "USD" "TRANSACTIONS")
+    if [ -z "$acct" ]; then
+        echo "  ERROR: failed to create test account"
+        scenario_failed "scenario_1_incremental_recalc_preserves_lots"
+        return
+    fi
+    echo "  Account: $acct"
+
+    # Batch all setup activities, then recalc once.
+    create_activity "$acct" "" "DEPOSIT" "2025-01-01" 50000 1 0 "USD" > /dev/null
+    create_activity "$acct" "AAPL" "BUY" "2025-01-15" 100 150 10 "USD" "XNAS" > /dev/null
+    create_activity "$acct" "MSFT" "BUY" "2025-02-01" 50 400 10 "USD" "XNAS" > /dev/null
+
+    recalc_account "$acct"
+    wait_worker "initial recalc"
+
+    # Baseline: 2 security positions (AAPL + MSFT).
+    assert_eq "baseline has 2 security positions" "2" "$(account_security_count "$acct")"
+    assert_decimal_eq "baseline AAPL quantity" "100" "$(account_holding_qty "$acct" "AAPL")"
+    assert_decimal_eq "baseline MSFT quantity" "50" "$(account_holding_qty "$acct" "MSFT")"
+
+    # Mutation: add a cash dividend. This is the trigger that broke things —
+    # it queues an incremental portfolio job that loaded the start state
+    # from the DB and replayed only the dividend.
+    echo "  Adding DIVIDEND (cash-only, must not affect positions)..."
+    create_activity "$acct" "AAPL" "DIVIDEND" "2025-03-01" 0 0 0 "USD" "XNAS" > /dev/null
+
+    wait_worker "post-dividend queue worker"
+
+    # Critical assertions: positions are still there after the incremental recalc.
+    assert_eq "lots preserved after dividend" "2" "$(account_security_count "$acct")"
+    assert_decimal_eq "post-dividend AAPL quantity" "100" "$(account_holding_qty "$acct" "AAPL")"
+    assert_decimal_eq "post-dividend MSFT quantity" "50" "$(account_holding_qty "$acct" "MSFT")"
+    assert_lots_match_holdings "$acct"
+
+    api_del "/accounts/$acct" > /dev/null 2>&1 || true
+}
+
+# ── Scenario 2: activity delete preserves OTHER accounts' lots ──────────────
+#
+# When an activity is deleted, the recalc fires for the affected account.
+# Other accounts must not be touched — but recalc/cascade bugs can leak
+# across accounts (e.g. a recalc-all triggered by domain events).
+#
+# Setup: two accounts, each with their own BUY.
+# Mutation: delete the BUY in account 1.
+# Expected: account 1 has no security positions; account 2 unchanged.
+scenario_2_activity_delete_isolation() {
+    echo ""
+    echo "=== Scenario 2: activity delete is isolated to one account ==="
+
+    local acct1 acct2
+    acct1=$(create_account "Regr - Delete A" "SECURITIES" "USD" "TRANSACTIONS")
+    acct2=$(create_account "Regr - Delete B" "SECURITIES" "USD" "TRANSACTIONS")
+    if [ -z "$acct1" ] || [ -z "$acct2" ]; then
+        echo "  ERROR: failed to create test accounts"
+        scenario_failed "scenario_2_activity_delete_isolation"
+        return
+    fi
+    echo "  Account A: $acct1"
+    echo "  Account B: $acct2"
+
+    create_activity "$acct1" "" "DEPOSIT" "2025-01-01" 50000 1 0 "USD" > /dev/null
+    local buy_a
+    buy_a=$(create_activity_id "$acct1" "AAPL" "BUY" "2025-01-15" 100 150 10 "USD" "XNAS")
+    if [ -z "$buy_a" ]; then
+        echo "  ERROR: failed to create BUY in account A"
+        api_del "/accounts/$acct1" > /dev/null 2>&1 || true
+        api_del "/accounts/$acct2" > /dev/null 2>&1 || true
+        scenario_failed "scenario_2_activity_delete_isolation"
+        return
+    fi
+
+    create_activity "$acct2" "" "DEPOSIT" "2025-01-01" 50000 1 0 "USD" > /dev/null
+    create_activity "$acct2" "MSFT" "BUY" "2025-01-15" 50 400 10 "USD" "XNAS" > /dev/null
+
+    recalc_all
+    wait_worker "initial recalc"
+
+    assert_eq "baseline A has 1 security" "1" "$(account_security_count "$acct1")"
+    assert_eq "baseline B has 1 security" "1" "$(account_security_count "$acct2")"
+
+    # Mutation: delete A's BUY.
+    echo "  Deleting BUY $buy_a from account A..."
+    api_del "/activities/$buy_a" > /dev/null 2>&1 || true
+    wait_worker "post-delete queue worker"
+
+    # Account A should now have no security holdings.
+    assert_eq "A has 0 securities after delete" "0" "$(account_security_count "$acct1")"
+    # Account B must be untouched.
+    assert_eq "B unchanged after delete" "1" "$(account_security_count "$acct2")"
+    assert_decimal_eq "B MSFT quantity unchanged" "50" "$(account_holding_qty "$acct2" "MSFT")"
+    assert_lots_match_holdings "$acct1"
+    assert_lots_match_holdings "$acct2"
+
+    api_del "/accounts/$acct1" > /dev/null 2>&1 || true
+    api_del "/accounts/$acct2" > /dev/null 2>&1 || true
+}
+
+# ── Scenario 3: HOLDINGS-mode snapshot delete refreshes lots correctly ──────
+#
+# refresh_lots_from_latest_snapshot reads snapshot.positions from the DB.
+# After the column drop, positions are empty — and the function would
+# replace lots with an empty list, wiping the account.
+#
+# Setup: HOLDINGS-mode account with two manual snapshots:
+#   S1 (50 MSFT) on 2025-06-01
+#   S2 (50 MSFT + 100 GOOG) on 2025-09-01
+# State: lots reflect S2 (latest).
+# Mutation: delete S2.
+# Expected: lots reflect S1 — 50 MSFT only, no GOOG.
+scenario_3_holdings_snapshot_delete() {
+    echo ""
+    echo "=== Scenario 3: HOLDINGS snapshot delete refreshes lots ==="
+
+    local acct
+    acct=$(create_account "Regr - HOLDINGS Delete" "SECURITIES" "USD" "HOLDINGS")
+    if [ -z "$acct" ]; then
+        echo "  ERROR: failed to create HOLDINGS account"
+        scenario_failed "scenario_3_holdings_snapshot_delete"
+        return
+    fi
+    echo "  Account: $acct"
+
+    # Batch both snapshots, then recalc once.
+    api_post "/snapshots" "{
+        \"accountId\": \"$acct\",
+        \"snapshotDate\": \"2025-06-01\",
+        \"holdings\": [
+            {\"symbol\": \"MSFT\", \"quantity\": \"50\", \"averageCost\": \"400\", \"currency\": \"USD\"}
+        ],
+        \"cashBalances\": {\"USD\": \"5000\"}
+    }" > /dev/null 2>&1
+    api_post "/snapshots" "{
+        \"accountId\": \"$acct\",
+        \"snapshotDate\": \"2025-09-01\",
+        \"holdings\": [
+            {\"symbol\": \"MSFT\", \"quantity\": \"50\", \"averageCost\": \"420\", \"currency\": \"USD\"},
+            {\"symbol\": \"GOOG\", \"quantity\": \"100\", \"averageCost\": \"170\", \"currency\": \"USD\"}
+        ],
+        \"cashBalances\": {\"USD\": \"3000\"}
+    }" > /dev/null 2>&1
+
+    recalc_account "$acct"
+    wait_worker "initial recalc"
+
+    # Baseline: lots reflect the LATEST snapshot (S2).
+    assert_eq "baseline reflects S2 (2 positions)" "2" "$(account_security_count "$acct")"
+    assert_decimal_eq "baseline MSFT quantity" "50" "$(account_holding_qty "$acct" "MSFT")"
+    assert_decimal_eq "baseline GOOG quantity" "100" "$(account_holding_qty "$acct" "GOOG")"
+
+    # Mutation: delete S2.
+    echo "  Deleting S2 (2025-09-01)..."
+    api_del "/snapshots?accountId=$acct&date=2025-09-01" > /dev/null 2>&1 || true
+    wait_worker "post-snapshot-delete queue worker"
+
+    # After deletion: lots should reflect S1 — only MSFT, no GOOG.
+    assert_eq "lots reflect S1 (1 position)" "1" "$(account_security_count "$acct")"
+    assert_decimal_eq "MSFT preserved from S1" "50" "$(account_holding_qty "$acct" "MSFT")"
+    assert_decimal_eq "GOOG removed (came from deleted S2)" "0" "$(account_holding_qty "$acct" "GOOG")"
+    assert_lots_match_holdings "$acct"
+
+    api_del "/accounts/$acct" > /dev/null 2>&1 || true
+}
+
+# ── Scenario 4: recalc idempotency ──────────────────────────────────────────
+#
+# A pure recalc with no activity changes should produce identical state.
+# This catches: hidden state in the calculator, FIFO ordering instability,
+# float precision drift, and "first run vs subsequent run" bugs.
+#
+# Worth the extra wait cost — three recalcs is the only way to test this.
+scenario_4_recalc_idempotency() {
+    echo ""
+    echo "=== Scenario 4: recalc idempotency (3 sequential recalcs) ==="
+
+    local acct
+    acct=$(create_account "Regr - Idempotency" "SECURITIES" "USD" "TRANSACTIONS")
+    if [ -z "$acct" ]; then
+        echo "  ERROR: failed to create test account"
+        scenario_failed "scenario_4_recalc_idempotency"
+        return
+    fi
+    echo "  Account: $acct"
+
+    create_activity "$acct" "" "DEPOSIT" "2025-01-01" 100000 1 0 "USD" > /dev/null
+    create_activity "$acct" "AAPL" "BUY" "2025-01-15" 100 150 10 "USD" "XNAS" > /dev/null
+    create_activity "$acct" "AAPL" "BUY" "2025-03-01" 50 160 10 "USD" "XNAS" > /dev/null
+    create_activity "$acct" "MSFT" "BUY" "2025-02-01" 50 400 10 "USD" "XNAS" > /dev/null
+    create_activity "$acct" "AAPL" "SELL" "2025-06-01" 30 175 10 "USD" "XNAS" > /dev/null
+
+    recalc_account "$acct"
+    wait_worker "first recalc"
+
+    # Capture state after first recalc. Strip any volatile fields.
+    local h1
+    h1=$(api_get "/holdings?accountId=$acct" \
+        | jq -S 'map({symbol: .instrument.symbol, type: .holdingType, qty: .quantity, cost: .costBasis.local}) | sort_by(.symbol // "")')
+
+    recalc_account "$acct"
+    wait_worker "second recalc"
+    local h2
+    h2=$(api_get "/holdings?accountId=$acct" \
+        | jq -S 'map({symbol: .instrument.symbol, type: .holdingType, qty: .quantity, cost: .costBasis.local}) | sort_by(.symbol // "")')
+
+    if [ "$h1" = "$h2" ]; then
+        echo "    PASS: holdings identical between recalc 1 and recalc 2"
+        REGRESSION_PASS=$((REGRESSION_PASS+1))
+    else
+        echo "    FAIL: holdings differ between recalc 1 and recalc 2"
+        echo "    First:"
+        printf '%s\n' "$h1" | sed 's/^/      /'
+        echo "    Second:"
+        printf '%s\n' "$h2" | sed 's/^/      /'
+        REGRESSION_FAIL=$((REGRESSION_FAIL+1))
+    fi
+
+    recalc_account "$acct"
+    wait_worker "third recalc"
+    local h3
+    h3=$(api_get "/holdings?accountId=$acct" \
+        | jq -S 'map({symbol: .instrument.symbol, type: .holdingType, qty: .quantity, cost: .costBasis.local}) | sort_by(.symbol // "")')
+
+    if [ "$h1" = "$h3" ]; then
+        echo "    PASS: holdings identical between recalc 1 and recalc 3"
+        REGRESSION_PASS=$((REGRESSION_PASS+1))
+    else
+        echo "    FAIL: third recalc diverges from first"
+        REGRESSION_FAIL=$((REGRESSION_FAIL+1))
+    fi
+    assert_lots_match_holdings "$acct"
+
+    api_del "/accounts/$acct" > /dev/null 2>&1 || true
+}
+
+# ── Scenario 5: holdings ↔ valuations consistency ───────────────────────────
+#
+# After a recalc, /holdings and /valuations/latest should agree on the
+# total cost basis of an account. This is the broadest internal-consistency
+# check we can do via the API.
+scenario_5_holdings_valuations_consistency() {
+    echo ""
+    echo "=== Scenario 5: holdings ↔ valuations consistency ==="
+
+    local acct
+    acct=$(create_account "Regr - Consistency" "SECURITIES" "USD" "TRANSACTIONS")
+    if [ -z "$acct" ]; then
+        echo "  ERROR: failed to create test account"
+        scenario_failed "scenario_5_holdings_valuations_consistency"
+        return
+    fi
+    echo "  Account: $acct"
+
+    create_activity "$acct" "" "DEPOSIT" "2025-01-01" 100000 1 0 "USD" > /dev/null
+    create_activity "$acct" "AAPL" "BUY" "2025-01-15" 100 150 10 "USD" "XNAS" > /dev/null
+    create_activity "$acct" "MSFT" "BUY" "2025-02-01" 50 400 10 "USD" "XNAS" > /dev/null
+
+    recalc_account "$acct"
+    wait_worker "recalc"
+
+    # Sum of cost basis from /holdings (security positions only).
+    local holdings_cost
+    holdings_cost=$(api_get "/holdings?accountId=$acct" \
+        | jq -r '[.[] | select(.holdingType == "security") | .costBasis.local | tonumber] | add // 0')
+
+    # Cost basis from /valuations/latest.
+    local valuation_cost
+    valuation_cost=$(api_get "/valuations/latest?accountIds=$acct" \
+        | jq -r '.[] | .costBasis | tonumber')
+
+    echo "  /holdings cost basis: $holdings_cost"
+    echo "  /valuations cost basis: $valuation_cost"
+    assert_decimal_eq "holdings cost basis matches valuations cost basis" \
+        "$holdings_cost" "$valuation_cost"
+
+    # Position quantities should match the BUYs we recorded.
+    assert_decimal_eq "AAPL quantity" "100" "$(account_holding_qty "$acct" "AAPL")"
+    assert_decimal_eq "MSFT quantity" "50" "$(account_holding_qty "$acct" "MSFT")"
+    assert_lots_match_holdings "$acct"
+
+    api_del "/accounts/$acct" > /dev/null 2>&1 || true
+}
+
+do_regression() {
+    local only="${1:-}"
+
+    if ! api_get "/accounts" > /dev/null 2>&1; then
+        echo "ERROR: Cannot reach server at $BASE_URL"
+        exit 1
+    fi
+    echo "=== Running regression scenarios ==="
+    echo "Server: $BASE_URL"
+    echo "Worker wait per step: ${WORKER_WAIT}s"
+
+    # Ensure base currency is set so valuation FX (USD->USD self-rate) resolves.
+    api_put "/settings" '{"baseCurrency":"USD"}' > /dev/null 2>&1 || true
+    if [ -n "$only" ]; then
+        echo "Only running scenario: $only"
+    fi
+
+    REGRESSION_PASS=0
+    REGRESSION_FAIL=0
+    REGRESSION_FAILED_SCENARIOS=""
+
+    if [ -z "$only" ] || [ "$only" = "1" ]; then
+        scenario_1_incremental_recalc_preserves_lots
+    fi
+    if [ -z "$only" ] || [ "$only" = "2" ]; then
+        scenario_2_activity_delete_isolation
+    fi
+    if [ -z "$only" ] || [ "$only" = "3" ]; then
+        scenario_3_holdings_snapshot_delete
+    fi
+    if [ -z "$only" ] || [ "$only" = "4" ]; then
+        scenario_4_recalc_idempotency
+    fi
+    if [ -z "$only" ] || [ "$only" = "5" ]; then
+        scenario_5_holdings_valuations_consistency
+    fi
+
+    echo ""
+    echo "=== Regression summary ==="
+    echo "Passed assertions: $REGRESSION_PASS"
+    echo "Failed assertions: $REGRESSION_FAIL"
+    if [ -n "$REGRESSION_FAILED_SCENARIOS" ]; then
+        echo "Scenarios that errored before completion:"
+        printf "%b\n" "$REGRESSION_FAILED_SCENARIOS"
+    fi
+    if [ "$REGRESSION_FAIL" -gt 0 ] || [ -n "$REGRESSION_FAILED_SCENARIOS" ]; then
+        exit 1
+    fi
+}
+
 # ─── CLEANUP: Delete all test accounts and data ──────────────────────────────
 
 do_cleanup() {
@@ -516,30 +1010,49 @@ do_cleanup() {
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 case "$MODE" in
-    setup)    do_setup ;;
-    baseline) echo "Capturing BASELINE..."; do_capture "$RESULTS_DIR/baseline" ;;
-    verify)   echo "Capturing VERIFY...";   do_capture "$RESULTS_DIR/verify"; do_diff ;;
-    diff)     do_diff ;;
-    cleanup)  do_cleanup ;;
+    setup)      do_setup ;;
+    baseline)   echo "Capturing BASELINE..."; do_capture "$RESULTS_DIR/baseline" ;;
+    verify)     echo "Capturing VERIFY...";   do_capture "$RESULTS_DIR/verify"; do_diff ;;
+    diff)       do_diff ;;
+    regression) do_regression "${2:-}" ;;
+    cleanup)    do_cleanup ;;
     *)
         cat <<USAGE
-Usage: $0 [setup|baseline|verify|diff|cleanup]
+Usage: $0 [setup|baseline|verify|diff|regression [N]|cleanup]
 
 Integration test for the lots-based data model migration.
-Creates test accounts, captures API responses before and after code changes.
+Two complementary modes:
+
+  1. baseline → verify: capture API responses on old vs new code and diff.
+     Validates that read paths produce identical output for the same state.
+
+  2. regression: run mutation scenarios against the current code that
+     specifically exercise state-migration and incremental-recalc paths.
+     Each scenario creates its own account, performs a mutation, waits
+     for the queue worker, and asserts invariants. Catches bugs that the
+     baseline/verify diff misses (e.g. PR #820's positions-column-drop
+     regression that wiped lots when an incremental recalc loaded an
+     empty start state).
 
 Commands:
-  setup     Create 3 test accounts with activities, snapshots, alt assets
-  baseline  Capture all API responses (run on old code)
-  verify    Capture again and diff against baseline (run on new code)
-  diff      Re-diff existing captures
-  cleanup   Delete all test accounts and data
+  setup            Create 3 test accounts with activities, snapshots, alt assets
+  baseline         Capture all API responses (run on old code)
+  verify           Capture again and diff against baseline (run on new code)
+  diff             Re-diff existing captures
+  regression       Run all 5 regression scenarios against current code
+  regression N     Run only scenario N (for narrowing failures)
+                     1 = incremental recalc preserves lots
+                     2 = activity delete is isolated to one account
+                     3 = HOLDINGS snapshot delete refreshes lots
+                     4 = recalc idempotency
+                     5 = holdings ↔ valuations consistency
+  cleanup          Delete all test accounts and data
 
 Environment:
   WF_BASE_URL  Server URL (default: http://localhost:8088/api/v1)
   WF_TEST_DIR  Capture directory (default: /tmp/wf-lots-test)
 
-Test data covers:
+Test data (baseline) covers:
   - Multi-lot FIFO (buy 100 + buy 50 AAPL, sell 30)
   - Cross-currency (CHF position in USD account, EUR account)
   - Options with contract_multiplier (NVDA call)
@@ -547,6 +1060,9 @@ Test data covers:
   - HOLDINGS-mode account (manual snapshots at two dates)
   - TOTAL portfolio aggregation across all accounts
   - Historical as-of queries at 5 dates spanning the activity range
+
+Regression mode runs are self-cleaning — each scenario tears down its
+own test account.
 USAGE
         ;;
 esac
