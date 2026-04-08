@@ -226,7 +226,7 @@ impl DataConsistencyCheck {
                 })
                 .collect();
 
-            // Details: one line per account with cash / investments breakdown
+            // Details: one entry per account with date, breakdown, and likely cause
             let details: String = negative_balance_issues
                 .iter()
                 .filter_map(|i| {
@@ -234,17 +234,31 @@ impl DataConsistencyCheck {
                     let cash = i.cash_balance?;
                     let total = i.total_value_at_date?;
                     let investments = total - cash;
-                    Some(format!(
-                        "{}: cash {} {}, investments {} {}",
-                        i.description,
+                    let date_line = i
+                        .first_negative_date
+                        .map(|d| format!("First went negative on {}", d.format("%Y-%m-%d")))
+                        .unwrap_or_default();
+                    let breakdown = format!(
+                        "Cash: {} {} | Investments: {} {}",
                         cash.round_dp(2),
                         ccy,
                         investments.round_dp(2),
                         ccy,
+                    );
+                    let likely_cause = if cash < Decimal::ZERO && investments >= Decimal::ZERO {
+                        "→ Likely missing Transfer In or deposit before a buy transaction"
+                    } else if cash >= Decimal::ZERO && investments < Decimal::ZERO {
+                        "→ Likely missing Buy transaction before a Sell"
+                    } else {
+                        "→ Multiple data issues — check activities around this date"
+                    };
+                    Some(format!(
+                        "{}\n{}\n{}\n{}",
+                        i.description, date_line, breakdown, likely_cause
                     ))
                 })
                 .collect::<Vec<_>>()
-                .join("\n");
+                .join("\n\n");
 
             let mut builder = HealthIssue::builder()
                 .id(format!("negative_account_balance:{}", data_hash))
