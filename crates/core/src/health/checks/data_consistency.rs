@@ -25,6 +25,8 @@ pub enum ConsistencyIssueType {
     LegacyClassification,
     /// Account has negative total portfolio value in its history
     NegativeAccountBalance,
+    /// Cash account had a negative balance at some point (may be a bank overdraft)
+    NegativeCashBalance,
 }
 
 /// Data about a consistency issue.
@@ -262,6 +264,57 @@ impl DataConsistencyCheck {
                 })
                 .message(
                     "One or more accounts show a negative total value in their history. This is usually caused by missing buy transactions. Review your activities to fix this.",
+                )
+                .affected_count(count as u32)
+                .affected_items(affected_items)
+                .navigate_action(NavigateAction::to_activities(None))
+                .data_hash(data_hash);
+            if !details.is_empty() {
+                builder = builder.details(details);
+            }
+            health_issues.push(builder.build());
+        }
+
+        // Emit info issue for cash accounts with negative balance (may be a normal overdraft)
+        if let Some(cash_balance_issues) = by_type.get(&ConsistencyIssueType::NegativeCashBalance) {
+            let count = cash_balance_issues.len();
+            let account_ids: Vec<String> = cash_balance_issues
+                .iter()
+                .map(|i| i.record_id.clone())
+                .collect();
+            let data_hash = compute_data_hash(&account_ids);
+            let affected_items: Vec<AffectedItem> = cash_balance_issues
+                .iter()
+                .map(|i| AffectedItem::account(i.record_id.clone(), i.description.clone()))
+                .collect();
+            let details: String = cash_balance_issues
+                .iter()
+                .filter_map(|i| {
+                    let ccy = i.account_currency.as_deref()?;
+                    let cash = i.cash_balance?;
+                    let date_line = i
+                        .first_negative_date
+                        .map(|d| format!("First went negative on {}.", d.format("%Y-%m-%d")))
+                        .unwrap_or_default();
+                    Some(format!(
+                        "{}\n{}\nCash: {} {}\n→ This may be a bank overdraft or a missing deposit entry.",
+                        i.description, date_line, cash.round_dp(2), ccy,
+                    ))
+                })
+                .collect::<Vec<_>>()
+                .join("\n\n");
+
+            let mut builder = HealthIssue::builder()
+                .id(format!("negative_cash_balance:{}", data_hash))
+                .severity(Severity::Info)
+                .category(HealthCategory::DataConsistency)
+                .title(if count == 1 {
+                    "Cash account had a negative balance".to_string()
+                } else {
+                    format!("{} cash accounts had a negative balance", count)
+                })
+                .message(
+                    "One or more cash accounts show a negative balance in their history. This may be a normal bank overdraft or a missing deposit entry.",
                 )
                 .affected_count(count as u32)
                 .affected_items(affected_items)
