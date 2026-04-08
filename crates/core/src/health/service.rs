@@ -383,7 +383,7 @@ impl HealthService {
                 warn!("Failed to check for negative account balances: {}", e);
                 Vec::new()
             });
-        let consistency_issues: Vec<ConsistencyIssueInfo> = negative_balance_accounts
+        let mut consistency_issues: Vec<ConsistencyIssueInfo> = negative_balance_accounts
             .into_iter()
             .map(|info| {
                 let name = account_name_map
@@ -403,6 +403,38 @@ impl HealthService {
                 }
             })
             .collect();
+
+        // Check CASH accounts separately — negative balance may be a normal overdraft (INFO only)
+        let cash_account_ids: Vec<String> = accounts
+            .iter()
+            .filter(|a| a.account_type == crate::accounts::account_types::CASH)
+            .map(|a| a.id.clone())
+            .collect();
+        if !cash_account_ids.is_empty() {
+            let negative_cash_accounts = valuation_service
+                .get_accounts_with_negative_balance(&cash_account_ids)
+                .unwrap_or_else(|e| {
+                    warn!("Failed to check for negative cash balances: {}", e);
+                    Vec::new()
+                });
+            for info in negative_cash_accounts {
+                let name = account_name_map
+                    .get(&info.account_id)
+                    .cloned()
+                    .unwrap_or_else(|| info.account_id.clone());
+                consistency_issues.push(ConsistencyIssueInfo {
+                    issue_type: super::checks::ConsistencyIssueType::NegativeCashBalance,
+                    record_id: info.account_id.clone(),
+                    description: name,
+                    account_id: Some(info.account_id),
+                    asset_id: None,
+                    first_negative_date: Some(info.first_negative_date),
+                    cash_balance: Some(info.cash_balance),
+                    total_value_at_date: Some(info.total_value),
+                    account_currency: Some(info.account_currency),
+                });
+            }
+        }
 
         // Gather accounts without tracking mode set
         let unconfigured_accounts: Vec<UnconfiguredAccountInfo> = accounts
