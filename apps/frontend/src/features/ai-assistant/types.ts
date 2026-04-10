@@ -148,6 +148,8 @@ export interface AiSendMessageRequest {
   parentMessageId?: string;
   /** File attachments (CSV, images, PDFs). */
   attachments?: AiMessageAttachment[];
+  /** BCP 47 locale tag from the client (e.g. "fr-FR"). When set, the assistant responds in that language. */
+  locale?: string;
 }
 
 /**

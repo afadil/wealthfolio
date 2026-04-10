@@ -308,6 +308,7 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
         let initial_title_clone = initial_title.clone();
         let is_new_thread_clone = is_new_thread;
         let thinking_override = request.config.as_ref().and_then(|c| c.thinking);
+        let locale = request.locale.clone();
 
         // Spawn the streaming task
         tokio::spawn(async move {
@@ -326,6 +327,7 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
                 initial_title_clone,
                 is_new_thread_clone,
                 thinking_override,
+                locale,
             )
             .await
             {
@@ -559,6 +561,7 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     initial_title: Option<String>,
     is_new_thread: bool,
     thinking_override: Option<bool>,
+    locale: Option<String>,
 ) -> Result<(), AiError> {
     // Send system event first
     tx.send(AiStreamEvent::system(&thread_id, &run_id, &message_id))
@@ -603,8 +606,16 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         current_date, current_datetime, base_currency
     );
 
+    // Add locale instruction if non-default
+    let locale_context = match locale.as_deref() {
+        Some(loc) if !loc.is_empty() && loc != "en" && loc != "en-US" => {
+            format!("\n\n## Language\nRespond in the language and formatting conventions for locale: {}.", loc)
+        }
+        _ => String::new(),
+    };
+
     // Build preamble with capability-specific instructions
-    let mut preamble = format!("{}{}", base_preamble, dynamic_context);
+    let mut preamble = format!("{}{}{}", base_preamble, dynamic_context, locale_context);
 
     // Add tool limitation notice if model doesn't support tools
     if !capabilities.tools {
