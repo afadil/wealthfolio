@@ -214,7 +214,7 @@ pub async fn resolve_symbol_quote(
         .and_then(wealthfolio_core::assets::InstrumentType::from_db_str);
     state
         .quote_service()
-        .resolve_symbol_quote(&symbol, exchange_mic.as_deref(), inst_type.as_ref())
+        .resolve_symbol_quote(&symbol, exchange_mic.as_deref(), inst_type.as_ref(), None)
         .await
         .map_err(|e| format!("Failed to resolve symbol quote: {}", e))
 }

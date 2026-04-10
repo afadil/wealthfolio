@@ -456,6 +456,7 @@ mod tests {
             symbol: &str,
             exchange_mic: Option<&str>,
             _instrument_type: Option<&InstrumentType>,
+            _preferred_provider: Option<&str>,
         ) -> Result<ResolvedQuote> {
             let is_uk_vwrp = (exchange_mic == Some("XLON") || exchange_mic == Some("CXE"))
                 && (symbol.eq_ignore_ascii_case("VWRPL")

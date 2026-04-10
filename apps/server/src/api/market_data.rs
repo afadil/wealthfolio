@@ -255,7 +255,12 @@ async fn resolve_symbol_quote(
         .and_then(wealthfolio_core::assets::InstrumentType::from_db_str);
     let res = state
         .quote_service
-        .resolve_symbol_quote(&q.symbol, q.exchange_mic.as_deref(), inst_type.as_ref())
+        .resolve_symbol_quote(
+            &q.symbol,
+            q.exchange_mic.as_deref(),
+            inst_type.as_ref(),
+            None,
+        )
         .await?;
     Ok(Json(res))
 }
