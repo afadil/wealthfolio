@@ -287,6 +287,7 @@ impl AiProviderServiceTrait for AiProviderService {
                 // Sort models alphabetically for consistent ordering
                 models.sort_by(|a, b| a.id.cmp(&b.id));
 
+
                 // Check if provider supports dynamic model listing
                 let supports_model_listing = Self::provider_supports_model_listing(id);
 
@@ -461,14 +462,28 @@ impl AiProviderServiceTrait for AiProviderService {
         provider_id: &str,
     ) -> std::result::Result<ListModelsResponse, ProviderApiError> {
         // The Claude Subscription provider doesn't have a remote model listing
-        // endpoint — the model is whatever the user's local Claude Code is
-        // configured with. Return the single static catalog entry instead.
+        // endpoint. Return a static list of known Claude models. The user can
+        // pick one; "claude-code-default" lets the SDK choose automatically.
         if provider_id == crate::claude_subscription::SUBSCRIPTION_PROVIDER_ID {
             return Ok(ListModelsResponse {
-                models: vec![crate::provider_model::FetchedModel {
-                    id: "claude-code-default".to_string(),
-                    name: Some("Claude (Subscription default)".to_string()),
-                }],
+                models: vec![
+                    crate::provider_model::FetchedModel {
+                        id: "claude-code-default".to_string(),
+                        name: Some("Default (auto)".to_string()),
+                    },
+                    crate::provider_model::FetchedModel {
+                        id: "claude-sonnet-4-6".to_string(),
+                        name: Some("Claude Sonnet 4.6".to_string()),
+                    },
+                    crate::provider_model::FetchedModel {
+                        id: "claude-opus-4-6".to_string(),
+                        name: Some("Claude Opus 4.6".to_string()),
+                    },
+                    crate::provider_model::FetchedModel {
+                        id: "claude-haiku-4-5-20251001".to_string(),
+                        name: Some("Claude Haiku 4.5".to_string()),
+                    },
+                ],
                 supports_listing: false,
             });
         }

@@ -109,8 +109,11 @@ export function useChatModel(): ChatModelState {
   // Ensure resolved model is accessible in the provider's favorites.
   // ModelPicker filters by favorites — if the resolved model isn't among them,
   // the picker shows "No model" while the hook sends a different model to the backend.
+  // Subscription providers show all catalog models (not filtered by favorites),
+  // so skip the adjustment for them.
   const adjustedModelId = useMemo(() => {
     if (!currentModelId) return currentModelId;
+    if (currentProvider?.type === "subscription") return currentModelId;
     if (!currentProvider?.favoriteModels?.length) return currentModelId;
     if (currentProvider.favoriteModels.includes(currentModelId)) return currentModelId;
     return currentProvider.favoriteModels[0];

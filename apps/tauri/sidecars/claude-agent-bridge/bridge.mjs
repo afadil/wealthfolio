@@ -12,7 +12,7 @@
 //
 // Commands (stdin):
 //   {type:"ping", id}
-//   {type:"start_query", threadId, prompt, systemPrompt?, toolDefs?, maxTurns?, cwd?}
+//   {type:"start_query", threadId, prompt, systemPrompt?, toolDefs?, maxTurns?, cwd?, model?}
 //   {type:"tool_result", threadId, toolCallId, ok, content?, error?}
 //   {type:"cancel", threadId}
 //   {type:"shutdown"}
@@ -193,7 +193,7 @@ async function handlePing(cmd) {
 }
 
 async function handleStartQuery(cmd) {
-  const { threadId, prompt, systemPrompt, toolDefs = [], maxTurns, cwd } = cmd;
+  const { threadId, prompt, systemPrompt, toolDefs = [], maxTurns, cwd, model } = cmd;
 
   if (!threadId || typeof prompt !== 'string') {
     send({
@@ -271,6 +271,9 @@ async function handleStartQuery(cmd) {
   }
   if (cwd) {
     options.cwd = cwd;
+  }
+  if (model) {
+    options.model = model;
   }
 
   let sessionId = null;

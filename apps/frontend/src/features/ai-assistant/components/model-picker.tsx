@@ -30,6 +30,12 @@ export const ModelPicker: FC = () => {
     const favoriteIds = currentProvider.favoriteModels ?? [];
     const allModels: MergedModel[] = currentProvider.models ?? [];
 
+    // Subscription providers (e.g. Claude via Claude Code) have a small fixed
+    // model set — always show all of them regardless of favorites.
+    if (currentProvider.type === "subscription") {
+      return allModels;
+    }
+
     // If no favorites set, fall back to all catalog models
     if (favoriteIds.length === 0) {
       return allModels;

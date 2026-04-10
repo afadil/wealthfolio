@@ -586,6 +586,13 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
             base_preamble, current_datetime, base_currency
         );
 
+        // Forward model_id so the user can pick a specific Claude model.
+        let sub_model = if model_id == "claude-code-default" {
+            None
+        } else {
+            Some(model_id)
+        };
+
         return crate::claude_subscription::subscription_chat_stream(
             env,
             tx,
@@ -596,6 +603,7 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
             thread_id,
             run_id,
             message_id,
+            sub_model,
         )
         .await;
     }
