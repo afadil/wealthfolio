@@ -1017,6 +1017,7 @@ pub async fn get_snapshot_by_date(
             notes: asset.notes.clone(),
             pricing_mode: asset.quote_mode.as_db_str().to_string(),
             preferred_provider: asset.preferred_provider(),
+            exchange_mic: asset.instrument_exchange_mic.clone(),
             classifications: None,
         };
 
