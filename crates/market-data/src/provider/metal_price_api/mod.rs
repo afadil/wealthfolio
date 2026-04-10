@@ -33,6 +33,9 @@ const SUPPORTED_METALS: &[&str] = &["XAU", "XAG", "XPT", "XPD", "XRH", "XRU", "X
 /// Provider ID constant
 const PROVIDER_ID: &str = "METAL_PRICE_API";
 
+/// One troy ounce in grams.
+const TROY_OZ_GRAMS: f64 = 31.1035;
+
 /// API response from Metal Price API (latest and historical endpoints)
 #[derive(Debug, Deserialize)]
 struct MetalPriceResponse {
@@ -87,9 +90,40 @@ impl MetalPriceApiProvider {
         Self { client, api_key }
     }
 
-    /// Check if the given symbol is a supported metal.
-    fn is_supported_metal(symbol: &str) -> bool {
-        SUPPORTED_METALS.contains(&symbol)
+    /// Parse a metal symbol, returning the base metal code and a troy-ounce
+    /// multiplier for weight-suffixed symbols.
+    ///
+    /// Examples:
+    ///   "XAU"      → ("XAU", 1.0)           — price per troy ounce
+    ///   "XAU-1KG"  → ("XAU", 32.1507…)      — price per 1 kg bar
+    ///   "XAU-500G" → ("XAU", 16.0753…)      — price per 500 g bar
+    ///   "XAG-100G" → ("XAG", 3.2150…)       — price per 100 g bar
+    ///   "FAKE"     → None
+    fn parse_metal_symbol(symbol: &str) -> Option<(&str, Decimal)> {
+        let (base, suffix) = match symbol.split_once('-') {
+            Some((b, s)) => (b, Some(s)),
+            None => (symbol, None),
+        };
+        if !SUPPORTED_METALS.contains(&base) {
+            return None;
+        }
+        let multiplier = match suffix {
+            None => Decimal::ONE,
+            Some(s) => {
+                let grams: f64 = match s {
+                    "1KG" => 1000.0,
+                    "500G" => 500.0,
+                    "250G" => 250.0,
+                    "100G" => 100.0,
+                    "50G" => 50.0,
+                    "10G" => 10.0,
+                    "1OZ" => TROY_OZ_GRAMS,
+                    _ => return None,
+                };
+                Decimal::try_from(grams / TROY_OZ_GRAMS).ok()?
+            }
+        };
+        Some((base, multiplier))
     }
 
     /// Convert a rate (1 base_currency = rate troy ounces) to price per troy ounce.
@@ -144,7 +178,7 @@ impl MarketDataProvider for MetalPriceApiProvider {
         instrument: ProviderInstrument,
     ) -> Result<Quote, MarketDataError> {
         // Extract symbol and quote currency from the instrument
-        let (symbol, quote_currency) = match &instrument {
+        let (raw_symbol, quote_currency) = match &instrument {
             ProviderInstrument::MetalSymbol { symbol, quote } => {
                 (symbol.to_string(), quote.to_string())
             }
@@ -156,15 +190,14 @@ impl MarketDataProvider for MetalPriceApiProvider {
             }
         };
 
-        // Validate that this is a supported metal symbol
-        if !Self::is_supported_metal(&symbol) {
-            return Err(MarketDataError::SymbolNotFound(symbol));
-        }
+        // Parse the symbol, extracting the base metal code and weight multiplier
+        let (base_code, weight_multiplier) = Self::parse_metal_symbol(&raw_symbol)
+            .ok_or_else(|| MarketDataError::SymbolNotFound(raw_symbol.clone()))?;
 
-        // Build the API URL
+        // Build the API URL using the base metal code
         let url = format!(
             "https://api.metalpriceapi.com/v1/latest?base={}&currencies={}",
-            quote_currency, symbol
+            quote_currency, base_code
         );
 
         // Make the API request
@@ -193,7 +226,7 @@ impl MarketDataProvider for MetalPriceApiProvider {
         if !metal_resp.success {
             warn!(
                 provider = PROVIDER_ID,
-                symbol = %symbol,
+                symbol = %raw_symbol,
                 "Metal Price API latest request failed"
             );
             return Err(MarketDataError::ProviderError {
@@ -202,15 +235,17 @@ impl MarketDataProvider for MetalPriceApiProvider {
             });
         }
 
-        // Get the rate for the requested symbol
+        // Get the rate for the base metal code
         let rate = metal_resp
             .rates
-            .get(&symbol)
-            .ok_or_else(|| MarketDataError::SymbolNotFound(symbol.clone()))?;
+            .get(base_code)
+            .ok_or_else(|| MarketDataError::SymbolNotFound(raw_symbol.clone()))?;
 
         // API returns: 1 base_currency = rate troy ounces of metal
         // Price per troy ounce = 1 / rate
-        let price = Self::rate_to_price(*rate)?;
+        // Price per unit = price_per_oz * weight_multiplier
+        let price_per_oz = Self::rate_to_price(*rate)?;
+        let price = price_per_oz * weight_multiplier;
 
         Ok(Quote::new(
             Utc::now(),
@@ -232,7 +267,7 @@ impl MarketDataProvider for MetalPriceApiProvider {
         start: DateTime<Utc>,
         end: DateTime<Utc>,
     ) -> Result<Vec<Quote>, MarketDataError> {
-        let (symbol, quote_currency) = match &instrument {
+        let (raw_symbol, quote_currency) = match &instrument {
             ProviderInstrument::MetalSymbol { symbol, quote } => {
                 (symbol.to_string(), quote.to_string())
             }
@@ -244,16 +279,15 @@ impl MarketDataProvider for MetalPriceApiProvider {
             }
         };
 
-        if !Self::is_supported_metal(&symbol) {
-            return Err(MarketDataError::SymbolNotFound(symbol));
-        }
+        let (base_code, weight_multiplier) = Self::parse_metal_symbol(&raw_symbol)
+            .ok_or_else(|| MarketDataError::SymbolNotFound(raw_symbol.clone()))?;
 
         let start_date = start.format("%Y-%m-%d");
         let end_date = end.format("%Y-%m-%d");
 
         let url = format!(
             "https://api.metalpriceapi.com/v1/timeframe?base={}&currencies={}&start_date={}&end_date={}",
-            quote_currency, symbol, start_date, end_date
+            quote_currency, base_code, start_date, end_date
         );
 
         let response = self
@@ -294,7 +328,7 @@ impl MarketDataProvider for MetalPriceApiProvider {
         if !tf_resp.success || tf_resp.rates.is_empty() {
             warn!(
                 provider = PROVIDER_ID,
-                symbol = %symbol,
+                symbol = %raw_symbol,
                 body = %&response_text[..response_text.len().min(300)],
                 "Metal Price API timeframe request failed"
             );
@@ -309,10 +343,11 @@ impl MarketDataProvider for MetalPriceApiProvider {
 
         let mut quotes = Vec::new();
         for (date_str, rates) in &tf_resp.rates {
-            let Some(rate) = rates.get(&symbol) else {
+            let Some(rate) = rates.get(base_code) else {
                 continue;
             };
-            let price = Self::rate_to_price(*rate)?;
+            let price_per_oz = Self::rate_to_price(*rate)?;
+            let price = price_per_oz * weight_multiplier;
 
             let date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d").map_err(|e| {
                 MarketDataError::ProviderError {
@@ -342,17 +377,38 @@ mod tests {
     use rust_decimal_macros::dec;
 
     #[test]
-    fn test_is_supported_metal() {
-        assert!(MetalPriceApiProvider::is_supported_metal("XAU"));
-        assert!(MetalPriceApiProvider::is_supported_metal("XAG"));
-        assert!(MetalPriceApiProvider::is_supported_metal("XPT"));
-        assert!(MetalPriceApiProvider::is_supported_metal("XPD"));
-        assert!(MetalPriceApiProvider::is_supported_metal("XRH"));
-        assert!(MetalPriceApiProvider::is_supported_metal("XRU"));
-        assert!(MetalPriceApiProvider::is_supported_metal("XIR"));
-        assert!(MetalPriceApiProvider::is_supported_metal("XOS"));
-        assert!(!MetalPriceApiProvider::is_supported_metal("AAPL"));
-        assert!(!MetalPriceApiProvider::is_supported_metal("BTC"));
+    fn test_parse_metal_symbol_base() {
+        let (base, mult) = MetalPriceApiProvider::parse_metal_symbol("XAU").unwrap();
+        assert_eq!(base, "XAU");
+        assert_eq!(mult, Decimal::ONE);
+    }
+
+    #[test]
+    fn test_parse_metal_symbol_1kg() {
+        let (base, mult) = MetalPriceApiProvider::parse_metal_symbol("XAU-1KG").unwrap();
+        assert_eq!(base, "XAU");
+        // 1 kg = 1000g / 31.1035 g/oz ≈ 32.1507 oz
+        assert!(mult > dec!(32.15) && mult < dec!(32.16));
+    }
+
+    #[test]
+    fn test_parse_metal_symbol_500g() {
+        let (base, mult) = MetalPriceApiProvider::parse_metal_symbol("XAU-500G").unwrap();
+        assert_eq!(base, "XAU");
+        assert!(mult > dec!(16.07) && mult < dec!(16.08));
+    }
+
+    #[test]
+    fn test_parse_metal_symbol_1oz() {
+        let (_, mult) = MetalPriceApiProvider::parse_metal_symbol("XAG-1OZ").unwrap();
+        assert_eq!(mult, Decimal::ONE);
+    }
+
+    #[test]
+    fn test_parse_metal_symbol_unsupported() {
+        assert!(MetalPriceApiProvider::parse_metal_symbol("AAPL").is_none());
+        assert!(MetalPriceApiProvider::parse_metal_symbol("BTC").is_none());
+        assert!(MetalPriceApiProvider::parse_metal_symbol("XAU-99G").is_none());
     }
 
     #[test]
