@@ -128,6 +128,7 @@ impl HoldingsService {
                             notes: asset.notes.clone(),
                             pricing_mode: asset.quote_mode.as_db_str().to_string(),
                             preferred_provider: asset.preferred_provider(),
+                            exchange_mic: asset.instrument_exchange_mic.clone(),
                             classifications: None,
                         };
 
@@ -222,6 +223,7 @@ impl HoldingsService {
                 notes: None,
                 pricing_mode: "MANUAL".to_string(),
                 preferred_provider: None,
+                exchange_mic: None,
                 classifications: None,
             };
 
@@ -595,6 +597,7 @@ impl HoldingsServiceTrait for HoldingsService {
                 notes: asset.notes.clone(),
                 pricing_mode: asset.quote_mode.as_db_str().to_string(),
                 preferred_provider: asset.preferred_provider(),
+                exchange_mic: asset.instrument_exchange_mic.clone(),
                 classifications: None,
             };
 
@@ -712,6 +715,7 @@ mod tests {
                 notes: None,
                 pricing_mode: "MARKET".to_string(),
                 preferred_provider: None,
+                exchange_mic: None,
                 classifications: None,
             }),
             asset_kind: None,
