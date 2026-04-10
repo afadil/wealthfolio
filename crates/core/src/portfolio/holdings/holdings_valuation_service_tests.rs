@@ -463,6 +463,7 @@ mod tests {
                 notes: None,
                 pricing_mode: "MARKET".to_string(),
                 preferred_provider: None,
+                exchange_mic: None,
                 classifications: None,
             })
         } else {

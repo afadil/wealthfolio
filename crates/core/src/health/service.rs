@@ -284,7 +284,7 @@ impl HealthService {
                             asset_id: instrument.id.clone(),
                             symbol: instrument.symbol.clone(),
                             name: instrument.name.clone(),
-                            exchange_mic: None, // TODO: populate from instrument once holdings model is updated
+                            exchange_mic: instrument.exchange_mic.clone(),
                             market_value: market_value_f64,
                             uses_market_pricing,
                         });
