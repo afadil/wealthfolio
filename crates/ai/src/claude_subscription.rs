@@ -69,6 +69,8 @@ enum SidecarCommand<'a> {
         tool_defs: Vec<ToolDefWire>,
         #[serde(rename = "maxTurns", skip_serializing_if = "Option::is_none")]
         max_turns: Option<u32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        model: Option<String>,
     },
     #[serde(rename = "tool_result")]
     ToolResult {
@@ -341,6 +343,7 @@ pub async fn subscription_chat_stream<E: AiEnvironment + 'static>(
     thread_id: String,
     run_id: String,
     message_id: String,
+    model_id: Option<String>,
 ) -> Result<(), AiError> {
     // Always emit a terminal `Done` event so the frontend stream closes —
     // returning `Err` from this function only emits an `error` event upstream
@@ -397,6 +400,10 @@ pub async fn subscription_chat_stream<E: AiEnvironment + 'static>(
     // into the prompt instead of being passed as a message array.
     let prompt = render_prompt_with_history(&history, &user_message);
 
+    // Map well-known Wealthfolio model IDs to Claude model identifiers.
+    // "claude-code-default" (or None) → let the SDK pick; otherwise pass through.
+    let sidecar_model = model_id.filter(|m| m != "claude-code-default" && !m.is_empty());
+
     if let Err(e) = sidecar
         .send(&SidecarCommand::StartQuery {
             thread_id: &thread_id,
@@ -404,6 +411,7 @@ pub async fn subscription_chat_stream<E: AiEnvironment + 'static>(
             system_prompt: Some(preamble),
             tool_defs,
             max_turns: Some(25),
+            model: sidecar_model,
         })
         .await
     {
@@ -622,6 +630,16 @@ pub async fn subscription_chat_stream<E: AiEnvironment + 'static>(
     if !stream_ok {
         // We still send Done so the frontend can close the stream.
         debug!("subscription chat finished with stream_ok=false");
+    }
+
+    // Persist the assistant message so chat history survives app restarts.
+    // This mirrors the rig-core path in chat.rs (line ~1675).
+    if let Err(e) = env
+        .chat_repository()
+        .create_message(final_message.clone())
+        .await
+    {
+        error!("Failed to save subscription assistant message: {}", e);
     }
 
     let _ = tx
