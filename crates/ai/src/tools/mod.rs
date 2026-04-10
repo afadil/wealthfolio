@@ -19,6 +19,7 @@ pub mod activities;
 pub mod allocation;
 pub mod constants;
 pub mod goals;
+pub mod health;
 pub mod holdings;
 pub mod import_csv;
 pub mod income;
@@ -35,6 +36,7 @@ pub use accounts::GetAccountsTool;
 pub use activities::SearchActivitiesTool;
 pub use allocation::GetAssetAllocationTool;
 pub use goals::GetGoalsTool;
+pub use health::GetHealthStatusTool;
 pub use holdings::GetHoldingsTool;
 pub use import_csv::ImportCsvTool;
 pub use income::GetIncomeTool;
@@ -60,6 +62,7 @@ pub struct ToolSet<E: AiEnvironment> {
     pub record_activity: RecordActivityTool<E>,
     pub record_activities: RecordActivitiesTool<E>,
     pub import_csv: ImportCsvTool<E>,
+    pub health_status: GetHealthStatusTool<E>,
 }
 
 impl<E: AiEnvironment> ToolSet<E> {
@@ -76,7 +79,8 @@ impl<E: AiEnvironment> ToolSet<E> {
             performance: GetPerformanceTool::new(env.clone(), base_currency.clone()),
             record_activity: RecordActivityTool::new(env.clone()),
             record_activities: RecordActivitiesTool::new(env.clone()),
-            import_csv: ImportCsvTool::new(env, base_currency),
+            import_csv: ImportCsvTool::new(env.clone(), base_currency),
+            health_status: GetHealthStatusTool::new(env),
         }
     }
 }

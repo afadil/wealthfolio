@@ -10,6 +10,7 @@ use wealthfolio_core::{
     accounts::AccountServiceTrait,
     activities::ActivityServiceTrait,
     goals::GoalServiceTrait,
+    health::HealthServiceTrait,
     portfolio::{
         allocation::AllocationServiceTrait, holdings::HoldingsServiceTrait,
         income::IncomeServiceTrait, performance::PerformanceServiceTrait,
@@ -70,6 +71,9 @@ pub trait AiEnvironment: Send + Sync {
 
     /// Get the income service for income/dividend summaries.
     fn income_service(&self) -> Arc<dyn IncomeServiceTrait>;
+
+    /// Get the health service for portfolio health diagnostics.
+    fn health_service(&self) -> Arc<dyn HealthServiceTrait>;
 }
 
 #[cfg(test)]
@@ -91,6 +95,7 @@ pub mod test_env {
         assets::{Asset, ProviderProfile},
         errors::DatabaseError,
         goals::{Goal, GoalServiceTrait, GoalsAllocation, NewGoal},
+        health::{FixAction, HealthConfig, HealthServiceTrait, HealthStatus},
         holdings::{Holding, HoldingsServiceTrait},
         portfolio::allocation::{AllocationHoldings, AllocationServiceTrait, PortfolioAllocations},
         portfolio::income::{IncomeServiceTrait, IncomeSummary},
@@ -1236,6 +1241,66 @@ pub mod test_env {
 
         fn income_service(&self) -> Arc<dyn IncomeServiceTrait> {
             self.income_service.clone()
+        }
+
+        fn health_service(&self) -> Arc<dyn HealthServiceTrait> {
+            Arc::new(MockHealthService)
+        }
+    }
+
+    pub struct MockHealthService;
+
+    #[async_trait::async_trait]
+    impl HealthServiceTrait for MockHealthService {
+        async fn run_checks(&self, _base_currency: &str) -> CoreResult<HealthStatus> {
+            Ok(HealthStatus::healthy())
+        }
+
+        async fn run_checks_with_data(
+            &self,
+            _base_currency: &str,
+            _total_portfolio_value: f64,
+            _holdings: &[wealthfolio_core::portfolio::holdings::Holding],
+            _latest_quote_times: &std::collections::HashMap<String, chrono::DateTime<chrono::Utc>>,
+            _quote_sync_errors: &[wealthfolio_core::health::QuoteSyncError],
+            _fx_pairs: &[wealthfolio_core::health::FxPairInfo],
+            _unclassified_assets: &[wealthfolio_core::health::UnclassifiedAssetInfo],
+            _consistency_issues: &[wealthfolio_core::health::DataConsistencyIssue],
+            _legacy_migration_info: Option<&wealthfolio_core::health::LegacyMigrationInfo>,
+            _unconfigured_accounts: &[wealthfolio_core::accounts::Account],
+            _configured_timezone: Option<&str>,
+        ) -> CoreResult<HealthStatus> {
+            Ok(HealthStatus::healthy())
+        }
+
+        async fn get_cached_status(&self) -> Option<HealthStatus> {
+            None
+        }
+
+        async fn dismiss_issue(&self, _issue_id: &str, _data_hash: &str) -> CoreResult<()> {
+            Ok(())
+        }
+
+        async fn restore_issue(&self, _issue_id: &str) -> CoreResult<()> {
+            Ok(())
+        }
+
+        async fn get_dismissed_ids(&self) -> CoreResult<Vec<String>> {
+            Ok(Vec::new())
+        }
+
+        async fn execute_fix(&self, _action: &FixAction) -> CoreResult<()> {
+            Ok(())
+        }
+
+        async fn clear_cache(&self) {}
+
+        async fn get_config(&self) -> HealthConfig {
+            HealthConfig::default()
+        }
+
+        async fn update_config(&self, _config: HealthConfig) -> CoreResult<()> {
+            Ok(())
         }
     }
 }
