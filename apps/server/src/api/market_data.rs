@@ -243,6 +243,7 @@ struct ResolveSymbolQuoteQuery {
     symbol: String,
     exchange_mic: Option<String>,
     instrument_type: Option<String>,
+    provider_id: Option<String>,
 }
 
 async fn resolve_symbol_quote(
@@ -259,7 +260,7 @@ async fn resolve_symbol_quote(
             &q.symbol,
             q.exchange_mic.as_deref(),
             inst_type.as_ref(),
-            None,
+            q.provider_id.as_deref(),
         )
         .await?;
     Ok(Json(res))
