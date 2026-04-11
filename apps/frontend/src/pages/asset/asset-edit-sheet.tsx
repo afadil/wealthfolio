@@ -527,10 +527,11 @@ export function AssetEditSheet({
     }
   }, [asset, form]);
 
-  // Reset tab when sheet opens
+  // Reset tab and validation state when sheet opens
   useEffect(() => {
     if (open) {
       setActiveTab(defaultTab);
+      setSymbolValidations({});
     }
   }, [open, defaultTab]);
 
@@ -573,7 +574,7 @@ export function AssetEditSheet({
         // Keep sheet open so user can retry
       }
     },
-    [asset, updateAssetProfileMutation, onOpenChange],
+    [asset, updateAssetProfileMutation, onOpenChange, symbolValidations],
   );
 
   const isManualMode = form.watch("quoteMode") === QuoteMode.MANUAL;
