@@ -5378,6 +5378,13 @@ mod tests {
             Ok(Vec::new())
         }
 
+        async fn get_lots_for_asset(
+            &self,
+            _asset_id: &str,
+        ) -> AppResult<Vec<crate::lots::LotRecord>> {
+            Ok(Vec::new())
+        }
+
         async fn get_all_lots(&self) -> AppResult<Vec<crate::lots::LotRecord>> {
             Ok(Vec::new())
         }

@@ -56,6 +56,19 @@ pub async fn get_holding(
     Ok(Json(holding))
 }
 
+pub async fn get_asset_lots(
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<super::dto::AssetLotsQuery>,
+) -> ApiResult<Json<Vec<wealthfolio_core::portfolio::holdings::LotView>>> {
+    use wealthfolio_core::portfolio::holdings::LotView;
+    let lots = state
+        .lots_repository
+        .get_lots_for_asset(&q.asset_id)
+        .await?;
+    let views: Vec<LotView> = lots.iter().filter_map(LotView::from_record).collect();
+    Ok(Json(views))
+}
+
 pub async fn get_asset_holdings(
     State(state): State<Arc<AppState>>,
     Query(q): Query<AssetHoldingsQuery>,
