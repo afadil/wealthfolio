@@ -90,14 +90,14 @@ test.describe("Symbol Mapping Validation", () => {
   }
 
   async function addMappingRow(provider: string, symbol: string) {
-    // Click Add to create a new mapping row
-    await page.getByRole("button", { name: "Add" }).click();
-    await page.waitForTimeout(300);
-
     // Scope to the mapping table (contains "Provider" column header)
     const mappingTable = page.locator("table").filter({
       has: page.getByRole("columnheader", { name: "Provider" }),
     });
+
+    // Click Add to create a new mapping row
+    await page.getByRole("button", { name: "Add" }).click();
+    await page.waitForTimeout(300);
 
     // The row's provider combobox defaults to YAHOO; change if needed
     if (provider !== "Yahoo Finance") {
@@ -109,16 +109,21 @@ test.describe("Symbol Mapping Validation", () => {
       await page.waitForTimeout(300);
     }
 
-    // Fill the symbol input in the last row
     const lastRow = mappingTable.locator("tbody tr").last();
     const symbolInput = lastRow.getByRole("textbox");
     await symbolInput.fill(symbol);
     await page.waitForTimeout(1000);
+
+    return mappingTable.locator("tbody tr").last();
   }
 
-  async function waitForValidation(expected: "valid" | "invalid", timeoutMs = 30000) {
-    // Poll directly for the final icon — skip racing on the spinner
-    await expect(page.getByTestId(`symbol-validation-${expected}`)).toBeVisible({
+  async function waitForValidation(
+    row: ReturnType<typeof page.locator>,
+    expected: "valid" | "invalid",
+    timeoutMs = 30000,
+  ) {
+    // Poll directly for the final icon scoped to the specific row
+    await expect(row.getByTestId(`symbol-validation-${expected}`)).toBeVisible({
       timeout: timeoutMs,
     });
   }
@@ -150,16 +155,16 @@ test.describe("Symbol Mapping Validation", () => {
   test("1. Yahoo Finance — valid symbol shows green check", async () => {
     test.setTimeout(60000);
     await openAssetMarketDataTab();
-    await addMappingRow("Yahoo Finance", "AAPL");
-    await waitForValidation("valid", 30000);
+    const row = await addMappingRow("Yahoo Finance", "AAPL");
+    await waitForValidation(row, "valid", 30000);
     await closeSheet();
   });
 
   test("2. Yahoo Finance — invalid symbol shows red error", async () => {
     test.setTimeout(60000);
     await openAssetMarketDataTab();
-    await addMappingRow("Yahoo Finance", "INVALID_TICKER_XYZ_E2E");
-    await waitForValidation("invalid", 30000);
+    const row = await addMappingRow("Yahoo Finance", "INVALID_TICKER_XYZ_E2E");
+    await waitForValidation(row, "invalid", 30000);
     await closeSheet();
   });
 
@@ -168,16 +173,16 @@ test.describe("Symbol Mapping Validation", () => {
   test("3. Börse Frankfurt — valid ISIN shows green check", async () => {
     test.setTimeout(60000);
     await openAssetMarketDataTab();
-    await addMappingRow("Börse Frankfurt", "DE0007164600");
-    await waitForValidation("valid", 30000);
+    const row = await addMappingRow("Börse Frankfurt", "DE0007164600");
+    await waitForValidation(row, "valid", 30000);
     await closeSheet();
   });
 
   test("4. Börse Frankfurt — invalid symbol shows red error", async () => {
     test.setTimeout(60000);
     await openAssetMarketDataTab();
-    await addMappingRow("Börse Frankfurt", "INVALID_TICKER_XYZ_E2E");
-    await waitForValidation("invalid", 30000);
+    const row = await addMappingRow("Börse Frankfurt", "INVALID_TICKER_XYZ_E2E");
+    await waitForValidation(row, "invalid", 30000);
     await closeSheet();
   });
 });
