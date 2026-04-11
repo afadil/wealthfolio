@@ -94,10 +94,14 @@ test.describe("Symbol Mapping Validation", () => {
     await page.getByRole("button", { name: "Add" }).click();
     await page.waitForTimeout(300);
 
+    // Scope to the mapping table (contains "Provider" column header)
+    const mappingTable = page.locator("table").filter({
+      has: page.getByRole("columnheader", { name: "Provider" }),
+    });
+
     // The row's provider combobox defaults to YAHOO; change if needed
     if (provider !== "Yahoo Finance") {
-      // Find the combobox in the last table row
-      const lastRow = page.locator("tbody tr").last();
+      const lastRow = mappingTable.locator("tbody tr").last();
       const providerTrigger = lastRow.getByRole("combobox").first();
       await providerTrigger.click();
       await page.waitForTimeout(300);
@@ -106,27 +110,31 @@ test.describe("Symbol Mapping Validation", () => {
     }
 
     // Fill the symbol input in the last row
-    const lastRow = page.locator("tbody tr").last();
+    const lastRow = mappingTable.locator("tbody tr").last();
     const symbolInput = lastRow.getByRole("textbox");
     await symbolInput.fill(symbol);
+    await page.waitForTimeout(1000);
   }
 
   async function waitForValidation(expected: "valid" | "invalid", timeoutMs = 30000) {
-    // Wait for loading spinner to appear (debounce fires after 800ms)
-    await expect(page.getByTestId("symbol-validation-loading")).toBeVisible({
-      timeout: 5000,
-    });
-    // Wait for loading spinner to disappear (network call completes)
-    await expect(page.getByTestId("symbol-validation-loading")).not.toBeVisible({
+    // Poll directly for the final icon — skip racing on the spinner
+    await expect(page.getByTestId(`symbol-validation-${expected}`)).toBeVisible({
       timeout: timeoutMs,
     });
-    // Check final icon
-    await expect(page.getByTestId(`symbol-validation-${expected}`)).toBeVisible({ timeout: 3000 });
   }
 
   async function closeSheet() {
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 5000 });
+    // Try close button first (Escape may close a Radix dropdown instead of the sheet)
+    const closeBtn = page
+      .getByRole("button", { name: /close/i })
+      .or(page.locator('[aria-label="Close"]'))
+      .first();
+    if (await closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await closeBtn.click();
+    } else {
+      await page.keyboard.press("Escape");
+    }
+    await expect(page.getByRole("dialog").first()).not.toBeVisible({ timeout: 5000 });
   }
 
   // ── setup ─────────────────────────────────────────────────────────────────
