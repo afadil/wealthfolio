@@ -51,7 +51,7 @@ import {
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import * as z from "zod";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
@@ -294,6 +294,12 @@ function SymbolMappingRow({
   onValidationChange,
 }: SymbolMappingRowProps) {
   const [validationStatus, setValidationStatus] = useState<SymbolValidationStatus>("idle");
+  const mounted = useRef(true);
+  useEffect(() => {
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const symbol = useWatch({ control, name: `providerConfig.${index}.symbol` as any });
   const provider = useWatch({ control, name: `providerConfig.${index}.provider` as any });
@@ -305,15 +311,20 @@ function SymbolMappingRow({
       return;
     }
 
-    setValidationStatus("loading");
+    // Reset immediately while user is typing (before the debounce fires)
+    setValidationStatus("idle");
 
     const timer = setTimeout(async () => {
+      setValidationStatus("loading");
+      onValidationChange(fieldId, "idle"); // reset parent while loading
       try {
         const result = await resolveSymbolQuote(symbol.trim(), undefined, undefined, provider);
+        if (!mounted.current) return;
         const status: SymbolValidationStatus = result?.price ? "valid" : "invalid";
         setValidationStatus(status);
         onValidationChange(fieldId, status);
       } catch {
+        if (!mounted.current) return;
         setValidationStatus("invalid");
         onValidationChange(fieldId, "invalid");
       }
