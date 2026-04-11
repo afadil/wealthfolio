@@ -362,13 +362,19 @@ function SymbolMappingRow({
                   />
                   <span className="absolute right-2 flex items-center">
                     {validationStatus === "loading" && (
-                      <Icons.Spinner className="text-muted-foreground h-3.5 w-3.5 animate-spin" />
+                      <span data-testid="symbol-validation-loading">
+                        <Icons.Spinner className="text-muted-foreground h-3.5 w-3.5 animate-spin" />
+                      </span>
                     )}
                     {validationStatus === "valid" && (
-                      <Icons.Check className="h-3.5 w-3.5 text-green-500" />
+                      <span data-testid="symbol-validation-valid">
+                        <Icons.Check className="h-3.5 w-3.5 text-green-500" />
+                      </span>
                     )}
                     {validationStatus === "invalid" && (
-                      <Icons.AlertCircle className="h-3.5 w-3.5 text-red-500" />
+                      <span data-testid="symbol-validation-invalid">
+                        <Icons.AlertCircle className="h-3.5 w-3.5 text-red-500" />
+                      </span>
                     )}
                   </span>
                 </div>
