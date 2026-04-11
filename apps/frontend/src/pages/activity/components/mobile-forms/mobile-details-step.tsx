@@ -63,6 +63,7 @@ export function MobileDetailsStep({ accounts, activityType, isEditing }: MobileD
   const assetType = isBuyOrSell ? ((watch("assetType" as any) as string) ?? "stock") : "stock";
   const isOption = assetType === "option";
   const isBond = assetType === "bond";
+  const isMetal = assetType === "metal";
   const isManualForType = isManualAsset && !isBond;
 
   // Option fields for total calculation
@@ -196,7 +197,7 @@ export function MobileDetailsStep({ accounts, activityType, isEditing }: MobileD
   }, [accountId, currency, filteredAccounts, getFieldState, setValue]);
 
   // Quantity label adapts to asset type
-  const quantityLabel = isOption ? "Contracts" : isBond ? "Bonds" : "Shares";
+  const quantityLabel = isOption ? "Contracts" : isBond ? "Bonds" : isMetal ? "Units" : "Shares";
   const priceLabel = isOption ? "Premium/Share" : isSecuritiesTransfer ? "Cost Basis" : "Price";
 
   return (
