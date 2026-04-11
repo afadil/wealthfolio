@@ -9,7 +9,7 @@
 
 use async_trait::async_trait;
 use chrono::{Duration, NaiveDate, TimeZone, Utc};
-use log::{debug, info};
+use log::{debug, info, warn};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -1315,6 +1315,9 @@ where
                         asset_id, current_qty
                     );
                     self.sync_state_store.mark_active(asset_id).await?;
+                    if let Err(e) = self.asset_repo.reactivate(asset_id).await {
+                        warn!("Failed to reactivate asset {}: {}", asset_id, e);
+                    }
                     marked_active += 1;
                 }
                 // If already active, no change needed
@@ -1324,6 +1327,9 @@ where
                     // Was active, now closed - mark as inactive with today's date
                     debug!("Marking asset {} as inactive (position closed)", asset_id);
                     self.sync_state_store.mark_inactive(asset_id, today).await?;
+                    if let Err(e) = self.asset_repo.deactivate(asset_id).await {
+                        warn!("Failed to deactivate asset {}: {}", asset_id, e);
+                    }
                     marked_inactive += 1;
                 }
                 // If already inactive, no change needed (preserve existing closed date)
