@@ -59,6 +59,7 @@ const SettingsAccountsPage = () => {
   const handleArchiveAccount = (account: Account, archive: boolean) => {
     updateAccountMutation.mutate({
       ...account,
+      taxTreatment: (account.taxTreatment || "TAXABLE") as "TAXABLE" | "TAX_FREE" | "TAX_DEFERRED",
       isArchived: archive,
     });
   };
@@ -66,6 +67,7 @@ const SettingsAccountsPage = () => {
   const handleHideAccount = (account: Account, hide: boolean) => {
     updateAccountMutation.mutate({
       ...account,
+      taxTreatment: (account.taxTreatment || "TAXABLE") as "TAXABLE" | "TAX_FREE" | "TAX_DEFERRED",
       isActive: !hide,
     });
   };

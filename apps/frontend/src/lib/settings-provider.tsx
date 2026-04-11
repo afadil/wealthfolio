@@ -29,6 +29,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const { data, isLoading, isError, refetch } = useSettings();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [accountsGrouped, setAccountsGrouped] = useState(true);
+  const [groupingMode, setGroupingMode] = useState<"none" | "accountGroup" | "taxTreatment">(
+    "accountGroup",
+  );
 
   const updateMutation = useSettingsMutation(setSettings, applySettingsToDocument);
 
@@ -85,6 +88,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     },
     accountsGrouped,
     setAccountsGrouped,
+    groupingMode,
+    setGroupingMode,
   };
 
   return <SettingsContext.Provider value={contextValue}>{children}</SettingsContext.Provider>;

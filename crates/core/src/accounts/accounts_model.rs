@@ -18,6 +18,37 @@ pub enum TrackingMode {
     NotSet,
 }
 
+/// Tax treatment for an account - determines tax categorization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum TaxTreatment {
+    /// Account gains are taxable
+    #[default]
+    Taxable,
+    /// Account gains are not taxed
+    TaxFree,
+    /// Account gains are taxed when withdrawn
+    TaxDeferred,
+}
+
+impl TaxTreatment {
+    pub fn as_str(&self) -> &str {
+        match self {
+            TaxTreatment::Taxable => "TAXABLE",
+            TaxTreatment::TaxFree => "TAX_FREE",
+            TaxTreatment::TaxDeferred => "TAX_DEFERRED",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "TAX_FREE" => TaxTreatment::TaxFree,
+            "TAX_DEFERRED" => TaxTreatment::TaxDeferred,
+            _ => TaxTreatment::Taxable,
+        }
+    }
+}
+
 /// Domain model representing an account in the system.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -44,6 +75,8 @@ pub struct Account {
     pub is_archived: bool,
     /// Tracking mode for the account
     pub tracking_mode: TrackingMode,
+    /// Tax treatment classification
+    pub tax_treatment: TaxTreatment,
 }
 
 /// Input model for creating a new account.
@@ -67,6 +100,8 @@ pub struct NewAccount {
     pub is_archived: bool,
     #[serde(default)]
     pub tracking_mode: TrackingMode,
+    #[serde(default)]
+    pub tax_treatment: TaxTreatment,
 }
 
 impl NewAccount {
@@ -103,6 +138,7 @@ pub struct AccountUpdate {
     pub provider_account_id: Option<String>,
     pub is_archived: Option<bool>,
     pub tracking_mode: Option<TrackingMode>,
+    pub tax_treatment: Option<TaxTreatment>,
 }
 
 impl AccountUpdate {

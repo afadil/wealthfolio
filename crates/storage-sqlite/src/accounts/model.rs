@@ -4,7 +4,7 @@ use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use wealthfolio_core::accounts::{Account, AccountUpdate, NewAccount, TrackingMode};
+use wealthfolio_core::accounts::{Account, AccountUpdate, NewAccount, TaxTreatment, TrackingMode};
 
 /// Database model for accounts
 #[derive(
@@ -41,6 +41,7 @@ pub struct AccountDB {
     pub provider_account_id: Option<String>,
     pub is_archived: bool,
     pub tracking_mode: String,
+    pub tax_treatment: String,
 }
 
 // Conversion implementations
@@ -51,6 +52,7 @@ impl From<AccountDB> for Account {
             "HOLDINGS" => TrackingMode::Holdings,
             _ => TrackingMode::NotSet,
         };
+        let tax_treatment = TaxTreatment::from_str(&db.tax_treatment);
         Self {
             id: db.id,
             name: db.name,
@@ -68,6 +70,7 @@ impl From<AccountDB> for Account {
             provider_account_id: db.provider_account_id,
             is_archived: db.is_archived,
             tracking_mode,
+            tax_treatment,
         }
     }
 }
@@ -81,6 +84,7 @@ impl From<NewAccount> for AccountDB {
             TrackingMode::NotSet => "NOT_SET",
         }
         .to_string();
+        let tax_treatment = domain.tax_treatment.as_str().to_string();
         Self {
             id: domain.id.unwrap_or_default(),
             name: domain.name,
@@ -98,6 +102,7 @@ impl From<NewAccount> for AccountDB {
             provider_account_id: domain.provider_account_id,
             is_archived: domain.is_archived,
             tracking_mode,
+            tax_treatment,
         }
     }
 }
@@ -113,6 +118,10 @@ impl From<AccountUpdate> for AccountDB {
             })
             .unwrap_or("NOT_SET")
             .to_string();
+        let tax_treatment = domain
+            .tax_treatment
+            .map(|tt| tt.as_str().to_string())
+            .unwrap_or_else(|| "TAXABLE".to_string());
         Self {
             id: domain.id.unwrap_or_default(),
             name: domain.name,
@@ -130,6 +139,7 @@ impl From<AccountUpdate> for AccountDB {
             provider_account_id: domain.provider_account_id,
             is_archived: domain.is_archived.unwrap_or(false),
             tracking_mode,
+            tax_treatment,
         }
     }
 }
