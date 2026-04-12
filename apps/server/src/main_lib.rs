@@ -106,6 +106,10 @@ pub struct AppState {
     pub health_service: Arc<dyn HealthServiceTrait + Send + Sync>,
     pub token_lifecycle: Arc<TokenLifecycleState>,
     pub custom_provider_service: Arc<wealthfolio_core::custom_provider::CustomProviderService>,
+    /// Global mutex to prevent concurrent portfolio recalculations.
+    /// Both the API (`enqueue_portfolio_job`) and the queue worker acquire this
+    /// before running a portfolio job.
+    pub portfolio_job_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 pub fn init_tracing() {
@@ -434,6 +438,8 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let token_lifecycle = Arc::new(TokenLifecycleState::new());
 
     // Domain event sink - Phase 2: Start the worker now that all services are ready
+    let portfolio_job_lock = Arc::new(tokio::sync::Mutex::new(()));
+
     domain_event_sink.start_worker(
         asset_service.clone(),
         connect_sync_service.clone(),
@@ -448,6 +454,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         secret_store.clone(),
         token_lifecycle.clone(),
         lots_repository.clone(),
+        portfolio_job_lock.clone(),
     );
 
     let addon_service: Arc<dyn AddonServiceTrait + Send + Sync> = Arc::new(AddonService::new(
@@ -501,5 +508,6 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         health_service,
         token_lifecycle,
         custom_provider_service,
+        portfolio_job_lock,
     }))
 }
