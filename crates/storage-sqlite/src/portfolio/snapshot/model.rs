@@ -88,8 +88,16 @@ impl From<AccountStateSnapshot> for AccountStateSnapshotDB {
             account_id: domain.account_id,
             snapshot_date: domain.snapshot_date.format("%Y-%m-%d").to_string(),
             currency: domain.currency,
-            positions: serde_json::to_string(&domain.positions)
-                .unwrap_or_else(|_| "{}".to_string()),
+            // Only persist positions JSON for non-calculated snapshots
+            // (HOLDINGS-mode: ManualEntry, BrokerImported, CsvImport, Synthetic).
+            // TRANSACTIONS-mode snapshots (Calculated) use the lots table as the
+            // source of truth — writing positions JSON wastes ~150MB+ and the data
+            // was never read back for any purpose.
+            positions: if domain.source.is_non_calculated() {
+                serde_json::to_string(&domain.positions).unwrap_or_else(|_| "{}".to_string())
+            } else {
+                "{}".to_string()
+            },
             cash_balances: serde_json::to_string(&domain.cash_balances)
                 .unwrap_or_else(|_| "{}".to_string()),
             cost_basis: domain.cost_basis.round_dp(DECIMAL_PRECISION).to_string(),

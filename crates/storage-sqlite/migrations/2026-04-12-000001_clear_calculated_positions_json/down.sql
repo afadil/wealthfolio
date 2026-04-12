@@ -1,0 +1,2 @@
+-- Cannot restore cleared JSON — a full recalc would regenerate it if needed.
+-- This is a no-op since the data was redundant with the lots table.
