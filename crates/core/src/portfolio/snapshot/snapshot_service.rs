@@ -397,10 +397,31 @@ impl SnapshotService {
         // Write lot rows alongside the JSON snapshots so both representations can
         // be compared during validation. Skips the virtual TOTAL account because it
         // has no activities of its own and its positions are derived at query time.
+        //
+        // For TRANSACTIONS-mode accounts, only sync lots during a Full recalc.
+        // IncrementalFromLast and SinceDate modes load starting state from
+        // snapshot positions JSON, which may contain stale lot quantities
+        // (e.g. pre-split values from snapshots written before split adjustment
+        // was implemented). The lots table is the source of truth for
+        // TRANSACTIONS-mode accounts and should only be rewritten by a Full
+        // recalc that replays all activities with proper split adjustment.
         if let Some(lot_repo) = &self.lot_repository {
+            let is_full_recalc = matches!(mode, SnapshotRecalcMode::Full);
             for (acc_id, snapshot) in &final_holdings_states {
                 if acc_id == PORTFOLIO_TOTAL_ACCOUNT_ID {
                     continue;
+                }
+                // Skip lots sync for TRANSACTIONS accounts on non-Full recalcs
+                if !is_full_recalc {
+                    if let Some(account) = accounts_to_process.get(acc_id) {
+                        if matches!(
+                            account.tracking_mode,
+                            crate::accounts::TrackingMode::Transactions
+                                | crate::accounts::TrackingMode::NotSet
+                        ) {
+                            continue;
+                        }
+                    }
                 }
                 let open_lots = extract_lot_records(snapshot);
                 let _ = check_lot_quantity_consistency(snapshot, &open_lots);
