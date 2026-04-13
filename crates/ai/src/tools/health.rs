@@ -87,7 +87,7 @@ impl<E: AiEnvironment + 'static> Tool for GetHealthStatusTool<E> {
 
         let status = health_service.get_cached_status().await.ok_or_else(|| {
             AiError::ToolExecutionFailed(
-                "Health status not available yet. Please wait a moment and try again.".to_string(),
+                "Health status not available yet. Please open the Health Center to run a check first.".to_string(),
             )
         })?;
 
@@ -119,15 +119,52 @@ impl<E: AiEnvironment + 'static> Tool for GetHealthStatusTool<E> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::env::test_env::MockEnvironment;
+    use crate::env::test_env::{MockEnvironment, MockHealthService};
+    use wealthfolio_core::health::{HealthCategory, HealthIssue, HealthStatus, Severity};
 
     #[tokio::test]
-    async fn test_get_health_status_tool() {
+    async fn test_get_health_status_no_cache() {
         let env = Arc::new(MockEnvironment::new());
         let tool = GetHealthStatusTool::new(env);
 
         let result = tool.call(GetHealthStatusArgs {}).await;
-        // Mock returns None for cached status, so expect an error
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_get_health_status_with_issues() {
+        let issue = HealthIssue::builder()
+            .id("price_stale:AAPL")
+            .severity(Severity::Warning)
+            .category(HealthCategory::PriceStaleness)
+            .title("Outdated prices")
+            .message("AAPL has stale price data.")
+            .affected_count(1)
+            .affected_mv_pct(0.05)
+            .details("Last updated 10 days ago.")
+            .data_hash("abc123")
+            .build();
+
+        let status = HealthStatus::from_issues(vec![issue]);
+        let health_svc = MockHealthService {
+            cached_status: Some(status),
+        };
+
+        let mut env = MockEnvironment::new();
+        env.health_service = Arc::new(health_svc);
+
+        let tool = GetHealthStatusTool::new(Arc::new(env));
+        let result = tool.call(GetHealthStatusArgs {}).await.unwrap();
+
+        assert_eq!(result.total_count, 1);
+        assert_eq!(result.overall_severity, "WARNING");
+        let dto = &result.issues[0];
+        assert_eq!(dto.id, "price_stale:AAPL");
+        assert_eq!(dto.severity, "WARNING");
+        assert_eq!(dto.category, "Price Updates");
+        assert_eq!(dto.title, "Outdated prices");
+        assert_eq!(dto.affected_count, 1);
+        assert_eq!(dto.affected_mv_pct, Some(0.05));
+        assert_eq!(dto.details.as_deref(), Some("Last updated 10 days ago."));
     }
 }

@@ -92,10 +92,16 @@ pub mod test_env {
             ImportAssetPreviewItem, ImportMappingData, ImportTemplateData, ImportTemplateScope,
             NewActivity, SaveBrokerSyncProfileRulesRequest, Sort,
         },
-        assets::{Asset, ProviderProfile},
+        assets::{Asset, AssetServiceTrait, ProviderProfile},
         errors::DatabaseError,
         goals::{Goal, GoalServiceTrait, GoalsAllocation, NewGoal},
-        health::{FixAction, HealthConfig, HealthServiceTrait, HealthStatus},
+        health::{
+            checks::{
+                AssetHoldingInfo, ConsistencyIssueInfo, FxPairInfo, LegacyMigrationInfo,
+                QuoteSyncErrorInfo, UnclassifiedAssetInfo, UnconfiguredAccountInfo,
+            },
+            FixAction, HealthConfig, HealthServiceTrait, HealthStatus,
+        },
         holdings::{Holding, HoldingsServiceTrait},
         portfolio::allocation::{AllocationHoldings, AllocationServiceTrait, PortfolioAllocations},
         portfolio::income::{IncomeServiceTrait, IncomeSummary},
@@ -107,9 +113,8 @@ pub mod test_env {
         },
         secrets::SecretStore,
         settings::{Settings, SettingsServiceTrait, SettingsUpdate},
-        valuation::{
-            DailyAccountValuation, NegativeBalanceInfo, ValuationRecalcMode, ValuationServiceTrait,
-        },
+        taxonomies::TaxonomyServiceTrait,
+        valuation::{DailyAccountValuation, ValuationRecalcMode, ValuationServiceTrait},
         Error as CoreError, Result as CoreResult,
     };
 
@@ -1156,6 +1161,7 @@ pub mod test_env {
         pub allocation_service: Arc<dyn AllocationServiceTrait>,
         pub performance_service: Arc<dyn PerformanceServiceTrait>,
         pub income_service: Arc<dyn IncomeServiceTrait>,
+        pub health_service: Arc<dyn HealthServiceTrait>,
     }
 
     impl Default for MockEnvironment {
@@ -1180,6 +1186,7 @@ pub mod test_env {
                 allocation_service: Arc::new(MockAllocationService),
                 performance_service: Arc::new(MockPerformanceService),
                 income_service: Arc::new(MockIncomeService),
+                health_service: Arc::new(MockHealthService::default()),
             }
         }
 
@@ -1244,11 +1251,21 @@ pub mod test_env {
         }
 
         fn health_service(&self) -> Arc<dyn HealthServiceTrait> {
-            Arc::new(MockHealthService)
+            self.health_service.clone()
         }
     }
 
-    pub struct MockHealthService;
+    pub struct MockHealthService {
+        pub cached_status: Option<HealthStatus>,
+    }
+
+    impl Default for MockHealthService {
+        fn default() -> Self {
+            Self {
+                cached_status: None,
+            }
+        }
+    }
 
     #[async_trait::async_trait]
     impl HealthServiceTrait for MockHealthService {
@@ -1260,21 +1277,37 @@ pub mod test_env {
             &self,
             _base_currency: &str,
             _total_portfolio_value: f64,
-            _holdings: &[wealthfolio_core::portfolio::holdings::Holding],
+            _holdings: &[AssetHoldingInfo],
             _latest_quote_times: &std::collections::HashMap<String, chrono::DateTime<chrono::Utc>>,
-            _quote_sync_errors: &[wealthfolio_core::health::QuoteSyncError],
-            _fx_pairs: &[wealthfolio_core::health::FxPairInfo],
-            _unclassified_assets: &[wealthfolio_core::health::UnclassifiedAssetInfo],
-            _consistency_issues: &[wealthfolio_core::health::DataConsistencyIssue],
-            _legacy_migration_info: Option<&wealthfolio_core::health::LegacyMigrationInfo>,
-            _unconfigured_accounts: &[wealthfolio_core::accounts::Account],
+            _quote_sync_errors: &[QuoteSyncErrorInfo],
+            _fx_pairs: &[FxPairInfo],
+            _unclassified_assets: &[UnclassifiedAssetInfo],
+            _consistency_issues: &[ConsistencyIssueInfo],
+            _legacy_migration_info: &Option<LegacyMigrationInfo>,
+            _unconfigured_accounts: &[UnconfiguredAccountInfo],
             _configured_timezone: Option<&str>,
+            _client_timezone: Option<&str>,
+        ) -> CoreResult<HealthStatus> {
+            Ok(HealthStatus::healthy())
+        }
+
+        async fn run_full_checks(
+            &self,
+            _base_currency: &str,
+            _account_service: Arc<dyn wealthfolio_core::accounts::AccountServiceTrait>,
+            _holdings_service: Arc<dyn HoldingsServiceTrait>,
+            _quote_service: Arc<dyn QuoteServiceTrait>,
+            _asset_service: Arc<dyn AssetServiceTrait>,
+            _taxonomy_service: Arc<dyn TaxonomyServiceTrait>,
+            _valuation_service: Arc<dyn ValuationServiceTrait>,
+            _configured_timezone: Option<&str>,
+            _client_timezone: Option<&str>,
         ) -> CoreResult<HealthStatus> {
             Ok(HealthStatus::healthy())
         }
 
         async fn get_cached_status(&self) -> Option<HealthStatus> {
-            None
+            self.cached_status.clone()
         }
 
         async fn dismiss_issue(&self, _issue_id: &str, _data_hash: &str) -> CoreResult<()> {
