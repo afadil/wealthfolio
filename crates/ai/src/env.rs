@@ -114,7 +114,9 @@ pub mod test_env {
         secrets::SecretStore,
         settings::{Settings, SettingsServiceTrait, SettingsUpdate},
         taxonomies::TaxonomyServiceTrait,
-        valuation::{DailyAccountValuation, ValuationRecalcMode, ValuationServiceTrait},
+        valuation::{
+            DailyAccountValuation, NegativeBalanceInfo, ValuationRecalcMode, ValuationServiceTrait,
+        },
         Error as CoreError, Result as CoreResult,
     };
 
