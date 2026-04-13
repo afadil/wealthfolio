@@ -1257,16 +1257,9 @@ pub mod test_env {
         }
     }
 
+    #[derive(Default)]
     pub struct MockHealthService {
         pub cached_status: Option<HealthStatus>,
-    }
-
-    impl Default for MockHealthService {
-        fn default() -> Self {
-            Self {
-                cached_status: None,
-            }
-        }
     }
 
     #[async_trait::async_trait]
