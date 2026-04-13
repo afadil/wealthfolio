@@ -8,6 +8,8 @@ const ASSET_SYMBOL = "SYMVAL_TEST";
 test.describe("Symbol Mapping Validation", () => {
   let page: Page;
 
+  test.use({ timeout: 120000 });
+
   test.beforeAll(async ({ browser }) => {
     page = await browser.newPage();
   });
@@ -23,13 +25,14 @@ test.describe("Symbol Mapping Validation", () => {
       waitUntil: "domcontentloaded",
     });
     await expect(page.getByRole("heading", { name: "Securities" })).toBeVisible({ timeout: 10000 });
-    await page.waitForTimeout(500);
 
     // Reset portfolio filter so all assets are visible
     const resetBtn = page.getByRole("button", { name: "Reset" });
     if (await resetBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await resetBtn.click();
-      await page.waitForTimeout(500);
+      await expect(resetBtn)
+        .not.toBeVisible({ timeout: 3000 })
+        .catch(() => {});
     }
 
     // Skip creation if asset already exists
@@ -45,13 +48,14 @@ test.describe("Symbol Mapping Validation", () => {
     await expect(page.getByRole("dialog")).not.toBeVisible({
       timeout: 10000,
     });
-    await page.waitForTimeout(1000);
 
     // Reset filter again after creation
     const resetBtn2 = page.getByRole("button", { name: "Reset" });
     if (await resetBtn2.isVisible({ timeout: 2000 }).catch(() => false)) {
       await resetBtn2.click();
-      await page.waitForTimeout(500);
+      await expect(resetBtn2)
+        .not.toBeVisible({ timeout: 3000 })
+        .catch(() => {});
     }
 
     await expect(page.getByRole("row").filter({ hasText: ASSET_SYMBOL }).first()).toBeVisible({
@@ -64,13 +68,14 @@ test.describe("Symbol Mapping Validation", () => {
       waitUntil: "domcontentloaded",
     });
     await expect(page.getByRole("heading", { name: "Securities" })).toBeVisible({ timeout: 10000 });
-    await page.waitForTimeout(500);
 
     // Reset filter
     const resetBtn = page.getByRole("button", { name: "Reset" });
     if (await resetBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await resetBtn.click();
-      await page.waitForTimeout(500);
+      await expect(resetBtn)
+        .not.toBeVisible({ timeout: 3000 })
+        .catch(() => {});
     }
 
     const assetRow = page.getByRole("row").filter({ hasText: ASSET_SYMBOL }).first();
@@ -78,7 +83,7 @@ test.describe("Symbol Mapping Validation", () => {
 
     const actionsBtn = assetRow.getByRole("button", { name: "Open actions" });
     await actionsBtn.click();
-    await page.waitForTimeout(300);
+    await expect(page.getByRole("menuitem", { name: "Edit" })).toBeVisible({ timeout: 3000 });
     await page.getByRole("menuitem", { name: "Edit" }).click();
 
     const editSheet = page.getByRole("dialog").first();
@@ -86,21 +91,25 @@ test.describe("Symbol Mapping Validation", () => {
 
     // Click the Market Data tab
     await page.getByRole("tab", { name: "Market Data" }).click();
-    await page.waitForTimeout(300);
+    await expect(page.getByRole("switch"))
+      .toBeVisible({ timeout: 3000 })
+      .catch(() => {});
 
     // Symbol Mapping section is only visible when pricing is Automatic.
     // If the asset is in Manual mode, enable Automatic pricing first.
-    const pricingSwitch = page.getByRole("switch").first();
+    const pricingSwitch = editSheet.getByRole("switch").first();
     if (await pricingSwitch.isVisible({ timeout: 2000 }).catch(() => false)) {
       const isChecked = await pricingSwitch.getAttribute("aria-checked");
       if (isChecked === "false") {
         await pricingSwitch.click();
-        await page.waitForTimeout(500);
         // Confirm if a confirmation dialog appears
-        const confirmBtn = page.getByRole("button", { name: /confirm|enable|yes/i }).first();
+        // Using broad regex because the exact button label varies by app state
+        const confirmBtn = page
+          .getByRole("button")
+          .filter({ hasText: /confirm|enable|yes/i })
+          .first();
         if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
           await confirmBtn.click();
-          await page.waitForTimeout(300);
         }
       }
     }
@@ -115,26 +124,28 @@ test.describe("Symbol Mapping Validation", () => {
       has: page.getByRole("columnheader", { name: "Provider" }),
     });
 
+    // Capture row count before clicking Add to get a stable nth() index
+    const rowIndex = await mappingTable.locator("tbody tr").count();
+
     // Click Add to create a new mapping row
     await page.getByRole("button", { name: "Add" }).click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(300); // wait for row to appear — no observable state to poll here
 
     // The row's provider combobox defaults to YAHOO; change if needed
     if (provider !== "Yahoo Finance") {
-      const lastRow = mappingTable.locator("tbody tr").last();
-      const providerTrigger = lastRow.getByRole("combobox").first();
+      const newRow = mappingTable.locator("tbody tr").nth(rowIndex);
+      const providerTrigger = newRow.getByRole("combobox").first();
       await providerTrigger.click();
-      await page.waitForTimeout(300);
+      await expect(page.getByRole("listbox")).toBeVisible({ timeout: 3000 });
       await page.getByRole("option", { name: provider }).click();
-      await page.waitForTimeout(300);
+      await expect(page.getByRole("listbox")).not.toBeVisible({ timeout: 3000 });
     }
 
-    const lastRow = mappingTable.locator("tbody tr").last();
-    const symbolInput = lastRow.getByRole("textbox");
+    const newRow = mappingTable.locator("tbody tr").nth(rowIndex);
+    const symbolInput = newRow.getByRole("textbox");
     await symbolInput.fill(symbol);
-    await page.waitForTimeout(1000);
 
-    return mappingTable.locator("tbody tr").last();
+    return mappingTable.locator("tbody tr").nth(rowIndex);
   }
 
   async function waitForValidation(
@@ -153,7 +164,7 @@ test.describe("Symbol Mapping Validation", () => {
     await expect(page.getByText("Asset profile updated successfully")).toBeVisible({
       timeout: 10000,
     });
-    await expect(page.getByRole("dialog").first()).not.toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole("dialog").first()).not.toBeVisible({ timeout: 10000 });
   }
 
   async function removeMapping(symbol: string) {
@@ -173,7 +184,6 @@ test.describe("Symbol Mapping Validation", () => {
       const value = await row.getByRole("textbox").inputValue();
       if (value === symbol) {
         await row.locator("button").last().click();
-        await page.waitForTimeout(300);
         found = true;
         break;
       }
@@ -195,7 +205,6 @@ test.describe("Symbol Mapping Validation", () => {
   // ── Yahoo Finance ─────────────────────────────────────────────────────────
 
   test("1. Yahoo Finance — valid symbol shows green check and price after save", async () => {
-    test.setTimeout(120000);
     await openAssetMarketDataTab();
     const row = await addMappingRow("Yahoo Finance", "AAPL");
     await waitForValidation(row, "valid", 30000);
@@ -203,13 +212,12 @@ test.describe("Symbol Mapping Validation", () => {
 
     // Re-open and verify the latest price card is shown
     await openAssetMarketDataTab();
-    await expect(page.getByText("Latest price")).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText("Latest price", { exact: true })).toBeVisible({ timeout: 30000 });
 
     await removeMapping("AAPL");
   });
 
   test("2. Yahoo Finance — invalid symbol shows red error and mapping is persisted after save", async () => {
-    test.setTimeout(120000);
     await openAssetMarketDataTab();
     const row = await addMappingRow("Yahoo Finance", "INVALID_TICKER_XYZ_E2E");
     await waitForValidation(row, "invalid", 30000);
@@ -222,7 +230,6 @@ test.describe("Symbol Mapping Validation", () => {
   // ── Börse Frankfurt ───────────────────────────────────────────────────────
 
   test("3. Börse Frankfurt — valid ISIN shows green check and price after save", async () => {
-    test.setTimeout(120000);
     await openAssetMarketDataTab();
     const row = await addMappingRow("Börse Frankfurt", "DE0007164600");
     await waitForValidation(row, "valid", 30000);
@@ -230,19 +237,18 @@ test.describe("Symbol Mapping Validation", () => {
 
     // Re-open and verify the latest price card is shown
     await openAssetMarketDataTab();
-    await expect(page.getByText("Latest price")).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText("Latest price", { exact: true })).toBeVisible({ timeout: 30000 });
 
     await removeMapping("DE0007164600");
   });
 
   test("4. Börse Frankfurt — invalid symbol shows red error and mapping is persisted after save", async () => {
-    test.setTimeout(120000);
     await openAssetMarketDataTab();
-    const row = await addMappingRow("Börse Frankfurt", "INVALID_TICKER_XYZ_E2E");
+    const row = await addMappingRow("Börse Frankfurt", "INVALID_BF_XYZ_E2E");
     await waitForValidation(row, "invalid", 30000);
     await saveChanges();
 
     // Re-open and verify the invalid mapping was persisted (removeMapping throws if not found)
-    await removeMapping("INVALID_TICKER_XYZ_E2E");
+    await removeMapping("INVALID_BF_XYZ_E2E");
   });
 });
