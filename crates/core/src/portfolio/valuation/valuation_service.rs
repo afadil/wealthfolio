@@ -3,7 +3,7 @@ use crate::fx::currency::normalize_currency_code;
 use crate::fx::FxServiceTrait;
 use crate::portfolio::snapshot::SnapshotServiceTrait;
 use crate::portfolio::valuation::valuation_calculator::calculate_valuation;
-use crate::portfolio::valuation::valuation_model::DailyAccountValuation;
+use crate::portfolio::valuation::valuation_model::{DailyAccountValuation, NegativeBalanceInfo};
 use crate::portfolio::valuation::ValuationRepositoryTrait;
 use crate::quotes::QuoteServiceTrait;
 use crate::utils::time_utils;
@@ -81,9 +81,11 @@ pub trait ValuationServiceTrait: Send + Sync {
         date: NaiveDate,
     ) -> CoreResult<Vec<DailyAccountValuation>>;
 
-    /// Returns account IDs that have at least one negative total_value in their history.
-    fn get_accounts_with_negative_balance(&self, account_ids: &[String])
-        -> CoreResult<Vec<String>>;
+    /// Returns info about accounts that have at least one negative total_value in their history.
+    fn get_accounts_with_negative_balance(
+        &self,
+        account_ids: &[String],
+    ) -> CoreResult<Vec<NegativeBalanceInfo>>;
 }
 
 #[derive(Clone)]
@@ -419,7 +421,7 @@ impl ValuationServiceTrait for ValuationService {
     fn get_accounts_with_negative_balance(
         &self,
         account_ids: &[String],
-    ) -> CoreResult<Vec<String>> {
+    ) -> CoreResult<Vec<NegativeBalanceInfo>> {
         self.valuation_repository
             .get_accounts_with_negative_balance(account_ids)
     }

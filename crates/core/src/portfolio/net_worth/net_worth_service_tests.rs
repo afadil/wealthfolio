@@ -11,7 +11,9 @@ use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
 use crate::portfolio::snapshot::{
     AccountStateSnapshot, Position, SnapshotRepositoryTrait, SnapshotSource,
 };
-use crate::portfolio::valuation::{DailyAccountValuation, ValuationRepositoryTrait};
+use crate::portfolio::valuation::{
+    DailyAccountValuation, NegativeBalanceInfo, ValuationRepositoryTrait,
+};
 use crate::quotes::{
     LatestQuotePair, LatestQuoteSnapshot, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait,
     QuoteSyncState, SymbolSearchResult, SymbolSyncPlan, SyncResult,
@@ -792,7 +794,10 @@ impl ValuationRepositoryTrait for MockValuationRepository {
         Ok(filtered)
     }
 
-    fn get_accounts_with_negative_balance(&self, _account_ids: &[String]) -> Result<Vec<String>> {
+    fn get_accounts_with_negative_balance(
+        &self,
+        _account_ids: &[String],
+    ) -> Result<Vec<NegativeBalanceInfo>> {
         Ok(Vec::new())
     }
 }

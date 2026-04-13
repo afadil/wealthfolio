@@ -102,7 +102,9 @@ pub mod test_env {
         },
         secrets::SecretStore,
         settings::{Settings, SettingsServiceTrait, SettingsUpdate},
-        valuation::{DailyAccountValuation, ValuationRecalcMode, ValuationServiceTrait},
+        valuation::{
+            DailyAccountValuation, NegativeBalanceInfo, ValuationRecalcMode, ValuationServiceTrait,
+        },
         Error as CoreError, Result as CoreResult,
     };
 
@@ -523,7 +525,7 @@ pub mod test_env {
         fn get_accounts_with_negative_balance(
             &self,
             _account_ids: &[String],
-        ) -> CoreResult<Vec<String>> {
+        ) -> CoreResult<Vec<NegativeBalanceInfo>> {
             Ok(Vec::new())
         }
 
