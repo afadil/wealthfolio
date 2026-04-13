@@ -40,6 +40,11 @@ This starts two processes in parallel:
 Wait until both are ready (you'll see Vite's "ready in Xms" and the Rust server
 binding messages in the output).
 
+> **If the web app is already running:** Stop it first (Ctrl+C), then re-run
+> `prep-e2e.mjs` and restart. The running instance is using a stale database —
+> tests assume an empty DB and will silently skip asset creation if data already
+> exists, causing failures for unrelated reasons.
+
 ### Step 3 — Run the tests
 
 In a separate terminal:
