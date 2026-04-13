@@ -94,6 +94,16 @@ npx playwright test && npx playwright show-report
 | `09-bulk-holdings.spec.ts`             | Bulk holdings CSV import                                             |
 | `10-symbol-mapping-validation.spec.ts` | Symbol mapping real-time validation (Yahoo Finance, Börse Frankfurt) |
 
+> **Dependency:** `10-symbol-mapping-validation.spec.ts` requires
+> `01-happy-path.spec.ts` to have run first on the same database. Test 0 (setup)
+> calls `loginIfNeeded`, which expects either a login page or a dashboard —
+> neither exists on a fresh DB until onboarding is complete. Always run spec 01
+> before spec 10 on a fresh database:
+>
+> ```bash
+> npx playwright test e2e/01-happy-path.spec.ts e2e/10-symbol-mapping-validation.spec.ts
+> ```
+
 ---
 
 ## Debugging a failing test

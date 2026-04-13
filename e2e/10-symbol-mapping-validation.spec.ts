@@ -148,18 +148,40 @@ test.describe("Symbol Mapping Validation", () => {
     });
   }
 
-  async function closeSheet() {
-    // Try close button first (Escape may close a Radix dropdown instead of the sheet)
-    const closeBtn = page
-      .getByRole("button", { name: /close/i })
-      .or(page.locator('[aria-label="Close"]'))
-      .first();
-    if (await closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await closeBtn.click();
-    } else {
-      await page.keyboard.press("Escape");
-    }
+  async function saveChanges() {
+    await page.getByRole("button", { name: "Save changes" }).click();
+    await expect(page.getByText("Asset profile updated successfully")).toBeVisible({
+      timeout: 10000,
+    });
     await expect(page.getByRole("dialog").first()).not.toBeVisible({ timeout: 5000 });
+  }
+
+  async function removeMapping(symbol: string) {
+    // Re-open the sheet and go to Market Data tab
+    await openAssetMarketDataTab();
+
+    const mappingTable = page.locator("table").filter({
+      has: page.getByRole("columnheader", { name: "Provider" }),
+    });
+
+    // hasText doesn't match React controlled input values — iterate rows and compare inputValue()
+    const rows = mappingTable.locator("tbody tr");
+    const count = await rows.count();
+    let found = false;
+    for (let i = 0; i < count; i++) {
+      const row = rows.nth(i);
+      const value = await row.getByRole("textbox").inputValue();
+      if (value === symbol) {
+        await row.locator("button").last().click();
+        await page.waitForTimeout(300);
+        found = true;
+        break;
+      }
+    }
+    if (!found) throw new Error(`Mapping row for symbol "${symbol}" not found`);
+
+    // Save the removal
+    await saveChanges();
   }
 
   // ── setup ─────────────────────────────────────────────────────────────────
@@ -172,37 +194,55 @@ test.describe("Symbol Mapping Validation", () => {
 
   // ── Yahoo Finance ─────────────────────────────────────────────────────────
 
-  test("1. Yahoo Finance — valid symbol shows green check", async () => {
-    test.setTimeout(60000);
+  test("1. Yahoo Finance — valid symbol shows green check and price after save", async () => {
+    test.setTimeout(120000);
     await openAssetMarketDataTab();
     const row = await addMappingRow("Yahoo Finance", "AAPL");
     await waitForValidation(row, "valid", 30000);
-    await closeSheet();
+    await saveChanges();
+
+    // Re-open and verify the latest price card is shown
+    await openAssetMarketDataTab();
+    await expect(page.getByText("Latest price")).toBeVisible({ timeout: 30000 });
+
+    await removeMapping("AAPL");
   });
 
-  test("2. Yahoo Finance — invalid symbol shows red error", async () => {
-    test.setTimeout(60000);
+  test("2. Yahoo Finance — invalid symbol shows red error and mapping is persisted after save", async () => {
+    test.setTimeout(120000);
     await openAssetMarketDataTab();
     const row = await addMappingRow("Yahoo Finance", "INVALID_TICKER_XYZ_E2E");
     await waitForValidation(row, "invalid", 30000);
-    await closeSheet();
+    await saveChanges();
+
+    // Re-open and verify the invalid mapping was persisted (removeMapping throws if not found)
+    await removeMapping("INVALID_TICKER_XYZ_E2E");
   });
 
   // ── Börse Frankfurt ───────────────────────────────────────────────────────
 
-  test("3. Börse Frankfurt — valid ISIN shows green check", async () => {
-    test.setTimeout(60000);
+  test("3. Börse Frankfurt — valid ISIN shows green check and price after save", async () => {
+    test.setTimeout(120000);
     await openAssetMarketDataTab();
     const row = await addMappingRow("Börse Frankfurt", "DE0007164600");
     await waitForValidation(row, "valid", 30000);
-    await closeSheet();
+    await saveChanges();
+
+    // Re-open and verify the latest price card is shown
+    await openAssetMarketDataTab();
+    await expect(page.getByText("Latest price")).toBeVisible({ timeout: 30000 });
+
+    await removeMapping("DE0007164600");
   });
 
-  test("4. Börse Frankfurt — invalid symbol shows red error", async () => {
-    test.setTimeout(60000);
+  test("4. Börse Frankfurt — invalid symbol shows red error and mapping is persisted after save", async () => {
+    test.setTimeout(120000);
     await openAssetMarketDataTab();
     const row = await addMappingRow("Börse Frankfurt", "INVALID_TICKER_XYZ_E2E");
     await waitForValidation(row, "invalid", 30000);
-    await closeSheet();
+    await saveChanges();
+
+    // Re-open and verify the invalid mapping was persisted (removeMapping throws if not found)
+    await removeMapping("INVALID_TICKER_XYZ_E2E");
   });
 });
