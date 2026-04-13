@@ -87,6 +87,26 @@ test.describe("Symbol Mapping Validation", () => {
     // Click the Market Data tab
     await page.getByRole("tab", { name: "Market Data" }).click();
     await page.waitForTimeout(300);
+
+    // Symbol Mapping section is only visible when pricing is Automatic.
+    // If the asset is in Manual mode, enable Automatic pricing first.
+    const pricingSwitch = page.getByRole("switch").first();
+    if (await pricingSwitch.isVisible({ timeout: 2000 }).catch(() => false)) {
+      const isChecked = await pricingSwitch.getAttribute("aria-checked");
+      if (isChecked === "false") {
+        await pricingSwitch.click();
+        await page.waitForTimeout(500);
+        // Confirm if a confirmation dialog appears
+        const confirmBtn = page.getByRole("button", { name: /confirm|enable|yes/i }).first();
+        if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+          await confirmBtn.click();
+          await page.waitForTimeout(300);
+        }
+      }
+    }
+
+    // Wait for the Symbol Mapping "Add" button to be visible
+    await expect(page.getByRole("button", { name: "Add" })).toBeVisible({ timeout: 5000 });
   }
 
   async function addMappingRow(provider: string, symbol: string) {
