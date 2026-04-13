@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use chrono::NaiveDate;
 use std::collections::HashMap;
 
-use super::AccountStateSnapshot;
+use super::{AccountStateSnapshot, Position};
 use crate::errors::Result;
 
 /// Repository trait for managing account state snapshots.
@@ -118,4 +118,16 @@ pub trait SnapshotRepositoryTrait: Send + Sync {
         &self,
         account_id: &str,
     ) -> Result<Option<AccountStateSnapshot>>;
+
+    /// Load positions from the `snapshot_positions` table for a given snapshot.
+    /// Returns a HashMap keyed by asset_id, matching the in-memory
+    /// `AccountStateSnapshot.positions` shape.
+    fn get_snapshot_positions(&self, snapshot_id: &str) -> Result<HashMap<String, Position>>;
+
+    /// Batch-load positions for multiple snapshot IDs at once.
+    /// Returns a map of snapshot_id -> (asset_id -> Position).
+    fn get_snapshot_positions_batch(
+        &self,
+        snapshot_ids: &[String],
+    ) -> Result<HashMap<String, HashMap<String, Position>>>;
 }

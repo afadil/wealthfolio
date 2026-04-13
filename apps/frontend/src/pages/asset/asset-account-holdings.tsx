@@ -90,7 +90,11 @@ export function useHasManualSnapshots(assetId: string): boolean {
 }
 
 /** Holdings table - per-account breakdown for an asset */
-export function AssetAccountHoldings({ assetId, baseCurrency, instrumentType }: AssetAccountHoldingsProps) {
+export function AssetAccountHoldings({
+  assetId,
+  baseCurrency,
+  instrumentType,
+}: AssetAccountHoldingsProps) {
   const { isBalanceHidden } = useBalancePrivacy();
   const { accounts } = useAccounts();
   const isMobile = useIsMobileViewport();
@@ -125,7 +129,8 @@ export function AssetAccountHoldings({ assetId, baseCurrency, instrumentType }: 
                   )}
                 </div>
                 <p className="text-muted-foreground text-xs">
-                  <QuantityDisplay value={h.quantity} isHidden={isBalanceHidden} /> {quantityLabel(instrumentType)}
+                  <QuantityDisplay value={h.quantity} isHidden={isBalanceHidden} />{" "}
+                  {quantityLabel(instrumentType)}
                 </p>
               </div>
               <div className="shrink-0 text-right">
@@ -477,7 +482,9 @@ export function AssetSnapshotHistory({
               <TableRow>
                 <TableHead>Date</TableHead>
                 <TableHead>Account</TableHead>
-                <TableHead className="text-right capitalize">{quantityLabel(instrumentType)}</TableHead>
+                <TableHead className="text-right capitalize">
+                  {quantityLabel(instrumentType)}
+                </TableHead>
                 <TableHead className="text-right">Avg Cost</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead className="w-[80px]" />

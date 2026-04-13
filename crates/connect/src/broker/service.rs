@@ -986,10 +986,16 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                     .collect()
             } else {
                 // Fallback: read from snapshot (legacy path when lot_repository not injected)
-                self.snapshot_repository
-                    .get_latest_snapshot_before_date(&account_id, tomorrow)?
-                    .map(|s| s.positions)
-                    .unwrap_or_default()
+                let snap = self
+                    .snapshot_repository
+                    .get_latest_snapshot_before_date(&account_id, tomorrow)?;
+                match snap {
+                    Some(s) if s.positions.is_empty() && s.source.is_non_calculated() => {
+                        self.snapshot_repository.get_snapshot_positions(&s.id)?
+                    }
+                    Some(s) => s.positions,
+                    None => HashMap::new(),
+                }
             };
 
         // 4. Build positions_map using resolved asset IDs
@@ -1278,13 +1284,21 @@ impl BrokerSyncService {
             .snapshot_repository
             .get_earliest_non_calculated_snapshot(account_id)?;
 
-        let earliest = match earliest {
+        let mut earliest = match earliest {
             Some(s) => s,
             None => {
                 debug!("No earliest snapshot found for account {}", account_id);
                 return Ok(());
             }
         };
+
+        // Enrich positions from snapshot_positions table (DB load no longer
+        // parses positions JSON).
+        if earliest.positions.is_empty() && earliest.source.is_non_calculated() {
+            earliest.positions = self
+                .snapshot_repository
+                .get_snapshot_positions(&earliest.id)?;
+        }
 
         // Calculate synthetic date: 3 months before earliest
         let synthetic_date = earliest

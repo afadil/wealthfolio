@@ -994,6 +994,35 @@ mod tests {
             }
             Ok(None)
         }
+
+        fn get_snapshot_positions(
+            &self,
+            snapshot_id: &str,
+        ) -> AppResult<HashMap<String, Position>> {
+            let store = self.snapshots.read().unwrap();
+            for snapshots in store.values() {
+                if let Some(snap) = snapshots.iter().find(|s| s.id == snapshot_id) {
+                    return Ok(snap.positions.clone());
+                }
+            }
+            Ok(HashMap::new())
+        }
+
+        fn get_snapshot_positions_batch(
+            &self,
+            snapshot_ids: &[String],
+        ) -> AppResult<HashMap<String, HashMap<String, Position>>> {
+            let store = self.snapshots.read().unwrap();
+            let mut result = HashMap::new();
+            for snapshots in store.values() {
+                for snap in snapshots {
+                    if snapshot_ids.contains(&snap.id) && !snap.positions.is_empty() {
+                        result.insert(snap.id.clone(), snap.positions.clone());
+                    }
+                }
+            }
+            Ok(result)
+        }
     }
 
     fn create_test_account(id: &str, currency: &str, name: &str) -> Account {
@@ -4571,6 +4600,35 @@ mod tests {
                     .cloned());
             }
             Ok(None)
+        }
+
+        fn get_snapshot_positions(
+            &self,
+            snapshot_id: &str,
+        ) -> AppResult<HashMap<String, Position>> {
+            let store = self.snapshots.read().unwrap();
+            for snapshots in store.values() {
+                if let Some(snap) = snapshots.iter().find(|s| s.id == snapshot_id) {
+                    return Ok(snap.positions.clone());
+                }
+            }
+            Ok(HashMap::new())
+        }
+
+        fn get_snapshot_positions_batch(
+            &self,
+            snapshot_ids: &[String],
+        ) -> AppResult<HashMap<String, HashMap<String, Position>>> {
+            let store = self.snapshots.read().unwrap();
+            let mut result = HashMap::new();
+            for snapshots in store.values() {
+                for snap in snapshots {
+                    if snapshot_ids.contains(&snap.id) && !snap.positions.is_empty() {
+                        result.insert(snap.id.clone(), snap.positions.clone());
+                    }
+                }
+            }
+            Ok(result)
         }
     }
 

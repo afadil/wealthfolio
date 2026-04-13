@@ -306,6 +306,28 @@ impl SnapshotRepositoryTrait for MockSnapshotRepository {
     ) -> Result<Option<AccountStateSnapshot>> {
         Ok(None)
     }
+
+    fn get_snapshot_positions(&self, snapshot_id: &str) -> Result<HashMap<String, Position>> {
+        Ok(self
+            .snapshots
+            .values()
+            .find(|s| s.id == snapshot_id)
+            .map(|s| s.positions.clone())
+            .unwrap_or_default())
+    }
+
+    fn get_snapshot_positions_batch(
+        &self,
+        snapshot_ids: &[String],
+    ) -> Result<HashMap<String, HashMap<String, Position>>> {
+        let mut result = HashMap::new();
+        for snap in self.snapshots.values() {
+            if snapshot_ids.contains(&snap.id) && !snap.positions.is_empty() {
+                result.insert(snap.id.clone(), snap.positions.clone());
+            }
+        }
+        Ok(result)
+    }
 }
 
 struct MockMarketDataRepository {

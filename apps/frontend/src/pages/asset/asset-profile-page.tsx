@@ -622,11 +622,19 @@ export const AssetProfilePage = () => {
             )}
 
             {overviewSubTab === "holdings" && (
-              <AssetAccountHoldings assetId={assetId} baseCurrency={baseCurrency} instrumentType={assetProfile?.instrumentType} />
+              <AssetAccountHoldings
+                assetId={assetId}
+                baseCurrency={baseCurrency}
+                instrumentType={assetProfile?.instrumentType}
+              />
             )}
 
             {overviewSubTab === "snapshots" && (
-              <AssetSnapshotHistory assetId={assetId} baseCurrency={baseCurrency} instrumentType={assetProfile?.instrumentType} />
+              <AssetSnapshotHistory
+                assetId={assetId}
+                baseCurrency={baseCurrency}
+                instrumentType={assetProfile?.instrumentType}
+              />
             )}
           </div>
         ),
@@ -1240,11 +1248,19 @@ export const AssetProfilePage = () => {
                 )}
 
                 {overviewSubTab === "holdings" && (
-                  <AssetAccountHoldings assetId={assetId} baseCurrency={baseCurrency} instrumentType={assetProfile?.instrumentType} />
+                  <AssetAccountHoldings
+                    assetId={assetId}
+                    baseCurrency={baseCurrency}
+                    instrumentType={assetProfile?.instrumentType}
+                  />
                 )}
 
                 {overviewSubTab === "snapshots" && (
-                  <AssetSnapshotHistory assetId={assetId} baseCurrency={baseCurrency} instrumentType={assetProfile?.instrumentType} />
+                  <AssetSnapshotHistory
+                    assetId={assetId}
+                    baseCurrency={baseCurrency}
+                    instrumentType={assetProfile?.instrumentType}
+                  />
                 )}
               </TabsContent>
             )}

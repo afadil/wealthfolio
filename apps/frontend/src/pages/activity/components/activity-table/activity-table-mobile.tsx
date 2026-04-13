@@ -110,7 +110,12 @@ export const ActivityTableMobile = ({
                               <>
                                 <span>•</span>
                                 <span>
-                                  {activity.quantity} {isOptionActivity ? "contracts" : isMetalActivity ? "units" : "shares"}
+                                  {activity.quantity}{" "}
+                                  {isOptionActivity
+                                    ? "contracts"
+                                    : isMetalActivity
+                                      ? "units"
+                                      : "shares"}
                                 </span>
                               </>
                             )}
