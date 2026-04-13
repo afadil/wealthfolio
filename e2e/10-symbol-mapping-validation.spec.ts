@@ -63,7 +63,7 @@ test.describe("Symbol Mapping Validation", () => {
     });
   }
 
-  async function openAssetMarketDataTab() {
+  async function openMarketDataTab() {
     await page.goto(`${BASE_URL}/settings/securities`, {
       waitUntil: "domcontentloaded",
     });
@@ -82,9 +82,24 @@ test.describe("Symbol Mapping Validation", () => {
     await expect(assetRow).toBeVisible({ timeout: 10000 });
 
     const actionsBtn = assetRow.getByRole("button", { name: "Open actions" });
-    await actionsBtn.click();
-    await expect(page.getByRole("menuitem", { name: "Edit" })).toBeVisible({ timeout: 3000 });
-    await page.getByRole("menuitem", { name: "Edit" }).click();
+
+    // Retry loop: Radix UI dropdown may close during animation before the click lands.
+    // The table can re-render (quote updates) causing the button to detach — we retry.
+    let editClicked = false;
+    for (let attempt = 0; attempt < 5 && !editClicked; attempt++) {
+      try {
+        await actionsBtn.click({ timeout: 5000 });
+        await page.waitForTimeout(300);
+        const editItem = page.getByRole("menuitem", { name: "Edit" });
+        await expect(editItem).toBeVisible({ timeout: 3000 });
+        await editItem.click({ force: true });
+        editClicked = true;
+      } catch {
+        // button detached or menu closed before click landed — retry
+        await page.waitForTimeout(200);
+      }
+    }
+    if (!editClicked) throw new Error("Could not click Edit menu item after 5 attempts");
 
     const editSheet = page.getByRole("dialog").first();
     await expect(editSheet).toBeVisible({ timeout: 5000 });
@@ -116,6 +131,26 @@ test.describe("Symbol Mapping Validation", () => {
 
     // Wait for the Symbol Mapping "Add" button to be visible
     await expect(page.getByRole("button", { name: "Add" })).toBeVisible({ timeout: 5000 });
+  }
+
+  async function openAssetMarketDataTab() {
+    await openMarketDataTab();
+    // Remove any leftover mapping rows from a previous partial run
+    await clearAllMappings();
+  }
+
+  async function clearAllMappings() {
+    const mappingTable = page.locator("table").filter({
+      has: page.getByRole("columnheader", { name: "Provider" }),
+    });
+    // Remove rows one at a time until none remain
+    while (true) {
+      const rows = mappingTable.locator("tbody tr");
+      if ((await rows.count()) === 0) break;
+      const deleteBtn = rows.first().locator("button").last();
+      await deleteBtn.click();
+      await page.waitForTimeout(100);
+    }
   }
 
   async function addMappingRow(provider: string, symbol: string) {
@@ -168,8 +203,8 @@ test.describe("Symbol Mapping Validation", () => {
   }
 
   async function removeMapping(symbol: string) {
-    // Re-open the sheet and go to Market Data tab
-    await openAssetMarketDataTab();
+    // Re-open the sheet and go to Market Data tab (without clearing mappings)
+    await openMarketDataTab();
 
     const mappingTable = page.locator("table").filter({
       has: page.getByRole("columnheader", { name: "Provider" }),
