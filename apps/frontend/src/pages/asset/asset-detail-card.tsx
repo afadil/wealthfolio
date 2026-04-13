@@ -127,7 +127,9 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
             <div>
               <QuantityDisplay value={numShares} isHidden={isBalanceHidden} />
             </div>
-            <div className="text-muted-foreground text-sm font-normal">{quantityLabel(assetData.instrumentType)}</div>
+            <div className="text-muted-foreground text-sm font-normal">
+              {quantityLabel(assetData.instrumentType)}
+            </div>
           </div>
           <div>
             <div className="text-xl font-extrabold">
