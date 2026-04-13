@@ -33,8 +33,8 @@ const SUPPORTED_METALS: &[&str] = &["XAU", "XAG", "XPT", "XPD", "XRH", "XRU", "X
 /// Provider ID constant
 const PROVIDER_ID: &str = "METAL_PRICE_API";
 
-/// One troy ounce in grams.
-const TROY_OZ_GRAMS: f64 = 31.1035;
+/// One troy ounce in grams (exact definition).
+const TROY_OZ_GRAMS: Decimal = Decimal::from_parts(311034768, 0, 0, false, 7);
 
 /// API response from Metal Price API (latest and historical endpoints)
 #[derive(Debug, Deserialize)]
@@ -110,17 +110,17 @@ impl MetalPriceApiProvider {
         let multiplier = match suffix {
             None => Decimal::ONE,
             Some(s) => {
-                let grams: f64 = match s {
-                    "1KG" => 1000.0,
-                    "500G" => 500.0,
-                    "250G" => 250.0,
-                    "100G" => 100.0,
-                    "50G" => 50.0,
-                    "10G" => 10.0,
+                let grams: Decimal = match s {
+                    "1KG" => Decimal::from(1000),
+                    "500G" => Decimal::from(500),
+                    "250G" => Decimal::from(250),
+                    "100G" => Decimal::from(100),
+                    "50G" => Decimal::from(50),
+                    "10G" => Decimal::from(10),
                     "1OZ" => TROY_OZ_GRAMS,
                     _ => return None,
                 };
-                Decimal::try_from(grams / TROY_OZ_GRAMS).ok()?
+                grams / TROY_OZ_GRAMS
             }
         };
         Some((base, multiplier))
@@ -387,7 +387,7 @@ mod tests {
     fn test_parse_metal_symbol_1kg() {
         let (base, mult) = MetalPriceApiProvider::parse_metal_symbol("XAU-1KG").unwrap();
         assert_eq!(base, "XAU");
-        // 1 kg = 1000g / 31.1035 g/oz ≈ 32.1507 oz
+        // 1 kg = 1000g / 31.1034768 g/oz ≈ 32.1507 oz
         assert!(mult > dec!(32.15) && mult < dec!(32.16));
     }
 
