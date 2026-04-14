@@ -342,7 +342,7 @@ function SymbolMappingRow({
     }, 800);
 
     return () => clearTimeout(timer);
-  }, [symbol, provider, fieldId, onValidationChange, initialSymbol]);
+  }, [symbol, provider, fieldId, onValidationChange]); // eslint-disable-line react-hooks/exhaustive-deps -- initialSymbol is intentionally captured at mount time only
 
   return (
     <tr className="border-b last:border-b-0">

@@ -166,9 +166,8 @@ test.describe("Symbol Mapping Validation", () => {
     const rowIndex = await mappingTable.locator("tbody tr").count();
 
     // Click Add to create a new mapping row
-    const rowCountBefore = await mappingTable.locator("tbody tr").count();
     await page.getByRole("button", { name: "Add" }).click();
-    await expect(mappingTable.locator("tbody tr")).toHaveCount(rowCountBefore + 1, {
+    await expect(mappingTable.locator("tbody tr")).toHaveCount(rowIndex + 1, {
       timeout: 3000,
     });
 
