@@ -51,8 +51,8 @@ import {
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useFieldArray, useForm, useWatch } from "react-hook-form";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type Path, useFieldArray, useForm, useWatch } from "react-hook-form";
 import * as z from "zod";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useAssetProfileMutations } from "./hooks/use-asset-profile-mutations";
@@ -279,6 +279,7 @@ type SymbolValidationStatus = "idle" | "loading" | "valid" | "invalid";
 interface SymbolMappingRowProps {
   index: number;
   fieldId: string;
+  initialSymbol?: string;
   control: ReturnType<typeof useForm<AssetFormValues>>["control"];
   mappingProviderOptions: ResponsiveSelectOption[];
   onRemove: () => void;
@@ -288,32 +289,50 @@ interface SymbolMappingRowProps {
 function SymbolMappingRow({
   index,
   fieldId,
+  initialSymbol,
   control,
   mappingProviderOptions,
   onRemove,
   onValidationChange,
 }: SymbolMappingRowProps) {
-  const [validationStatus, setValidationStatus] = useState<SymbolValidationStatus>("idle");
+  const [validationStatus, setValidationStatus] = useState<SymbolValidationStatus>(
+    initialSymbol?.trim() ? "valid" : "idle",
+  );
+  // Track whether we are on the first render to avoid re-validating pre-loaded values.
+  const isFirstRender = useRef(true);
 
-  const symbol = useWatch({ control, name: `providerConfig.${index}.symbol` as any });
-  const provider = useWatch({ control, name: `providerConfig.${index}.provider` as any });
+  const symbol = useWatch({
+    control,
+    name: `providerConfig.${index}.symbol` as Path<AssetFormValues>,
+  }) as string | undefined;
+  const provider = useWatch({
+    control,
+    name: `providerConfig.${index}.provider` as Path<AssetFormValues>,
+  }) as string | undefined;
 
   useEffect(() => {
+    // Skip validation on mount when the symbol is already known-good (loaded from DB).
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      if (symbol?.trim() === initialSymbol?.trim() && initialSymbol?.trim()) {
+        return;
+      }
+    }
+
     if (!symbol?.trim()) {
       setValidationStatus("idle");
       onValidationChange(fieldId, "idle");
       return;
     }
 
-    // Reset immediately while user is typing (before the debounce fires)
     setValidationStatus("idle");
 
     const timer = setTimeout(async () => {
       setValidationStatus("loading");
-      onValidationChange(fieldId, "idle"); // reset parent while loading
+      onValidationChange(fieldId, "idle");
       try {
         const result = await resolveSymbolQuote(symbol.trim(), undefined, undefined, provider);
-        const status: SymbolValidationStatus = result?.price ? "valid" : "invalid";
+        const status: SymbolValidationStatus = result?.price != null ? "valid" : "invalid";
         setValidationStatus(status);
         onValidationChange(fieldId, status);
       } catch {
@@ -323,19 +342,19 @@ function SymbolMappingRow({
     }, 800);
 
     return () => clearTimeout(timer);
-  }, [symbol, provider, fieldId, onValidationChange]);
+  }, [symbol, provider, fieldId, onValidationChange, initialSymbol]);
 
   return (
     <tr className="border-b last:border-b-0">
       <td className="px-4 py-2">
         <FormField
           control={control}
-          name={`providerConfig.${index}.provider` as any}
+          name={`providerConfig.${index}.provider` as Path<AssetFormValues>}
           render={({ field: providerField }) => (
             <FormItem className="space-y-0">
               <FormControl>
                 <ResponsiveSelect
-                  value={providerField.value}
+                  value={providerField.value as string | undefined}
                   onValueChange={providerField.onChange}
                   options={mappingProviderOptions}
                   placeholder="Select provider"
@@ -350,14 +369,17 @@ function SymbolMappingRow({
       <td className="px-4 py-2">
         <FormField
           control={control}
-          name={`providerConfig.${index}.symbol` as any}
+          name={`providerConfig.${index}.symbol` as Path<AssetFormValues>}
           render={({ field: symbolField }) => (
             <FormItem className="space-y-0">
               <FormControl>
                 <div className="relative flex items-center">
                   <Input
-                    placeholder={getSymbolPlaceholder(provider)}
-                    {...symbolField}
+                    placeholder={getSymbolPlaceholder(provider ?? "")}
+                    {...{
+                      ...symbolField,
+                      value: (symbolField.value as string | undefined) ?? "",
+                    }}
                     className="h-9 pr-8"
                   />
                   <span className="absolute right-2 flex items-center">
@@ -1035,6 +1057,7 @@ export function AssetEditSheet({
                                     key={field.id}
                                     index={index}
                                     fieldId={field.id}
+                                    initialSymbol={field.symbol}
                                     control={form.control}
                                     mappingProviderOptions={mappingProviderOptions}
                                     onRemove={() => {
