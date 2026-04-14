@@ -29,6 +29,7 @@ pub struct Instrument {
     pub notes: Option<String>,
     pub pricing_mode: String,
     pub preferred_provider: Option<String>,
+    pub exchange_mic: Option<String>,
 
     // Taxonomy-based classifications
     pub classifications: Option<AssetClassifications>,
