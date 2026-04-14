@@ -16,7 +16,30 @@ frontend and backend must be running against a fresh database.
 
 ## Running E2E Tests
 
-### Step 1 — Prepare a fresh database
+### Automated — full suite
+
+The easiest way to run the entire suite. Handles everything automatically:
+prepares a fresh database, starts the web app, waits for both servers, runs
+Playwright, and shuts everything down.
+
+```bash
+pnpm test:e2e
+```
+
+To open the Playwright UI instead:
+
+```bash
+pnpm test:e2e:ui
+```
+
+---
+
+### Manual — specific tests or debugging
+
+Use this when you want to run a subset of tests or iterate quickly without
+restarting the server on every run.
+
+#### Step 1 — Prepare a fresh database
 
 ```bash
 node scripts/prep-e2e.mjs
@@ -26,38 +49,45 @@ This creates a new timestamped SQLite database (e.g.
 `db/app-testing-20260411T120000Z.db`) and writes its path to `.env.web`. **Run
 this every time** before starting the server — it ensures test isolation.
 
-### Step 2 — Start the web app
+#### Step 2 — Start the web app
+
+**Option A — watch the terminal output directly:**
 
 ```bash
 pnpm run dev:web
 ```
 
-This starts two processes in parallel:
+Wait until you see Vite's "ready in Xms" and the Rust server binding messages,
+then move on to Step 3 in a separate terminal.
 
-- **Frontend** — Vite dev server on `http://localhost:1420`
-- **Backend** — Rust Axum server on `http://localhost:8088`
+**Option B — redirect output to a log file and use the wait script:**
 
-Wait until both are ready (you'll see Vite's "ready in Xms" and the Rust server
-binding messages in the output).
+```bash
+pnpm run dev:web > /tmp/wealthfolio-dev2.log 2>&1 &
+./scripts/wait-for-both-servers-to-be-ready.sh
+```
+
+`wait-for-both-servers-to-be-ready.sh` polls the log file until it detects both
+"ready in" (Vite) and the Axum server binding on port 8088, then prints the last
+few lines and exits. The output redirect is required — the script reads from a
+file, not from a live terminal.
 
 > **If the web app is already running:** Stop it first (Ctrl+C), then re-run
 > `prep-e2e.mjs` and restart. The running instance is using a stale database —
 > tests assume an empty DB and will silently skip asset creation if data already
 > exists, causing failures for unrelated reasons.
 
-### Step 3 — Run the tests
-
-In a separate terminal:
+#### Step 3 — Run specific tests
 
 ```bash
-# Run all E2E tests
-npx playwright test
-
 # Run a specific spec file
 npx playwright test e2e/10-symbol-mapping-validation.spec.ts
 
 # Run with browser visible (useful for debugging)
-npx playwright test --headed
+npx playwright test e2e/10-symbol-mapping-validation.spec.ts --headed
+
+# Run all tests
+npx playwright test
 
 # Run and open the HTML report afterwards
 npx playwright test && npx playwright show-report
