@@ -553,7 +553,7 @@ export function AssetEditSheet({
       setActiveTab(defaultTab);
       setSymbolValidations({});
     }
-  }, [open, defaultTab]);
+  }, [open, defaultTab, asset?.id]);
 
   const handleSave = useCallback(
     async (values: AssetFormValues) => {
