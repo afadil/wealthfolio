@@ -35,9 +35,14 @@ pub struct HealthIssueDto {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetHealthStatusOutput {
+    /// One of the `Severity` values (INFO | WARNING | ERROR | CRITICAL) or the
+    /// synthetic string `"NOT_COMPUTED"` when no cached status exists. Not a
+    /// real `Severity` variant — do not deserialize back into the enum.
     pub overall_severity: String,
     pub issues: Vec<HealthIssueDto>,
-    pub total_count: usize,
+    pub is_stale: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
 }
 
 // ============================================================================
@@ -73,7 +78,18 @@ impl<E: AiEnvironment + 'static> Tool for GetHealthStatusTool<E> {
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
             name: Self::NAME.to_string(),
-            description: "Get the current health status of the portfolio data. Returns detected issues (missing prices, stale FX rates, negative balances, unclassified assets, etc.) with severity levels and details. Use this to help the user diagnose and fix data problems.".to_string(),
+            description: "Read the cached portfolio health status produced by the Health Center. \
+                `overallSeverity` is one of INFO | WARNING | ERROR | CRITICAL, or NOT_COMPUTED when \
+                no check has run yet in this session (in that case `issues` is empty and `note` \
+                tells the user how to populate it). \
+                Each issue has `severity` (same scale), `category` (PRICE_STALENESS | FX_INTEGRITY | \
+                CLASSIFICATION | DATA_CONSISTENCY | ACCOUNT_CONFIGURATION | SETTINGS_CONFIGURATION), \
+                `title`, `message`, `affectedCount`, optional `affectedMvPct` (share of portfolio \
+                market value impacted, as a fraction 0.0-1.0), and optional `details`. \
+                `isStale` is true when the cache is older than 5 minutes. \
+                Use this to diagnose data problems (missing prices, stale FX rates, negative \
+                balances, unclassified assets) and guide the user to fixes in the Health Center."
+                .to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {},
@@ -83,21 +99,26 @@ impl<E: AiEnvironment + 'static> Tool for GetHealthStatusTool<E> {
     }
 
     async fn call(&self, _args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let health_service = self.env.health_service();
-
-        let status = health_service.get_cached_status().await.ok_or_else(|| {
-            AiError::ToolExecutionFailed(
-                "Health status not available yet. Please open the Health Center to run a check first.".to_string(),
-            )
-        })?;
+        let Some(status) = self.env.health_service().get_cached_status().await else {
+            return Ok(GetHealthStatusOutput {
+                overall_severity: "NOT_COMPUTED".to_string(),
+                issues: Vec::new(),
+                is_stale: false,
+                note: Some(
+                    "No health check has run yet in this session. Ask the user to open \
+                     the Health Center to run a check."
+                        .to_string(),
+                ),
+            });
+        };
 
         let issues = status
             .issues
             .iter()
             .map(|issue| HealthIssueDto {
                 id: issue.id.clone(),
-                severity: issue.severity.to_string(),
-                category: issue.category.to_string(),
+                severity: issue.severity.as_str().to_string(),
+                category: issue.category.as_str().to_string(),
                 title: issue.title.clone(),
                 message: issue.message.clone(),
                 affected_count: issue.affected_count,
@@ -106,12 +127,11 @@ impl<E: AiEnvironment + 'static> Tool for GetHealthStatusTool<E> {
             })
             .collect::<Vec<_>>();
 
-        let total_count = issues.len();
-
         Ok(GetHealthStatusOutput {
-            overall_severity: status.overall_severity.to_string(),
+            overall_severity: status.overall_severity.as_str().to_string(),
             issues,
-            total_count,
+            is_stale: status.is_stale,
+            note: None,
         })
     }
 }
@@ -122,17 +142,39 @@ mod tests {
     use crate::env::test_env::{MockEnvironment, MockHealthService};
     use wealthfolio_core::health::{HealthCategory, HealthIssue, HealthStatus, Severity};
 
-    #[tokio::test]
-    async fn test_get_health_status_no_cache() {
-        let env = Arc::new(MockEnvironment::new());
-        let tool = GetHealthStatusTool::new(env);
+    fn env_with_status(status: Option<HealthStatus>) -> MockEnvironment {
+        let mut env = MockEnvironment::new();
+        env.health_service = Arc::new(MockHealthService {
+            cached_status: status,
+        });
+        env
+    }
 
-        let result = tool.call(GetHealthStatusArgs {}).await;
-        assert!(result.is_err());
+    fn make_issue(id: &str, severity: Severity, category: HealthCategory) -> HealthIssue {
+        HealthIssue::builder()
+            .id(id)
+            .severity(severity)
+            .category(category)
+            .title("t")
+            .message("m")
+            .data_hash("h")
+            .build()
     }
 
     #[tokio::test]
-    async fn test_get_health_status_with_issues() {
+    async fn no_cache_returns_not_computed_payload() {
+        let tool = GetHealthStatusTool::new(Arc::new(env_with_status(None)));
+
+        let out = tool.call(GetHealthStatusArgs {}).await.unwrap();
+
+        assert_eq!(out.overall_severity, "NOT_COMPUTED");
+        assert!(out.issues.is_empty());
+        assert!(!out.is_stale);
+        assert!(out.note.is_some());
+    }
+
+    #[tokio::test]
+    async fn single_issue_maps_fields_and_formats() {
         let issue = HealthIssue::builder()
             .id("price_stale:AAPL")
             .severity(Severity::Warning)
@@ -146,25 +188,38 @@ mod tests {
             .build();
 
         let status = HealthStatus::from_issues(vec![issue]);
-        let health_svc = MockHealthService {
-            cached_status: Some(status),
-        };
+        let tool = GetHealthStatusTool::new(Arc::new(env_with_status(Some(status))));
 
-        let mut env = MockEnvironment::new();
-        env.health_service = Arc::new(health_svc);
+        let out = tool.call(GetHealthStatusArgs {}).await.unwrap();
 
-        let tool = GetHealthStatusTool::new(Arc::new(env));
-        let result = tool.call(GetHealthStatusArgs {}).await.unwrap();
-
-        assert_eq!(result.total_count, 1);
-        assert_eq!(result.overall_severity, "WARNING");
-        let dto = &result.issues[0];
+        assert_eq!(out.overall_severity, "WARNING");
+        assert_eq!(out.issues.len(), 1);
+        let dto = &out.issues[0];
         assert_eq!(dto.id, "price_stale:AAPL");
         assert_eq!(dto.severity, "WARNING");
-        assert_eq!(dto.category, "Price Updates");
+        assert_eq!(dto.category, "PRICE_STALENESS");
         assert_eq!(dto.title, "Outdated prices");
         assert_eq!(dto.affected_count, 1);
         assert_eq!(dto.affected_mv_pct, Some(0.05));
         assert_eq!(dto.details.as_deref(), Some("Last updated 10 days ago."));
+    }
+
+    #[tokio::test]
+    async fn overall_severity_rolls_up_to_highest() {
+        let status = HealthStatus::from_issues(vec![
+            make_issue("info:x", Severity::Info, HealthCategory::Classification),
+            make_issue("warn:y", Severity::Warning, HealthCategory::FxIntegrity),
+            make_issue(
+                "crit:z",
+                Severity::Critical,
+                HealthCategory::DataConsistency,
+            ),
+        ]);
+        let tool = GetHealthStatusTool::new(Arc::new(env_with_status(Some(status))));
+
+        let out = tool.call(GetHealthStatusArgs {}).await.unwrap();
+
+        assert_eq!(out.overall_severity, "CRITICAL");
+        assert_eq!(out.issues.len(), 3);
     }
 }
